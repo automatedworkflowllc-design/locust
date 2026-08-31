@@ -4,6 +4,10 @@ A local-first, open-source platform for autonomous AI teammates with explicit mo
 
 The working product name is intentionally generic until naming is settled.
 
+![Teammate control-room prototype](docs/assets/control-room.png)
+
+The screenshot uses sample mission data; the local runtime readiness panel is live.
+
 ## Why this exists
 
 Current autonomous-agent products often hide the runtime, model, provider, permissions, and failure state behind one opaque “agent.” This project separates them and makes every important decision inspectable.

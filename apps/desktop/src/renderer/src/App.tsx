@@ -115,7 +115,7 @@ function WindowBar(): ReactNode {
         <div className="brand-mark"><Icon name="spark" size={14} /></div>
         <span>Teammate</span>
         <span className="window-separator">/</span>
-        <span className="workspace-name">Colin&apos;s workspace</span>
+        <span className="workspace-name">Local workspace</span>
         <span className="prototype-badge">Prototype · sample data</span>
       </div>
       <div className="window-center">
@@ -235,7 +235,7 @@ function Sidebar({ activeId, onSelect, runtimeState }: { activeId: number; onSel
 
       <div className="sidebar-footer">
         <RuntimeDiscoveryCard state={runtimeState} />
-        <button type="button" className="profile-button" disabled title="Workspace settings are coming next"><span className="profile-avatar">CB</span><span>Colin</span><Icon name="settings" size={15} /></button>
+        <button type="button" className="profile-button" disabled title="Workspace settings are coming next"><span className="profile-avatar">LU</span><span>Local user</span><Icon name="settings" size={15} /></button>
       </div>
     </aside>
   )
