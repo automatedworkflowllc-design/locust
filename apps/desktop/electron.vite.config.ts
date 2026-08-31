@@ -4,7 +4,9 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@teammate/runtime-adapters'] })]
+    plugins: [externalizeDepsPlugin({
+      exclude: ['@teammate/runtime-adapters', '@teammate/mission-store']
+    })]
   },
   preload: {
     plugins: [externalizeDepsPlugin()],

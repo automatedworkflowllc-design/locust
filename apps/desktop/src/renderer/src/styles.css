@@ -521,6 +521,10 @@ kbd {
   color: #6b717a;
 }
 
+.mission-status.stopped {
+  color: var(--amber);
+}
+
 .mission-status.complete {
   color: #6eaa81;
 }
@@ -2127,7 +2131,8 @@ kbd {
 }
 
 .live-label.completed,
-.live-label.cancelled {
+.live-label.cancelled,
+.live-label.interrupted {
   color: #9da799;
   background: rgba(135, 151, 129, 0.08);
   border-color: rgba(135, 151, 129, 0.16);
@@ -2140,7 +2145,9 @@ kbd {
 }
 
 .live-label.failed span,
-.running-elapsed.failed > span {
+.running-elapsed.failed > span,
+.live-label.interrupted span,
+.running-elapsed.interrupted > span {
   background: #de756b;
   animation: none;
 }
@@ -2237,6 +2244,40 @@ kbd {
 
 .live-error strong {
   color: #e4a29b;
+}
+
+.live-recovery {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 2px;
+  padding: 10px 11px;
+  color: #9fb889;
+  font-size: 9px;
+  line-height: 1.45;
+  background: rgba(28, 40, 23, 0.58);
+  border: 1px solid #314229;
+  border-radius: 7px;
+}
+
+.live-recovery > span {
+  display: grid;
+  gap: 2px;
+}
+
+.live-recovery strong {
+  color: #c9ed8d;
+  font-size: 9px;
+}
+
+.live-recovery.warning {
+  color: #caa86e;
+  background: #1a1711;
+  border-color: #3b321f;
+}
+
+.live-recovery.warning strong {
+  color: #e0c389;
 }
 
 .live-response {

@@ -20,6 +20,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@teammate/mission-store':
+        specifier: workspace:*
+        version: link:../../packages/mission-store
       '@teammate/runtime-adapters':
         specifier: workspace:*
         version: link:../../packages/runtime-adapters
@@ -53,6 +56,12 @@ importers:
         version: 7.3.6(@types/node@24.13.3)(lightningcss@1.33.0)
 
   packages/contracts: {}
+
+  packages/mission-store:
+    dependencies:
+      '@teammate/runtime-adapters':
+        specifier: workspace:*
+        version: link:../runtime-adapters
 
   packages/runtime-adapters: {}
 

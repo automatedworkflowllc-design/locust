@@ -2,6 +2,7 @@ import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useSta
 import type {
   CodexMissionStartData,
   CodexMissionUpdate,
+  PublicRecoveredMission,
   PublicRuntimeStatus,
   RuntimeProbeStatus
 } from '../../shared/ipc.js'
@@ -73,7 +74,7 @@ function Icon({ name, size = 16 }: { name: IconName; size?: number }): ReactNode
   )
 }
 
-type MissionStatus = 'running' | 'approval' | 'queued' | 'complete'
+type MissionStatus = 'running' | 'approval' | 'queued' | 'stopped' | 'complete'
 
 interface Mission {
   id: number
@@ -110,7 +111,7 @@ const routes: RouteOption[] = [
 ]
 
 type CodexRuntimeEvent = Extract<CodexMissionUpdate, { readonly kind: 'event' }>['event']
-type LiveRunPhase = 'starting' | 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled'
+type LiveRunPhase = 'starting' | 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
 
 interface LiveRunState {
   readonly prompt: string
@@ -118,6 +119,10 @@ interface LiveRunState {
   readonly phase: LiveRunPhase
   readonly events: readonly CodexRuntimeEvent[]
   readonly error?: string
+  readonly restored?: boolean
+  readonly eventCount?: number
+  readonly eventsTruncated?: boolean
+  readonly integrityIssueCount?: number
 }
 
 function liveRunIsActive(run: LiveRunState | undefined): boolean {
@@ -125,25 +130,33 @@ function liveRunIsActive(run: LiveRunState | undefined): boolean {
 }
 
 function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): LiveRunState {
-  if (update.kind === 'transport-error') {
-    return { ...run, phase: 'failed', error: update.error.message }
+  // Any update for this runId proves the host still owns the run: a receipt
+  // restored from the ledger stops being "restored" and becomes live again,
+  // so the stop control and live status reflect the real process.
+  let live: LiveRunState = run
+  if (run.restored === true) {
+    const { error: _staleError, ...rest } = run
+    live = { ...rest, restored: false, phase: 'running' }
+  }
+  if (update.kind === 'transport-error' || update.kind === 'persistence-error') {
+    return { ...live, phase: 'failed', error: update.error.message }
   }
 
-  const events = [...run.events, update.event].slice(-500)
-  if (update.event.type === 'run.completed') return { ...run, events, phase: 'completed' }
-  if (update.event.type === 'run.cancelled') return { ...run, events, phase: 'cancelled' }
+  const events = [...live.events, update.event].slice(-500)
+  if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
+  if (update.event.type === 'run.cancelled') return { ...live, events, phase: 'cancelled' }
   if (update.event.type === 'run.failed') {
-    return { ...run, events, phase: 'failed', error: update.event.payload.message }
+    return { ...live, events, phase: 'failed', error: update.event.payload.message }
   }
-  return { ...run, events, phase: run.phase === 'starting' ? 'running' : run.phase }
+  return { ...live, events, phase: live.phase === 'starting' ? 'running' : live.phase }
 }
 
 function missionForLiveRun(run: LiveRunState): Mission {
   const shortPrompt = run.prompt.length > 42 ? `${run.prompt.slice(0, 42).trimEnd()}…` : run.prompt
   const status: MissionStatus = run.phase === 'completed'
     ? 'complete'
-    : run.phase === 'failed' || run.phase === 'cancelled'
-      ? 'queued'
+    : run.phase === 'failed' || run.phase === 'cancelled' || run.phase === 'interrupted'
+      ? 'stopped'
       : 'running'
   return {
     id: 1,
@@ -151,8 +164,33 @@ function missionForLiveRun(run: LiveRunState): Mission {
     teammate: 'Codex · Read-only',
     teammateInitials: 'CX',
     status,
-    time: run.phase === 'completed' ? 'Done' : run.phase === 'failed' ? 'Failed' : run.phase === 'cancelled' ? 'Stopped' : 'Live',
+    time: run.phase === 'completed' ? 'Done' : run.phase === 'failed' ? 'Failed' : run.phase === 'cancelled' ? 'Stopped' : run.phase === 'interrupted' ? 'Interrupted' : 'Live',
     accent: '#c2f66f'
+  }
+}
+
+function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
+  const terminalError = mission.events.filter((event) => event.type === 'run.failed').at(-1)
+  const error = mission.hostFailureMessage
+    ?? (terminalError?.type === 'run.failed' ? terminalError.payload.message : undefined)
+    ?? (mission.phase === 'interrupted' ? 'This run has no terminal receipt and was recovered as interrupted.' : undefined)
+  return {
+    prompt: mission.prompt,
+    data: {
+      runId: mission.runId,
+      missionId: mission.missionId,
+      runtime: mission.runtime,
+      model: mission.model,
+      resolvedRouteId: mission.resolvedRouteId,
+      cliVersion: mission.cliVersion
+    },
+    phase: mission.phase,
+    events: mission.events,
+    ...(error === undefined ? {} : { error }),
+    restored: true,
+    eventCount: mission.eventCount,
+    eventsTruncated: mission.eventsTruncated,
+    integrityIssueCount: mission.integrityIssueCount
   }
 }
 
@@ -189,6 +227,7 @@ function StatusDot({ status }: { status: MissionStatus }): ReactNode {
   if (status === 'running') return <span className="mission-status running" aria-label="Running"><span /></span>
   if (status === 'approval') return <span className="mission-status approval" aria-label="Needs approval"><Icon name="shield" size={10} /></span>
   if (status === 'queued') return <span className="mission-status queued" aria-label="Queued"><Icon name="clock" size={10} /></span>
+  if (status === 'stopped') return <span className="mission-status stopped" aria-label="Stopped"><Icon name="close" size={10} /></span>
   return <span className="mission-status complete" aria-label="Complete"><Icon name="check" size={10} /></span>
 }
 
@@ -331,6 +370,8 @@ function MissionHeader({ mission, route, onRouteClick, liveRun, onCancel }: {
         ? 'Failed'
         : liveRun.phase === 'cancelled'
           ? 'Stopped'
+          : liveRun.phase === 'interrupted'
+            ? 'Interrupted'
           : liveRun.phase === 'cancelling'
             ? 'Stopping'
             : 'Live'
@@ -340,7 +381,11 @@ function MissionHeader({ mission, route, onRouteClick, liveRun, onCancel }: {
       <div className="mission-heading-row">
         <div>
           <div className="title-with-state"><h1>{liveRun === undefined ? mission.title : 'Local Codex mission'}</h1><span className={`live-label ${liveRun === undefined ? '' : liveRun.phase}`}><span /> {stateLabel}</span></div>
-          <p>{liveRun === undefined ? 'Example run: Maya is researching, drafting, and preparing the next safe action.' : 'A real Codex CLI run in the host-selected workspace with the read-only sandbox enforced.'}</p>
+          <p>{liveRun === undefined
+            ? 'Example run: Maya is researching, drafting, and preparing the next safe action.'
+            : liveRun.restored
+              ? 'A durable local Codex receipt recovered from the append-only mission ledger.'
+              : 'A real Codex CLI run in the host-selected workspace with the read-only sandbox enforced.'}</p>
         </div>
         <div className="mission-actions">
           <RoutePill route={route} onClick={onRouteClick} disabled={active} />
@@ -349,7 +394,7 @@ function MissionHeader({ mission, route, onRouteClick, liveRun, onCancel }: {
         </div>
       </div>
       <nav className="mission-tabs" aria-label="Mission sections" role="tablist">
-        <button type="button" className="active" role="tab" aria-selected="true"><Icon name="activity" size={14} />Activity <span>{liveRun?.events.length ?? 8}</span></button>
+        <button type="button" className="active" role="tab" aria-selected="true"><Icon name="activity" size={14} />Activity <span>{liveRun?.eventCount ?? liveRun?.events.length ?? 8}</span></button>
         <button type="button" role="tab" aria-selected="false" disabled title="Artifact view is coming next"><Icon name="file" size={14} />Artifacts <span>4</span></button>
         <button type="button" role="tab" aria-selected="false" disabled title="Context view is coming next"><Icon name="message" size={14} />Context</button>
       </nav>
@@ -464,11 +509,25 @@ function LiveSignalRail({ run }: { run: LiveRunState }): ReactNode {
           ? 'Completed'
           : run.phase === 'cancelled'
             ? 'Stopped'
-            : 'Needs attention'
+            : run.phase === 'interrupted'
+              ? 'Interrupted'
+              : 'Needs attention'
 
   return (
     <section className="signal-rail live-signal-rail">
-      <div className="section-kicker"><span>Signal rail · live Codex run</span><span className={`running-elapsed ${run.phase}`}><span /> {statusLabel}</span></div>
+      <div className="section-kicker"><span>Signal rail · {run.restored ? 'restored local receipt' : 'live Codex run'}</span><span className={`running-elapsed ${run.phase}`}><span /> {statusLabel}</span></div>
+      {run.restored && (
+        <div className={`live-recovery ${(run.integrityIssueCount ?? 0) > 0 ? 'warning' : ''}`} role="status">
+          <Icon name={(run.integrityIssueCount ?? 0) > 0 ? 'shield' : 'check'} size={14} />
+          <span>
+            <strong>Durable local receipt</strong>
+            {run.eventsTruncated
+              ? `Showing the first and latest ${run.events.length.toLocaleString()} of ${(run.eventCount ?? run.events.length).toLocaleString()} events.`
+              : `Recovered ${(run.eventCount ?? run.events.length).toLocaleString()} normalized events after restart.`}
+            {(run.integrityIssueCount ?? 0) > 0 && ` ${run.integrityIssueCount} ledger integrity issue${run.integrityIssueCount === 1 ? '' : 's'} were isolated.`}
+          </span>
+        </div>
+      )}
 
       <TimelineItem state={started === undefined ? 'active' : 'done'} icon="terminal" title={started === undefined ? 'Starting Codex safely' : 'Connected to Codex'} time={eventTime(started)}>
         <p>{started === undefined ? 'Verifying the installed CLI and opening a bounded JSONL transport.' : `Codex CLI ${run.data?.cliVersion ?? 'version unavailable'} · account default · read-only sandbox`}</p>
@@ -498,7 +557,7 @@ function LiveSignalRail({ run }: { run: LiveRunState }): ReactNode {
       </TimelineItem>
 
       <TimelineItem state={terminal === undefined ? 'waiting' : terminal.type === 'run.completed' ? 'done' : 'active'} icon={terminal?.type === 'run.completed' ? 'check' : terminal?.type === 'run.cancelled' ? 'pause' : 'shield'} title={terminal === undefined ? 'Finalize run receipt' : terminal.type === 'run.completed' ? 'Mission completed' : terminal.type === 'run.cancelled' ? 'Mission stopped' : 'Codex invocation ended'} time={eventTime(terminal)} last>
-        {terminal?.type === 'run.completed' && <p>The provider terminal event and clean host-process exit agreed. This receipt is safe to persist next.</p>}
+        {terminal?.type === 'run.completed' && <p>The provider terminal event and clean host-process exit agreed. This receipt was durably written before it appeared here.</p>}
         {terminal?.type === 'run.cancelled' && <p>The host requested cancellation and waited for process termination confirmation.</p>}
         {terminal?.type === 'run.failed' && <div className="live-error"><strong>{terminal.payload.kind}</strong><span>{terminal.payload.message}</span></div>}
         {terminal === undefined && run.error !== undefined && <div className="live-error"><strong>Runtime error</strong><span>{run.error}</span></div>}
@@ -544,19 +603,24 @@ function ApprovalCard({ status, onChange }: { status: 'pending' | 'approved' | '
 
 function LiveSafetyCard({ run }: { run: LiveRunState }): ReactNode {
   const limit = run.events.some((event) => event.type === 'route.limit_detected')
+  const restored = run.restored === true
   return (
     <section className={`approval-card live-safety-card ${limit ? 'limit' : ''}`}>
       <div className="approval-card-top">
         <span className="approval-shield"><Icon name={limit ? 'route' : 'shield'} size={16} /></span>
-        <span>{limit ? 'Route handoff required' : 'Live guardrails'}</span>
-        <span className="risk-badge">Read only</span>
+        <span>{limit ? 'Route handoff required' : restored ? 'Mission history' : 'Live guardrails'}</span>
+        <span className="risk-badge">{restored ? 'Local receipt' : 'Read only'}</span>
       </div>
-      <h3>{limit ? 'Codex reached a provider limit' : 'External writes are disabled'}</h3>
-      <p>{limit ? 'This invocation will close cleanly. Automatic fallback waits for the durable-checkpoint milestone.' : 'The host fixed the workspace, executable, argv, and sandbox. The renderer supplied only the prompt.'}</p>
+      <h3>{limit ? 'Codex reached a provider limit' : restored ? 'Recovered from the local ledger' : 'External writes are disabled'}</h3>
+      <p>{limit
+        ? 'This invocation will close cleanly. Automatic fallback waits for the durable-checkpoint milestone.'
+        : restored
+          ? 'The append-only receipt survived restart. Incomplete runs are marked interrupted instead of being presented as successful.'
+          : 'The host fixed the workspace, executable, argv, and sandbox. The renderer supplied only the prompt.'}</p>
       <div className="approval-receipt">
         <div><span>Runtime</span><strong>Codex CLI</strong></div>
-        <div><span>Model</span><strong>Account default</strong></div>
-        <div><span>Sandbox</span><strong>Read only</strong></div>
+        <div><span>{restored ? 'Events' : 'Model'}</span><strong>{restored ? (run.eventCount ?? run.events.length).toLocaleString() : 'Account default'}</strong></div>
+        <div><span>{restored ? 'State' : 'Sandbox'}</span><strong>{restored ? run.phase : 'Read only'}</strong></div>
       </div>
     </section>
   )
@@ -782,6 +846,22 @@ export default function App(): ReactNode {
       })
       .catch(() => {
         if (active) setRuntimeState({ phase: 'error' })
+      })
+
+    void bridge.getMissionHistory()
+      .then((response) => {
+        if (!active || !response.ok) return
+        const latest = response.data.missions[0]
+        if (latest === undefined) return
+        setLiveRun((current) => {
+          if (current !== undefined) return current
+          const queued = pendingUpdatesRef.current.get(latest.runId) ?? []
+          pendingUpdatesRef.current.delete(latest.runId)
+          return queued.reduce(applyMissionUpdate, restoredLiveRun(latest))
+        })
+      })
+      .catch(() => {
+        // History recovery is optional at startup; live runtime discovery remains usable.
       })
 
     return () => {

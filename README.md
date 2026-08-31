@@ -33,7 +33,9 @@ The repository contains a runnable Electron/React control room. Its interactive 
 
 Shared packages define the runtime/routing contracts, implement capability-aware fallback and the safe-handoff state machine, and generate conservative non-interactive Codex/Claude command specifications. Probe and Codex mission-process transports are shell-free, prompt-on-stdin, time/output-bounded, cancellation-aware, and covered by fake-runner tests. The Codex adapter also has a typed, privacy-aware JSONL normalizer that converts provider records into product-owned mission events, redacts bounded diagnostic evidence, and does not persist reasoning content.
 
-Users can now start one real Codex mission from the command dock. The renderer supplies only a bounded prompt; the trusted main process fixes the executable, workspace, account-default route, and `read-only` sandbox, streams sanitized normalized events into the Signal Rail, and exposes host-correlated cancellation. The other listed missions, app connections, Claude/OmniRoute execution, automatic fallback, and external tools remain demonstrations or future work. Durable local mission storage is next.
+Users can now start one real Codex mission from the command dock. The renderer supplies only a bounded prompt; the trusted main process fixes the executable, workspace, account-default route, and `read-only` sandbox, streams sanitized normalized events into the Signal Rail, and exposes host-correlated cancellation.
+
+Missions are durable: a versioned, append-only local ledger (`packages/mission-store`) persists mission metadata, every normalized event, and host failures before the UI shows them, and restores completed, failed, cancelled, and interrupted runs after a restart with truthful integrity reporting. The renderer holds no permissions and, in packaged builds, no network egress. The other listed missions, app connections, Claude/OmniRoute execution, automatic fallback, and external tools remain demonstrations or future work — `docs/ROADMAP.md` lays out the path.
 
 ## Run locally
 
@@ -53,7 +55,7 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the complete test suite. The 2026-08-31 live-mission milestone passes all checks with 43/43 tests.
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite. The 2026-08-31 durable-ledger milestone passes all checks with 63/63 tests.
 
 ## Working from another Codex task
 

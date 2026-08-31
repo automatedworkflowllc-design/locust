@@ -3,6 +3,7 @@ import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
   CODEX_MISSION_UPDATE_CHANNEL,
+  MISSION_HISTORY_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL
 } from '../shared/ipc.js'
 import type {
@@ -12,6 +13,7 @@ import type {
   CodexMissionStartResponse,
   CodexMissionUpdate,
   DesktopApi,
+  MissionHistoryResponse,
   RuntimeDiscoveryResponse
 } from '../shared/ipc.js'
 
@@ -23,6 +25,8 @@ export type {
   CodexMissionUpdate,
   DesktopApi,
   LocalRuntimeId,
+  MissionHistoryResponse,
+  PublicRecoveredMission,
   PublicRuntimeStatus,
   RuntimeAuthState,
   RuntimeDiscoveryResponse,
@@ -35,6 +39,7 @@ const desktopApi: DesktopApi = {
   toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   close: () => ipcRenderer.send('window:close'),
   getLocalRuntimes: () => ipcRenderer.invoke(RUNTIME_DISCOVERY_CHANNEL) as Promise<RuntimeDiscoveryResponse>,
+  getMissionHistory: () => ipcRenderer.invoke(MISSION_HISTORY_CHANNEL) as Promise<MissionHistoryResponse>,
   startCodexMission: (request: CodexMissionStartRequest) =>
     ipcRenderer.invoke(CODEX_MISSION_START_CHANNEL, request) as Promise<CodexMissionStartResponse>,
   cancelCodexMission: (request: CodexMissionCancelRequest) =>

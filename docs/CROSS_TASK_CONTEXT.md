@@ -52,7 +52,7 @@ As of 2026-08-31, the Electron/React desktop control-room prototype is implement
 
 The desktop performs live, read-only Codex CLI, Claude Code, and OmniRoute discovery in the trusted main process and shows sanitized readiness/version status through preload IPC. It never reads credential stores. One real Codex path is wired end to end: a bounded renderer prompt crosses a narrow IPC surface, the main process owns the workspace/executable/fixed read-only argv, the controlled prompt-on-stdin transport streams through the privacy-aware normalizer, and the Signal Rail renders the resulting events with host-correlated cancellation. Reasoning content is excluded and only bounded redacted evidence crosses the bridge.
 
-The remaining mission fixtures, Claude/OmniRoute execution, automatic fallback, and connection/tool surfaces are not live. Mission/event state is still memory-only and does not survive a restart, so automatic route fallback remains deliberately disabled until an append-only ledger and reconciled checkpoint exist.
+The durable mission ledger is now live: `packages/mission-store` persists schema-versioned, append-only mission records with fsync, contiguity checks, tamper detection, and fail-closed recovery; the desktop persists before emitting, restores history after restart through a tested `mission-history` module, and hardens the renderer boundary (deny-all permissions, packaged-build network egress block, validated window-control IPC, latching dispose). The remaining mission fixtures, Claude/OmniRoute execution, automatic fallback, and connection/tool surfaces are not live. Automatic route fallback stays deliberately disabled until a reconciled checkpoint record exists.
 
 From the canonical workspace:
 
@@ -67,9 +67,9 @@ Run the complete validation suite with:
 pnpm check
 ```
 
-Last verified on 2026-08-31: the Electron production build and every workspace TypeScript check passed, with 43/43 tests passing across runtime adapters, runtime core, and desktop services. A real UI smoke run returned `LIVE_UI_OK` through Codex CLI 0.151.0-alpha.7.2 and rendered a clean completion receipt.
+Last verified on 2026-08-31 after the durable-ledger milestone: production build and all TypeScript checks passed with 63/63 tests, and the Electron app boots cleanly with the ledger wired in. The `LIVE_UI_OK` smoke from earlier that day ran on the pre-hardening build; re-run the live smoke when Codex quota allows.
 
-The next milestone is a durable local ledger/checkpoint: atomically persist product-owned mission metadata and normalized events, recover interrupted/completed runs after restart, then create a reconciled checkpoint before enabling Ask/Automatic fallback. Contract fixtures must remain authentication-free.
+The next milestone is the reconciled checkpoint record, then Claude runtime parity — see `docs/ROADMAP.md`, which also records the 2026-08-31 owner direction (Cursor x Grok Bot thesis, Claude obviously selectable, teammate workroom, simple avatar-first UI with model choice on the main surface). Contract fixtures must remain authentication-free.
 
 ## Important implementation invariants
 
@@ -158,6 +158,16 @@ Use this template:
 - Decisions made: the renderer controls only the prompt; model selection is account-default for this slice; exact provider allowance is shown as unavailable instead of guessed; `run.failed` closes an invocation, not automatically the parent mission.
 - Known issues: mission/event state is memory-only; current-run ownership is process-wide; live model enumeration, Claude/OmniRoute execution, fallback, and external tools are not implemented.
 - Recommended next step: add a versioned append-only local mission/event ledger and restart recovery, then persist a reconciled checkpoint before enabling fallback.
+
+### 2026-08-31 — durable mission ledger landed; adversarial review; roadmap
+
+- Scope/owner: Claude Code session taking over from the Codex task that hit its usage limit mid-milestone; full-repo review and completion of the in-flight durable-ledger work.
+- Files changed: `packages/mission-store` (completed and hardened, 9 tests), `apps/desktop/src/main/codex-mission.ts` (metadata completion, persistence-error ordering, interrupt/dispose split with a shutdown latch), `apps/desktop/src/main/index.ts` (permission handlers, packaged egress block, validated window-control IPC, `mission-history` extraction), new `apps/desktop/src/main/mission-history.ts` (+ tests), renderer `App.tsx` (restored-receipt/live-update reconciliation, queued-update drain, honest integrity attribution, stopped status), `docs/ROADMAP.md` (new), `PRODUCT.md`/`PROJECT.md`/`README.md`.
+- Outcome: `pnpm check` fully green with 63/63 tests (was failing typecheck at handover); an adversarial review (5 parallel reviewers, per-finding refutation; verification completed in-session where agent verifiers hit usage limits) produced 33 findings — 11 real defects fixed, 9 coverage gaps closed with 14 new tests, the rest recorded as the hardening backlog in `docs/ROADMAP.md` M1.
+- Validation: build, all typechecks, 63/63 tests; Electron boots cleanly with all changes. Not validated: a live post-hardening Codex mission (provider quota exhausted at the time).
+- Decisions made: owner direction 2026-08-31 recorded in PRODUCT.md and ROADMAP.md — the Cursor x Grok Bot thesis, Claude as an obviously selectable runtime (issue #3 elevated), teammate avatars + workroom communication (issue #4 filed), simple main surface with model choice visible and policy in settings.
+- Known issues: hardening backlog (write-side event validation parity, batched fsync, >500-ledger scan ordering, byte-capped history IPC, head-of-run preservation past 500 live events); live smoke pending quota.
+- Recommended next step: live UI smoke, then the reconciled checkpoint record, then the Claude adapter per ROADMAP M2.
 
 ## Prompt for a new Codex task
 

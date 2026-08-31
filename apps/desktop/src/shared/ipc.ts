@@ -4,6 +4,7 @@ export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
 export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
 export const CODEX_MISSION_CANCEL_CHANNEL = 'codex-mission:cancel'
 export const CODEX_MISSION_UPDATE_CHANNEL = 'codex-mission:update'
+export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 
 export type LocalRuntimeId = 'codex' | 'claude' | 'omniroute'
 export type RuntimeAuthState = 'authenticated' | 'unauthenticated' | 'unknown' | 'not-applicable'
@@ -40,6 +41,7 @@ export type CodexMissionErrorCode =
   | 'RUN_ALREADY_ACTIVE'
   | 'CODEX_UNAVAILABLE'
   | 'RUNTIME_START_FAILED'
+  | 'PERSISTENCE_FAILED'
   | 'RUN_NOT_ACTIVE'
   | 'INTERNAL_ERROR'
 
@@ -57,7 +59,7 @@ export interface CodexMissionStartData {
   readonly missionId: string
   readonly runtime: 'codex'
   readonly model: 'account-default'
-  readonly resolvedRouteId: 'codex-account:default'
+  readonly resolvedRouteId: string
   readonly cliVersion: string | null
 }
 
@@ -95,6 +97,50 @@ export type CodexMissionUpdate =
         readonly message: string
       }
     }
+  | {
+      readonly kind: 'persistence-error'
+      readonly runId: string
+      readonly missionId: string
+      readonly error: {
+        readonly code: 'MISSION_PERSISTENCE_FAILED'
+        readonly message: string
+      }
+    }
+
+export interface PublicRecoveredMission {
+  readonly missionId: string
+  readonly runId: string
+  readonly prompt: string
+  readonly runtime: 'codex'
+  readonly model: 'account-default'
+  readonly requestedRouteId: string
+  readonly resolvedRouteId: string
+  readonly cliVersion: string | null
+  readonly createdAt: string
+  readonly lastUpdatedAt: string
+  readonly phase: 'completed' | 'failed' | 'cancelled' | 'interrupted'
+  readonly events: readonly NormalizedRuntimeEvent[]
+  readonly eventCount: number
+  readonly eventsTruncated: boolean
+  readonly hostFailureMessage?: string
+  readonly integrityIssueCount: number
+}
+
+export type MissionHistoryResponse =
+  | {
+      readonly ok: true
+      readonly data: {
+        readonly missions: readonly PublicRecoveredMission[]
+        readonly issueCount: number
+      }
+    }
+  | {
+      readonly ok: false
+      readonly error: {
+        readonly code: 'HISTORY_UNAVAILABLE'
+        readonly message: string
+      }
+    }
 
 export interface DesktopApi {
   readonly platform: string
@@ -102,6 +148,7 @@ export interface DesktopApi {
   toggleMaximize(): void
   close(): void
   getLocalRuntimes(): Promise<RuntimeDiscoveryResponse>
+  getMissionHistory(): Promise<MissionHistoryResponse>
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>
   cancelCodexMission(request: CodexMissionCancelRequest): Promise<CodexMissionCancelResponse>
   onCodexMissionUpdate(listener: (update: CodexMissionUpdate) => void): () => void

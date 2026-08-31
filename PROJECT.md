@@ -34,7 +34,13 @@ The differentiator is not merely “more agents.” It is a trustworthy control 
 - Typed, privacy-aware Codex JSONL normalization into product-owned run, step, tool, message, diagnostic, and route-limit events, with bounded redacted evidence and reasoning content excluded.
 - Narrow main/preload IPC for one live Codex mission, with a bounded renderer prompt, host-owned workspace/executable/argv, normalized streaming Signal Rail, generic transport errors, one-run concurrency, and safe Stop behavior.
 
-One harmless read-only Codex mission is live end to end. The remaining mission fixtures, Claude/OmniRoute routes, automatic fallback, token-budget preview, and connection/tool surfaces are still demonstrations. Mission state is not yet durable across restarts, and the app does not invoke real external tools.
+- Versioned, append-only local mission ledger (`packages/mission-store`): strict revalidation on read, ledger/event sequence contiguity, fsync on append, exclusive create, byte-offset tamper detection, truncated-tail recovery, bounded sizes, and fail-closed behavior with cache invalidation after an uncertain write.
+- Live Codex missions persist their metadata, every normalized event, and host failures durably before the renderer sees them; a failed durable write aborts the run and surfaces a persistence error only after the process has terminated.
+- Mission history IPC and restart recovery: completed, failed, cancelled, and interrupted runs are restored with truthful phase, event-window, and per-mission integrity-issue reporting; a restored receipt that receives live updates becomes a live, cancellable run again.
+- Renderer hardening: deny-all permission handlers, no renderer network egress in packaged builds, and sender/frame validation on every IPC channel including window controls.
+- Service lifecycle: `interrupt()` for window close versus a latching `dispose()` for shutdown, so no mission can start after the final ledger flush.
+
+One harmless read-only Codex mission is live end to end and now survives restarts through the durable ledger. The remaining mission fixtures, Claude/OmniRoute routes, automatic fallback, token-budget preview, and connection/tool surfaces are still demonstrations, and the app does not invoke real external tools.
 
 ## Run and validate
 
@@ -51,18 +57,18 @@ In a separate run, validate the full workspace:
 pnpm check
 ```
 
-Last verified on 2026-08-31: the production build and every workspace TypeScript check passed, with 43/43 tests passing across runtime adapters, runtime core, and desktop services. A real UI smoke mission returned `LIVE_UI_OK` through Codex CLI 0.151.0-alpha.7.2 with a clean normalized receipt.
+Last verified on 2026-08-31 (after the durable-ledger milestone landed): the production build and every workspace TypeScript check passed, with 63/63 tests passing across runtime adapters, runtime core, the mission store, and desktop services, and the Electron app boots cleanly with the ledger wired in. A real UI smoke mission returned `LIVE_UI_OK` through Codex CLI 0.151.0-alpha.7.2 earlier the same day on the pre-hardening build; re-run the live smoke once Codex quota allows.
 
 ## Next implementation milestone
 
-Make the live local mission durable before enabling fallback:
+The durable ledger and restart recovery landed on 2026-08-31 (with an adversarial review and hardening pass). What remains, in order — see `docs/ROADMAP.md` for the full plan and the 2026-08-31 owner direction (Cursor x Grok Bot thesis, Claude as an obviously selectable runtime, teammate workroom, simple avatar-first UI):
 
-1. Persist missions, invocation receipts, and append-only normalized events locally with schema versioning and atomic ordering.
-2. Restore completed/interrupted runs after restart and surface a clear resumability state.
-3. Create a reconciled checkpoint before any provider fallback or route switch.
-4. Keep adapter fixtures covering partial output, malformed events, quota classification, provider drift, and cancellation as the boundary evolves.
-5. Apply the proven runner/event contract to Claude Code, then add the curated OmniRoute gateway adapter.
+1. Re-run the live UI smoke once Codex quota allows, confirming the post-hardening build end to end.
+2. Create a reconciled checkpoint record before any provider fallback or route switch (finishes issue #1).
+3. Apply the proven runner/event/ledger contract to Claude Code so both runtimes are selectable from the command dock (issue #3, elevated).
+4. Work through the recorded hardening backlog: write-side event validation parity with the reader, batched fsync, recency-aware ledger scans past 500 files, and byte-capped history responses.
+5. Then the curated OmniRoute gateway adapter and Ask/Automatic fallback from a reconciled checkpoint.
 
 Public roadmap: [live Codex mission](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/2), [durable mission ledger](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/1), and [Claude/OmniRoute adapters](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/3).
 
-Definition of done: a user can start a harmless local Codex mission from the desktop UI, observe normalized events, cancel safely, restart the app, and inspect the durable run receipt. Claude and OmniRoute adapters follow the same proven boundary.
+Definition of done for issue #1: a user can start a harmless local Codex mission from the desktop UI, observe normalized events, cancel safely, restart the app, and inspect the durable run receipt — implemented; awaiting one live post-hardening smoke plus the checkpoint record. Claude and OmniRoute adapters follow the same proven boundary.

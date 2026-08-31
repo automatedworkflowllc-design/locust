@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "types": ["node"]
+  },
+  "references": [{ "path": "../runtime-adapters" }],
+  "include": ["src/**/*.ts"]
+}
