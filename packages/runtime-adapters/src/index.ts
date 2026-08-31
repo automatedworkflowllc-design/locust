@@ -8,6 +8,7 @@ export {
   OMNIROUTE_REQUIRED_FEATURES,
 } from "./commands.js";
 export { discoverInstalledRuntimes } from "./discovery.js";
+export { createCodexEventNormalizer } from "./codex-events.js";
 export { createNodeProbeRunner } from "./node-runner.js";
 export { createPathExecutableLocator } from "./path-locator.js";
 export {
@@ -18,6 +19,17 @@ export { parseRuntimeVersion } from "./version.js";
 export type {
   RuntimeCommandOptions,
 } from "./commands.js";
+export type {
+  CodexEventEvidence,
+  CodexEventNormalizer,
+  CodexInvocationContext,
+  CodexLimitKind,
+  CodexRunFailureKind,
+  NormalizedRuntimeEvent,
+  NormalizedRuntimeEventType,
+  NormalizedRuntimePayloadMap,
+  RedactedJsonValue,
+} from "./codex-events.js";
 export type {
   DiscoverInstalledRuntimesOptions,
 } from "./discovery.js";

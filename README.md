@@ -24,16 +24,16 @@ Mission control plane
 - `apps/desktop` — Electron + React desktop control room.
 - `packages/contracts` — shared runtime, routing, checkpoint, and event contracts.
 - `packages/runtime-core` — provider-neutral routing and safe-handoff logic.
-- `packages/runtime-adapters` — safe installed-CLI discovery and launch specifications.
+- `packages/runtime-adapters` — safe installed-CLI discovery, launch/process transport, and provider event normalization.
 - `docs` — product, architecture, model-routing, Codex wire contract, and cross-task context.
 
 ## What works now
 
 The repository contains a runnable Electron/React control-room prototype. Its interactive UI includes mission filtering, the Signal Rail execution timeline, an approval receipt, command dock, runtime/model picker, and visible fallback chain. It now performs real, read-only discovery of installed Codex CLI, Claude Code, and optional OmniRoute, displaying version and authentication readiness without reading credential files.
 
-Shared packages define the runtime/routing contracts, implement capability-aware fallback and the safe-handoff state machine, and generate conservative non-interactive Codex/Claude command specifications. Probe and mission-process transports are shell-free, prompt-on-stdin, time/output-bounded, cancellation-aware, and covered entirely by fake-runner tests.
+Shared packages define the runtime/routing contracts, implement capability-aware fallback and the safe-handoff state machine, and generate conservative non-interactive Codex/Claude command specifications. Probe and Codex mission-process transports are shell-free, prompt-on-stdin, time/output-bounded, cancellation-aware, and covered by fake-runner tests. The Codex adapter also has a typed, privacy-aware JSONL normalizer that converts provider records into product-owned mission events, redacts bounded diagnostic evidence, and does not persist reasoning content.
 
-The current mission data and activity are demonstrations. Runtime discovery is live, but Codex/Claude mission execution, durable mission storage, and real app tools are the next implementation layer; the UI does not yet perform autonomous work.
+The current mission data and activity are demonstrations. Runtime discovery is live, and the controlled Codex transport/normalizer exists behind the adapter boundary, but it is not yet wired into the Electron mission flow. The next milestone is one harmless, read-only Codex mission streamed into the control room with safe cancellation; durable mission storage and real app tools follow.
 
 ## Run locally
 
@@ -53,7 +53,7 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the test suite. The baseline was last verified on 2026-08-31 with all checks passing and 27 tests passing.
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite. The 2026-08-31 normalizer milestone passes all checks with 37/37 tests.
 
 ## Working from another Codex task
 

@@ -50,6 +50,8 @@ Cancellation does not imply that in-flight side effects were undone. The control
 
 Observed usage-limit failures can appear twice: a message-only top-level `error`, followed by a message-only `turn.failed`. The normalizer emits a single `route.limit_detected` event and retains both raw records as bounded evidence.
 
+After host/process reconciliation, `run.failed` closes that specific runtime invocation. It does not automatically fail the parent mission: the control plane freezes new work, reconciles tool state, persists a checkpoint, and applies the user's Off, Ask, or Automatic fallback policy before deciding the mission's terminal state.
+
 Classification order:
 
 1. a future structured runtime code, when present;

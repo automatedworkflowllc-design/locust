@@ -1,0 +1,914 @@
+import type {
+  RuntimeJsonlRecord,
+  RuntimeProcessCompletion,
+} from "./process-runner.js";
+
+/** JSON that is safe to place in the product event ledger after redaction. */
+export type RedactedJsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly RedactedJsonValue[]
+  | { readonly [key: string]: RedactedJsonValue };
+
+export type NormalizedRuntimeEventType =
+  | "run.started"
+  | "plan.updated"
+  | "message.delta"
+  | "step.started"
+  | "step.completed"
+  | "step.failed"
+  | "tool.started"
+  | "tool.completed"
+  | "tool.failed"
+  | "route.limit_detected"
+  | "run.cancelled"
+  | "run.failed"
+  | "run.completed"
+  | "adapter.diagnostic";
+
+export type CodexLimitKind = "quota-exhausted" | "temporary-rate-limit";
+
+export type CodexRunFailureKind =
+  | CodexLimitKind
+  | "authentication-failed"
+  | "safety-blocked"
+  | "process-failed"
+  | "protocol-mismatch"
+  | "unknown";
+
+export interface CodexInvocationContext {
+  /** Product-owned run identifier. Never use the Codex thread ID in its place. */
+  readonly runId: string;
+  readonly missionId?: string;
+  readonly requestedRouteId?: string;
+  readonly resolvedRouteId?: string;
+  /** Discovered executable version captured as invocation provenance when available. */
+  readonly cliVersion?: string;
+  /** Test seam and host clock. Provider events do not include timestamps. */
+  readonly now?: () => Date;
+}
+
+export interface CodexEventEvidence {
+  readonly transportSequence?: number;
+  readonly runtimeEventType?: string;
+  /** Parsed and recursively redacted provider evidence, or a redacted malformed line. */
+  readonly raw?: RedactedJsonValue;
+  readonly redacted: boolean;
+}
+
+interface RunStartedPayload {
+  readonly runtimeThreadId: string;
+  readonly evidence: CodexEventEvidence;
+}
+
+interface PlanUpdatedPayload {
+  readonly itemId: string;
+  readonly plan: RedactedJsonValue;
+  readonly final: boolean;
+  readonly evidence: CodexEventEvidence;
+}
+
+interface MessageDeltaPayload {
+  readonly itemId: string;
+  readonly operation: "append" | "replace";
+  readonly text: string;
+  readonly final: boolean;
+  readonly evidence: CodexEventEvidence;
+}
+
+interface StepPayload {
+  readonly stepKind: "turn" | "reasoning" | "item";
+  readonly itemId?: string;
+  readonly itemType?: string;
+  readonly status?: string;
+  readonly message?: string;
+  readonly evidence: CodexEventEvidence;
+}
+
+interface ToolPayload {
+  readonly itemId: string;
+  readonly toolKind: string;
+  readonly name: string;
+  readonly command?: string;
+  readonly output?: RedactedJsonValue;
+  readonly exitCode?: number;
+  readonly status?: string;
+  readonly phase: "started" | "updated" | "completed";
+  readonly evidence: CodexEventEvidence;
+}
+
+interface LimitDetectedPayload {
+  readonly kind: CodexLimitKind;
+  readonly message: string;
+  readonly evidence: CodexEventEvidence;
+}
+
+interface DiagnosticPayload {
+  readonly level: "info" | "warning" | "error";
+  readonly code: string;
+  readonly message: string;
+  /** Provider diagnostics never decide the product run's terminal state by themselves. */
+  readonly terminal: false;
+  readonly evidence: CodexEventEvidence;
+}
+
+interface ProcessEvidence {
+  readonly exitCode: number | null;
+  readonly signal: NodeJS.Signals | null;
+  readonly stderr: string;
+  readonly stderrTruncated: boolean;
+  readonly recordCount: number;
+  readonly inputDeliveryFailed: boolean;
+  readonly outputLimitExceeded: boolean;
+  readonly forcedTerminationAttempted: boolean;
+  readonly terminationUnconfirmed: boolean;
+  readonly startedAt: string;
+  readonly finishedAt: string;
+}
+
+interface RunCompletedPayload {
+  readonly runtimeThreadId?: string;
+  readonly usage?: RedactedJsonValue;
+  readonly process: ProcessEvidence;
+}
+
+interface RunCancelledPayload {
+  readonly runtimeThreadId?: string;
+  readonly process: ProcessEvidence;
+}
+
+interface RunFailedPayload {
+  readonly kind: CodexRunFailureKind;
+  readonly message: string;
+  readonly runtimeThreadId?: string;
+  readonly runtimeTerminal: "completed" | "failed" | "missing";
+  readonly process: ProcessEvidence;
+}
+
+export interface NormalizedRuntimePayloadMap {
+  readonly "run.started": RunStartedPayload;
+  readonly "plan.updated": PlanUpdatedPayload;
+  readonly "message.delta": MessageDeltaPayload;
+  readonly "step.started": StepPayload;
+  readonly "step.completed": StepPayload;
+  readonly "step.failed": StepPayload;
+  readonly "tool.started": ToolPayload;
+  readonly "tool.completed": ToolPayload;
+  readonly "tool.failed": ToolPayload;
+  readonly "route.limit_detected": LimitDetectedPayload;
+  readonly "run.cancelled": RunCancelledPayload;
+  readonly "run.failed": RunFailedPayload;
+  readonly "run.completed": RunCompletedPayload;
+  readonly "adapter.diagnostic": DiagnosticPayload;
+}
+
+interface NormalizedRuntimeEventBase {
+  readonly id: string;
+  readonly runId: string;
+  readonly missionId?: string;
+  readonly sequence: number;
+  readonly occurredAt: string;
+  readonly sourceAdapter: "codex";
+  readonly cliVersion?: string;
+  readonly requestedRouteId?: string;
+  readonly resolvedRouteId?: string;
+  readonly runtimeThreadId?: string;
+}
+
+export type NormalizedRuntimeEvent = {
+  readonly [TType in NormalizedRuntimeEventType]: NormalizedRuntimeEventBase & {
+    readonly type: TType;
+    readonly payload: NormalizedRuntimePayloadMap[TType];
+  };
+}[NormalizedRuntimeEventType];
+
+export interface CodexEventNormalizer {
+  readonly runtimeThreadId: string | undefined;
+  readonly finalized: boolean;
+  accept(record: RuntimeJsonlRecord): readonly NormalizedRuntimeEvent[];
+  finish(completion: RuntimeProcessCompletion): readonly NormalizedRuntimeEvent[];
+}
+
+type JsonObject = Record<string, unknown>;
+
+interface ItemState {
+  readonly id: string;
+  type: string;
+  messageText: string;
+  toolStarted: boolean;
+  completed: boolean;
+}
+
+const MAX_EVIDENCE_STRING_LENGTH = 8_192;
+const MAX_EVIDENCE_ARRAY_LENGTH = 100;
+const MAX_EVIDENCE_OBJECT_KEYS = 100;
+const MAX_EVIDENCE_DEPTH = 8;
+
+const SENSITIVE_KEY = /^(?:api[_-]?key|access[_-]?token|refresh[_-]?token|auth(?:orization)?|password|passwd|secret|cookie|set-cookie|credential|session[_-]?token)$/i;
+const REASONING_KEY = /^(?:reasoning|thinking|chain[_-]?of[_-]?thought|analysis)$/i;
+
+const QUOTA_PATTERNS = [
+  /\byou(?:'ve| have) hit your usage limit\b/i,
+  /\b(?:usage|quota) limit (?:has been )?(?:reached|exceeded)\b/i,
+  /\b(?:quota|usage allowance) (?:is )?exhausted\b/i,
+  /\binsufficient_quota\b/i,
+] as const;
+
+const RATE_LIMIT_PATTERNS = [
+  /\brate[_ -]?limit(?:ed| exceeded)?\b/i,
+  /\btoo many requests\b/i,
+  /\bhttp\s*429\b/i,
+] as const;
+
+const AUTHENTICATION_PATTERNS = [
+  /\bauthentication (?:failed|required)\b/i,
+  /\bunauthorized\b/i,
+  /\binvalid api key\b/i,
+  /\blogin (?:required|expired)\b/i,
+] as const;
+
+const SAFETY_PATTERNS = [
+  /\bsafety (?:policy|refusal|block)\b/i,
+  /\bblocked by policy\b/i,
+  /\bcontent policy\b/i,
+] as const;
+
+const TOOL_ITEM_TYPES = new Set([
+  "command_execution",
+  "file_change",
+  "mcp_tool_call",
+  "web_search",
+]);
+
+function isObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function redactText(value: string): string {
+  const truncated = value.length > MAX_EVIDENCE_STRING_LENGTH
+    ? `${value.slice(0, MAX_EVIDENCE_STRING_LENGTH)}\u2026[truncated]`
+    : value;
+  return truncated
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [redacted]")
+    .replace(/\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b/g, "[redacted]")
+    .replace(/\b(?:gh[opusr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[A-Z0-9]{16})\b/g, "[redacted]")
+    .replace(
+      /((?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret|cookie|credential)\s*[=:]\s*["']?)([^\s,"';}]+)/gi,
+      "$1[redacted]",
+    );
+}
+
+function sanitizeJson(
+  value: unknown,
+  state: { redacted: boolean },
+  depth = 0,
+  key?: string,
+): RedactedJsonValue {
+  if (key !== undefined && (SENSITIVE_KEY.test(key) || REASONING_KEY.test(key))) {
+    state.redacted = true;
+    return "[redacted]";
+  }
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
+  if (typeof value === "string") {
+    const redacted = redactText(value);
+    if (redacted !== value) state.redacted = true;
+    return redacted;
+  }
+  if (depth >= MAX_EVIDENCE_DEPTH) {
+    state.redacted = true;
+    return "[depth limit]";
+  }
+  if (Array.isArray(value)) {
+    if (value.length > MAX_EVIDENCE_ARRAY_LENGTH) state.redacted = true;
+    return value
+      .slice(0, MAX_EVIDENCE_ARRAY_LENGTH)
+      .map((entry) => sanitizeJson(entry, state, depth + 1));
+  }
+  if (isObject(value)) {
+    const result: Record<string, RedactedJsonValue> = {};
+    const entries = Object.entries(value);
+    if (entries.length > MAX_EVIDENCE_OBJECT_KEYS) state.redacted = true;
+    for (const [entryKey, entryValue] of entries.slice(0, MAX_EVIDENCE_OBJECT_KEYS)) {
+      result[entryKey] = sanitizeJson(entryValue, state, depth + 1, entryKey);
+    }
+    return result;
+  }
+  state.redacted = true;
+  return `[unsupported ${typeof value}]`;
+}
+
+function sanitizeReasoningRecord(record: JsonObject): JsonObject {
+  const item = isObject(record.item) ? record.item : undefined;
+  if (item === undefined || item.type !== "reasoning") return record;
+  const safeItem: JsonObject = { type: "reasoning" };
+  const id = stringValue(item.id);
+  const status = stringValue(item.status);
+  if (id !== undefined) safeItem.id = id;
+  if (status !== undefined) safeItem.status = status;
+  return { type: record.type, item: safeItem, reasoning_content: "[redacted]" };
+}
+
+function evidenceFor(
+  record: RuntimeJsonlRecord,
+  parsed: unknown,
+  runtimeEventType?: string,
+): CodexEventEvidence {
+  const state = { redacted: false };
+  const safeSource = isObject(parsed) ? sanitizeReasoningRecord(parsed) : parsed;
+  const raw = sanitizeJson(safeSource, state);
+  return {
+    transportSequence: record.sequence,
+    ...(runtimeEventType === undefined ? {} : { runtimeEventType }),
+    raw,
+    redacted: state.redacted || safeSource !== parsed,
+  };
+}
+
+function malformedEvidence(record: RuntimeJsonlRecord): CodexEventEvidence {
+  const redacted = redactText(record.raw);
+  return {
+    transportSequence: record.sequence,
+    raw: redacted,
+    redacted: redacted !== record.raw,
+  };
+}
+
+function messageFromError(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (!isObject(value)) return undefined;
+  return stringValue(value.message) ?? stringValue(value.error);
+}
+
+function limitKind(message: string): CodexLimitKind | undefined {
+  if (QUOTA_PATTERNS.some((pattern) => pattern.test(message))) {
+    return "quota-exhausted";
+  }
+  if (RATE_LIMIT_PATTERNS.some((pattern) => pattern.test(message))) {
+    return "temporary-rate-limit";
+  }
+  return undefined;
+}
+
+function failureKind(message: string | undefined): CodexRunFailureKind {
+  if (message === undefined) return "unknown";
+  const routeLimit = limitKind(message);
+  if (routeLimit !== undefined) return routeLimit;
+  if (AUTHENTICATION_PATTERNS.some((pattern) => pattern.test(message))) {
+    return "authentication-failed";
+  }
+  if (SAFETY_PATTERNS.some((pattern) => pattern.test(message))) {
+    return "safety-blocked";
+  }
+  return "unknown";
+}
+
+function toolName(item: JsonObject, itemType: string): string {
+  if (itemType === "command_execution") return "shell";
+  if (itemType === "web_search") return "web_search";
+  if (itemType === "file_change") return "file_change";
+  const server = stringValue(item.server) ?? stringValue(item.server_name);
+  const tool = stringValue(item.tool) ?? stringValue(item.tool_name) ?? "mcp_tool";
+  return server === undefined ? tool : `${server}.${tool}`;
+}
+
+function processEvidence(completion: RuntimeProcessCompletion): ProcessEvidence {
+  return {
+    exitCode: completion.exitCode,
+    signal: completion.signal,
+    stderr: redactText(completion.stderr),
+    stderrTruncated: completion.stderrTruncated,
+    recordCount: completion.recordCount,
+    inputDeliveryFailed: completion.inputDeliveryFailed,
+    outputLimitExceeded: completion.outputLimitExceeded,
+    forcedTerminationAttempted: completion.forcedTerminationAttempted,
+    terminationUnconfirmed: completion.terminationUnconfirmed,
+    startedAt: completion.startedAt,
+    finishedAt: completion.finishedAt,
+  };
+}
+
+function requireContextText(value: string, label: string): string {
+  if (!value.trim() || value.includes("\0")) throw new Error(`${label} must be non-empty`);
+  return value;
+}
+
+/**
+ * Stateful, forward-compatible normalizer for `codex exec --json` output.
+ *
+ * It intentionally does not make a terminal decision while consuming provider
+ * records. `finish` correlates those records with host-owned process metadata;
+ * only a `turn.completed` record plus a clean exit is success, and cancellation
+ * is synthesized exclusively from `completion.cancelled`.
+ */
+export function createCodexEventNormalizer(
+  context: CodexInvocationContext,
+): CodexEventNormalizer {
+  const runId = requireContextText(context.runId, "runId");
+  const cliVersion = context.cliVersion === undefined
+    ? undefined
+    : requireContextText(context.cliVersion, "cliVersion");
+  const now = context.now ?? (() => new Date());
+  const items = new Map<string, ItemState>();
+  const emittedLimits = new Set<CodexLimitKind>();
+  let runtimeThreadId: string | undefined;
+  let normalizedSequence = 0;
+  let previousTransportSequence = 0;
+  let sawTurnCompleted = false;
+  let sawTurnFailed = false;
+  let finalized = false;
+  let lastTerminalMessage: string | undefined;
+  let completedUsage: RedactedJsonValue | undefined;
+
+  const emit = <TType extends NormalizedRuntimeEventType>(
+    type: TType,
+    payload: NormalizedRuntimePayloadMap[TType],
+  ): NormalizedRuntimeEvent => {
+    normalizedSequence += 1;
+    return {
+      id: `${runId}:codex:${normalizedSequence}`,
+      runId,
+      ...(context.missionId === undefined ? {} : { missionId: context.missionId }),
+      sequence: normalizedSequence,
+      occurredAt: now().toISOString(),
+      sourceAdapter: "codex",
+      ...(cliVersion === undefined ? {} : { cliVersion }),
+      ...(context.requestedRouteId === undefined
+        ? {}
+        : { requestedRouteId: context.requestedRouteId }),
+      ...(context.resolvedRouteId === undefined
+        ? {}
+        : { resolvedRouteId: context.resolvedRouteId }),
+      ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
+      type,
+      payload,
+    } as NormalizedRuntimeEvent;
+  };
+
+  const diagnostic = (
+    level: DiagnosticPayload["level"],
+    code: string,
+    message: string,
+    evidence: CodexEventEvidence,
+  ): NormalizedRuntimeEvent => emit("adapter.diagnostic", {
+    level,
+    code,
+    message,
+    terminal: false,
+    evidence,
+  });
+
+  const maybeEmitLimit = (
+    message: string,
+    evidence: CodexEventEvidence,
+  ): NormalizedRuntimeEvent | undefined => {
+    const kind = limitKind(message);
+    if (kind === undefined || emittedLimits.has(kind)) return undefined;
+    emittedLimits.add(kind);
+    return emit("route.limit_detected", {
+      kind,
+      message: redactText(message),
+      evidence,
+    });
+  };
+
+  const itemIdentity = (
+    item: JsonObject,
+    record: RuntimeJsonlRecord,
+    eventType: string,
+    evidence: CodexEventEvidence,
+    events: NormalizedRuntimeEvent[],
+  ): { id: string; type: string; state: ItemState } => {
+    const id = stringValue(item.id) ?? `codex-item-${record.sequence}`;
+    const itemType = stringValue(item.type) ?? "unknown";
+    if (stringValue(item.id) === undefined || stringValue(item.type) === undefined) {
+      events.push(diagnostic(
+        "warning",
+        "codex.item_identity_missing",
+        `${eventType} omitted an item id or type; a transport-scoped identity was used`,
+        evidence,
+      ));
+    }
+    const existing = items.get(id);
+    if (existing !== undefined) {
+      if (existing.type === "unknown" && itemType !== "unknown") existing.type = itemType;
+      return { id, type: existing.type, state: existing };
+    }
+    const state: ItemState = {
+      id,
+      type: itemType,
+      messageText: "",
+      toolStarted: false,
+      completed: false,
+    };
+    items.set(id, state);
+    return { id, type: itemType, state };
+  };
+
+  const messageEvent = (
+    item: JsonObject,
+    state: ItemState,
+    final: boolean,
+    evidence: CodexEventEvidence,
+  ): NormalizedRuntimeEvent | undefined => {
+    const explicitDelta = stringValue(item.delta) ?? stringValue(item.text_delta);
+    const replacement = stringValue(item.text);
+    let operation: MessageDeltaPayload["operation"];
+    let text: string;
+
+    if (explicitDelta !== undefined) {
+      operation = "append";
+      text = explicitDelta;
+      state.messageText += explicitDelta;
+    } else if (replacement !== undefined) {
+      if (state.messageText.length > 0 && replacement.startsWith(state.messageText)) {
+        operation = "append";
+        text = replacement.slice(state.messageText.length);
+      } else {
+        operation = "replace";
+        text = replacement;
+      }
+      state.messageText = replacement;
+    } else if (final) {
+      operation = "append";
+      text = "";
+    } else {
+      return undefined;
+    }
+
+    return emit("message.delta", {
+      itemId: state.id,
+      operation,
+      text: redactText(text),
+      final,
+      evidence,
+    });
+  };
+
+  const toolPayload = (
+    item: JsonObject,
+    itemId: string,
+    itemType: string,
+    phase: ToolPayload["phase"],
+    evidence: CodexEventEvidence,
+  ): ToolPayload => {
+    const command = stringValue(item.command);
+    const status = stringValue(item.status);
+    const exitCode = numberValue(item.exit_code) ?? numberValue(item.exitCode);
+    const rawOutput = item.aggregated_output ?? item.output ?? item.result;
+    const outputState = { redacted: false };
+    const output = rawOutput === undefined
+      ? undefined
+      : sanitizeJson(rawOutput, outputState);
+    return {
+      itemId,
+      toolKind: itemType,
+      name: toolName(item, itemType),
+      ...(command === undefined ? {} : { command: redactText(command) }),
+      ...(output === undefined ? {} : { output }),
+      ...(exitCode === undefined ? {} : { exitCode }),
+      ...(status === undefined ? {} : { status }),
+      phase,
+      evidence,
+    };
+  };
+
+  const acceptItem = (
+    eventType: "item.started" | "item.updated" | "item.completed",
+    record: RuntimeJsonlRecord,
+    parsed: JsonObject,
+    evidence: CodexEventEvidence,
+  ): readonly NormalizedRuntimeEvent[] => {
+    const events: NormalizedRuntimeEvent[] = [];
+    if (!isObject(parsed.item)) {
+      return [diagnostic(
+        "warning",
+        "codex.item_missing",
+        `${eventType} did not contain an item object`,
+        evidence,
+      )];
+    }
+    const item = parsed.item;
+    const identity = itemIdentity(item, record, eventType, evidence, events);
+    const { id, type: itemType, state } = identity;
+    const final = eventType === "item.completed";
+
+    if (state.completed && eventType !== "item.completed") {
+      events.push(diagnostic(
+        "warning",
+        "codex.item_after_completion",
+        `Received ${eventType} after item completion`,
+        evidence,
+      ));
+    }
+
+    if (itemType === "agent_message") {
+      const message = messageEvent(item, state, final, evidence);
+      if (message !== undefined) events.push(message);
+    } else if (itemType === "reasoning") {
+      if (eventType === "item.started") {
+        events.push(emit("step.started", {
+          stepKind: "reasoning",
+          itemId: id,
+          itemType,
+          evidence,
+        }));
+      } else if (final) {
+        const status = stringValue(item.status);
+        events.push(emit("step.completed", {
+          stepKind: "reasoning",
+          itemId: id,
+          itemType,
+          ...(status === undefined ? {} : { status }),
+          evidence,
+        }));
+      }
+    } else if (itemType === "error") {
+      const message = stringValue(item.message) ?? "Codex reported an item diagnostic";
+      events.push(diagnostic(
+        "error",
+        "codex.item_error",
+        redactText(message),
+        evidence,
+      ));
+    } else if (itemType === "todo_list") {
+      const stateForPlan = { redacted: false };
+      events.push(emit("plan.updated", {
+        itemId: id,
+        plan: sanitizeJson(item.items ?? item.todos ?? item, stateForPlan),
+        final,
+        evidence,
+      }));
+    } else if (TOOL_ITEM_TYPES.has(itemType)) {
+      if (eventType === "item.started") {
+        state.toolStarted = true;
+        events.push(emit("tool.started", toolPayload(
+          item,
+          id,
+          itemType,
+          "started",
+          evidence,
+        )));
+      } else if (eventType === "item.updated") {
+        if (!state.toolStarted) state.toolStarted = true;
+        events.push(emit("tool.started", toolPayload(
+          item,
+          id,
+          itemType,
+          "updated",
+          evidence,
+        )));
+      } else {
+        const status = stringValue(item.status)?.toLowerCase();
+        const exitCode = numberValue(item.exit_code) ?? numberValue(item.exitCode);
+        const failed = status === "failed" || status === "error" || exitCode !== undefined && exitCode !== 0;
+        events.push(emit(failed ? "tool.failed" : "tool.completed", toolPayload(
+          item,
+          id,
+          itemType,
+          "completed",
+          evidence,
+        )));
+      }
+    } else if (eventType === "item.started") {
+      events.push(emit("step.started", {
+        stepKind: "item",
+        itemId: id,
+        itemType,
+        evidence,
+      }));
+    } else if (final) {
+      const status = stringValue(item.status);
+      events.push(emit("step.completed", {
+        stepKind: "item",
+        itemId: id,
+        itemType,
+        ...(status === undefined ? {} : { status }),
+        evidence,
+      }));
+    } else {
+      events.push(diagnostic(
+        "info",
+        "codex.unknown_item_update",
+        `Preserved an update for unknown item type ${itemType}`,
+        evidence,
+      ));
+    }
+
+    if (final) state.completed = true;
+    return events;
+  };
+
+  const accept = (record: RuntimeJsonlRecord): readonly NormalizedRuntimeEvent[] => {
+    if (finalized) throw new Error("Codex event normalizer is already finalized");
+    const prefixEvents: NormalizedRuntimeEvent[] = [];
+    if (!Number.isSafeInteger(record.sequence) || record.sequence <= 0) {
+      prefixEvents.push(diagnostic(
+        "warning",
+        "codex.invalid_transport_sequence",
+        "Runtime record had an invalid transport sequence",
+        malformedEvidence(record),
+      ));
+    } else if (record.sequence <= previousTransportSequence) {
+      prefixEvents.push(diagnostic(
+        "warning",
+        "codex.nonmonotonic_transport_sequence",
+        "Runtime record sequence did not increase monotonically",
+        malformedEvidence(record),
+      ));
+    }
+    previousTransportSequence = Math.max(previousTransportSequence, record.sequence);
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(record.raw) as unknown;
+    } catch {
+      return [...prefixEvents, diagnostic(
+        "warning",
+        "codex.malformed_json",
+        "Codex emitted a malformed JSONL record",
+        malformedEvidence(record),
+      )];
+    }
+
+    if (!isObject(parsed)) {
+      return [...prefixEvents, diagnostic(
+        "warning",
+        "codex.non_object_record",
+        "Codex emitted a JSONL value that was not an object",
+        evidenceFor(record, parsed),
+      )];
+    }
+
+    const eventType = stringValue(parsed.type);
+    const evidence = evidenceFor(record, parsed, eventType);
+    if (eventType === undefined) {
+      return [...prefixEvents, diagnostic(
+        "warning",
+        "codex.event_type_missing",
+        "Codex emitted an event without a type",
+        evidence,
+      )];
+    }
+
+    switch (eventType) {
+      case "thread.started": {
+        const threadId = stringValue(parsed.thread_id);
+        if (threadId === undefined) {
+          return [...prefixEvents, diagnostic(
+            "warning",
+            "codex.thread_id_missing",
+            "thread.started did not include a runtime thread ID",
+            evidence,
+          )];
+        }
+        if (runtimeThreadId !== undefined) {
+          return [...prefixEvents, diagnostic(
+            "warning",
+            runtimeThreadId === threadId
+              ? "codex.thread_started_duplicate"
+              : "codex.thread_id_changed",
+            runtimeThreadId === threadId
+              ? "Codex emitted thread.started more than once"
+              : "Codex changed the runtime thread ID during one invocation",
+            evidence,
+          )];
+        }
+        runtimeThreadId = threadId;
+        return [...prefixEvents, emit("run.started", {
+          runtimeThreadId: threadId,
+          evidence,
+        })];
+      }
+      case "turn.started":
+        return [...prefixEvents, emit("step.started", {
+          stepKind: "turn",
+          evidence,
+        })];
+      case "turn.completed": {
+        sawTurnCompleted = true;
+        if (parsed.usage !== undefined) {
+          completedUsage = sanitizeJson(parsed.usage, { redacted: false });
+        }
+        return [...prefixEvents, emit("step.completed", {
+          stepKind: "turn",
+          status: "completed",
+          evidence,
+        })];
+      }
+      case "turn.failed": {
+        sawTurnFailed = true;
+        const message = messageFromError(parsed.error) ?? stringValue(parsed.message)
+          ?? "Codex reported that the turn failed";
+        lastTerminalMessage = redactText(message);
+        const limit = maybeEmitLimit(message, evidence);
+        return [
+          ...prefixEvents,
+          ...(limit === undefined ? [] : [limit]),
+          emit("step.failed", {
+            stepKind: "turn",
+            status: "failed",
+            message: redactText(message),
+            evidence,
+          }),
+        ];
+      }
+      case "item.started":
+      case "item.updated":
+      case "item.completed":
+        return [...prefixEvents, ...acceptItem(eventType, record, parsed, evidence)];
+      case "error": {
+        const message = stringValue(parsed.message) ?? messageFromError(parsed.error)
+          ?? "Codex reported a runtime error";
+        lastTerminalMessage = redactText(message);
+        const limit = maybeEmitLimit(message, evidence);
+        return [
+          ...prefixEvents,
+          ...(limit === undefined ? [] : [limit]),
+          diagnostic("error", "codex.runtime_error", redactText(message), evidence),
+        ];
+      }
+      default:
+        return [...prefixEvents, diagnostic(
+          "info",
+          "codex.unknown_event",
+          `Preserved unknown Codex event type ${redactText(eventType)}`,
+          evidence,
+        )];
+    }
+  };
+
+  const finish = (
+    completion: RuntimeProcessCompletion,
+  ): readonly NormalizedRuntimeEvent[] => {
+    if (finalized) return [];
+    finalized = true;
+    const process = processEvidence(completion);
+
+    if (completion.cancelled) {
+      return [emit("run.cancelled", {
+        ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
+        process,
+      })];
+    }
+
+    const cleanExit = completion.exitCode === 0
+      && completion.signal === null
+      && !completion.inputDeliveryFailed
+      && !completion.outputLimitExceeded
+      && !completion.terminationUnconfirmed;
+    if (cleanExit && sawTurnCompleted && !sawTurnFailed) {
+      return [emit("run.completed", {
+        ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
+        ...(completedUsage === undefined ? {} : { usage: completedUsage }),
+        process,
+      })];
+    }
+
+    const runtimeTerminal: RunFailedPayload["runtimeTerminal"] = sawTurnFailed
+      ? "failed"
+      : sawTurnCompleted
+        ? "completed"
+        : "missing";
+    let kind = failureKind(lastTerminalMessage);
+    let message = lastTerminalMessage ?? "Codex invocation did not complete successfully";
+    if (sawTurnCompleted && !cleanExit) {
+      kind = "protocol-mismatch";
+      message = "Codex reported turn completion but the host process did not exit cleanly";
+    } else if (!sawTurnCompleted && cleanExit && !sawTurnFailed) {
+      kind = "protocol-mismatch";
+      message = "Codex exited successfully without a turn.completed event";
+    } else if (kind === "unknown" && !cleanExit) {
+      kind = "process-failed";
+    }
+
+    return [emit("run.failed", {
+      kind,
+      message,
+      ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
+      runtimeTerminal,
+      process,
+    })];
+  };
+
+  return {
+    get runtimeThreadId() {
+      return runtimeThreadId;
+    },
+    get finalized() {
+      return finalized;
+    },
+    accept,
+    finish,
+  };
+}

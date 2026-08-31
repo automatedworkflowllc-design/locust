@@ -50,7 +50,7 @@ Then inspect the actual source tree and tests. The repository is authoritative f
 
 As of 2026-08-31, the Electron/React desktop control-room prototype is implemented and runnable. It includes an interactive mission index and filter, Signal Rail, approval surface, command dock, runtime/model menu, and fallback-chain controls. Shared TypeScript packages define the runtime/routing/checkpoint contracts, capability-aware fallback, a guarded handoff state machine, and safe installed-runtime discovery.
 
-The desktop now performs live, read-only Codex CLI, Claude Code, and OmniRoute discovery in the trusted main process and shows sanitized readiness/version status through preload IPC. It never reads credential stores. A controlled prompt-on-stdin process transport is implemented and fake-tested, but it is not wired to the renderer yet. The current mission activity remains demonstration data: no Codex/Claude mission process is launched from the UI, and mission persistence and real app/tool execution are not implemented.
+The desktop now performs live, read-only Codex CLI, Claude Code, and OmniRoute discovery in the trusted main process and shows sanitized readiness/version status through preload IPC. It never reads credential stores. A controlled prompt-on-stdin Codex process transport and typed, privacy-aware JSONL normalizer are implemented and fake-tested. The normalizer converts provider records into product-owned events, retains only bounded redacted diagnostic evidence, excludes reasoning content, and captures the discovered CLI version as provenance. Neither layer is wired to the renderer yet. The current mission activity remains demonstration data: no Codex/Claude mission process is launched from the UI, and mission persistence and real app/tool execution are not implemented.
 
 From the canonical workspace:
 
@@ -65,9 +65,9 @@ Run the complete validation suite with:
 pnpm check
 ```
 
-Last verification on 2026-08-31 passed the Electron production build, all workspace TypeScript checks, and 27/27 tests across runtime adapters, runtime core, and desktop discovery.
+Last verified on 2026-08-31: the Electron production build and every workspace TypeScript check passed, with 37/37 tests passing across runtime adapters, runtime core, and desktop discovery.
 
-The next milestone is one end-to-end local Codex path: prompt-on-stdin process execution from the main process, normalized streamed events, safe cancellation, a durable local event ledger/checkpoint, and adapter contract fixtures that do not require personal authentication.
+The next milestone is one end-to-end local Codex path in Electron: launch a harmless read-only prompt through the existing controlled transport, stream normalized events into one real mission timeline, expose safe cancellation and actionable failure state, then add a durable local event ledger/checkpoint. Contract fixtures must remain authentication-free.
 
 ## Important implementation invariants
 
@@ -141,11 +141,11 @@ Use this template:
 
 - Scope/owner: runtime adapter foundation and Electron readiness bridge.
 - Files changed: `packages/runtime-adapters`, Electron main/preload/renderer runtime-discovery files, tests, and project-status documentation.
-- Outcome: the app safely discovers Codex CLI, Claude Code, and optional OmniRoute; displays sanitized version/readiness status; builds conservative command specs; and provides a bounded, cancellation-aware prompt-on-stdin JSONL transport without yet launching a UI mission.
-- Validation: `pnpm check` passed the production build, all TypeScript checks, and 27/27 tests; a desktop smoke capture showed both installed runtimes ready and OmniRoute absent on the development machine.
+- Outcome: the app safely discovers Codex CLI, Claude Code, and optional OmniRoute; displays sanitized version/readiness status; builds conservative command specs; and provides a bounded, cancellation-aware prompt-on-stdin JSONL transport plus typed, privacy-aware Codex event normalization without yet launching a UI mission.
+- Validation: `pnpm check` passed the production build, all TypeScript checks, and 37/37 tests; a desktop smoke capture showed both installed runtimes ready and OmniRoute absent on the development machine.
 - Decisions made: discovery is read-only and credential-blind; IPC accepts no renderer-controlled path or command; PATH shims are executed without `shell: true`; dangerous permission-bypass flags are forbidden.
 - Known issues: the route/model surface remains example data, discovery can take several seconds on first launch, and no live mission event stream or persistence exists yet.
-- Recommended next step: implement the controlled Codex JSONL runner and persist one harmless read-only mission end to end.
+- Recommended next step: wire the controlled Codex transport and normalizer through trusted Electron IPC, then render and safely cancel one harmless read-only mission end to end.
 
 ## Prompt for a new Codex task
 

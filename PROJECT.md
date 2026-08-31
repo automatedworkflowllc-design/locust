@@ -31,8 +31,9 @@ The differentiator is not merely “more agents.” It is a trustworthy control 
 - Live runtime readiness in the desktop sidebar through a narrow, sanitized main/preload IPC bridge.
 - Safe read-only Codex and restricted/plan-mode Claude command specifications with dangerous bypass flags rejected.
 - Controlled prompt-on-stdin JSONL process transport with bounded queues/stderr, filtered environment, no retries, and explicit cancellation/termination state.
+- Typed, privacy-aware Codex JSONL normalization into product-owned run, step, tool, message, diagnostic, and route-limit events, with bounded redacted evidence and reasoning content excluded.
 
-The mission and route activity remains demonstration data. The app detects runtimes but does not yet launch a mission, persist mission state, or invoke real app tools.
+The mission and route activity remains demonstration data. The app detects runtimes, and the Codex process/event boundary is implemented in the adapter package, but Electron does not yet launch a mission, persist mission state, or invoke real app tools.
 
 ## Run and validate
 
@@ -49,16 +50,16 @@ In a separate run, validate the full workspace:
 pnpm check
 ```
 
-Last verified on 2026-08-31: production build passed, all TypeScript checks passed, and all 27 tests passed across runtime adapters, runtime core, and the desktop discovery service.
+Last verified on 2026-08-31: the production build and every workspace TypeScript check passed, with 37/37 tests passing across runtime adapters, runtime core, and the desktop discovery service.
 
 ## Next implementation milestone
 
-Connect one real local runtime end to end, starting with Codex:
+Wire one real, safe local Codex mission into Electron end to end:
 
-1. Parse Codex JSONL into the normalized mission events defined in `packages/contracts`.
-2. Replace one demonstration mission timeline with a harmless live read-only run, including cancellation and actionable error state.
+1. Connect the trusted Electron main process to the controlled Codex transport and event normalizer through a narrow, sanitized IPC surface.
+2. Replace one demonstration mission timeline with a harmless read-only run, including streamed normalized events, cancellation, and actionable error state.
 3. Persist the event ledger and a resumable checkpoint locally before adding automatic provider fallback.
-4. Add adapter contract fixtures for partial output, malformed events, quota classification, and provider event drift.
+4. Keep adapter fixtures covering partial output, malformed events, quota classification, provider drift, and cancellation as the boundary evolves.
 5. Apply the proven runner/event contract to Claude Code, then add the curated OmniRoute gateway adapter.
 
 Public roadmap: [live Codex mission](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/2), [durable mission ledger](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/1), and [Claude/OmniRoute adapters](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/3).
