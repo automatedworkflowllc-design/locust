@@ -31,7 +31,7 @@ Mission control plane
 
 The repository contains a runnable Electron/React control-room prototype. Its interactive UI includes mission filtering, the Signal Rail execution timeline, an approval receipt, command dock, runtime/model picker, and visible fallback chain. It now performs real, read-only discovery of installed Codex CLI, Claude Code, and optional OmniRoute, displaying version and authentication readiness without reading credential files.
 
-Shared packages define the runtime/routing contracts, implement capability-aware fallback and the safe-handoff state machine, and generate conservative non-interactive Codex/Claude command specifications. Probe execution is shell-free, time-limited, output-bounded, and covered by fake-runner tests.
+Shared packages define the runtime/routing contracts, implement capability-aware fallback and the safe-handoff state machine, and generate conservative non-interactive Codex/Claude command specifications. Probe and mission-process transports are shell-free, prompt-on-stdin, time/output-bounded, cancellation-aware, and covered entirely by fake-runner tests.
 
 The current mission data and activity are demonstrations. Runtime discovery is live, but Codex/Claude mission execution, durable mission storage, and real app tools are the next implementation layer; the UI does not yet perform autonomous work.
 
@@ -53,7 +53,7 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the test suite. The baseline was last verified on 2026-08-31 with all checks passing and 14 tests passing.
+This builds every workspace package, runs TypeScript checks, and runs the test suite. The baseline was last verified on 2026-08-31 with all checks passing and 27 tests passing.
 
 ## Working from another Codex task
 

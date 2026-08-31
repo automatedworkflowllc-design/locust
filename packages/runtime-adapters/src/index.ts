@@ -10,6 +10,10 @@ export {
 export { discoverInstalledRuntimes } from "./discovery.js";
 export { createNodeProbeRunner } from "./node-runner.js";
 export { createPathExecutableLocator } from "./path-locator.js";
+export {
+  createNodeRuntimeProcessRunner,
+  RUNTIME_ENVIRONMENT_ALLOWLIST,
+} from "./process-runner.js";
 export { parseRuntimeVersion } from "./version.js";
 export type {
   RuntimeCommandOptions,
@@ -25,6 +29,17 @@ export type {
 export type {
   PathExecutableLocatorOptions,
 } from "./path-locator.js";
+export type {
+  NodeRuntimeProcessRunnerOptions,
+  RuntimeJsonlRecord,
+  RuntimeProcessCompletion,
+  RuntimeProcessRun,
+  RuntimeProcessRunner,
+  RuntimeProcessStartOptions,
+  RuntimeSpawn,
+  RuntimeSpawnOptions,
+  SpawnedRuntimeProcess,
+} from "./process-runner.js";
 export type {
   CommandResult,
   CommandRunner,

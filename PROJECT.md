@@ -30,6 +30,7 @@ The differentiator is not merely “more agents.” It is a trustworthy control 
 - Shell-free, bounded discovery of installed Codex CLI, Claude Code, and optional OmniRoute.
 - Live runtime readiness in the desktop sidebar through a narrow, sanitized main/preload IPC bridge.
 - Safe read-only Codex and restricted/plan-mode Claude command specifications with dangerous bypass flags rejected.
+- Controlled prompt-on-stdin JSONL process transport with bounded queues/stderr, filtered environment, no retries, and explicit cancellation/termination state.
 
 The mission and route activity remains demonstration data. The app detects runtimes but does not yet launch a mission, persist mission state, or invoke real app tools.
 
@@ -48,17 +49,18 @@ In a separate run, validate the full workspace:
 pnpm check
 ```
 
-Last verified on 2026-08-31: production build passed, all TypeScript checks passed, and all 14 tests passed across runtime adapters, runtime core, and the desktop discovery service.
+Last verified on 2026-08-31: production build passed, all TypeScript checks passed, and all 27 tests passed across runtime adapters, runtime core, and the desktop discovery service.
 
 ## Next implementation milestone
 
 Connect one real local runtime end to end, starting with Codex:
 
-1. Add a controlled Codex process runner using the existing safe command specification and prompt-on-stdin boundary.
-2. Parse Codex JSONL into the normalized mission events defined in `packages/contracts`.
-3. Replace one demonstration mission timeline with a harmless live read-only run, including cancellation and actionable error state.
-4. Persist the event ledger and a resumable checkpoint locally before adding automatic provider fallback.
-5. Add adapter contract fixtures for partial output, malformed events, cancellation, quota classification, and process-tree cleanup.
-6. Apply the proven runner/event contract to Claude Code, then add the curated OmniRoute gateway adapter.
+1. Parse Codex JSONL into the normalized mission events defined in `packages/contracts`.
+2. Replace one demonstration mission timeline with a harmless live read-only run, including cancellation and actionable error state.
+3. Persist the event ledger and a resumable checkpoint locally before adding automatic provider fallback.
+4. Add adapter contract fixtures for partial output, malformed events, quota classification, and provider event drift.
+5. Apply the proven runner/event contract to Claude Code, then add the curated OmniRoute gateway adapter.
+
+Public roadmap: [live Codex mission](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/2), [durable mission ledger](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/1), and [Claude/OmniRoute adapters](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/3).
 
 Definition of done: a user can start a harmless local Codex mission from the desktop UI, observe normalized events, cancel safely, restart the app, and inspect the durable run receipt. Claude and OmniRoute adapters follow the same proven boundary.
