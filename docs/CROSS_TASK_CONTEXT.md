@@ -44,7 +44,7 @@ Then inspect the actual source tree and tests. The repository is authoritative f
 | Credentials | Never copy CLI auth, pool subscriptions, capture cookies, or expose secrets in logs |
 | Safety | Checkpoint and reconcile before route changes; verify before restoring side-effect tools |
 | Cloud future | Preserve a runner abstraction so isolated persistent cloud runners can be added later |
-| Public name | Undecided; avoid locking architecture or package names to a temporary brand |
+| Public name | **Locust** (settled 2026-08-31). Package namespace still open -- the desktop app is not distributed through npm or PyPI, where the name is taken |
 
 ## Current implementation status
 
