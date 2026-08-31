@@ -47,9 +47,9 @@ Then inspect the actual source tree and tests. The repository is authoritative f
 
 ## Current implementation status
 
-As of 2026-08-30, the Electron/React desktop control-room prototype is implemented and runnable. It includes an interactive mission index and filter, Signal Rail, approval surface, command dock, runtime/model menu, and fallback-chain controls. Shared TypeScript packages define the runtime/routing/checkpoint contracts and implement capability-aware fallback plus a guarded handoff state machine.
+As of 2026-08-31, the Electron/React desktop control-room prototype is implemented and runnable. It includes an interactive mission index and filter, Signal Rail, approval surface, command dock, runtime/model menu, and fallback-chain controls. Shared TypeScript packages define the runtime/routing/checkpoint contracts, capability-aware fallback, a guarded handoff state machine, and safe installed-runtime discovery.
 
-The current mission activity is demonstration data. No installed Codex/Claude process is launched yet, and mission persistence and real app/tool execution are not implemented.
+The desktop now performs live, read-only Codex CLI, Claude Code, and OmniRoute discovery in the trusted main process and shows sanitized readiness/version status through preload IPC. It never reads credential stores. The current mission activity remains demonstration data: no Codex/Claude mission process is launched yet, and mission persistence and real app/tool execution are not implemented.
 
 From the canonical workspace:
 
@@ -64,9 +64,9 @@ Run the complete validation suite with:
 pnpm check
 ```
 
-Last verification on 2026-08-30 passed the Electron production build, all workspace TypeScript checks, and 4/4 runtime-core tests.
+Last verification on 2026-08-31 passed the Electron production build, all workspace TypeScript checks, and 14/14 tests across runtime adapters, runtime core, and desktop discovery.
 
-The next milestone is one end-to-end local Codex path: installed-runtime detection in the Electron main process, normalized streamed events, safe cancellation, a durable local event ledger/checkpoint, and adapter contract tests that do not require personal authentication.
+The next milestone is one end-to-end local Codex path: prompt-on-stdin process execution from the main process, normalized streamed events, safe cancellation, a durable local event ledger/checkpoint, and adapter contract fixtures that do not require personal authentication.
 
 ## Important implementation invariants
 
@@ -135,6 +135,16 @@ Use this template:
 - Decisions made: Electron + React is the first desktop shell; orchestration remains framework-independent and outside the renderer.
 - Known issues: the prototype uses demonstration data and does not yet execute or persist a real mission.
 - Recommended next step: implement the local Codex detection/adapter vertical slice described in `PROJECT.md`.
+
+### 2026-08-31 — live installed-runtime discovery
+
+- Scope/owner: runtime adapter foundation and Electron readiness bridge.
+- Files changed: `packages/runtime-adapters`, Electron main/preload/renderer runtime-discovery files, tests, and project-status documentation.
+- Outcome: the app safely discovers Codex CLI, Claude Code, and optional OmniRoute; displays sanitized version/readiness status; and can build conservative prompt-on-stdin command specs without launching a mission.
+- Validation: `pnpm check` passed the production build, all TypeScript checks, and 14/14 tests; a desktop smoke capture showed both installed runtimes ready and OmniRoute absent on the development machine.
+- Decisions made: discovery is read-only and credential-blind; IPC accepts no renderer-controlled path or command; PATH shims are executed without `shell: true`; dangerous permission-bypass flags are forbidden.
+- Known issues: the route/model surface remains example data, discovery can take several seconds on first launch, and no live mission event stream or persistence exists yet.
+- Recommended next step: implement the controlled Codex JSONL runner and persist one harmless read-only mission end to end.
 
 ## Prompt for a new Codex task
 

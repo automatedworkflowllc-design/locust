@@ -555,6 +555,168 @@ kbd {
   font-size: 8px;
 }
 
+.runtime-discovery-card {
+  padding: 8px;
+  color: #777c84;
+  background: #101216;
+  border: 1px solid #1d2025;
+  border-radius: 8px;
+}
+
+.runtime-discovery-card.loading,
+.runtime-discovery-card.error {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+}
+
+.runtime-discovery-card.loading > span:last-child,
+.runtime-discovery-card.error > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.runtime-discovery-card.loading strong,
+.runtime-discovery-card.error strong {
+  color: #aeb2b8;
+  font-size: 10px;
+  font-weight: 580;
+}
+
+.runtime-discovery-card.loading small,
+.runtime-discovery-card.error small {
+  color: #626770;
+  font-size: 9px;
+}
+
+.runtime-discovery-card.error > svg {
+  color: #c89e5a;
+}
+
+.runtime-spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 2px solid #2b3036;
+  border-top-color: var(--lime);
+  border-radius: 50%;
+  animation: runtime-spin 700ms linear infinite;
+}
+
+@keyframes runtime-spin {
+  to { transform: rotate(360deg); }
+}
+
+.runtime-discovery-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: #737982;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.runtime-discovery-heading strong {
+  color: #92aa72;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.runtime-discovery-list {
+  display: grid;
+  gap: 2px;
+}
+
+.runtime-discovery-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 29px;
+  padding: 3px 4px;
+  background: #0d0f12;
+  border: 1px solid #191c21;
+  border-radius: 6px;
+}
+
+.runtime-mini-glyph {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  color: #b7c995;
+  font-size: 8px;
+  font-weight: 700;
+  background: #20271b;
+  border: 1px solid #35432a;
+  border-radius: 5px;
+}
+
+.runtime-mini-glyph.claude {
+  color: #a9c2ed;
+  background: #172236;
+  border-color: #263c61;
+}
+
+.runtime-mini-glyph.omniroute {
+  color: #c7a8ed;
+  background: #241833;
+  border-color: #422859;
+}
+
+.runtime-discovery-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.runtime-discovery-copy strong {
+  overflow: hidden;
+  color: #b9bdc3;
+  font-size: 9px;
+  font-weight: 570;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-discovery-copy small {
+  overflow: hidden;
+  color: #555b64;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-probe-state {
+  color: #697079;
+  font-size: 8px;
+  font-weight: 620;
+}
+
+.runtime-probe-state.ready {
+  color: var(--lime);
+}
+
+.runtime-probe-state.auth-required {
+  color: #e5b965;
+}
+
+.runtime-probe-state.offline,
+.runtime-probe-state.probe-failed {
+  color: #cf8681;
+}
+
+.runtime-discovery-note {
+  display: block;
+  margin-top: 6px;
+  color: #565c64;
+  font-size: 8px;
+  line-height: 1.35;
+}
+
 .profile-button {
   display: flex;
   align-items: center;

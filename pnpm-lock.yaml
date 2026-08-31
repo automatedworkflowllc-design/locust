@@ -20,6 +20,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@teammate/runtime-adapters':
+        specifier: workspace:*
+        version: link:../../packages/runtime-adapters
       react:
         specifier: ^19.2.0
         version: 19.2.8
@@ -50,6 +53,8 @@ importers:
         version: 7.3.6(@types/node@24.13.3)(lightningcss@1.33.0)
 
   packages/contracts: {}
+
+  packages/runtime-adapters: {}
 
   packages/runtime-core:
     dependencies:

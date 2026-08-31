@@ -97,11 +97,16 @@ interface RouteOption {
 }
 
 const routes: RouteOption[] = [
-  { runtime: 'Codex', model: 'GPT-5.6 Sol', source: 'Codex account', badge: 'PRIMARY', tone: 'lime' },
-  { runtime: 'Claude Code', model: 'Claude Sonnet 5', source: 'Claude account', badge: 'STANDBY', tone: 'blue' },
-  { runtime: 'OmniRoute', model: 'Qwen3 Coder', source: 'Free provider', badge: 'FREE', tone: 'violet' },
-  { runtime: 'Ollama', model: 'Devstral Small', source: 'This computer', badge: 'LOCAL', tone: 'neutral' }
+  { runtime: 'Codex', model: 'GPT-5.6 Sol', source: 'Example account route', badge: 'PRIMARY', tone: 'lime' },
+  { runtime: 'Claude Code', model: 'Claude Sonnet 5', source: 'Example account route', badge: 'STANDBY', tone: 'blue' },
+  { runtime: 'OmniRoute', model: 'Qwen3 Coder', source: 'Example free route', badge: 'FREE', tone: 'violet' },
+  { runtime: 'Ollama', model: 'Devstral Small', source: 'Example local route', badge: 'LOCAL', tone: 'neutral' }
 ]
+
+type RuntimeDiscoveryState =
+  | { readonly phase: 'loading' }
+  | { readonly phase: 'ready'; readonly runtimes: readonly PublicRuntimeStatus[] }
+  | { readonly phase: 'error' }
 
 function WindowBar(): ReactNode {
   return (
@@ -134,7 +139,42 @@ function StatusDot({ status }: { status: MissionStatus }): ReactNode {
   return <span className="mission-status complete" aria-label="Complete"><Icon name="check" size={10} /></span>
 }
 
-function Sidebar({ activeId, onSelect }: { activeId: number; onSelect: (id: number) => void }): ReactNode {
+function RuntimeDiscoveryCard({ state }: { state: RuntimeDiscoveryState }): ReactNode {
+  if (state.phase === 'loading') {
+    return <div className="runtime-discovery-card loading" role="status"><span className="runtime-spinner" /><span><strong>Checking local runtimes</strong><small>Read-only CLI detection</small></span></div>
+  }
+
+  if (state.phase === 'error') {
+    return <div className="runtime-discovery-card error" role="status"><Icon name="shield" size={14} /><span><strong>Runtime check unavailable</strong><small>No credentials were accessed</small></span></div>
+  }
+
+  const readyCount = state.runtimes.filter((runtime) => runtime.ready).length
+  const statusLabel = (status: RuntimeProbeStatus): string => {
+    if (status === 'ready') return 'Ready'
+    if (status === 'auth-required') return 'Sign in'
+    if (status === 'not-installed') return 'Not installed'
+    if (status === 'offline') return 'Offline'
+    return 'Check'
+  }
+
+  return (
+    <div className="runtime-discovery-card">
+      <div className="runtime-discovery-heading"><span>Local runtimes</span><strong>{readyCount}/{state.runtimes.length} ready</strong></div>
+      <div className="runtime-discovery-list">
+        {state.runtimes.map((runtime) => (
+          <div className="runtime-discovery-row" key={runtime.id}>
+            <span className={`runtime-mini-glyph ${runtime.id}`}>{runtime.id === 'codex' ? 'O' : runtime.id === 'claude' ? 'A' : '∞'}</span>
+            <span className="runtime-discovery-copy"><strong>{runtime.displayName}</strong><small>{runtime.version ? `v${runtime.version}` : runtime.installed ? 'Version unavailable' : 'Optional'}</small></span>
+            <span className={`runtime-probe-state ${runtime.status}`}>{statusLabel(runtime.status)}</span>
+          </div>
+        ))}
+      </div>
+      <small className="runtime-discovery-note">Detection only · mission execution not connected</small>
+    </div>
+  )
+}
+
+function Sidebar({ activeId, onSelect, runtimeState }: { activeId: number; onSelect: (id: number) => void; runtimeState: RuntimeDiscoveryState }): ReactNode {
   const [filter, setFilter] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
   const visibleMissions = useMemo(
@@ -194,7 +234,7 @@ function Sidebar({ activeId, onSelect }: { activeId: number; onSelect: (id: numb
       </div>
 
       <div className="sidebar-footer">
-        <div className="provider-health"><span className="health-orb" /><span><strong>4 example routes</strong><small>No live runtime connected</small></span><Icon name="chevron-right" size={14} /></div>
+        <RuntimeDiscoveryCard state={runtimeState} />
         <button type="button" className="profile-button" disabled title="Workspace settings are coming next"><span className="profile-avatar">CB</span><span>Colin</span><Icon name="settings" size={15} /></button>
       </div>
     </aside>
@@ -219,7 +259,7 @@ function MissionHeader({ mission, route, onRouteClick }: { mission: Mission; rou
       <div className="breadcrumb"><span>Missions</span><Icon name="chevron-right" size={12} /><span>{mission.title}</span></div>
       <div className="mission-heading-row">
         <div>
-          <div className="title-with-state"><h1>{mission.title}</h1><span className="live-label"><span /> Running</span></div>
+          <div className="title-with-state"><h1>{mission.title}</h1><span className="live-label"><span /> Preview</span></div>
           <p>Example run: Maya is researching, drafting, and preparing the next safe action.</p>
         </div>
         <div className="mission-actions">
@@ -496,8 +536,35 @@ export default function App(): ReactNode {
   const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved' | 'changes'>('pending')
   const [selectedRoute, setSelectedRoute] = useState(0)
   const [routeMenuOpen, setRouteMenuOpen] = useState(false)
+  const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
   const routeTriggerRef = useRef<HTMLElement | null>(null)
   const activeMission = missions.find((mission) => mission.id === activeMissionId) ?? missions[0]
+
+  useEffect(() => {
+    let active = true
+    const bridge = window.desktop
+    if (!bridge) {
+      setRuntimeState({ phase: 'error' })
+      return () => {
+        active = false
+      }
+    }
+
+    void bridge.getLocalRuntimes()
+      .then((response) => {
+        if (!active) return
+        setRuntimeState(response.ok
+          ? { phase: 'ready', runtimes: response.data.runtimes }
+          : { phase: 'error' })
+      })
+      .catch(() => {
+        if (active) setRuntimeState({ phase: 'error' })
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const openRouteMenu = (): void => {
     routeTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -513,7 +580,7 @@ export default function App(): ReactNode {
     <div className="app-shell">
       <WindowBar />
       <div className="app-grid">
-        <Sidebar activeId={activeMissionId} onSelect={setActiveMissionId} />
+        <Sidebar activeId={activeMissionId} onSelect={setActiveMissionId} runtimeState={runtimeState} />
         <main className="mission-workspace">
           <MissionHeader mission={activeMission} route={routes[selectedRoute]} onRouteClick={openRouteMenu} />
           <div className="mission-scroll"><SignalRail approvalStatus={approvalStatus} /></div>

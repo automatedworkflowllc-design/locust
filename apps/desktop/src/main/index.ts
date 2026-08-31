@@ -1,7 +1,23 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, shell } from 'electron'
+import {
+  createNodeProbeRunner,
+  createPathExecutableLocator,
+  discoverInstalledRuntimes
+} from '@teammate/runtime-adapters'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
+
+const probeRunner = createNodeProbeRunner()
+const executableLocator = createPathExecutableLocator()
+const runtimeDiscovery = createRuntimeDiscoveryService({
+  probe: () => discoverInstalledRuntimes({
+    runner: probeRunner,
+    locator: executableLocator,
+    includeOmniRoute: true
+  })
+})
 
 const isAllowedExternalUrl = (url: string): boolean => {
   try {
@@ -24,7 +40,7 @@ const createWindow = (): void => {
     titleBarOverlay: false,
     backgroundColor: '#090a0c',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.cjs'),
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false
@@ -37,7 +53,7 @@ const createWindow = (): void => {
     const capturePath = app.isPackaged ? undefined : process.env.TEAMMATE_CAPTURE_PATH
     if (capturePath) {
       void (async () => {
-        await delay(300)
+        await delay(8_000)
         const image = await window.webContents.capturePage()
         await writeFile(capturePath, image.toPNG())
         app.quit()
@@ -67,6 +83,20 @@ const createWindow = (): void => {
 
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'dark'
+
+  ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender)
+    if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
+      return {
+        ok: false,
+        error: {
+          code: 'DISCOVERY_FAILED',
+          message: 'Local runtime discovery could not complete.'
+        }
+      } as const
+    }
+    return runtimeDiscovery.get()
+  })
 
   ipcMain.on('window:minimize', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()

@@ -5,12 +5,16 @@
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
+    "predev": "pnpm --filter @teammate/runtime-adapters build",
     "dev": "electron-vite dev",
+    "prebuild": "pnpm --filter @teammate/runtime-adapters build",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@teammate/runtime-adapters": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
