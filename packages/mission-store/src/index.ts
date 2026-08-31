@@ -737,6 +737,13 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
           if (event.sequence !== eventSequence) {
             throw new Error('Mission event sequence is invalid')
           }
+          // Writer strictness is defined BY the reader, not agreed with it. An
+          // event the reader would refuse is unwritable: recovery stops at the
+          // first record it cannot parse, so accepting one here would silently
+          // discard every later record of an otherwise intact mission.
+          if (parsedEvent(event, hydrated.metadata) === undefined) {
+            throw new Error('Mission event is not readable by the ledger reader')
+          }
           const record: EventRecord = {
             schemaVersion: MISSION_LEDGER_SCHEMA_VERSION,
             recordType: 'mission.event',

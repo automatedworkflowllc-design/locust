@@ -266,4 +266,40 @@ it('stops recovery at a noncontiguous body record and refuses to extend the corr
     const all = await ledger.listMissions()
     expect(all.missions.map((mission) => mission.metadata.missionId)).toEqual(['mission_b', 'mission_c', 'mission_a'])
   })
+  it('refuses an event its own reader would reject, rather than truncating recovery later', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    const events = successfulEvents()
+    // A message event is the one the reader constrains hardest: itemId is
+    // capped at 512 characters and no persisted string may contain NUL.
+    const message = events.find((event) => event.type === 'message.delta')
+    if (message === undefined) throw new Error('Fixture message event missing')
+    await ledger.createMission(metadata())
+
+    const oversizedIdentity = {
+      ...message,
+      sequence: 1,
+      payload: { ...message.payload, itemId: 'x'.repeat(513) }
+    } as typeof message
+    const nulBearing = {
+      ...message,
+      sequence: 1,
+      payload: { ...message.payload, text: `answer${String.fromCharCode(0)}` }
+    } as typeof message
+
+    await expect(ledger.appendEvents('mission_1', [oversizedIdentity])).rejects.toThrow(
+      'Mission event is not readable by the ledger reader'
+    )
+    await expect(ledger.appendEvents('mission_1', [nulBearing])).rejects.toThrow(
+      'Mission event is not readable by the ledger reader'
+    )
+
+    // Nothing was written, so the mission is still appendable and still whole.
+    expect((await ledger.getMission('mission_1'))?.events).toEqual([])
+    await ledger.appendEvents('mission_1', events)
+    const recovered = await ledger.getMission('mission_1')
+    expect(recovered?.events).toHaveLength(events.length)
+    expect(recovered?.phase).toBe('completed')
+    expect(recovered?.issues).toEqual([])
+  })
 })

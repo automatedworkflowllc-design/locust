@@ -247,7 +247,36 @@ function isObject(value: unknown): value is JsonObject {
 }
 
 function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  // Every persisted string originates here. The mission ledger's reader refuses
+  // any string containing NUL, and a refused record stops recovery at that
+  // point -- so no NUL may leave this function, whatever the provider sent.
+  const clean = value.includes("\u0000") ? value.replace(/\u0000/g, "") : value;
+  return clean.length > 0 ? clean : undefined;
+}
+
+// The mission ledger's reader caps identity-ish fields (item id, item type,
+// tool kind, tool name, status) at 512 characters and refuses NUL outright.
+// Provider records carry no such bound, so clamp here rather than emit an
+// event that cannot be persisted -- a truncated tool name costs nothing next
+// to a mission whose recovery stops at that record.
+const MAX_IDENTITY_LENGTH = 512;
+// The ledger reader's cap for free text. Losing the tail of one very long
+// delta, marked as truncated, beats emitting an event that cannot be persisted.
+const MAX_MESSAGE_TEXT_LENGTH = 16_384;
+
+function boundedMessageText(value: string): string {
+  return value.length > MAX_MESSAGE_TEXT_LENGTH
+    ? `${value.slice(0, MAX_MESSAGE_TEXT_LENGTH - 12)}\u2026[truncated]`
+    : value;
+}
+
+function identityValue(value: unknown): string | undefined {
+  const clean = stringValue(value) ?? "";
+  if (clean.trim().length === 0) return undefined;
+  return clean.length > MAX_IDENTITY_LENGTH
+    ? `${clean.slice(0, MAX_IDENTITY_LENGTH - 1)}\u2026`
+    : clean;
 }
 
 function numberValue(value: unknown): number | undefined {
@@ -255,9 +284,13 @@ function numberValue(value: unknown): number | undefined {
 }
 
 function redactText(value: string): string {
-  const truncated = value.length > MAX_EVIDENCE_STRING_LENGTH
-    ? `${value.slice(0, MAX_EVIDENCE_STRING_LENGTH)}\u2026[truncated]`
-    : value;
+  // NUL is unpersistable: the mission ledger's reader rejects any string
+  // containing it, and a rejected record stops recovery at that point. Strip
+  // it here, where every persisted string already passes through.
+  const withoutNul = value.includes("\u0000") ? value.replace(/\u0000/g, "") : value;
+  const truncated = withoutNul.length > MAX_EVIDENCE_STRING_LENGTH
+    ? `${withoutNul.slice(0, MAX_EVIDENCE_STRING_LENGTH)}\u2026[truncated]`
+    : withoutNul;
   return truncated
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [redacted]")
     .replace(/\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b/g, "[redacted]")
@@ -377,9 +410,10 @@ function toolName(item: JsonObject, itemType: string): string {
   if (itemType === "command_execution") return "shell";
   if (itemType === "web_search") return "web_search";
   if (itemType === "file_change") return "file_change";
-  const server = stringValue(item.server) ?? stringValue(item.server_name);
-  const tool = stringValue(item.tool) ?? stringValue(item.tool_name) ?? "mcp_tool";
-  return server === undefined ? tool : `${server}.${tool}`;
+  const server = identityValue(item.server) ?? identityValue(item.server_name);
+  const tool = identityValue(item.tool) ?? identityValue(item.tool_name) ?? "mcp_tool";
+  // Both halves are individually bounded; the join is not, so bound it again.
+  return identityValue(server === undefined ? tool : `${server}.${tool}`) ?? "mcp_tool";
 }
 
 function processEvidence(completion: RuntimeProcessCompletion): ProcessEvidence {
@@ -489,9 +523,11 @@ export function createCodexEventNormalizer(
     evidence: CodexEventEvidence,
     events: NormalizedRuntimeEvent[],
   ): { id: string; type: string; state: ItemState } => {
-    const id = stringValue(item.id) ?? `codex-item-${record.sequence}`;
-    const itemType = stringValue(item.type) ?? "unknown";
-    if (stringValue(item.id) === undefined || stringValue(item.type) === undefined) {
+    const rawId = identityValue(item.id);
+    const rawType = identityValue(item.type);
+    const id = rawId ?? `codex-item-${record.sequence}`;
+    const itemType = rawType ?? "unknown";
+    if (rawId === undefined || rawType === undefined) {
       events.push(diagnostic(
         "warning",
         "codex.item_identity_missing",
@@ -545,6 +581,7 @@ export function createCodexEventNormalizer(
     } else {
       return undefined;
     }
+    text = boundedMessageText(text);
 
     return emit("message.delta", {
       itemId: state.id,
@@ -563,7 +600,7 @@ export function createCodexEventNormalizer(
     evidence: CodexEventEvidence,
   ): ToolPayload => {
     const command = stringValue(item.command);
-    const status = stringValue(item.status);
+    const status = identityValue(item.status);
     const exitCode = numberValue(item.exit_code) ?? numberValue(item.exitCode);
     const rawOutput = item.aggregated_output ?? item.output ?? item.result;
     const outputState = { redacted: false };

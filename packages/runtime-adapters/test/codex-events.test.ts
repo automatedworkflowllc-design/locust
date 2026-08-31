@@ -391,3 +391,63 @@ describe("Codex JSONL event normalizer", () => {
     )[0]?.payload.kind).toBe("process-failed");
   });
 });
+
+describe("ledger-writable bounds", () => {
+  const NUL = String.fromCharCode(0);
+
+  it("clamps identity fields the mission ledger caps at 512 characters", () => {
+    const target = normalizer();
+    const events = feed(target, [
+      { type: "thread.started", thread_id: "thread-bounds" },
+      {
+        type: "item.completed",
+        item: {
+          id: "i".repeat(900),
+          type: "mcp_tool_call",
+          server: "s".repeat(400),
+          tool: "t".repeat(400),
+          status: "u".repeat(700),
+        },
+      },
+    ]);
+    const tool = ofType(events, "tool.completed")[0];
+    expect(tool).toBeDefined();
+    const payload = tool?.payload as { itemId: string; name: string; status?: string };
+    // Clamped, not dropped: the record is still identifiable afterwards.
+    expect(payload.itemId.length).toBeLessThanOrEqual(512);
+    expect(payload.name.length).toBeLessThanOrEqual(512);
+    expect(payload.status?.length ?? 0).toBeLessThanOrEqual(512);
+    expect(payload.itemId.startsWith("iii")).toBe(true);
+    expect(payload.name.startsWith("sss")).toBe(true);
+  });
+
+  it("strips NUL from every persisted string", () => {
+    const target = normalizer();
+    const events = feed(target, [
+      { type: "thread.started", thread_id: `thread${NUL}-nul` },
+      {
+        type: "item.completed",
+        item: {
+          id: `answer${NUL}`,
+          type: "agent_message",
+          text: `Durable${NUL} result`,
+        },
+      },
+    ]);
+    // A NUL anywhere in a persisted string makes the ledger reader refuse the
+    // record, and recovery then stops at that point -- so none may survive.
+    // Walk the real string values: JSON.stringify escapes NUL to a six-character
+    // sequence, so searching its output for a NUL can never fail.
+    const strings: string[] = [];
+    const walk = (value: unknown): void => {
+      if (typeof value === "string") strings.push(value);
+      else if (Array.isArray(value)) value.forEach(walk);
+      else if (value !== null && typeof value === "object") {
+        Object.values(value as Record<string, unknown>).forEach(walk);
+      }
+    };
+    walk(events);
+    expect(strings.length).toBeGreaterThan(0);
+    expect(strings.filter((entry) => entry.includes(NUL))).toEqual([]);
+  });
+});
