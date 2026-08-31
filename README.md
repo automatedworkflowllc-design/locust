@@ -4,9 +4,9 @@ A local-first, open-source platform for autonomous AI teammates with explicit mo
 
 The working product name is intentionally generic until naming is settled.
 
-![Teammate control-room prototype](docs/assets/control-room.png)
+![Teammate live Codex control room](docs/assets/control-room.png)
 
-The screenshot uses sample mission data; the local runtime readiness panel is live.
+The screenshot is a real read-only Codex smoke mission rendered from the normalized local CLI event stream.
 
 ## Why this exists
 
@@ -29,11 +29,11 @@ Mission control plane
 
 ## What works now
 
-The repository contains a runnable Electron/React control-room prototype. Its interactive UI includes mission filtering, the Signal Rail execution timeline, an approval receipt, command dock, runtime/model picker, and visible fallback chain. It now performs real, read-only discovery of installed Codex CLI, Claude Code, and optional OmniRoute, displaying version and authentication readiness without reading credential files.
+The repository contains a runnable Electron/React control room. Its interactive UI includes mission filtering, the Signal Rail execution timeline, an approval receipt, command dock, runtime/model picker, and visible fallback chain. It performs real, read-only discovery of installed Codex CLI, Claude Code, and optional OmniRoute, displaying version and authentication readiness without reading credential files.
 
 Shared packages define the runtime/routing contracts, implement capability-aware fallback and the safe-handoff state machine, and generate conservative non-interactive Codex/Claude command specifications. Probe and Codex mission-process transports are shell-free, prompt-on-stdin, time/output-bounded, cancellation-aware, and covered by fake-runner tests. The Codex adapter also has a typed, privacy-aware JSONL normalizer that converts provider records into product-owned mission events, redacts bounded diagnostic evidence, and does not persist reasoning content.
 
-The current mission data and activity are demonstrations. Runtime discovery is live, and the controlled Codex transport/normalizer exists behind the adapter boundary, but it is not yet wired into the Electron mission flow. The next milestone is one harmless, read-only Codex mission streamed into the control room with safe cancellation; durable mission storage and real app tools follow.
+Users can now start one real Codex mission from the command dock. The renderer supplies only a bounded prompt; the trusted main process fixes the executable, workspace, account-default route, and `read-only` sandbox, streams sanitized normalized events into the Signal Rail, and exposes host-correlated cancellation. The other listed missions, app connections, Claude/OmniRoute execution, automatic fallback, and external tools remain demonstrations or future work. Durable local mission storage is next.
 
 ## Run locally
 
@@ -53,7 +53,7 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the complete test suite. The 2026-08-31 normalizer milestone passes all checks with 37/37 tests.
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite. The 2026-08-31 live-mission milestone passes all checks with 43/43 tests.
 
 ## Working from another Codex task
 

@@ -50,7 +50,9 @@ Then inspect the actual source tree and tests. The repository is authoritative f
 
 As of 2026-08-31, the Electron/React desktop control-room prototype is implemented and runnable. It includes an interactive mission index and filter, Signal Rail, approval surface, command dock, runtime/model menu, and fallback-chain controls. Shared TypeScript packages define the runtime/routing/checkpoint contracts, capability-aware fallback, a guarded handoff state machine, and safe installed-runtime discovery.
 
-The desktop now performs live, read-only Codex CLI, Claude Code, and OmniRoute discovery in the trusted main process and shows sanitized readiness/version status through preload IPC. It never reads credential stores. A controlled prompt-on-stdin Codex process transport and typed, privacy-aware JSONL normalizer are implemented and fake-tested. The normalizer converts provider records into product-owned events, retains only bounded redacted diagnostic evidence, excludes reasoning content, and captures the discovered CLI version as provenance. Neither layer is wired to the renderer yet. The current mission activity remains demonstration data: no Codex/Claude mission process is launched from the UI, and mission persistence and real app/tool execution are not implemented.
+The desktop performs live, read-only Codex CLI, Claude Code, and OmniRoute discovery in the trusted main process and shows sanitized readiness/version status through preload IPC. It never reads credential stores. One real Codex path is wired end to end: a bounded renderer prompt crosses a narrow IPC surface, the main process owns the workspace/executable/fixed read-only argv, the controlled prompt-on-stdin transport streams through the privacy-aware normalizer, and the Signal Rail renders the resulting events with host-correlated cancellation. Reasoning content is excluded and only bounded redacted evidence crosses the bridge.
+
+The remaining mission fixtures, Claude/OmniRoute execution, automatic fallback, and connection/tool surfaces are not live. Mission/event state is still memory-only and does not survive a restart, so automatic route fallback remains deliberately disabled until an append-only ledger and reconciled checkpoint exist.
 
 From the canonical workspace:
 
@@ -65,9 +67,9 @@ Run the complete validation suite with:
 pnpm check
 ```
 
-Last verified on 2026-08-31: the Electron production build and every workspace TypeScript check passed, with 37/37 tests passing across runtime adapters, runtime core, and desktop discovery.
+Last verified on 2026-08-31: the Electron production build and every workspace TypeScript check passed, with 43/43 tests passing across runtime adapters, runtime core, and desktop services. A real UI smoke run returned `LIVE_UI_OK` through Codex CLI 0.151.0-alpha.7.2 and rendered a clean completion receipt.
 
-The next milestone is one end-to-end local Codex path in Electron: launch a harmless read-only prompt through the existing controlled transport, stream normalized events into one real mission timeline, expose safe cancellation and actionable failure state, then add a durable local event ledger/checkpoint. Contract fixtures must remain authentication-free.
+The next milestone is a durable local ledger/checkpoint: atomically persist product-owned mission metadata and normalized events, recover interrupted/completed runs after restart, then create a reconciled checkpoint before enabling Ask/Automatic fallback. Contract fixtures must remain authentication-free.
 
 ## Important implementation invariants
 
@@ -146,6 +148,16 @@ Use this template:
 - Decisions made: discovery is read-only and credential-blind; IPC accepts no renderer-controlled path or command; PATH shims are executed without `shell: true`; dangerous permission-bypass flags are forbidden.
 - Known issues: the route/model surface remains example data, discovery can take several seconds on first launch, and no live mission event stream or persistence exists yet.
 - Recommended next step: wire the controlled Codex transport and normalizer through trusted Electron IPC, then render and safely cancel one harmless read-only mission end to end.
+
+### 2026-08-31 — live read-only Codex mission
+
+- Scope/owner: Electron mission service, secure IPC/preload surface, live Signal Rail UI, tests, and current-state documentation.
+- Files changed: `apps/desktop/src/main/codex-mission.ts`, Electron main/preload/shared IPC files, renderer UI/styles, desktop tests, screenshot, and project-status documentation.
+- Outcome: a user can run one real account-default Codex mission from the command dock; the host fixes the executable/workspace/read-only command, streams normalized events, enforces one active process, and supports safe cancellation without exposing raw process failures.
+- Validation: `pnpm check` passed the production build, all TypeScript checks, and 43/43 tests. A real adapter smoke returned `LIVE_SMOKE_OK`; a real Electron UI smoke returned and rendered `LIVE_UI_OK` with a clean provider/host terminal receipt.
+- Decisions made: the renderer controls only the prompt; model selection is account-default for this slice; exact provider allowance is shown as unavailable instead of guessed; `run.failed` closes an invocation, not automatically the parent mission.
+- Known issues: mission/event state is memory-only; current-run ownership is process-wide; live model enumeration, Claude/OmniRoute execution, fallback, and external tools are not implemented.
+- Recommended next step: add a versioned append-only local mission/event ledger and restart recovery, then persist a reconciled checkpoint before enabling fallback.
 
 ## Prompt for a new Codex task
 

@@ -1,35 +1,24 @@
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
-
-export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
-
-export type LocalRuntimeId = 'codex' | 'claude' | 'omniroute'
-export type RuntimeAuthState = 'authenticated' | 'unauthenticated' | 'unknown' | 'not-applicable'
-export type RuntimeProbeStatus = 'ready' | 'not-installed' | 'auth-required' | 'offline' | 'probe-failed'
-
-export interface PublicRuntimeStatus {
-  readonly id: LocalRuntimeId
-  readonly displayName: string
-  readonly installed: boolean
-  readonly version: string | null
-  readonly auth: RuntimeAuthState
-  readonly ready: boolean
-  readonly status: RuntimeProbeStatus
-}
+import type {
+  LocalRuntimeId,
+  PublicRuntimeStatus,
+  RuntimeAuthState,
+  RuntimeDiscoveryResponse,
+  RuntimeProbeStatus
+} from '../shared/ipc.js'
+export { RUNTIME_DISCOVERY_CHANNEL } from '../shared/ipc.js'
+export type {
+  LocalRuntimeId,
+  PublicRuntimeStatus,
+  RuntimeAuthState,
+  RuntimeDiscoveryResponse,
+  RuntimeProbeStatus
+} from '../shared/ipc.js'
 
 export interface RuntimeDiscoverySnapshot {
   readonly checkedAt: string
   readonly runtimes: readonly PublicRuntimeStatus[]
 }
-
-export type RuntimeDiscoveryResponse =
-  | { readonly ok: true; readonly data: RuntimeDiscoverySnapshot }
-  | {
-      readonly ok: false
-      readonly error: {
-        readonly code: 'DISCOVERY_FAILED'
-        readonly message: string
-      }
-    }
 
 export interface RuntimeDiscoveryService {
   get(): Promise<RuntimeDiscoveryResponse>

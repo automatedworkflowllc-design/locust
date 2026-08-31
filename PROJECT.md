@@ -32,8 +32,9 @@ The differentiator is not merely “more agents.” It is a trustworthy control 
 - Safe read-only Codex and restricted/plan-mode Claude command specifications with dangerous bypass flags rejected.
 - Controlled prompt-on-stdin JSONL process transport with bounded queues/stderr, filtered environment, no retries, and explicit cancellation/termination state.
 - Typed, privacy-aware Codex JSONL normalization into product-owned run, step, tool, message, diagnostic, and route-limit events, with bounded redacted evidence and reasoning content excluded.
+- Narrow main/preload IPC for one live Codex mission, with a bounded renderer prompt, host-owned workspace/executable/argv, normalized streaming Signal Rail, generic transport errors, one-run concurrency, and safe Stop behavior.
 
-The mission and route activity remains demonstration data. The app detects runtimes, and the Codex process/event boundary is implemented in the adapter package, but Electron does not yet launch a mission, persist mission state, or invoke real app tools.
+One harmless read-only Codex mission is live end to end. The remaining mission fixtures, Claude/OmniRoute routes, automatic fallback, token-budget preview, and connection/tool surfaces are still demonstrations. Mission state is not yet durable across restarts, and the app does not invoke real external tools.
 
 ## Run and validate
 
@@ -50,15 +51,15 @@ In a separate run, validate the full workspace:
 pnpm check
 ```
 
-Last verified on 2026-08-31: the production build and every workspace TypeScript check passed, with 37/37 tests passing across runtime adapters, runtime core, and the desktop discovery service.
+Last verified on 2026-08-31: the production build and every workspace TypeScript check passed, with 43/43 tests passing across runtime adapters, runtime core, and desktop services. A real UI smoke mission returned `LIVE_UI_OK` through Codex CLI 0.151.0-alpha.7.2 with a clean normalized receipt.
 
 ## Next implementation milestone
 
-Wire one real, safe local Codex mission into Electron end to end:
+Make the live local mission durable before enabling fallback:
 
-1. Connect the trusted Electron main process to the controlled Codex transport and event normalizer through a narrow, sanitized IPC surface.
-2. Replace one demonstration mission timeline with a harmless read-only run, including streamed normalized events, cancellation, and actionable error state.
-3. Persist the event ledger and a resumable checkpoint locally before adding automatic provider fallback.
+1. Persist missions, invocation receipts, and append-only normalized events locally with schema versioning and atomic ordering.
+2. Restore completed/interrupted runs after restart and surface a clear resumability state.
+3. Create a reconciled checkpoint before any provider fallback or route switch.
 4. Keep adapter fixtures covering partial output, malformed events, quota classification, provider drift, and cancellation as the boundary evolves.
 5. Apply the proven runner/event contract to Claude Code, then add the curated OmniRoute gateway adapter.
 

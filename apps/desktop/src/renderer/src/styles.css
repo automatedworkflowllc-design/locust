@@ -139,6 +139,12 @@ button,
   border-radius: 5px;
 }
 
+.prototype-badge.live {
+  color: #b8d885;
+  background: rgba(196, 240, 108, 0.07);
+  border-color: rgba(196, 240, 108, 0.18);
+}
+
 .workspace-name {
   overflow: hidden;
   color: var(--text-3);
@@ -221,6 +227,7 @@ kbd {
 .sidebar {
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
   border-right: 1px solid var(--line);
 }
 
@@ -2104,6 +2111,205 @@ kbd {
   font-size: 9px;
   background: #0f1115;
   border-top: 1px solid #23272d;
+}
+
+.route-pill:disabled,
+.fallback-row:disabled,
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.route-pill:disabled:hover {
+  color: #8b9099;
+  background: #12151a;
+  border-color: #282c33;
+}
+
+.live-label.completed,
+.live-label.cancelled {
+  color: #9da799;
+  background: rgba(135, 151, 129, 0.08);
+  border-color: rgba(135, 151, 129, 0.16);
+}
+
+.live-label.failed {
+  color: #e4a29b;
+  background: rgba(219, 102, 91, 0.08);
+  border-color: rgba(219, 102, 91, 0.18);
+}
+
+.live-label.failed span,
+.running-elapsed.failed > span {
+  background: #de756b;
+  animation: none;
+}
+
+.live-label.completed span,
+.live-label.cancelled span,
+.running-elapsed.completed > span,
+.running-elapsed.cancelled > span {
+  background: #7f8c7a;
+  animation: none;
+}
+
+.live-guard-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 6px 8px;
+  color: #79876d;
+  font-size: 8px;
+  background: #11160f;
+  border: 1px solid #263020;
+  border-radius: 6px;
+}
+
+.live-prompt {
+  padding: 9px 10px;
+  color: #aeb3ba !important;
+  background: linear-gradient(135deg, rgba(31, 35, 41, 0.9), rgba(17, 19, 23, 0.9));
+  border: 1px solid #292e36;
+  border-radius: 7px;
+}
+
+.live-tool-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.tool-call.live {
+  margin-top: 0;
+}
+
+.tool-call.live .tool-icon {
+  color: #b9d887;
+  background: #192016;
+  border-color: #334328;
+}
+
+.tool-call.live div span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-call.live.tool\.failed {
+  border-color: #442825;
+}
+
+.live-limit,
+.live-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 9px;
+  padding: 9px 10px;
+  color: #caa86e;
+  font-size: 9px;
+  line-height: 1.45;
+  background: #1a1711;
+  border: 1px solid #3b321f;
+  border-radius: 7px;
+}
+
+.live-limit > span,
+.live-error > span {
+  display: grid;
+  gap: 2px;
+}
+
+.live-limit strong,
+.live-error strong {
+  color: #e0c389;
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
+.live-error {
+  color: #c28b86;
+  background: #1b1313;
+  border-color: #402323;
+}
+
+.live-error strong {
+  color: #e4a29b;
+}
+
+.live-response {
+  margin-top: 9px;
+  padding: 11px 12px;
+  overflow-wrap: anywhere;
+  color: #c6c9ce;
+  font-size: 10px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  background: linear-gradient(145deg, #12151a, #0f1114);
+  border: 1px solid #292e35;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+}
+
+.command-dock textarea:disabled {
+  color: #777c84;
+  cursor: wait;
+}
+
+.send-button.stop {
+  color: #f0b2ac;
+  background: #3a2020;
+  border: 1px solid #5a2d2b;
+  box-shadow: 0 4px 12px rgba(137, 52, 46, 0.12);
+}
+
+.send-button.stop:hover:not(:disabled) {
+  color: #ffd0ca;
+  background: #4a2726;
+}
+
+.command-notice.error {
+  color: #d9a29d;
+  background: #1e1414;
+  border-color: #462727;
+}
+
+.live-safety-card {
+  background: linear-gradient(145deg, rgba(28, 40, 23, 0.72), #111519 48%);
+  border-color: #314229;
+}
+
+.live-safety-card .approval-card-top {
+  color: #afd080;
+}
+
+.live-safety-card .approval-shield {
+  color: #c9ed8d;
+  background: rgba(196, 240, 108, 0.08);
+  border-color: rgba(196, 240, 108, 0.18);
+}
+
+.live-safety-card .risk-badge {
+  color: #94ad72;
+  background: rgba(196, 240, 108, 0.05);
+  border-color: rgba(196, 240, 108, 0.12);
+}
+
+.live-safety-card .approval-receipt {
+  border-color: #293124;
+}
+
+.live-safety-card.limit {
+  background: linear-gradient(145deg, rgba(45, 34, 20, 0.72), #141416 48%);
+  border-color: #483720;
+}
+
+.context-icon.codex {
+  color: #d2f58a;
+  background: #1b2115;
+  border-color: #354424;
 }
 
 @media (max-width: 1270px) {

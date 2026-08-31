@@ -1,4 +1,10 @@
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import type {
+  CodexMissionStartData,
+  CodexMissionUpdate,
+  PublicRuntimeStatus,
+  RuntimeProbeStatus
+} from '../../shared/ipc.js'
 
 type IconName =
   | 'activity'
@@ -97,18 +103,65 @@ interface RouteOption {
 }
 
 const routes: RouteOption[] = [
-  { runtime: 'Codex', model: 'GPT-5.6 Sol', source: 'Example account route', badge: 'PRIMARY', tone: 'lime' },
+  { runtime: 'Codex', model: 'Account default', source: 'Detected local account', badge: 'LIVE', tone: 'lime' },
   { runtime: 'Claude Code', model: 'Claude Sonnet 5', source: 'Example account route', badge: 'STANDBY', tone: 'blue' },
   { runtime: 'OmniRoute', model: 'Qwen3 Coder', source: 'Example free route', badge: 'FREE', tone: 'violet' },
   { runtime: 'Ollama', model: 'Devstral Small', source: 'Example local route', badge: 'LOCAL', tone: 'neutral' }
 ]
+
+type CodexRuntimeEvent = Extract<CodexMissionUpdate, { readonly kind: 'event' }>['event']
+type LiveRunPhase = 'starting' | 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled'
+
+interface LiveRunState {
+  readonly prompt: string
+  readonly data?: CodexMissionStartData
+  readonly phase: LiveRunPhase
+  readonly events: readonly CodexRuntimeEvent[]
+  readonly error?: string
+}
+
+function liveRunIsActive(run: LiveRunState | undefined): boolean {
+  return run?.phase === 'starting' || run?.phase === 'running' || run?.phase === 'cancelling'
+}
+
+function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): LiveRunState {
+  if (update.kind === 'transport-error') {
+    return { ...run, phase: 'failed', error: update.error.message }
+  }
+
+  const events = [...run.events, update.event].slice(-500)
+  if (update.event.type === 'run.completed') return { ...run, events, phase: 'completed' }
+  if (update.event.type === 'run.cancelled') return { ...run, events, phase: 'cancelled' }
+  if (update.event.type === 'run.failed') {
+    return { ...run, events, phase: 'failed', error: update.event.payload.message }
+  }
+  return { ...run, events, phase: run.phase === 'starting' ? 'running' : run.phase }
+}
+
+function missionForLiveRun(run: LiveRunState): Mission {
+  const shortPrompt = run.prompt.length > 42 ? `${run.prompt.slice(0, 42).trimEnd()}…` : run.prompt
+  const status: MissionStatus = run.phase === 'completed'
+    ? 'complete'
+    : run.phase === 'failed' || run.phase === 'cancelled'
+      ? 'queued'
+      : 'running'
+  return {
+    id: 1,
+    title: shortPrompt,
+    teammate: 'Codex · Read-only',
+    teammateInitials: 'CX',
+    status,
+    time: run.phase === 'completed' ? 'Done' : run.phase === 'failed' ? 'Failed' : run.phase === 'cancelled' ? 'Stopped' : 'Live',
+    accent: '#c2f66f'
+  }
+}
 
 type RuntimeDiscoveryState =
   | { readonly phase: 'loading' }
   | { readonly phase: 'ready'; readonly runtimes: readonly PublicRuntimeStatus[] }
   | { readonly phase: 'error' }
 
-function WindowBar(): ReactNode {
+function WindowBar({ live = false }: { live?: boolean }): ReactNode {
   return (
     <header className="window-bar" onDoubleClick={() => window.desktop?.toggleMaximize()}>
       <div className="window-brand">
@@ -116,7 +169,7 @@ function WindowBar(): ReactNode {
         <span>Teammate</span>
         <span className="window-separator">/</span>
         <span className="workspace-name">Local workspace</span>
-        <span className="prototype-badge">Prototype · sample data</span>
+        <span className={`prototype-badge ${live ? 'live' : ''}`}>{live ? 'Local alpha · live runtime' : 'Prototype · sample data'}</span>
       </div>
       <div className="window-center">
         <Icon name="command" size={12} />
@@ -169,17 +222,26 @@ function RuntimeDiscoveryCard({ state }: { state: RuntimeDiscoveryState }): Reac
           </div>
         ))}
       </div>
-      <small className="runtime-discovery-note">Detection only · mission execution not connected</small>
+      <small className="runtime-discovery-note">{state.runtimes.some((runtime) => runtime.id === 'codex' && runtime.ready) ? 'Codex ready · live runs are read-only' : 'Detection only · sign in to enable live runs'}</small>
     </div>
   )
 }
 
-function Sidebar({ activeId, onSelect, runtimeState }: { activeId: number; onSelect: (id: number) => void; runtimeState: RuntimeDiscoveryState }): ReactNode {
+function Sidebar({ activeId, onSelect, runtimeState, liveRun }: {
+  activeId: number
+  onSelect: (id: number) => void
+  runtimeState: RuntimeDiscoveryState
+  liveRun?: LiveRunState
+}): ReactNode {
   const [filter, setFilter] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
+  const indexedMissions = useMemo(
+    () => liveRun === undefined ? missions : [missionForLiveRun(liveRun), ...missions.slice(1)],
+    [liveRun]
+  )
   const visibleMissions = useMemo(
-    () => missions.filter((mission) => `${mission.title} ${mission.teammate}`.toLowerCase().includes(filter.toLowerCase())),
-    [filter]
+    () => indexedMissions.filter((mission) => `${mission.title} ${mission.teammate}`.toLowerCase().includes(filter.toLowerCase())),
+    [filter, indexedMissions]
   )
 
   useEffect(() => {
@@ -211,7 +273,7 @@ function Sidebar({ activeId, onSelect, runtimeState }: { activeId: number; onSel
       </div>
 
       <div className="mission-list-scroll">
-        <div className="list-heading"><span>Example missions</span><button type="button" aria-label="Mission list menu (not available in prototype)" disabled><Icon name="dots" size={15} /></button></div>
+        <div className="list-heading"><span>{liveRun === undefined ? 'Example missions' : 'Local missions'}</span><button type="button" aria-label="Mission list menu (not available in prototype)" disabled><Icon name="dots" size={15} /></button></div>
         <div className="mission-list">
           {visibleMissions.map((mission) => (
             <button
@@ -241,9 +303,9 @@ function Sidebar({ activeId, onSelect, runtimeState }: { activeId: number; onSel
   )
 }
 
-function RoutePill({ route, onClick }: { route: RouteOption; onClick?: () => void }): ReactNode {
+function RoutePill({ route, onClick, disabled = false }: { route: RouteOption; onClick?: () => void; disabled?: boolean }): ReactNode {
   return (
-    <button type="button" className="route-pill" onClick={onClick}>
+    <button type="button" className="route-pill" onClick={onClick} disabled={disabled}>
       <span className={`runtime-glyph ${route.tone}`}>{route.runtime === 'Codex' ? 'O' : route.runtime === 'Claude Code' ? 'A' : route.runtime === 'OmniRoute' ? '∞' : 'L'}</span>
       <span>{route.runtime}</span>
       <span className="route-slash">/</span>
@@ -253,23 +315,41 @@ function RoutePill({ route, onClick }: { route: RouteOption; onClick?: () => voi
   )
 }
 
-function MissionHeader({ mission, route, onRouteClick }: { mission: Mission; route: RouteOption; onRouteClick: () => void }): ReactNode {
+function MissionHeader({ mission, route, onRouteClick, liveRun, onCancel }: {
+  mission: Mission
+  route: RouteOption
+  onRouteClick: () => void
+  liveRun?: LiveRunState
+  onCancel: () => void
+}): ReactNode {
+  const active = liveRunIsActive(liveRun)
+  const stateLabel = liveRun === undefined
+    ? 'Preview'
+    : liveRun.phase === 'completed'
+      ? 'Complete'
+      : liveRun.phase === 'failed'
+        ? 'Failed'
+        : liveRun.phase === 'cancelled'
+          ? 'Stopped'
+          : liveRun.phase === 'cancelling'
+            ? 'Stopping'
+            : 'Live'
   return (
     <header className="mission-header">
       <div className="breadcrumb"><span>Missions</span><Icon name="chevron-right" size={12} /><span>{mission.title}</span></div>
       <div className="mission-heading-row">
         <div>
-          <div className="title-with-state"><h1>{mission.title}</h1><span className="live-label"><span /> Preview</span></div>
-          <p>Example run: Maya is researching, drafting, and preparing the next safe action.</p>
+          <div className="title-with-state"><h1>{liveRun === undefined ? mission.title : 'Local Codex mission'}</h1><span className={`live-label ${liveRun === undefined ? '' : liveRun.phase}`}><span /> {stateLabel}</span></div>
+          <p>{liveRun === undefined ? 'Example run: Maya is researching, drafting, and preparing the next safe action.' : 'A real Codex CLI run in the host-selected workspace with the read-only sandbox enforced.'}</p>
         </div>
         <div className="mission-actions">
-          <RoutePill route={route} onClick={onRouteClick} />
-          <button type="button" className="icon-button" aria-label="Pause mission (not available in prototype)" title="Pause is coming with the live runtime" disabled><Icon name="pause" size={15} /></button>
+          <RoutePill route={route} onClick={onRouteClick} disabled={active} />
+          <button type="button" className="icon-button" aria-label="Stop live mission" title={active ? 'Stop this Codex process safely' : 'No active mission'} disabled={!active || liveRun?.data === undefined} onClick={onCancel}><Icon name="pause" size={15} /></button>
           <button type="button" className="icon-button" aria-label="More mission options (not available in prototype)" disabled><Icon name="dots" size={16} /></button>
         </div>
       </div>
       <nav className="mission-tabs" aria-label="Mission sections" role="tablist">
-        <button type="button" className="active" role="tab" aria-selected="true"><Icon name="activity" size={14} />Activity <span>8</span></button>
+        <button type="button" className="active" role="tab" aria-selected="true"><Icon name="activity" size={14} />Activity <span>{liveRun?.events.length ?? 8}</span></button>
         <button type="button" role="tab" aria-selected="false" disabled title="Artifact view is coming next"><Icon name="file" size={14} />Artifacts <span>4</span></button>
         <button type="button" role="tab" aria-selected="false" disabled title="Context view is coming next"><Icon name="message" size={14} />Context</button>
       </nav>
@@ -348,6 +428,86 @@ function SignalRail({ approvalStatus }: { approvalStatus: 'pending' | 'approved'
   )
 }
 
+function eventTime(event: CodexRuntimeEvent | undefined): string {
+  if (event === undefined) return 'Waiting'
+  return new Date(event.occurredAt).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+function LiveSignalRail({ run }: { run: LiveRunState }): ReactNode {
+  const started = run.events.find((event) => event.type === 'run.started')
+  const turnStarted = run.events.find((event) => event.type === 'step.started' && event.payload.stepKind === 'turn')
+  const terminal = run.events.filter((event) => event.type === 'run.completed' || event.type === 'run.failed' || event.type === 'run.cancelled').at(-1)
+  const limit = run.events.filter((event) => event.type === 'route.limit_detected').at(-1)
+  const toolEvents = run.events.filter((event): event is Extract<CodexRuntimeEvent, {
+    readonly type: 'tool.started' | 'tool.completed' | 'tool.failed'
+  }> => event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.failed')
+  let responseText = ''
+  let responseTime: CodexRuntimeEvent | undefined
+  for (const event of run.events) {
+    if (event.type !== 'message.delta') continue
+    responseText = event.payload.operation === 'replace'
+      ? event.payload.text
+      : responseText + event.payload.text
+    responseTime = event
+  }
+  const statusLabel = run.phase === 'starting'
+    ? 'Verifying runtime'
+    : run.phase === 'running'
+      ? 'Running'
+      : run.phase === 'cancelling'
+        ? 'Stopping safely'
+        : run.phase === 'completed'
+          ? 'Completed'
+          : run.phase === 'cancelled'
+            ? 'Stopped'
+            : 'Needs attention'
+
+  return (
+    <section className="signal-rail live-signal-rail">
+      <div className="section-kicker"><span>Signal rail · live Codex run</span><span className={`running-elapsed ${run.phase}`}><span /> {statusLabel}</span></div>
+
+      <TimelineItem state={started === undefined ? 'active' : 'done'} icon="terminal" title={started === undefined ? 'Starting Codex safely' : 'Connected to Codex'} time={eventTime(started)}>
+        <p>{started === undefined ? 'Verifying the installed CLI and opening a bounded JSONL transport.' : `Codex CLI ${run.data?.cliVersion ?? 'version unavailable'} · account default · read-only sandbox`}</p>
+        <div className="live-guard-row"><Icon name="shield" size={13} /><span>No shell command string, no prompt in argv, and no permission-bypass flags.</span></div>
+      </TimelineItem>
+
+      <TimelineItem state={terminal === undefined ? (turnStarted === undefined ? 'waiting' : 'active') : 'done'} icon="spark" title="Working through the mission" time={eventTime(turnStarted)}>
+        <p className="live-prompt">{run.prompt}</p>
+        {toolEvents.length > 0 && (
+          <div className="live-tool-list">
+            {toolEvents.slice(-5).map((event) => (
+              <div className={`tool-call live ${event.type}`} key={event.id}>
+                <span className="tool-icon"><Icon name={event.payload.toolKind === 'command_execution' ? 'terminal' : 'code'} size={13} /></span>
+                <div><strong>{event.payload.name}</strong><span>{event.payload.command ?? event.payload.toolKind}</span></div>
+                <span className="tool-result">{event.type === 'tool.failed' ? 'Failed' : event.type === 'tool.completed' ? 'Done' : 'Running'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {limit !== undefined && <div className="live-limit"><Icon name="route" size={14} /><span><strong>Provider limit detected</strong>{limit.payload.message}</span></div>}
+      </TimelineItem>
+
+      <TimelineItem state={responseText ? (terminal?.type === 'run.completed' ? 'done' : 'active') : 'waiting'} icon="message" title="Codex response" time={eventTime(responseTime)}>
+        {responseText
+          ? <div className="live-response">{responseText}</div>
+          : <p>{terminal === undefined ? 'The response will stream here as normalized events arrive.' : 'This run ended without an assistant message.'}</p>}
+      </TimelineItem>
+
+      <TimelineItem state={terminal === undefined ? 'waiting' : terminal.type === 'run.completed' ? 'done' : 'active'} icon={terminal?.type === 'run.completed' ? 'check' : terminal?.type === 'run.cancelled' ? 'pause' : 'shield'} title={terminal === undefined ? 'Finalize run receipt' : terminal.type === 'run.completed' ? 'Mission completed' : terminal.type === 'run.cancelled' ? 'Mission stopped' : 'Codex invocation ended'} time={eventTime(terminal)} last>
+        {terminal?.type === 'run.completed' && <p>The provider terminal event and clean host-process exit agreed. This receipt is safe to persist next.</p>}
+        {terminal?.type === 'run.cancelled' && <p>The host requested cancellation and waited for process termination confirmation.</p>}
+        {terminal?.type === 'run.failed' && <div className="live-error"><strong>{terminal.payload.kind}</strong><span>{terminal.payload.message}</span></div>}
+        {terminal === undefined && run.error !== undefined && <div className="live-error"><strong>Runtime error</strong><span>{run.error}</span></div>}
+        {terminal === undefined && run.error === undefined && <p>Waiting for both the Codex terminal record and the host process receipt.</p>}
+      </TimelineItem>
+    </section>
+  )
+}
+
 function ApprovalCard({ status, onChange }: { status: 'pending' | 'approved' | 'changes'; onChange: (status: 'pending' | 'approved' | 'changes') => void }): ReactNode {
   if (status !== 'pending') {
     return (
@@ -382,20 +542,40 @@ function ApprovalCard({ status, onChange }: { status: 'pending' | 'approved' | '
   )
 }
 
-function RoutePanel({ selected, onSelect }: { selected: number; onSelect: (index: number) => void }): ReactNode {
+function LiveSafetyCard({ run }: { run: LiveRunState }): ReactNode {
+  const limit = run.events.some((event) => event.type === 'route.limit_detected')
+  return (
+    <section className={`approval-card live-safety-card ${limit ? 'limit' : ''}`}>
+      <div className="approval-card-top">
+        <span className="approval-shield"><Icon name={limit ? 'route' : 'shield'} size={16} /></span>
+        <span>{limit ? 'Route handoff required' : 'Live guardrails'}</span>
+        <span className="risk-badge">Read only</span>
+      </div>
+      <h3>{limit ? 'Codex reached a provider limit' : 'External writes are disabled'}</h3>
+      <p>{limit ? 'This invocation will close cleanly. Automatic fallback waits for the durable-checkpoint milestone.' : 'The host fixed the workspace, executable, argv, and sandbox. The renderer supplied only the prompt.'}</p>
+      <div className="approval-receipt">
+        <div><span>Runtime</span><strong>Codex CLI</strong></div>
+        <div><span>Model</span><strong>Account default</strong></div>
+        <div><span>Sandbox</span><strong>Read only</strong></div>
+      </div>
+    </section>
+  )
+}
+
+function RoutePanel({ selected, onSelect, locked = false, live = false }: { selected: number; onSelect: (index: number) => void; locked?: boolean; live?: boolean }): ReactNode {
   const [automatic, setAutomatic] = useState(true)
 
   return (
     <section className="route-panel">
       <div className="panel-title"><span><Icon name="route" size={15} /> Model route preview</span><button type="button" aria-label="Routing settings (not available in prototype)" disabled><Icon name="settings" size={14} /></button></div>
       <div className="route-policy">
-        <div><strong>Automatic fallback</strong><span>Preview the policy used at a provider limit</span></div>
-        <button type="button" className={`switch ${automatic ? 'on' : ''}`} onClick={() => setAutomatic((value) => !value)} role="switch" aria-label="Automatic fallback preview" aria-checked={automatic}><span /></button>
+        <div><strong>{live ? 'Automatic fallback preview' : 'Automatic fallback'}</strong><span>{live ? 'Connects after durable checkpoints are added' : 'Preview the policy used at a provider limit'}</span></div>
+        <button type="button" className={`switch ${automatic ? 'on' : ''}`} onClick={() => setAutomatic((value) => !value)} role="switch" aria-label="Automatic fallback preview" aria-checked={automatic} disabled={locked || live}><span /></button>
       </div>
       <div className="fallback-label"><span>Example fallback chain</span><span>Quality floor · Capable</span></div>
       <div className="fallback-chain" role="radiogroup" aria-label="Example fallback route">
         {routes.map((route, index) => (
-          <button type="button" role="radio" aria-checked={selected === index} className={`fallback-row ${selected === index ? 'current' : ''}`} key={`${route.runtime}-${route.model}`} onClick={() => onSelect(index)}>
+          <button type="button" role="radio" aria-checked={selected === index} className={`fallback-row ${selected === index ? 'current' : ''}`} key={`${route.runtime}-${route.model}`} onClick={() => onSelect(index)} disabled={locked || live}>
             <span className="drag-handle" aria-hidden="true">{index + 1}</span>
             <span className={`runtime-glyph ${route.tone}`}>{route.runtime === 'Codex' ? 'O' : route.runtime === 'Claude Code' ? 'A' : route.runtime === 'OmniRoute' ? '∞' : 'L'}</span>
             <span className="fallback-copy"><strong>{route.model}</strong><small>{route.runtime} · {route.source}</small></span>
@@ -404,45 +584,67 @@ function RoutePanel({ selected, onSelect }: { selected: number; onSelect: (index
         ))}
       </div>
       <div className="quota-card">
-        <div className="quota-heading"><span>Mission token budget</span><strong>63% left</strong></div>
-        <div className="quota-bar"><span /></div>
-        <p>Local policy · provider allowance is checked at runtime</p>
+        <div className="quota-heading"><span>{live ? 'Provider allowance' : 'Mission token budget'}</span><strong>{live ? 'Runtime-owned' : '63% left'}</strong></div>
+        {!live && <div className="quota-bar"><span /></div>}
+        <p>{live ? 'Codex does not expose an exact remaining allowance in this stream.' : 'Local policy · provider allowance is checked at runtime'}</p>
       </div>
-      <div className="route-guard"><Icon name="shield" size={14} /><span>Model switches pause external tools and create a checkpoint.</span></div>
+      <div className="route-guard"><Icon name="shield" size={14} /><span>{live ? 'Planned guard: route switches require a durable checkpoint.' : 'Model switches pause external tools and create a checkpoint.'}</span></div>
     </section>
   )
 }
 
-function DetailsRail({ approvalStatus, onApprovalChange, selectedRoute, onRouteSelect }: {
+function DetailsRail({ approvalStatus, onApprovalChange, selectedRoute, onRouteSelect, liveRun }: {
   approvalStatus: 'pending' | 'approved' | 'changes'
   onApprovalChange: (status: 'pending' | 'approved' | 'changes') => void
   selectedRoute: number
   onRouteSelect: (index: number) => void
+  liveRun?: LiveRunState
 }): ReactNode {
   return (
     <aside className="details-rail">
-      <ApprovalCard status={approvalStatus} onChange={onApprovalChange} />
-      <RoutePanel selected={selectedRoute} onSelect={onRouteSelect} />
+      {liveRun === undefined ? <ApprovalCard status={approvalStatus} onChange={onApprovalChange} /> : <LiveSafetyCard run={liveRun} />}
+      <RoutePanel selected={selectedRoute} onSelect={onRouteSelect} locked={liveRunIsActive(liveRun)} live={liveRun !== undefined} />
       <section className="context-panel">
-        <div className="panel-title"><span><Icon name="file" size={15} /> Sample context</span><button type="button" aria-label="Add context (not available in prototype)" disabled><Icon name="plus" size={14} /></button></div>
-        <div className="context-row"><span className="context-icon hubspot">H</span><span><strong>HubSpot sample</strong><small>Fictional customer accounts</small></span><span className="live-dot" /></div>
-        <div className="context-row"><span className="context-icon notion">N</span><span><strong>Sample renewal playbook</strong><small>Prototype · read only</small></span><Icon name="chevron-right" size={13} /></div>
+        <div className="panel-title"><span><Icon name="file" size={15} /> {liveRun === undefined ? 'Sample context' : 'Run context'}</span><button type="button" aria-label="Add context (not available in prototype)" disabled><Icon name="plus" size={14} /></button></div>
+        {liveRun === undefined
+          ? <><div className="context-row"><span className="context-icon hubspot">H</span><span><strong>HubSpot sample</strong><small>Fictional customer accounts</small></span><span className="live-dot" /></div><div className="context-row"><span className="context-icon notion">N</span><span><strong>Sample renewal playbook</strong><small>Prototype · read only</small></span><Icon name="chevron-right" size={13} /></div></>
+          : <><div className="context-row"><span className="context-icon codex">O</span><span><strong>Host-selected workspace</strong><small>Local files · read only</small></span><span className="live-dot" /></div><div className="context-row"><span className="context-icon notion">i</span><span><strong>Mission prompt</strong><small>Sent through stdin, never argv</small></span><Icon name="shield" size={13} /></div></>}
       </section>
     </aside>
   )
 }
 
-function CommandDock({ route, onRouteClick }: { route: RouteOption; onRouteClick: () => void }): ReactNode {
+function CommandDock({ route, onRouteClick, runtimeState, liveRun, onStart, onCancel }: {
+  route: RouteOption
+  onRouteClick: () => void
+  runtimeState: RuntimeDiscoveryState
+  liveRun?: LiveRunState
+  onStart: (prompt: string) => Promise<boolean>
+  onCancel: () => void
+}): ReactNode {
   const [value, setValue] = useState('')
-  const [notice, setNotice] = useState('')
+  const active = liveRunIsActive(liveRun)
+  const codexReady = runtimeState.phase === 'ready'
+    && runtimeState.runtimes.some((runtime) => runtime.id === 'codex' && runtime.ready)
+  const routeSupported = route.runtime === 'Codex'
+  const canStart = codexReady && routeSupported && !active && value.trim().length > 0
+  const placeholder = active
+    ? 'Codex is working — stop the run before starting another…'
+    : !routeSupported
+      ? 'Live execution currently supports the Codex route…'
+      : codexReady
+        ? 'Give Codex a read-only mission in this workspace…'
+        : runtimeState.phase === 'loading'
+          ? 'Checking the local Codex runtime…'
+          : 'Sign in to Codex CLI to run a live mission…'
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
-    const command = value.trim()
-    if (!command) return
-    setNotice(`Prototype only — captured locally: “${command}”`)
-    setValue('')
-    window.setTimeout(() => setNotice(''), 3200)
+    const prompt = value.trim()
+    if (!canStart || !prompt) return
+    void onStart(prompt).then((started) => {
+      if (started) setValue('')
+    })
   }
 
   const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -454,17 +656,22 @@ function CommandDock({ route, onRouteClick }: { route: RouteOption; onRouteClick
 
   return (
     <div className="dock-wrap">
-      {notice && <div className="command-notice" role="status" aria-live="polite"><Icon name="check" size={13} />{notice}</div>}
+      {liveRun?.error && <div className="command-notice error" role="status" aria-live="polite"><Icon name="shield" size={13} />{liveRun.error}</div>}
       <form className="command-dock" onSubmit={submit}>
-        <textarea value={value} onChange={(event) => setValue(event.target.value)} onKeyDown={keyDown} placeholder="Try a prototype instruction for Maya…" aria-label="Prototype mission instruction" rows={1} />
+        <textarea value={value} onChange={(event) => setValue(event.target.value)} onKeyDown={keyDown} placeholder={placeholder} aria-label="Read-only Codex mission instruction" rows={1} maxLength={8000} disabled={active} />
         <div className="dock-toolbar">
           <div className="dock-tools">
             <button type="button" className="dock-icon" aria-label="Attach context (not available in prototype)" title="Attach context is coming next" disabled><Icon name="attachment" size={15} /></button>
-            <button type="button" className="teammate-chip" disabled title="Teammate selection is coming next"><span className="tiny-avatar">MY</span>Maya<Icon name="chevron-down" size={11} /></button>
-            <RoutePill route={route} onClick={onRouteClick} />
-            <span className="permission-chip"><Icon name="shield" size={12} /> Ask before acting</span>
+            <button type="button" className="teammate-chip" disabled title="Specialized teammate profiles are coming next"><span className="tiny-avatar">CX</span>Codex<Icon name="chevron-down" size={11} /></button>
+            <RoutePill route={route} onClick={onRouteClick} disabled={active} />
+            <span className="permission-chip"><Icon name="shield" size={12} /> Read-only sandbox</span>
           </div>
-          <div className="send-wrap"><span><kbd>Enter</kbd> to send</span><button type="submit" className="send-button" disabled={!value.trim()} aria-label="Send instruction"><Icon name="arrow-up" size={15} /></button></div>
+          <div className="send-wrap">
+            <span>{active ? 'One local process active' : <><kbd>Enter</kbd> to run</>}</span>
+            {active
+              ? <button type="button" className="send-button stop" disabled={liveRun?.data === undefined || liveRun.phase === 'cancelling'} onClick={onCancel} aria-label="Stop Codex mission"><Icon name="close" size={15} /></button>
+              : <button type="submit" className="send-button" disabled={!canStart} aria-label="Run read-only Codex mission"><Icon name="arrow-up" size={15} /></button>}
+          </div>
         </div>
       </form>
     </div>
@@ -537,8 +744,13 @@ export default function App(): ReactNode {
   const [selectedRoute, setSelectedRoute] = useState(0)
   const [routeMenuOpen, setRouteMenuOpen] = useState(false)
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
+  const [liveRun, setLiveRun] = useState<LiveRunState>()
   const routeTriggerRef = useRef<HTMLElement | null>(null)
-  const activeMission = missions.find((mission) => mission.id === activeMissionId) ?? missions[0]
+  const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
+  const activeRunIdRef = useRef<string | undefined>(undefined)
+  const activeMission = liveRun !== undefined && activeMissionId === 1
+    ? missionForLiveRun(liveRun)
+    : missions.find((mission) => mission.id === activeMissionId) ?? missions[0]
 
   useEffect(() => {
     let active = true
@@ -549,6 +761,17 @@ export default function App(): ReactNode {
         active = false
       }
     }
+
+    const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
+      setLiveRun((current) => {
+        if (current !== undefined && (current.data?.runId === update.runId || activeRunIdRef.current === update.runId)) {
+          return applyMissionUpdate(current, update)
+        }
+        const queued = pendingUpdatesRef.current.get(update.runId) ?? []
+        pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
+        return current
+      })
+    })
 
     void bridge.getLocalRuntimes()
       .then((response) => {
@@ -563,10 +786,77 @@ export default function App(): ReactNode {
 
     return () => {
       active = false
+      removeMissionListener()
     }
   }, [])
 
+  const startMission = async (prompt: string): Promise<boolean> => {
+    const bridge = window.desktop
+    setActiveMissionId(1)
+    setSelectedRoute(0)
+    activeRunIdRef.current = undefined
+    pendingUpdatesRef.current.clear()
+    setLiveRun({ prompt, phase: 'starting', events: [] })
+    if (!bridge) {
+      setLiveRun({ prompt, phase: 'failed', events: [], error: 'The secure desktop bridge is unavailable.' })
+      return false
+    }
+
+    try {
+      const response = await bridge.startCodexMission({ prompt })
+      if (!response.ok) {
+        activeRunIdRef.current = undefined
+        setLiveRun({ prompt, phase: 'failed', events: [], error: response.error.message })
+        return false
+      }
+
+      activeRunIdRef.current = response.data.runId
+      const queued = pendingUpdatesRef.current.get(response.data.runId) ?? []
+      pendingUpdatesRef.current.delete(response.data.runId)
+      setLiveRun((current) => {
+        let next: LiveRunState = {
+          prompt,
+          data: response.data,
+          phase: current?.phase === 'completed' || current?.phase === 'failed' || current?.phase === 'cancelled'
+            ? current.phase
+            : 'running',
+          events: current?.prompt === prompt ? current.events : [],
+          ...(current?.error === undefined ? {} : { error: current.error })
+        }
+        for (const update of queued) next = applyMissionUpdate(next, update)
+        return next
+      })
+      return true
+    } catch {
+      activeRunIdRef.current = undefined
+      setLiveRun({ prompt, phase: 'failed', events: [], error: 'The Codex mission could not be started.' })
+      return false
+    }
+  }
+
+  const cancelMission = (): void => {
+    const bridge = window.desktop
+    const runId = liveRun?.data?.runId
+    if (!bridge || runId === undefined || !liveRunIsActive(liveRun)) return
+    setLiveRun((current) => current?.data?.runId === runId
+      ? { ...current, phase: 'cancelling', error: undefined }
+      : current)
+    void bridge.cancelCodexMission({ runId })
+      .then((response) => {
+        if (response.ok) return
+        setLiveRun((current) => current?.data?.runId === runId && liveRunIsActive(current)
+          ? { ...current, phase: 'running', error: response.error.message }
+          : current)
+      })
+      .catch(() => {
+        setLiveRun((current) => current?.data?.runId === runId && liveRunIsActive(current)
+          ? { ...current, phase: 'running', error: 'The cancellation request could not be delivered.' }
+          : current)
+      })
+  }
+
   const openRouteMenu = (): void => {
+    if (liveRunIsActive(liveRun)) return
     routeTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     setRouteMenuOpen(true)
   }
@@ -578,19 +868,20 @@ export default function App(): ReactNode {
 
   return (
     <div className="app-shell">
-      <WindowBar />
+      <WindowBar live={liveRun !== undefined} />
       <div className="app-grid">
-        <Sidebar activeId={activeMissionId} onSelect={setActiveMissionId} runtimeState={runtimeState} />
+        <Sidebar activeId={activeMissionId} onSelect={setActiveMissionId} runtimeState={runtimeState} liveRun={liveRun} />
         <main className="mission-workspace">
-          <MissionHeader mission={activeMission} route={routes[selectedRoute]} onRouteClick={openRouteMenu} />
-          <div className="mission-scroll"><SignalRail approvalStatus={approvalStatus} /></div>
-          <CommandDock route={routes[selectedRoute]} onRouteClick={openRouteMenu} />
+          <MissionHeader mission={activeMission} route={routes[selectedRoute]} onRouteClick={openRouteMenu} liveRun={liveRun} onCancel={cancelMission} />
+          <div className="mission-scroll">{liveRun === undefined ? <SignalRail approvalStatus={approvalStatus} /> : <LiveSignalRail run={liveRun} />}</div>
+          <CommandDock route={routes[selectedRoute]} onRouteClick={openRouteMenu} runtimeState={runtimeState} liveRun={liveRun} onStart={startMission} onCancel={cancelMission} />
         </main>
         <DetailsRail
           approvalStatus={approvalStatus}
           onApprovalChange={setApprovalStatus}
           selectedRoute={selectedRoute}
           onRouteSelect={setSelectedRoute}
+          liveRun={liveRun}
         />
       </div>
       {routeMenuOpen && <RouteMenu selected={selectedRoute} onSelect={setSelectedRoute} onClose={closeRouteMenu} />}
