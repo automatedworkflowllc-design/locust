@@ -25,7 +25,7 @@ Mission control plane
 - `packages/contracts` — shared runtime, routing, checkpoint, and event contracts.
 - `packages/runtime-core` — provider-neutral routing and safe-handoff logic.
 - `packages/runtime-adapters` — safe installed-CLI discovery and launch specifications.
-- `docs` — product, architecture, model-routing, and cross-task context.
+- `docs` — product, architecture, model-routing, Codex wire contract, and cross-task context.
 
 ## What works now
 

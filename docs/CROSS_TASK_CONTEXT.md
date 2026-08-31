@@ -24,6 +24,7 @@ Every new implementation task should read, in order:
 4. `docs/PRODUCT.md`
 5. `docs/ARCHITECTURE.md`
 6. `docs/MODEL_ROUTING.md`
+7. `docs/CODEX_RUNTIME.md`
 
 Then inspect the actual source tree and tests. The repository is authoritative for implemented state; this document records intent and handoff state.
 
@@ -151,5 +152,5 @@ Use this template:
 Use this when starting a related chat:
 
 ```text
-Work in C:\Users\<home>\Documents\Codex\ai-teammate-platform. First read AGENTS.md, PROJECT.md, docs/CROSS_TASK_CONTEXT.md, docs/PRODUCT.md, docs/ARCHITECTURE.md, and docs/MODEL_ROUTING.md. Inspect the current tree and git status before editing because other Codex tasks may share this checkout. Preserve unrelated changes, state which files you own, and use a separate Git worktree for substantial parallel source changes. Update the handoff log if your work changes implementation status or architectural decisions.
+Work in C:\Users\<home>\Documents\Codex\ai-teammate-platform. First read AGENTS.md, PROJECT.md, docs/CROSS_TASK_CONTEXT.md, docs/PRODUCT.md, docs/ARCHITECTURE.md, docs/MODEL_ROUTING.md, and docs/CODEX_RUNTIME.md. Inspect the current tree and git status before editing because other Codex tasks may share this checkout. Preserve unrelated changes, state which files you own, and use a separate Git worktree for substantial parallel source changes. Update the handoff log if your work changes implementation status or architectural decisions.
 ```
