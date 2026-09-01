@@ -38,11 +38,13 @@ export function Sidebar({
   return (
     <nav className="lc-sidebar" aria-label="Workspace">
       <div className="lc-sidebar__brand">
-        <img className="lc-brand__mark" src={mark} alt="" aria-hidden="true" />
-        <img className="lc-brand__wordmark" src={wordmark} alt="Locust" />
+        <span className="lc-brand__lockup">
+          <img className="lc-brand__mark" src={mark} alt="" aria-hidden="true" />
+          <img className="lc-brand__wordmark" src={wordmark} alt="Locust" />
+        </span>
         <button
           type="button"
-          className="lc-iconbutton lc-brand__add"
+          className="lc-iconbutton"
           aria-label="New teammate"
           title="Teammates arrive with the roster"
           disabled

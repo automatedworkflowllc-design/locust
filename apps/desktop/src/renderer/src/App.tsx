@@ -15,6 +15,7 @@ import { Icon } from './components/Icon.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { Thread } from './components/Thread.js'
+import { AgentAvatar } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
 import { shortMissionId } from './status.js'
 
@@ -295,7 +296,8 @@ export default function App(): ReactElement {
             <>
               <header className="lc-workroom__header">
                 <div className="lc-workroom__identity">
-                  <div>
+                  <AgentAvatar size={32} />
+                  <div style={{ minWidth: 0 }}>
                     <div>
                       <span className="lc-workroom__name">{missionTitle(liveRun.prompt)}</span>
                       <span className="lc-workroom__role">
@@ -327,6 +329,14 @@ export default function App(): ReactElement {
                 restoredMission={liveRun.restored === true ? liveRun.restoredMission : undefined}
                 error={liveRun.error}
                 errorIsPersistence={liveRun.errorIsPersistence === true}
+                startedAt={
+                  liveRun.restoredMission === undefined
+                    ? undefined
+                    : new Date(liveRun.restoredMission.createdAt).toLocaleTimeString(undefined, {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                }
               />
             </>
           )}

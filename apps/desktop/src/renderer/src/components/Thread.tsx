@@ -7,6 +7,7 @@ import type { PublicRecoveredMission } from '../../../shared/ipc.js'
 import { buildThread } from '../missionView.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { Icon } from './Icon.js'
+import { AgentAvatar, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
 
 function ActivityCard({
   summary,
@@ -99,6 +100,8 @@ export interface ThreadProps {
   readonly restoredMission: PublicRecoveredMission | undefined
   readonly error: string | undefined
   readonly errorIsPersistence: boolean
+  /** Local wall-clock label for when the mission began. */
+  readonly startedAt: string | undefined
 }
 
 export function Thread({
@@ -108,14 +111,18 @@ export function Thread({
   missionId,
   restoredMission,
   error,
-  errorIsPersistence
+  errorIsPersistence,
+  startedAt
 }: ThreadProps): ReactElement {
   const items = buildThread(events, { running })
   return (
     <div className="lc-thread">
       <div className="lc-thread__column">
         {missionId !== undefined && (
-          <div className="lc-thread__marker lc-mono">Mission · {shortMissionId(missionId)}</div>
+          <div className="lc-thread__marker lc-mono">
+            Mission · {shortMissionId(missionId)}
+            {startedAt !== undefined && ` · started ${startedAt}`}
+          </div>
         )}
 
         <div className="lc-bubble">{prompt}</div>
@@ -124,6 +131,7 @@ export function Thread({
           if (item.type === 'agent-message') {
             return (
               <div className="lc-agentline" key={item.key}>
+                <AgentAvatar />
                 <p>
                   {item.text}
                   {item.streaming && <span className="lc-caret" />}
@@ -131,24 +139,20 @@ export function Thread({
               </div>
             )
           }
+          if (item.type === 'plan') {
+            return <PlanCard key={item.key} steps={item.steps} doneCount={item.doneCount} />
+          }
           if (item.type === 'activity') {
             return <ActivityCard key={item.key} summary={item.summary} details={item.details} />
           }
           if (item.type === 'live-step') {
             return (
-              <div className="lc-card is-live" key={item.key}>
-                <div className="lc-card__head">
-                  <span>
-                    <span className="lc-dot is-pulsing lc-tone-lime" /> {item.label}
-                  </span>
-                  {item.detail !== undefined && <span className="lc-rail__meta">{item.detail}</span>}
-                </div>
-                <div className="lc-card__body">
-                  <div className="lc-progress">
-                    <span />
-                  </div>
-                </div>
-              </div>
+              <LiveStepCard
+                key={item.key}
+                label={item.label}
+                detail={item.detail}
+                startedAt={item.startedAt}
+              />
             )
           }
           if (item.type === 'limit') {
@@ -164,15 +168,7 @@ export function Thread({
               </div>
             )
           }
-          return (
-            <div className={`lc-card is-${item.level === 'error' ? 'red' : 'amber'}`} key={item.key}>
-              <div className="lc-card__head">
-                <span>Runtime notice</span>
-                <span className="lc-rail__meta">{item.level}</span>
-              </div>
-              <div className="lc-card__body">{item.message}</div>
-            </div>
-          )
+          return <DiagnosticLine key={item.key} level={item.level} message={item.message} />
         })}
 
         {error !== undefined && (

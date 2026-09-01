@@ -88,10 +88,13 @@ export function PixelFace({ hue, pixels, size = 32, className }: PixelFaceProps)
   const chip: CSSProperties = {
     width: size,
     height: size,
-    borderRadius: Math.max(4, Math.round(size * 0.25)),
+    // The reference uses a small fixed radius at every avatar size (5px on a
+    // 30px chip), which reads as a pixel-art tile rather than a rounded app
+    // icon. A proportional radius rounds the corners off the illusion.
+    borderRadius: size >= 44 ? 7 : 5,
     background: `var(${HUE_VARIABLE[hue]})`,
     // Border is the chip hue at 50% alpha, so it reads as the same material.
-    border: `1px solid color-mix(in srgb, var(${HUE_VARIABLE[hue]}) 50%, transparent)`,
+    border: `1px solid color-mix(in srgb, var(${HUE_VARIABLE[hue]}) 55%, transparent)`,
     color: `var(${FACE_VARIABLE[hue]})`,
     position: 'relative',
     flexShrink: 0,

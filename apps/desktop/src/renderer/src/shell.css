@@ -143,24 +143,28 @@ textarea {
 .lc-sidebar__brand {
   display: flex;
   align-items: center;
-  gap: var(--lc-space-4);
-  padding: var(--lc-space-5) var(--lc-space-5) var(--lc-space-4);
+  justify-content: space-between;
+  gap: var(--lc-space-5);
+  padding: 18px var(--lc-space-6) var(--lc-space-5);
+}
+
+.lc-brand__lockup {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-left: var(--lc-space-1);
 }
 
 .lc-brand__mark {
-  height: 20px;
+  height: 24px;
   width: auto;
-  opacity: 0.92;
+  opacity: 0.95;
 }
 
 .lc-brand__wordmark {
   height: 13px;
   width: auto;
-  opacity: 0.92;
-}
-
-.lc-brand__add {
-  margin-left: auto;
+  opacity: 0.9;
 }
 
 .lc-iconbutton {
@@ -192,16 +196,21 @@ textarea {
 }
 
 .lc-search {
-  margin: 0 var(--lc-space-5) var(--lc-space-5);
+  margin: 0 14px;
   display: flex;
   align-items: center;
-  gap: var(--lc-space-3);
+  gap: 9px;
   height: 32px;
-  padding: 0 var(--lc-space-4);
+  padding: 0 10px;
   border-radius: var(--lc-radius-button);
   background: var(--lc-bg-raised-2);
-  border: 1px solid var(--lc-border-card);
+  border: 1px solid var(--lc-border-hairline);
   color: var(--lc-text-label);
+  transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-search:hover {
+  border-color: var(--lc-border-hover);
 }
 
 .lc-search input {
@@ -218,10 +227,10 @@ textarea {
 }
 
 .lc-sectionlabel {
-  padding: var(--lc-space-4) var(--lc-space-5) var(--lc-space-3);
+  padding: 20px var(--lc-space-6) var(--lc-space-4);
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-label);
-  letter-spacing: var(--lc-tracking-label);
+  letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
   color: var(--lc-text-label);
 }
@@ -230,27 +239,29 @@ textarea {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: var(--lc-space-5);
+  padding: 0 var(--lc-space-4) var(--lc-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
 }
 
 .lc-row {
   display: flex;
   align-items: center;
-  gap: var(--lc-space-4);
-  width: calc(100% - var(--lc-space-5) * 2);
-  margin: 0 var(--lc-space-5) var(--lc-space-1);
-  padding: var(--lc-space-4);
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
   border: 1px solid transparent;
-  border-radius: var(--lc-radius-button);
+  border-radius: 9px;
   background: transparent;
   text-align: left;
   cursor: pointer;
-  color: var(--lc-text-primary);
+  color: var(--lc-text-name);
   transition: background var(--lc-motion-hover) var(--lc-ease);
 }
 
 .lc-row:hover {
-  background: var(--lc-hover-surface);
+  background: var(--lc-bg-raised-2);
 }
 
 .lc-row[aria-current='true'],
@@ -267,7 +278,7 @@ textarea {
 }
 
 .lc-row__name {
-  font-size: var(--lc-text-teammate-name);
+  font-size: var(--lc-text-body);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -275,7 +286,7 @@ textarea {
 }
 
 .lc-row__meta {
-  font-size: var(--lc-text-description);
+  font-size: var(--lc-text-mono-provenance);
   color: var(--lc-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -361,10 +372,12 @@ textarea {
 }
 
 .lc-workroom__header {
+  flex: none;
+  height: 60px;
   display: flex;
   align-items: center;
   gap: var(--lc-space-5);
-  padding: var(--lc-space-5) var(--lc-space-6);
+  padding: 0 20px;
   border-bottom: 1px solid var(--lc-border-hairline);
   background: var(--lc-bg-chrome);
 }
@@ -380,12 +393,13 @@ textarea {
 .lc-workroom__name {
   font-size: var(--lc-text-teammate-name);
   font-weight: 500;
+  color: var(--lc-text-name);
 }
 
 .lc-workroom__role {
-  font-size: var(--lc-text-description);
+  font-size: var(--lc-text-secondary-size);
   color: var(--lc-text-muted);
-  margin-left: var(--lc-space-3);
+  margin-left: var(--lc-space-4);
 }
 
 .lc-workroom__mission {
@@ -398,11 +412,14 @@ textarea {
 }
 
 .lc-button {
-  height: 28px;
+  height: 30px;
   padding: 0 var(--lc-space-5);
-  border: 1px solid var(--lc-border-card);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--lc-border-control);
   border-radius: var(--lc-radius-control);
-  background: var(--lc-bg-raised);
+  background: var(--lc-bg-control);
   color: var(--lc-text-secondary);
   font-size: var(--lc-text-secondary-size);
   cursor: pointer;
@@ -749,28 +766,42 @@ textarea {
 }
 
 .lc-composer form {
-  border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-popover);
-  background: var(--lc-bg-raised);
+  display: block;
 }
 
-.lc-composer__field {
-  position: relative;
+/*
+ * The field is its own bordered box and the controls sit BELOW it, unenclosed
+ * -- not a second row inside the border. Exact values ported from the
+ * reference: 50px tall, 12px radius, 15px left padding, 8px right.
+ */
+.lc-composer__box {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  gap: var(--lc-space-4);
+  min-height: 50px;
+  padding: 0 var(--lc-space-4) 0 15px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-popover);
+  background: var(--lc-bg-field);
+  transition: border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-composer__box:hover {
+  border-color: var(--lc-border-hover);
 }
 
 .lc-composer textarea {
   flex: 1;
-  min-height: 50px;
+  min-width: 0;
+  min-height: 48px;
   max-height: 180px;
   resize: none;
   border: 0;
   outline: none;
   background: transparent;
-  padding: var(--lc-space-5) 52px var(--lc-space-5) var(--lc-space-6);
+  padding: 15px 0;
   font-size: var(--lc-text-body);
-  line-height: 1.5;
+  line-height: 1.4;
   color: var(--lc-text-primary);
 }
 
@@ -779,23 +810,28 @@ textarea {
 }
 
 .lc-send {
-  position: absolute;
-  right: var(--lc-space-4);
-  top: var(--lc-space-4);
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
+  flex: none;
   display: grid;
   place-items: center;
-  border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-control);
-  background: var(--lc-bg-raised-2);
-  color: var(--lc-text-secondary);
+  border: 1px solid var(--lc-border-button);
+  border-radius: var(--lc-radius-button);
+  background: transparent;
+  color: var(--lc-text-control-fg);
   cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease),
+    border-color var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease);
 }
 
 .lc-send:not(:disabled):hover {
-  background: var(--lc-hover-surface-strong);
-  border-color: var(--lc-hover-border);
+  background: var(--lc-lime-tint-strong);
+  border-color: var(--lc-lime-border-strong);
+  color: var(--lc-lime-text);
+}
+
+.lc-send:not(:disabled):active {
+  transform: scale(0.94);
 }
 
 .lc-send:disabled {
@@ -803,25 +839,40 @@ textarea {
   cursor: default;
 }
 
-.lc-send.is-stop {
+.lc-send.is-stop:not(:disabled):hover {
+  background: var(--lc-red-tint);
   border-color: var(--lc-red-border);
   color: var(--lc-red-text);
 }
 
-.lc-composer__toolbar {
+/* The stop glyph is a small rounded square, not an icon. */
+.lc-stopsquare {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: currentColor;
+  display: block;
+}
+
+.lc-composer__controls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--lc-space-5);
-  padding: var(--lc-space-4) var(--lc-space-5) var(--lc-space-4) var(--lc-space-6);
-  border-top: 1px solid var(--lc-border-hairline);
+  gap: var(--lc-space-1);
+  margin-top: 9px;
+  padding: 0 var(--lc-space-1);
 }
 
 .lc-composer__group {
   display: flex;
   align-items: center;
-  gap: var(--lc-space-5);
+  gap: var(--lc-space-1);
   min-width: 0;
+}
+
+/* Mode and add sit left; route, effort and swarm sit right. */
+.lc-composer__group + .lc-composer__group {
+  margin-left: auto;
+  gap: var(--lc-space-5);
 }
 
 .lc-control {
@@ -944,4 +995,82 @@ textarea {
   .lc-composer__inner {
     max-width: var(--lc-thread-max-width-compact);
   }
+}
+
+/* --- Plan card --------------------------------------------------------- */
+
+.lc-plan {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--lc-space-5) var(--lc-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+}
+
+.lc-plan__step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lc-space-4);
+  font-size: var(--lc-text-secondary-size);
+  color: var(--lc-text-muted);
+}
+
+.lc-plan__step.is-running {
+  color: var(--lc-text-primary);
+  font-weight: 500;
+}
+
+.lc-plan__step.is-done {
+  color: var(--lc-text-secondary);
+}
+
+.lc-plan__marker {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 1px solid var(--lc-border-card);
+  color: var(--lc-text-muted);
+}
+
+.lc-plan__step.is-done .lc-plan__marker {
+  border-color: var(--lc-lime-border);
+  color: var(--lc-lime-text);
+}
+
+.lc-plan__step.is-running .lc-plan__marker {
+  border-color: var(--lc-lime-border-strong);
+  color: var(--lc-lime-text);
+}
+
+/* --- Live step + agent line -------------------------------------------- */
+
+.lc-livestep__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+}
+
+.lc-agentline p {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * Provider housekeeping notices. One quiet line -- the design's rule is that
+ * logs never dump into the thread, and a full-width red card for a routine
+ * runtime message reads as a failure and buries the real work.
+ */
+.lc-diagnostic {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lc-space-4);
+  font-size: var(--lc-text-description);
+  padding-left: var(--lc-space-4);
+  border-left: 2px solid var(--lc-border-card);
+  text-wrap: pretty;
 }

@@ -15,6 +15,11 @@ export interface ActivityDetail {
   readonly settled: boolean
 }
 
+export interface PlanStep {
+  readonly text: string
+  readonly state: 'done' | 'running' | 'pending'
+}
+
 export type ThreadItem =
   | { readonly key: string; readonly type: 'agent-message'; readonly text: string; readonly streaming: boolean }
   | {
@@ -28,6 +33,14 @@ export type ThreadItem =
       readonly type: 'live-step'
       readonly label: string
       readonly detail: string | undefined
+      /** When the step began, so the card can show elapsed time as it runs. */
+      readonly startedAt: string
+    }
+  | {
+      readonly key: string
+      readonly type: 'plan'
+      readonly steps: readonly PlanStep[]
+      readonly doneCount: number
     }
   | {
       readonly key: string
@@ -41,6 +54,39 @@ export type ThreadItem =
       readonly level: 'info' | 'warning' | 'error'
       readonly message: string
     }
+
+/**
+ * Read a provider plan into steps. The payload is redacted JSON of whatever
+ * shape the provider sent, so every field is checked rather than assumed --
+ * an unreadable plan yields no card instead of a malformed one.
+ */
+export function readPlan(value: unknown): readonly PlanStep[] {
+  const list = Array.isArray(value)
+    ? value
+    : typeof value === 'object' && value !== null && Array.isArray((value as { plan?: unknown }).plan)
+      ? ((value as { plan: unknown[] }).plan)
+      : []
+  const steps: PlanStep[] = []
+  for (const entry of list) {
+    if (typeof entry === 'string') {
+      steps.push({ text: entry, state: 'pending' })
+      continue
+    }
+    if (typeof entry !== 'object' || entry === null) continue
+    const record = entry as Record<string, unknown>
+    const text = record.step ?? record.text ?? record.title ?? record.name
+    if (typeof text !== 'string' || text.length === 0) continue
+    const status = typeof record.status === 'string' ? record.status.toLowerCase() : ''
+    const state: PlanStep['state'] =
+      status.includes('complete') || status === 'done'
+        ? 'done'
+        : status.includes('progress') || status === 'running' || status === 'active'
+          ? 'running'
+          : 'pending'
+    steps.push({ text, state })
+  }
+  return steps
+}
 
 /** Shell verbs that read as file edits rather than as commands. */
 const EDIT_COMMANDS = /^(?:apply_patch|patch|edit|write|sed|tee)\b/
@@ -108,7 +154,8 @@ export function buildThread(
   const items: ThreadItem[] = []
   const openTools = new Map<string, ActivityDetail>()
   const activity: ActivityDetail[] = []
-  let runningStep: { label: string; detail: string | undefined } | undefined
+  let runningStep: { label: string; detail: string | undefined; startedAt: string } | undefined
+  let plan: readonly PlanStep[] = []
 
   for (const event of events) {
     switch (event.type) {
@@ -136,8 +183,13 @@ export function buildThread(
         const message = event.payload.message
         runningStep = {
           label: message ?? (event.payload.stepKind === 'turn' ? 'Working' : 'Thinking'),
-          detail: event.payload.itemType
+          detail: event.payload.itemType,
+          startedAt: event.occurredAt
         }
+        break
+      }
+      case 'plan.updated': {
+        plan = readPlan(event.payload.plan)
         break
       }
       case 'step.completed':
@@ -168,6 +220,15 @@ export function buildThread(
     }
   }
 
+  if (plan.length > 0) {
+    items.push({
+      key: 'plan',
+      type: 'plan',
+      steps: plan,
+      doneCount: plan.filter((step) => step.state === 'done').length
+    })
+  }
+
   if (activity.length > 0) {
     items.push({
       key: 'activity',
@@ -194,7 +255,8 @@ export function buildThread(
       key: 'live-step',
       type: 'live-step',
       label: runningStep.label,
-      detail: runningStep.detail
+      detail: runningStep.detail,
+      startedAt: runningStep.startedAt
     })
   }
 

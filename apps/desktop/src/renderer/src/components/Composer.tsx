@@ -85,7 +85,7 @@ export function Composer({
           </div>
         )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>
-          <div className="lc-composer__field">
+          <div className="lc-composer__box">
             <textarea
               value={value}
               onChange={(changeEvent) => setValue(changeEvent.target.value)}
@@ -104,7 +104,8 @@ export function Composer({
                 disabled={cancelling}
                 aria-label="Stop the running mission"
               >
-                <Icon name="pause" size={14} />
+                {/* A small rounded square, as drawn -- not a pause icon. */}
+                <span className="lc-stopsquare" />
               </button>
             ) : (
               <button
@@ -117,7 +118,7 @@ export function Composer({
               </button>
             )}
           </div>
-          <div className="lc-composer__toolbar">
+          <div className="lc-composer__controls">
             <div className="lc-composer__group">
               <button type="button" className="lc-control" disabled title="Approval modes arrive with a write-capable sandbox">
                 Ask
@@ -139,8 +140,13 @@ export function Composer({
                 <span className="lc-separator">/</span>
                 <span className="lc-control__mono">{modelLabel}</span>
               </button>
-              <button type="button" className="lc-control" disabled title="Effort routing arrives with the route layer">
-                <span className="lc-control__mono">effort</span>
+              <button
+                type="button"
+                className="lc-control"
+                disabled
+                title="Effort routing arrives with the route layer, once a route reports whether it honors effort"
+              >
+                Balanced
               </button>
             </div>
           </div>

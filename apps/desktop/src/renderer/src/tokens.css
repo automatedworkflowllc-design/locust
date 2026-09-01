@@ -55,7 +55,13 @@
   --lc-bg-bubble-user: #23282a;
   --lc-bg-bubble-peer: #202324;
 
+  --lc-bg-field: #1a1d1e;
+  --lc-bg-control: #1d2122;
+
   --lc-border-hairline: rgba(255, 255, 255, 0.06);
+  --lc-border-control: rgba(255, 255, 255, 0.09);
+  --lc-border-button: rgba(255, 255, 255, 0.12);
+  --lc-border-hover: rgba(255, 255, 255, 0.16);
   --lc-border-card: rgba(255, 255, 255, 0.07);
   --lc-border-strong: rgba(255, 255, 255, 0.11);
   --lc-overlay-scrim: rgba(8, 10, 10, 0.55);
@@ -68,6 +74,9 @@
    * they exist only for documentation captions outside the app window.
    */
   --lc-text-primary: #f2efe9;
+  /* The sidebar and headers use a fractionally warmer white in the reference. */
+  --lc-text-name: #f4f1eb;
+  --lc-text-control-fg: #a8adab;
   --lc-text-secondary: #c7c3bc;
   --lc-text-muted: #8b9190;
   --lc-text-label: #8b9190;
