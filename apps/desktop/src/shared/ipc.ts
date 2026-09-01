@@ -118,6 +118,22 @@ export type CodexMissionUpdate =
       }
     }
 
+/**
+ * A checkpoint as the renderer may see it. Deliberately narrower than the
+ * ledger's record: the receipt card needs to say how many checkpoints exist,
+ * which was last, and what was left unsettled -- it does not need the
+ * transcript digest or the assistant summary, and neither belongs on an IPC
+ * surface that exists to render a status card.
+ */
+export interface PublicMissionCheckpoint {
+  readonly epoch: number
+  readonly reason: string
+  readonly resumeSafety: 'safe' | 'approval-required' | 'unsafe'
+  readonly safetyReason: string
+  readonly createdAt: string
+  readonly unsettledActions: readonly { readonly itemId: string; readonly name: string }[]
+}
+
 export interface PublicRecoveredMission {
   readonly missionId: string
   readonly runId: string
@@ -139,6 +155,7 @@ export interface PublicRecoveredMission {
   readonly eventsTruncated: boolean
   readonly hostFailureMessage?: string
   readonly integrityIssueCount: number
+  readonly checkpoints: readonly PublicMissionCheckpoint[]
 }
 
 export type MissionHistoryResponse =

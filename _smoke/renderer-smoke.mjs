@@ -135,7 +135,11 @@ try {
   // before that races the probe and submits nothing.
   const runtimeReady = await cdp.eval(`(async () => {
     for (let i = 0; i < 80; i += 1) {
-      if (/Codex ready/.test(document.body.innerText)) return true
+      // The shell's own vocabulary: a discovered, usable runtime renders a
+      // READY tag. Word-bounded so ALREADY cannot satisfy it. The escapes are
+      // doubled because this regex lives inside a template literal, where a
+      // single backslash-b is a backspace character.
+      if (/\\bREADY\\b/.test(document.body.innerText)) return true
       await new Promise(r => setTimeout(r, 250))
     }
     return false
@@ -176,7 +180,7 @@ try {
   const detected = await cdp.eval(`(() => {
     const text = document.body.innerText
     const version = /v(\\d+\\.\\d+\\.\\d+[^\\s]*)/.exec(text)
-    return JSON.stringify({ codexReady: /Codex ready/.test(text), version: version && version[1] })
+    return JSON.stringify({ runtimeReady: /\\bREADY\\b/.test(text), version: version && version[1] })
   })()`)
   say(`       ${detected}`)
 
@@ -198,12 +202,20 @@ try {
     await new Promise(r => setTimeout(r, 300))
     const enabledWithPrompt = !send.disabled
     send.click()
-    await new Promise(r => setTimeout(r, 1500))
+    // Poll for the clear rather than sleeping a fixed interval: the composer
+    // clears when the start IPC resolves, and how long the host takes to spawn
+    // a real provider process is not something this assertion should encode.
+    let cleared = false
+    for (let i = 0; i < 40; i += 1) {
+      if (field.value === '') { cleared = true; break }
+      await new Promise(r => setTimeout(r, 250))
+    }
     return JSON.stringify({
       disabledEmpty,
       enabledWithPrompt,
-      cleared: field.value === '',
-      live: /LIVE RUNTIME/.test(document.body.innerText)
+      cleared,
+      // The title bar's run counter is the shell's live indicator.
+      live: /\\d+ running/.test(document.body.innerText)
     })
   })()`)
   const state = JSON.parse(submitted)
@@ -217,7 +229,7 @@ try {
   const finished = await cdp.eval(`(async () => {
     for (let i = 0; i < 240; i += 1) {
       const text = document.body.innerText
-      if (/COMPLETE|FAILED|INTERRUPTED/.test(text)) {
+      if (/\\u00b7 (completed|failed|cancelled) \\u00b7|interrupted/.test(text)) {
         await new Promise(r => setTimeout(r, 1200))
         return document.body.innerText
       }
@@ -226,13 +238,12 @@ try {
     return document.body.innerText
   })()`)
   check('the model answer reached the screen', finished.includes(ANSWER))
-  check('the mission reads as complete', /COMPLETE/.test(finished))
+  check('the mission reads as complete', /· completed ·/.test(finished))
   check('the screen does not report a failed or interrupted run',
-    !/INTERRUPTED|FAILED/.test(finished))
-  check('the run was labelled read-only', /[Rr]ead[- ]only/.test(finished))
+    !/interrupted|· failed ·/.test(finished))
+  check('the run was labelled read-only', /read-only/.test(finished))
 
-  const receipt = finished.split('Mission completed')[1]
-  say(`       ...${(receipt ?? '(no completion receipt on screen)').trim().slice(0, 220)}`)
+  say(`       ...${finished.trim().slice(-240)}`)
 
   say(`\n${failures === 0 ? 'RENDERER SMOKE PASSED' : `RENDERER SMOKE FAILED (${failures})`}`)
 } finally {

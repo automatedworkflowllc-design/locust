@@ -3,6 +3,7 @@ import type { MissionHistoryResponse, PublicRecoveredMission } from '../shared/i
 
 const MAX_HISTORY_MISSIONS = 20
 const MAX_HISTORY_EVENTS = 500
+const MAX_HISTORY_CHECKPOINTS = 25
 
 export function publicRecoveredMission(mission: RecoveredMission): PublicRecoveredMission {
   const events = mission.events.length <= MAX_HISTORY_EVENTS
@@ -26,7 +27,19 @@ export function publicRecoveredMission(mission: RecoveredMission): PublicRecover
     eventCount: mission.events.length,
     eventsTruncated: events.length !== mission.events.length,
     ...(hostFailureMessage === undefined ? {} : { hostFailureMessage }),
-    integrityIssueCount: mission.issues.length
+    integrityIssueCount: mission.issues.length,
+    // Bounded projection: counts and causes, not the digest or the summary.
+    checkpoints: mission.checkpoints.slice(-MAX_HISTORY_CHECKPOINTS).map((checkpoint) => ({
+      epoch: checkpoint.epoch,
+      reason: checkpoint.reason,
+      resumeSafety: checkpoint.resumeSafety,
+      safetyReason: checkpoint.safetyReason,
+      createdAt: checkpoint.createdAt,
+      unsettledActions: checkpoint.unsettledActions.map((action) => ({
+        itemId: action.itemId,
+        name: action.name
+      }))
+    }))
   }
 }
 

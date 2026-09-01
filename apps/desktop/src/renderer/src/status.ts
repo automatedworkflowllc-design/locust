@@ -101,10 +101,7 @@ export function routeRowStatus(
   return {
     tag: isActive ? 'ACTIVE' : 'READY',
     selectable: true,
-    detail:
-      runtime.version === null
-        ? 'Signed in on this machine.'
-        : `${runtime.version} · signed in on this machine.`
+    detail: 'Signed in on this machine, using your own account.'
   }
 }
 
