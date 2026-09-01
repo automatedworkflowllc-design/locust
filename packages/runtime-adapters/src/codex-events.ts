@@ -2,6 +2,7 @@ import type {
   RuntimeJsonlRecord,
   RuntimeProcessCompletion,
 } from "./process-runner.js";
+import type { MissionRuntimeId } from "./types.js";
 
 /** JSON that is safe to place in the product event ledger after redaction. */
 export type RedactedJsonValue =
@@ -170,7 +171,8 @@ interface NormalizedRuntimeEventBase {
   readonly missionId?: string;
   readonly sequence: number;
   readonly occurredAt: string;
-  readonly sourceAdapter: "codex";
+  /** Which runtime produced this event. Every adapter emits this same shape. */
+  readonly sourceAdapter: MissionRuntimeId;
   readonly cliVersion?: string;
   readonly requestedRouteId?: string;
   readonly resolvedRouteId?: string;

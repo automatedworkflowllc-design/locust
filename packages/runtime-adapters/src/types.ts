@@ -1,5 +1,12 @@
 export type RuntimeIntegrationId = "codex" | "claude" | "omniroute";
 
+/**
+ * A runtime that can actually own a mission. OmniRoute is a gateway to other
+ * providers rather than a runtime a mission runs under, so it is excluded by
+ * construction instead of by remembering to exclude it at each use.
+ */
+export type MissionRuntimeId = Exclude<RuntimeIntegrationId, "omniroute">;
+
 export type RuntimeIntegrationKind = "agent-runtime" | "provider-gateway";
 
 export type RuntimeAvailability = "available" | "unavailable";
@@ -103,7 +110,7 @@ export interface RuntimeDiscovery {
 
 /** A future runner may bind the prompt to stdin; this package does not execute it. */
 export interface RuntimeCommandSpec {
-  readonly runtime: Exclude<RuntimeIntegrationId, "omniroute">;
+  readonly runtime: MissionRuntimeId;
   readonly executablePath: string;
   readonly args: readonly string[];
   readonly cwd: string;

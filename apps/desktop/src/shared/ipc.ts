@@ -1,4 +1,4 @@
-import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
 export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
@@ -54,13 +54,24 @@ export interface CodexMissionStartRequest {
   readonly prompt: string
 }
 
-export interface CodexMissionStartData {
+/**
+ * What the renderer needs to say which route a mission is on. Shared by a live
+ * start response and a mission restored from the ledger, because a restored
+ * mission may be on a runtime this build cannot start.
+ */
+export interface MissionRouteSummary {
   readonly runId: string
   readonly missionId: string
-  readonly runtime: 'codex'
-  readonly model: 'account-default'
+  readonly runtime: MissionRuntimeId
+  readonly model: string
   readonly resolvedRouteId: string
   readonly cliVersion: string | null
+}
+
+/** A Codex start is always Codex on the account default; the narrowing is real. */
+export interface CodexMissionStartData extends MissionRouteSummary {
+  readonly runtime: 'codex'
+  readonly model: 'account-default'
 }
 
 export type CodexMissionStartResponse =
@@ -111,8 +122,12 @@ export interface PublicRecoveredMission {
   readonly missionId: string
   readonly runId: string
   readonly prompt: string
-  readonly runtime: 'codex'
-  readonly model: 'account-default'
+  // History spans every runtime a mission could have run under, so this is the
+  // union even while Codex is the only one that can be started today. Pinning
+  // it to a literal would make recovered Claude missions a type error rather
+  // than a missing feature.
+  readonly runtime: MissionRuntimeId
+  readonly model: string
   readonly requestedRouteId: string
   readonly resolvedRouteId: string
   readonly cliVersion: string | null

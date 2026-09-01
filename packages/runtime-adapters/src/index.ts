@@ -65,6 +65,7 @@ export type {
   RuntimeDiagnosticCode,
   RuntimeDiscovery,
   RuntimeFeature,
+  MissionRuntimeId,
   RuntimeIntegrationId,
   RuntimeIntegrationKind,
   RuntimeReadiness,

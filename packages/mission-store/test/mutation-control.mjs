@@ -1,4 +1,4 @@
-// Mutation control for the checkpoint suite.
+// Mutation control for the mission-store suites (checkpoint + schema versions).
 //
 // A passing suite is only evidence if it could have failed. This breaks one
 // behaviour at a time in the engine, runs the suite, and requires the EXPECTED
@@ -70,6 +70,41 @@ const MUTATIONS = [
     from: '        if (checkpoint.resumeSafety === \'unsafe\') return checkpoint',
     to: '        void 0',
     expect: 'reports an unreadable ledger as unsafe, and refuses to write past the break'
+  },
+  {
+    name: 'the reader forgets how to read version 1',
+    file: INDEX,
+    from: '  return value === 1 || value === 2',
+    to: '  return value === 2',
+    expect: 'still recovers a mission recorded before the version bump'
+  },
+  {
+    name: 'appends silently upgrade a version-1 file',
+    file: INDEX,
+    from: '            schemaVersion: hydrated.schemaVersion,',
+    to: '            schemaVersion: MISSION_LEDGER_SCHEMA_VERSION,',
+    expect: 'appends to a version-1 mission in version 1, keeping the file walkable'
+  },
+  {
+    name: 'records are checked against the writer version, not the file version',
+    file: INDEX,
+    from: '      || value.schemaVersion !== schemaVersion',
+    to: '      || !isSupportedSchemaVersion(value.schemaVersion)',
+    expect: 'stops recovery when a record disagrees with its file version'
+  },
+  {
+    name: 'an event may come from a runtime the mission is not running',
+    file: INDEX,
+    from: '    || value.sourceAdapter !== metadata.runtime',
+    to: '    || value.sourceAdapter !== \'codex\'',
+    expect: 'accepts a Claude mission and its Claude events'
+  },
+  {
+    name: 'a version-1 file may describe a runtime version 1 could not write',
+    file: INDEX,
+    from: '  if (schemaVersion === 1 && (candidate.runtime !== \'codex\' || candidate.model !== \'account-default\')) {\n    return undefined\n  }\n',
+    to: '',
+    expect: 'refuses a version-1 file describing a runtime version 1 could not write'
   },
   {
     name: 'recovery accepts an out-of-order checkpoint epoch',

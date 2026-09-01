@@ -1,4 +1,5 @@
 import type {
+  MissionRuntimeId,
   NormalizedRuntimeEvent,
   NormalizedRuntimeEventType,
   RedactedJsonValue
@@ -11,7 +12,30 @@ import { isAbsolute, join } from 'node:path'
 import { parsedCheckpoint, reconcileMission } from './checkpoint.js'
 import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 1 as const
+/**
+ * The version NEW ledger files are written at. Version 2 widened `runtime` from
+ * the literal 'codex' to the mission-runtime union and `model` from the literal
+ * 'account-default' to a free string, so a version-1 reader must not be handed
+ * a version-2 file -- which is the entire reason the number moved.
+ */
+export const MISSION_LEDGER_SCHEMA_VERSION = 2 as const
+
+/**
+ * Versions this reader accepts. Version 1 is a strict subset of version 2, so
+ * it is read rather than rejected: bumping the number without this list would
+ * make every mission recorded before the bump come back as
+ * `unsupported-schema`, which reads to a user as their history disappearing.
+ * A file's version is fixed by its header, and every record in it must match --
+ * appends to a version-1 mission stay version 1.
+ */
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2] as const
+
+export type MissionLedgerSchemaVersion =
+  (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
+
+function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
+  return value === 1 || value === 2
+}
 
 const MAX_PROMPT_LENGTH = 8_000
 const MAX_TEXT_LENGTH = 16_384
@@ -46,8 +70,9 @@ export interface MissionLedgerMetadata {
   readonly missionId: string
   readonly runId: string
   readonly prompt: string
-  readonly runtime: 'codex'
-  readonly model: 'account-default'
+  readonly runtime: MissionRuntimeId
+  /** Route-specific model identifier, e.g. `account-default`. */
+  readonly model: string
   readonly requestedRouteId: string
   readonly resolvedRouteId: string
   readonly cliVersion: string | null
@@ -132,7 +157,7 @@ export interface FileMissionLedgerOptions {
 }
 
 interface CreatedRecord {
-  readonly schemaVersion: typeof MISSION_LEDGER_SCHEMA_VERSION
+  readonly schemaVersion: MissionLedgerSchemaVersion
   readonly recordType: 'mission.created'
   readonly ledgerSequence: 1
   readonly occurredAt: string
@@ -140,7 +165,7 @@ interface CreatedRecord {
 }
 
 interface EventRecord {
-  readonly schemaVersion: typeof MISSION_LEDGER_SCHEMA_VERSION
+  readonly schemaVersion: MissionLedgerSchemaVersion
   readonly recordType: 'mission.event'
   readonly ledgerSequence: number
   readonly occurredAt: string
@@ -148,7 +173,7 @@ interface EventRecord {
 }
 
 interface HostFailureRecord {
-  readonly schemaVersion: typeof MISSION_LEDGER_SCHEMA_VERSION
+  readonly schemaVersion: MissionLedgerSchemaVersion
   readonly recordType: 'mission.host_failure'
   readonly ledgerSequence: number
   readonly occurredAt: string
@@ -156,7 +181,7 @@ interface HostFailureRecord {
 }
 
 interface CheckpointRecord {
-  readonly schemaVersion: typeof MISSION_LEDGER_SCHEMA_VERSION
+  readonly schemaVersion: MissionLedgerSchemaVersion
   readonly recordType: 'mission.checkpoint'
   readonly ledgerSequence: number
   readonly occurredAt: string
@@ -172,6 +197,8 @@ interface ParsedLedger {
   readonly nextSequence?: number
   readonly nextEventSequence?: number
   readonly byteLength?: number
+  /** The version this FILE is written at, which appends must not change. */
+  readonly schemaVersion?: MissionLedgerSchemaVersion
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -202,9 +229,10 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
   requireText(metadata.prompt, 'prompt', MAX_PROMPT_LENGTH)
   requireText(metadata.requestedRouteId, 'requestedRouteId', 256)
   requireText(metadata.resolvedRouteId, 'resolvedRouteId', 256)
-  if (metadata.runtime !== 'codex' || metadata.model !== 'account-default') {
+  if (metadata.runtime !== 'codex' && metadata.runtime !== 'claude') {
     throw new Error('Mission runtime metadata is invalid')
   }
+  requireText(metadata.model, 'model', 256)
   if (metadata.cliVersion !== null) requireText(metadata.cliVersion, 'cliVersion', 256)
   requireSafeId(metadata.workspaceId, 'workspaceId')
   if (metadata.sandbox !== 'read-only' || metadata.executionPolicyVersion !== 1) {
@@ -247,15 +275,24 @@ function publicIssue(
   }
 }
 
-function parsedMetadata(value: unknown): MissionLedgerMetadata | undefined {
+function parsedMetadata(
+  value: unknown,
+  schemaVersion: MissionLedgerSchemaVersion
+): MissionLedgerMetadata | undefined {
   if (!isObject(value)) return undefined
   const candidate = value as Partial<MissionLedgerMetadata>
+  // A version-1 file could only ever hold these two values. Accepting anything
+  // wider here would let a hand-edited v1 file describe a runtime that version
+  // of the writer could not have produced.
+  if (schemaVersion === 1 && (candidate.runtime !== 'codex' || candidate.model !== 'account-default')) {
+    return undefined
+  }
   if (
     typeof candidate.missionId !== 'string'
     || typeof candidate.runId !== 'string'
     || typeof candidate.prompt !== 'string'
-    || candidate.runtime !== 'codex'
-    || candidate.model !== 'account-default'
+    || (candidate.runtime !== 'codex' && candidate.runtime !== 'claude')
+    || typeof candidate.model !== 'string'
     || typeof candidate.requestedRouteId !== 'string'
     || typeof candidate.resolvedRouteId !== 'string'
     || !(candidate.cliVersion === null || typeof candidate.cliVersion === 'string')
@@ -416,7 +453,10 @@ function parsedEvent(value: unknown, metadata: MissionLedgerMetadata): Normalize
     || typeof value.type !== 'string'
     || !NORMALIZED_EVENT_TYPES.has(value.type as NormalizedRuntimeEventType)
     || !isTimestamp(value.occurredAt)
-    || value.sourceAdapter !== 'codex'
+    // An event must come from the runtime the mission says it is running. A
+    // Claude event inside a Codex mission means one of the two records is
+    // wrong, and a ledger that accepts both cannot say which.
+    || value.sourceAdapter !== metadata.runtime
     || !isObject(value.payload)
     || !isOptionalText(value.cliVersion, 256)
     || !isOptionalText(value.requestedRouteId, 256)
@@ -507,11 +547,12 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
     issues.push(publicIssue('invalid-record', 'The mission ledger header was invalid.', missionId))
     return { issues }
   }
-  if (headerValue.schemaVersion !== MISSION_LEDGER_SCHEMA_VERSION) {
+  if (!isSupportedSchemaVersion(headerValue.schemaVersion)) {
     issues.push(publicIssue('unsupported-schema', 'The mission ledger uses an unsupported schema.', missionId))
     return { issues }
   }
-  const metadata = parsedMetadata(headerValue.metadata)
+  const schemaVersion = headerValue.schemaVersion
+  const metadata = parsedMetadata(headerValue.metadata, schemaVersion)
   if (
     headerValue.recordType !== 'mission.created'
     || headerValue.ledgerSequence !== 1
@@ -543,7 +584,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
     }
     if (
       !isObject(value)
-      || value.schemaVersion !== MISSION_LEDGER_SCHEMA_VERSION
+      || value.schemaVersion !== schemaVersion
       || value.ledgerSequence !== expectedSequence
       || !isTimestamp(value.occurredAt)
     ) {
@@ -606,7 +647,8 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
     issues,
     nextSequence: expectedSequence,
     nextEventSequence: expectedEventSequence,
-    byteLength: Buffer.byteLength(text, 'utf8')
+    byteLength: Buffer.byteLength(text, 'utf8'),
+    schemaVersion
   }
 }
 
@@ -635,6 +677,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
   const nextEventSequences = new Map<string, number>()
   const nextByteOffsets = new Map<string, number>()
   const metadataByMission = new Map<string, MissionLedgerMetadata>()
+  const schemaVersions = new Map<string, MissionLedgerSchemaVersion>()
   let directoryReady: Promise<void> | undefined
   let writeTail: Promise<void> = Promise.resolve()
 
@@ -648,6 +691,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
     nextEventSequences.delete(missionId)
     nextByteOffsets.delete(missionId)
     metadataByMission.delete(missionId)
+    schemaVersions.delete(missionId)
   }
 
   const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
@@ -661,22 +705,26 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
     readonly nextSequence: number
     readonly nextEventSequence: number
     readonly byteLength: number
+    readonly schemaVersion: MissionLedgerSchemaVersion
   }> => {
     const cachedMetadata = metadataByMission.get(missionId)
     const cachedSequence = nextSequences.get(missionId)
     const cachedEventSequence = nextEventSequences.get(missionId)
     const cachedByteLength = nextByteOffsets.get(missionId)
+    const cachedSchemaVersion = schemaVersions.get(missionId)
     if (
       cachedMetadata !== undefined
       && cachedSequence !== undefined
       && cachedEventSequence !== undefined
       && cachedByteLength !== undefined
+      && cachedSchemaVersion !== undefined
     ) {
       return {
         metadata: cachedMetadata,
         nextSequence: cachedSequence,
         nextEventSequence: cachedEventSequence,
-        byteLength: cachedByteLength
+        byteLength: cachedByteLength,
+        schemaVersion: cachedSchemaVersion
       }
     }
     await ensureDirectory()
@@ -686,6 +734,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       || parsed.nextSequence === undefined
       || parsed.nextEventSequence === undefined
       || parsed.byteLength === undefined
+      || parsed.schemaVersion === undefined
       || parsed.issues.length > 0
     ) {
       throw new Error('Mission ledger is unavailable')
@@ -694,10 +743,12 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
     nextSequences.set(missionId, parsed.nextSequence)
     nextEventSequences.set(missionId, parsed.nextEventSequence)
     nextByteOffsets.set(missionId, parsed.byteLength)
+    schemaVersions.set(missionId, parsed.schemaVersion)
     return {
       metadata: parsed.mission.metadata,
       nextSequence: parsed.nextSequence,
       nextEventSequence: parsed.nextEventSequence,
+      schemaVersion: parsed.schemaVersion,
       byteLength: parsed.byteLength
     }
   }
@@ -759,6 +810,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         metadataByMission.set(metadata.missionId, metadata)
         nextSequences.set(metadata.missionId, 2)
         nextEventSequences.set(metadata.missionId, 1)
+        schemaVersions.set(metadata.missionId, MISSION_LEDGER_SCHEMA_VERSION)
         nextByteOffsets.set(metadata.missionId, Buffer.byteLength(line, 'utf8'))
       })
     },
@@ -791,7 +843,9 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
             throw new Error('Mission event is not readable by the ledger reader')
           }
           const record: EventRecord = {
-            schemaVersion: MISSION_LEDGER_SCHEMA_VERSION,
+            // The file's version, not the writer's. A v1 mission that starts
+            // receiving v2 records becomes a file no reader can walk end to end.
+            schemaVersion: hydrated.schemaVersion,
             recordType: 'mission.event',
             ledgerSequence: sequence,
             occurredAt: requireTimestamp(event.occurredAt, 'Event timestamp'),
@@ -813,7 +867,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         validateFailure(failure)
         const hydrated = await hydrateForAppend(missionId)
         const record: HostFailureRecord = {
-          schemaVersion: MISSION_LEDGER_SCHEMA_VERSION,
+          schemaVersion: hydrated.schemaVersion,
           recordType: 'mission.host_failure',
           ledgerSequence: hydrated.nextSequence,
           occurredAt: failure.occurredAt,
@@ -858,7 +912,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         if (checkpoint.resumeSafety === 'unsafe') return checkpoint
         const hydrated = await hydrateForAppend(missionId)
         const record: CheckpointRecord = {
-          schemaVersion: MISSION_LEDGER_SCHEMA_VERSION,
+          schemaVersion: hydrated.schemaVersion,
           recordType: 'mission.checkpoint',
           ledgerSequence: hydrated.nextSequence,
           occurredAt: checkpoint.createdAt,

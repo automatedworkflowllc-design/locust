@@ -1,0 +1,249 @@
+import { createCodexEventNormalizer } from '@teammate/runtime-adapters'
+import type { NormalizedRuntimeEvent, RuntimeProcessCompletion } from '@teammate/runtime-adapters'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import {
+  createFileMissionLedger,
+  MISSION_LEDGER_SCHEMA_VERSION,
+  SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS
+} from '../src/index.js'
+import type { MissionLedgerMetadata } from '../src/index.js'
+
+const NOW = '2026-08-31T16:00:00.000Z'
+const roots: string[] = []
+
+async function temporaryRoot(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'teammate-schema-'))
+  roots.push(root)
+  return root
+}
+
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
+
+function v1Metadata(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    missionId: 'mission_1',
+    runId: 'run_1',
+    prompt: 'Inspect the workspace without changing it.',
+    runtime: 'codex',
+    model: 'account-default',
+    requestedRouteId: 'codex',
+    resolvedRouteId: 'codex-account:default',
+    cliVersion: '0.151.0-alpha.7.2',
+    workspaceId: 'ws_test',
+    sandbox: 'read-only',
+    executionPolicyVersion: 1,
+    createdAt: NOW,
+    ...overrides
+  }
+}
+
+function completion(): RuntimeProcessCompletion {
+  return {
+    exitCode: 0,
+    signal: null,
+    stderr: '',
+    stderrTruncated: false,
+    recordCount: 3,
+    cancelled: false,
+    forcedTerminationAttempted: false,
+    terminationUnconfirmed: false,
+    inputDeliveryFailed: false,
+    outputLimitExceeded: false,
+    startedAt: NOW,
+    finishedAt: NOW
+  }
+}
+
+function codexEvents(): readonly NormalizedRuntimeEvent[] {
+  const codex = createCodexEventNormalizer({
+    runId: 'run_1',
+    missionId: 'mission_1',
+    requestedRouteId: 'codex',
+    resolvedRouteId: 'codex-account:default',
+    cliVersion: '0.151.0-alpha.7.2',
+    now: () => new Date(NOW)
+  })
+  return [
+    ...codex.accept({ sequence: 1, raw: JSON.stringify({ type: 'thread.started', thread_id: 'thread_1' }) }),
+    ...codex.accept({
+      sequence: 2,
+      raw: JSON.stringify({
+        type: 'item.completed',
+        item: { id: 'answer', type: 'agent_message', text: 'Durable result' }
+      })
+    }),
+    ...codex.accept({ sequence: 3, raw: JSON.stringify({ type: 'turn.completed' }) }),
+    ...codex.finish(completion())
+  ]
+}
+
+/** A ledger file exactly as version 1 of this package wrote them. */
+async function writeV1Ledger(
+  root: string,
+  events: readonly NormalizedRuntimeEvent[],
+  metadataOverrides: Record<string, unknown> = {}
+): Promise<string> {
+  const metadata = v1Metadata(metadataOverrides)
+  const lines = [
+    JSON.stringify({
+      schemaVersion: 1,
+      recordType: 'mission.created',
+      ledgerSequence: 1,
+      occurredAt: metadata.createdAt,
+      metadata
+    }),
+    ...events.map((event, index) =>
+      JSON.stringify({
+        schemaVersion: 1,
+        recordType: 'mission.event',
+        ledgerSequence: index + 2,
+        occurredAt: event.occurredAt,
+        event
+      })
+    )
+  ]
+  const path = join(root, 'mission_1.jsonl')
+  await writeFile(path, `${lines.join('\n')}\n`, 'utf8')
+  return path
+}
+
+describe('ledger schema versions', () => {
+  it('writes new missions at the current version', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission({
+      ...v1Metadata()
+    } as unknown as MissionLedgerMetadata)
+
+    const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
+
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(2)
+    expect(header.schemaVersion).toBe(2)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2])
+  })
+
+  it('still recovers a mission recorded before the version bump', async () => {
+    const root = await temporaryRoot()
+    const events = codexEvents()
+    await writeV1Ledger(root, events)
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    // The whole point of the compatibility list: a version bump must not read
+    // to a user as their history disappearing.
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.phase).toBe('completed')
+    expect(recovered?.events).toHaveLength(events.length)
+    expect(recovered?.metadata.runtime).toBe('codex')
+  })
+
+  it('appends to a version-1 mission in version 1, keeping the file walkable', async () => {
+    const root = await temporaryRoot()
+    const events = codexEvents()
+    await writeV1Ledger(root, events.slice(0, 2))
+
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.appendEvents('mission_1', events.slice(2))
+
+    const lines = (await readFile(join(root, 'mission_1.jsonl'), 'utf8')).trimEnd().split('\n')
+    // A v2 record inside a v1 file would stop recovery at the first one, so the
+    // appended half of the mission would vanish on the next launch.
+    expect(lines.map((line) => JSON.parse(line).schemaVersion)).toEqual(lines.map(() => 1))
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.events).toHaveLength(events.length)
+    expect(recovered?.phase).toBe('completed')
+  })
+
+  it('stops recovery when a record disagrees with its file version', async () => {
+    const root = await temporaryRoot()
+    const events = codexEvents()
+    await writeV1Ledger(root, events)
+    const lines = (await readFile(join(root, 'mission_1.jsonl'), 'utf8')).trimEnd().split('\n')
+    const third = JSON.parse(lines[2] ?? '{}')
+    third.schemaVersion = 2
+    lines[2] = JSON.stringify(third)
+    await writeFile(join(root, 'mission_1.jsonl'), `${lines.join('\n')}\n`, 'utf8')
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.events).toHaveLength(1)
+    expect(recovered?.issues.map((issue) => issue.code)).toContain('invalid-record')
+  })
+
+  it('refuses a version-1 file describing a runtime version 1 could not write', async () => {
+    const root = await temporaryRoot()
+    await writeV1Ledger(root, [], { runtime: 'claude' })
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered).toBeUndefined()
+  })
+
+  it('rejects a file whose version this reader does not know', async () => {
+    const root = await temporaryRoot()
+    const metadata = v1Metadata()
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 3,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}\n`,
+      'utf8'
+    )
+
+    const snapshot = await createFileMissionLedger({ rootDirectory: root }).listMissions()
+
+    expect(snapshot.issues.map((issue) => issue.code)).toContain('unsupported-schema')
+    expect(snapshot.missions).toEqual([])
+  })
+})
+
+describe('runtime agreement', () => {
+  it('accepts a Claude mission and its Claude events', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission({
+      ...v1Metadata({ runtime: 'claude', model: 'claude-sonnet-5', requestedRouteId: 'claude' })
+    } as unknown as MissionLedgerMetadata)
+
+    const claudeEvent = {
+      ...codexEvents()[0],
+      sourceAdapter: 'claude'
+    } as unknown as NormalizedRuntimeEvent
+    await ledger.appendEvents('mission_1', [claudeEvent])
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.runtime).toBe('claude')
+    expect(recovered?.metadata.model).toBe('claude-sonnet-5')
+    expect(recovered?.events).toHaveLength(1)
+  })
+
+  it('refuses an event from a runtime the mission is not running', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission({ ...v1Metadata() } as unknown as MissionLedgerMetadata)
+
+    const foreign = {
+      ...codexEvents()[0],
+      sourceAdapter: 'claude'
+    } as unknown as NormalizedRuntimeEvent
+
+    // A Claude event inside a Codex mission means one of the two records is
+    // wrong, and a ledger that accepts both can no longer say which.
+    await expect(ledger.appendEvents('mission_1', [foreign])).rejects.toThrow(
+      /not readable by the ledger reader/
+    )
+  })
+})

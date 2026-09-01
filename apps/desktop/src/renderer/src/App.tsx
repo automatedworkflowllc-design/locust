@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import type {
-  CodexMissionStartData,
+  MissionRouteSummary,
   CodexMissionUpdate,
   PublicRecoveredMission,
   PublicRuntimeStatus,
@@ -115,7 +115,7 @@ type LiveRunPhase = 'starting' | 'running' | 'cancelling' | 'completed' | 'faile
 
 interface LiveRunState {
   readonly prompt: string
-  readonly data?: CodexMissionStartData
+  readonly data?: MissionRouteSummary
   readonly phase: LiveRunPhase
   readonly events: readonly CodexRuntimeEvent[]
   readonly error?: string
