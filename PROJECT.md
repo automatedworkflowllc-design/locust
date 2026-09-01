@@ -58,9 +58,9 @@ In a separate run, validate the full workspace:
 pnpm check
 ```
 
-Last verified on 2026-08-31 (after the durable-ledger milestone, its hardening pass, and the checkpoint record): the production build and every workspace TypeScript check passed, with 81/81 tests passing across runtime adapters, runtime core, the mission store, and desktop services.
+Last verified on 2026-08-31 (after the durable-ledger milestone, its hardening pass, and the checkpoint record): the production build and every workspace TypeScript check passed, with 89/89 tests passing across runtime adapters, runtime core, the mission store, and desktop services.
 
-The checkpoint suite is verified by mutation, not by being green: `packages/mission-store/test/mutation-control.mjs` breaks eight behaviours one at a time and requires the NAMED test to fail, rejecting any mutation that stops the file running (a red suite caused by a broken file proves nothing about any test in it). It found two tests of mine that passed for the wrong reason — a digest test comparing transcripts of different lengths, which a constant-per-event digest satisfies, and a shutdown test that called `dispose()` before the run settled, which passed against a service with the line it names removed.
+The checkpoint suite is verified by mutation, not by being green: `packages/mission-store/test/mutation-control.mjs` breaks thirteen behaviours one at a time and requires the NAMED test to fail, rejecting any mutation that stops the file running (a red suite caused by a broken file proves nothing about any test in it). It found two tests of mine that passed for the wrong reason — a digest test comparing transcripts of different lengths, which a constant-per-event digest satisfies, and a shutdown test that called `dispose()` before the run settled, which passed against a service with the line it names removed.
 
 The post-hardening live smoke is **done**, on the built app against Codex CLI 0.151.0-alpha.7.2, in two layers (`_smoke/`, run by hand — they need a signed-in provider and a desktop session, so they are not part of `pnpm check`):
 
@@ -73,7 +73,7 @@ Each carries a committed negative control, because a green check that could neve
 
 The durable ledger and restart recovery landed on 2026-08-31 (with an adversarial review and hardening pass). What remains, in order — see `docs/ROADMAP.md` for the full plan and the 2026-08-31 owner direction (Cursor x Grok Bot thesis, Claude as an obviously selectable runtime, teammate workroom, simple avatar-first UI):
 
-1. Apply the proven runner/event/ledger contract to Claude Code so both runtimes are selectable from the command dock (issue #3, elevated).
+1. Apply the proven runner/event/ledger contract to Claude Code so both runtimes are selectable from the command dock (issue #3, elevated). **The contract side is done** — the runtime union, ledger schema v2, and the renderer types all landed; what remains is the normalizer and the main-process wiring, specified in `docs/HANDOFF-claude-adapter.md` against a real measured Claude stream.
 2. Work through the recorded hardening backlog (write-side/reader parity landed in the hardening pass): batched fsync, recency-aware ledger scans past 500 files, and byte-capped history responses.
 3. Then the curated OmniRoute gateway adapter and Ask/Automatic fallback from a reconciled checkpoint.
 
