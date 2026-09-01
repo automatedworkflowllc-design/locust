@@ -1,6 +1,7 @@
 import type {
   RuntimeDiscovery,
   RuntimeJsonlRecord,
+  RuntimeProcessRecordStream,
   RuntimeProcessCompletion,
   RuntimeProcessRun,
   RuntimeProcessRunner
@@ -72,13 +73,33 @@ function completion(overrides: Partial<RuntimeProcessCompletion> = {}): RuntimeP
   }
 }
 
-function records(values: readonly Record<string, unknown>[]): AsyncIterable<RuntimeJsonlRecord> {
+function records(values: readonly Record<string, unknown>[]): RuntimeProcessRecordStream {
   return {
     async *[Symbol.asyncIterator]() {
       for (const [index, value] of values.entries()) {
         yield { sequence: index + 1, raw: JSON.stringify(value) }
       }
-    }
+    },
+    // Nothing is buffered ahead in this fake, so the consumer's batching path
+    // degrades to one record per append -- which is what the ordering tests
+    // below want to observe.
+    drainAvailable: () => []
+  }
+}
+
+/**
+ * A stream that hands over the first record and reports the rest as already
+ * buffered, the way a real burst arrives while the consumer is awaiting a
+ * durable write.
+ */
+function burst(values: readonly Record<string, unknown>[]): RuntimeProcessRecordStream {
+  const all = values.map((value, index) => ({ sequence: index + 1, raw: JSON.stringify(value) }))
+  const buffered = all.slice(1)
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield all[0]!
+    },
+    drainAvailable: () => buffered.splice(0)
   }
 }
 
@@ -275,6 +296,8 @@ describe('Codex mission service', () => {
             yield { sequence: 1, raw: JSON.stringify({ type: 'thread.started', thread_id: 'thread-cancel' }) }
             await recordsReleased
           }
+          ,
+          drainAvailable: () => []
         },
         completion: processCompletion
       }
@@ -464,6 +487,8 @@ describe('Codex mission durability and lifecycle boundaries', () => {
             yield { sequence: 1, raw: JSON.stringify({ type: 'thread.started', thread_id: 'thread-drain' }) }
             await processCompletion
           }
+          ,
+          drainAvailable: () => []
         },
         completion: processCompletion
       }
@@ -701,5 +726,70 @@ describe('runtime selection', () => {
       ok: false,
       error: { code: 'CODEX_UNAVAILABLE', message: expect.stringContaining('Claude Code') }
     })
+  })
+})
+
+describe('durable write batching', () => {
+  it('collapses a burst of records into one durable append', async () => {
+    // Each append costs an fsync. Paying it per provider record lets the
+    // runner's bounded queue fill while the consumer waits, and a full queue
+    // ends the run as an output-limit breach -- a verbose mission killed for
+    // being verbose.
+    const appendEvents = vi.fn<MissionLedger['appendEvents']>(async () => undefined)
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: burst([
+        { type: 'thread.started', thread_id: 'thread-live' },
+        { type: 'turn.started' },
+        { type: 'item.completed', item: { id: 'a', type: 'agent_message', text: 'one' } },
+        { type: 'turn.completed' }
+      ]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, fakeLedger({ appendEvents }))
+
+    await service.start('Do work.', 'codex', 'ask', () => undefined)
+    scheduled[0]?.()
+    await vi.waitFor(() => {
+      expect(appendEvents.mock.calls.length).toBeGreaterThan(0)
+    })
+
+    // Four provider records, ONE durable append for the burst -- then a second
+    // for the terminal event that finish() produces.
+    expect(appendEvents.mock.calls[0]?.[1].map((event) => event.type)).toEqual([
+      'run.started',
+      'step.started',
+      'message.delta',
+      'step.completed'
+    ])
+    await vi.waitFor(() => {
+      expect(appendEvents.mock.calls).toHaveLength(2)
+    })
+    expect(appendEvents.mock.calls[1]?.[1].map((event) => event.type)).toEqual(['run.completed'])
+  })
+
+  it('still persists every event before any of them is emitted', async () => {
+    const order: string[] = []
+    const appendEvents = vi.fn<MissionLedger['appendEvents']>(async (_id, events) => {
+      order.push(`persist:${events.length}`)
+    })
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: burst([
+        { type: 'thread.started', thread_id: 't' },
+        { type: 'item.completed', item: { id: 'a', type: 'agent_message', text: 'one' } }
+      ]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, fakeLedger({ appendEvents }))
+
+    await service.start('Do work.', 'codex', 'ask', (update) => {
+      if (update.kind === 'event') order.push('emit')
+    })
+    scheduled[0]?.()
+    await vi.waitFor(() => {
+      expect(order).toContain('emit')
+    })
+
+    // Batching must not reorder the guarantee: the write lands first.
+    expect(order[0]).toMatch(/^persist:/)
   })
 })

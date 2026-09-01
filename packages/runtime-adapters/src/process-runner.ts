@@ -67,9 +67,17 @@ export interface RuntimeProcessCompletion {
   readonly finishedAt: string;
 }
 
+/**
+ * A single-consumer stream of raw JSONL records that can also be drained
+ * without awaiting, so a consumer doing slow per-batch work does not back the
+ * queue up into an output-limit breach.
+ */
+export interface RuntimeProcessRecordStream extends AsyncIterable<RuntimeJsonlRecord> {
+  drainAvailable(): readonly RuntimeJsonlRecord[];
+}
+
 export interface RuntimeProcessRun {
-  /** A single-consumer stream of raw JSONL records. */
-  readonly records: AsyncIterable<RuntimeJsonlRecord>;
+  readonly records: RuntimeProcessRecordStream;
   /** Settles on confirmed close or with `terminationUnconfirmed` after the watchdog. */
   readonly completion: Promise<RuntimeProcessCompletion>;
 }
@@ -144,7 +152,7 @@ export const RUNTIME_ENVIRONMENT_ALLOWLIST = [
 
 const ALLOWED_ENVIRONMENT_KEYS = new Set<string>(RUNTIME_ENVIRONMENT_ALLOWLIST);
 
-class AsyncRecordQueue implements AsyncIterableIterator<RuntimeJsonlRecord> {
+class AsyncRecordQueue implements RuntimeProcessRecordStream, AsyncIterableIterator<RuntimeJsonlRecord> {
   private readonly queued: RuntimeJsonlRecord[] = [];
   private readonly waiting: Array<{
     readonly resolve: (result: IteratorResult<RuntimeJsonlRecord>) => void;
@@ -179,6 +187,19 @@ class AsyncRecordQueue implements AsyncIterableIterator<RuntimeJsonlRecord> {
     if (this.queued.length >= this.maximumQueuedRecords) return false;
     this.queued.push(record);
     return true;
+  }
+
+  /**
+   * Records already buffered, taken without awaiting more.
+   *
+   * This exists so a consumer that must do slow work per batch -- an fsync,
+   * say -- can collapse a burst into one unit instead of one per record.
+   * Without it the queue fills at its cap while the consumer is awaiting,
+   * and a full queue ends the run as an output-limit breach: a verbose
+   * mission would be killed for being verbose.
+   */
+  drainAvailable(): readonly RuntimeJsonlRecord[] {
+    return this.queued.splice(0);
   }
 
   close(): void {

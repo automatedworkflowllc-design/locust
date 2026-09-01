@@ -4,6 +4,14 @@ import type { MissionHistoryResponse, PublicRecoveredMission } from '../shared/i
 const MAX_HISTORY_MISSIONS = 20
 const MAX_HISTORY_EVENTS = 500
 const MAX_HISTORY_CHECKPOINTS = 25
+/**
+ * Ceiling on one IPC response. The per-mission event window bounds COUNT, not
+ * SIZE: a mission of large tool outputs can carry megabytes inside 500 events,
+ * and twenty such missions would hand the renderer an unbounded payload to
+ * structured-clone in one go. Missions are dropped from the tail -- they are
+ * already ordered newest first, so what is lost is the oldest.
+ */
+const MAX_HISTORY_BYTES = 4 * 1024 * 1024
 
 export function publicRecoveredMission(mission: RecoveredMission): PublicRecoveredMission {
   const events = mission.events.length <= MAX_HISTORY_EVENTS
@@ -44,13 +52,36 @@ export function publicRecoveredMission(mission: RecoveredMission): PublicRecover
   }
 }
 
+/**
+ * Take missions until the response would exceed its byte budget. The first
+ * mission is always included even if it alone is over budget: returning an
+ * empty history for one large mission would look like "you have no missions",
+ * which is a worse failure than a large payload.
+ */
+export function withinByteBudget(
+  missions: readonly PublicRecoveredMission[],
+  budget = MAX_HISTORY_BYTES
+): readonly PublicRecoveredMission[] {
+  const kept: PublicRecoveredMission[] = []
+  let used = 0
+  for (const mission of missions) {
+    const size = Buffer.byteLength(JSON.stringify(mission), 'utf8')
+    if (kept.length > 0 && used + size > budget) break
+    kept.push(mission)
+    used += size
+  }
+  return kept
+}
+
 export async function readMissionHistory(ledger: MissionLedger): Promise<MissionHistoryResponse> {
   try {
     const snapshot = await ledger.listMissions({ limit: MAX_HISTORY_MISSIONS })
     return {
       ok: true,
       data: {
-        missions: snapshot.missions.slice(0, MAX_HISTORY_MISSIONS).map(publicRecoveredMission),
+        missions: withinByteBudget(
+          snapshot.missions.slice(0, MAX_HISTORY_MISSIONS).map(publicRecoveredMission)
+        ),
         issueCount: snapshot.issues.length
       }
     }

@@ -170,7 +170,23 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     try {
       for await (const record of mission.process.records) {
         try {
-          await persistAndEmit(mission, options.ledger, mission.normalizer.accept(record))
+          // Take everything already buffered along with this record and
+          // persist it as ONE durable append. Each append costs an fsync, and
+          // paying that per provider record lets the runner's bounded queue
+          // fill while we wait -- a full queue ends the run as an output-limit
+          // breach, so a verbose mission would be killed for being verbose.
+          // Ordering and persist-before-emit are unchanged: the batch is
+          // written before any of its events reach the renderer.
+          // Defensive: a stream from a source that does not implement draining
+          // must degrade to one record per append, not throw -- a TypeError
+          // here would be caught below and reported as a persistence failure,
+          // which is a misleading thing to tell a user about a working ledger.
+          const buffered = typeof mission.process.records.drainAvailable === 'function'
+            ? mission.process.records.drainAvailable()
+            : []
+          const batch = [record, ...buffered]
+          const events = batch.flatMap((entry) => [...mission.normalizer.accept(entry)])
+          await persistAndEmit(mission, options.ledger, events)
         } catch {
           persistenceFailed = true
           mission.controller.abort()

@@ -303,3 +303,45 @@ it('stops recovery at a noncontiguous body record and refuses to extend the corr
     expect(recovered?.issues).toEqual([])
   })
 })
+
+describe('recency-aware scanning past the file cap', () => {
+  it('reads the most recently updated ledgers rather than whichever sort first by name', async () => {
+    const root = await temporaryRoot()
+    const { utimes, writeFile } = await import('node:fs/promises')
+
+    // 501 files against a cap of 500, so the selection path actually runs --
+    // a handful of files would leave it unexercised and this test unable to
+    // fail. Names are chosen so name order and recency order DISAGREE: the
+    // wanted mission sorts LAST by name and is the newest by mtime.
+    const base = Math.floor(Date.now() / 1000)
+    const write = async (missionId: string, modifiedAt: number): Promise<void> => {
+      const own = metadata({ missionId, runId: 'run_1' })
+      const header = JSON.stringify({
+        schemaVersion: MISSION_LEDGER_SCHEMA_VERSION,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: own.createdAt,
+        metadata: own
+      })
+      const path = join(root, `${missionId}.jsonl`)
+      await writeFile(path, `${header}\n`, 'utf8')
+      await utimes(path, modifiedAt, modifiedAt)
+    }
+
+    await Promise.all(
+      Array.from({ length: 500 }, (_, index) =>
+        write(`mission_a${String(index).padStart(4, '0')}`, base - 10_000)
+      )
+    )
+    await write('mission_zzz_newest', base)
+
+    const snapshot = await createFileMissionLedger({ rootDirectory: root }).listMissions({ limit: 5 })
+
+    // Sorting by name and slicing would drop exactly this one.
+    expect(snapshot.missions.some((mission) => mission.metadata.missionId === 'mission_zzz_newest')).toBe(true)
+    // And the issue has to describe the rule that was actually applied, because
+    // it is what a user reads to understand an incomplete list.
+    const capIssue = snapshot.issues.find((issue) => issue.code === 'file-limit-exceeded')
+    expect(capIssue?.message).toContain('most recently updated')
+  })
+})

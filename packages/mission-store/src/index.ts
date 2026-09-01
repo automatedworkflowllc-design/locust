@@ -961,19 +961,39 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
           issues: [publicIssue('read-failed', 'Local mission history could not be read.')]
         }
       }
-      const candidateIds = entries
+      const allIds = entries
         .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
         .map((entry) => entry.name.slice(0, -'.jsonl'.length))
         .filter((missionId) => SAFE_ID.test(missionId))
-        .sort()
       const issues: MissionLedgerIssue[] = []
-      if (candidateIds.length > MAX_MISSION_FILES) {
+
+      // Choose WHICH files to read by recency, not by filename. Mission ids are
+      // random, so sorting by name and taking the first N gives an arbitrary
+      // subset -- and past the cap the user would be shown whichever missions
+      // happened to sort early rather than the ones they last worked on. The
+      // sort further down orders what was read; this decides what gets read at
+      // all, which is the part that was wrong.
+      let candidateIds = allIds
+      if (allIds.length > MAX_MISSION_FILES) {
+        const stamped = await Promise.all(allIds.map(async (missionId) => {
+          try {
+            const file = await stat(missionPath(rootDirectory, missionId))
+            return { missionId, modifiedAt: file.mtimeMs }
+          } catch {
+            // Unreadable now is likely unreadable in a moment; sort it last
+            // rather than dropping it, so it can still surface its own issue.
+            return { missionId, modifiedAt: 0 }
+          }
+        }))
+        stamped.sort((left, right) => right.modifiedAt - left.modifiedAt)
+        candidateIds = stamped.slice(0, MAX_MISSION_FILES).map((entry) => entry.missionId)
         issues.push(publicIssue(
           'file-limit-exceeded',
-          `Only the first ${MAX_MISSION_FILES} local mission ledgers were inspected.`
+          `Only the ${MAX_MISSION_FILES} most recently updated local mission ledgers were inspected.`
         ))
       }
-      const parsed = await Promise.all(candidateIds.slice(0, MAX_MISSION_FILES).map(async (missionId) =>
+
+      const parsed = await Promise.all(candidateIds.map(async (missionId) =>
         readLedgerFile(missionPath(rootDirectory, missionId), missionId)))
       const missions = parsed
         .flatMap((result) => result.mission === undefined ? [] : [result.mission])

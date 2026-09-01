@@ -1,7 +1,7 @@
 import type { MissionLedger, RecoveredMission } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it } from 'vitest'
-import { publicRecoveredMission, readMissionHistory } from './mission-history.js'
+import { publicRecoveredMission, withinByteBudget, readMissionHistory } from './mission-history.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 
@@ -125,5 +125,51 @@ describe('mission history reads', () => {
       }
     })
     expect(JSON.stringify(response)).not.toContain('private')
+  })
+})
+
+describe('history byte budget', () => {
+  function sized(missionId: string, bytes: number) {
+    return recovered({
+      metadata: { ...recovered().metadata, missionId },
+      events: [
+        {
+          ...event(1),
+          payload: { ...event(1).payload, message: 'x'.repeat(bytes) }
+        } as unknown as NormalizedRuntimeEvent
+      ]
+    })
+  }
+
+  it('stops adding missions once the response would exceed its budget', () => {
+    // The per-mission window bounds COUNT, not SIZE: 500 events of large tool
+    // output is still megabytes, and twenty of those is an unbounded payload.
+    const missions = [
+      publicRecoveredMission(sized('mission_1', 400)),
+      publicRecoveredMission(sized('mission_2', 400)),
+      publicRecoveredMission(sized('mission_3', 400))
+    ]
+    // Budget derived from the real serialized size rather than guessed, so the
+    // test pins the BEHAVIOUR (two fit, the third does not) instead of pinning
+    // a magic number that drifts the moment a field is added to the shape.
+    const one = Buffer.byteLength(JSON.stringify(missions[0]), 'utf8')
+    const kept = withinByteBudget(missions, one * 2 + 1)
+
+    expect(kept.map((mission) => mission.missionId)).toEqual(['mission_1', 'mission_2'])
+  })
+
+  it('always returns the first mission even when it alone is over budget', () => {
+    // An empty history reads as "you have no missions", which is a worse lie
+    // than a large payload.
+    const kept = withinByteBudget([publicRecoveredMission(sized('mission_1', 5000))], 10)
+    expect(kept).toHaveLength(1)
+  })
+
+  it('keeps everything when the whole response fits', () => {
+    const missions = [
+      publicRecoveredMission(sized('mission_1', 10)),
+      publicRecoveredMission(sized('mission_2', 10))
+    ]
+    expect(withinByteBudget(missions, 1_000_000)).toHaveLength(2)
   })
 })

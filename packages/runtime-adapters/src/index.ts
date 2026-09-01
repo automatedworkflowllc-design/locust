@@ -56,6 +56,7 @@ export type {
   NodeRuntimeProcessRunnerOptions,
   RuntimeJsonlRecord,
   RuntimeProcessCompletion,
+  RuntimeProcessRecordStream,
   RuntimeProcessRun,
   RuntimeProcessRunner,
   RuntimeProcessStartOptions,
