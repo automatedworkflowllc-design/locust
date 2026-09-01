@@ -1,7 +1,14 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it } from 'vitest'
 
-import { activitySummary, assistantMessages, buildThread, cancellationSummary } from './missionView.js'
+import {
+  activitySummary,
+  assistantMessages,
+  buildSignalRail,
+  buildThread,
+  cancellationSummary,
+  railLabel
+} from './missionView.js'
 
 const NOW = '2026-08-31T16:00:00.000Z'
 let sequence = 0
@@ -162,5 +169,62 @@ describe('cancellation summary', () => {
   it('never reports a negative count when more ran than were planned', () => {
     const summary = cancellationSummary([toolStart('t1', 'shell', 'a'), toolDone('t1')], 0)
     expect(summary.neverStarted).toBe(0)
+  })
+})
+
+describe('signal rail', () => {
+  it('shows newest first', () => {
+    const rows = buildSignalRail(
+      [event('run.started', { runtimeThreadId: 't' }), toolStart('t1', 'shell', 'pnpm test')],
+      { running: true }
+    )
+    expect(rows[0]?.name).toMatch(/^tool\./)
+    expect(rows[1]?.name).toMatch(/^runtime\.started/)
+  })
+
+  it('marks a tool live only while it is open AND the run is going', () => {
+    const open = [toolStart('t1', 'shell', 'pnpm test')]
+    const closed = [toolStart('t1', 'shell', 'pnpm test'), toolDone('t1')]
+    expect(buildSignalRail(open, { running: true }).find((r) => r.name.startsWith('tool.'))?.live).toBe(true)
+    // The same open tool in a run that has stopped is not live -- a pulsing dot
+    // on a dead run is the shell asserting something is happening when nothing
+    // is.
+    expect(buildSignalRail(open, { running: false })[0]?.live).toBe(false)
+    expect(buildSignalRail(closed, { running: true }).find((r) => r.name.includes('completed'))?.live).toBe(false)
+  })
+
+  it('colours by meaning, not decoration', () => {
+    const rows = buildSignalRail(
+      [
+        event('route.limit_detected', { kind: 'temporary-rate-limit', message: 'slow down' }),
+        event('run.failed', { kind: 'process-failed', message: 'died', runtimeTerminal: 'failed', process: {} }),
+        event('run.completed', { process: {} })
+      ],
+      { running: false }
+    )
+    expect(rows.find((r) => r.name.includes('limit_detected'))?.tone).toBe('amber')
+    expect(rows.find((r) => r.name.includes('run.failed'))?.tone).toBe('red')
+    expect(rows.find((r) => r.name === 'run.completed')?.tone).toBe('blue')
+  })
+
+  it('says nothing about events it does not understand', () => {
+    expect(buildSignalRail([event('nonsense.event', {})], { running: true })).toEqual([])
+  })
+})
+
+describe('rail labels', () => {
+  it('collapses whitespace and bounds a long command', () => {
+    const long = `tool.shell · "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -Command "Get-Content -Raw -LiteralPath .\package.json"`
+    const label = railLabel(long)
+    expect(label.length).toBeLessThanOrEqual(72)
+    expect(label.endsWith('\u2026')).toBe(true)
+  })
+
+  it('leaves a short label exactly as it is', () => {
+    expect(railLabel('tool.shell · pnpm test')).toBe('tool.shell · pnpm test')
+  })
+
+  it('does not let a multi-line command become multiple rail lines', () => {
+    expect(railLabel('a\nb\n  c')).toBe('a b c')
   })
 })

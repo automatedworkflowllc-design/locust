@@ -14,6 +14,7 @@ import type {
 } from '../../shared/ipc.js'
 import { Composer } from './components/Composer.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
+import { Inspector } from './components/Inspector.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import { Sidebar } from './components/Sidebar.js'
@@ -126,6 +127,7 @@ export default function App(): ReactElement {
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
+  const [inspectorOpen, setInspectorOpen] = useState(false)
   const [teammateError, setTeammateError] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
@@ -363,7 +365,12 @@ export default function App(): ReactElement {
                     </div>
                   </div>
                 </div>
-                <button type="button" className="lc-button" disabled title="The inspector arrives with the Signal Rail">
+                <button
+                  type="button"
+                  className={`lc-button${inspectorOpen ? ' is-active' : ''}`}
+                  aria-pressed={inspectorOpen}
+                  onClick={() => setInspectorOpen(!inspectorOpen)}
+                >
                   <Icon name="activity" size={13} /> Activity
                 </button>
               </header>
@@ -398,6 +405,15 @@ export default function App(): ReactElement {
             onOpenRoutePicker={() => undefined}
           />
         </main>
+        {inspectorOpen && liveRun !== undefined && (
+          <Inspector
+            events={liveRun.events}
+            running={running}
+            route={liveRun.data}
+            restoredMission={liveRun.restoredMission}
+            onClose={() => setInspectorOpen(false)}
+          />
+        )}
       </div>
       {newTeammateOpen && (
         <NewTeammateDialog

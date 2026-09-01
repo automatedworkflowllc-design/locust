@@ -300,3 +300,152 @@ export function cancellationSummary(
     neverStarted: Math.max(0, plannedSteps - done)
   }
 }
+
+/** Colour class for a Signal Rail row, by what the event means. */
+export type SignalTone = 'lime' | 'blue' | 'violet' | 'amber' | 'red' | 'muted'
+
+export interface SignalRow {
+  readonly key: string
+  readonly name: string
+  readonly meta: string
+  readonly tone: SignalTone
+  readonly live: boolean
+}
+
+/**
+ * A rail row names what happened; it is not the place for the payload. A real
+ * shell invocation can be hundreds of characters (a full PowerShell line, an
+ * absolute interpreter path), and pasting it whole turns one row into four and
+ * pushes everything else off screen.
+ */
+export function railLabel(value: string, limit = 72): string {
+  const single = value.replace(/\s+/g, ' ').trim()
+  return single.length <= limit ? single : `${single.slice(0, limit - 1)}…`
+}
+
+function clockOf(occurredAt: string): string {
+  const parsed = new Date(occurredAt)
+  return Number.isFinite(parsed.getTime())
+    ? parsed.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : ''
+}
+
+/**
+ * The Signal Rail: raw events, newest first, in the product's own vocabulary.
+ *
+ * This is where detail belongs -- the thread shows semantic items, the rail
+ * shows what actually happened. Tone carries meaning rather than decoration:
+ * tools are lime while running and neutral once settled, checkpoints blue,
+ * limits amber, failures red.
+ */
+export function buildSignalRail(
+  events: readonly NormalizedRuntimeEvent[],
+  options: { readonly running: boolean }
+): readonly SignalRow[] {
+  const settled = new Set<string>()
+  for (const event of events) {
+    if (event.type === 'tool.completed' || event.type === 'tool.failed') settled.add(event.payload.itemId)
+  }
+
+  const rows: SignalRow[] = []
+  for (const event of events) {
+    const clock = clockOf(event.occurredAt)
+    switch (event.type) {
+      case 'run.started':
+        rows.push({
+          key: event.id,
+          name: `runtime.started · ${event.sourceAdapter}`,
+          meta: `${clock} · handshake verified`,
+          tone: 'muted',
+          live: false
+        })
+        break
+      case 'tool.started': {
+        const open = !settled.has(event.payload.itemId)
+        rows.push({
+          key: event.id,
+          name: railLabel(`tool.${event.payload.name} · ${event.payload.command ?? event.payload.toolKind}`),
+          meta: `${clock} · ${open ? 'running' : 'started'}`,
+          tone: open && options.running ? 'lime' : 'muted',
+          live: open && options.running
+        })
+        break
+      }
+      case 'tool.completed':
+        rows.push({
+          key: event.id,
+          name: `tool.completed · ${event.payload.name}`,
+          meta: `${clock}${event.payload.exitCode === undefined ? '' : ` · exit ${event.payload.exitCode}`}`,
+          tone: 'muted',
+          live: false
+        })
+        break
+      case 'tool.failed':
+        rows.push({
+          key: event.id,
+          name: `tool.failed · ${event.payload.name}`,
+          meta: `${clock} · ${event.payload.status ?? 'failed'}`,
+          tone: 'red',
+          live: false
+        })
+        break
+      case 'step.started':
+      case 'step.completed':
+      case 'step.failed':
+        rows.push({
+          key: event.id,
+          name: `${event.type} · ${event.payload.stepKind}`,
+          meta: clock,
+          tone: event.type === 'step.failed' ? 'red' : 'muted',
+          live: false
+        })
+        break
+      case 'plan.updated':
+        rows.push({
+          key: event.id,
+          name: `plan.updated${event.payload.final ? ' · final' : ''}`,
+          meta: clock,
+          tone: 'violet',
+          live: false
+        })
+        break
+      case 'route.limit_detected':
+        rows.push({
+          key: event.id,
+          name: `route.limit_detected · ${event.payload.kind}`,
+          meta: railLabel(`${clock} · ${event.payload.message}`, 96),
+          tone: 'amber',
+          live: false
+        })
+        break
+      case 'adapter.diagnostic':
+        rows.push({
+          key: event.id,
+          name: `adapter.diagnostic · ${event.payload.code}`,
+          meta: `${clock} · ${event.payload.level}`,
+          tone: event.payload.level === 'error' ? 'red' : 'amber',
+          live: false
+        })
+        break
+      case 'run.completed':
+        rows.push({ key: event.id, name: 'run.completed', meta: `${clock} · receipt written`, tone: 'blue', live: false })
+        break
+      case 'run.cancelled':
+        rows.push({ key: event.id, name: 'run.cancelled', meta: `${clock} · stopped by you`, tone: 'amber', live: false })
+        break
+      case 'run.failed':
+        rows.push({
+          key: event.id,
+          name: `run.failed · ${event.payload.kind}`,
+          meta: railLabel(`${clock} · ${event.payload.message}`, 96),
+          tone: 'red',
+          live: false
+        })
+        break
+      default:
+        break
+    }
+  }
+  // Newest first, as drawn.
+  return rows.reverse()
+}
