@@ -11,6 +11,7 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
+import { createTeammateStore } from './teammate-store.js'
 import { readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
@@ -18,7 +19,11 @@ import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
   CODEX_MISSION_UPDATE_CHANNEL,
-  MISSION_HISTORY_CHANNEL
+  MISSION_HISTORY_CHANNEL,
+  TEAMMATE_ASSIGN_CHANNEL,
+  TEAMMATE_CREATE_CHANNEL,
+  TEAMMATE_LIST_CHANNEL,
+  TEAMMATE_REMOVE_CHANNEL
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
@@ -143,6 +148,7 @@ if (!ownsSingleInstanceLock) {
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger
     })
+    const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })
     missionServiceForShutdown = codexMissions
     ledgerForShutdown = missionLedger
 
@@ -158,6 +164,66 @@ if (!ownsSingleInstanceLock) {
         } as const
       }
       return runtimeDiscovery.get()
+    })
+
+    // Every teammate channel validates its sender the same way the mission
+    // channels do: a top-level frame of a window this process owns, never a
+    // subframe. The roster is local data, but it is still a write surface.
+    const fromOwnWindow = (event: Electron.IpcMainInvokeEvent): boolean =>
+      BrowserWindow.fromWebContents(event.sender) !== null
+      && event.senderFrame !== null
+      && event.senderFrame.parent === null
+
+    const teammatesUnavailable = {
+      ok: false,
+      error: { code: 'TEAMMATES_UNAVAILABLE', message: 'The local teammate roster could not be read.' }
+    } as const
+
+    const teammateRejected = (message: string) =>
+      ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
+
+    ipcMain.handle(TEAMMATE_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return teammatesUnavailable
+      try {
+        const [list, missionOwners] = await Promise.all([teammates.list(), teammates.missionOwners()])
+        return { ok: true, data: { teammates: list, missionOwners } } as const
+      } catch {
+        return teammatesUnavailable
+      }
+    })
+
+    ipcMain.handle(TEAMMATE_CREATE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return teammateRejected('The teammate could not be created.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role })
+        return { ok: true, data: { teammate } } as const
+      } catch {
+        // The store's own validation is the authority; the renderer is told
+        // that it was refused, never why in terms it could probe.
+        return teammateRejected('That teammate could not be created. Check the name, hue and role.')
+      }
+    })
+
+    ipcMain.handle(TEAMMATE_REMOVE_CHANNEL, async (event, teammateId: unknown) => {
+      if (!fromOwnWindow(event)) return teammateRejected('The teammate could not be removed.')
+      try {
+        await teammates.remove(teammateId)
+        return { ok: true, data: {} } as const
+      } catch {
+        return teammateRejected('That teammate could not be removed.')
+      }
+    })
+
+    ipcMain.handle(TEAMMATE_ASSIGN_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return teammateRejected('The mission could not be assigned.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await teammates.assignMission(input.teammateId, input.missionId)
+        return { ok: true, data: {} } as const
+      } catch {
+        return teammateRejected('That mission could not be assigned.')
+      }
     })
 
     ipcMain.handle(MISSION_HISTORY_CHANNEL, async (event) => {

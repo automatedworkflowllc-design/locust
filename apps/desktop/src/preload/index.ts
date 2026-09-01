@@ -4,7 +4,11 @@ import {
   CODEX_MISSION_START_CHANNEL,
   CODEX_MISSION_UPDATE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
-  RUNTIME_DISCOVERY_CHANNEL
+  RUNTIME_DISCOVERY_CHANNEL,
+  TEAMMATE_ASSIGN_CHANNEL,
+  TEAMMATE_CREATE_CHANNEL,
+  TEAMMATE_LIST_CHANNEL,
+  TEAMMATE_REMOVE_CHANNEL
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
@@ -14,7 +18,10 @@ import type {
   CodexMissionUpdate,
   DesktopApi,
   MissionHistoryResponse,
-  RuntimeDiscoveryResponse
+  RuntimeDiscoveryResponse,
+  TeammateCreateRequest,
+  TeammateListResponse,
+  TeammateMutationResponse
 } from '../shared/ipc.js'
 
 export type {
@@ -28,6 +35,12 @@ export type {
   MissionHistoryResponse,
   PublicRecoveredMission,
   PublicRuntimeStatus,
+  PublicTeammate,
+  TeammateCreateRequest,
+  TeammateHue,
+  TeammateListResponse,
+  TeammateMutationResponse,
+  TeammateRole,
   RuntimeAuthState,
   RuntimeDiscoveryResponse,
   RuntimeProbeStatus
@@ -40,6 +53,13 @@ const desktopApi: DesktopApi = {
   close: () => ipcRenderer.send('window:close'),
   getLocalRuntimes: () => ipcRenderer.invoke(RUNTIME_DISCOVERY_CHANNEL) as Promise<RuntimeDiscoveryResponse>,
   getMissionHistory: () => ipcRenderer.invoke(MISSION_HISTORY_CHANNEL) as Promise<MissionHistoryResponse>,
+  listTeammates: () => ipcRenderer.invoke(TEAMMATE_LIST_CHANNEL) as Promise<TeammateListResponse>,
+  createTeammate: (request: TeammateCreateRequest) =>
+    ipcRenderer.invoke(TEAMMATE_CREATE_CHANNEL, request) as Promise<TeammateMutationResponse>,
+  removeTeammate: (teammateId: string) =>
+    ipcRenderer.invoke(TEAMMATE_REMOVE_CHANNEL, teammateId) as Promise<TeammateMutationResponse>,
+  assignMission: (teammateId: string, missionId: string) =>
+    ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
   startCodexMission: (request: CodexMissionStartRequest) =>
     ipcRenderer.invoke(CODEX_MISSION_START_CHANNEL, request) as Promise<CodexMissionStartResponse>,
   cancelCodexMission: (request: CodexMissionCancelRequest) =>

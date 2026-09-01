@@ -1,9 +1,11 @@
 import type { ReactElement } from 'react'
 
-import type { PublicRecoveredMission, PublicRuntimeStatus } from '../../../shared/ipc.js'
+import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
-import { connectedRuntimeCount, missionPhaseView, shortMissionId } from '../status.js'
+import { connectedRuntimeCount, missionPhaseView, shortMissionId, teammateStatusView } from '../status.js'
+import { faceForName } from './NewTeammateDialog.js'
+import { PixelFace } from './PixelFace.js'
 import { Icon } from './Icon.js'
 
 export interface SidebarMission {
@@ -24,17 +26,24 @@ export interface SidebarMission {
 export function Sidebar({
   runtimes,
   missions,
+  teammates,
+  missionOwners,
   selectedMissionId,
   onSelectMission,
+  onNewTeammate,
   onOpenSettings
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
+  readonly teammates: readonly PublicTeammate[]
+  readonly missionOwners: Readonly<Record<string, string>>
   readonly selectedMissionId: string | undefined
   readonly onSelectMission: (missionId: string) => void
+  readonly onNewTeammate: () => void
   readonly onOpenSettings: () => void
 }): ReactElement {
   const connected = connectedRuntimeCount(runtimes)
+  const unowned = missions.filter((mission) => missionOwners[mission.missionId] === undefined)
   return (
     <nav className="lc-sidebar" aria-label="Workspace">
       <div className="lc-sidebar__brand">
@@ -46,8 +55,8 @@ export function Sidebar({
           type="button"
           className="lc-iconbutton"
           aria-label="New teammate"
-          title="Teammates arrive with the roster"
-          disabled
+          title="New teammate"
+          onClick={onNewTeammate}
         >
           <Icon name="plus" size={14} />
         </button>
@@ -59,35 +68,96 @@ export function Sidebar({
       </div>
 
       <div className="lc-sidebar__scroll">
-        <div className="lc-sectionlabel">Missions</div>
-        {missions.length === 0 ? (
-          <p
-            className="lc-row__meta"
-            style={{ padding: '0 var(--lc-space-5)', textWrap: 'pretty' }}
-          >
-            No missions yet. Describe one below and it is recorded locally as it runs.
-          </p>
-        ) : (
-          missions.map((mission) => {
-            const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
-            return (
-              <button
-                type="button"
-                key={mission.missionId}
-                className="lc-row"
-                aria-current={mission.missionId === selectedMissionId}
-                onClick={() => onSelectMission(mission.missionId)}
-              >
-                <span className={`lc-dot lc-tone-${view.tone}${mission.phase === 'running' ? ' is-pulsing' : ''}`} />
+        {teammates.length > 0 && <div className="lc-sectionlabel">Teammates</div>}
+        {teammates.map((teammate) => {
+          const owned = missions.filter((mission) => missionOwners[mission.missionId] === teammate.teammateId)
+          const status = teammateStatusView({
+            runtime: runtimes.find((entry) => entry.id === 'codex'),
+            hasRunningMission: owned.some((mission) => mission.phase === 'running'),
+            pendingApprovals: 0,
+            roleLabel: teammate.role
+          })
+          const selected = owned.some((mission) => mission.missionId === selectedMissionId)
+          return (
+            <div key={teammate.teammateId} className={`lc-teammate${selected ? ' is-selected' : ''}`}>
+              <div className="lc-row">
+                <PixelFace hue={teammate.hue} pixels={faceForName(teammate.name)} size={30} />
                 <span className="lc-row__text">
-                  <span className="lc-row__name">{mission.title}</span>
-                  <span className="lc-row__meta">
-                    {view.label} · <span className="lc-mono">{shortMissionId(mission.missionId)}</span>
+                  <span className="lc-row__name">
+                    {teammate.name}
+                    {status.pulse && <span className={`lc-dot is-pulsing lc-tone-${status.tone} lc-namedot`} />}
+                  </span>
+                  <span className={`lc-row__meta lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
+                    {status.label}
                   </span>
                 </span>
-              </button>
-            )
-          })
+              </div>
+              {owned.length > 0 && (
+                <div className="lc-teammate__missions">
+                  {owned.map((mission) => (
+                    <button
+                      type="button"
+                      key={mission.missionId}
+                      className={`lc-teammate__mission${
+                        mission.missionId === selectedMissionId ? ' is-active' : ''
+                      }`}
+                      onClick={() => onSelectMission(mission.missionId)}
+                    >
+                      <span
+                        className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}`}
+                      />
+                      <span>{mission.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {unowned.length > 0 && (
+          <>
+            <div className="lc-sectionlabel">{teammates.length > 0 ? 'Other missions' : 'Missions'}</div>
+            {unowned.map((mission) => {
+              const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
+              return (
+                <button
+                  type="button"
+                  key={mission.missionId}
+                  className="lc-row"
+                  aria-current={mission.missionId === selectedMissionId}
+                  onClick={() => onSelectMission(mission.missionId)}
+                >
+                  <span
+                    className={`lc-dot lc-tone-${view.tone}${mission.phase === 'running' ? ' is-pulsing' : ''}`}
+                  />
+                  <span className="lc-row__text">
+                    <span className="lc-row__name">{mission.title}</span>
+                    <span className="lc-row__meta">
+                      {view.label} · <span className="lc-mono">{shortMissionId(mission.missionId)}</span>
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
+          </>
+        )}
+
+        {/*
+          Only one empty state, and only when it is true: no missions at all.
+          When every mission belongs to a teammate they are already listed
+          above, so an "other missions" section with a note in it would be a
+          heading for nothing.
+        */}
+        {missions.length === 0 && (
+          <>
+            <div className="lc-sectionlabel">Missions</div>
+            <p className="lc-sidebar__empty lc-row__meta">
+              {teammates.length === 0
+                ? 'No missions yet. Describe one below and it is recorded locally as it runs.'
+                : `No missions yet. Describe one below and ${teammates[0]!.name} picks it up.`}
+            </p>
+          </>
         )}
       </div>
 

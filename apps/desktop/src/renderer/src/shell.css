@@ -38,6 +38,7 @@ textarea {
 }
 
 .lc-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1072,5 +1073,341 @@ textarea {
   font-size: var(--lc-text-description);
   padding-left: var(--lc-space-4);
   border-left: 2px solid var(--lc-border-card);
+  text-wrap: pretty;
+}
+
+/* --- Dialog ------------------------------------------------------------ */
+
+.lc-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--lc-overlay-scrim);
+  display: grid;
+  place-items: center;
+  z-index: 22;
+}
+
+.lc-dialog {
+  width: 560px;
+  max-width: calc(100% - var(--lc-space-8));
+  background: var(--lc-bg-raised-2);
+  border: 1px solid var(--lc-border-button);
+  border-radius: 13px;
+  box-shadow: var(--lc-shadow-palette);
+  overflow: hidden;
+}
+
+.lc-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--lc-border-card);
+}
+
+.lc-dialog__title {
+  font-size: var(--lc-text-teammate-name);
+  font-weight: 500;
+}
+
+.lc-dialog__sub {
+  font-size: var(--lc-text-mono-provenance);
+  color: var(--lc-text-muted);
+}
+
+.lc-dialog__close {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-border-strong);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-dialog__close:hover {
+  background: var(--lc-hover-surface-strong);
+  border-color: var(--lc-hover-border);
+}
+
+.lc-dialog__body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lc-dialog__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-6);
+}
+
+.lc-dialog__fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+}
+
+.lc-fieldlabel {
+  font-size: 10px;
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+  color: var(--lc-text-label);
+}
+
+.lc-input {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: var(--lc-radius-button);
+  border: 1px solid var(--lc-border-card);
+  background: var(--lc-bg-raised);
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-control);
+  outline: none;
+}
+
+.lc-input:focus {
+  border-color: var(--lc-hover-border);
+}
+
+.lc-hues {
+  display: flex;
+  gap: var(--lc-space-3);
+}
+
+.lc-hue {
+  padding: 3px;
+  border-radius: var(--lc-radius-button);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.lc-hue.is-selected {
+  border-color: var(--lc-lime-border-strong);
+  background: var(--lc-lime-tint);
+}
+
+.lc-dialog__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+}
+
+.lc-rolegrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lc-space-4);
+}
+
+.lc-rolecard {
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--lc-border-card);
+  background: var(--lc-bg-raised);
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-rolecard:hover {
+  border-color: var(--lc-hover-border);
+}
+
+.lc-rolecard.is-selected {
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+}
+
+.lc-rolecard__name {
+  display: block;
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+}
+
+.lc-rolecard__desc {
+  display: block;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.lc-dialog__summary {
+  display: flex;
+  gap: var(--lc-space-4);
+}
+
+.lc-summarycard {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--lc-border-card);
+  background: var(--lc-bg-raised);
+  min-width: 0;
+}
+
+.lc-summarycard__text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--lc-text-secondary-size);
+  color: var(--lc-text-secondary);
+}
+
+.lc-summarycard__label {
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+}
+
+.lc-dialog__note {
+  margin: 0;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  line-height: 1.5;
+}
+
+.lc-dialog__error {
+  margin: 0;
+  font-size: var(--lc-text-secondary-size);
+  color: var(--lc-red-text);
+}
+
+.lc-dialog__foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--lc-border-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-ghostbutton {
+  margin-left: auto;
+  height: 32px;
+  padding: 0 15px;
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-border-strong);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-control);
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-ghostbutton:hover {
+  background: var(--lc-hover-surface-strong);
+  border-color: var(--lc-hover-border);
+}
+
+.lc-primarybutton {
+  height: 32px;
+  padding: 0 var(--lc-space-6);
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-lime-border);
+  background: var(--lc-lime-tint-strong);
+  color: var(--lc-lime-text);
+  font-size: var(--lc-text-control);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease), transform var(--lc-motion-press) var(--lc-ease);
+}
+
+.lc-primarybutton:hover:not(:disabled) {
+  background: var(--lc-lime-tint-strong);
+}
+
+.lc-primarybutton:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.lc-primarybutton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* --- Teammate rows ----------------------------------------------------- */
+
+.lc-teammate {
+  border-radius: 9px;
+}
+
+.lc-teammate.is-selected {
+  background: var(--lc-bg-selected);
+  border: 1px solid var(--lc-border-card);
+}
+
+.lc-teammate__missions {
+  padding: 0 10px 9px 50px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lc-teammate__mission {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px var(--lc-space-4);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.lc-teammate__mission.is-active {
+  background: var(--lc-lime-tint);
+  color: var(--lc-lime-text);
+}
+
+.lc-teammate__mission span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-badge {
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--lc-amber-tint);
+  border: 1px solid var(--lc-amber-border);
+  color: var(--lc-amber-text);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  display: grid;
+  place-items: center;
+}
+
+.lc-namedot {
+  margin-left: var(--lc-space-3);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.lc-row__name {
+  display: flex;
+  align-items: center;
+}
+
+.lc-sidebar__empty {
+  padding: 0 10px var(--lc-space-4);
+  white-space: normal;
   text-wrap: pretty;
 }

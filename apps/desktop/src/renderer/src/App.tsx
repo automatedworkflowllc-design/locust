@@ -7,11 +7,15 @@ import type {
   CodexMissionUpdate,
   MissionRouteSummary,
   PublicRecoveredMission,
-  PublicRuntimeStatus
+  PublicRuntimeStatus,
+  PublicTeammate,
+  TeammateHue,
+  TeammateRole
 } from '../../shared/ipc.js'
 import { Composer } from './components/Composer.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
 import { Icon } from './components/Icon.js'
+import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { Thread } from './components/Thread.js'
@@ -119,6 +123,10 @@ export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
   const [liveRun, setLiveRun] = useState<LiveRunState>()
   const [history, setHistory] = useState<readonly PublicRecoveredMission[]>([])
+  const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
+  const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
+  const [newTeammateOpen, setNewTeammateOpen] = useState(false)
+  const [teammateError, setTeammateError] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
 
@@ -151,6 +159,17 @@ export default function App(): ReactElement {
       })
       .catch(() => {
         if (active) setRuntimeState({ phase: 'error' })
+      })
+
+    void bridge
+      .listTeammates()
+      .then((response) => {
+        if (!active || !response.ok) return
+        setTeammates(response.data.teammates)
+        setMissionOwners(response.data.missionOwners)
+      })
+      .catch(() => {
+        // The roster is optional at startup; missions still run without it.
       })
 
     void bridge
@@ -246,6 +265,27 @@ export default function App(): ReactElement {
       })
   }
 
+  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole }): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .createTeammate(input)
+      .then((response) => {
+        if (!response.ok) {
+          setTeammateError(response.error.message)
+          return
+        }
+        setTeammateError(undefined)
+        setNewTeammateOpen(false)
+        return bridge.listTeammates().then((listed) => {
+          if (!listed.ok) return
+          setTeammates(listed.data.teammates)
+          setMissionOwners(listed.data.missionOwners)
+        })
+      })
+      .catch(() => setTeammateError('That teammate could not be created.'))
+  }
+
   const runtimes = runtimeState.phase === 'ready' ? runtimeState.runtimes : []
   const running = liveRunIsActive(liveRun)
 
@@ -285,8 +325,14 @@ export default function App(): ReactElement {
         <Sidebar
           runtimes={runtimes}
           missions={sidebarMissions}
+          teammates={teammates}
+          missionOwners={missionOwners}
           selectedMissionId={liveRun?.data?.missionId}
           onSelectMission={() => undefined}
+          onNewTeammate={() => {
+            setTeammateError(undefined)
+            setNewTeammateOpen(true)
+          }}
           onOpenSettings={() => undefined}
         />
         <main className="lc-workroom">
@@ -353,6 +399,13 @@ export default function App(): ReactElement {
           />
         </main>
       </div>
+      {newTeammateOpen && (
+        <NewTeammateDialog
+          error={teammateError}
+          onCancel={() => setNewTeammateOpen(false)}
+          onCreate={createTeammate}
+        />
+      )}
     </div>
   )
 }

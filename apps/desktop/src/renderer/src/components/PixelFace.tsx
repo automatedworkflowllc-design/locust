@@ -86,6 +86,11 @@ function faceShadow(pixels: readonly FacePixel[], size: number): string {
 export function PixelFace({ hue, pixels, size = 32, className }: PixelFaceProps): ReactElement {
   const pixel = facePixelSize(size)
   const chip: CSSProperties = {
+    // A span is inline by default, and width/height do not apply to inline
+    // boxes -- the avatar only looked right where its parent happened to be a
+    // flex container and blockified it. Set explicitly so the chip is the same
+    // size wherever it is placed.
+    display: 'inline-flex',
     width: size,
     height: size,
     // The reference uses a small fixed radius at every avatar size (5px on a

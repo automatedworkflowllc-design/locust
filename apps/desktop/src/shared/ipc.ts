@@ -5,8 +5,55 @@ export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
 export const CODEX_MISSION_CANCEL_CHANNEL = 'codex-mission:cancel'
 export const CODEX_MISSION_UPDATE_CHANNEL = 'codex-mission:update'
 export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
+export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
+export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
+export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
+export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
 
 export type LocalRuntimeId = 'codex' | 'claude' | 'omniroute'
+
+export type TeammateHue = 'lime' | 'blue' | 'violet' | 'clay'
+
+export type TeammateRole =
+  | 'Code & Migrations'
+  | 'Research & Briefs'
+  | 'Ops & Scheduling'
+  | 'Docs & QA'
+  | 'Data & Reporting'
+  | 'Custom'
+
+/**
+ * A teammate is local identity and routing defaults. It owns no process and
+ * grants no capability -- the roster is real without a multi-agent runtime
+ * behind it.
+ */
+export interface PublicTeammate {
+  readonly teammateId: string
+  readonly name: string
+  readonly hue: TeammateHue
+  readonly role: TeammateRole
+  readonly createdAt: string
+}
+
+export interface TeammateCreateRequest {
+  readonly name: string
+  readonly hue: TeammateHue
+  readonly role: TeammateRole
+}
+
+export type TeammateListResponse =
+  | {
+      readonly ok: true
+      readonly data: {
+        readonly teammates: readonly PublicTeammate[]
+        readonly missionOwners: Readonly<Record<string, string>>
+      }
+    }
+  | { readonly ok: false; readonly error: { readonly code: 'TEAMMATES_UNAVAILABLE'; readonly message: string } }
+
+export type TeammateMutationResponse =
+  | { readonly ok: true; readonly data: { readonly teammate?: PublicTeammate } }
+  | { readonly ok: false; readonly error: { readonly code: 'TEAMMATE_REJECTED'; readonly message: string } }
 export type RuntimeAuthState = 'authenticated' | 'unauthenticated' | 'unknown' | 'not-applicable'
 export type RuntimeProbeStatus = 'ready' | 'not-installed' | 'auth-required' | 'offline' | 'probe-failed'
 
@@ -181,6 +228,10 @@ export interface DesktopApi {
   close(): void
   getLocalRuntimes(): Promise<RuntimeDiscoveryResponse>
   getMissionHistory(): Promise<MissionHistoryResponse>
+  listTeammates(): Promise<TeammateListResponse>
+  createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
+  removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
+  assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>
   cancelCodexMission(request: CodexMissionCancelRequest): Promise<CodexMissionCancelResponse>
   onCodexMissionUpdate(listener: (update: CodexMissionUpdate) => void): () => void
