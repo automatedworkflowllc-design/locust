@@ -16,3 +16,6 @@ Thumbs.db
 
 *.tsbuildinfo
 release/
+
+# mutation-control scratch report
+packages/mission-store/mutation-result.json

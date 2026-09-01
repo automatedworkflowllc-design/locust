@@ -87,6 +87,7 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
     createMission: async () => undefined,
     appendEvents: async () => undefined,
     appendHostFailure: async () => undefined,
+    createCheckpoint: async () => { throw new Error('not used in this test') },
     getMission: async () => undefined,
     listMissions: async () => ({ missions: [], issues: [] }),
     flush: async () => undefined,
@@ -485,5 +486,90 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     })
     reusable.interrupt()
     await expect(reusable.start('After interrupt.', () => undefined)).resolves.toMatchObject({ ok: true })
+  })
+  it('checkpoints the mission it cut short, after that run has finished settling', async () => {
+    const calls: Array<[string, string]> = []
+    const ledger = fakeLedger({
+      createCheckpoint: async (missionId, reason) => {
+        calls.push([missionId, reason])
+        return { missionId } as never
+      }
+    })
+    const start = vi.fn((_spec, _prompt, options): RuntimeProcessRun => {
+      const signal = options?.signal
+      return {
+        records: records([{ type: 'thread.started', thread_id: 'thread-live' }]),
+        completion: new Promise((resolve) => {
+          signal?.addEventListener('abort', () => {
+            resolve(completion({ cancelled: true }))
+          })
+        })
+      }
+    }) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, ledger)
+    const updates: CodexMissionUpdate[] = []
+    await service.start('Wait safely.', (update) => updates.push(update))
+    scheduled[0]?.()
+
+    // The real sequence: the window closes, the run settles and the service
+    // forgets it, and only THEN does the app quit. Calling dispose() straight
+    // after interrupt() leaves the mission still active, so dispose reads the
+    // id itself and the test passes whether or not interrupt() recorded it --
+    // which is exactly how this test first passed against a service that had
+    // the line removed.
+    service.interrupt()
+    for (let tick = 0; tick < 20; tick += 1) {
+      if (updates.some((update) => update.kind === 'event' && update.event.type === 'run.cancelled')) break
+      await new Promise((resolve) => setImmediate(resolve))
+    }
+    expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.cancelled')).toBe(true)
+
+    await service.dispose()
+
+    expect(calls).toEqual([['mission_2', 'shutdown']])
+  })
+
+  it('does not checkpoint when no mission was running', async () => {
+    const calls: string[] = []
+    const ledger = fakeLedger({
+      createCheckpoint: async (missionId) => {
+        calls.push(missionId)
+        return {} as never
+      }
+    })
+    const { service } = scheduledService(
+      { start: () => ({ records: records([]), completion: Promise.resolve(completion()) }) },
+      ledger
+    )
+
+    await service.dispose()
+
+    expect(calls).toEqual([])
+  })
+
+  it('still shuts down when the checkpoint write fails', async () => {
+    const ledger = fakeLedger({
+      createCheckpoint: async () => {
+        throw new Error('disk full')
+      }
+    })
+    const start = vi.fn((_spec, _prompt, options): RuntimeProcessRun => {
+      const signal = options?.signal
+      return {
+        records: records([{ type: 'thread.started', thread_id: 'thread-live' }]),
+        completion: new Promise((resolve) => {
+          signal?.addEventListener('abort', () => {
+            resolve(completion({ cancelled: true }))
+          })
+        })
+      }
+    }) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, ledger)
+    await service.start('Wait safely.', () => undefined)
+    scheduled[0]?.()
+    service.interrupt()
+
+    // A bookkeeping write must never be able to hang or crash shutdown.
+    await expect(service.dispose()).resolves.toBeUndefined()
   })
 })

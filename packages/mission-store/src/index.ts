@@ -8,6 +8,9 @@ import { mkdir, open, readdir, stat } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
+import { parsedCheckpoint, reconcileMission } from './checkpoint.js'
+import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
+
 export const MISSION_LEDGER_SCHEMA_VERSION = 1 as const
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -82,6 +85,8 @@ export interface RecoveredMission {
   readonly metadata: MissionLedgerMetadata
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly hostFailures: readonly MissionHostFailure[]
+  /** Reconciled checkpoints in ledger order; the last one is the newest. */
+  readonly checkpoints: readonly ReconciledCheckpoint[]
   readonly phase: RecoveredMissionPhase
   readonly lastUpdatedAt: string
   readonly ledgerSequence: number
@@ -97,6 +102,20 @@ export interface MissionLedger {
   createMission(metadata: MissionLedgerMetadata): Promise<void>
   appendEvents(missionId: string, events: readonly NormalizedRuntimeEvent[]): Promise<void>
   appendHostFailure(missionId: string, failure: MissionHostFailure): Promise<void>
+  /**
+   * Derive a checkpoint from what is durably recorded and append it.
+   *
+   * There is deliberately no `appendCheckpoint(checkpoint)`. A caller that
+   * could hand in its own checkpoint could hand in one that disagrees with
+   * the ledger -- and a checkpoint whose whole purpose is to be trusted at a
+   * provider limit is worthless the moment it can be authored by the
+   * component whose state is in doubt.
+   *
+   * The returned checkpoint is durable EXCEPT when it reports `unsafe`: a
+   * ledger that already stops short during recovery cannot receive a record
+   * anyone would read again, so that verdict is returned without being written.
+   */
+  createCheckpoint(missionId: string, reason: CheckpointReason): Promise<ReconciledCheckpoint>
   getMission(missionId: string): Promise<RecoveredMission | undefined>
   listMissions(options?: MissionLedgerListOptions): Promise<MissionLedgerSnapshot>
   flush(): Promise<void>
@@ -108,6 +127,8 @@ export interface MissionLedgerListOptions {
 
 export interface FileMissionLedgerOptions {
   readonly rootDirectory: string
+  /** Test seam. Checkpoints are stamped by the ledger, never by a caller. */
+  readonly now?: () => Date
 }
 
 interface CreatedRecord {
@@ -134,7 +155,15 @@ interface HostFailureRecord {
   readonly failure: MissionHostFailure
 }
 
-type LedgerRecord = CreatedRecord | EventRecord | HostFailureRecord
+interface CheckpointRecord {
+  readonly schemaVersion: typeof MISSION_LEDGER_SCHEMA_VERSION
+  readonly recordType: 'mission.checkpoint'
+  readonly ledgerSequence: number
+  readonly occurredAt: string
+  readonly checkpoint: ReconciledCheckpoint
+}
+
+type LedgerRecord = CreatedRecord | EventRecord | HostFailureRecord | CheckpointRecord
 type JsonObject = Record<string, unknown>
 
 interface ParsedLedger {
@@ -496,6 +525,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
 
   const events: NormalizedRuntimeEvent[] = []
   const hostFailures: MissionHostFailure[] = []
+  const checkpoints: ReconciledCheckpoint[] = []
   let expectedSequence = 2
   let expectedEventSequence = 1
   let lastUpdatedAt = metadata.createdAt
@@ -542,6 +572,19 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       }
       hostFailures.push(failure)
       lastUpdatedAt = failure.occurredAt
+    } else if (value.recordType === 'mission.checkpoint') {
+      const checkpoint = parsedCheckpoint(value.checkpoint, metadata)
+      if (
+        checkpoint === undefined
+        || value.occurredAt !== checkpoint.createdAt
+        || checkpoint.epoch !== checkpoints.length + 1
+        || checkpoint.reconciledThroughSequence > expectedEventSequence - 1
+      ) {
+        issues.push(publicIssue('invalid-record', 'An invalid checkpoint and its tail were ignored.', missionId))
+        break
+      }
+      checkpoints.push(checkpoint)
+      lastUpdatedAt = checkpoint.createdAt
     } else {
       issues.push(publicIssue('invalid-record', 'An unknown mission record and its tail were ignored.', missionId))
       break
@@ -554,6 +597,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       metadata,
       events,
       hostFailures,
+      checkpoints,
       phase: phaseFor(events, hostFailures),
       lastUpdatedAt,
       ledgerSequence: expectedSequence - 1,
@@ -584,6 +628,8 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
   if (!isAbsolute(rootDirectory) || rootDirectory.includes('\0')) {
     throw new Error('Mission ledger directory is invalid')
   }
+
+  const now = options.now ?? (() => new Date())
 
   const nextSequences = new Map<string, number>()
   const nextEventSequences = new Map<string, number>()
@@ -778,6 +824,52 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       })
     },
 
+    createCheckpoint(missionId: string, reason: CheckpointReason): Promise<ReconciledCheckpoint> {
+      return serialize(async () => {
+        requireSafeId(missionId, 'missionId')
+        // Read the FILE first, before hydrating anything. Reconciliation runs
+        // against what survived an fsync, never against cached counters -- the
+        // cached view is exactly what an interrupted process leaves behind.
+        // Reading first also matters for a damaged ledger: `hydrateForAppend`
+        // fails closed on integrity issues, so hydrating up front would turn
+        // the most important verdict this function can return into an opaque
+        // throw, and the caller needs the reason, not just the refusal.
+        const parsed = await readLedgerFile(missionPath(rootDirectory, missionId), missionId)
+        const mission = parsed.mission
+        if (mission === undefined) throw new Error('Mission ledger could not be reconciled')
+        const checkpoint = reconcileMission(
+          { metadata: mission.metadata, events: mission.events, issues: mission.issues },
+          {
+            reason,
+            epoch: mission.checkpoints.length + 1,
+            createdAt: now().toISOString()
+          }
+        )
+        // Same rule as events: the reader defines what is writable.
+        if (parsedCheckpoint(checkpoint, mission.metadata) === undefined) {
+          throw new Error('Checkpoint is not readable by the ledger reader')
+        }
+        // An already-broken ledger cannot be checkpointed durably. Recovery
+        // stops at the first record it cannot parse, so anything appended past
+        // that break is written, fsynced, and permanently unreachable -- the
+        // exact shape of the defect this ledger was hardened against. The
+        // verdict still goes back to the caller, and `unsafe` is the strongest
+        // answer it can give, so nothing is lost by declining to write it.
+        if (checkpoint.resumeSafety === 'unsafe') return checkpoint
+        const hydrated = await hydrateForAppend(missionId)
+        const record: CheckpointRecord = {
+          schemaVersion: MISSION_LEDGER_SCHEMA_VERSION,
+          recordType: 'mission.checkpoint',
+          ledgerSequence: hydrated.nextSequence,
+          occurredAt: checkpoint.createdAt,
+          checkpoint
+        }
+        await appendRecords(missionId, [record])
+        nextSequences.set(missionId, hydrated.nextSequence + 1)
+        return checkpoint
+      })
+    },
+
     async getMission(missionId: string): Promise<RecoveredMission | undefined> {
       requireSafeId(missionId, 'missionId')
       await writeTail
@@ -828,3 +920,19 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
     }
   }
 }
+
+export {
+  CHECKPOINT_SCHEMA_VERSION,
+  MAX_CHECKPOINT_SUMMARY_LENGTH,
+  MAX_UNSETTLED_ACTIONS,
+  parsedCheckpoint,
+  reconcileMission
+} from './checkpoint.js'
+export type {
+  CheckpointReason,
+  CheckpointResumeSafety,
+  ReconciledCheckpoint,
+  ReconcileMissionInput,
+  ReconcileMissionOptions,
+  UnsettledAction
+} from './checkpoint.js'

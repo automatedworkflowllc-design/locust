@@ -149,6 +149,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   let startingToken: symbol | undefined
   let lifecycleVersion = 0
   let disposed = false
+  let interruptedMissionId: string | undefined
   const startOperations = new Set<Promise<void>>()
   const consumeOperations = new Set<Promise<void>>()
 
@@ -420,6 +421,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     interrupt(): void {
       lifecycleVersion += 1
       startingToken = undefined
+      // Remember which mission the host cut short. `interrupt()` is synchronous
+      // and the consume loop clears `active` once the aborted process settles,
+      // so by the time `dispose()` can await a durable write there is nothing
+      // left to name -- the id has to be captured here or not at all.
+      if (active !== undefined) interruptedMissionId = active.missionId
       active?.controller.abort()
     },
 
@@ -427,8 +433,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       disposed = true
       lifecycleVersion += 1
       startingToken = undefined
+      if (active !== undefined) interruptedMissionId = active.missionId
       active?.controller.abort()
       await Promise.allSettled([...startOperations, ...consumeOperations])
+      if (interruptedMissionId === undefined) return
+      try {
+        // Reconcile AFTER the run's own records have settled, so the checkpoint
+        // describes the finished ledger rather than racing it. On the next
+        // launch this is what says which actions were left in doubt.
+        await options.ledger.createCheckpoint(interruptedMissionId, 'shutdown')
+      } catch {
+        // Best effort by design. A mission that cannot be checkpointed still
+        // recovers from its events, and refusing to shut down over a bookkeeping
+        // write would be a worse failure than the missing record.
+      }
     }
   }
 }

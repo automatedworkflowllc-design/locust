@@ -97,18 +97,16 @@ export interface SideEffectReceipt {
   readonly providerReference?: string;
 }
 
-export interface MissionCheckpoint {
-  readonly missionId: string;
-  readonly epoch: number;
-  readonly goal: string;
-  readonly summary: string;
-  readonly completedStepIds: readonly string[];
-  readonly pendingStepId?: string;
-  readonly artifactHashes: Readonly<Record<string, string>>;
-  readonly approvals: readonly string[];
-  readonly sideEffects: readonly SideEffectReceipt[];
-  readonly createdAt: string;
-}
+/**
+ * The checkpoint type lives in `@teammate/mission-store` as
+ * `ReconciledCheckpoint`, not here.
+ *
+ * A design sketch of it used to sit at this spot, written before there was a
+ * ledger to derive one from, and nothing ever consumed it. Two definitions of
+ * one concept agree only until someone edits either, and a checkpoint is the
+ * record a provider fallback trusts -- so it has exactly one definition, beside
+ * the durable store that is the only thing allowed to produce one.
+ */
 
 export type HandoffState =
   | "running"
