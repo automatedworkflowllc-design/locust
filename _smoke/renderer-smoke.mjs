@@ -142,6 +142,37 @@ try {
   })()`)
   check('runtime discovery reports Codex ready', runtimeReady === true)
 
+  // The vendored-font catch, proven rather than assumed. The reference design
+  // fetches Geist from Google; this app's CSP pins font-src to 'self' and
+  // packaged builds block renderer egress, so a fetched face would silently
+  // fall back to Helvetica on every real install. document.fonts.check is the
+  // only honest way to tell those apart -- the page looks plausible either way.
+  // Force the load rather than reading status: @font-face is lazy, so a face no
+  // rendered element has asked for yet reports `unloaded` even when the file is
+  // perfectly good. What must be proven here is that the file is REACHABLE and
+  // CSP-legal from inside the renderer; whether the shell has adopted it is a
+  // separate assertion, made once the new components render.
+  const fonts = await cdp.eval(`(async () => {
+    const wanted = ['400 13px Geist', '500 13px Geist', '400 11px "Geist Mono"']
+    const results = {}
+    for (const spec of wanted) {
+      try {
+        const faces = await document.fonts.load(spec)
+        results[spec] = faces.length > 0 && faces.every(f => f.status === 'loaded')
+      } catch (error) {
+        results[spec] = 'threw: ' + String(error && error.message)
+      }
+    }
+    return JSON.stringify({
+      results,
+      sans: results['400 13px Geist'] === true && results['500 13px Geist'] === true,
+      mono: results['400 11px \"Geist Mono\"'] === true
+    })
+  })()`)
+  const fontState = JSON.parse(fonts)
+  check('vendored Geist loaded from disk, not the network', fontState.sans === true, fonts)
+  check('vendored Geist Mono loaded', fontState.mono === true)
+
   const detected = await cdp.eval(`(() => {
     const text = document.body.innerText
     const version = /v(\\d+\\.\\d+\\.\\d+[^\\s]*)/.exec(text)

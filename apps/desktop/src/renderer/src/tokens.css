@@ -1,0 +1,233 @@
+/*
+ * Locust design tokens. Values are exact from design/locust-desktop/HANDOFF.md.
+ *
+ * Components consume these variables and never literal colors -- a raw hex in a
+ * component is a review defect, and `_qa/token-gate.mjs` fails the build on one.
+ *
+ * The font is vendored rather than fetched. The reference loads Geist from
+ * fonts.googleapis.com; this app denies renderer network egress in packaged
+ * builds and its CSP pins `font-src 'self'`, so a fetched face would silently
+ * fall back to Helvetica on every real install. Same typeface, shipped inside.
+ * Geist is SIL OFL 1.1 -- see assets/fonts/GEIST-LICENSE.txt.
+ */
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/fonts/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/fonts/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./assets/fonts/GeistMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./assets/fonts/GeistMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  /* --- Surfaces ------------------------------------------------------- */
+  --lc-bg-app: #0b0d0e;
+  --lc-bg-window: #121415;
+  --lc-bg-chrome: #16191a;
+  --lc-bg-sidebar: #17191a;
+  --lc-bg-raised: #191c1d;
+  --lc-bg-raised-2: #1b1e1f;
+  --lc-bg-selected: #1e2223;
+  --lc-bg-bubble-user: #23282a;
+  --lc-bg-bubble-peer: #202324;
+
+  --lc-border-hairline: rgba(255, 255, 255, 0.06);
+  --lc-border-card: rgba(255, 255, 255, 0.07);
+  --lc-border-strong: rgba(255, 255, 255, 0.11);
+  --lc-overlay-scrim: rgba(8, 10, 10, 0.55);
+
+  /* --- Text ------------------------------------------------------------
+   * `--lc-text-muted` and `--lc-text-label` are the AA floor for anything
+   * readable. `--lc-text-faint` is for NON-TEXT only (icon strokes, the `/`
+   * separator glyph, hairline marks) -- it measures 4.2-4.4:1 and fails AA on
+   * copy. The two annotation grays from the spec are deliberately absent:
+   * they exist only for documentation captions outside the app window.
+   */
+  --lc-text-primary: #f2efe9;
+  --lc-text-secondary: #c7c3bc;
+  --lc-text-muted: #8b9190;
+  --lc-text-label: #8b9190;
+  --lc-text-faint: #7a807f;
+
+  /* --- Semantics -------------------------------------------------------
+   * Lime is the only near-decorative color, and only for active/ready/live.
+   * Blue, amber, red and violet must carry meaning -- never hierarchy or
+   * delight.
+   */
+  --lc-lime: #c9f04a;
+  --lc-lime-text: #dbf785;
+  --lc-lime-tint: rgba(201, 240, 74, 0.1);
+  --lc-lime-tint-strong: rgba(201, 240, 74, 0.2);
+  --lc-lime-border: rgba(201, 240, 74, 0.3);
+  --lc-lime-border-strong: rgba(201, 240, 74, 0.55);
+
+  --lc-blue: #6ea8fe;
+  --lc-blue-text: #9dc2fb;
+  --lc-blue-tint: rgba(110, 168, 254, 0.12);
+  --lc-blue-border: rgba(110, 168, 254, 0.32);
+
+  --lc-amber: #e9b949;
+  --lc-amber-text: #efc969;
+  --lc-amber-tint: rgba(233, 185, 73, 0.12);
+  --lc-amber-border: rgba(233, 185, 73, 0.32);
+
+  --lc-red: #e4685d;
+  --lc-red-text: #ee9188;
+  --lc-red-tint: rgba(228, 104, 93, 0.12);
+  --lc-red-border: rgba(228, 104, 93, 0.32);
+
+  --lc-violet: #ba96f0;
+  --lc-violet-tint: rgba(186, 150, 240, 0.12);
+  --lc-violet-border: rgba(186, 150, 240, 0.32);
+
+  --lc-neutral: #4a4f4f;
+
+  /* --- Teammate avatar hues (8-bit faces) ----------------------------- */
+  --lc-hue-lime: #a9d93f;
+  --lc-hue-lime-face: #151a0c;
+  --lc-hue-blue: #5e9bf0;
+  --lc-hue-blue-face: #0d1520;
+  --lc-hue-violet: #a98be8;
+  --lc-hue-violet-face: #150f1e;
+  --lc-hue-clay: #e4857a;
+  --lc-hue-clay-face: #1e100f;
+
+  /* --- Typography ------------------------------------------------------
+   * Weights 400/500 only -- no bold headings inside the app.
+   * Floor is 10px and only for uppercase mono labels; everything readable
+   * is >= 12px.
+   */
+  --lc-font-ui: 'Geist', Helvetica, ui-sans-serif, system-ui, sans-serif;
+  --lc-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --lc-text-screen-title: 15px;
+  --lc-text-teammate-name: 14.5px;
+  --lc-text-body: 13.5px;
+  --lc-text-control: 13px;
+  --lc-text-secondary-size: 12.5px;
+  --lc-text-description: 12px;
+  --lc-text-mono-provenance: 11.5px;
+  --lc-text-mono-caption: 11px;
+  --lc-text-mono-label: 10.5px;
+
+  --lc-tracking-label: 0.14em;
+  --lc-tracking-label-wide: 0.16em;
+  --lc-leading-prose: 1.55;
+
+  /* --- Spacing (8px system; 2/4/6 for icon gaps and face internals) ---- */
+  --lc-space-1: 2px;
+  --lc-space-2: 4px;
+  --lc-space-3: 6px;
+  --lc-space-4: 8px;
+  --lc-space-5: 12px;
+  --lc-space-6: 16px;
+  --lc-space-7: 24px;
+  --lc-space-8: 32px;
+
+  /* --- Radii ----------------------------------------------------------- */
+  --lc-radius-control: 7px;
+  --lc-radius-button: 8px;
+  --lc-radius-card: 10px;
+  --lc-radius-popover: 12px;
+
+  /* --- Elevation: popovers and overlays only. Cards use borders. ------- */
+  --lc-shadow-menu: 0 24px 60px rgba(0, 0, 0, 0.6);
+  --lc-shadow-palette: 0 40px 100px rgba(0, 0, 0, 0.65);
+  --lc-shadow-window: 0 32px 80px rgba(0, 0, 0, 0.55);
+
+  /* --- Motion ---------------------------------------------------------- */
+  --lc-motion-press: 120ms;
+  --lc-motion-hover: 140ms;
+  --lc-motion-panel: 180ms;
+  --lc-ease: ease;
+
+  /* --- Layout ---------------------------------------------------------- */
+  --lc-sidebar-width: 268px;
+  --lc-sidebar-rail-width: 64px;
+  --lc-inspector-width: 344px;
+  --lc-thread-max-width: 760px;
+  --lc-thread-max-width-compact: 700px;
+
+  /* --- Interaction ----------------------------------------------------- */
+  --lc-hover-surface: rgba(255, 255, 255, 0.06);
+  --lc-hover-surface-strong: rgba(255, 255, 255, 0.07);
+  --lc-hover-border: rgba(255, 255, 255, 0.2);
+  --lc-focus-ring: var(--lc-lime);
+}
+
+/*
+ * Keyboard focus only. Never a sticky ring after a mouse click, and no
+ * persistent glow anywhere in the product.
+ */
+.lc-focusable:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+[role='menuitem']:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+@keyframes lcPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes lcCaret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes lcBar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
