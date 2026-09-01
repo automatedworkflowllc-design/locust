@@ -63,6 +63,8 @@ export interface ComposerProps {
    */
   readonly onHandOff: (route: RouteChoice) => void
   readonly handingOff: boolean
+  /** Who the next mission is messaged to; the placeholder says so. */
+  readonly teammateName: string | undefined
 }
 
 /**
@@ -95,7 +97,8 @@ export function Composer({
   onCancel,
   onOpenRoutePicker,
   onHandOff,
-  handingOff
+  handingOff,
+  teammateName
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
   const [modeOpen, setModeOpen] = useState(false)
@@ -120,7 +123,9 @@ export function Composer({
           ? 'Describe a mission. It may edit files in this workspace…'
           : route.runtime === 'claude'
             ? 'Describe a mission. Claude Code runs read-only for now…'
-            : 'Describe a mission for this workspace…'
+            : teammateName !== undefined
+              ? `Message ${teammateName}, or describe a mission…`
+              : 'Describe a mission for this workspace…'
         : discoveryPhase === 'loading'
           ? 'Checking local runtimes…'
           : discoveryPhase === 'error'

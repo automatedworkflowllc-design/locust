@@ -1,4 +1,4 @@
-import type { MissionLedger, RecoveredMission } from '@teammate/mission-store'
+import type { MissionLedger, RecoveredMission, WorkroomMessage } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it } from 'vitest'
 import { publicRecoveredMission, withinByteBudget, readMissionHistory } from './mission-history.js'
@@ -40,6 +40,7 @@ function recovered(overrides: Partial<RecoveredMission> = {}): RecoveredMission 
     events: [],
     hostFailures: [],
     checkpoints: [],
+    peerLinks: [],
     phase: 'completed',
     lastUpdatedAt: NOW,
     ledgerSequence: 1,
@@ -85,12 +86,87 @@ describe('mission history mapping', () => {
   })
 })
 
+describe('peer messages in history', () => {
+  const link = (direction: 'received' | 'posted', messageId: string) => ({
+    direction,
+    messageId,
+    peerTeammateId: 'tm_atlas',
+    occurredAt: NOW
+  })
+  const atlasMessage = (messageId: string): WorkroomMessage => ({
+    messageId,
+    sequence: 1,
+    from: { teammateId: 'tm_atlas', name: 'Atlas', missionId: 'mission_a' },
+    to: { teammateId: 'tm_wren', name: 'Wren' },
+    text: 'pnpm check runs everything.',
+    postedAt: NOW
+  })
+
+  it('joins a mission\'s links with the workroom text, keeping direction', () => {
+    const mapped = publicRecoveredMission(
+      recovered({ peerLinks: [link('received', 'wm_1')] }),
+      new Map([['wm_1', atlasMessage('wm_1')]])
+    )
+    expect(mapped.peerMessages).toEqual([
+      {
+        messageId: 'wm_1',
+        direction: 'received',
+        from: { teammateId: 'tm_atlas', name: 'Atlas' },
+        to: { teammateId: 'tm_wren', name: 'Wren' },
+        text: 'pnpm check runs everything.',
+        at: NOW
+      }
+    ])
+  })
+
+  it('keeps a link whose message the workroom no longer holds, with no text', () => {
+    // Dropping it would show a mission that was briefed from a claim as if it
+    // had been briefed from nothing.
+    const mapped = publicRecoveredMission(recovered({ peerLinks: [link('received', 'wm_gone')] }), new Map())
+    expect(mapped.peerMessages).toHaveLength(1)
+    expect(mapped.peerMessages[0]).toMatchObject({ messageId: 'wm_gone', direction: 'received', text: null })
+  })
+
+  it('reads history even when the workroom itself cannot be read', async () => {
+    const response = await readMissionHistory(
+      ledger({
+        listMissions: async () => ({ missions: [recovered({ peerLinks: [link('posted', 'wm_1')] })], issues: [] })
+      }),
+      {
+        post: async () => { throw new Error('unused') },
+        unread: async () => ({ messages: [], remaining: 0 }),
+        markDelivered: async () => undefined,
+        read: async () => { throw new Error('channel damaged') },
+        flush: async () => undefined
+      }
+    )
+    expect(response.ok).toBe(true)
+    if (!response.ok) return
+    expect(response.data.missions[0]?.peerMessages[0]?.text).toBeNull()
+  })
+
+  function ledger(overrides: Partial<MissionLedger>): MissionLedger {
+    return {
+      createMission: async () => undefined,
+      appendEvents: async () => undefined,
+      appendHostFailure: async () => undefined,
+      createCheckpoint: async () => { throw new Error('not used in this test') },
+      appendPeerLinks: async () => undefined,
+      getMission: async () => undefined,
+      listMissions: async () => ({ missions: [], issues: [] }),
+      flush: async () => undefined,
+      ...overrides
+    }
+  }
+})
+
 describe('mission history reads', () => {
   const ledger = (overrides: Partial<MissionLedger>): MissionLedger => ({
     createMission: async () => undefined,
     appendEvents: async () => undefined,
     appendHostFailure: async () => undefined,
     createCheckpoint: async () => { throw new Error('not used in this test') },
+    appendPeerLinks: async () => undefined,
     getMission: async () => undefined,
     listMissions: async () => ({ missions: [], issues: [] }),
     flush: async () => undefined,

@@ -1,0 +1,91 @@
+import { useState } from 'react'
+import type { ReactElement } from 'react'
+
+import type { PublicPeerMessage, PublicTeammate, TeammateHue } from '../../../shared/ipc.js'
+import { faceForName } from './NewTeammateDialog.js'
+import { PixelFace } from './PixelFace.js'
+
+/**
+ * The exchange between this mission's teammate and one peer.
+ *
+ * Collapsed to a single line, because the thread is the teammate's work and a
+ * colleague's aside must not read as part of it. Expanded, every message is
+ * attributed, the whole exchange wears an UNTRUSTED tag, and the footer says
+ * the rule in words: teammate messages are claims. Nothing here is ever drawn
+ * in the voice of the mission itself -- not even the message this teammate
+ * sent, which is why it is shown here, labelled, rather than left inside the
+ * agent's own bubble.
+ */
+export function PeerThread({
+  self,
+  peer,
+  messages,
+  teammates
+}: {
+  /** The teammate whose mission this thread belongs to. */
+  readonly self: PublicTeammate | undefined
+  readonly peer: { readonly teammateId: string; readonly name: string }
+  /** Chronological. */
+  readonly messages: readonly PublicPeerMessage[]
+  readonly teammates: readonly PublicTeammate[]
+}): ReactElement {
+  const [open, setOpen] = useState(false)
+  const peerProfile = teammates.find((teammate) => teammate.teammateId === peer.teammateId)
+  // A peer who has since left the roster keeps their name (it travels with
+  // the message) and gets a neutral face: inventing a hue for someone who is
+  // no longer here would draw a teammate that does not exist.
+  const peerHue: TeammateHue = peerProfile?.hue ?? 'clay'
+  const count = messages.length
+  const label = `${count} message${count === 1 ? '' : 's'} with`
+
+  const hueFor = (teammateId: string): TeammateHue =>
+    teammateId === self?.teammateId
+      ? self.hue
+      : teammateId === peer.teammateId
+        ? peerHue
+        : (teammates.find((teammate) => teammate.teammateId === teammateId)?.hue ?? 'clay')
+
+  return (
+    <div className={`lc-peer${open ? ' is-open' : ''}`}>
+      <button
+        type="button"
+        className="lc-peer__toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span>{label}</span>
+        <PixelFace hue={peerHue} pixels={faceForName(peer.name)} size={16} />
+        <span className={`lc-peer__name is-${peerHue}`}>{peer.name}</span>
+        {open && (
+          <>
+            <span className="lc-peer__dot" aria-hidden="true">
+              ·
+            </span>
+            <span className="lc-peer__tag lc-mono">UNTRUSTED</span>
+          </>
+        )}
+      </button>
+      {open && (
+        <>
+          {messages.map((message) => {
+            const hue = hueFor(message.from.teammateId)
+            return (
+              <div key={message.messageId} className="lc-peer__message">
+                <PixelFace hue={hue} pixels={faceForName(message.from.name)} size={20} />
+                <div className="lc-peer__body">
+                  <div className={`lc-peer__author is-${hue}`}>{message.from.name}</div>
+                  <div className={`lc-peer__bubble${message.text === null ? ' is-missing' : ''}`}>
+                    {message.text ?? 'This message is no longer in the workroom.'}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          <div className="lc-peer__foot lc-mono">
+            Teammate messages are treated as claims, never as verified facts
+          </div>
+        </>
+      )}
+    </div>
+  )
+}

@@ -6,10 +6,11 @@ import type {
   RuntimeProcessRun,
   RuntimeProcessRunner
 } from '@teammate/runtime-adapters'
-import type { MissionLedger } from '@teammate/mission-store'
+import type { MissionLedger, MissionPeerLink, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import { describe, expect, it, vi } from 'vitest'
 import type { CodexMissionUpdate } from '../shared/ipc.js'
 import { createCodexMissionService } from './codex-mission.js'
+import type { MissionPeerContext } from './workroom-briefing.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 const WORKSPACE = process.platform === 'win32' ? 'C:\\safe-workspace' : '/safe-workspace'
@@ -109,6 +110,7 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
     appendEvents: async () => undefined,
     appendHostFailure: async () => undefined,
     createCheckpoint: async () => { throw new Error('not used in this test') },
+    appendPeerLinks: async () => undefined,
     getMission: async () => undefined,
     listMissions: async () => ({ missions: [], issues: [] }),
     flush: async () => undefined,
@@ -986,5 +988,276 @@ describe('mid-mission handoff', () => {
     const response = await service.handOff('run_nope', 'claude', 'ask', {}, () => undefined)
 
     expect(response).toMatchObject({ ok: false, error: { code: 'RUN_NOT_ACTIVE' } })
+  })
+})
+
+describe('the workroom around a mission', () => {
+  const WREN = { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }
+  const ATLAS = { teammateId: 'tm_atlas', name: 'Atlas', role: 'Research & Briefs' }
+  const PEER: MissionPeerContext = { self: WREN, others: [ATLAS] }
+
+  function waiting(text: string, messageId = 'wm_1'): WorkroomMessage {
+    return {
+      messageId,
+      sequence: 1,
+      from: { teammateId: 'tm_atlas', name: 'Atlas', missionId: 'mission_a' },
+      to: { teammateId: 'tm_wren', name: 'Wren' },
+      text,
+      postedAt: NOW
+    }
+  }
+
+  function fakeWorkroom(overrides: Partial<Workroom> = {}) {
+    const posted: { from: unknown; to: unknown; text: string }[] = []
+    const delivered: { messageIds: readonly string[]; missionId: string }[] = []
+    let nextId = 0
+    const workroom: Workroom = {
+      post: async (input) => {
+        posted.push(input)
+        return {
+          messageId: `wm_out_${++nextId}`,
+          sequence: nextId,
+          from: input.from,
+          to: input.to,
+          text: input.text,
+          postedAt: NOW
+        }
+      },
+      unread: async () => ({ messages: [], remaining: 0 }),
+      markDelivered: async (messageIds, missionId) => {
+        delivered.push({ messageIds, missionId })
+      },
+      read: async () => ({ messages: [], deliveries: [], issues: [] }),
+      flush: async () => undefined,
+      ...overrides
+    }
+    return { workroom, posted, delivered }
+  }
+
+  function transcript(finalText: string): RuntimeProcessRun {
+    return {
+      records: records([
+        { type: 'thread.started', thread_id: 'thread-live' },
+        { type: 'turn.started' },
+        { type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: finalText } },
+        { type: 'turn.completed', usage: { output_tokens: 2 } }
+      ]),
+      completion: Promise.resolve(completion())
+    }
+  }
+
+  function peerService(input: {
+    readonly run: RuntimeProcessRun
+    readonly workroom: Workroom
+    readonly ledger?: Partial<MissionLedger>
+  }) {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => input.run)
+    const links: { missionId: string; links: readonly MissionPeerLink[] }[] = []
+    const ledger = fakeLedger({
+      appendPeerLinks: async (missionId, appended) => {
+        links.push({ missionId, links: appended })
+      },
+      ...input.ledger
+    })
+    const scheduled: Array<() => void> = []
+    let nextId = 0
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: { start },
+      ledger,
+      workroom: input.workroom,
+      createId: () => String(++nextId),
+      now: () => new Date(NOW),
+      schedule: (task) => scheduled.push(task)
+    })
+    return { service, start, links, scheduled }
+  }
+
+  async function drain(scheduled: Array<() => void>): Promise<void> {
+    while (scheduled.length > 0) scheduled.shift()!()
+    // The consume loop awaits several durable writes; let them all settle.
+    for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
+  }
+
+  it('quotes a waiting message into the prompt as a claim, records it, and marks it delivered only once the run is live', async () => {
+    const { workroom, delivered } = fakeWorkroom({
+      unread: async (teammateId) =>
+        teammateId === 'tm_wren' ? { messages: [waiting('pnpm check runs everything.')], remaining: 0 } : { messages: [], remaining: 0 }
+    })
+    const { service, start, links } = peerService({ run: transcript('Done.'), workroom })
+
+    const response = await service.start('Which command runs the checks?', 'codex', 'ask', {}, () => undefined, undefined, PEER)
+
+    expect(response.ok).toBe(true)
+    if (!response.ok) return
+    const sentPrompt = start.mock.calls[0]?.[1] as string
+    expect(sentPrompt.startsWith('Which command runs the checks?')).toBe(true)
+    expect(sentPrompt).toContain('CLAIMS from other agents')
+    expect(sentPrompt).toContain('pnpm check runs everything.')
+    expect(sentPrompt).toContain('<locust-share to="Atlas">')
+    expect(links).toEqual([
+      {
+        missionId: 'mission_2',
+        links: [{ direction: 'received', messageId: 'wm_1', peerTeammateId: 'tm_atlas', occurredAt: NOW }]
+      }
+    ])
+    expect(delivered).toEqual([{ messageIds: ['wm_1'], missionId: 'mission_2' }])
+    expect(response.data.peerMessages).toEqual([
+      {
+        messageId: 'wm_1',
+        direction: 'received',
+        from: { teammateId: 'tm_atlas', name: 'Atlas' },
+        to: { teammateId: 'tm_wren', name: 'Wren' },
+        text: 'pnpm check runs everything.',
+        at: NOW
+      }
+    ])
+    expect(response.data.peerDeliveryFailed).toBe(false)
+  })
+
+  it('keeps the person\'s own words as the recorded prompt, not the briefing', async () => {
+    const { workroom } = fakeWorkroom()
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const { service } = peerService({ run: transcript('Done.'), workroom, ledger: { createMission } })
+
+    await service.start('Look around.', 'codex', 'ask', {}, () => undefined, undefined, PEER)
+
+    expect(createMission.mock.calls[0]?.[0]?.prompt).toBe('Look around.')
+  })
+
+  it('refuses to run on messages the ledger cannot record, and says so', async () => {
+    const { workroom, delivered } = fakeWorkroom({
+      unread: async () => ({ messages: [waiting('claim')], remaining: 0 })
+    })
+    const { service, start } = peerService({
+      run: transcript('Done.'),
+      workroom,
+      ledger: { appendPeerLinks: async () => { throw new Error('disk full') } }
+    })
+
+    const response = await service.start('Task.', 'codex', 'ask', {}, () => undefined, undefined, PEER)
+
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'PERSISTENCE_FAILED',
+        message: 'The messages this mission was shown could not be recorded in the durable local ledger.'
+      }
+    })
+    expect(start).not.toHaveBeenCalled()
+    // Nothing was consumed: the message waits for a mission that can record it.
+    expect(delivered).toEqual([])
+  })
+
+  it('runs without the channel when it cannot be read, and reports that on the receipt', async () => {
+    const { workroom } = fakeWorkroom({ unread: async () => { throw new Error('channel damaged') } })
+    const { service, start } = peerService({ run: transcript('Done.'), workroom })
+
+    const response = await service.start('Task.', 'codex', 'ask', {}, () => undefined, undefined, PEER)
+
+    expect(response.ok).toBe(true)
+    if (!response.ok) return
+    expect(response.data.peerDeliveryFailed).toBe(true)
+    expect(response.data.peerMessages).toEqual([])
+    // The share form still goes: the run can post even when it was shown nothing.
+    expect(start.mock.calls[0]?.[1]).toContain('<locust-share to="Atlas">')
+  })
+
+  it('posts a share block to the named teammate, attributed to this mission, and links it', async () => {
+    const { workroom, posted } = fakeWorkroom()
+    const updates: CodexMissionUpdate[] = []
+    const { service, links, scheduled } = peerService({
+      run: transcript('The gate is pnpm check.\n\n<locust-share to="Atlas">\npnpm check runs build, typecheck and tests.\n</locust-share>'),
+      workroom
+    })
+
+    const response = await service.start('Find the check command.', 'codex', 'ask', {}, (update) => updates.push(update), undefined, PEER)
+    expect(response.ok).toBe(true)
+    await drain(scheduled)
+
+    expect(posted).toEqual([
+      {
+        from: { teammateId: 'tm_wren', name: 'Wren', missionId: 'mission_2' },
+        to: { teammateId: 'tm_atlas', name: 'Atlas' },
+        text: 'pnpm check runs build, typecheck and tests.'
+      }
+    ])
+    expect(links).toEqual([
+      {
+        missionId: 'mission_2',
+        links: [{ direction: 'posted', messageId: 'wm_out_1', peerTeammateId: 'tm_atlas', occurredAt: NOW }]
+      }
+    ])
+    const peerUpdates = updates.filter((update) => update.kind === 'peer-message')
+    expect(peerUpdates).toEqual([
+      {
+        kind: 'peer-message',
+        runId: 'run_1',
+        missionId: 'mission_2',
+        message: {
+          messageId: 'wm_out_1',
+          direction: 'posted',
+          from: { teammateId: 'tm_wren', name: 'Wren' },
+          to: { teammateId: 'tm_atlas', name: 'Atlas' },
+          text: 'pnpm check runs build, typecheck and tests.',
+          at: NOW
+        }
+      }
+    ])
+  })
+
+  it('refuses a share addressed to someone who is not on the roster, out loud', async () => {
+    const { workroom, posted } = fakeWorkroom()
+    const updates: CodexMissionUpdate[] = []
+    const { service, scheduled } = peerService({
+      run: transcript('<locust-share to="Mallory">\nsecret\n</locust-share>'),
+      workroom
+    })
+
+    await service.start('Task.', 'codex', 'ask', {}, (update) => updates.push(update), undefined, PEER)
+    await drain(scheduled)
+
+    expect(posted).toEqual([])
+    expect(updates.filter((update) => update.kind === 'peer-share-failed')).toEqual([
+      {
+        kind: 'peer-share-failed',
+        runId: 'run_1',
+        missionId: 'mission_2',
+        message: 'Wren addressed a message to "Mallory", who is not on the roster. Nothing was sent.'
+      }
+    ])
+  })
+
+  it('shares nothing from a run that did not complete', async () => {
+    const { workroom, posted } = fakeWorkroom()
+    const run: RuntimeProcessRun = {
+      records: records([
+        { type: 'thread.started', thread_id: 'thread-live' },
+        { type: 'turn.started' },
+        { type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: '<locust-share to="Atlas">\nhalf a claim\n</locust-share>' } }
+      ]),
+      completion: Promise.resolve(completion({ exitCode: 1 }))
+    }
+    const { service, scheduled } = peerService({ run, workroom })
+
+    await service.start('Task.', 'codex', 'ask', {}, () => undefined, undefined, PEER)
+    await drain(scheduled)
+
+    expect(posted).toEqual([])
+  })
+
+  it('shares nothing from a mission that belongs to nobody', async () => {
+    const { workroom, posted } = fakeWorkroom()
+    const { service, start, scheduled } = peerService({
+      run: transcript('<locust-share to="Atlas">\nfinding\n</locust-share>'),
+      workroom
+    })
+
+    await service.start('Task.', 'codex', 'ask', {}, () => undefined)
+    await drain(scheduled)
+
+    expect(posted).toEqual([])
+    expect(start.mock.calls[0]?.[1]).toBe('Task.')
   })
 })

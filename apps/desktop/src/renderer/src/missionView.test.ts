@@ -7,6 +7,7 @@ import {
   buildSignalRail,
   buildThread,
   cancellationSummary,
+  peerGroups,
   railLabel
 } from './missionView.js'
 
@@ -226,5 +227,63 @@ describe('rail labels', () => {
 
   it('does not let a multi-line command become multiple rail lines', () => {
     expect(railLabel('a\nb\n  c')).toBe('a b c')
+  })
+})
+
+describe('peer messages in the thread', () => {
+  it('hides a share block from the agent bubble, keeping the prose', () => {
+    const events = [
+      {
+        id: 'e1',
+        runId: 'run_1',
+        missionId: 'mission_1',
+        sequence: 1,
+        type: 'message.delta',
+        occurredAt: '2026-09-01T15:00:00.000Z',
+        sourceAdapter: 'codex',
+        payload: {
+          itemId: 'answer',
+          operation: 'replace',
+          text: 'The gate is pnpm check.\n\n<locust-share to="Atlas">\npnpm check runs everything.\n</locust-share>',
+          final: true,
+          evidence: { redacted: true }
+        }
+      }
+    ] as unknown as NormalizedRuntimeEvent[]
+    const items = buildThread(events, { running: false })
+    expect(items).toEqual([{ key: 'msg_answer', type: 'agent-message', text: 'The gate is pnpm check.', streaming: false }])
+  })
+
+  it('groups an exchange by the other party and marks whether anything was received', () => {
+    const groups = peerGroups([
+      {
+        messageId: 'wm_2',
+        direction: 'posted',
+        from: { teammateId: 'tm_wren', name: 'Wren' },
+        to: { teammateId: 'tm_atlas', name: 'Atlas' },
+        text: 'Noted as a claim.',
+        at: '2026-09-01T15:05:00.000Z'
+      },
+      {
+        messageId: 'wm_1',
+        direction: 'received',
+        from: { teammateId: 'tm_atlas', name: 'Atlas' },
+        to: { teammateId: 'tm_wren', name: 'Wren' },
+        text: 'Dispute events changed shape.',
+        at: '2026-09-01T15:00:00.000Z'
+      },
+      {
+        messageId: 'wm_3',
+        direction: 'posted',
+        from: { teammateId: 'tm_wren', name: 'Wren' },
+        to: { teammateId: 'tm_nova', name: 'Nova' },
+        text: 'Docs are stale.',
+        at: '2026-09-01T15:06:00.000Z'
+      }
+    ])
+    expect(groups.map((group) => group.peer.name)).toEqual(['Atlas', 'Nova'])
+    expect(groups[0]?.messages.map((message) => message.messageId)).toEqual(['wm_1', 'wm_2'])
+    expect(groups[0]?.received).toBe(true)
+    expect(groups[1]?.received).toBe(false)
   })
 })

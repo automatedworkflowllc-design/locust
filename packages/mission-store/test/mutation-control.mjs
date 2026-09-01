@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path'
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const CHECKPOINT = join(ROOT, 'src', 'checkpoint.ts')
 const INDEX = join(ROOT, 'src', 'index.ts')
+const WORKROOM = join(ROOT, 'src', 'workroom.ts')
 
 const MUTATIONS = [
   {
@@ -133,6 +134,62 @@ const MUTATIONS = [
     from: '        || checkpoint.epoch !== checkpoints.length + 1\n',
     to: '',
     expect: 'stops recovery at a checkpoint whose epoch is out of order'
+  },
+  {
+    name: 'a pre-v5 file may carry a peer link',
+    file: INDEX,
+    from: '      if (schemaVersion < 5 || link === undefined || value.occurredAt !== link.occurredAt) {',
+    to: '      if (link === undefined || value.occurredAt !== link.occurredAt) {',
+    expect: 'refuses a peer link in a file written before version 5'
+  },
+  {
+    name: 'a peer link may be appended to a pre-v5 mission',
+    file: INDEX,
+    from: '        if (hydrated.schemaVersion < 5) {',
+    to: '        if (hydrated.schemaVersion < 0) {',
+    expect: 'refuses to append a peer link to a mission written before version 5'
+  },
+  {
+    name: 'a delivered message is shown to its recipient again',
+    file: WORKROOM,
+    from: '          (message) => message.to.teammateId === teammateId && !delivered.has(message.messageId)',
+    to: '          (message) => message.to.teammateId === teammateId',
+    expect: 'shows a message to its recipient once, and never to anyone else'
+  },
+  {
+    name: 'a message is shown to someone it was not addressed to',
+    file: WORKROOM,
+    from: '          (message) => message.to.teammateId === teammateId && !delivered.has(message.messageId)',
+    to: '          (message) => !delivered.has(message.messageId)',
+    expect: 'shows a message to its recipient once, and never to anyone else'
+  },
+  {
+    name: 'the reader accepts a self-addressed message',
+    file: WORKROOM,
+    from: '    || from.teammateId === to.teammateId\n  ) return undefined',
+    to: '  ) return undefined',
+    expect: 'refuses a self-addressed message, an oversized one, and control characters'
+  },
+  {
+    name: 'a second delivery of the same message is written',
+    file: WORKROOM,
+    from: "            if (delivered.has(messageId)) throw new Error('Workroom message was already delivered')",
+    to: '',
+    expect: 'refuses to deliver the same message twice'
+  },
+  {
+    name: 'a delivery for a message the file never held is read as valid',
+    file: WORKROOM,
+    from: '        || !seen.has(delivery.messageId)\n',
+    to: '',
+    expect: 'refuses a delivery record for a message the file does not hold'
+  },
+  {
+    name: 'the writer appends past a record the reader cannot walk',
+    file: WORKROOM,
+    from: "    if (parsed.issues.length > 0) throw new Error('Workroom is unavailable')\n    const records = build(parsed)",
+    to: '    const records = build(parsed)',
+    expect: 'stops at a record that breaks the sequence, and refuses to append past the break'
   }
 ]
 
@@ -168,7 +225,8 @@ function runSuite() {
 
 const originals = new Map([
   [CHECKPOINT, readFileSync(CHECKPOINT, 'utf8')],
-  [INDEX, readFileSync(INDEX, 'utf8')]
+  [INDEX, readFileSync(INDEX, 'utf8')],
+  [WORKROOM, readFileSync(WORKROOM, 'utf8')]
 ])
 
 let problems = 0

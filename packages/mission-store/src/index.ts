@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 4 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 5 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -40,14 +40,20 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 4 as const
  * previous one -- which is also the truthful record, since two runs really did
  * happen. An older reader shown a v4 file would drop that link and present the
  * continuation as an unrelated mission.
+ *
+ * v4 -> v5 adds `mission.peer` records: a mission's cross-references into the
+ * workroom, by message id, for the messages it was shown at its start and the
+ * ones its work posted. The text lives in the workroom's own file, never here.
+ * A v4 reader stops at the first record it cannot name, so a v5 file handed to
+ * one would lose every record after the first peer link.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -109,6 +115,20 @@ export interface MissionContinuation {
 
 export type MissionHostFailureCode = 'runtime-start-failed' | 'runtime-transport-failed'
 
+/**
+ * A mission's link to one workroom message. `received` means the message was
+ * quoted into this mission's prompt as a claim from a teammate; `posted` means
+ * this mission's work produced it. Only the id is held here: the message text
+ * has exactly one home, the workroom, so two records can never disagree about
+ * what was said.
+ */
+export interface MissionPeerLink {
+  readonly direction: 'received' | 'posted'
+  readonly messageId: string
+  readonly peerTeammateId: string
+  readonly occurredAt: string
+}
+
 export interface MissionHostFailure {
   readonly code: MissionHostFailureCode
   readonly message: string
@@ -137,6 +157,8 @@ export interface RecoveredMission {
   readonly hostFailures: readonly MissionHostFailure[]
   /** Reconciled checkpoints in ledger order; the last one is the newest. */
   readonly checkpoints: readonly ReconciledCheckpoint[]
+  /** Workroom messages this mission received or posted, in ledger order. */
+  readonly peerLinks: readonly MissionPeerLink[]
   readonly phase: RecoveredMissionPhase
   readonly lastUpdatedAt: string
   readonly ledgerSequence: number
@@ -166,6 +188,8 @@ export interface MissionLedger {
    * anyone would read again, so that verdict is returned without being written.
    */
   createCheckpoint(missionId: string, reason: CheckpointReason): Promise<ReconciledCheckpoint>
+  /** Record which workroom messages this mission was shown, or produced. */
+  appendPeerLinks(missionId: string, links: readonly MissionPeerLink[]): Promise<void>
   getMission(missionId: string): Promise<RecoveredMission | undefined>
   listMissions(options?: MissionLedgerListOptions): Promise<MissionLedgerSnapshot>
   flush(): Promise<void>
@@ -213,7 +237,15 @@ interface CheckpointRecord {
   readonly checkpoint: ReconciledCheckpoint
 }
 
-type LedgerRecord = CreatedRecord | EventRecord | HostFailureRecord | CheckpointRecord
+interface PeerRecord {
+  readonly schemaVersion: MissionLedgerSchemaVersion
+  readonly recordType: 'mission.peer'
+  readonly ledgerSequence: number
+  readonly occurredAt: string
+  readonly link: MissionPeerLink
+}
+
+type LedgerRecord = CreatedRecord | EventRecord | HostFailureRecord | CheckpointRecord | PeerRecord
 type JsonObject = Record<string, unknown>
 
 interface ParsedLedger {
@@ -287,6 +319,32 @@ function validateFailure(failure: MissionHostFailure): MissionHostFailure {
   requireText(failure.message, 'Host failure message', 1_024)
   requireTimestamp(failure.occurredAt, 'Host failure timestamp')
   return failure
+}
+
+function validatePeerLink(link: MissionPeerLink): MissionPeerLink {
+  if (link.direction !== 'received' && link.direction !== 'posted') {
+    throw new Error('Peer link direction is invalid')
+  }
+  requireSafeId(link.messageId, 'messageId')
+  requireSafeId(link.peerTeammateId, 'peerTeammateId')
+  requireTimestamp(link.occurredAt, 'Peer link timestamp')
+  return link
+}
+
+function parsedPeerLink(value: unknown): MissionPeerLink | undefined {
+  if (!isObject(value)) return undefined
+  const candidate = value as Partial<MissionPeerLink>
+  if (
+    (candidate.direction !== 'received' && candidate.direction !== 'posted')
+    || typeof candidate.messageId !== 'string'
+    || typeof candidate.peerTeammateId !== 'string'
+    || typeof candidate.occurredAt !== 'string'
+  ) return undefined
+  try {
+    return validatePeerLink(candidate as MissionPeerLink)
+  } catch {
+    return undefined
+  }
 }
 
 function recordLine(record: LedgerRecord): string {
@@ -614,6 +672,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
   const events: NormalizedRuntimeEvent[] = []
   const hostFailures: MissionHostFailure[] = []
   const checkpoints: ReconciledCheckpoint[] = []
+  const peerLinks: MissionPeerLink[] = []
   let expectedSequence = 2
   let expectedEventSequence = 1
   let lastUpdatedAt = metadata.createdAt
@@ -673,6 +732,17 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       }
       checkpoints.push(checkpoint)
       lastUpdatedAt = checkpoint.createdAt
+    } else if (value.recordType === 'mission.peer') {
+      const link = parsedPeerLink(value.link)
+      // No writer before v5 could produce one, so a peer link in an older
+      // file was written by hand -- refused for the same reason a hand-edited
+      // continuation is.
+      if (schemaVersion < 5 || link === undefined || value.occurredAt !== link.occurredAt) {
+        issues.push(publicIssue('invalid-record', 'An invalid peer link and its tail were ignored.', missionId))
+        break
+      }
+      peerLinks.push(link)
+      lastUpdatedAt = link.occurredAt
     } else {
       issues.push(publicIssue('invalid-record', 'An unknown mission record and its tail were ignored.', missionId))
       break
@@ -686,6 +756,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       events,
       hostFailures,
       checkpoints,
+      peerLinks,
       phase: phaseFor(events, hostFailures),
       lastUpdatedAt,
       ledgerSequence: expectedSequence - 1,
@@ -971,6 +1042,35 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       })
     },
 
+    appendPeerLinks(missionId: string, links: readonly MissionPeerLink[]): Promise<void> {
+      return serialize(async () => {
+        requireSafeId(missionId, 'missionId')
+        if (links.length === 0) return
+        if (links.length > MAX_EVENTS_PER_APPEND) throw new Error('Too many peer links in one append')
+        for (const link of links) validatePeerLink(link)
+        const hydrated = await hydrateForAppend(missionId)
+        if (hydrated.schemaVersion < 5) {
+          // The file's version is fixed by its header. A pre-v5 mission cannot
+          // take a record its own readers would stop at.
+          throw new Error('Mission ledger version cannot hold peer links')
+        }
+        let sequence = hydrated.nextSequence
+        const records: PeerRecord[] = links.map((link) => {
+          const record: PeerRecord = {
+            schemaVersion: hydrated.schemaVersion,
+            recordType: 'mission.peer',
+            ledgerSequence: sequence,
+            occurredAt: link.occurredAt,
+            link
+          }
+          sequence += 1
+          return record
+        })
+        await appendRecords(missionId, records)
+        nextSequences.set(missionId, sequence)
+      })
+    },
+
     async getMission(missionId: string): Promise<RecoveredMission | undefined> {
       requireSafeId(missionId, 'missionId')
       await writeTail
@@ -1042,6 +1142,26 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
   }
 }
 
+export {
+  createFileWorkroom,
+  isWorkroomName,
+  isWorkroomText,
+  MAX_WORKROOM_MESSAGE_LENGTH,
+  MAX_WORKROOM_NAME_LENGTH,
+  WORKROOM_SCHEMA_VERSION
+} from './workroom.js'
+export type {
+  FileWorkroomOptions,
+  Workroom,
+  WorkroomDelivery,
+  WorkroomIssue,
+  WorkroomIssueCode,
+  WorkroomMessage,
+  WorkroomParty,
+  WorkroomSender,
+  WorkroomSnapshot,
+  WorkroomUnread
+} from './workroom.js'
 export {
   CHECKPOINT_SCHEMA_VERSION,
   MAX_CHECKPOINT_SUMMARY_LENGTH,

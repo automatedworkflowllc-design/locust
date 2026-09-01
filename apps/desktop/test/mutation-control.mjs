@@ -20,8 +20,96 @@ const STATUS = join(ROOT, 'src', 'renderer', 'src', 'status.ts')
 const APPROVALS = join(ROOT, 'src', 'main', 'app-server-mission.ts')
 const HANDOFF = join(ROOT, 'src', 'main', 'handoff.ts')
 const MISSIONS = join(ROOT, 'src', 'main', 'codex-mission.ts')
+const PEERS = join(ROOT, 'src', 'main', 'peer-exchange.ts')
+const BRIEFING = join(ROOT, 'src', 'main', 'workroom-briefing.ts')
+const SHARE = join(ROOT, 'src', 'shared', 'peer-share.ts')
+const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 
 const MUTATIONS = [
+  {
+    file: BRIEFING,
+    name: 'a received message is quoted with its share tags intact',
+    from: '  const body = sanitizeInbound(message.text).replace(/\\n/g, \'\\n  \')',
+    to: '  const body = message.text.replace(/\\n/g, \'\\n  \')',
+    expect: 'defangs a share tag inside a received message so it cannot be echoed as a share'
+  },
+  {
+    file: BRIEFING,
+    name: 'messages that do not fit are sent anyway',
+    from: '  while (prompt.length > MAX_RUNTIME_PROMPT_LENGTH && delivered.length > 0) {',
+    to: '  while (false) {',
+    expect: 'leaves out messages that do not fit, from the newest end, and counts them as still waiting'
+  },
+  {
+    file: BRIEFING,
+    name: 'a teammate with nobody to share with is still told how',
+    from: '  const trailer = input.peer.others.length > 0 ? rosterSection(input.peer) : undefined',
+    to: '  const trailer = rosterSection(input.peer)',
+    expect: 'lists the other teammates and the exact share form, and only when there is someone to share with'
+  },
+  {
+    file: SHARE,
+    name: 'an upper-case share tag in a received message is left armed',
+    from: "  return text.replace(/<(\\/?)locust-share/gi, '‹$1locust-share')",
+    to: "  return text.replace(/<(\\/?)locust-share/g, '‹$1locust-share')",
+    expect: 'defangs an inbound share tag so a received message cannot be echoed as a share'
+  },
+  {
+    file: SHARE,
+    name: 'the bubble keeps its share blocks',
+    from: "  return text.replace(BLOCK, '').replace(/\\n{3,}/g, '\\n\\n').trimEnd()",
+    to: '  return text.trimEnd()',
+    expect: 'removes the blocks from the transcript and leaves the prose'
+  },
+  {
+    file: PEERS,
+    name: 'a share addressed to a stranger goes to the first teammate instead',
+    from: '        const target = peer.others.find((entry) => entry.name.toLowerCase() === block.to.toLowerCase())',
+    to: '        const target = peer.others[0]',
+    expect: 'refuses a share addressed to someone who is not on the roster, out loud'
+  },
+  {
+    file: MISSIONS,
+    name: 'a run that did not complete still shares',
+    from: '    if (mission.transcript.completed && mission.peer !== undefined && peerExchange !== undefined) {',
+    to: '    if (mission.peer !== undefined && peerExchange !== undefined) {',
+    expect: 'shares nothing from a run that did not complete'
+  },
+  {
+    file: MISSIONS,
+    name: 'the runtime is sent the bare prompt, never the briefing',
+    from: '          process = options.runner.start(command, runtimePrompt, { signal: controller.signal })',
+    to: '          process = options.runner.start(command, prompt, { signal: controller.signal })',
+    expect: 'quotes a waiting message into the prompt as a claim, records it, and marks it delivered only once the run is live'
+  },
+  {
+    file: MISSIONS,
+    name: 'the ledger records the briefing as what the person said',
+    from: '            runId,\n            prompt,\n            runtime,',
+    to: '            runId,\n            prompt: runtimePrompt,\n            runtime,',
+    expect: "keeps the person's own words as the recorded prompt, not the briefing"
+  },
+  {
+    file: MISSIONS,
+    name: 'a mission runs on messages its ledger could not record',
+    from: '            await peerExchange.recordReceived(missionId, delivered, createdAt)',
+    to: '            await Promise.resolve()',
+    expect: 'refuses to run on messages the ledger cannot record, and says so'
+  },
+  {
+    file: VIEW,
+    name: 'the agent bubble shows the share block too',
+    from: '    const text = stripShareBlocks(message.text)',
+    to: '    const text = message.text',
+    expect: 'hides a share block from the agent bubble, keeping the prose'
+  },
+  {
+    file: VIEW,
+    name: 'a received exchange is filed as sent-only',
+    from: "    if (message.direction === 'received') group.received = true\n",
+    to: '',
+    expect: 'groups an exchange by the other party and marks whether anything was received'
+  },
   {
     file: STATUS,
     name: 'a stale ready flag alone is enough to call a runtime usable',
@@ -240,7 +328,11 @@ const originals = new Map([
   [STATUS, readFileSync(STATUS, 'utf8')],
   [APPROVALS, readFileSync(APPROVALS, 'utf8')],
   [HANDOFF, readFileSync(HANDOFF, 'utf8')],
-  [MISSIONS, readFileSync(MISSIONS, 'utf8')]
+  [MISSIONS, readFileSync(MISSIONS, 'utf8')],
+  [PEERS, readFileSync(PEERS, 'utf8')],
+  [BRIEFING, readFileSync(BRIEFING, 'utf8')],
+  [SHARE, readFileSync(SHARE, 'utf8')],
+  [VIEW, readFileSync(VIEW, 'utf8')]
 ])
 let problems = 0
 

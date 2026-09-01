@@ -41,6 +41,22 @@ export interface PublicTeammate {
   readonly createdAt: string
 }
 
+/**
+ * A workroom message as the renderer sees it: who said it to whom, and the
+ * text. `direction` is relative to the mission being shown -- `received` was
+ * quoted into that mission's prompt, `posted` came out of its work. `text` is
+ * null when the ledger still points at a message the workroom no longer holds,
+ * which is said rather than hidden.
+ */
+export interface PublicPeerMessage {
+  readonly messageId: string
+  readonly direction: 'received' | 'posted'
+  readonly from: { readonly teammateId: string; readonly name: string }
+  readonly to: { readonly teammateId: string; readonly name: string }
+  readonly text: string | null
+  readonly at: string
+}
+
 export interface TeammateCreateRequest {
   readonly name: string
   readonly hue: TeammateHue
@@ -192,6 +208,12 @@ export interface CodexMissionStartRequest {
   readonly model?: string
   /** Only meaningful when the chosen model reports supporting it. */
   readonly effort?: string
+  /**
+   * The teammate this mission is messaged to. Decides who the mission belongs
+   * to, whose waiting workroom messages it is shown, and under whose name its
+   * findings are shared. Absent for a mission that belongs to nobody.
+   */
+  readonly teammateId?: string
 }
 
 /**
@@ -218,7 +240,15 @@ export interface MissionRouteSummary {
  * that Claude can own a run: narrowing it here would make a real Claude start
  * a type error instead of a supported route.
  */
-export interface CodexMissionStartData extends MissionRouteSummary {}
+export interface CodexMissionStartData extends MissionRouteSummary {
+  /** Workroom messages quoted into this mission's prompt, oldest first. */
+  readonly peerMessages: readonly PublicPeerMessage[]
+  /**
+   * True when the workroom could not be read at start. The mission still ran,
+   * with no teammate messages; whatever was waiting is still waiting.
+   */
+  readonly peerDeliveryFailed: boolean
+}
 
 export type CodexMissionStartResponse =
   | { readonly ok: true; readonly data: CodexMissionStartData }
@@ -245,7 +275,7 @@ export interface MissionHandoffRequest {
   readonly effort?: string
 }
 
-export interface MissionHandoffData extends MissionRouteSummary {
+export interface MissionHandoffData extends CodexMissionStartData {
   /** The mission this one continues, and the checkpoint it resumed from. */
   readonly continuesFrom: {
     readonly missionId: string
@@ -307,6 +337,20 @@ export type CodexMissionUpdate =
         readonly message: string
       }
     }
+  /** The mission's work posted a message to another teammate. */
+  | {
+      readonly kind: 'peer-message'
+      readonly runId: string
+      readonly missionId: string
+      readonly message: PublicPeerMessage
+    }
+  /** The mission asked to share something and the host could not honour it. */
+  | {
+      readonly kind: 'peer-share-failed'
+      readonly runId: string
+      readonly missionId: string
+      readonly message: string
+    }
 
 /**
  * A checkpoint as the renderer may see it. Deliberately narrower than the
@@ -347,6 +391,8 @@ export interface PublicRecoveredMission {
   readonly integrityIssueCount: number
   readonly sandbox: 'read-only' | 'workspace-write'
   readonly checkpoints: readonly PublicMissionCheckpoint[]
+  /** Workroom messages this mission received or posted, in ledger order. */
+  readonly peerMessages: readonly PublicPeerMessage[]
 }
 
 export type MissionHistoryResponse =

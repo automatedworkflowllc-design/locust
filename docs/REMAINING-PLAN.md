@@ -34,9 +34,26 @@ divider, then the second run. Live-verified Codex → Claude Code; the divider's
 "N actions never reported back" branch was never produced live (every real
 switch stopped clean) and is covered by unit tests only.
 
-**P5d — Peer threads.** `collabAgentToolCall` carries `senderThreadId` and
-`receiverThreadIds`, so the protocol supports it. Last because it needs the
-teammate workroom concept to mean something at runtime, not just in the roster.
+**P5d — Peer threads. BUILT 2026-09-01, unit- and mutation-verified, NOT yet
+live-verified.** The workroom is real at runtime now: a product-owned
+append-only channel (`workroom.jsonl`, own directory, same record discipline
+as the ledger), ledger schema v5 with `mission.peer` cross-references by
+message id, and missions that belong to the teammate they were messaged to.
+Routed, never broadcast: a runtime ends a completed run with one share block
+per named recipient; the host checks the name against the roster, bounds the
+text, posts it attributed to the sending mission, and the recipient's NEXT
+mission is shown it quoted as a claim -- dated, attributed, stated to carry no
+authority, share tags defanged. The thread shows the exchange as the design's
+"N messages with Atlas" card, UNTRUSTED when open, with the share block
+stripped from the agent's own bubble so no claim appears twice. Still to do
+before this is DONE: `_smoke/workroom-smoke.mjs` (two seeded teammates on
+one profile, Atlas shares a finding, Wren's next mission cites it, both
+ledgers and the channel file hold the links); the `approve-each` transport
+takes no part in the workroom yet (assigned an owner, shown nothing, shares
+nothing -- its receipt says so); one mutation survived in the store (the
+workroom READER's self-address refusal is only exercised through the writer's,
+so it needs a hand-written-record test); and side-by-side missions remain
+the one-active-run limit, which is a separate item.
 
 ## Rules carried into all of it
 

@@ -6,16 +6,19 @@ import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime
 import type {
   MissionApprovalDecision,
   MissionApprovalRequest,
-  PublicRecoveredMission
+  PublicPeerMessage,
+  PublicRecoveredMission,
+  PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, readPlan } from '../missionView.js'
+import { buildThread, cancellationSummary, peerGroups, readPlan } from '../missionView.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
 import { AgentAvatar, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
 import { HandoffDivider } from './HandoffDivider.js'
-import type { ThreadItem } from '../missionView.js'
+import { PeerThread } from './PeerThread.js'
+import type { PeerGroup, ThreadItem } from '../missionView.js'
 
 /**
  * One transcript's worth of items. Extracted so a handed-off mission can render
@@ -187,6 +190,17 @@ export interface ThreadProps {
         readonly priorEvents: readonly NormalizedRuntimeEvent[]
       }
     | undefined
+  /**
+   * The workroom exchange around this mission. `self` is the teammate the
+   * mission belongs to; `notices` are shares the host could not honour, said
+   * in the thread rather than dropped.
+   */
+  readonly peers: {
+    readonly self: PublicTeammate | undefined
+    readonly teammates: readonly PublicTeammate[]
+    readonly messages: readonly PublicPeerMessage[]
+    readonly notices: readonly string[]
+  }
 }
 
 export function Thread({
@@ -202,9 +216,20 @@ export function Thread({
   onDecide,
   decidingIds,
   cancelled,
-  handoff
+  handoff,
+  peers
 }: ThreadProps): ReactElement {
   const items = buildThread(events, { running })
+  const exchanges = peerGroups(peers.messages)
+  const peerCard = (group: PeerGroup): ReactElement => (
+    <PeerThread
+      key={`peer_${group.peer.teammateId || group.peer.name}`}
+      self={peers.self}
+      peer={group.peer}
+      messages={group.messages}
+      teammates={peers.teammates}
+    />
+  )
   // Planned-step count comes from the last plan the provider sent, so
   // "never started" is measured against what it said it would do.
   const plannedSteps = events
@@ -248,7 +273,18 @@ export function Thread({
           </>
         )}
 
+        {/*
+          Exchanges that were delivered to this run sit where they were in
+          time: before the work. Ones this run only sent follow the work.
+        */}
+        {exchanges.filter((group) => group.received).map(peerCard)}
+
         <ThreadItems items={items} />
+
+        {exchanges.filter((group) => !group.received).map(peerCard)}
+        {peers.notices.map((notice, index) => (
+          <DiagnosticLine key={`peer_notice_${index}`} level="warning" message={notice} />
+        ))}
 
         {/*
           Approvals sit at the END of the thread, after everything that has

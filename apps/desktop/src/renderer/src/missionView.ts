@@ -1,5 +1,8 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
+import type { PublicPeerMessage } from '../../shared/ipc.js'
+import { stripShareBlocks } from '../../shared/peer-share.js'
+
 /**
  * Turns the normalized event stream into the thread the workroom renders.
  *
@@ -239,11 +242,14 @@ export function buildThread(
   }
 
   for (const message of assistantMessages(events)) {
-    if (message.text.length === 0) continue
+    // A share block is shown in the peer card, attributed and labelled; left
+    // in the bubble it would present the same claim twice, once unlabelled.
+    const text = stripShareBlocks(message.text)
+    if (text.length === 0) continue
     items.push({
       key: `msg_${message.itemId}`,
       type: 'agent-message',
-      text: message.text,
+      text,
       // A caret only where text is genuinely still arriving: the run is live
       // AND the provider has not marked this message final.
       streaming: options.running && !message.final
@@ -448,4 +454,35 @@ export function buildSignalRail(
   }
   // Newest first, as drawn.
   return rows.reverse()
+}
+
+export interface PeerGroup {
+  /** The OTHER party: `from` of a received message, `to` of a posted one. */
+  readonly peer: { readonly teammateId: string; readonly name: string }
+  /** Chronological. */
+  readonly messages: readonly PublicPeerMessage[]
+  /** True when any message in the group was delivered to this mission. */
+  readonly received: boolean
+}
+
+/**
+ * One card per peer. A group that includes a received message sits at the top
+ * of the thread, where it was in time -- delivered before the work began; a
+ * group of only posted messages sits after the work that produced them.
+ */
+export function peerGroups(messages: readonly PublicPeerMessage[]): readonly PeerGroup[] {
+  const groups = new Map<string, { peer: PeerGroup['peer']; messages: PublicPeerMessage[]; received: boolean }>()
+  for (const message of messages) {
+    const peer = message.direction === 'received' ? message.from : message.to
+    const key = peer.teammateId.length > 0 ? peer.teammateId : `name:${peer.name}`
+    const group = groups.get(key) ?? { peer: { teammateId: peer.teammateId, name: peer.name }, messages: [], received: false }
+    group.messages.push(message)
+    if (message.direction === 'received') group.received = true
+    groups.set(key, group)
+  }
+  return [...groups.values()].map((group) => ({
+    peer: group.peer,
+    messages: [...group.messages].sort((left, right) => Date.parse(left.at) - Date.parse(right.at)),
+    received: group.received
+  }))
 }

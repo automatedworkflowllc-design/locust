@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(4)
-    expect(header.schemaVersion).toBe(4)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(5)
+    expect(header.schemaVersion).toBe(5)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -245,6 +245,74 @@ describe('ledger schema versions', () => {
     } as unknown as MissionLedgerMetadata)).rejects.toThrow()
   })
 
+  it('round-trips a peer link through the durable record', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission({ ...v1Metadata() } as unknown as MissionLedgerMetadata)
+    await ledger.appendPeerLinks('mission_1', [
+      { direction: 'received', messageId: 'wm_1', peerTeammateId: 'tm_atlas', occurredAt: NOW },
+      { direction: 'posted', messageId: 'wm_2', peerTeammateId: 'tm_atlas', occurredAt: NOW }
+    ])
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.peerLinks).toEqual([
+      { direction: 'received', messageId: 'wm_1', peerTeammateId: 'tm_atlas', occurredAt: NOW },
+      { direction: 'posted', messageId: 'wm_2', peerTeammateId: 'tm_atlas', occurredAt: NOW }
+    ])
+    expect(recovered?.ledgerSequence).toBe(3)
+  })
+
+  it('refuses a peer link in a file written before version 5', async () => {
+    const root = await temporaryRoot()
+    // No writer before v5 could produce one. A v1 file carrying a peer link
+    // was hand-edited, and reading it would let an invented cross-reference
+    // decide which workroom message a mission is shown as having received.
+    await writeV1Ledger(root, [])
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        recordType: 'mission.peer',
+        ledgerSequence: 2,
+        occurredAt: NOW,
+        link: { direction: 'received', messageId: 'wm_1', peerTeammateId: 'tm_atlas', occurredAt: NOW }
+      })}\n`,
+      { flag: 'a' }
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.peerLinks).toEqual([])
+    expect(recovered?.issues.map((issue) => issue.code)).toEqual(['invalid-record'])
+  })
+
+  it('refuses to append a peer link to a mission written before version 5', async () => {
+    const root = await temporaryRoot()
+    await writeV1Ledger(root, [])
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+
+    // The file's version is fixed by its header; a record its own readers stop
+    // at must not be written into it.
+    await expect(ledger.appendPeerLinks('mission_1', [
+      { direction: 'received', messageId: 'wm_1', peerTeammateId: 'tm_atlas', occurredAt: NOW }
+    ])).rejects.toThrow('cannot hold peer links')
+  })
+
+  it('refuses a peer link with an unsafe id or an unknown direction', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission({ ...v1Metadata() } as unknown as MissionLedgerMetadata)
+
+    await expect(ledger.appendPeerLinks('mission_1', [
+      { direction: 'received', messageId: '../escape', peerTeammateId: 'tm_atlas', occurredAt: NOW }
+    ])).rejects.toThrow()
+    await expect(ledger.appendPeerLinks('mission_1', [
+      { direction: 'broadcast' as 'posted', messageId: 'wm_1', peerTeammateId: 'tm_atlas', occurredAt: NOW }
+    ])).rejects.toThrow()
+  })
+
   it('rejects a file whose version this reader does not know', async () => {
     const root = await temporaryRoot()
     const metadata = v1Metadata()
@@ -252,7 +320,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 5,
+        schemaVersion: 6,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

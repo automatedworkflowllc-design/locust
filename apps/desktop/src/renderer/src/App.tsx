@@ -12,6 +12,7 @@ import type {
   MissionApprovalRequest,
   MissionMode,
   PublicModel,
+  PublicPeerMessage,
   PublicTeammate,
   TeammateHue,
   TeammateRole
@@ -26,7 +27,8 @@ import { MissionsScreen, SettingsScreen, TeammatesScreen } from './components/Sc
 import type { RouteChoice } from './components/RoutePicker.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
-import { NewTeammateDialog } from './components/NewTeammateDialog.js'
+import { faceForName, NewTeammateDialog } from './components/NewTeammateDialog.js'
+import { PixelFace } from './components/PixelFace.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { Thread } from './components/Thread.js'
@@ -74,6 +76,10 @@ interface LiveRunState {
     readonly omittedBriefing: readonly string[]
     readonly priorEvents: readonly NormalizedRuntimeEvent[]
   }
+  /** Workroom messages this run received or posted, as the host reported them. */
+  readonly peerMessages?: readonly PublicPeerMessage[]
+  /** Shares the host could not honour, in the host's words. */
+  readonly peerNotices?: readonly string[]
 }
 
 type RuntimeDiscoveryState =
@@ -101,6 +107,12 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
       error: update.error.message,
       errorIsPersistence: update.kind === 'persistence-error'
     }
+  }
+  if (update.kind === 'peer-message') {
+    return { ...live, peerMessages: [...(live.peerMessages ?? []), update.message] }
+  }
+  if (update.kind === 'peer-share-failed') {
+    return { ...live, peerNotices: [...(live.peerNotices ?? []), update.message] }
   }
 
   const events = [...live.events, update.event].slice(-500)
@@ -135,7 +147,8 @@ function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
     events: mission.events,
     ...(error === undefined ? {} : { error }),
     restored: true,
-    restoredMission: mission
+    restoredMission: mission,
+    peerMessages: mission.peerMessages
   }
 }
 
@@ -179,6 +192,12 @@ export default function App(): ReactElement {
   const [swarm, setSwarm] = useState(false)
   const [teammateError, setTeammateError] = useState<string>()
   const [handingOff, setHandingOff] = useState(false)
+  /**
+   * Who the composer is talking to. A mission is started by messaging a
+   * teammate, so this decides who the next mission belongs to, whose waiting
+   * workroom messages it is shown, and under whose name it may share.
+   */
+  const [selectedTeammateId, setSelectedTeammateId] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
   /**
@@ -322,8 +341,14 @@ export default function App(): ReactElement {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // The first teammate is addressed by default, so a roster of one never
+  // needs a click before the first mission; removal falls back the same way.
+  const selectedTeammate =
+    teammates.find((teammate) => teammate.teammateId === selectedTeammateId) ?? teammates[0]
+
   const startMission = async (prompt: string): Promise<boolean> => {
     const bridge = window.desktop
+    const teammateId = selectedTeammate?.teammateId
     activeRunIdRef.current = undefined
     pendingUpdatesRef.current.clear()
     setLiveRun({ prompt, phase: 'starting', events: [] })
@@ -341,6 +366,7 @@ export default function App(): ReactElement {
         mode,
         runtime: route.runtime,
         model: route.model,
+        ...(teammateId === undefined ? {} : { teammateId }),
         // Only sent when the chosen model advertised it; the composer cannot
         // offer an effort the catalog did not report for that model.
         // Swarm overrides the picked effort with the model's maximum, and the
@@ -356,6 +382,12 @@ export default function App(): ReactElement {
       }
 
       activeRunIdRef.current = response.data.runId
+      // The host recorded the owner; mirror it so the sidebar files the
+      // mission under the teammate at once rather than after a refresh.
+      if (teammateId !== undefined) {
+        const missionId = response.data.missionId
+        setMissionOwners((current) => ({ ...current, [missionId]: teammateId }))
+      }
       const queued = pendingUpdatesRef.current.get(response.data.runId) ?? []
       pendingUpdatesRef.current.delete(response.data.runId)
       setLiveRun((current) => {
@@ -367,7 +399,11 @@ export default function App(): ReactElement {
               ? current.phase
               : 'running',
           events: current?.prompt === prompt ? current.events : [],
-          ...(current?.error === undefined ? {} : { error: current.error })
+          ...(current?.error === undefined ? {} : { error: current.error }),
+          peerMessages: response.data.peerMessages,
+          ...(response.data.peerDeliveryFailed
+            ? { peerNotices: ['Messages from teammates could not be read for this mission. Whatever was waiting is still waiting.'] }
+            : {})
         }
         for (const update of queued) next = applyMissionUpdate(next, update)
         return next
@@ -433,6 +469,11 @@ export default function App(): ReactElement {
 
       activeRunIdRef.current = response.data.runId
       setRoute(choice)
+      const ownerId = missionOwners[response.data.continuesFrom.missionId]
+      if (ownerId !== undefined) {
+        const missionId = response.data.missionId
+        setMissionOwners((owners) => ({ ...owners, [missionId]: ownerId }))
+      }
       const queued = pendingUpdatesRef.current.get(response.data.runId) ?? []
       pendingUpdatesRef.current.delete(response.data.runId)
       setLiveRun((existing) => {
@@ -443,6 +484,7 @@ export default function App(): ReactElement {
           data: response.data,
           phase: 'running',
           events: [],
+          peerMessages: response.data.peerMessages,
           handoff: {
             from,
             to: response.data.runtime,
@@ -560,6 +602,13 @@ export default function App(): ReactElement {
   const noRuntimeReady =
     runtimeState.phase !== 'ready' || !runtimes.some((runtime) => runtime.ready && runtime.status === 'ready')
 
+  // Whose mission is on screen: the owner the host recorded, never the
+  // composer's current target, which may already be someone else.
+  const missionOwner =
+    liveRun?.data === undefined
+      ? undefined
+      : teammates.find((teammate) => teammate.teammateId === missionOwners[liveRun.data!.missionId])
+
   return (
     <div className="lc-shell">
       <TitleBar workspaceName="Local workspace" runningCount={running ? 1 : 0} swarm={swarm} />
@@ -570,7 +619,12 @@ export default function App(): ReactElement {
           teammates={teammates}
           missionOwners={missionOwners}
           selectedMissionId={liveRun?.data?.missionId}
+          selectedTeammateId={selectedTeammate?.teammateId}
           onSelectMission={() => undefined}
+          onSelectTeammate={(teammateId) => {
+            setSelectedTeammateId(teammateId)
+            setScreen('workroom')
+          }}
           onNewTeammate={() => {
             setTeammateError(undefined)
             setNewTeammateOpen(true)
@@ -602,7 +656,7 @@ export default function App(): ReactElement {
             // state; with no teammates at all, the runtime story comes first.
             teammates.length > 0 && runtimes.some((entry) => entry.ready && entry.status === 'ready') ? (
               <IdleTeammate
-                teammate={teammates[0]!}
+                teammate={selectedTeammate ?? teammates[0]!}
                 canStart
                 onStarter={(prompt) => {
                   void startMission(prompt)
@@ -615,11 +669,18 @@ export default function App(): ReactElement {
             <>
               <header className="lc-workroom__header">
                 <div className="lc-workroom__identity">
-                  <AgentAvatar size={32} />
+                  {missionOwner === undefined ? (
+                    <AgentAvatar size={32} />
+                  ) : (
+                    <PixelFace hue={missionOwner.hue} pixels={faceForName(missionOwner.name)} size={32} />
+                  )}
                   <div style={{ minWidth: 0 }}>
                     <div>
-                      <span className="lc-workroom__name">{missionTitle(liveRun.prompt)}</span>
+                      <span className="lc-workroom__name">
+                        {missionOwner?.name ?? missionTitle(liveRun.prompt)}
+                      </span>
                       <span className="lc-workroom__role">
+                        {missionOwner === undefined ? '' : `${missionOwner.role} · `}
                         {liveRun.data?.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'}
                       </span>
                     </div>
@@ -658,6 +719,12 @@ export default function App(): ReactElement {
                 decidingIds={decidingIds}
                 cancelled={liveRun.phase === 'cancelled'}
                 handoff={liveRun.handoff}
+                peers={{
+                  self: missionOwner,
+                  teammates,
+                  messages: liveRun.peerMessages ?? [],
+                  notices: liveRun.peerNotices ?? []
+                }}
                 startedAt={
                   liveRun.restoredMission === undefined
                     ? undefined
@@ -705,6 +772,7 @@ export default function App(): ReactElement {
             onOpenRoutePicker={() => undefined}
             onHandOff={(choice) => { void handOffMission(choice) }}
             handingOff={handingOff}
+            teammateName={selectedTeammate?.name}
           />
           )}
         </main>

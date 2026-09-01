@@ -12,7 +12,7 @@ import type {
   RuntimeProcessRun,
   RuntimeProcessRunner
 } from '@teammate/runtime-adapters'
-import type { MissionLedger } from '@teammate/mission-store'
+import type { MissionContinuation, MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionSandbox } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
@@ -23,8 +23,10 @@ import type {
   MissionHandoffResponse,
   MissionMode
 } from '../shared/ipc.js'
-import type { MissionContinuation } from '@teammate/mission-store'
 import { composeHandoffPrompt } from './handoff.js'
+import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
+import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
+import type { MissionPeerContext } from './workroom-briefing.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 
@@ -42,6 +44,10 @@ interface ActiveCodexMission {
    */
   readonly prompt: string
   readonly runtime: MissionRuntimeId
+  /** Who this mission belongs to and who it may share with; absent for a mission of nobody's. */
+  readonly peer: MissionPeerContext | undefined
+  /** Assistant text as the transcript rebuilt it, read for share blocks at the end. */
+  readonly transcript: TranscriptTracker
 }
 
 export interface CodexMissionService {
@@ -56,7 +62,13 @@ export interface CodexMissionService {
      * start channel builds its own argument list and has no field for it, so a
      * mission cannot claim to continue another just by asking.
      */
-    continuation?: MissionContinuation
+    continuation?: MissionContinuation,
+    /**
+     * The teammate the mission is messaged to. Only the host supplies it,
+     * from the roster it read itself: the renderer names a teammate id and
+     * the host decides whether that id is anyone.
+     */
+    peer?: MissionPeerContext
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   handOff(
@@ -75,6 +87,8 @@ interface CodexMissionServiceOptions {
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
   readonly runner: RuntimeProcessRunner
   readonly ledger: MissionLedger
+  /** The teammate channel. Optional: a service without one runs missions that belong to nobody. */
+  readonly workroom?: Workroom
   readonly createId?: () => string
   readonly now?: () => Date
   readonly schedule?: (task: () => void) => void
@@ -142,6 +156,9 @@ async function persistAndEmit(
   events: ReturnType<CodexEventNormalizer['accept']>
 ): Promise<void> {
   await ledger.appendEvents(active.missionId, events)
+  // Tracked only once durable, so what a share is read from is what the
+  // ledger holds.
+  active.transcript.track(events)
   for (const event of events) {
     safelyEmit(active, {
       kind: 'event',
@@ -184,6 +201,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   let interruptedMissionId: string | undefined
   const startOperations = new Set<Promise<void>>()
   const consumeOperations = new Set<Promise<void>>()
+  const peerExchange: PeerExchange | undefined =
+    options.workroom === undefined
+      ? undefined
+      : createPeerExchange({ workroom: options.workroom, ledger: options.ledger })
 
   const clearActive = (candidate: ActiveCodexMission): void => {
     if (active === candidate) active = undefined
@@ -259,9 +280,23 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       await persistAndEmit(mission, options.ledger, terminalEvents)
     } catch {
       persistenceFailure(mission)
-    } finally {
       clearActive(mission)
+      return
     }
+
+    // Share only from a run that finished on its own terms, and before the
+    // slot is released: a handoff waits on this loop, so it never reconciles
+    // a mission whose findings are still being posted.
+    if (mission.transcript.completed && mission.peer !== undefined && peerExchange !== undefined) {
+      const text = mission.transcript.latestFinal
+      if (text !== undefined) {
+        await peerExchange.share(
+          { runId: mission.runId, missionId: mission.missionId, peer: mission.peer, text },
+          (update) => safelyEmit(mission, update)
+        )
+      }
+    }
+    clearActive(mission)
   }
 
   const scheduleConsume = (mission: ActiveCodexMission): void => {
@@ -285,7 +320,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       mode: MissionMode,
       route: { readonly model?: string; readonly effort?: string },
       emit: (update: CodexMissionUpdate) => void,
-      continuation?: MissionContinuation
+      continuation?: MissionContinuation,
+      peer?: MissionPeerContext
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -378,6 +414,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           ? createClaudeEventNormalizer(normalizerContext)
           : createCodexEventNormalizer(normalizerContext)
 
+        // What the runtime is SENT is the person's words plus their teammates'
+        // waiting messages and the share form. The ledger keeps the person's
+        // words as the prompt and the delivered messages by id; the rest is
+        // deterministic over those.
+        let runtimePrompt = prompt
+        let delivered: readonly WorkroomMessage[] = []
+        let peerDeliveryFailed = false
+        if (peer !== undefined && peerExchange !== undefined) {
+          const prepared = await peerExchange.prepare(prompt, peer)
+          runtimePrompt = prepared.runtimePrompt
+          delivered = prepared.delivered
+          peerDeliveryFailed = prepared.failed
+        }
+
         try {
           await options.ledger.createMission({
             missionId,
@@ -399,6 +449,24 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             'PERSISTENCE_FAILED',
             'The mission could not be created in the durable local ledger.'
           ) as CodexMissionStartResponse
+        }
+
+        // Recorded BEFORE the process starts: a mission must not run on
+        // messages its own record cannot name.
+        if (peerExchange !== undefined && delivered.length > 0) {
+          try {
+            await peerExchange.recordReceived(missionId, delivered, createdAt)
+          } catch {
+            await options.ledger.appendHostFailure(missionId, {
+              code: 'runtime-start-failed',
+              message: 'The messages this mission was shown could not be recorded in the local ledger.',
+              occurredAt: now().toISOString()
+            }).catch(() => undefined)
+            return error(
+              'PERSISTENCE_FAILED',
+              'The messages this mission was shown could not be recorded in the durable local ledger.'
+            ) as CodexMissionStartResponse
+          }
         }
 
         if (startLifecycleVersion !== lifecycleVersion) {
@@ -432,7 +500,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                 sandbox: effectiveSandbox,
                 ...(chosenModel === undefined ? {} : { model: chosenModel })
               })
-          process = options.runner.start(command, prompt, { signal: controller.signal })
+          process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
         } catch {
           try {
             await options.ledger.appendHostFailure(missionId, {
@@ -460,10 +528,16 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           process,
           emit,
           prompt,
-          runtime
+          runtime,
+          peer,
+          transcript: createTranscriptTracker()
         }
         active = mission
         scheduleConsume(mission)
+
+        // Marked delivered only now that the run is live, so a start that
+        // failed above never consumed anything.
+        if (peerExchange !== undefined) await peerExchange.markDelivered(missionId, delivered)
 
         return {
           ok: true,
@@ -474,7 +548,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             model: chosenModel ?? 'account-default',
             resolvedRouteId,
             cliVersion: chosen.version?.version ?? null,
-            sandbox: effectiveSandbox
+            sandbox: effectiveSandbox,
+            peerMessages: delivered.map((message) => publicPeerMessage(message, 'received')),
+            peerDeliveryFailed
           }
         }
       } finally {
@@ -565,11 +641,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         ) as MissionHandoffResponse
       }
 
+      // The continuation stays the same teammate's mission: it keeps the
+      // roster, receives what is waiting, and shares under the same name.
       const started = await service.start(briefing.prompt, runtime, mode, route, emit, {
         missionId: fromMissionId,
         checkpointEpoch: checkpoint.epoch,
         reason: 'route-switch'
-      })
+      }, previous.peer)
       if (!started.ok) {
         // Pass the start failure through unchanged but keep the stop visible:
         // the user asked for a switch and now has neither run.

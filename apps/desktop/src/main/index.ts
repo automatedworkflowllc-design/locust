@@ -5,8 +5,8 @@ import {
   createPathExecutableLocator,
   discoverInstalledRuntimes
 } from '@teammate/runtime-adapters'
-import { createFileMissionLedger } from '@teammate/mission-store'
-import type { MissionLedger } from '@teammate/mission-store'
+import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
+import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import { execFileSync, spawn } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -18,6 +18,7 @@ import { createTeammateStore } from './teammate-store.js'
 import { readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { AppServerMissionService } from './app-server-mission.js'
+import type { MissionPeerContext } from './workroom-briefing.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
@@ -56,6 +57,7 @@ const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
 let appServerServiceForShutdown: AppServerMissionService | undefined
 let ledgerForShutdown: MissionLedger | undefined
+let workroomForShutdown: Workroom | undefined
 
 const isAllowedExternalUrl = (url: string): boolean => {
   try {
@@ -159,11 +161,17 @@ if (!ownsSingleInstanceLock) {
     const missionLedger = createFileMissionLedger({
       rootDirectory: join(app.getPath('userData'), 'mission-ledger')
     })
+    // Its own directory: the ledger treats every `.jsonl` in ITS directory as
+    // a mission, and the channel is not one.
+    const workroom = createFileWorkroom({
+      rootDirectory: join(app.getPath('userData'), 'workroom')
+    })
     const codexMissions = createCodexMissionService({
       workspacePath: process.cwd(),
       discover: discoverRuntimes,
       runner: createNodeRuntimeProcessRunner(),
-      ledger: missionLedger
+      ledger: missionLedger,
+      workroom
     })
     // The approval transport. It only runs for the mode that asked for it, so
     // an experimental protocol failing cannot take the ordinary paths with it.
@@ -240,6 +248,38 @@ if (!ownsSingleInstanceLock) {
     missionServiceForShutdown = codexMissions
     appServerServiceForShutdown = appServerMissions
     ledgerForShutdown = missionLedger
+    workroomForShutdown = workroom
+
+    /**
+     * Who a mission is messaged to, resolved by the host from the roster it
+     * reads itself. The renderer only names an id; an id that is nobody yields
+     * a mission that belongs to nobody, never a guessed teammate.
+     */
+    const peerContextFor = async (teammateId: unknown): Promise<MissionPeerContext | undefined> => {
+      if (typeof teammateId !== 'string' || teammateId.length === 0) return undefined
+      let roster
+      try {
+        roster = await teammates.list()
+      } catch {
+        return undefined
+      }
+      const self = roster.find((entry) => entry.teammateId === teammateId)
+      if (self === undefined) return undefined
+      return {
+        self: { teammateId: self.teammateId, name: self.name, role: self.role },
+        others: roster
+          .filter((entry) => entry.teammateId !== teammateId)
+          .map((entry) => ({ teammateId: entry.teammateId, name: entry.name, role: entry.role }))
+      }
+    }
+
+    // Ownership is recorded by the host, once, after a start succeeded -- so
+    // the roster and the ledger cannot disagree about who a mission belongs
+    // to because a renderer forgot to say.
+    const assignOwner = async (teammateId: string | undefined, missionId: string): Promise<void> => {
+      if (teammateId === undefined) return
+      await teammates.assignMission(teammateId, missionId).catch(() => undefined)
+    }
 
     ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
@@ -345,7 +385,7 @@ if (!ownsSingleInstanceLock) {
           }
         } as const
       }
-      return readMissionHistory(missionLedger)
+      return readMissionHistory(missionLedger, workroom)
     })
 
     ipcMain.handle(CODEX_MISSION_START_CHANNEL, async (event, request: unknown) => {
@@ -377,6 +417,10 @@ if (!ownsSingleInstanceLock) {
         }
         try {
           const mission = await appServerMissions.start(prompt)
+          // The approval transport does not take part in the workroom yet:
+          // the mission is still the teammate's, but it is shown no messages
+          // and shares none, and the receipt says so with an empty list.
+          await assignOwner(await peerContextFor(payload.teammateId).then((peer) => peer?.self.teammateId), mission.missionId)
           return {
             ok: true,
             data: {
@@ -386,7 +430,9 @@ if (!ownsSingleInstanceLock) {
               model: 'account-default',
               resolvedRouteId: 'codex-app-server:default',
               cliVersion: null,
-              sandbox: 'workspace-write'
+              sandbox: 'workspace-write',
+              peerMessages: [],
+              peerDeliveryFailed: false
             }
           } as const
         } catch {
@@ -403,7 +449,8 @@ if (!ownsSingleInstanceLock) {
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       try {
-        return await codexMissions.start(
+        const peer = await peerContextFor(payload.teammateId)
+        const response = await codexMissions.start(
           prompt,
           runtime,
           mode,
@@ -412,8 +459,12 @@ if (!ownsSingleInstanceLock) {
             if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
               owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
             }
-          }
+          },
+          undefined,
+          peer
         )
+        if (response.ok) await assignOwner(peer?.self.teammateId, response.data.missionId)
+        return response
       } catch {
         return {
           ok: false,
@@ -459,7 +510,7 @@ if (!ownsSingleInstanceLock) {
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       try {
-        return await codexMissions.handOff(
+        const response = await codexMissions.handOff(
           payload.runId,
           runtime,
           mode,
@@ -470,6 +521,12 @@ if (!ownsSingleInstanceLock) {
             }
           }
         )
+        if (response.ok) {
+          // The continuation belongs to whoever the stopped mission did.
+          const owners = await teammates.missionOwners().catch(() => ({}) as Readonly<Record<string, string>>)
+          await assignOwner(owners[response.data.continuesFrom.missionId], response.data.missionId)
+        }
+        return response
       } catch {
         return {
           ok: false,
@@ -530,6 +587,7 @@ if (ownsSingleInstanceLock) {
       // with it, so nothing is left prompting for an app that has gone.
       await appServerServiceForShutdown?.dispose()
       await ledgerForShutdown?.flush()
+      await workroomForShutdown?.flush()
       shutdownComplete = true
       app.quit()
     })().catch((error: unknown) => {

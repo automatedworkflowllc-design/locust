@@ -2301,3 +2301,120 @@ textarea {
   font-size: var(--lc-text-description);
   text-wrap: pretty;
 }
+
+/* --- Peer thread (the workroom exchange, always labelled) ---------------- */
+
+.lc-peer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lc-peer__toggle {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--lc-text-caption, 12px);
+  color: var(--lc-text-muted);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.lc-peer__toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--lc-text-secondary, #a8adab);
+}
+
+.lc-peer.is-open .lc-peer__toggle {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.lc-peer.is-open .lc-peer__toggle:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lc-peer__dot {
+  color: var(--lc-text-muted);
+}
+
+.lc-peer__tag {
+  font-size: 10.5px;
+  color: var(--lc-amber-text);
+}
+
+.lc-peer__name.is-lime,
+.lc-peer__author.is-lime {
+  color: var(--lc-lime-text);
+}
+
+.lc-peer__name.is-blue,
+.lc-peer__author.is-blue {
+  color: var(--lc-blue-text);
+}
+
+/* Violet and clay have no text token; these are their hues lifted to the
+   same contrast band as the lime and blue text tokens (>= 4.5:1 on the raised
+   surface), checked with a ratio, not by eye. */
+.lc-peer__name.is-violet,
+.lc-peer__author.is-violet {
+  color: #c9b8f3;
+}
+
+.lc-peer__name.is-clay,
+.lc-peer__author.is-clay {
+  color: #f0aea6;
+}
+
+.lc-peer__message {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.lc-peer__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.lc-peer__author {
+  font-size: 11.5px;
+  margin-bottom: 4px;
+}
+
+.lc-peer__bubble {
+  padding: 10px 13px;
+  border-radius: 9px;
+  background: var(--lc-bg-bubble-peer, #202324);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lc-peer__bubble.is-missing {
+  color: var(--lc-text-muted);
+  font-style: italic;
+}
+
+.lc-peer__foot {
+  align-self: center;
+  font-size: 11px;
+  color: var(--lc-text-muted);
+}
+
+/* A sidebar teammate row is a real button: same box as the row, none of the
+   browser's button chrome. */
+.lc-row--button {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}

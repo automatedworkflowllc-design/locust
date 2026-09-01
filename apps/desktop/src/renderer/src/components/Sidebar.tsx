@@ -29,7 +29,9 @@ export function Sidebar({
   teammates,
   missionOwners,
   selectedMissionId,
+  selectedTeammateId,
   onSelectMission,
+  onSelectTeammate,
   onNewTeammate,
   onOpenSettings
 }: {
@@ -38,7 +40,10 @@ export function Sidebar({
   readonly teammates: readonly PublicTeammate[]
   readonly missionOwners: Readonly<Record<string, string>>
   readonly selectedMissionId: string | undefined
+  /** Who the composer is addressing. Selecting a teammate makes them the next mission's owner. */
+  readonly selectedTeammateId: string | undefined
   readonly onSelectMission: (missionId: string) => void
+  readonly onSelectTeammate: (teammateId: string) => void
   readonly onNewTeammate: () => void
   readonly onOpenSettings: () => void
 }): ReactElement {
@@ -77,10 +82,16 @@ export function Sidebar({
             pendingApprovals: 0,
             roleLabel: teammate.role
           })
-          const selected = owned.some((mission) => mission.missionId === selectedMissionId)
+          const selected = teammate.teammateId === selectedTeammateId
           return (
             <div key={teammate.teammateId} className={`lc-teammate${selected ? ' is-selected' : ''}`}>
-              <div className="lc-row">
+              <button
+                type="button"
+                className="lc-row lc-row--button"
+                aria-current={selected ? 'true' : undefined}
+                title={`Message ${teammate.name}`}
+                onClick={() => onSelectTeammate(teammate.teammateId)}
+              >
                 <PixelFace hue={teammate.hue} pixels={faceForName(teammate.name)} size={30} />
                 <span className="lc-row__text">
                   <span className="lc-row__name">
@@ -91,7 +102,7 @@ export function Sidebar({
                     {status.label}
                   </span>
                 </span>
-              </div>
+              </button>
               {owned.length > 0 && (
                 <div className="lc-teammate__missions">
                   {owned.map((mission) => (
