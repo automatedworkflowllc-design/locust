@@ -21,6 +21,11 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
     mode: 'accept-edits',
     name: 'Accept edits',
     consequence: 'May edit files inside this workspace folder, and nowhere else.'
+  },
+  {
+    mode: 'approve-each',
+    name: 'Approve each action',
+    consequence: 'Stops and asks before every command or file change.'
   }
 ]
 
@@ -81,7 +86,9 @@ export function Composer({
     : !routeCanRun
       ? `The ${selected?.displayName ?? 'selected'} adapter is not finished — switch the route to run a mission…`
       : selectedReady
-        ? mode === 'accept-edits' && route.runtime === 'codex'
+        ? mode === 'approve-each' && route.runtime === 'codex'
+          ? 'Describe a mission. You will be asked before each action…'
+          : mode === 'accept-edits' && route.runtime === 'codex'
           ? 'Describe a mission. It may edit files in this workspace…'
           : route.runtime === 'claude'
             ? 'Describe a mission. Claude Code runs read-only for now…'

@@ -8,6 +8,8 @@ import type {
   MissionRouteSummary,
   PublicRecoveredMission,
   PublicRuntimeStatus,
+  MissionApprovalDecision,
+  MissionApprovalRequest,
   MissionMode,
   PublicTeammate,
   TeammateHue,
@@ -139,6 +141,8 @@ export default function App(): ReactElement {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [mode, setMode] = useState<MissionMode>('ask')
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
+  const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
+  const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
   const [teammateError, setTeammateError] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
@@ -152,6 +156,14 @@ export default function App(): ReactElement {
         active = false
       }
     }
+
+    const removeApprovalListener = bridge.onMissionApproval((request) => {
+      // Append rather than replace: the runtime can have more than one action
+      // waiting, and dropping an earlier one would strand its turn.
+      setApprovals((current) =>
+        current.some((entry) => entry.approvalId === request.approvalId) ? current : [...current, request]
+      )
+    })
 
     const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
       setLiveRun((current) => {
@@ -206,8 +218,24 @@ export default function App(): ReactElement {
     return () => {
       active = false
       removeMissionListener()
+      removeApprovalListener()
     }
   }, [])
+
+  const decideApproval = (approvalId: string, decision: MissionApprovalDecision): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setDecidingIds((current) => [...current, approvalId])
+    void bridge
+      .decideMissionApproval({ approvalId, decision })
+      .catch(() => undefined)
+      .finally(() => {
+        // The card goes once the answer is delivered, whatever it was --
+        // leaving it up would invite a second click on a settled action.
+        setApprovals((current) => current.filter((entry) => entry.approvalId !== approvalId))
+        setDecidingIds((current) => current.filter((entry) => entry !== approvalId))
+      })
+  }
 
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent): void => {
@@ -236,6 +264,9 @@ export default function App(): ReactElement {
     activeRunIdRef.current = undefined
     pendingUpdatesRef.current.clear()
     setLiveRun({ prompt, phase: 'starting', events: [] })
+    // A new mission cannot inherit the previous one's pending questions.
+    setApprovals([])
+    setDecidingIds([])
     if (!bridge) {
       setLiveRun({ prompt, phase: 'failed', events: [], error: 'The secure desktop bridge is unavailable.' })
       return false
@@ -448,6 +479,9 @@ export default function App(): ReactElement {
                 restoredMission={liveRun.restored === true ? liveRun.restoredMission : undefined}
                 error={liveRun.error}
                 errorIsPersistence={liveRun.errorIsPersistence === true}
+                approvals={approvals}
+                onDecide={decideApproval}
+                decidingIds={decidingIds}
                 startedAt={
                   liveRun.restoredMission === undefined
                     ? undefined

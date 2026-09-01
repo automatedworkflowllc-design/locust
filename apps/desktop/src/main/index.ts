@@ -7,18 +7,23 @@ import {
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger } from '@teammate/mission-store'
 import type { MissionLedger } from '@teammate/mission-store'
+import { execFileSync, spawn } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
+import { createAppServerMissionService } from './app-server-mission.js'
 import { createTeammateStore } from './teammate-store.js'
 import { readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
+import type { AppServerMissionService } from './app-server-mission.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
   CODEX_MISSION_UPDATE_CHANNEL,
+  MISSION_APPROVAL_CHANNEL,
+  MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
@@ -43,6 +48,7 @@ const runtimeDiscovery = createRuntimeDiscoveryService({
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
+let appServerServiceForShutdown: AppServerMissionService | undefined
 let ledgerForShutdown: MissionLedger | undefined
 
 const isAllowedExternalUrl = (url: string): boolean => {
@@ -54,7 +60,10 @@ const isAllowedExternalUrl = (url: string): boolean => {
   }
 }
 
-const createWindow = (codexMissions: CodexMissionService): void => {
+const createWindow = (
+  codexMissions: CodexMissionService,
+  onWindow: (window: BrowserWindow) => void
+): void => {
   const window = new BrowserWindow({
     width: 1480,
     height: 940,
@@ -72,6 +81,8 @@ const createWindow = (codexMissions: CodexMissionService): void => {
       nodeIntegration: false
     }
   })
+
+  onWindow(window)
 
   window.once('ready-to-show', () => {
     window.show()
@@ -148,8 +159,63 @@ if (!ownsSingleInstanceLock) {
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger
     })
+    // The approval transport. It only runs for the mode that asked for it, so
+    // an experimental protocol failing cannot take the ordinary paths with it.
+    let approvalWindow: BrowserWindow | undefined
+    const appServerMissions = createAppServerMissionService({
+      workspacePath: process.cwd(),
+      ledger: missionLedger,
+      discover: discoverRuntimes,
+      spawn: (executablePath, args) => {
+        const child = spawn(executablePath, [...args], { stdio: ['pipe', 'pipe', 'pipe'] })
+        return {
+          write: (line) => child.stdin.write(line),
+          // Take the tree: app-server starts its own children, and killing only
+          // the parent leaves them running after the mission ends.
+          kill: () => {
+            try {
+              if (process.platform === 'win32' && child.pid !== undefined) {
+                execFileSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore' })
+                return
+              }
+            } catch {
+              // Fall through to the ordinary signal.
+            }
+            child.kill()
+          },
+          onData: (listener) => child.stdout.on('data', (chunk: Buffer) => listener(String(chunk))),
+          onExit: (listener) => child.on('exit', () => listener())
+        }
+      },
+      emitApproval: (request) => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(MISSION_APPROVAL_CHANNEL, request)
+        }
+      },
+      emitEvent: (runId, missionId, event) => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, { kind: 'event', runId, missionId, event })
+        }
+      }
+    })
+
+    ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL, (event, answer: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false } as const
+      const payload = (typeof answer === 'object' && answer !== null ? answer : {}) as Record<string, unknown>
+      const decision = payload.decision
+      // Anything but a recognized answer is a refusal. A malformed message must
+      // never be able to approve an action.
+      const normalized =
+        decision === 'approve-once' || decision === 'approve-always' ? decision : 'deny'
+      if (typeof payload.approvalId !== 'string') return { ok: false } as const
+      return { ok: appServerMissions.decide({ approvalId: payload.approvalId, decision: normalized }) } as const
+    })
+
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })
     missionServiceForShutdown = codexMissions
+    appServerServiceForShutdown = appServerMissions
     ledgerForShutdown = missionLedger
 
     ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event) => {
@@ -256,10 +322,42 @@ if (!ownsSingleInstanceLock) {
       const prompt = payload.prompt
       // Anything but an explicit accept-edits is read-only. A malformed or
       // missing mode must never widen what a run may touch.
-      const mode = payload.mode === 'accept-edits' ? 'accept-edits' : 'ask'
+      const mode =
+        payload.mode === 'accept-edits' || payload.mode === 'approve-each' ? payload.mode : 'ask'
       // Same shape as the mode: an unrecognized runtime falls back to Codex
       // rather than being passed through to discovery as-is.
       const runtime = payload.runtime === 'claude' ? 'claude' : 'codex'
+      // `approve-each` is the only mode that needs a runtime able to stop and
+      // ask, so it is the only one routed to the experimental transport.
+      if (mode === 'approve-each') {
+        if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+          return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const
+        }
+        try {
+          const mission = await appServerMissions.start(prompt)
+          return {
+            ok: true,
+            data: {
+              runId: mission.runId,
+              missionId: mission.missionId,
+              runtime: 'codex',
+              model: 'account-default',
+              resolvedRouteId: 'codex-app-server:default',
+              cliVersion: null,
+              sandbox: 'workspace-write'
+            }
+          } as const
+        } catch {
+          return {
+            ok: false,
+            error: {
+              code: 'RUNTIME_START_FAILED',
+              message: 'The approval-capable runtime could not be started.'
+            }
+          } as const
+        }
+      }
+
       try {
         return await codexMissions.start(prompt, runtime, mode, (update: CodexMissionUpdate) => {
           if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
@@ -311,10 +409,16 @@ if (!ownsSingleInstanceLock) {
       windowFromValidSender(event)?.close()
     })
 
-    createWindow(codexMissions)
+    createWindow(codexMissions, (window) => {
+      approvalWindow = window
+    })
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow(codexMissions)
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow(codexMissions, (window) => {
+          approvalWindow = window
+        })
+      }
     })
   }).catch((error: unknown) => {
     console.error('Failed to initialize Teammate', error)
@@ -336,6 +440,9 @@ if (ownsSingleInstanceLock) {
     shutdownStarted = true
     void (async () => {
       await missionServiceForShutdown?.dispose()
+      // Releases any pending approval and takes the app-server process tree
+      // with it, so nothing is left prompting for an app that has gone.
+      await appServerServiceForShutdown?.dispose()
       await ledgerForShutdown?.flush()
       shutdownComplete = true
       app.quit()

@@ -3,10 +3,15 @@ import type { ReactElement } from 'react'
 
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
-import type { PublicRecoveredMission } from '../../../shared/ipc.js'
+import type {
+  MissionApprovalDecision,
+  MissionApprovalRequest,
+  PublicRecoveredMission
+} from '../../../shared/ipc.js'
 import { buildThread } from '../missionView.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { Icon } from './Icon.js'
+import { ApprovalCard } from './ApprovalCard.js'
 import { AgentAvatar, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
 
 function ActivityCard({
@@ -102,6 +107,10 @@ export interface ThreadProps {
   readonly errorIsPersistence: boolean
   /** Local wall-clock label for when the mission began. */
   readonly startedAt: string | undefined
+  /** Approvals waiting on the user, oldest first. */
+  readonly approvals: readonly MissionApprovalRequest[]
+  readonly onDecide: (approvalId: string, decision: MissionApprovalDecision) => void
+  readonly decidingIds: readonly string[]
 }
 
 export function Thread({
@@ -112,7 +121,10 @@ export function Thread({
   restoredMission,
   error,
   errorIsPersistence,
-  startedAt
+  startedAt,
+  approvals,
+  onDecide,
+  decidingIds
 }: ThreadProps): ReactElement {
   const items = buildThread(events, { running })
   return (
@@ -170,6 +182,20 @@ export function Thread({
           }
           return <DiagnosticLine key={item.key} level={item.level} message={item.message} />
         })}
+
+        {/*
+          Approvals sit at the END of the thread, after everything that has
+          happened. They are what the run is waiting on, so they belong where
+          the reader's eye already is rather than buried in the transcript.
+        */}
+        {approvals.map((request) => (
+          <ApprovalCard
+            key={request.approvalId}
+            request={request}
+            busy={decidingIds.includes(request.approvalId)}
+            onDecide={(decision) => onDecide(request.approvalId, decision)}
+          />
+        ))}
 
         {error !== undefined && (
           <div className="lc-card is-red">
