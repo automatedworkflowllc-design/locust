@@ -39,6 +39,7 @@ The differentiator is not merely “more agents.” It is a trustworthy control 
 - Mission history IPC and restart recovery: completed, failed, cancelled, and interrupted runs are restored with truthful phase, event-window, and per-mission integrity-issue reporting; a restored receipt that receives live updates becomes a live, cancellable run again.
 - Renderer hardening: deny-all permission handlers, no renderer network egress in packaged builds, and sender/frame validation on every IPC channel including window controls.
 - Service lifecycle: `interrupt()` for window close versus a latching `dispose()` for shutdown, so no mission can start after the final ledger flush.
+- Reconciled checkpoint records derived by the ledger from durable state alone: a tool call that started and never reported an outcome is `unknown`, not failed, so the checkpoint returns `safe`, `approval-required`, or `unsafe` with the cause. There is no `appendCheckpoint(checkpoint)` — a component whose state is in doubt may not author the record that is trusted when its state is in doubt. Closing a window mid-mission writes a `shutdown` checkpoint once that run has settled.
 
 One harmless read-only Codex mission is live end to end and now survives restarts through the durable ledger. The remaining mission fixtures, Claude/OmniRoute routes, automatic fallback, token-budget preview, and connection/tool surfaces are still demonstrations, and the app does not invoke real external tools.
 
@@ -57,7 +58,9 @@ In a separate run, validate the full workspace:
 pnpm check
 ```
 
-Last verified on 2026-08-31 (after the durable-ledger milestone and its hardening pass): the production build and every workspace TypeScript check passed, with 66/66 tests passing across runtime adapters, runtime core, the mission store, and desktop services.
+Last verified on 2026-08-31 (after the durable-ledger milestone, its hardening pass, and the checkpoint record): the production build and every workspace TypeScript check passed, with 81/81 tests passing across runtime adapters, runtime core, the mission store, and desktop services.
+
+The checkpoint suite is verified by mutation, not by being green: `packages/mission-store/test/mutation-control.mjs` breaks eight behaviours one at a time and requires the NAMED test to fail, rejecting any mutation that stops the file running (a red suite caused by a broken file proves nothing about any test in it). It found two tests of mine that passed for the wrong reason — a digest test comparing transcripts of different lengths, which a constant-per-event digest satisfies, and a shutdown test that called `dispose()` before the run settled, which passed against a service with the line it names removed.
 
 The post-hardening live smoke is **done**, on the built app against Codex CLI 0.151.0-alpha.7.2, in two layers (`_smoke/`, run by hand — they need a signed-in provider and a desktop session, so they are not part of `pnpm check`):
 
@@ -70,11 +73,12 @@ Each carries a committed negative control, because a green check that could neve
 
 The durable ledger and restart recovery landed on 2026-08-31 (with an adversarial review and hardening pass). What remains, in order — see `docs/ROADMAP.md` for the full plan and the 2026-08-31 owner direction (Cursor x Grok Bot thesis, Claude as an obviously selectable runtime, teammate workroom, simple avatar-first UI):
 
-1. Create a reconciled checkpoint record before any provider fallback or route switch (finishes issue #1).
-2. Apply the proven runner/event/ledger contract to Claude Code so both runtimes are selectable from the command dock (issue #3, elevated).
-3. Work through the recorded hardening backlog (write-side/reader parity landed in the hardening pass): batched fsync, recency-aware ledger scans past 500 files, and byte-capped history responses.
-4. Then the curated OmniRoute gateway adapter and Ask/Automatic fallback from a reconciled checkpoint.
+1. Apply the proven runner/event/ledger contract to Claude Code so both runtimes are selectable from the command dock (issue #3, elevated).
+2. Work through the recorded hardening backlog (write-side/reader parity landed in the hardening pass): batched fsync, recency-aware ledger scans past 500 files, and byte-capped history responses.
+3. Then the curated OmniRoute gateway adapter and Ask/Automatic fallback from a reconciled checkpoint.
 
 Public roadmap: [live Codex mission](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/2), [durable mission ledger](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/1), and [Claude/OmniRoute adapters](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/3).
 
-Definition of done for issue #1: a user can start a harmless local Codex mission from the desktop UI, observe normalized events, cancel safely, restart the app, and inspect the durable run receipt — implemented and smoke-verified live on the built app; awaiting only the reconciled checkpoint record. Claude and OmniRoute adapters follow the same proven boundary.
+Definition of done for issue #1: a user can start a harmless local Codex mission from the desktop UI, observe normalized events, cancel safely, restart the app, and inspect the durable run receipt — implemented, smoke-verified live on the built app, and now checkpointed. Claude and OmniRoute adapters follow the same proven boundary.
+
+**Stated plainly, because it is the kind of gap that reads as done:** the checkpoint record exists, is durable, is recoverable, refuses to contradict itself, and has one production caller (shutdown). Nothing calls it *at a route switch*, because no route switch exists yet — that arrives with the Claude adapter and automatic fallback, and is where the `approval-required` verdict finally gates something. Until then the mechanism is built and exercised, not yet load-bearing.
