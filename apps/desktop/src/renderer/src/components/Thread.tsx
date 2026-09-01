@@ -8,10 +8,11 @@ import type {
   MissionApprovalRequest,
   PublicRecoveredMission
 } from '../../../shared/ipc.js'
-import { buildThread } from '../missionView.js'
+import { buildThread, cancellationSummary, readPlan } from '../missionView.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
+import { CancellationCard } from './CancellationCard.js'
 import { AgentAvatar, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
 
 function ActivityCard({
@@ -111,6 +112,8 @@ export interface ThreadProps {
   readonly approvals: readonly MissionApprovalRequest[]
   readonly onDecide: (approvalId: string, decision: MissionApprovalDecision) => void
   readonly decidingIds: readonly string[]
+  /** True once the run has been stopped by the user. */
+  readonly cancelled: boolean
 }
 
 export function Thread({
@@ -124,9 +127,23 @@ export function Thread({
   startedAt,
   approvals,
   onDecide,
-  decidingIds
+  decidingIds,
+  cancelled
 }: ThreadProps): ReactElement {
   const items = buildThread(events, { running })
+  // Planned-step count comes from the last plan the provider sent, so
+  // "never started" is measured against what it said it would do.
+  const plannedSteps = events
+    .filter((event) => event.type === 'plan.updated')
+    .map((event) => (event.type === 'plan.updated' ? readPlan(event.payload.plan).length : 0))
+    .at(-1) ?? 0
+  const stopped = cancelled ? cancellationSummary(events, plannedSteps) : undefined
+  const stoppedAt = cancelled
+    ? new Date(events.at(-1)?.occurredAt ?? Date.now()).toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : undefined
   return (
     <div className="lc-thread">
       <div className="lc-thread__column">
@@ -196,6 +213,8 @@ export function Thread({
             onDecide={(decision) => onDecide(request.approvalId, decision)}
           />
         ))}
+
+        {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} />}
 
         {error !== undefined && (
           <div className="lc-card is-red">

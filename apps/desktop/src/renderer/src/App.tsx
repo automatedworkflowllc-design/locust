@@ -20,6 +20,7 @@ import { Composer } from './components/Composer.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
 import { CommandPalette } from './components/CommandPalette.js'
 import type { PaletteAction } from './components/CommandPalette.js'
+import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
 import { MissionsScreen, SettingsScreen, TeammatesScreen } from './components/Screens.js'
 import type { RouteChoice } from './components/RoutePicker.js'
@@ -486,7 +487,19 @@ export default function App(): ReactElement {
           ) : screen === 'settings' ? (
             <SettingsScreen runtimes={runtimes} ledgerPath={undefined} />
           ) : liveRun === undefined ? (
-            <FirstLaunch runtimes={runtimes} discoveryPhase={runtimeState.phase} />
+            // A teammate with nothing running gets their own capability-led
+            // state; with no teammates at all, the runtime story comes first.
+            teammates.length > 0 && runtimes.some((entry) => entry.ready && entry.status === 'ready') ? (
+              <IdleTeammate
+                teammate={teammates[0]!}
+                canStart
+                onStarter={(prompt) => {
+                  void startMission(prompt)
+                }}
+              />
+            ) : (
+              <FirstLaunch runtimes={runtimes} discoveryPhase={runtimeState.phase} />
+            )
           ) : (
             <>
               <header className="lc-workroom__header">
@@ -532,6 +545,7 @@ export default function App(): ReactElement {
                 approvals={approvals}
                 onDecide={decideApproval}
                 decidingIds={decidingIds}
+                cancelled={liveRun.phase === 'cancelled'}
                 startedAt={
                   liveRun.restoredMission === undefined
                     ? undefined

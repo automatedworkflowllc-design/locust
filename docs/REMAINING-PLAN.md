@@ -17,10 +17,10 @@ because "maximum" is per model — sol and terra reach `ultra`, luna stops at
 `max`, the 5.4/5.5 family at `xhigh`. Without per-model data it would be a
 label over a guess.
 
-**P5a — Cancellation card.** KEPT / STOPPED / NOT DONE, derived from events.
+**P5a — Cancellation card. DONE 2026-09-01.** KEPT / STOPPED / NOT DONE, derived from events.
 `cancellationSummary` already exists and is tested; it has no UI.
 
-**P5b — Idle teammate.** The design's capability-led empty state, shown when a
+**P5b — Idle teammate. DONE 2026-09-01.** The design's capability-led empty state, shown when a
 teammate has no active mission. Small, and it is the state a user sees most.
 
 **P5c — Handoff divider.** Needs mid-mission route switching, which needs the
