@@ -257,8 +257,11 @@ if (!ownsSingleInstanceLock) {
       // Anything but an explicit accept-edits is read-only. A malformed or
       // missing mode must never widen what a run may touch.
       const mode = payload.mode === 'accept-edits' ? 'accept-edits' : 'ask'
+      // Same shape as the mode: an unrecognized runtime falls back to Codex
+      // rather than being passed through to discovery as-is.
+      const runtime = payload.runtime === 'claude' ? 'claude' : 'codex'
       try {
-        return await codexMissions.start(prompt, mode, (update: CodexMissionUpdate) => {
+        return await codexMissions.start(prompt, runtime, mode, (update: CodexMissionUpdate) => {
           if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
             owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
           }

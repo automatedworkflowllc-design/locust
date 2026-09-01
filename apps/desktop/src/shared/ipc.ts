@@ -111,6 +111,7 @@ export type MissionMode = 'ask' | 'accept-edits'
 export interface CodexMissionStartRequest {
   readonly prompt: string
   readonly mode?: MissionMode
+  readonly runtime?: MissionRuntimeId
 }
 
 /**
@@ -132,9 +133,12 @@ export interface MissionRouteSummary {
   readonly sandbox: 'read-only' | 'workspace-write'
 }
 
-/** A Codex start is always Codex on the account default; the narrowing is real. */
+/**
+ * A mission start receipt. `runtime` is the union rather than a literal now
+ * that Claude can own a run: narrowing it here would make a real Claude start
+ * a type error instead of a supported route.
+ */
 export interface CodexMissionStartData extends MissionRouteSummary {
-  readonly runtime: 'codex'
   readonly model: 'account-default'
 }
 

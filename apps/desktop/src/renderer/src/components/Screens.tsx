@@ -11,7 +11,7 @@ export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
 
 const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
   codex: 'live',
-  claude: 'preview',
+  claude: 'live',
   omniroute: 'planned'
 }
 

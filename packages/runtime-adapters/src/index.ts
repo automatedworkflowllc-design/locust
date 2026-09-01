@@ -9,6 +9,12 @@ export {
 } from "./commands.js";
 export { discoverInstalledRuntimes } from "./discovery.js";
 export { createCodexEventNormalizer } from "./codex-events.js";
+export {
+  createClaudeEventNormalizer,
+  limitKindFor,
+  resetsAtIso,
+  summarizeInit,
+} from "./claude-events.js";
 export { createNodeProbeRunner } from "./node-runner.js";
 export { createPathExecutableLocator } from "./path-locator.js";
 export {
@@ -31,6 +37,10 @@ export type {
   NormalizedRuntimePayloadMap,
   RedactedJsonValue,
 } from "./codex-events.js";
+export type {
+  ClaudeEventNormalizer,
+  ClaudeInvocationContext,
+} from "./claude-events.js";
 export type {
   DiscoverInstalledRuntimesOptions,
 } from "./discovery.js";

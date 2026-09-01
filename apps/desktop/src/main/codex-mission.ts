@@ -1,9 +1,13 @@
 import {
+  createClaudeEventNormalizer,
+  createClaudePrintCommand,
   createCodexEventNormalizer,
   createCodexExecCommand
 } from '@teammate/runtime-adapters'
 import type {
+  ClaudeEventNormalizer,
   CodexEventNormalizer,
+  MissionRuntimeId,
   RuntimeDiscovery,
   RuntimeProcessRun,
   RuntimeProcessRunner
@@ -25,7 +29,7 @@ interface ActiveCodexMission {
   readonly runId: string
   readonly missionId: string
   readonly controller: AbortController
-  readonly normalizer: CodexEventNormalizer
+  readonly normalizer: CodexEventNormalizer | ClaudeEventNormalizer
   readonly process: RuntimeProcessRun
   readonly emit: (update: CodexMissionUpdate) => void
 }
@@ -33,6 +37,7 @@ interface ActiveCodexMission {
 export interface CodexMissionService {
   start(
     prompt: unknown,
+    runtime: MissionRuntimeId,
     mode: MissionMode,
     emit: (update: CodexMissionUpdate) => void
   ): Promise<CodexMissionStartResponse>
@@ -236,6 +241,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   return {
     async start(
       prompt: unknown,
+      runtime: MissionRuntimeId,
       mode: MissionMode,
       emit: (update: CodexMissionUpdate) => void
     ): Promise<CodexMissionStartResponse> {
@@ -289,15 +295,15 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           ) as CodexMissionStartResponse
         }
 
-        const codex = runtimes.find((runtime) => runtime.id === 'codex')
+        const chosen = runtimes.find((entry) => entry.id === runtime)
         if (
-          codex?.availability !== 'available'
-          || codex.readiness !== 'ready'
-          || codex.executable === undefined
+          chosen?.availability !== 'available'
+          || chosen.readiness !== 'ready'
+          || chosen.executable === undefined
         ) {
           return error(
             'CODEX_UNAVAILABLE',
-            'Codex is not ready. Install or sign in to the Codex CLI, then retry discovery.'
+            `${runtime === 'claude' ? 'Claude Code' : 'Codex CLI'} is not ready. Install or sign in to it, then retry discovery.`
           ) as CodexMissionStartResponse
         }
 
@@ -305,27 +311,38 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const missionId = `mission_${createId()}`
         const controller = new AbortController()
         const createdAt = now().toISOString()
-        const normalizer = createCodexEventNormalizer({
+        const routeId = runtime === 'claude' ? 'claude' : 'codex'
+        // ONE definition of what this run may touch, computed before anything
+        // records it. Only Codex takes a sandbox flag today, so a Claude run is
+        // restricted whatever the composer asked for -- and the durable header
+        // and the receipt must agree about that, or the ledger claims a run
+        // could write when it could not.
+        const effectiveSandbox: MissionSandbox = runtime === 'claude' ? 'read-only' : sandbox
+        const resolvedRouteId = `${routeId}-account:default`
+        const normalizerContext = {
           runId,
           missionId,
-          requestedRouteId: 'codex',
-          resolvedRouteId: 'codex-account:default',
-          ...(codex.version?.version === undefined ? {} : { cliVersion: codex.version.version }),
+          requestedRouteId: routeId,
+          resolvedRouteId,
+          ...(chosen.version?.version === undefined ? {} : { cliVersion: chosen.version.version }),
           now
-        })
+        }
+        const normalizer = runtime === 'claude'
+          ? createClaudeEventNormalizer(normalizerContext)
+          : createCodexEventNormalizer(normalizerContext)
 
         try {
           await options.ledger.createMission({
             missionId,
             runId,
             prompt,
-            runtime: 'codex',
+            runtime,
             model: 'account-default',
-            requestedRouteId: 'codex',
-            resolvedRouteId: 'codex-account:default',
-            cliVersion: codex.version?.version ?? null,
+            requestedRouteId: routeId,
+            resolvedRouteId,
+            cliVersion: chosen.version?.version ?? null,
             workspaceId,
-            sandbox,
+            sandbox: effectiveSandbox,
             executionPolicyVersion: 1,
             createdAt
           })
@@ -357,10 +374,15 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
         let process: RuntimeProcessRun
         try {
-          const command = createCodexExecCommand(codex.executable, {
-            workspacePath: options.workspacePath,
-            sandbox
-          })
+          // Claude's print command carries its own restricted argv; only Codex
+          // takes a sandbox flag, so write mode is a Codex capability today and
+          // a Claude mission stays read-only whatever the composer said.
+          const command = runtime === 'claude'
+            ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath })
+            : createCodexExecCommand(chosen.executable, {
+                workspacePath: options.workspacePath,
+                sandbox: effectiveSandbox
+              })
           process = options.runner.start(command, prompt, { signal: controller.signal })
         } catch {
           try {
@@ -397,11 +419,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           data: {
             runId,
             missionId,
-            runtime: 'codex',
+            runtime,
             model: 'account-default',
-            resolvedRouteId: 'codex-account:default',
-            cliVersion: codex.version?.version ?? null,
-            sandbox
+            resolvedRouteId,
+            cliVersion: chosen.version?.version ?? null,
+            sandbox: effectiveSandbox
           }
         }
       } finally {

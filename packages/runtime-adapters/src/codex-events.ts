@@ -244,11 +244,11 @@ const TOOL_ITEM_TYPES = new Set([
   "web_search",
 ]);
 
-function isObject(value: unknown): value is JsonObject {
+export function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function stringValue(value: unknown): string | undefined {
+export function stringValue(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length === 0) return undefined;
   // Every persisted string originates here. The mission ledger's reader refuses
   // any string containing NUL, and a refused record stops recovery at that
@@ -267,13 +267,13 @@ const MAX_IDENTITY_LENGTH = 512;
 // delta, marked as truncated, beats emitting an event that cannot be persisted.
 const MAX_MESSAGE_TEXT_LENGTH = 16_384;
 
-function boundedMessageText(value: string): string {
+export function boundedMessageText(value: string): string {
   return value.length > MAX_MESSAGE_TEXT_LENGTH
     ? `${value.slice(0, MAX_MESSAGE_TEXT_LENGTH - 12)}\u2026[truncated]`
     : value;
 }
 
-function identityValue(value: unknown): string | undefined {
+export function identityValue(value: unknown): string | undefined {
   const clean = stringValue(value) ?? "";
   if (clean.trim().length === 0) return undefined;
   return clean.length > MAX_IDENTITY_LENGTH
@@ -354,7 +354,7 @@ function sanitizeReasoningRecord(record: JsonObject): JsonObject {
   return { type: record.type, item: safeItem, reasoning_content: "[redacted]" };
 }
 
-function evidenceFor(
+export function evidenceFor(
   record: RuntimeJsonlRecord,
   parsed: unknown,
   runtimeEventType?: string,
@@ -370,7 +370,7 @@ function evidenceFor(
   };
 }
 
-function malformedEvidence(record: RuntimeJsonlRecord): CodexEventEvidence {
+export function malformedEvidence(record: RuntimeJsonlRecord): CodexEventEvidence {
   const redacted = redactText(record.raw);
   return {
     transportSequence: record.sequence,
@@ -418,7 +418,7 @@ function toolName(item: JsonObject, itemType: string): string {
   return identityValue(server === undefined ? tool : `${server}.${tool}`) ?? "mcp_tool";
 }
 
-function processEvidence(completion: RuntimeProcessCompletion): ProcessEvidence {
+export function processEvidence(completion: RuntimeProcessCompletion): ProcessEvidence {
   return {
     exitCode: completion.exitCode,
     signal: completion.signal,
@@ -434,7 +434,7 @@ function processEvidence(completion: RuntimeProcessCompletion): ProcessEvidence 
   };
 }
 
-function requireContextText(value: string, label: string): string {
+export function requireContextText(value: string, label: string): string {
   if (!value.trim() || value.includes("\0")) throw new Error(`${label} must be non-empty`);
   return value;
 }

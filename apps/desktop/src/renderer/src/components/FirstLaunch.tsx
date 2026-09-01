@@ -16,7 +16,7 @@ import type { IntegrationLevel } from '../status.js'
  */
 const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
   codex: 'live',
-  claude: 'preview',
+  claude: 'live',
   omniroute: 'planned'
 }
 

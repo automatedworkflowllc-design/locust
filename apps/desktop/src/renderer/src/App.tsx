@@ -242,7 +242,7 @@ export default function App(): ReactElement {
     }
 
     try {
-      const response = await bridge.startCodexMission({ prompt, mode })
+      const response = await bridge.startCodexMission({ prompt, mode, runtime: route.runtime })
       if (!response.ok) {
         activeRunIdRef.current = undefined
         setLiveRun({ prompt, phase: 'failed', events: [], error: response.error.message })

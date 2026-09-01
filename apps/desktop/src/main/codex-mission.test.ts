@@ -129,7 +129,7 @@ describe('Codex mission service', () => {
     }))
     const updates: CodexMissionUpdate[] = []
 
-    const response = await service.start('Inspect the workspace without changing it.', 'ask', (update) => {
+    const response = await service.start('Inspect the workspace without changing it.', 'codex', 'ask', (update) => {
       updates.push(update)
     })
     expect(response).toMatchObject({
@@ -180,7 +180,7 @@ describe('Codex mission service', () => {
       ledger: fakeLedger()
     })
 
-    await expect(service.start('   ', 'ask', () => undefined)).resolves.toMatchObject({
+    await expect(service.start('   ', 'codex', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'INVALID_PROMPT' }
     })
@@ -197,7 +197,7 @@ describe('Codex mission service', () => {
     })
     const { service } = scheduledService({ start }, ledger)
 
-    await expect(service.start('Do safe work.', 'ask', () => undefined)).resolves.toEqual({
+    await expect(service.start('Do safe work.', 'codex', 'ask', () => undefined)).resolves.toEqual({
       ok: false,
       error: {
         code: 'PERSISTENCE_FAILED',
@@ -216,11 +216,11 @@ describe('Codex mission service', () => {
       ledger: fakeLedger()
     })
 
-    await expect(service.start('Do safe work.', 'ask', () => undefined)).resolves.toEqual({
+    await expect(service.start('Do safe work.', 'codex', 'ask', () => undefined)).resolves.toEqual({
       ok: false,
       error: {
         code: 'CODEX_UNAVAILABLE',
-        message: 'Codex is not ready. Install or sign in to the Codex CLI, then retry discovery.'
+        message: 'Codex CLI is not ready. Install or sign in to it, then retry discovery.'
       }
     })
     expect(start).not.toHaveBeenCalled()
@@ -239,7 +239,7 @@ describe('Codex mission service', () => {
       ledger: fakeLedger()
     })
 
-    const response = service.start('Do safe work.', 'ask', () => undefined)
+    const response = service.start('Do safe work.', 'codex', 'ask', () => undefined)
     service.dispose()
     finishDiscovery([codexRuntime()])
 
@@ -281,9 +281,9 @@ describe('Codex mission service', () => {
     }) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start })
     const updates: CodexMissionUpdate[] = []
-    const first = await service.start('Wait safely.', 'ask', (update) => updates.push(update))
+    const first = await service.start('Wait safely.', 'codex', 'ask', (update) => updates.push(update))
     expect(first.ok).toBe(true)
-    await expect(service.start('A second run.', 'ask', () => undefined)).resolves.toMatchObject({
+    await expect(service.start('A second run.', 'codex', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUN_ALREADY_ACTIVE' }
     })
@@ -308,7 +308,7 @@ describe('Codex mission service', () => {
     }
     const { service, scheduled } = scheduledService({ start: () => process })
     const updates: CodexMissionUpdate[] = []
-    await service.start('Safe prompt.', 'ask', (update) => updates.push(update))
+    await service.start('Safe prompt.', 'codex', 'ask', (update) => updates.push(update))
     scheduled[0]?.()
 
     await vi.waitFor(() => expect(updates).toHaveLength(1))
@@ -353,7 +353,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     })
     const { service, scheduled } = scheduledService({ start }, ledger)
     const updates: CodexMissionUpdate[] = []
-    const response = await service.start('Persist safely.', 'ask', (update) => {
+    const response = await service.start('Persist safely.', 'codex', 'ask', (update) => {
       timeline.push(update.kind === 'event' ? `emit:${update.event.type}` : `emit:${update.kind}`)
       updates.push(update)
     })
@@ -367,7 +367,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     expect(timeline).toEqual(['append:run.started', 'emit:run.started', 'emit:persistence-error'])
     expect(updates.filter((update) => update.kind === 'persistence-error')).toHaveLength(1)
     // The service is free again as soon as the renderer hears about the failure.
-    await expect(service.start('Try again.', 'ask', () => undefined)).resolves.toMatchObject({ ok: true })
+    await expect(service.start('Try again.', 'codex', 'ask', () => undefined)).resolves.toMatchObject({ ok: true })
   })
 
   it('records host launch failures durably and reports a persistence failure when even that write fails', async () => {
@@ -376,7 +376,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     }) satisfies RuntimeProcessRunner['start']
     const appendHostFailure = vi.fn<MissionLedger['appendHostFailure']>(async () => undefined)
     const { service } = scheduledService({ start: failingStart }, fakeLedger({ appendHostFailure }))
-    await expect(service.start('Do safe work.', 'ask', () => undefined)).resolves.toMatchObject({
+    await expect(service.start('Do safe work.', 'codex', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUNTIME_START_FAILED' }
     })
@@ -389,7 +389,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
         throw new Error('disk full')
       }
     }))
-    await expect(doomed.start('Do safe work.', 'ask', () => undefined)).resolves.toMatchObject({
+    await expect(doomed.start('Do safe work.', 'codex', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'PERSISTENCE_FAILED' }
     })
@@ -403,7 +403,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     const appendHostFailure = vi.fn<MissionLedger['appendHostFailure']>(async () => undefined)
     const { service, scheduled } = scheduledService({ start: () => brokenProcess() }, fakeLedger({ appendHostFailure }))
     const updates: CodexMissionUpdate[] = []
-    await service.start('Safe prompt.', 'ask', (update) => updates.push(update))
+    await service.start('Safe prompt.', 'codex', 'ask', (update) => updates.push(update))
     scheduled[0]?.()
     await vi.waitFor(() => expect(updates).toHaveLength(1))
     expect(updates[0]).toMatchObject({ kind: 'transport-error' })
@@ -417,7 +417,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       }
     }))
     const doomedUpdates: CodexMissionUpdate[] = []
-    await doomed.start('Safe prompt.', 'ask', (update) => doomedUpdates.push(update))
+    await doomed.start('Safe prompt.', 'codex', 'ask', (update) => doomedUpdates.push(update))
     doomedScheduled[0]?.()
     await vi.waitFor(() => expect(doomedUpdates).toHaveLength(1))
     expect(doomedUpdates[0]).toMatchObject({ kind: 'persistence-error' })
@@ -440,8 +440,8 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       schedule: () => undefined
     })
 
-    const first = service.start('First mission.', 'ask', () => undefined)
-    await expect(service.start('Second mission.', 'ask', () => undefined)).resolves.toMatchObject({
+    const first = service.start('First mission.', 'codex', 'ask', () => undefined)
+    await expect(service.start('Second mission.', 'codex', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUN_ALREADY_ACTIVE' }
     })
@@ -470,13 +470,13 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     }) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start })
     const updates: CodexMissionUpdate[] = []
-    await service.start('Wait safely.', 'ask', (update) => updates.push(update))
+    await service.start('Wait safely.', 'codex', 'ask', (update) => updates.push(update))
     scheduled[0]?.()
 
     await service.dispose()
     // dispose resolved only after consume settled, so the terminal receipt is already emitted.
     expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.cancelled')).toBe(true)
-    await expect(service.start('After shutdown.', 'ask', () => undefined)).resolves.toMatchObject({
+    await expect(service.start('After shutdown.', 'codex', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUNTIME_START_FAILED' }
     })
@@ -485,7 +485,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       start: () => ({ records: records([]), completion: Promise.resolve(completion()) })
     })
     reusable.interrupt()
-    await expect(reusable.start('After interrupt.', 'ask', () => undefined)).resolves.toMatchObject({ ok: true })
+    await expect(reusable.start('After interrupt.', 'codex', 'ask', () => undefined)).resolves.toMatchObject({ ok: true })
   })
   it('checkpoints the mission it cut short, after that run has finished settling', async () => {
     const calls: Array<[string, string]> = []
@@ -508,7 +508,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     }) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start }, ledger)
     const updates: CodexMissionUpdate[] = []
-    await service.start('Wait safely.', 'ask', (update) => updates.push(update))
+    await service.start('Wait safely.', 'codex', 'ask', (update) => updates.push(update))
     scheduled[0]?.()
 
     // The real sequence: the window closes, the run settles and the service
@@ -565,7 +565,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       }
     }) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start }, ledger)
-    await service.start('Wait safely.', 'ask', () => undefined)
+    await service.start('Wait safely.', 'codex', 'ask', () => undefined)
     scheduled[0]?.()
     service.interrupt()
 
@@ -585,7 +585,7 @@ describe('mission sandbox', () => {
 
   it('runs read-only when the mode is ask', async () => {
     const { start, service } = specFor('ask')
-    await service.start('Look around.', 'ask', () => undefined)
+    await service.start('Look around.', 'codex', 'ask', () => undefined)
     expect(start.mock.calls[0]?.[0]?.args).toEqual(
       expect.arrayContaining(['--sandbox', 'read-only'])
     )
@@ -594,7 +594,7 @@ describe('mission sandbox', () => {
 
   it('runs workspace-write only when edits were explicitly accepted', async () => {
     const { start, service } = specFor('accept-edits')
-    const response = await service.start('Fix the typo.', 'accept-edits', () => undefined)
+    const response = await service.start('Fix the typo.', 'codex', 'accept-edits', () => undefined)
     expect(start.mock.calls[0]?.[0]?.args).toEqual(
       expect.arrayContaining(['--sandbox', 'workspace-write'])
     )
@@ -611,7 +611,7 @@ describe('mission sandbox', () => {
     })) satisfies RuntimeProcessRunner['start']
     const { service } = scheduledService({ start }, fakeLedger({ createMission }))
 
-    await service.start('Fix the typo.', 'accept-edits', () => undefined)
+    await service.start('Fix the typo.', 'codex', 'accept-edits', () => undefined)
 
     expect(createMission).toHaveBeenCalledWith(
       expect.objectContaining({ sandbox: 'workspace-write' })
@@ -627,8 +627,79 @@ describe('mission sandbox', () => {
 
     // The IPC layer normalizes this, but the service must not depend on that:
     // a mode it does not recognise is read-only, never write.
-    await service.start('Do something.', 'whatever' as never, () => undefined)
+    await service.start('Do something.', 'codex', 'whatever' as never, () => undefined)
 
     expect(start.mock.calls[0]?.[0]?.args).toEqual(expect.arrayContaining(['--sandbox', 'read-only']))
+  })
+})
+
+describe('runtime selection', () => {
+  function claudeRuntime(): RuntimeDiscovery {
+    return {
+      ...codexRuntime(),
+      id: 'claude',
+      displayName: 'Claude Code',
+      executable: {
+        commandName: 'claude',
+        discoveredPath: process.platform === 'win32' ? 'C:\tools\claude.exe' : '/tools/claude',
+        executablePath: process.platform === 'win32' ? 'C:\tools\claude.exe' : '/tools/claude',
+        prefixArgs: [],
+        kind: 'native'
+      }
+    }
+  }
+
+  function serviceWith(runtimes: RuntimeDiscovery[], ledger = fakeLedger()) {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => runtimes,
+      runner: { start },
+      ledger,
+      createId: (() => { let n = 0; return () => String(++n) })(),
+      now: () => new Date(NOW),
+      schedule: () => undefined
+    })
+    return { start, service }
+  }
+
+  it('launches Claude with its own restricted argv when Claude is chosen', async () => {
+    const { start, service } = serviceWith([codexRuntime(), claudeRuntime()])
+
+    const response = await service.start('Summarize this repo.', 'claude', 'ask', () => undefined)
+
+    expect(response).toMatchObject({ ok: true, data: { runtime: 'claude' } })
+    const args = start.mock.calls[0]?.[0]?.args ?? []
+    expect(start.mock.calls[0]?.[0]?.runtime).toBe('claude')
+    expect(args).toEqual(expect.arrayContaining(['--print', '--output-format', 'stream-json']))
+    // Claude's command takes no sandbox flag; the Codex one must not leak in.
+    expect(args).not.toContain('--sandbox')
+  })
+
+  it('reports a Claude run as read-only even when edits were requested', async () => {
+    // Only Codex takes a sandbox flag today, so accept-edits cannot widen a
+    // Claude run -- and the receipt must say what actually happened.
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const { service } = serviceWith([codexRuntime(), claudeRuntime()], fakeLedger({ createMission }))
+
+    const response = await service.start('Edit something.', 'claude', 'accept-edits', () => undefined)
+
+    expect(response).toMatchObject({ ok: true, data: { sandbox: 'read-only' } })
+    expect(createMission).toHaveBeenCalledWith(expect.objectContaining({
+      runtime: 'claude',
+      sandbox: 'read-only'
+    }))
+  })
+
+  it('names the runtime the user actually chose when it is unavailable', async () => {
+    const { service } = serviceWith([codexRuntime()])
+
+    await expect(service.start('Do work.', 'claude', 'ask', () => undefined)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'CODEX_UNAVAILABLE', message: expect.stringContaining('Claude Code') }
+    })
   })
 })

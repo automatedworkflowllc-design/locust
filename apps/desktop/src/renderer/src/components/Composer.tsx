@@ -71,10 +71,9 @@ export function Composer({
 
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   const selectedReady = selected !== undefined && runtimeIsUsable(selected)
-  // Only Codex can own a mission today. Claude is selectable -- discovery
-  // has proven it is there and signed in -- but starting on it would
-  // silently run something else, so the composer refuses and says why.
-  const routeCanRun = route.runtime === 'codex'
+  // Both runtimes can own a mission now. Readiness still comes from discovery,
+  // so a route that is installed but signed out cannot be started.
+  const routeCanRun = route.runtime === 'codex' || route.runtime === 'claude'
   const canStart = selectedReady && routeCanRun && !running && value.trim().length > 0
 
   const placeholder = running
@@ -82,9 +81,11 @@ export function Composer({
     : !routeCanRun
       ? `The ${selected?.displayName ?? 'selected'} adapter is not finished — switch the route to run a mission…`
       : selectedReady
-        ? mode === 'accept-edits'
+        ? mode === 'accept-edits' && route.runtime === 'codex'
           ? 'Describe a mission. It may edit files in this workspace…'
-          : 'Describe a mission for this workspace…'
+          : route.runtime === 'claude'
+            ? 'Describe a mission. Claude Code runs read-only for now…'
+            : 'Describe a mission for this workspace…'
         : discoveryPhase === 'loading'
           ? 'Checking local runtimes…'
           : discoveryPhase === 'error'

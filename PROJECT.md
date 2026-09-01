@@ -77,7 +77,7 @@ The Locust desktop shell design landed 2026-08-31 (`design/locust-desktop/` — 
 
 The durable ledger and restart recovery landed on 2026-08-31 (with an adversarial review and hardening pass). What remains, in order — see `docs/ROADMAP.md` for the full plan and the 2026-08-31 owner direction (Cursor x Grok Bot thesis, Claude as an obviously selectable runtime, teammate workroom, simple avatar-first UI):
 
-1. Apply the proven runner/event/ledger contract to Claude Code so both runtimes are selectable from the command dock (issue #3, elevated). **The contract side is done** — the runtime union, ledger schema v2, and the renderer types all landed; what remains is the normalizer and the main-process wiring, specified in `docs/HANDOFF-claude-adapter.md` against a real measured Claude stream.
+1. ~~Apply the proven runner/event/ledger contract to Claude Code~~ **DONE 2026-09-01** — Claude Code is selectable in the route picker and can own a real mission end to end, recorded at ledger schema v3 with `runtime: claude` and recovered after restart. Remaining from that milestone: the hardening backlog. (Original note: the contract side was done first — the runtime union, ledger schema v2, and the renderer types all landed; what remains is the normalizer and the main-process wiring, specified in `docs/HANDOFF-claude-adapter.md` against a real measured Claude stream.
 2. Work through the recorded hardening backlog (write-side/reader parity landed in the hardening pass): batched fsync, recency-aware ledger scans past 500 files, and byte-capped history responses.
 3. Then the curated OmniRoute gateway adapter and Ask/Automatic fallback from a reconciled checkpoint.
 
