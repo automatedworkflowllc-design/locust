@@ -57,18 +57,24 @@ In a separate run, validate the full workspace:
 pnpm check
 ```
 
-Last verified on 2026-08-31 (after the durable-ledger milestone landed): the production build and every workspace TypeScript check passed, with 63/63 tests passing across runtime adapters, runtime core, the mission store, and desktop services, and the Electron app boots cleanly with the ledger wired in. A real UI smoke mission returned `LIVE_UI_OK` through Codex CLI 0.151.0-alpha.7.2 earlier the same day on the pre-hardening build; re-run the live smoke once Codex quota allows.
+Last verified on 2026-08-31 (after the durable-ledger milestone and its hardening pass): the production build and every workspace TypeScript check passed, with 66/66 tests passing across runtime adapters, runtime core, the mission store, and desktop services.
+
+The post-hardening live smoke is **done**, on the built app against Codex CLI 0.151.0-alpha.7.2, in two layers (`_smoke/`, run by hand — they need a signed-in provider and a desktop session, so they are not part of `pnpm check`):
+
+- `live-ledger-smoke.mjs` — a real read-only mission through discovery, transport, normalizer and the durable ledger, recovered intact by a fresh reader: 6 events, contiguous, phase `completed`, no integrity issues.
+- `renderer-smoke.mjs` — the same mission driven through the Electron UI over CDP, asserted on what the screen shows: the composer reaches React state, the run completes, and the answer and the read-only receipt are on screen.
+
+Each carries a committed negative control, because a green check that could never go red proves nothing. The ledger smoke corrupts a copy of the ledger it just wrote and requires recovery to come back short, flagged and `interrupted`; the renderer smoke asks for a computed answer rather than an instructed token (an instructed token is echoed back in the displayed prompt and would match with no model in the loop) and launches with a private profile, since the app restores history from the ledger.
 
 ## Next implementation milestone
 
 The durable ledger and restart recovery landed on 2026-08-31 (with an adversarial review and hardening pass). What remains, in order — see `docs/ROADMAP.md` for the full plan and the 2026-08-31 owner direction (Cursor x Grok Bot thesis, Claude as an obviously selectable runtime, teammate workroom, simple avatar-first UI):
 
-1. Re-run the live UI smoke once Codex quota allows, confirming the post-hardening build end to end.
-2. Create a reconciled checkpoint record before any provider fallback or route switch (finishes issue #1).
-3. Apply the proven runner/event/ledger contract to Claude Code so both runtimes are selectable from the command dock (issue #3, elevated).
-4. Work through the recorded hardening backlog: write-side event validation parity with the reader, batched fsync, recency-aware ledger scans past 500 files, and byte-capped history responses.
-5. Then the curated OmniRoute gateway adapter and Ask/Automatic fallback from a reconciled checkpoint.
+1. Create a reconciled checkpoint record before any provider fallback or route switch (finishes issue #1).
+2. Apply the proven runner/event/ledger contract to Claude Code so both runtimes are selectable from the command dock (issue #3, elevated).
+3. Work through the recorded hardening backlog (write-side/reader parity landed in the hardening pass): batched fsync, recency-aware ledger scans past 500 files, and byte-capped history responses.
+4. Then the curated OmniRoute gateway adapter and Ask/Automatic fallback from a reconciled checkpoint.
 
 Public roadmap: [live Codex mission](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/2), [durable mission ledger](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/1), and [Claude/OmniRoute adapters](https://github.com/automatedworkflowllc-design/ai-teammate-platform/issues/3).
 
-Definition of done for issue #1: a user can start a harmless local Codex mission from the desktop UI, observe normalized events, cancel safely, restart the app, and inspect the durable run receipt — implemented; awaiting one live post-hardening smoke plus the checkpoint record. Claude and OmniRoute adapters follow the same proven boundary.
+Definition of done for issue #1: a user can start a harmless local Codex mission from the desktop UI, observe normalized events, cancel safely, restart the app, and inspect the durable run receipt — implemented and smoke-verified live on the built app; awaiting only the reconciled checkpoint record. Claude and OmniRoute adapters follow the same proven boundary.
