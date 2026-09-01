@@ -8,6 +8,7 @@ export {
   OMNIROUTE_REQUIRED_FEATURES,
 } from "./commands.js";
 export { discoverInstalledRuntimes } from "./discovery.js";
+export { createAppServerClient } from "./app-server.js";
 export { createCodexEventNormalizer } from "./codex-events.js";
 export {
   createClaudeEventNormalizer,
@@ -37,6 +38,15 @@ export type {
   NormalizedRuntimePayloadMap,
   RedactedJsonValue,
 } from "./codex-events.js";
+export type {
+  AppServerClient,
+  AppServerClientOptions,
+  AppServerDiagnostic,
+  AppServerNotification,
+  AppServerRequest,
+  AppServerTransport,
+  JsonValue,
+} from "./app-server.js";
 export type {
   ClaudeEventNormalizer,
   ClaudeInvocationContext,
