@@ -9,6 +9,8 @@ export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
 export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
+export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
+export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
 export type LocalRuntimeId = 'codex' | 'claude' | 'omniroute'
 
@@ -106,7 +108,45 @@ export interface CodexMissionError {
  * approval channel -- there is no way for the runtime to stop mid-run and ask.
  * Per-action approval needs the experimental app-server protocol.
  */
-export type MissionMode = 'ask' | 'accept-edits'
+/**
+ * `ask` is read-only. `accept-edits` may write inside the workspace with no
+ * per-action prompt. `approve-each` runs on the app-server transport, where the
+ * runtime can stop and ask before every consequential action.
+ *
+ * These are three different bargains, not three intensities, so the composer
+ * states the consequence of each rather than only its name.
+ */
+export type MissionMode = 'ask' | 'accept-edits' | 'approve-each'
+
+/** What the runtime is asking permission to do. */
+export type MissionApprovalKind = 'command' | 'file-change' | 'question'
+
+export interface MissionApprovalRequest {
+  readonly approvalId: string
+  readonly runId: string
+  readonly missionId: string
+  readonly kind: MissionApprovalKind
+  /** One line naming the action, safe to show. */
+  readonly summary: string
+  /** The exact command or change, already bounded. Empty when there is none. */
+  readonly detail: string
+  /** Where it would happen. */
+  readonly cwd: string | null
+  readonly requestedAt: string
+}
+
+/**
+ * `approve-once` allows this action only. `approve-always` allows matching
+ * actions for the rest of the session. `deny` refuses it. There is deliberately
+ * no "always, forever" -- a durable grant is a Settings decision, not something
+ * to hand over mid-run under time pressure.
+ */
+export type MissionApprovalDecision = 'approve-once' | 'approve-always' | 'deny'
+
+export interface MissionApprovalAnswer {
+  readonly approvalId: string
+  readonly decision: MissionApprovalDecision
+}
 
 export interface CodexMissionStartRequest {
   readonly prompt: string
@@ -254,6 +294,9 @@ export interface DesktopApi {
   createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
   removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
+  /** Answer a pending approval. Unknown or already-answered ids are ignored. */
+  decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
+  onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>
   cancelCodexMission(request: CodexMissionCancelRequest): Promise<CodexMissionCancelResponse>
   onCodexMissionUpdate(listener: (update: CodexMissionUpdate) => void): () => void

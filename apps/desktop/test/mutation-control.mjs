@@ -1,4 +1,4 @@
-// Mutation control for the renderer's status derivations.
+// Mutation control for the renderer's status derivations and the approval layer.
 //
 // These functions decide whether the shell may call a runtime live, whether a
 // teammate reads as blocked, and whether a receipt prints `verified`. The
@@ -17,55 +17,99 @@ import { dirname, join } from 'node:path'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const STATUS = join(ROOT, 'src', 'renderer', 'src', 'status.ts')
+const APPROVALS = join(ROOT, 'src', 'main', 'app-server-mission.ts')
 
 const MUTATIONS = [
   {
+    file: STATUS,
     name: 'a stale ready flag alone is enough to call a runtime usable',
     from: '  return runtime.ready && runtime.status === \'ready\'',
     to: '  return runtime.ready',
     expect: 'never issues ACTIVE or READY for a runtime that is not ready'
   },
   {
+    file: STATUS,
     name: 'a ready probe alone is enough, ignoring the readiness flag',
     from: '  return runtime.ready && runtime.status === \'ready\'',
     to: '  return runtime.status === \'ready\'',
     expect: 'never issues ACTIVE or READY for a runtime that is not ready'
   },
   {
+    file: STATUS,
     name: 'a half-built adapter is advertised as ready',
     from: '      tag: \'PREVIEW\',',
     to: '      tag: \'READY\',',
     expect: 'never calls a half-built adapter live, even when its runtime is ready'
   },
   {
+    file: STATUS,
     name: 'a planned runtime becomes selectable',
     from: '      tag: \'PLANNED\',\n      selectable: false,',
     to: '      tag: \'PLANNED\',\n      selectable: true,',
     expect: 'keeps a planned runtime non-interactive whatever discovery says'
   },
   {
+    file: STATUS,
     name: 'every discovered runtime counts as connected',
     from: '  return runtimes.filter(runtimeIsUsable).length',
     to: '  return runtimes.length',
     expect: 'counts only usable runtimes as connected'
   },
   {
+    file: STATUS,
     name: 'a blocked runtime is hidden behind an optimistic running mission',
     from: '  if (input.runtime === undefined || !runtimeIsUsable(input.runtime)) {',
     to: '  if (false) {',
     expect: 'reports a blocked runtime even while a mission looks like it is running'
   },
   {
+    file: STATUS,
     name: 'a completed mission prints clean over an unreadable ledger',
     from: '  if (hasIntegrityIssues) {',
     to: '  if (false) {',
     expect: 'will not present a completed mission as clean when its ledger is not'
   },
   {
+    file: STATUS,
     name: 'the receipt says verified regardless of integrity issues',
     from: '  return integrityIssueCount === 0 ? \'verified\' : \'incomplete\'',
     to: '  return \'verified\'',
     expect: 'will not present a completed mission as clean when its ledger is not'
+  },
+  {
+    file: APPROVALS,
+    name: 'an unrecognized approval request is approved rather than refused',
+    from: "            return { decision: 'reject' }",
+    to: "            return { decision: 'accept' }",
+    expect: 'refuses a request it does not understand rather than guessing'
+  },
+  {
+    file: APPROVALS,
+    name: 'always-allow becomes a durable grant instead of a session one',
+    from: "  if (decision === 'approve-always') return 'acceptForSession'",
+    to: "  if (decision === 'approve-always') return 'acceptForever'",
+    expect: 'maps the product answers onto the protocol'
+  },
+  {
+    file: APPROVALS,
+    name: 'a dead runtime leaves approvals pending forever',
+    from: "        for (const [, pending] of approvals) pending.resolve({ decision: 'reject' })\n        approvals.clear()\n        active = undefined",
+    to: '        active = undefined',
+    expect: 'releases a pending approval when the runtime dies'
+  },
+  {
+    file: APPROVALS,
+    name: 'an already-answered approval can be answered again',
+    from: '      if (pending === undefined) return false',
+    to: '      if (pending === undefined) return true',
+    expect: 'ignores a decision for an unknown or already-answered approval'
+  },
+  {
+    file: APPROVALS,
+    name: 'an undescribed command is presented as an ordinary one',
+    from: "      summary: command.length > 0 ? 'Run a command' : 'Run a command it did not describe',",
+    to: "      summary: 'Run a command',",
+    expect: 'says so plainly when the runtime described nothing'
   }
 ]
 
@@ -99,7 +143,10 @@ function runSuite() {
   return { failed, unparseable, total: report.numTotalTests ?? 0 }
 }
 
-const original = readFileSync(STATUS, 'utf8')
+const originals = new Map([
+  [STATUS, readFileSync(STATUS, 'utf8')],
+  [APPROVALS, readFileSync(APPROVALS, 'utf8')]
+])
 let problems = 0
 
 try {
@@ -111,14 +158,16 @@ try {
   console.error(`baseline green (${baseline.total} tests)\n`)
 
   for (const mutation of MUTATIONS) {
+    const target = mutation.file
+    const original = originals.get(target)
     if (!original.includes(mutation.from)) {
       console.error(`  [SKIP] ${mutation.name} -- anchor not found`)
       problems += 1
       continue
     }
-    writeFileSync(STATUS, original.replace(mutation.from, mutation.to), 'utf8')
+    writeFileSync(target, original.replace(mutation.from, mutation.to), 'utf8')
     const result = runSuite()
-    writeFileSync(STATUS, original, 'utf8')
+    writeFileSync(target, original, 'utf8')
 
     if (result.unparseable || result.total !== baseline.total) {
       console.error(`  [INVALID] ${mutation.name} -- the file stopped running, so this red means nothing`)
@@ -133,7 +182,7 @@ try {
     )
   }
 } finally {
-  writeFileSync(STATUS, original, 'utf8')
+  for (const [file, text] of originals) writeFileSync(file, text, 'utf8')
   rmSync(REPORT, { force: true })
 }
 

@@ -59,7 +59,13 @@ async function session(run) {
     return await run({ client, root, notifications, approvals, diagnostics })
   } finally {
     client.dispose('smoke finished')
-    child.kill()
+    // app-server spawns its own children (a code-mode host), and killing only
+    // the parent leaves them running after the smoke exits. Take the tree.
+    try {
+      execFileSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore' })
+    } catch {
+      child.kill()
+    }
     await sleep(1_500)
     await rm(root, { recursive: true, force: true }).catch(() => undefined)
   }
