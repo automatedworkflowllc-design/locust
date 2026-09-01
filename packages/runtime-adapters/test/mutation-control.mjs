@@ -1,4 +1,4 @@
-// Mutation control for the app-server client.
+// Mutation control for the app-server client and its event normalizer.
 //
 // This client sits on an experimental protocol and handles the approval
 // channel, so its bounds and its request/response correlation are the parts
@@ -17,55 +17,106 @@ import { dirname, join } from 'node:path'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const CLIENT = join(ROOT, 'src', 'app-server.ts')
+const EVENTS = join(ROOT, 'src', 'app-server-events.ts')
 
 const MUTATIONS = [
   {
+    file: CLIENT,
     name: 'a server request is mistaken for a response',
     from: '    if (hasId && method === undefined) {',
     to: '    if (hasId) {',
     expect: 'does not confuse a server request with a response'
   },
   {
+    file: CLIENT,
     name: 'a handler failure leaves the server waiting forever',
     from: '          if (disposed) return\n          options.transport.send(\n            `${JSON.stringify({\n              jsonrpc: \'2.0\',\n              id: request.id,\n              error: { code: -32_000, message: \'The client could not answer this request.\' }\n            })}\\n`\n          )',
     to: '          void 0',
     expect: 'still answers when the handler throws'
   },
   {
+    file: CLIENT,
     name: 'the buffer grows without bound',
     from: '      if (Buffer.byteLength(buffer, \'utf8\') > maxBufferedBytes) {',
     to: '      if (false) {',
     expect: 'drops a buffer that grows without a newline rather than growing forever'
   },
   {
+    file: CLIENT,
     name: 'an oversized line is accepted',
     from: '    if (Buffer.byteLength(trimmed, \'utf8\') > maxLineBytes) {',
     to: '    if (false) {',
     expect: 'drops an oversized single line but keeps the connection usable'
   },
   {
+    file: CLIENT,
     name: 'requests are never timed out',
     from: '        const timer = setTimeout(() => {',
     to: '        const timer = setTimeout(() => { if (true) return;',
     expect: 'times out a request the server never answers'
   },
   {
+    file: CLIENT,
     name: 'the in-flight limit is not enforced',
     from: '      if (pending.size >= maxPending) {',
     to: '      if (false) {',
     expect: 'refuses to queue beyond its in-flight limit'
   },
   {
+    file: CLIENT,
     name: 'dispose leaves in-flight requests hanging',
     from: '      for (const id of [...pending.keys()]) {\n        settle(id, (entry) => entry.reject(new Error(reason)))\n      }',
     to: '      void 0',
     expect: 'fails every in-flight request on dispose instead of hanging'
   },
   {
+    file: CLIENT,
     name: 'an unexpected response is swallowed',
     from: "        diagnostic({ code: 'unknown-response', message: 'A response arrived for an unknown request.' })",
     to: '        void 0',
     expect: 'reports a response nobody asked for rather than dropping it silently'
+  },
+  {
+    file: EVENTS,
+    name: 'a completed agent message appends instead of replacing',
+    from: '          operation: "replace",',
+    to: '          operation: "append",',
+    expect: 'appends deltas and replaces on the completed item'
+  },
+  {
+    file: EVENTS,
+    name: 'a non-zero exit is not treated as a failure',
+    from: 'const failed = status === "failed" || status === "error" || (exitCode !== undefined && exitCode !== 0);',
+    to: 'const failed = status === "failed" || status === "error";',
+    expect: 'treats a non-zero exit as a failure even when the status says otherwise'
+  },
+  {
+    file: EVENTS,
+    name: 'a retryable error ends the run',
+    from: '          if (params.willRetry === true) {',
+    to: '          if (false) {',
+    expect: 'does not end the run on an error the provider intends to retry'
+  },
+  {
+    file: EVENTS,
+    name: 'comfortable usage is reported as a limit',
+    from: '  if (worst.used >= 90) {',
+    to: '  if (worst.used >= 0) {',
+    expect: 'says nothing while usage is comfortable'
+  },
+  {
+    file: EVENTS,
+    name: 'the same limit is announced on every push',
+    from: '          if (limit === undefined || announcedLimit) return [];',
+    to: '          if (limit === undefined) return [];',
+    expect: 'announces a limit once rather than on every push'
+  },
+  {
+    file: EVENTS,
+    name: 'a lost connection is reported as cancelled',
+    from: '      if (reason === "cancelled") {',
+    to: '      if (true) {',
+    expect: 'reports a lost connection as failed rather than completed'
   }
 ]
 
@@ -99,7 +150,10 @@ function runSuite() {
   return { failed, unparseable, total: report.numTotalTests ?? 0 }
 }
 
-const original = readFileSync(CLIENT, 'utf8')
+const originals = new Map([
+  [CLIENT, readFileSync(CLIENT, 'utf8')],
+  [EVENTS, readFileSync(EVENTS, 'utf8')]
+])
 let problems = 0
 
 try {
@@ -111,14 +165,16 @@ try {
   console.error(`baseline green (${baseline.total} tests)\n`)
 
   for (const mutation of MUTATIONS) {
+    const target = mutation.file
+    const original = originals.get(target)
     if (!original.includes(mutation.from)) {
       console.error(`  [SKIP] ${mutation.name} -- anchor not found`)
       problems += 1
       continue
     }
-    writeFileSync(CLIENT, original.replace(mutation.from, mutation.to), 'utf8')
+    writeFileSync(target, original.replace(mutation.from, mutation.to), 'utf8')
     const result = runSuite()
-    writeFileSync(CLIENT, original, 'utf8')
+    writeFileSync(target, original, 'utf8')
 
     if (result.unparseable || result.total !== baseline.total) {
       console.error(`  [INVALID] ${mutation.name} -- the file stopped running, so this red means nothing`)
@@ -133,7 +189,7 @@ try {
     )
   }
 } finally {
-  writeFileSync(CLIENT, original, 'utf8')
+  for (const [file, text] of originals) writeFileSync(file, text, 'utf8')
   rmSync(REPORT, { force: true })
 }
 

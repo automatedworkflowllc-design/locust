@@ -9,6 +9,12 @@ export {
 } from "./commands.js";
 export { discoverInstalledRuntimes } from "./discovery.js";
 export { createAppServerClient } from "./app-server.js";
+export {
+  createAppServerEventNormalizer,
+  limitFromSnapshot,
+  toolCommandOf,
+  toolNameOf,
+} from "./app-server-events.js";
 export { createCodexEventNormalizer } from "./codex-events.js";
 export {
   createClaudeEventNormalizer,
@@ -38,6 +44,10 @@ export type {
   NormalizedRuntimePayloadMap,
   RedactedJsonValue,
 } from "./codex-events.js";
+export type {
+  AppServerEventNormalizer,
+  AppServerInvocationContext,
+} from "./app-server-events.js";
 export type {
   AppServerClient,
   AppServerClientOptions,
