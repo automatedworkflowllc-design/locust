@@ -11,6 +11,7 @@ import type {
   MissionApprovalDecision,
   MissionApprovalRequest,
   MissionMode,
+  PublicModel,
   PublicTeammate,
   TeammateHue,
   TeammateRole
@@ -143,6 +144,8 @@ export default function App(): ReactElement {
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
+  const [models, setModels] = useState<readonly PublicModel[]>([])
+  const [effort, setEffort] = useState<string>()
   const [teammateError, setTeammateError] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
@@ -184,6 +187,17 @@ export default function App(): ReactElement {
       })
       .catch(() => {
         if (active) setRuntimeState({ phase: 'error' })
+      })
+
+    void bridge
+      .listModels()
+      .then((response) => {
+        if (!active || !response.ok) return
+        setModels(response.data.models)
+      })
+      .catch(() => {
+        // The catalog is optional: without it the picker offers the account
+        // default, which is what the process is launched with anyway.
       })
 
     void bridge
@@ -273,7 +287,15 @@ export default function App(): ReactElement {
     }
 
     try {
-      const response = await bridge.startCodexMission({ prompt, mode, runtime: route.runtime })
+      const response = await bridge.startCodexMission({
+        prompt,
+        mode,
+        runtime: route.runtime,
+        model: route.model,
+        // Only sent when the chosen model advertised it; the composer cannot
+        // offer an effort the catalog did not report for that model.
+        ...(effort === undefined ? {} : { effort })
+      })
       if (!response.ok) {
         activeRunIdRef.current = undefined
         setLiveRun({ prompt, phase: 'failed', events: [], error: response.error.message })
@@ -503,7 +525,15 @@ export default function App(): ReactElement {
             mode={mode}
             onModeChange={setMode}
             route={route}
-            onRouteChange={setRoute}
+            onRouteChange={(next) => {
+              setRoute(next)
+              // Effort belongs to a model. Carrying it across a model switch
+              // could send a level the new model never advertised.
+              setEffort(undefined)
+            }}
+            models={models}
+            effort={effort}
+            onEffortChange={setEffort}
             error={noRuntimeReady && runtimeState.phase === 'ready' ? undefined : undefined}
             onStart={startMission}
             onCancel={cancelMission}

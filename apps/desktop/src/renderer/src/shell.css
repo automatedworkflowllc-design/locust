@@ -2106,3 +2106,9 @@ textarea {
   color: var(--lc-text-muted);
   text-wrap: pretty;
 }
+
+.lc-menu--right {
+  left: auto;
+  right: 0;
+  width: 220px;
+}

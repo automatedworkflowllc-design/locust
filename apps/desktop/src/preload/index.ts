@@ -6,6 +6,7 @@ import {
   MISSION_APPROVAL_CHANNEL,
   MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
+  MODEL_CATALOG_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
@@ -22,6 +23,7 @@ import type {
   MissionApprovalAnswer,
   MissionApprovalRequest,
   MissionHistoryResponse,
+  ModelCatalogResponse,
   RuntimeDiscoveryResponse,
   TeammateCreateRequest,
   TeammateListResponse,
@@ -43,6 +45,8 @@ export type {
   MissionApprovalKind,
   MissionApprovalRequest,
   MissionMode,
+  ModelCatalogResponse,
+  PublicModel,
   PublicTeammate,
   TeammateCreateRequest,
   TeammateHue,
@@ -72,6 +76,7 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(CODEX_MISSION_START_CHANNEL, request) as Promise<CodexMissionStartResponse>,
   cancelCodexMission: (request: CodexMissionCancelRequest) =>
     ipcRenderer.invoke(CODEX_MISSION_CANCEL_CHANNEL, request) as Promise<CodexMissionCancelResponse>,
+  listModels: () => ipcRenderer.invoke(MODEL_CATALOG_CHANNEL) as Promise<ModelCatalogResponse>,
   decideMissionApproval: (answer: MissionApprovalAnswer) =>
     ipcRenderer.invoke(MISSION_APPROVAL_DECIDE_CHANNEL, answer) as Promise<{ readonly ok: boolean }>,
   onMissionApproval: (listener: (request: MissionApprovalRequest) => void) => {

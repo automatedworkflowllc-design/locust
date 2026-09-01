@@ -39,6 +39,7 @@ export interface CodexMissionService {
     prompt: unknown,
     runtime: MissionRuntimeId,
     mode: MissionMode,
+    route: { readonly model?: string; readonly effort?: string },
     emit: (update: CodexMissionUpdate) => void
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
@@ -259,8 +260,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       prompt: unknown,
       runtime: MissionRuntimeId,
       mode: MissionMode,
+      route: { readonly model?: string; readonly effort?: string },
       emit: (update: CodexMissionUpdate) => void
     ): Promise<CodexMissionStartResponse> {
+      // `account-default` is the shell's word for "send no --model", not a
+      // model id. Passing it through would make the CLI look for a model that
+      // does not exist.
+      const chosenModel =
+        route.model === undefined || route.model === 'account-default' ? undefined : route.model
       // Read-only unless the renderer explicitly asked for edits. The host
       // decides the sandbox from this one value; the renderer never passes a
       // sandbox string of its own.
@@ -353,7 +360,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             runId,
             prompt,
             runtime,
-            model: 'account-default',
+            model: chosenModel ?? 'account-default',
             requestedRouteId: routeId,
             resolvedRouteId,
             cliVersion: chosen.version?.version ?? null,
@@ -397,7 +404,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath })
             : createCodexExecCommand(chosen.executable, {
                 workspacePath: options.workspacePath,
-                sandbox: effectiveSandbox
+                sandbox: effectiveSandbox,
+                ...(chosenModel === undefined ? {} : { model: chosenModel })
               })
           process = options.runner.start(command, prompt, { signal: controller.signal })
         } catch {
@@ -436,7 +444,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             runId,
             missionId,
             runtime,
-            model: 'account-default',
+            model: chosenModel ?? 'account-default',
             resolvedRouteId,
             cliVersion: chosen.version?.version ?? null,
             sandbox: effectiveSandbox

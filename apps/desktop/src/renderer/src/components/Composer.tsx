@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
 
-import type { MissionMode, MissionRouteSummary, PublicRuntimeStatus } from '../../../shared/ipc.js'
+import type {
+  MissionMode,
+  MissionRouteSummary,
+  PublicModel,
+  PublicRuntimeStatus
+} from '../../../shared/ipc.js'
 import { runtimeIsUsable } from '../status.js'
 import { Icon } from './Icon.js'
 import { RoutePicker } from './RoutePicker.js'
@@ -40,6 +45,9 @@ export interface ComposerProps {
   readonly onModeChange: (mode: MissionMode) => void
   readonly route: RouteChoice
   readonly onRouteChange: (route: RouteChoice) => void
+  readonly models: readonly PublicModel[]
+  readonly effort: string | undefined
+  readonly onEffortChange: (effort: string | undefined) => void
   readonly onStart: (prompt: string) => Promise<boolean>
   readonly onCancel: () => void
   readonly onOpenRoutePicker: () => void
@@ -66,6 +74,9 @@ export function Composer({
   onModeChange,
   route,
   onRouteChange,
+  models,
+  effort,
+  onEffortChange,
   onStart,
   onCancel,
   onOpenRoutePicker
@@ -73,6 +84,7 @@ export function Composer({
   const [value, setValue] = useState('')
   const [modeOpen, setModeOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [effortOpen, setEffortOpen] = useState(false)
 
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   const selectedReady = selected !== undefined && runtimeIsUsable(selected)
@@ -114,6 +126,11 @@ export function Composer({
       keyEvent.currentTarget.form?.requestSubmit()
     }
   }
+
+  // Effort is offered ONLY where the chosen model says it is supported. The
+  // design's rule is that an unsupported effort must show as unsupported
+  // rather than be sent as a silent no-op.
+  const supportedEfforts = models.find((model) => model.id === route.model)?.supportedEfforts ?? []
 
   const runtimeLabel = selected?.displayName ?? (route.runtime === 'claude' ? 'Claude Code' : 'Codex CLI')
   const modelLabel = activeRoute?.model ?? route.model
@@ -207,6 +224,7 @@ export function Composer({
                 {pickerOpen && (
                   <RoutePicker
                     runtimes={runtimes}
+                    models={models}
                     active={route}
                     onSelect={onRouteChange}
                     onClose={() => setPickerOpen(false)}
@@ -229,14 +247,47 @@ export function Composer({
                   <span className="lc-control__mono">{modelLabel}</span>
                 </button>
               </span>
-              <button
-                type="button"
-                className="lc-control"
-                disabled
-                title="Effort routing arrives with the route layer, once a route reports whether it honors effort"
-              >
-                Balanced
-              </button>
+              <span className="lc-control__anchor">
+                {effortOpen && supportedEfforts.length > 0 && (
+                  <div className="lc-menu lc-menu--right" role="menu" aria-label="Reasoning effort">
+                    {supportedEfforts.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={effort === option}
+                        className="lc-menu__item"
+                        onClick={() => {
+                          onEffortChange(option)
+                          setEffortOpen(false)
+                        }}
+                      >
+                        <span className="lc-menu__text">
+                          <span className="lc-menu__name">{option}</span>
+                        </span>
+                        {effort === option && <Icon name="check" size={13} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="lc-control"
+                  aria-haspopup="menu"
+                  aria-expanded={effortOpen}
+                  disabled={running || supportedEfforts.length === 0}
+                  title={
+                    supportedEfforts.length === 0
+                      ? 'This route does not report reasoning effort, so none is sent.'
+                      : 'Reasoning effort'
+                  }
+                  onClick={() => setEffortOpen(!effortOpen)}
+                >
+                  <span className="lc-control__mono">
+                    {supportedEfforts.length === 0 ? 'no effort' : (effort ?? 'default')}
+                  </span>
+                </button>
+              </span>
             </div>
           </div>
         </form>

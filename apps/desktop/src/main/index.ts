@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService } from './app-server-mission.js'
+import { createModelCatalog } from './model-catalog.js'
 import { createTeammateStore } from './teammate-store.js'
 import { readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
@@ -25,6 +26,7 @@ import {
   MISSION_APPROVAL_CHANNEL,
   MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
+  MODEL_CATALOG_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
@@ -162,31 +164,41 @@ if (!ownsSingleInstanceLock) {
     // The approval transport. It only runs for the mode that asked for it, so
     // an experimental protocol failing cannot take the ordinary paths with it.
     let approvalWindow: BrowserWindow | undefined
+
+    // One definition of how an app-server process is started and stopped, used
+    // by both the mission transport and the model probe. Killing the TREE
+    // matters: app-server starts children that outlive their parent.
+    const spawnAppServer = (executablePath: string, args: readonly string[]) => {
+      const child = spawn(executablePath, [...args], { stdio: ['pipe', 'pipe', 'pipe'] })
+      return {
+        write: (line: string) => child.stdin.write(line),
+        kill: () => {
+          try {
+            if (process.platform === 'win32' && child.pid !== undefined) {
+              execFileSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore' })
+              return
+            }
+          } catch {
+            // Fall through to the ordinary signal.
+          }
+          child.kill()
+        },
+        onData: (listener: (chunk: string) => void) =>
+          child.stdout.on('data', (chunk: Buffer) => listener(String(chunk))),
+        onExit: (listener: () => void) => child.on('exit', () => listener())
+      }
+    }
+
+    const modelCatalog = createModelCatalog({
+      discover: discoverRuntimes,
+      spawn: spawnAppServer
+    })
+
     const appServerMissions = createAppServerMissionService({
       workspacePath: process.cwd(),
       ledger: missionLedger,
       discover: discoverRuntimes,
-      spawn: (executablePath, args) => {
-        const child = spawn(executablePath, [...args], { stdio: ['pipe', 'pipe', 'pipe'] })
-        return {
-          write: (line) => child.stdin.write(line),
-          // Take the tree: app-server starts its own children, and killing only
-          // the parent leaves them running after the mission ends.
-          kill: () => {
-            try {
-              if (process.platform === 'win32' && child.pid !== undefined) {
-                execFileSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore' })
-                return
-              }
-            } catch {
-              // Fall through to the ordinary signal.
-            }
-            child.kill()
-          },
-          onData: (listener) => child.stdout.on('data', (chunk: Buffer) => listener(String(chunk))),
-          onExit: (listener) => child.on('exit', () => listener())
-        }
-      },
+      spawn: spawnAppServer,
       emitApproval: (request) => {
         const target = approvalWindow
         if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
@@ -199,6 +211,13 @@ if (!ownsSingleInstanceLock) {
           target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, { kind: 'event', runId, missionId, event })
         }
       }
+    })
+
+    ipcMain.handle(MODEL_CATALOG_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Models could not be read.' } } as const
+      }
+      return modelCatalog.read()
     })
 
     ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL, (event, answer: unknown) => {
@@ -358,12 +377,20 @@ if (!ownsSingleInstanceLock) {
         }
       }
 
+      const model = typeof payload.model === 'string' ? payload.model : undefined
+      const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       try {
-        return await codexMissions.start(prompt, runtime, mode, (update: CodexMissionUpdate) => {
-          if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
-            owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
+        return await codexMissions.start(
+          prompt,
+          runtime,
+          mode,
+          { ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) },
+          (update: CodexMissionUpdate) => {
+            if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
+              owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
+            }
           }
-        })
+        )
       } catch {
         return {
           ok: false,

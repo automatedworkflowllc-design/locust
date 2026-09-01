@@ -9,6 +9,7 @@ export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
 export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
+export const MODEL_CATALOG_CHANNEL = 'models:list'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
@@ -118,6 +119,22 @@ export interface CodexMissionError {
  */
 export type MissionMode = 'ask' | 'accept-edits' | 'approve-each'
 
+/**
+ * A model the active runtime actually reports, with the reasoning efforts IT
+ * supports. Effort is per model -- offering one a model cannot honour would be
+ * a silent no-op, which the design explicitly forbids.
+ */
+export interface PublicModel {
+  readonly id: string
+  readonly displayName: string
+  readonly description: string
+  readonly supportedEfforts: readonly string[]
+}
+
+export type ModelCatalogResponse =
+  | { readonly ok: true; readonly data: { readonly models: readonly PublicModel[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'MODELS_UNAVAILABLE'; readonly message: string } }
+
 /** What the runtime is asking permission to do. */
 export type MissionApprovalKind = 'command' | 'file-change' | 'question'
 
@@ -152,6 +169,10 @@ export interface CodexMissionStartRequest {
   readonly prompt: string
   readonly mode?: MissionMode
   readonly runtime?: MissionRuntimeId
+  /** A model id from the catalog, or omitted for the account default. */
+  readonly model?: string
+  /** Only meaningful when the chosen model reports supporting it. */
+  readonly effort?: string
 }
 
 /**
@@ -178,9 +199,7 @@ export interface MissionRouteSummary {
  * that Claude can own a run: narrowing it here would make a real Claude start
  * a type error instead of a supported route.
  */
-export interface CodexMissionStartData extends MissionRouteSummary {
-  readonly model: 'account-default'
-}
+export interface CodexMissionStartData extends MissionRouteSummary {}
 
 export type CodexMissionStartResponse =
   | { readonly ok: true; readonly data: CodexMissionStartData }
@@ -295,6 +314,7 @@ export interface DesktopApi {
   removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */
+  listModels(): Promise<ModelCatalogResponse>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>

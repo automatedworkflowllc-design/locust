@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
-import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
+import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { routeRowStatus } from '../status.js'
 import type { IntegrationLevel, RouteTag } from '../status.js'
 
@@ -30,44 +30,64 @@ const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
 }
 
 /**
- * Every row is built from discovery. There are no invented models: Codex is
- * started without `--model`, so the one route it truly has is its account
- * default, and calling it `gpt-5-codex` here would be the shell asserting
- * something it never sent. When a model picker is real, these rows grow from
- * the same source rather than from a list typed into this file.
+ * Rows come from discovery, and models come from the runtime's own catalog.
+ * There are still no invented entries: when the catalog cannot be read the row
+ * is the account default, which is exactly what the process is launched with.
  */
 function buildRows(
   runtimes: readonly PublicRuntimeStatus[],
+  models: readonly PublicModel[],
   active: RouteChoice
 ): readonly RouteRow[] {
   const rows: RouteRow[] = []
   for (const runtime of runtimes) {
     if (runtime.id === 'omniroute') continue
     const integration = INTEGRATION[runtime.id] ?? 'planned'
-    const model = 'account-default'
-    const isActive = runtime.id === active.runtime && model === active.model
-    const status = routeRowStatus(runtime, integration, isActive)
-    rows.push({
-      key: `${runtime.id}:${model}`,
-      group: `${runtime.displayName} · your account`,
-      runtime: runtime.id as MissionRuntimeId,
-      model,
-      label: model,
-      detail: status.detail,
-      tag: status.tag,
-      selectable: status.selectable
-    })
+    const status = routeRowStatus(runtime, integration, false)
+    const group = `${runtime.displayName} · your account`
+
+    // The catalog is read from Codex's own app-server, so it describes that
+    // runtime only. Offering its models under Claude would be a claim nothing
+    // has checked.
+    const forRuntime = runtime.id === 'codex' ? models : []
+    const entries =
+      forRuntime.length > 0
+        ? forRuntime.map((model) => ({
+            model: model.id,
+            label: model.displayName,
+            detail:
+              model.supportedEfforts.length > 0
+                ? `${model.supportedEfforts.length} effort levels · ${model.supportedEfforts.join(', ')}`
+                : 'no effort levels reported'
+          }))
+        : [{ model: 'account-default', label: 'account-default', detail: status.detail }]
+
+    for (const entry of entries) {
+      const isActive = runtime.id === active.runtime && entry.model === active.model
+      rows.push({
+        key: `${runtime.id}:${entry.model}`,
+        group,
+        runtime: runtime.id as MissionRuntimeId,
+        model: entry.model,
+        label: entry.label,
+        detail: entry.detail,
+        tag: isActive ? 'ACTIVE' : status.tag,
+        selectable: status.selectable
+      })
+    }
   }
   return rows
 }
 
 export function RoutePicker({
   runtimes,
+  models,
   active,
   onSelect,
   onClose
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
+  readonly models: readonly PublicModel[]
   readonly active: RouteChoice
   readonly onSelect: (choice: RouteChoice) => void
   readonly onClose: () => void
@@ -79,7 +99,7 @@ export function RoutePicker({
     inputRef.current?.focus()
   }, [])
 
-  const rows = useMemo(() => buildRows(runtimes, active), [runtimes, active])
+  const rows = useMemo(() => buildRows(runtimes, models, active), [runtimes, models, active])
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return rows
