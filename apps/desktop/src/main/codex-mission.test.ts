@@ -830,3 +830,161 @@ describe('model selection', () => {
     expect(start.mock.calls[0]?.[0]?.args).not.toContain('--model')
   })
 })
+
+describe('mid-mission handoff', () => {
+  function checkpoint(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 1,
+      missionId: 'mission_2',
+      runId: 'run_1',
+      epoch: 3,
+      reason: 'route-switch',
+      reconciledThroughSequence: 9,
+      settledActions: [],
+      unsettledActions: [],
+      resumeSafety: 'safe',
+      safetyReason: 'Nothing was in flight.',
+      transcriptDigest: 'digest',
+      assistantSummary: 'Renamed the parser module.',
+      createdAt: NOW,
+      ...overrides
+    } as Awaited<ReturnType<MissionLedger['createCheckpoint']>>
+  }
+
+  function handoffClaudeRuntime(): RuntimeDiscovery {
+    return {
+      ...codexRuntime(),
+      id: 'claude',
+      displayName: 'Claude Code',
+      executable: {
+        commandName: 'claude',
+        discoveredPath: process.platform === 'win32' ? 'C:\\tools\\claude.exe' : '/tools/claude',
+        executablePath: process.platform === 'win32' ? 'C:\\tools\\claude.exe' : '/tools/claude',
+        prefixArgs: [],
+        kind: 'native'
+      }
+    }
+  }
+
+  function liveService(
+    ledger: MissionLedger,
+    runtimes: RuntimeDiscovery[] = [codexRuntime(), handoffClaudeRuntime()]
+  ) {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed', usage: { output_tokens: 1 } }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => runtimes,
+      runner: { start },
+      ledger,
+      createId: (() => { let n = 0; return () => String(++n) })(),
+      now: () => new Date(NOW),
+      schedule: (task) => { setImmediate(task) }
+    })
+    return { start, service }
+  }
+
+  it('starts a NEW mission that records what it continues from', async () => {
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
+    const { service, start } = liveService(fakeLedger({ createMission, createCheckpoint }))
+
+    await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
+    const response = await service.handOff('run_1', 'claude', 'ask', {}, () => undefined)
+
+    expect(response).toMatchObject({
+      ok: true,
+      data: {
+        runtime: 'claude',
+        continuesFrom: { missionId: 'mission_2', checkpointEpoch: 3 },
+        resumeSafety: 'safe'
+      }
+    })
+    // A mission records ONE runtime, so the continuation is a separate mission
+    // pointing back at the checkpoint -- not the first mission mutated.
+    expect(createMission).toHaveBeenCalledTimes(2)
+    expect(createMission.mock.calls[1]?.[0]).toMatchObject({
+      runtime: 'claude',
+      continuesFrom: { missionId: 'mission_2', checkpointEpoch: 3, reason: 'route-switch' }
+    })
+    expect(createMission.mock.calls[0]?.[0].continuesFrom).toBeUndefined()
+    // The new runtime is launched with the briefing, not the bare original.
+    expect(start.mock.calls[1]?.[1]).toContain('Refactor the parser.')
+    expect(start.mock.calls[1]?.[1]).toContain('Renamed the parser module.')
+  })
+
+  it('reconciles only after the stopped run has settled', async () => {
+    const order: string[] = []
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => {
+      order.push('checkpoint')
+      return checkpoint()
+    })
+    const appendEvents = vi.fn<MissionLedger['appendEvents']>(async () => {
+      order.push('append')
+    })
+    const { service } = liveService(fakeLedger({ createCheckpoint, appendEvents }))
+
+    await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
+    await service.handOff('run_1', 'claude', 'ask', {}, () => undefined)
+
+    // Checkpointing a still-draining mission would report actions as unsettled
+    // that were about to report back, and the briefing would then tell the next
+    // runtime to re-verify work that had already finished.
+    expect(order.indexOf('append')).toBeGreaterThanOrEqual(0)
+    expect(order.indexOf('checkpoint')).toBeGreaterThan(order.indexOf('append'))
+  })
+
+  it('refuses a handoff to the runtime already running it, without stopping anything', async () => {
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
+    const { service } = liveService(fakeLedger({ createCheckpoint }))
+
+    await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
+    const response = await service.handOff('run_1', 'codex', 'ask', {}, () => undefined)
+
+    expect(response).toMatchObject({ ok: false, error: { code: 'HANDOFF_REFUSED' } })
+    expect(response.ok === false && response.error.message).toContain('Nothing was changed')
+    // Stopping a run to restart it on the same route costs progress and buys
+    // nothing, so the run must still be running.
+    expect(createCheckpoint).not.toHaveBeenCalled()
+  })
+
+  it('refuses when the ledger cannot be reconciled, and says the run is stopped', async () => {
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () =>
+      checkpoint({ resumeSafety: 'unsafe', safetyReason: 'The ledger stops at sequence 4.' })
+    )
+    const { service } = liveService(fakeLedger({ createCheckpoint }))
+
+    await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
+    const response = await service.handOff('run_1', 'claude', 'ask', {}, () => undefined)
+
+    expect(response).toMatchObject({ ok: false, error: { code: 'HANDOFF_REFUSED' } })
+    // The stop is real and cannot be undone, so the message must not imply the
+    // mission is still running.
+    expect(response.ok === false && response.error.message).toContain('was stopped')
+    expect(response.ok === false && response.error.message).toContain('The ledger stops at sequence 4.')
+  })
+
+  it('says both things when the stop worked and the new run did not start', async () => {
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
+    // Claude is discovered but signed out, so the continuation cannot launch.
+    const notReady: RuntimeDiscovery = { ...handoffClaudeRuntime(), readiness: 'authentication-required' }
+    const { service } = liveService(fakeLedger({ createCheckpoint }), [codexRuntime(), notReady])
+
+    await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
+    const response = await service.handOff('run_1', 'claude', 'ask', {}, () => undefined)
+
+    expect(response.ok).toBe(false)
+    expect(response.ok === false && response.error.message).toContain('was stopped for the handoff')
+    expect(response.ok === false && response.error.message).toContain('not ready')
+  })
+
+  it('refuses when there is no active run to hand off', async () => {
+    const { service } = liveService(fakeLedger())
+
+    const response = await service.handOff('run_nope', 'claude', 'ask', {}, () => undefined)
+
+    expect(response).toMatchObject({ ok: false, error: { code: 'RUN_NOT_ACTIVE' } })
+  })
+})

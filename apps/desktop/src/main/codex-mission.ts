@@ -20,8 +20,11 @@ import type {
   CodexMissionCancelResponse,
   CodexMissionStartResponse,
   CodexMissionUpdate,
+  MissionHandoffResponse,
   MissionMode
 } from '../shared/ipc.js'
+import type { MissionContinuation } from '@teammate/mission-store'
+import { composeHandoffPrompt } from './handoff.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 
@@ -32,6 +35,13 @@ interface ActiveCodexMission {
   readonly normalizer: CodexEventNormalizer | ClaudeEventNormalizer
   readonly process: RuntimeProcessRun
   readonly emit: (update: CodexMissionUpdate) => void
+  /**
+   * Kept so a handoff can brief the next runtime. The ledger holds this too,
+   * but re-reading the file to find out what the user asked for would make a
+   * switch depend on a disk read that can fail after the run is already gone.
+   */
+  readonly prompt: string
+  readonly runtime: MissionRuntimeId
 }
 
 export interface CodexMissionService {
@@ -40,9 +50,22 @@ export interface CodexMissionService {
     runtime: MissionRuntimeId,
     mode: MissionMode,
     route: { readonly model?: string; readonly effort?: string },
-    emit: (update: CodexMissionUpdate) => void
+    emit: (update: CodexMissionUpdate) => void,
+    /**
+     * Only `handOff` supplies this. It is not reachable from the renderer: the
+     * start channel builds its own argument list and has no field for it, so a
+     * mission cannot claim to continue another just by asking.
+     */
+    continuation?: MissionContinuation
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
+  handOff(
+    runId: unknown,
+    runtime: MissionRuntimeId,
+    mode: MissionMode,
+    route: { readonly model?: string; readonly effort?: string },
+    emit: (update: CodexMissionUpdate) => void
+  ): Promise<MissionHandoffResponse>
   interrupt(): void
   dispose(): Promise<void>
 }
@@ -58,9 +81,9 @@ interface CodexMissionServiceOptions {
 }
 
 function error(
-  code: 'INVALID_PROMPT' | 'RUN_ALREADY_ACTIVE' | 'CODEX_UNAVAILABLE' | 'RUNTIME_START_FAILED' | 'PERSISTENCE_FAILED' | 'RUN_NOT_ACTIVE',
+  code: 'INVALID_PROMPT' | 'RUN_ALREADY_ACTIVE' | 'CODEX_UNAVAILABLE' | 'RUNTIME_START_FAILED' | 'PERSISTENCE_FAILED' | 'RUN_NOT_ACTIVE' | 'HANDOFF_REFUSED',
   message: string
-): CodexMissionStartResponse | CodexMissionCancelResponse {
+): CodexMissionStartResponse | CodexMissionCancelResponse | MissionHandoffResponse {
   return { ok: false, error: { code, message } }
 }
 
@@ -255,13 +278,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     })
   }
 
-  return {
+  const service: CodexMissionService = {
     async start(
       prompt: unknown,
       runtime: MissionRuntimeId,
       mode: MissionMode,
       route: { readonly model?: string; readonly effort?: string },
-      emit: (update: CodexMissionUpdate) => void
+      emit: (update: CodexMissionUpdate) => void,
+      continuation?: MissionContinuation
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -367,7 +391,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             workspaceId,
             sandbox: effectiveSandbox,
             executionPolicyVersion: 1,
-            createdAt
+            createdAt,
+            ...(continuation === undefined ? {} : { continuesFrom: continuation })
           })
         } catch {
           return error(
@@ -433,7 +458,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           controller,
           normalizer,
           process,
-          emit
+          emit,
+          prompt,
+          runtime
         }
         active = mission
         scheduleConsume(mission)
@@ -474,6 +501,99 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       }
     },
 
+    async handOff(
+      runId: unknown,
+      runtime: MissionRuntimeId,
+      mode: MissionMode,
+      route: { readonly model?: string; readonly effort?: string },
+      emit: (update: CodexMissionUpdate) => void
+    ): Promise<MissionHandoffResponse> {
+      if (!validRunId(runId) || active === undefined || active.runId !== runId) {
+        return error(
+          'RUN_NOT_ACTIVE',
+          'That mission is no longer active, so there is nothing to hand off.'
+        ) as MissionHandoffResponse
+      }
+      const previous = active
+      // Refuse a handoff to the runtime already running it. Stopping a run to
+      // restart it on the same route would cost the user their progress and
+      // buy nothing, and it is much more likely to be a misclick than a wish.
+      if (previous.runtime === runtime) {
+        return error(
+          'HANDOFF_REFUSED',
+          'That mission is already on this runtime. Nothing was changed.'
+        ) as MissionHandoffResponse
+      }
+
+      const fromMissionId = previous.missionId
+      const fromRuntime = previous.runtime === 'claude' ? 'Claude Code' : 'Codex'
+      const originalPrompt = previous.prompt
+
+      // Stop the run, then WAIT for its own records to settle before
+      // reconciling. Checkpointing a still-draining mission would race the
+      // consume loop and report actions as unsettled that were about to
+      // report back -- the checkpoint would be pessimistic, and the briefing
+      // would tell the next runtime to re-verify work that had finished.
+      previous.controller.abort()
+      await Promise.allSettled([...consumeOperations])
+
+      let checkpoint
+      try {
+        checkpoint = await options.ledger.createCheckpoint(fromMissionId, 'route-switch')
+      } catch {
+        return error(
+          'HANDOFF_REFUSED',
+          'The mission was stopped, but it could not be reconciled, so nothing was handed off.'
+        ) as MissionHandoffResponse
+      }
+
+      // `unsafe` means the ledger itself is damaged: the checkpoint was not
+      // even written. A briefing built from a record that cannot be trusted
+      // would carry that damage into a fresh run under a confident heading.
+      if (checkpoint.resumeSafety === 'unsafe') {
+        return error(
+          'HANDOFF_REFUSED',
+          `The mission was stopped, but it could not be handed off safely: ${checkpoint.safetyReason}`
+        ) as MissionHandoffResponse
+      }
+
+      const briefing = composeHandoffPrompt(originalPrompt, checkpoint, fromRuntime)
+      if (briefing === undefined) {
+        return error(
+          'HANDOFF_REFUSED',
+          'The mission was stopped, but its original request is too long to carry to another runtime.'
+        ) as MissionHandoffResponse
+      }
+
+      const started = await service.start(briefing.prompt, runtime, mode, route, emit, {
+        missionId: fromMissionId,
+        checkpointEpoch: checkpoint.epoch,
+        reason: 'route-switch'
+      })
+      if (!started.ok) {
+        // Pass the start failure through unchanged but keep the stop visible:
+        // the user asked for a switch and now has neither run.
+        return {
+          ok: false,
+          error: {
+            code: started.error.code,
+            message: `The mission was stopped for the handoff, but the new run did not start. ${started.error.message}`
+          }
+        }
+      }
+
+      return {
+        ok: true,
+        data: {
+          ...started.data,
+          continuesFrom: { missionId: fromMissionId, checkpointEpoch: checkpoint.epoch },
+          resumeSafety: checkpoint.resumeSafety,
+          omittedBriefing: briefing.omitted,
+          unsettledCount: checkpoint.unsettledActions.length
+        }
+      }
+    },
+
     interrupt(): void {
       lifecycleVersion += 1
       startingToken = undefined
@@ -505,4 +625,6 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       }
     }
   }
+
+  return service
 }

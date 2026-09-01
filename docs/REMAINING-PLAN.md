@@ -23,9 +23,16 @@ label over a guess.
 **P5b — Idle teammate. DONE 2026-09-01.** The design's capability-led empty state, shown when a
 teammate has no active mission. Small, and it is the state a user sees most.
 
-**P5c — Handoff divider.** Needs mid-mission route switching, which needs the
-reconciled checkpoint to be the thing a switch resumes from. The checkpoint
-exists; the switch does not.
+**P5c — Handoff divider. DONE 2026-09-01.** Mid-mission route switching, resumed from
+the reconciled checkpoint. A mission records ONE runtime and its events must
+agree with it, so a switch is genuinely two missions: the first is stopped and
+reconciled (`createCheckpoint(id, 'route-switch')`), the second starts with
+`continuesFrom` (ledger schema v4) and a briefing that lists the unsettled
+actions first. Every refusal after the stop says the mission is stopped. The
+thread shows the person's original words once, the first run's events, the
+divider, then the second run. Live-verified Codex → Claude Code; the divider's
+"N actions never reported back" branch was never produced live (every real
+switch stopped clean) and is covered by unit tests only.
 
 **P5d — Peer threads.** `collabAgentToolCall` carries `senderThreadId` and
 `receiverThreadIds`, so the protocol supports it. Last because it needs the

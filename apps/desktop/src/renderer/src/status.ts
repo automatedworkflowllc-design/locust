@@ -191,3 +191,35 @@ export function shortMissionId(missionId: string): string {
 export function checkpointLabel(epoch: number): string {
   return `ck_${epoch}`
 }
+
+/**
+ * Whether the route control can hand the running mission to another runtime.
+ *
+ * A handoff is addressed by runId, and there is a real window -- between the
+ * user submitting and the host's receipt coming back -- where a mission is
+ * visibly running but has no id yet. A control offered in that window looks
+ * available and silently does nothing, which is the exact failure this shell
+ * refuses everywhere else. So the state is named, and the control says why.
+ *
+ * `switching` is a handoff already in flight: a second one would race the
+ * first, and the first is irreversible.
+ */
+export type HandoffAvailability = 'idle' | 'starting' | 'available' | 'switching'
+
+export function handoffAvailability(
+  running: boolean,
+  hasRunId: boolean,
+  switching: boolean
+): HandoffAvailability {
+  if (switching) return 'switching'
+  if (!running) return 'idle'
+  return hasRunId ? 'available' : 'starting'
+}
+
+/** What the route control says about itself. `undefined` where a title adds nothing. */
+export function handoffTitle(availability: HandoffAvailability): string | undefined {
+  if (availability === 'available') return 'Hand this mission to another runtime'
+  if (availability === 'starting') return 'Waiting for the mission to start before it can be handed over'
+  if (availability === 'switching') return 'Handing this mission over'
+  return undefined
+}

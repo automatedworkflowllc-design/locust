@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type {
   MissionApprovalDecision,
@@ -14,6 +14,63 @@ import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
 import { AgentAvatar, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
+import { HandoffDivider } from './HandoffDivider.js'
+import type { ThreadItem } from '../missionView.js'
+
+/**
+ * One transcript's worth of items. Extracted so a handed-off mission can render
+ * TWO of them -- what the first runtime did, the divider, then what the second
+ * one did -- without either half being re-derived differently from the other.
+ */
+function ThreadItems({ items }: { readonly items: readonly ThreadItem[] }): ReactElement {
+  return (
+    <>
+      {items.map((item) => {
+        if (item.type === 'agent-message') {
+          return (
+            <div className="lc-agentline" key={item.key}>
+              <AgentAvatar />
+              <p>
+                {item.text}
+                {item.streaming && <span className="lc-caret" />}
+              </p>
+            </div>
+          )
+        }
+        if (item.type === 'plan') {
+          return <PlanCard key={item.key} steps={item.steps} doneCount={item.doneCount} />
+        }
+        if (item.type === 'activity') {
+          return <ActivityCard key={item.key} summary={item.summary} details={item.details} />
+        }
+        if (item.type === 'live-step') {
+          return (
+            <LiveStepCard
+              key={item.key}
+              label={item.label}
+              detail={item.detail}
+              startedAt={item.startedAt}
+            />
+          )
+        }
+        if (item.type === 'limit') {
+          return (
+            <div className="lc-card is-red" key={item.key}>
+              <div className="lc-card__head">
+                <span>
+                  {item.kind === 'quota-exhausted' ? 'Usage limit reached' : 'Provider rate limit'}
+                </span>
+                <span className="lc-tag is-red">{item.kind}</span>
+              </div>
+              <div className="lc-card__body">{item.message}</div>
+            </div>
+          )
+        }
+        return <DiagnosticLine key={item.key} level={item.level} message={item.message} />
+      })}
+    </>
+  )
+}
 
 function ActivityCard({
   summary,
@@ -114,6 +171,22 @@ export interface ThreadProps {
   readonly decidingIds: readonly string[]
   /** True once the run has been stopped by the user. */
   readonly cancelled: boolean
+  /**
+   * Set when this run continues one that was stopped for a route switch. The
+   * prior run's events are rendered above the divider so the transcript reads
+   * as one piece of work, while the divider keeps the two runtimes' authorship
+   * distinguishable -- which the durable record insists on.
+   */
+  readonly handoff:
+    | {
+        readonly from: MissionRuntimeId
+        readonly to: MissionRuntimeId
+        readonly at: string | undefined
+        readonly unsettledCount: number
+        readonly omittedBriefing: readonly string[]
+        readonly priorEvents: readonly NormalizedRuntimeEvent[]
+      }
+    | undefined
 }
 
 export function Thread({
@@ -128,7 +201,8 @@ export function Thread({
   approvals,
   onDecide,
   decidingIds,
-  cancelled
+  cancelled,
+  handoff
 }: ThreadProps): ReactElement {
   const items = buildThread(events, { running })
   // Planned-step count comes from the last plan the provider sent, so
@@ -154,51 +228,27 @@ export function Thread({
           </div>
         )}
 
+        {/*
+          The user's own words, once. A handed-off run is launched with a
+          machine-written briefing instead, and drawing THAT as a user bubble
+          would attribute to the person something they never said.
+        */}
         <div className="lc-bubble">{prompt}</div>
 
-        {items.map((item) => {
-          if (item.type === 'agent-message') {
-            return (
-              <div className="lc-agentline" key={item.key}>
-                <AgentAvatar />
-                <p>
-                  {item.text}
-                  {item.streaming && <span className="lc-caret" />}
-                </p>
-              </div>
-            )
-          }
-          if (item.type === 'plan') {
-            return <PlanCard key={item.key} steps={item.steps} doneCount={item.doneCount} />
-          }
-          if (item.type === 'activity') {
-            return <ActivityCard key={item.key} summary={item.summary} details={item.details} />
-          }
-          if (item.type === 'live-step') {
-            return (
-              <LiveStepCard
-                key={item.key}
-                label={item.label}
-                detail={item.detail}
-                startedAt={item.startedAt}
-              />
-            )
-          }
-          if (item.type === 'limit') {
-            return (
-              <div className="lc-card is-red" key={item.key}>
-                <div className="lc-card__head">
-                  <span>
-                    {item.kind === 'quota-exhausted' ? 'Usage limit reached' : 'Provider rate limit'}
-                  </span>
-                  <span className="lc-tag is-red">{item.kind}</span>
-                </div>
-                <div className="lc-card__body">{item.message}</div>
-              </div>
-            )
-          }
-          return <DiagnosticLine key={item.key} level={item.level} message={item.message} />
-        })}
+        {handoff !== undefined && (
+          <>
+            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} />
+            <HandoffDivider
+              from={handoff.from}
+              to={handoff.to}
+              at={handoff.at}
+              unsettledCount={handoff.unsettledCount}
+              omittedBriefing={handoff.omittedBriefing}
+            />
+          </>
+        )}
+
+        <ThreadItems items={items} />
 
         {/*
           Approvals sit at the END of the thread, after everything that has

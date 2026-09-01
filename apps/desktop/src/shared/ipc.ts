@@ -3,6 +3,7 @@ import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime
 export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
 export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
 export const CODEX_MISSION_CANCEL_CHANNEL = 'codex-mission:cancel'
+export const MISSION_HANDOFF_CHANNEL = 'mission:hand-off'
 export const CODEX_MISSION_UPDATE_CHANNEL = 'codex-mission:update'
 export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
@@ -96,6 +97,13 @@ export type CodexMissionErrorCode =
   | 'PERSISTENCE_FAILED'
   | 'RUN_NOT_ACTIVE'
   | 'INTERNAL_ERROR'
+  /**
+   * The run was stopped for a handoff, and the handoff could not proceed. The
+   * stop is NOT undone -- nothing here can restart a killed process -- so this
+   * error always describes a mission that is now stopped, and the message says
+   * so rather than implying the user can simply try again.
+   */
+  | 'HANDOFF_REFUSED'
 
 export interface CodexMissionError {
   readonly code: CodexMissionErrorCode
@@ -220,6 +228,50 @@ export interface CodexMissionCancelRequest {
   readonly runId: string
 }
 
+/**
+ * Move work from one runtime to another mid-mission.
+ *
+ * This is deliberately NOT modelled as "the same mission changes runtime". A
+ * mission records ONE runtime and every event must agree with it, so a switch
+ * produces a NEW mission that continues from a checkpoint of the old one --
+ * which is also what actually happened: two runs, with a reconciliation
+ * between them.
+ */
+export interface MissionHandoffRequest {
+  readonly runId: string
+  readonly runtime: MissionRuntimeId
+  readonly mode: MissionMode
+  readonly model?: string
+  readonly effort?: string
+}
+
+export interface MissionHandoffData extends MissionRouteSummary {
+  /** The mission this one continues, and the checkpoint it resumed from. */
+  readonly continuesFrom: {
+    readonly missionId: string
+    readonly checkpointEpoch: number
+  }
+  /**
+   * How much the briefing could promise the new runtime. `safe` means nothing
+   * was in flight when the old run stopped; `approval-required` means some
+   * actions started and never reported back, and the new run has been told to
+   * verify them before building on them.
+   */
+  readonly resumeSafety: 'safe' | 'approval-required'
+  /** Sections of the briefing dropped to fit the prompt bound, if any. */
+  readonly omittedBriefing: readonly string[]
+  /**
+   * How many actions had started and not reported back when the old run
+   * stopped. The divider states this rather than a reassuring summary: it is
+   * the number the person needs to decide whether to trust what follows.
+   */
+  readonly unsettledCount: number
+}
+
+export type MissionHandoffResponse =
+  | { readonly ok: true; readonly data: MissionHandoffData }
+  | { readonly ok: false; readonly error: CodexMissionError }
+
 export type CodexMissionCancelResponse =
   | {
       readonly ok: true
@@ -332,5 +384,6 @@ export interface DesktopApi {
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>
   cancelCodexMission(request: CodexMissionCancelRequest): Promise<CodexMissionCancelResponse>
+  handOffMission(request: MissionHandoffRequest): Promise<MissionHandoffResponse>
   onCodexMissionUpdate(listener: (update: CodexMissionUpdate) => void): () => void
 }

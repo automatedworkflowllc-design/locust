@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 3 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 4 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -33,14 +33,21 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 3 as const
  * literal 'read-only' to include 'workspace-write': a v2 reader must not be
  * handed a mission that was allowed to write, because it would render the
  * run's permissions as read-only and be wrong about what happened.
+ *
+ * v3 -> v4 adds `continuesFrom`. A handoff to a different runtime cannot be the
+ * same mission: a mission records ONE runtime, and every event must agree with
+ * it. So a handoff is a NEW mission that continues from a checkpoint of the
+ * previous one -- which is also the truthful record, since two runs really did
+ * happen. An older reader shown a v4 file would drop that link and present the
+ * continuation as an unrelated mission.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3
+  return value === 1 || value === 2 || value === 3 || value === 4
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -86,6 +93,18 @@ export interface MissionLedgerMetadata {
   readonly sandbox: MissionSandbox
   readonly executionPolicyVersion: 1
   readonly createdAt: string
+  /**
+   * Set when this mission continues another after a route switch. Points at the
+   * checkpoint it resumed from, so the pair can be shown as one piece of work
+   * without pretending they were one run.
+   */
+  readonly continuesFrom?: MissionContinuation
+}
+
+export interface MissionContinuation {
+  readonly missionId: string
+  readonly checkpointEpoch: number
+  readonly reason: 'route-switch'
 }
 
 export type MissionHostFailureCode = 'runtime-start-failed' | 'runtime-transport-failed'
@@ -248,6 +267,16 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
     throw new Error('Mission execution policy is invalid')
   }
   requireTimestamp(metadata.createdAt, 'createdAt')
+  if (metadata.continuesFrom !== undefined) {
+    requireSafeId(metadata.continuesFrom.missionId, 'continuesFrom.missionId')
+    if (
+      !Number.isSafeInteger(metadata.continuesFrom.checkpointEpoch)
+      || metadata.continuesFrom.checkpointEpoch < 1
+      || metadata.continuesFrom.reason !== 'route-switch'
+    ) {
+      throw new Error('Mission continuation is invalid')
+    }
+  }
   return metadata
 }
 
@@ -299,6 +328,10 @@ function parsedMetadata(
   // Versions before 3 could only ever record a read-only mission, so a file
   // claiming otherwise was hand-edited and is refused rather than believed.
   if (schemaVersion < 3 && candidate.sandbox !== 'read-only') {
+    return undefined
+  }
+  // Same rule for continuation: no writer before v4 could produce one.
+  if (schemaVersion < 4 && candidate.continuesFrom !== undefined) {
     return undefined
   }
   if (

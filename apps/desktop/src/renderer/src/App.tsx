@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type {
   CodexMissionUpdate,
@@ -61,6 +61,19 @@ interface LiveRunState {
   readonly errorIsPersistence?: boolean
   readonly restored?: boolean
   readonly restoredMission?: PublicRecoveredMission
+  /**
+   * What this run continues, when it was started by a route switch. Held in
+   * renderer state rather than re-read from the ledger because the thread has
+   * to show the seam the moment it happens, not after a history refresh.
+   */
+  readonly handoff?: {
+    readonly from: MissionRuntimeId
+    readonly to: MissionRuntimeId
+    readonly at: string | undefined
+    readonly unsettledCount: number
+    readonly omittedBriefing: readonly string[]
+    readonly priorEvents: readonly NormalizedRuntimeEvent[]
+  }
 }
 
 type RuntimeDiscoveryState =
@@ -165,8 +178,19 @@ export default function App(): ReactElement {
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
   const [teammateError, setTeammateError] = useState<string>()
+  const [handingOff, setHandingOff] = useState(false)
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
+  /**
+   * The live run as of the LAST render, for handlers that run after an await.
+   * A handoff is decided inside an async callback, and reading `liveRun` from
+   * that callback's closure can hand it the value from whichever render
+   * created the callback -- which, for a control that opens a menu and waits
+   * for a click, is often the render before the mission even had a runId.
+   * Mirroring into a ref is the same shape `activeRunIdRef` already uses.
+   */
+  const liveRunRef = useRef<LiveRunState | undefined>(undefined)
+  liveRunRef.current = liveRun
 
   useEffect(() => {
     let active = true
@@ -353,6 +377,93 @@ export default function App(): ReactElement {
       activeRunIdRef.current = undefined
       setLiveRun({ prompt, phase: 'failed', events: [], error: 'The mission could not be started.' })
       return false
+    }
+  }
+
+  /**
+   * Move a running mission to another runtime.
+   *
+   * The host stops the current run, reconciles it, and starts a NEW mission
+   * briefed from that checkpoint -- so what comes back is a different runId and
+   * missionId, and the renderer has to carry the old run's events forward
+   * itself if the thread is to keep reading as one piece of work.
+   *
+   * Everything about a refusal is surfaced verbatim, because every refusal path
+   * in the host describes a mission that is now STOPPED. Swallowing one would
+   * leave a dead run looking live.
+   */
+  const handOffMission = async (choice: RouteChoice): Promise<void> => {
+    const bridge = window.desktop
+    const current = liveRunRef.current
+    const runId = current?.data?.runId
+    if (!bridge || current === undefined || runId === undefined || !liveRunIsActive(current)) return
+
+    const from = current.data?.runtime ?? route.runtime
+    const priorEvents = current.events
+    setHandingOff(true)
+    setLiveRun((existing) =>
+      existing?.data?.runId === runId ? { ...existing, phase: 'cancelling', error: undefined } : existing
+    )
+    // The new run cannot inherit questions asked of the old one.
+    setApprovals([])
+    setDecidingIds([])
+
+    try {
+      const response = await bridge.handOffMission({
+        runId,
+        runtime: choice.runtime,
+        mode,
+        model: choice.model,
+        ...(swarmEffortFor(models, choice.model, swarm, effort) === undefined
+          ? {}
+          : { effort: swarmEffortFor(models, choice.model, swarm, effort)! })
+      })
+
+      if (!response.ok) {
+        activeRunIdRef.current = undefined
+        // Failed, not cancelled: the mission is over and the reason has to be
+        // the thing on screen.
+        setLiveRun((existing) =>
+          existing?.data?.runId === runId
+            ? { ...existing, phase: 'failed', error: response.error.message }
+            : existing
+        )
+        return
+      }
+
+      activeRunIdRef.current = response.data.runId
+      setRoute(choice)
+      const queued = pendingUpdatesRef.current.get(response.data.runId) ?? []
+      pendingUpdatesRef.current.delete(response.data.runId)
+      setLiveRun((existing) => {
+        let next: LiveRunState = {
+          // The ORIGINAL words, not the generated briefing: the person never
+          // typed the briefing, so it must not appear as something they said.
+          prompt: existing?.prompt ?? current.prompt,
+          data: response.data,
+          phase: 'running',
+          events: [],
+          handoff: {
+            from,
+            to: response.data.runtime,
+            at: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+            unsettledCount: response.data.unsettledCount,
+            omittedBriefing: response.data.omittedBriefing,
+            priorEvents
+          }
+        }
+        for (const update of queued) next = applyMissionUpdate(next, update)
+        return next
+      })
+    } catch {
+      activeRunIdRef.current = undefined
+      setLiveRun((existing) =>
+        existing?.data?.runId === runId
+          ? { ...existing, phase: 'failed', error: 'The handoff request could not be delivered.' }
+          : existing
+      )
+    } finally {
+      setHandingOff(false)
     }
   }
 
@@ -546,6 +657,7 @@ export default function App(): ReactElement {
                 onDecide={decideApproval}
                 decidingIds={decidingIds}
                 cancelled={liveRun.phase === 'cancelled'}
+                handoff={liveRun.handoff}
                 startedAt={
                   liveRun.restoredMission === undefined
                     ? undefined
@@ -591,6 +703,8 @@ export default function App(): ReactElement {
             onStart={startMission}
             onCancel={cancelMission}
             onOpenRoutePicker={() => undefined}
+            onHandOff={(choice) => { void handOffMission(choice) }}
+            handingOff={handingOff}
           />
           )}
         </main>

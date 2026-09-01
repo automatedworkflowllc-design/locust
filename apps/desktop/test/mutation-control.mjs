@@ -18,6 +18,8 @@ import { dirname, join } from 'node:path'
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const STATUS = join(ROOT, 'src', 'renderer', 'src', 'status.ts')
 const APPROVALS = join(ROOT, 'src', 'main', 'app-server-mission.ts')
+const HANDOFF = join(ROOT, 'src', 'main', 'handoff.ts')
+const MISSIONS = join(ROOT, 'src', 'main', 'codex-mission.ts')
 
 const MUTATIONS = [
   {
@@ -110,6 +112,97 @@ const MUTATIONS = [
     from: "      summary: command.length > 0 ? 'Run a command' : 'Run a command it did not describe',",
     to: "      summary: 'Run a command',",
     expect: 'says so plainly when the runtime described nothing'
+  },
+  {
+    file: STATUS,
+    name: 'the control offers a handoff before the mission has a runId',
+    from: "  return hasRunId ? 'available' : 'starting'",
+    to: "  return 'available'",
+    expect: 'offers a handoff only once the mission has a runId to address'
+  },
+  {
+    file: STATUS,
+    name: 'a second switch may race one already in flight',
+    from: "  if (switching) return 'switching'",
+    to: '',
+    expect: 'refuses a second switch while one is in flight'
+  },
+  {
+    file: STATUS,
+    name: 'a finished mission still offers a handoff',
+    from: "  if (!running) return 'idle'",
+    to: '',
+    expect: 'offers nothing when no mission is running'
+  },
+  {
+    file: STATUS,
+    name: 'a control that cannot do its job stays silent about why',
+    from: "  if (availability === 'starting') return 'Waiting for the mission to start before it can be handed over'",
+    to: '',
+    expect: 'says why whenever the control cannot do its job'
+  },
+  {
+    file: HANDOFF,
+    name: 'the briefing tells the next runtime an unsettled action is done',
+    from: "        'These actions STARTED and never reported back. Whether each took effect is unknown. '",
+    to: "        'These actions were completed. '",
+    expect: 'tells the new runtime to verify actions that never reported back'
+  },
+  {
+    file: HANDOFF,
+    name: 'the optional sections are ordered by size rather than by risk',
+    from: '  return sections\n}',
+    to: '  return sections.slice(0, 1).concat(sections.slice(1).reverse())\n}',
+    expect: 'separates what finished from what did not'
+  },
+  {
+    file: HANDOFF,
+    name: 'the reserve is too small for the notice it has to hold',
+    from: 'export const NOTICE_BUDGET = 120',
+    to: 'export const NOTICE_BUDGET = 40',
+    expect: 'reserves room for the longest notice every optional section could produce'
+  },
+  {
+    file: HANDOFF,
+    name: 'the omission notice is dropped, so a trimmed brief reads as complete',
+    from: '    : `${kept.join(\'\\n\\n\')}\\n\\n${omissionNotice(omitted)}`',
+    to: '    : kept.join(\'\\n\\n\')',
+    expect: 'says so when detail was left out, rather than reading as complete'
+  },
+  {
+    file: HANDOFF,
+    name: 'the notice budget is reserved only after the first drop',
+    from: '  const budget = MAX_HANDOFF_PROMPT_LENGTH - (sections.length > 1 ? NOTICE_BUDGET : 0)',
+    to: '  const budget = MAX_HANDOFF_PROMPT_LENGTH',
+    expect: 'reserves enough room for the longest possible omission notice'
+  },
+  {
+    file: MISSIONS,
+    name: 'the checkpoint is taken before the stopped run has settled',
+    from: '      previous.controller.abort()\n      await Promise.allSettled([...consumeOperations])',
+    to: '      previous.controller.abort()',
+    expect: 'reconciles only after the stopped run has settled'
+  },
+  {
+    file: MISSIONS,
+    name: 'a handoff to the same runtime restarts the run instead of refusing',
+    from: '      if (previous.runtime === runtime) {',
+    to: '      if (false) {',
+    expect: 'refuses a handoff to the runtime already running it, without stopping anything'
+  },
+  {
+    file: MISSIONS,
+    name: 'an unreconcilable ledger is handed off anyway',
+    from: "      if (checkpoint.resumeSafety === 'unsafe') {",
+    to: '      if (false) {',
+    expect: 'refuses when the ledger cannot be reconciled, and says the run is stopped'
+  },
+  {
+    file: MISSIONS,
+    name: 'the continuation is not recorded, so the new mission looks unrelated',
+    from: '            ...(continuation === undefined ? {} : { continuesFrom: continuation })',
+    to: '            ...{}',
+    expect: 'starts a NEW mission that records what it continues from'
   }
 ]
 
@@ -145,7 +238,9 @@ function runSuite() {
 
 const originals = new Map([
   [STATUS, readFileSync(STATUS, 'utf8')],
-  [APPROVALS, readFileSync(APPROVALS, 'utf8')]
+  [APPROVALS, readFileSync(APPROVALS, 'utf8')],
+  [HANDOFF, readFileSync(HANDOFF, 'utf8')],
+  [MISSIONS, readFileSync(MISSIONS, 'utf8')]
 ])
 let problems = 0
 

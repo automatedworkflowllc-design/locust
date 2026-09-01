@@ -100,6 +100,27 @@ const MUTATIONS = [
     expect: 'accepts a Claude mission and its Claude events'
   },
   {
+    name: 'a pre-v4 file may claim to continue another mission',
+    file: INDEX,
+    from: "  if (schemaVersion < 4 && candidate.continuesFrom !== undefined) {\n    return undefined\n  }\n",
+    to: '',
+    expect: 'refuses a pre-v4 file claiming to continue another mission'
+  },
+  {
+    name: 'a continuation may name any mission id, traversal included',
+    file: INDEX,
+    from: "    requireSafeId(metadata.continuesFrom.missionId, 'continuesFrom.missionId')",
+    to: '',
+    expect: 'refuses a continuation that names an unsafe mission id'
+  },
+  {
+    name: 'a continuation may point at a checkpoint epoch that never existed',
+    file: INDEX,
+    from: '      || metadata.continuesFrom.checkpointEpoch < 1',
+    to: '      || metadata.continuesFrom.checkpointEpoch < 0',
+    expect: 'refuses a continuation with an impossible checkpoint epoch'
+  },
+  {
     name: 'a version-1 file may describe a runtime version 1 could not write',
     file: INDEX,
     from: '  if (schemaVersion === 1 && (candidate.runtime !== \'codex\' || candidate.model !== \'account-default\')) {\n    return undefined\n  }\n',

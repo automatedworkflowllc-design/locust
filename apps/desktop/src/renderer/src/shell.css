@@ -2217,3 +2217,87 @@ textarea {
   opacity: 0.5;
   cursor: default;
 }
+
+/*
+  The handoff seam.
+
+  Drawn as a rule with a label rather than as a card on purpose: a card would
+  read as another thing an agent produced, when this is a boundary BETWEEN two
+  agents' work. The rule runs the full column width so the eye reads everything
+  above it as one runtime's doing and everything below it as another's.
+*/
+.lc-handoff {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas: 'rule body rule2';
+  align-items: center;
+  gap: var(--lc-space-5);
+  margin: var(--lc-space-3) 0;
+}
+
+.lc-handoff__rule {
+  height: 1px;
+  background: var(--lc-border-hairline);
+}
+
+.lc-handoff__rule--start {
+  grid-area: rule;
+}
+
+.lc-handoff__rule--end {
+  grid-area: rule2;
+}
+
+.lc-handoff__body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--lc-space-2);
+  max-width: 46ch;
+  text-align: center;
+}
+
+.lc-handoff__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-label);
+}
+
+/* The receiving runtime is where the reader's attention should land. */
+.lc-handoff__to {
+  color: var(--lc-text-primary);
+}
+
+.lc-handoff__arrow {
+  color: var(--lc-text-label);
+}
+
+.lc-handoff__note {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}
+
+.lc-handoff__time {
+  color: var(--lc-text-label);
+}
+
+/*
+  Stated above the rows, because the picker looks identical whether it is
+  choosing the next mission's route or moving a live run to another runtime --
+  and only one of those stops something.
+*/
+.lc-picker__notice {
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-bottom: 1px solid var(--lc-border-card);
+  background: var(--lc-amber-tint);
+  color: var(--lc-amber-text);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}

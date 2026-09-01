@@ -84,13 +84,20 @@ export function RoutePicker({
   models,
   active,
   onSelect,
-  onClose
+  onClose,
+  notice
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly models: readonly PublicModel[]
   readonly active: RouteChoice
   readonly onSelect: (choice: RouteChoice) => void
   readonly onClose: () => void
+  /**
+   * Shown above the rows when picking has a consequence beyond the next
+   * mission. The picker looks identical whether it is choosing a route or
+   * moving a live run, so the difference has to be stated, not implied.
+   */
+  readonly notice?: string
 }): ReactElement {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -129,6 +136,7 @@ export function RoutePicker({
           autoComplete="off"
         />
       </div>
+      {notice !== undefined && <div className="lc-picker__notice">{notice}</div>}
       <div className="lc-picker__list">
         {shown.map((row) => {
           const header = row.group === lastGroup ? undefined : row.group

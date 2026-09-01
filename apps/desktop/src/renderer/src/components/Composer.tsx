@@ -7,7 +7,7 @@ import type {
   PublicModel,
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
-import { runtimeIsUsable } from '../status.js'
+import { handoffAvailability, handoffTitle, runtimeIsUsable } from '../status.js'
 import mark from '../assets/locust-mark.svg'
 import { Icon } from './Icon.js'
 import { RoutePicker } from './RoutePicker.js'
@@ -54,6 +54,15 @@ export interface ComposerProps {
   readonly onStart: (prompt: string) => Promise<boolean>
   readonly onCancel: () => void
   readonly onOpenRoutePicker: () => void
+  /**
+   * Move the RUNNING mission to another route. Distinct from `onRouteChange`,
+   * which only decides what the next mission starts on: this one stops the
+   * current run, reconciles it, and starts a briefed continuation. Two very
+   * different consequences, so they are two different callbacks rather than one
+   * that quietly means something else while a run is live.
+   */
+  readonly onHandOff: (route: RouteChoice) => void
+  readonly handingOff: boolean
 }
 
 /**
@@ -84,7 +93,9 @@ export function Composer({
   onSwarmChange,
   onStart,
   onCancel,
-  onOpenRoutePicker
+  onOpenRoutePicker,
+  onHandOff,
+  handingOff
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
   const [modeOpen, setModeOpen] = useState(false)
@@ -144,6 +155,14 @@ export function Composer({
 
   const runtimeLabel = selected?.displayName ?? (route.runtime === 'claude' ? 'Claude Code' : 'Codex CLI')
   const modelLabel = activeRoute?.model ?? route.model
+  // What the RUNNING mission is actually on, which is not always what the
+  // composer's next-run route says. A handoff has to be measured against the
+  // live run, or picking "the same" route would still stop it.
+  const handoff = handoffAvailability(running, activeRoute !== undefined, handingOff)
+  const activeChoice: RouteChoice =
+    activeRoute === undefined
+      ? route
+      : { runtime: activeRoute.runtime, model: activeRoute.model }
 
   return (
     <div className="lc-composer">
@@ -235,19 +254,42 @@ export function Composer({
                   <RoutePicker
                     runtimes={runtimes}
                     models={models}
-                    active={route}
-                    onSelect={onRouteChange}
+                    active={running ? activeChoice : route}
+                    onSelect={(choice) => {
+                      setPickerOpen(false)
+                      if (handoff !== 'available') {
+                        onRouteChange(choice)
+                        return
+                      }
+                      // Picking the route the run is already on would stop it
+                      // and buy nothing, so it is not an action here.
+                      if (choice.runtime === activeChoice.runtime) return
+                      onHandOff(choice)
+                    }}
                     onClose={() => setPickerOpen(false)}
+                    {...(handoff === 'available'
+                      ? {
+                          notice:
+                            'This mission is running. Choosing another runtime stops it, writes a checkpoint, and hands the work over — it cannot be undone.'
+                        }
+                      : {})}
                   />
                 )}
+                {/*
+                  A running mission CAN change route now: the host stops it,
+                  reconciles it, and briefs a continuation. Only an in-flight
+                  handoff locks this control, because a second switch would
+                  race the first.
+                */}
                 <button
                   type="button"
                   className="lc-control"
+                  title={handoffTitle(handoff)}
                   onClick={() => {
                     onOpenRoutePicker()
                     setPickerOpen(!pickerOpen)
                   }}
-                  disabled={running}
+                  disabled={handoff === 'starting' || handoff === 'switching'}
                   aria-haspopup="listbox"
                   aria-expanded={pickerOpen}
                 >

@@ -25,6 +25,7 @@ import {
   CODEX_MISSION_UPDATE_CHANNEL,
   MISSION_APPROVAL_CHANNEL,
   MISSION_APPROVAL_DECIDE_CHANNEL,
+  MISSION_HANDOFF_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
@@ -37,7 +38,8 @@ import {
 import type {
   CodexMissionCancelRequest,
   CodexMissionStartRequest,
-  CodexMissionUpdate
+  CodexMissionUpdate,
+  MissionHandoffRequest
 } from '../shared/ipc.js'
 
 const probeRunner = createNodeProbeRunner()
@@ -438,6 +440,42 @@ if (!ownsSingleInstanceLock) {
         ? (request as Partial<CodexMissionCancelRequest>).runId
         : undefined
       return codexMissions.cancel(runId)
+    })
+
+    ipcMain.handle(MISSION_HANDOFF_CHANNEL, async (event, request: unknown) => {
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
+        return {
+          ok: false,
+          error: { code: 'INTERNAL_ERROR', message: 'The handoff request was rejected.' }
+        } as const
+      }
+      const payload = (typeof request === 'object' && request !== null ? request : {}) as Partial<MissionHandoffRequest>
+      // Same widening rules as a start: an unrecognized mode is read-only and
+      // an unrecognized runtime is Codex. A handoff must not become the way a
+      // malformed request buys itself write access.
+      const mode = payload.mode === 'accept-edits' ? 'accept-edits' : 'ask'
+      const runtime = payload.runtime === 'claude' ? 'claude' : 'codex'
+      const model = typeof payload.model === 'string' ? payload.model : undefined
+      const effort = typeof payload.effort === 'string' ? payload.effort : undefined
+      try {
+        return await codexMissions.handOff(
+          payload.runId,
+          runtime,
+          mode,
+          { ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) },
+          (update: CodexMissionUpdate) => {
+            if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
+              owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
+            }
+          }
+        )
+      } catch {
+        return {
+          ok: false,
+          error: { code: 'INTERNAL_ERROR', message: 'The mission could not be handed off.' }
+        } as const
+      }
     })
 
     const windowFromValidSender = (event: Electron.IpcMainEvent): BrowserWindow | undefined => {

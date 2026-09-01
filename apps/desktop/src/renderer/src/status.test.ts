@@ -4,6 +4,8 @@ import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import {
   checkpointLabel,
   connectedRuntimeCount,
+  handoffAvailability,
+  handoffTitle,
   ledgerVerificationLabel,
   missionPhaseView,
   routeRowStatus,
@@ -163,5 +165,36 @@ describe('provenance formatting', () => {
     expect(runtimeIsUsable(runtime())).toBe(true)
     expect(runtimeIsUsable(runtime({ ready: false }))).toBe(false)
     expect(runtimeIsUsable(runtime({ status: 'probe-failed' }))).toBe(false)
+  })
+})
+
+describe('handoff availability', () => {
+  it('offers a handoff only once the mission has a runId to address', () => {
+    // The window between submitting and the host's receipt is real, and a
+    // control offered in it silently does nothing when clicked.
+    expect(handoffAvailability(true, false, false)).toBe('starting')
+    expect(handoffAvailability(true, true, false)).toBe('available')
+  })
+
+  it('offers nothing when no mission is running', () => {
+    expect(handoffAvailability(false, false, false)).toBe('idle')
+    // A stale runId from a finished mission must not make the control live.
+    expect(handoffAvailability(false, true, false)).toBe('idle')
+  })
+
+  it('refuses a second switch while one is in flight', () => {
+    // A handoff cannot be undone, so racing two of them would leave the user
+    // with runs they never asked for.
+    expect(handoffAvailability(true, true, true)).toBe('switching')
+    expect(handoffAvailability(false, false, true)).toBe('switching')
+  })
+
+  it('says why whenever the control cannot do its job', () => {
+    // Silence on a disabled control is the failure being prevented here.
+    expect(handoffTitle('starting')).toMatch(/waiting/i)
+    expect(handoffTitle('switching')).toMatch(/handing/i)
+    expect(handoffTitle('available')).toMatch(/hand this mission/i)
+    // Idle needs no explanation: the control is doing its ordinary job.
+    expect(handoffTitle('idle')).toBeUndefined()
   })
 })
