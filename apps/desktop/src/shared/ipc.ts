@@ -97,8 +97,20 @@ export interface CodexMissionError {
   readonly message: string
 }
 
+/**
+ * How much a mission may touch. `ask` is read-only: the agent inspects and
+ * explains, and the OS sandbox refuses every write. `accept-edits` lets it edit
+ * files inside the workspace folder the host chose, and nowhere else.
+ *
+ * Consent is given here, at the start, because `codex exec` has no interactive
+ * approval channel -- there is no way for the runtime to stop mid-run and ask.
+ * Per-action approval needs the experimental app-server protocol.
+ */
+export type MissionMode = 'ask' | 'accept-edits'
+
 export interface CodexMissionStartRequest {
   readonly prompt: string
+  readonly mode?: MissionMode
 }
 
 /**
@@ -113,6 +125,11 @@ export interface MissionRouteSummary {
   readonly model: string
   readonly resolvedRouteId: string
   readonly cliVersion: string | null
+  /**
+   * What the run was actually allowed to do. Carried here so the UI states the
+   * real posture of THIS run rather than whatever mode the composer shows now.
+   */
+  readonly sandbox: 'read-only' | 'workspace-write'
 }
 
 /** A Codex start is always Codex on the account default; the narrowing is real. */
@@ -202,6 +219,7 @@ export interface PublicRecoveredMission {
   readonly eventsTruncated: boolean
   readonly hostFailureMessage?: string
   readonly integrityIssueCount: number
+  readonly sandbox: 'read-only' | 'workspace-write'
   readonly checkpoints: readonly PublicMissionCheckpoint[]
 }
 

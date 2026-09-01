@@ -129,7 +129,7 @@ describe('Codex mission service', () => {
     }))
     const updates: CodexMissionUpdate[] = []
 
-    const response = await service.start('Inspect the workspace without changing it.', (update) => {
+    const response = await service.start('Inspect the workspace without changing it.', 'ask', (update) => {
       updates.push(update)
     })
     expect(response).toMatchObject({
@@ -180,7 +180,7 @@ describe('Codex mission service', () => {
       ledger: fakeLedger()
     })
 
-    await expect(service.start('   ', () => undefined)).resolves.toMatchObject({
+    await expect(service.start('   ', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'INVALID_PROMPT' }
     })
@@ -197,7 +197,7 @@ describe('Codex mission service', () => {
     })
     const { service } = scheduledService({ start }, ledger)
 
-    await expect(service.start('Do safe work.', () => undefined)).resolves.toEqual({
+    await expect(service.start('Do safe work.', 'ask', () => undefined)).resolves.toEqual({
       ok: false,
       error: {
         code: 'PERSISTENCE_FAILED',
@@ -216,7 +216,7 @@ describe('Codex mission service', () => {
       ledger: fakeLedger()
     })
 
-    await expect(service.start('Do safe work.', () => undefined)).resolves.toEqual({
+    await expect(service.start('Do safe work.', 'ask', () => undefined)).resolves.toEqual({
       ok: false,
       error: {
         code: 'CODEX_UNAVAILABLE',
@@ -239,7 +239,7 @@ describe('Codex mission service', () => {
       ledger: fakeLedger()
     })
 
-    const response = service.start('Do safe work.', () => undefined)
+    const response = service.start('Do safe work.', 'ask', () => undefined)
     service.dispose()
     finishDiscovery([codexRuntime()])
 
@@ -281,9 +281,9 @@ describe('Codex mission service', () => {
     }) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start })
     const updates: CodexMissionUpdate[] = []
-    const first = await service.start('Wait safely.', (update) => updates.push(update))
+    const first = await service.start('Wait safely.', 'ask', (update) => updates.push(update))
     expect(first.ok).toBe(true)
-    await expect(service.start('A second run.', () => undefined)).resolves.toMatchObject({
+    await expect(service.start('A second run.', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUN_ALREADY_ACTIVE' }
     })
@@ -308,7 +308,7 @@ describe('Codex mission service', () => {
     }
     const { service, scheduled } = scheduledService({ start: () => process })
     const updates: CodexMissionUpdate[] = []
-    await service.start('Safe prompt.', (update) => updates.push(update))
+    await service.start('Safe prompt.', 'ask', (update) => updates.push(update))
     scheduled[0]?.()
 
     await vi.waitFor(() => expect(updates).toHaveLength(1))
@@ -353,7 +353,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     })
     const { service, scheduled } = scheduledService({ start }, ledger)
     const updates: CodexMissionUpdate[] = []
-    const response = await service.start('Persist safely.', (update) => {
+    const response = await service.start('Persist safely.', 'ask', (update) => {
       timeline.push(update.kind === 'event' ? `emit:${update.event.type}` : `emit:${update.kind}`)
       updates.push(update)
     })
@@ -367,7 +367,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     expect(timeline).toEqual(['append:run.started', 'emit:run.started', 'emit:persistence-error'])
     expect(updates.filter((update) => update.kind === 'persistence-error')).toHaveLength(1)
     // The service is free again as soon as the renderer hears about the failure.
-    await expect(service.start('Try again.', () => undefined)).resolves.toMatchObject({ ok: true })
+    await expect(service.start('Try again.', 'ask', () => undefined)).resolves.toMatchObject({ ok: true })
   })
 
   it('records host launch failures durably and reports a persistence failure when even that write fails', async () => {
@@ -376,7 +376,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     }) satisfies RuntimeProcessRunner['start']
     const appendHostFailure = vi.fn<MissionLedger['appendHostFailure']>(async () => undefined)
     const { service } = scheduledService({ start: failingStart }, fakeLedger({ appendHostFailure }))
-    await expect(service.start('Do safe work.', () => undefined)).resolves.toMatchObject({
+    await expect(service.start('Do safe work.', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUNTIME_START_FAILED' }
     })
@@ -389,7 +389,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
         throw new Error('disk full')
       }
     }))
-    await expect(doomed.start('Do safe work.', () => undefined)).resolves.toMatchObject({
+    await expect(doomed.start('Do safe work.', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'PERSISTENCE_FAILED' }
     })
@@ -403,7 +403,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     const appendHostFailure = vi.fn<MissionLedger['appendHostFailure']>(async () => undefined)
     const { service, scheduled } = scheduledService({ start: () => brokenProcess() }, fakeLedger({ appendHostFailure }))
     const updates: CodexMissionUpdate[] = []
-    await service.start('Safe prompt.', (update) => updates.push(update))
+    await service.start('Safe prompt.', 'ask', (update) => updates.push(update))
     scheduled[0]?.()
     await vi.waitFor(() => expect(updates).toHaveLength(1))
     expect(updates[0]).toMatchObject({ kind: 'transport-error' })
@@ -417,7 +417,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       }
     }))
     const doomedUpdates: CodexMissionUpdate[] = []
-    await doomed.start('Safe prompt.', (update) => doomedUpdates.push(update))
+    await doomed.start('Safe prompt.', 'ask', (update) => doomedUpdates.push(update))
     doomedScheduled[0]?.()
     await vi.waitFor(() => expect(doomedUpdates).toHaveLength(1))
     expect(doomedUpdates[0]).toMatchObject({ kind: 'persistence-error' })
@@ -440,8 +440,8 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       schedule: () => undefined
     })
 
-    const first = service.start('First mission.', () => undefined)
-    await expect(service.start('Second mission.', () => undefined)).resolves.toMatchObject({
+    const first = service.start('First mission.', 'ask', () => undefined)
+    await expect(service.start('Second mission.', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUN_ALREADY_ACTIVE' }
     })
@@ -470,13 +470,13 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     }) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start })
     const updates: CodexMissionUpdate[] = []
-    await service.start('Wait safely.', (update) => updates.push(update))
+    await service.start('Wait safely.', 'ask', (update) => updates.push(update))
     scheduled[0]?.()
 
     await service.dispose()
     // dispose resolved only after consume settled, so the terminal receipt is already emitted.
     expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.cancelled')).toBe(true)
-    await expect(service.start('After shutdown.', () => undefined)).resolves.toMatchObject({
+    await expect(service.start('After shutdown.', 'ask', () => undefined)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUNTIME_START_FAILED' }
     })
@@ -485,7 +485,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       start: () => ({ records: records([]), completion: Promise.resolve(completion()) })
     })
     reusable.interrupt()
-    await expect(reusable.start('After interrupt.', () => undefined)).resolves.toMatchObject({ ok: true })
+    await expect(reusable.start('After interrupt.', 'ask', () => undefined)).resolves.toMatchObject({ ok: true })
   })
   it('checkpoints the mission it cut short, after that run has finished settling', async () => {
     const calls: Array<[string, string]> = []
@@ -508,7 +508,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     }) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start }, ledger)
     const updates: CodexMissionUpdate[] = []
-    await service.start('Wait safely.', (update) => updates.push(update))
+    await service.start('Wait safely.', 'ask', (update) => updates.push(update))
     scheduled[0]?.()
 
     // The real sequence: the window closes, the run settles and the service
@@ -565,11 +565,70 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       }
     }) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start }, ledger)
-    await service.start('Wait safely.', () => undefined)
+    await service.start('Wait safely.', 'ask', () => undefined)
     scheduled[0]?.()
     service.interrupt()
 
     // A bookkeeping write must never be able to hang or crash shutdown.
     await expect(service.dispose()).resolves.toBeUndefined()
+  })
+})
+
+describe('mission sandbox', () => {
+  function specFor(mode: 'ask' | 'accept-edits') {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'thread.started', thread_id: 't' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    return { start, service: scheduledService({ start }).service }
+  }
+
+  it('runs read-only when the mode is ask', async () => {
+    const { start, service } = specFor('ask')
+    await service.start('Look around.', 'ask', () => undefined)
+    expect(start.mock.calls[0]?.[0]?.args).toEqual(
+      expect.arrayContaining(['--sandbox', 'read-only'])
+    )
+    expect(start.mock.calls[0]?.[0]?.args).not.toContain('workspace-write')
+  })
+
+  it('runs workspace-write only when edits were explicitly accepted', async () => {
+    const { start, service } = specFor('accept-edits')
+    const response = await service.start('Fix the typo.', 'accept-edits', () => undefined)
+    expect(start.mock.calls[0]?.[0]?.args).toEqual(
+      expect.arrayContaining(['--sandbox', 'workspace-write'])
+    )
+    // What the run was allowed to do is reported back, so the UI states the
+    // real posture rather than assuming one.
+    expect(response).toMatchObject({ ok: true, data: { sandbox: 'workspace-write' } })
+  })
+
+  it('records the sandbox it actually used in the durable header', async () => {
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({ createMission }))
+
+    await service.start('Fix the typo.', 'accept-edits', () => undefined)
+
+    expect(createMission).toHaveBeenCalledWith(
+      expect.objectContaining({ sandbox: 'workspace-write' })
+    )
+  })
+
+  it('never widens the sandbox for an unrecognized mode', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start })
+
+    // The IPC layer normalizes this, but the service must not depend on that:
+    // a mode it does not recognise is read-only, never write.
+    await service.start('Do something.', 'whatever' as never, () => undefined)
+
+    expect(start.mock.calls[0]?.[0]?.args).toEqual(expect.arrayContaining(['--sandbox', 'read-only']))
   })
 })

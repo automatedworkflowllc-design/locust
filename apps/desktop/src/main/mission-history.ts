@@ -20,6 +20,7 @@ export function publicRecoveredMission(mission: RecoveredMission): PublicRecover
     requestedRouteId: mission.metadata.requestedRouteId,
     resolvedRouteId: mission.metadata.resolvedRouteId,
     cliVersion: mission.metadata.cliVersion,
+    sandbox: mission.metadata.sandbox,
     createdAt: mission.metadata.createdAt,
     lastUpdatedAt: mission.lastUpdatedAt,
     phase: mission.phase,

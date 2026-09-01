@@ -252,11 +252,13 @@ if (!ownsSingleInstanceLock) {
         } as const
       }
 
-      const prompt = typeof request === 'object' && request !== null
-        ? (request as Partial<CodexMissionStartRequest>).prompt
-        : undefined
+      const payload = (typeof request === 'object' && request !== null ? request : {}) as Partial<CodexMissionStartRequest>
+      const prompt = payload.prompt
+      // Anything but an explicit accept-edits is read-only. A malformed or
+      // missing mode must never widen what a run may touch.
+      const mode = payload.mode === 'accept-edits' ? 'accept-edits' : 'ask'
       try {
-        return await codexMissions.start(prompt, (update: CodexMissionUpdate) => {
+        return await codexMissions.start(prompt, mode, (update: CodexMissionUpdate) => {
           if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
             owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
           }

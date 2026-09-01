@@ -1,11 +1,26 @@
 import { useState } from 'react'
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
 
-import type { MissionRouteSummary, PublicRuntimeStatus } from '../../../shared/ipc.js'
+import type { MissionMode, MissionRouteSummary, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { runtimeIsUsable } from '../status.js'
 import { Icon } from './Icon.js'
 
 const MAX_PROMPT_LENGTH = 8_000
+
+/**
+ * Each mode states its consequence, not just its name. There are two because
+ * there are two the runtime can actually honour: `codex exec` has no
+ * interactive approval channel, so "plan first" and "automatic" would be
+ * labels over behaviour that does not differ.
+ */
+const MODES: readonly { readonly mode: MissionMode; readonly name: string; readonly consequence: string }[] = [
+  { mode: 'ask', name: 'Ask', consequence: 'Reads and explains. Every write is refused by the sandbox.' },
+  {
+    mode: 'accept-edits',
+    name: 'Accept edits',
+    consequence: 'May edit files inside this workspace folder, and nowhere else.'
+  }
+]
 
 export interface ComposerProps {
   readonly runtimes: readonly PublicRuntimeStatus[]
@@ -14,6 +29,8 @@ export interface ComposerProps {
   readonly cancelling: boolean
   readonly activeRoute: MissionRouteSummary | undefined
   readonly error: string | undefined
+  readonly mode: MissionMode
+  readonly onModeChange: (mode: MissionMode) => void
   readonly onStart: (prompt: string) => Promise<boolean>
   readonly onCancel: () => void
   readonly onOpenRoutePicker: () => void
@@ -36,11 +53,14 @@ export function Composer({
   cancelling,
   activeRoute,
   error,
+  mode,
+  onModeChange,
   onStart,
   onCancel,
   onOpenRoutePicker
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
+  const [modeOpen, setModeOpen] = useState(false)
 
   const codex = runtimes.find((runtime) => runtime.id === 'codex')
   const codexReady = codex !== undefined && runtimeIsUsable(codex)
@@ -120,9 +140,41 @@ export function Composer({
           </div>
           <div className="lc-composer__controls">
             <div className="lc-composer__group">
-              <button type="button" className="lc-control" disabled title="Approval modes arrive with a write-capable sandbox">
-                Ask
-              </button>
+              <span className="lc-control__anchor">
+                {modeOpen && (
+                  <div className="lc-menu" role="menu" aria-label="Permission mode">
+                    {MODES.map((option) => (
+                      <button
+                        key={option.mode}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={mode === option.mode}
+                        className="lc-menu__item"
+                        onClick={() => {
+                          onModeChange(option.mode)
+                          setModeOpen(false)
+                        }}
+                      >
+                        <span className="lc-menu__text">
+                          <span className="lc-menu__name">{option.name}</span>
+                          <span className="lc-menu__desc">{option.consequence}</span>
+                        </span>
+                        {mode === option.mode && <Icon name="check" size={13} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="lc-control"
+                  aria-haspopup="menu"
+                  aria-expanded={modeOpen}
+                  disabled={running}
+                  onClick={() => setModeOpen(!modeOpen)}
+                >
+                  {MODES.find((option) => option.mode === mode)?.name ?? 'Ask'}
+                </button>
+              </span>
               <button type="button" className="lc-control" disabled title="Attachments and slash commands are not built yet">
                 <Icon name="plus" size={14} />
               </button>

@@ -9,12 +9,14 @@ import type {
   RuntimeProcessRunner
 } from '@teammate/runtime-adapters'
 import type { MissionLedger } from '@teammate/mission-store'
+import type { MissionSandbox } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
 import type {
   CodexMissionCancelResponse,
   CodexMissionStartResponse,
-  CodexMissionUpdate
+  CodexMissionUpdate,
+  MissionMode
 } from '../shared/ipc.js'
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -31,6 +33,7 @@ interface ActiveCodexMission {
 export interface CodexMissionService {
   start(
     prompt: unknown,
+    mode: MissionMode,
     emit: (update: CodexMissionUpdate) => void
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
@@ -233,8 +236,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   return {
     async start(
       prompt: unknown,
+      mode: MissionMode,
       emit: (update: CodexMissionUpdate) => void
     ): Promise<CodexMissionStartResponse> {
+      // Read-only unless the renderer explicitly asked for edits. The host
+      // decides the sandbox from this one value; the renderer never passes a
+      // sandbox string of its own.
+      const sandbox: MissionSandbox = mode === 'accept-edits' ? 'workspace-write' : 'read-only'
       let resolveStartOperation!: () => void
       const startOperation = new Promise<void>((resolve) => {
         resolveStartOperation = resolve
@@ -317,7 +325,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             resolvedRouteId: 'codex-account:default',
             cliVersion: codex.version?.version ?? null,
             workspaceId,
-            sandbox: 'read-only',
+            sandbox,
             executionPolicyVersion: 1,
             createdAt
           })
@@ -350,7 +358,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         let process: RuntimeProcessRun
         try {
           const command = createCodexExecCommand(codex.executable, {
-            workspacePath: options.workspacePath
+            workspacePath: options.workspacePath,
+            sandbox
           })
           process = options.runner.start(command, prompt, { signal: controller.signal })
         } catch {
@@ -391,7 +400,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             runtime: 'codex',
             model: 'account-default',
             resolvedRouteId: 'codex-account:default',
-            cliVersion: codex.version?.version ?? null
+            cliVersion: codex.version?.version ?? null,
+            sandbox
           }
         }
       } finally {

@@ -8,10 +8,12 @@ needs a desktop session, so they are run by hand and their results reported.
 | --- | --- | --- |
 | `live-ledger-smoke.mjs` | discovery -> transport -> normalizer -> durable ledger -> recovery by a fresh reader, on a real Codex run | the renderer |
 | `renderer-smoke.mjs` | the same run driven through the built Electron UI, asserted on what the screen says | nothing above it |
+| `write-mode-smoke.mjs` | that the mission sandbox is real: the same prompt is refused under `read-only` and succeeds under `workspace-write` | the UI |
 
 ```
 node _smoke/live-ledger-smoke.mjs
 node _smoke/renderer-smoke.mjs      # requires apps/desktop to be built
+node _smoke/write-mode-smoke.mjs    # writes only inside a throwaway temp repo
 ```
 
 Each exits non-zero on any failed assertion.
@@ -40,3 +42,8 @@ same family: one waited for the send button to be *enabled* before typing, when
 it is correctly disabled until a prompt exists — a condition that could never go
 green; the other passed on a stale receipt restored from a shared profile. Both
 are now assertions that mean something.
+
+`write-mode-smoke.mjs` carries its control inline rather than as a separate
+step: the read-only run IS the control. Without it, a build that ignored the
+sandbox argument entirely -- or always passed `workspace-write` -- would still
+produce a green "it wrote the file" result.

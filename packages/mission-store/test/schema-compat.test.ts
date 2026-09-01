@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(2)
-    expect(header.schemaVersion).toBe(2)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(3)
+    expect(header.schemaVersion).toBe(3)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -193,7 +193,8 @@ describe('ledger schema versions', () => {
     await writeFile(
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
-        schemaVersion: 3,
+        // One past the newest this reader knows. Bump when the schema does.
+        schemaVersion: 4,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,
@@ -245,5 +246,35 @@ describe('runtime agreement', () => {
     await expect(ledger.appendEvents('mission_1', [foreign])).rejects.toThrow(
       /not readable by the ledger reader/
     )
+  })
+})
+
+describe('sandbox widening (v3)', () => {
+  it('records a workspace-write mission at the current version', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission({
+      ...v1Metadata({ sandbox: 'workspace-write' })
+    } as unknown as MissionLedgerMetadata)
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.metadata.sandbox).toBe('workspace-write')
+  })
+
+  it('refuses a pre-v3 file claiming a mission was allowed to write', async () => {
+    const root = await temporaryRoot()
+    // Versions before 3 could only record read-only runs, so this file was
+    // hand-edited. Believing it would render a write run's permissions wrongly.
+    await writeV1Ledger(root, [], { sandbox: 'workspace-write' })
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
+  it('still reads v1 and v2 read-only missions', async () => {
+    const root = await temporaryRoot()
+    await writeV1Ledger(root, [])
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+    expect(recovered?.metadata.sandbox).toBe('read-only')
   })
 })

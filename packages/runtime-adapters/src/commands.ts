@@ -137,16 +137,38 @@ function baseSpec(
   return spec;
 }
 
+/**
+ * How much a mission may touch. `read-only` is the default everywhere: a caller
+ * that says nothing gets the safe mode, so write access is only ever something
+ * a caller asked for explicitly.
+ *
+ * `danger-full-access` is deliberately not in this union. It is refused by
+ * `assertSafeRuntimeCommand` as well, so removing that check alone would not
+ * make it reachable.
+ */
+export type MissionSandbox = "read-only" | "workspace-write";
+
 export interface RuntimeCommandOptions {
   readonly workspacePath: string;
   readonly model?: string;
+  readonly sandbox?: MissionSandbox;
+}
+
+function sandboxArgument(sandbox: MissionSandbox | undefined): MissionSandbox {
+  if (sandbox === undefined) return "read-only";
+  if (sandbox !== "read-only" && sandbox !== "workspace-write") {
+    throw new Error("Unsupported mission sandbox");
+  }
+  return sandbox;
 }
 
 export function createCodexExecCommand(
   executable: ExecutableLaunch,
   options: RuntimeCommandOptions,
 ): RuntimeCommandSpec {
-  const args = ["exec", "--json", "--sandbox", "read-only", "-C", options.workspacePath];
+  // Writes, when allowed at all, are confined to the workspace Codex is given.
+  // The host chooses that directory; the renderer only ever chooses the mode.
+  const args = ["exec", "--json", "--sandbox", sandboxArgument(options.sandbox), "-C", options.workspacePath];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
   }

@@ -38,6 +38,9 @@ export function Inspector({
   readonly onClose: () => void
 }): ReactElement {
   const [tab, setTab] = useState<Tab>('Activity')
+  // What this run was ACTUALLY allowed to do, read from the start receipt --
+  // not from whatever mode the composer happens to show now.
+  const writes = route?.sandbox === 'workspace-write'
   const rows = buildSignalRail(events, { running })
 
   return (
@@ -90,21 +93,33 @@ export function Inspector({
             <div className="lc-permissions">
               <div className="lc-permissions__head">
                 <span className="lc-fieldlabel lc-mono">Tools &amp; permissions</span>
-                <span className="lc-rail__meta">read-only</span>
+                <span className="lc-rail__meta">{writes ? 'workspace-write' : 'read-only'}</span>
               </div>
               <div className="lc-permissions__rows">
                 <div className="lc-permissions__row">
                   <span className="lc-tone-lime">allow</span>
                   <span>read files in the host-selected workspace</span>
                 </div>
+                {writes ? (
+                  <div className="lc-permissions__row">
+                    <span className="lc-tone-lime">allow</span>
+                    <span>write files inside that same workspace folder</span>
+                  </div>
+                ) : (
+                  <div className="lc-permissions__row">
+                    <span className="lc-tone-red">deny</span>
+                    <span>every write to disk</span>
+                  </div>
+                )}
                 <div className="lc-permissions__row">
                   <span className="lc-tone-red">deny</span>
-                  <span>every write, and any network the runtime does not make itself</span>
+                  <span>anything outside the workspace, and any network the runtime does not make itself</span>
                 </div>
               </div>
               <p className="lc-permissions__note">
-                The host fixes the workspace, executable, argv and sandbox. Per-tool grants and
-                approvals arrive with a write-capable sandbox.
+                The host fixes the workspace, executable, argv and sandbox. `codex exec` has no
+                interactive approval channel, so consent is given when the mission starts rather
+                than per action; mid-run approvals need the app-server protocol.
               </p>
             </div>
           </>
@@ -123,7 +138,7 @@ export function Inspector({
             <dt>Mission</dt>
             <dd className="lc-mono">{route === undefined ? 'unknown' : shortMissionId(route.missionId)}</dd>
             <dt>Sandbox</dt>
-            <dd>Read only</dd>
+            <dd>{route?.sandbox ?? 'unknown'}</dd>
             <dt>Events</dt>
             <dd>{events.length} recorded in this view</dd>
           </dl>

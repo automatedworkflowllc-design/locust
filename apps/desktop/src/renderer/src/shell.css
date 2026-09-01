@@ -1879,3 +1879,62 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
+
+/* --- Composer menus ---------------------------------------------------- */
+
+.lc-control__anchor {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lc-menu {
+  position: absolute;
+  bottom: calc(100% + var(--lc-space-4));
+  left: 0;
+  width: 306px;
+  background: var(--lc-bg-raised-2);
+  border: 1px solid var(--lc-border-strong);
+  border-radius: 11px;
+  box-shadow: var(--lc-shadow-menu);
+  overflow: hidden;
+  z-index: 6;
+}
+
+.lc-menu__item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lc-space-4);
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--lc-text-secondary);
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-menu__item:hover {
+  background: var(--lc-hover-surface-strong);
+}
+
+.lc-menu__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-menu__name {
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+}
+
+.lc-menu__desc {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  line-height: 1.4;
+  text-wrap: pretty;
+}

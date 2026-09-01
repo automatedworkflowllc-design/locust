@@ -1,5 +1,6 @@
 import type {
   MissionRuntimeId,
+  MissionSandbox,
   NormalizedRuntimeEvent,
   NormalizedRuntimeEventType,
   RedactedJsonValue
@@ -18,23 +19,28 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 2 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 3 as const
 
 /**
- * Versions this reader accepts. Version 1 is a strict subset of version 2, so
- * it is read rather than rejected: bumping the number without this list would
- * make every mission recorded before the bump come back as
- * `unsupported-schema`, which reads to a user as their history disappearing.
- * A file's version is fixed by its header, and every record in it must match --
- * appends to a version-1 mission stay version 1.
+ * Versions this reader accepts, each a strict subset of the next, so all are
+ * read rather than rejected: bumping the number without this list would make
+ * every mission recorded before the bump come back as `unsupported-schema`,
+ * which reads to a user as their history disappearing. A file's version is
+ * fixed by its header and every record in it must match, so appends to an
+ * older mission stay at that mission's version.
+ *
+ * v1 -> v2 widened `runtime` and `model`. v2 -> v3 widened `sandbox` from the
+ * literal 'read-only' to include 'workspace-write': a v2 reader must not be
+ * handed a mission that was allowed to write, because it would render the
+ * run's permissions as read-only and be wrong about what happened.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2
+  return value === 1 || value === 2 || value === 3
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -77,7 +83,7 @@ export interface MissionLedgerMetadata {
   readonly resolvedRouteId: string
   readonly cliVersion: string | null
   readonly workspaceId: string
-  readonly sandbox: 'read-only'
+  readonly sandbox: MissionSandbox
   readonly executionPolicyVersion: 1
   readonly createdAt: string
 }
@@ -235,7 +241,10 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
   requireText(metadata.model, 'model', 256)
   if (metadata.cliVersion !== null) requireText(metadata.cliVersion, 'cliVersion', 256)
   requireSafeId(metadata.workspaceId, 'workspaceId')
-  if (metadata.sandbox !== 'read-only' || metadata.executionPolicyVersion !== 1) {
+  if (
+    (metadata.sandbox !== 'read-only' && metadata.sandbox !== 'workspace-write')
+    || metadata.executionPolicyVersion !== 1
+  ) {
     throw new Error('Mission execution policy is invalid')
   }
   requireTimestamp(metadata.createdAt, 'createdAt')
@@ -287,6 +296,11 @@ function parsedMetadata(
   if (schemaVersion === 1 && (candidate.runtime !== 'codex' || candidate.model !== 'account-default')) {
     return undefined
   }
+  // Versions before 3 could only ever record a read-only mission, so a file
+  // claiming otherwise was hand-edited and is refused rather than believed.
+  if (schemaVersion < 3 && candidate.sandbox !== 'read-only') {
+    return undefined
+  }
   if (
     typeof candidate.missionId !== 'string'
     || typeof candidate.runId !== 'string'
@@ -297,7 +311,7 @@ function parsedMetadata(
     || typeof candidate.resolvedRouteId !== 'string'
     || !(candidate.cliVersion === null || typeof candidate.cliVersion === 'string')
     || typeof candidate.workspaceId !== 'string'
-    || candidate.sandbox !== 'read-only'
+    || (candidate.sandbox !== 'read-only' && candidate.sandbox !== 'workspace-write')
     || candidate.executionPolicyVersion !== 1
     || typeof candidate.createdAt !== 'string'
   ) return undefined

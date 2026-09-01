@@ -35,6 +35,7 @@ export type {
   MissionHistoryResponse,
   PublicRecoveredMission,
   PublicRuntimeStatus,
+  MissionMode,
   PublicTeammate,
   TeammateCreateRequest,
   TeammateHue,

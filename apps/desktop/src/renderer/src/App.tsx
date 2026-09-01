@@ -8,6 +8,7 @@ import type {
   MissionRouteSummary,
   PublicRecoveredMission,
   PublicRuntimeStatus,
+  MissionMode,
   PublicTeammate,
   TeammateHue,
   TeammateRole
@@ -109,7 +110,8 @@ function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
       runtime: mission.runtime,
       model: mission.model,
       resolvedRouteId: mission.resolvedRouteId,
-      cliVersion: mission.cliVersion
+      cliVersion: mission.cliVersion,
+      sandbox: mission.sandbox
     },
     phase: mission.phase,
     events: mission.events,
@@ -134,6 +136,7 @@ export default function App(): ReactElement {
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [screen, setScreen] = useState<Screen>('workroom')
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [mode, setMode] = useState<MissionMode>('ask')
   const [teammateError, setTeammateError] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
@@ -237,7 +240,7 @@ export default function App(): ReactElement {
     }
 
     try {
-      const response = await bridge.startCodexMission({ prompt })
+      const response = await bridge.startCodexMission({ prompt, mode })
       if (!response.ok) {
         activeRunIdRef.current = undefined
         setLiveRun({ prompt, phase: 'failed', events: [], error: response.error.message })
@@ -461,6 +464,8 @@ export default function App(): ReactElement {
             running={running}
             cancelling={liveRun?.phase === 'cancelling'}
             activeRoute={liveRun?.data}
+            mode={mode}
+            onModeChange={setMode}
             error={noRuntimeReady && runtimeState.phase === 'ready' ? undefined : undefined}
             onStart={startMission}
             onCancel={cancelMission}

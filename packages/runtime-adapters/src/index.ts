@@ -17,6 +17,7 @@ export {
 } from "./process-runner.js";
 export { parseRuntimeVersion } from "./version.js";
 export type {
+  MissionSandbox,
   RuntimeCommandOptions,
 } from "./commands.js";
 export type {
