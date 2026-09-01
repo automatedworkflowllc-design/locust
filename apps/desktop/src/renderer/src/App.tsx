@@ -14,7 +14,11 @@ import type {
 } from '../../shared/ipc.js'
 import { Composer } from './components/Composer.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
+import { CommandPalette } from './components/CommandPalette.js'
+import type { PaletteAction } from './components/CommandPalette.js'
 import { Inspector } from './components/Inspector.js'
+import { MissionsScreen, SettingsScreen, TeammatesScreen } from './components/Screens.js'
+import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import { Sidebar } from './components/Sidebar.js'
@@ -128,6 +132,8 @@ export default function App(): ReactElement {
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  const [screen, setScreen] = useState<Screen>('workroom')
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const [teammateError, setTeammateError] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
@@ -196,6 +202,28 @@ export default function App(): ReactElement {
       active = false
       removeMissionListener()
     }
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent): void => {
+      const accel = event.ctrlKey || event.metaKey
+      if (accel && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+        return
+      }
+      if (accel && event.key.toLowerCase() === 'i') {
+        event.preventDefault()
+        setInspectorOpen((open) => !open)
+        return
+      }
+      if (!accel) return
+      if (event.key === '1') { event.preventDefault(); setScreen('missions') }
+      if (event.key === '2') { event.preventDefault(); setScreen('teammates') }
+      if (event.key === '3') { event.preventDefault(); setScreen('settings') }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   const startMission = async (prompt: string): Promise<boolean> => {
@@ -288,6 +316,20 @@ export default function App(): ReactElement {
       .catch(() => setTeammateError('That teammate could not be created.'))
   }
 
+  const removeTeammate = (teammateId: string): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .removeTeammate(teammateId)
+      .then(() => bridge.listTeammates())
+      .then((listed) => {
+        if (!listed.ok) return
+        setTeammates(listed.data.teammates)
+        setMissionOwners(listed.data.missionOwners)
+      })
+      .catch(() => undefined)
+  }
+
   const runtimes = runtimeState.phase === 'ready' ? runtimeState.runtimes : []
   const running = liveRunIsActive(liveRun)
 
@@ -335,10 +377,29 @@ export default function App(): ReactElement {
             setTeammateError(undefined)
             setNewTeammateOpen(true)
           }}
-          onOpenSettings={() => undefined}
+          onOpenSettings={() => setScreen(screen === 'settings' ? 'workroom' : 'settings')}
         />
         <main className="lc-workroom">
-          {liveRun === undefined ? (
+          {screen === 'missions' ? (
+            <MissionsScreen
+              missions={history}
+              teammates={teammates}
+              missionOwners={missionOwners}
+              onOpen={() => setScreen('workroom')}
+            />
+          ) : screen === 'teammates' ? (
+            <TeammatesScreen
+              teammates={teammates}
+              missionOwners={missionOwners}
+              onNewTeammate={() => {
+                setTeammateError(undefined)
+                setNewTeammateOpen(true)
+              }}
+              onRemove={removeTeammate}
+            />
+          ) : screen === 'settings' ? (
+            <SettingsScreen runtimes={runtimes} ledgerPath={undefined} />
+          ) : liveRun === undefined ? (
             <FirstLaunch runtimes={runtimes} discoveryPhase={runtimeState.phase} />
           ) : (
             <>
@@ -393,6 +454,7 @@ export default function App(): ReactElement {
               />
             </>
           )}
+          {screen === 'workroom' && (
           <Composer
             runtimes={runtimes}
             discoveryPhase={runtimeState.phase}
@@ -404,6 +466,7 @@ export default function App(): ReactElement {
             onCancel={cancelMission}
             onOpenRoutePicker={() => undefined}
           />
+          )}
         </main>
         {inspectorOpen && liveRun !== undefined && (
           <Inspector
@@ -415,6 +478,56 @@ export default function App(): ReactElement {
           />
         )}
       </div>
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => setPaletteOpen(false)}
+          actions={
+            [
+              {
+                id: 'go-workroom',
+                group: 'Go to',
+                label: 'Workroom',
+                run: () => setScreen('workroom')
+              },
+              { id: 'go-missions', group: 'Go to', label: 'Missions', hint: 'Ctrl 1', run: () => setScreen('missions') },
+              {
+                id: 'go-teammates',
+                group: 'Go to',
+                label: 'Teammates',
+                hint: 'Ctrl 2',
+                run: () => setScreen('teammates')
+              },
+              { id: 'go-settings', group: 'Go to', label: 'Settings', hint: 'Ctrl 3', run: () => setScreen('settings') },
+              {
+                id: 'new-teammate',
+                group: 'Teammates',
+                label: 'New teammate',
+                run: () => {
+                  setTeammateError(undefined)
+                  setNewTeammateOpen(true)
+                }
+              },
+              {
+                id: 'inspector',
+                group: 'Mission',
+                label: inspectorOpen ? 'Close the mission inspector' : 'Open the mission inspector',
+                hint: 'Ctrl I',
+                run: () => setInspectorOpen(!inspectorOpen)
+              },
+              ...(running
+                ? [
+                    {
+                      id: 'stop',
+                      group: 'Mission',
+                      label: 'Stop the running mission',
+                      run: cancelMission
+                    }
+                  ]
+                : [])
+            ] satisfies PaletteAction[]
+          }
+        />
+      )}
       {newTeammateOpen && (
         <NewTeammateDialog
           error={teammateError}

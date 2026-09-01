@@ -1,0 +1,275 @@
+import { useState } from 'react'
+import type { ReactElement } from 'react'
+
+import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
+import { missionPhaseView, routeRowStatus } from '../status.js'
+import type { IntegrationLevel } from '../status.js'
+import { faceForName } from './NewTeammateDialog.js'
+import { PixelFace } from './PixelFace.js'
+
+export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
+
+const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
+  codex: 'live',
+  claude: 'preview',
+  omniroute: 'planned'
+}
+
+function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
+  return (
+    <div className="lc-screen__header">
+      <span className="lc-screen__title">{title}</span>
+      <span className="lc-screen__meta lc-mono">{meta}</span>
+    </div>
+  )
+}
+
+const FILTERS = ['All', 'Running', 'Interrupted', 'Completed'] as const
+type Filter = (typeof FILTERS)[number]
+
+function matchesFilter(mission: PublicRecoveredMission, filter: Filter): boolean {
+  if (filter === 'All') return true
+  if (filter === 'Running') return false
+  if (filter === 'Interrupted') return mission.phase === 'interrupted'
+  return mission.phase === 'completed'
+}
+
+/**
+ * Missions.
+ *
+ * The reference offers a "Needs approval" filter; there is no approval channel
+ * yet, so a filter that can only ever return nothing is left out rather than
+ * shipped as a dead control.
+ */
+export function MissionsScreen({
+  missions,
+  teammates,
+  missionOwners,
+  onOpen
+}: {
+  readonly missions: readonly PublicRecoveredMission[]
+  readonly teammates: readonly PublicTeammate[]
+  readonly missionOwners: Readonly<Record<string, string>>
+  readonly onOpen: (missionId: string) => void
+}): ReactElement {
+  const [filter, setFilter] = useState<Filter>('All')
+  const shown = missions.filter((mission) => matchesFilter(mission, filter))
+  const withIssues = missions.filter((mission) => mission.integrityIssueCount > 0).length
+
+  return (
+    <div className="lc-screen">
+      <ScreenHeader
+        title="Missions"
+        meta={`${missions.length} local · ${
+          withIssues === 0 ? 'ledger verified' : `${withIssues} with an incomplete receipt`
+        }`}
+      />
+      <div className="lc-filters">
+        {FILTERS.map((name) => (
+          <button
+            key={name}
+            type="button"
+            aria-pressed={filter === name}
+            className={`lc-filter${filter === name ? ' is-active' : ''}`}
+            onClick={() => setFilter(name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className="lc-screen__scroll">
+        {shown.length === 0 ? (
+          <p className="lc-inspector__empty">
+            {missions.length === 0
+              ? 'No missions recorded on this machine yet.'
+              : 'No missions match this filter.'}
+          </p>
+        ) : (
+          <div className="lc-missionrows">
+            {shown.map((mission) => {
+              const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
+              const owner = teammates.find(
+                (teammate) => teammate.teammateId === missionOwners[mission.missionId]
+              )
+              const elapsed = Math.max(
+                0,
+                Math.round((Date.parse(mission.lastUpdatedAt) - Date.parse(mission.createdAt)) / 60000)
+              )
+              return (
+                <button
+                  type="button"
+                  key={mission.missionId}
+                  className="lc-missionrow"
+                  onClick={() => onOpen(mission.missionId)}
+                >
+                  <span className={`lc-rail__dot lc-tone-${view.tone}`} />
+                  <span className="lc-missionrow__title">{mission.prompt}</span>
+                  <span className="lc-missionrow__owner">{owner?.name ?? '—'}</span>
+                  <span className="lc-missionrow__route lc-mono">
+                    {mission.runtime} / {mission.model}
+                  </span>
+                  <span className="lc-missionrow__stats lc-mono">
+                    {mission.checkpoints.length} ck · {elapsed}m
+                  </span>
+                  <span className={`lc-missionrow__tag lc-mono lc-tone-${view.tone}`}>{view.tag}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function TeammatesScreen({
+  teammates,
+  missionOwners,
+  onNewTeammate,
+  onRemove
+}: {
+  readonly teammates: readonly PublicTeammate[]
+  readonly missionOwners: Readonly<Record<string, string>>
+  readonly onNewTeammate: () => void
+  readonly onRemove: (teammateId: string) => void
+}): ReactElement {
+  return (
+    <div className="lc-screen">
+      <ScreenHeader
+        title="Teammates"
+        meta={`${teammates.length} defined · avatars and roles are yours to set`}
+      />
+      <div className="lc-screen__scroll">
+        <div className="lc-rostergrid">
+          {teammates.map((teammate) => {
+            const owned = Object.values(missionOwners).filter((owner) => owner === teammate.teammateId).length
+            return (
+              <div className="lc-rostercard" key={teammate.teammateId}>
+                <div className="lc-rostercard__head">
+                  <PixelFace hue={teammate.hue} pixels={faceForName(teammate.name)} size={36} />
+                  <div className="lc-rostercard__id">
+                    <div className="lc-rostercard__name">{teammate.name}</div>
+                    <div className="lc-rostercard__role">{teammate.role}</div>
+                  </div>
+                </div>
+                <dl className="lc-rostercard__facts">
+                  <dt>Route</dt>
+                  <dd className="lc-mono">whichever is active at start</dd>
+                  <dt>Missions</dt>
+                  <dd className="lc-mono">{owned}</dd>
+                  <dt>Mode</dt>
+                  <dd className="lc-mono">read-only</dd>
+                </dl>
+                <button
+                  type="button"
+                  className="lc-rostercard__remove"
+                  onClick={() => onRemove(teammate.teammateId)}
+                >
+                  Remove
+                </button>
+              </div>
+            )
+          })}
+          <button type="button" className="lc-rostercard lc-rostercard--new" onClick={onNewTeammate}>
+            <span className="lc-rostercard__plus">+</span>
+            <span className="lc-rostercard__name">New teammate</span>
+            <span className="lc-rostercard__role">Name, role and avatar. Missions group under them.</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Settings.
+ *
+ * Runtimes read from discovery. Fallback policy and swarm are drawn because the
+ * design places them here, but both are shown as unavailable with the reason --
+ * fallback needs route switching, and swarm needs a route that reports whether
+ * it honours effort. Neither is rendered as a working toggle that does nothing.
+ */
+export function SettingsScreen({
+  runtimes,
+  ledgerPath
+}: {
+  readonly runtimes: readonly PublicRuntimeStatus[]
+  readonly ledgerPath: string | undefined
+}): ReactElement {
+  return (
+    <div className="lc-screen">
+      <ScreenHeader title="Settings" meta="workspace · local only" />
+      <div className="lc-screen__scroll">
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>
+          <p className="lc-settings__lede">
+            Locust uses the accounts already on this machine. It never pools subscriptions or proxies
+            your requests.
+          </p>
+          <div className="lc-runtimelist">
+            {runtimes.map((runtime) => {
+              const status = routeRowStatus(runtime, INTEGRATION[runtime.id] ?? 'planned', false)
+              return (
+                <div className="lc-runtimerow" key={runtime.id}>
+                  <div className="lc-runtimerow__text">
+                    <div className="lc-runtimerow__name">{runtime.displayName}</div>
+                    <div className="lc-runtimerow__detail">
+                      {runtime.version !== null && (
+                        <>
+                          <span className="lc-mono">{runtime.version}</span>
+                          {' · '}
+                        </>
+                      )}
+                      {status.detail}
+                    </div>
+                  </div>
+                  <span
+                    className={`lc-tag${
+                      status.tag === 'READY' || status.tag === 'ACTIVE'
+                        ? ' is-lime'
+                        : status.tag === 'SIGN IN'
+                          ? ' is-red'
+                          : status.tag === 'PREVIEW'
+                            ? ' is-amber'
+                            : ''
+                    }`}
+                  >
+                    {status.tag}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Fallback policy</h2>
+          <p className="lc-settings__lede">
+            What happens when the active route hits a limit mid-mission. Choosing a policy needs route
+            switching, which is not built yet — today a run pauses and waits for you.
+          </p>
+          <div className="lc-policyrow">
+            <span className="lc-tag">PAUSE AND WAIT</span>
+            <span className="lc-settings__note">
+              The mission stops at its last durable checkpoint rather than continuing somewhere you did
+              not choose.
+            </span>
+          </div>
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Privacy &amp; local data</h2>
+          <p className="lc-settings__lede">
+            Every mission is recorded to an append-only ledger on this machine. Nothing is uploaded.
+          </p>
+          <dl className="lc-receipt lc-receipt--flush">
+            <dt>Ledger</dt>
+            <dd className="lc-mono">{ledgerPath ?? 'in this profile'}</dd>
+            <dt>Network</dt>
+            <dd>The window itself makes no outbound requests; runtimes talk to their own providers.</dd>
+          </dl>
+        </section>
+      </div>
+    </div>
+  )
+}
