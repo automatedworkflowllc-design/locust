@@ -69,6 +69,10 @@ The post-hardening live smoke is **done**, on the built app against Codex CLI 0.
 
 Each carries a committed negative control, because a green check that could never go red proves nothing. The ledger smoke corrupts a copy of the ledger it just wrote and requires recovery to come back short, flagged and `interrupted`; the renderer smoke asks for a computed answer rather than an instructed token (an instructed token is echoed back in the displayed prompt and would match with no model in the loop) and launches with a private profile, since the app restores history from the ledger.
 
+## The shell redesign
+
+The Locust desktop shell design landed 2026-08-31 (`design/locust-desktop/` — spec, interactive reference, brand). Reviewed state-by-state in a browser and mapped surface-by-surface to real backing in `docs/UI-INTEGRATION-PLAN.md`: most of it binds to state that already exists (discovery, live missions, checkpoints, receipts, the ledger-failure hold), a small honest layer is new (teammate profiles as local identity + routing presets), and the capability states (approvals, handoffs, peer threads, swarm) stay unrendered until their backends exist. Execution order: P0 foundation → P1 shell → P2 teammates → P3 inspector/palette → P4 route layer → P5 capability states. P0–P3 do not depend on the Claude adapter.
+
 ## Next implementation milestone
 
 The durable ledger and restart recovery landed on 2026-08-31 (with an adversarial review and hardening pass). What remains, in order — see `docs/ROADMAP.md` for the full plan and the 2026-08-31 owner direction (Cursor x Grok Bot thesis, Claude as an obviously selectable runtime, teammate workroom, simple avatar-first UI):
