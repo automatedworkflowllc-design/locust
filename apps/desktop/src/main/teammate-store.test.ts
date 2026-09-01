@@ -165,3 +165,43 @@ describe('teammate record parsing', () => {
     expect(parsedTeammate(null)).toBeUndefined()
   })
 })
+
+describe('workspace settings', () => {
+  it('defaults swarm off and persists a change', async () => {
+    const { root, store: teammates } = await store()
+    expect(await teammates.readSettings()).toEqual({ swarm: false })
+
+    await teammates.writeSettings({ swarm: true })
+
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true })
+  })
+
+  it('only a literal true turns it on', async () => {
+    // A malformed message must not be able to enable a workspace-wide setting.
+    const { store: teammates } = await store()
+    for (const value of ['true', 1, {}, [], null, undefined]) {
+      await teammates.writeSettings({ swarm: value })
+      expect(await teammates.readSettings()).toEqual({ swarm: false })
+    }
+  })
+
+  it('reads a corrupt settings block as off without losing the roster', async () => {
+    const { root, store: teammates } = await store()
+    const wren = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Docs & QA' })
+    const path = join(root, 'teammates.json')
+    const file = JSON.parse(await readFile(path, 'utf8'))
+    file.settings = 'not an object'
+    await writeFile(path, JSON.stringify(file), 'utf8')
+
+    const reopened = createTeammateStore({ rootDirectory: root })
+    expect(await reopened.readSettings()).toEqual({ swarm: false })
+    expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
+  })
+
+  it('keeps teammates when settings are written', async () => {
+    const { store: teammates } = await store()
+    await teammates.create({ name: 'Wren', hue: 'lime', role: 'Docs & QA' })
+    await teammates.writeSettings({ swarm: true })
+    expect(await teammates.list()).toHaveLength(1)
+  })
+})

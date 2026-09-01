@@ -28,6 +28,8 @@ import {
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
+  WORKSPACE_SETTINGS_READ_CHANNEL,
+  WORKSPACE_SETTINGS_WRITE_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL
@@ -266,6 +268,25 @@ if (!ownsSingleInstanceLock) {
 
     const teammateRejected = (message: string) =>
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
+
+    ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { swarm: false } as const
+      try {
+        return await teammates.readSettings()
+      } catch {
+        // An unreadable switch reads as off. That is the safe direction.
+        return { swarm: false } as const
+      }
+    })
+
+    ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
+      if (!fromOwnWindow(event)) return { swarm: false } as const
+      try {
+        return await teammates.writeSettings(settings)
+      } catch {
+        return { swarm: false } as const
+      }
+    })
 
     ipcMain.handle(TEAMMATE_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return teammatesUnavailable

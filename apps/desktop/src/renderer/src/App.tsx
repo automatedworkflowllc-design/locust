@@ -125,6 +125,22 @@ function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
   }
 }
 
+/**
+ * The effort a mission should actually be started with. Swarm means this
+ * model's maximum, so it is the last effort THIS model reported rather than a
+ * fixed name some models do not have.
+ */
+export function swarmEffortFor(
+  models: readonly PublicModel[],
+  modelId: string,
+  swarm: boolean,
+  chosen: string | undefined
+): string | undefined {
+  if (!swarm) return chosen
+  const supported = models.find((model) => model.id === modelId)?.supportedEfforts ?? []
+  return supported[supported.length - 1]
+}
+
 function missionTitle(prompt: string): string {
   const trimmed = prompt.trim().split('\n')[0] ?? prompt
   return trimmed.length > 44 ? `${trimmed.slice(0, 44).trimEnd()}…` : trimmed
@@ -146,6 +162,7 @@ export default function App(): ReactElement {
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
   const [models, setModels] = useState<readonly PublicModel[]>([])
   const [effort, setEffort] = useState<string>()
+  const [swarm, setSwarm] = useState(false)
   const [teammateError, setTeammateError] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
@@ -188,6 +205,13 @@ export default function App(): ReactElement {
       .catch(() => {
         if (active) setRuntimeState({ phase: 'error' })
       })
+
+    void bridge
+      .readWorkspaceSettings()
+      .then((settings) => {
+        if (active) setSwarm(settings.swarm === true)
+      })
+      .catch(() => undefined)
 
     void bridge
       .listModels()
@@ -294,7 +318,11 @@ export default function App(): ReactElement {
         model: route.model,
         // Only sent when the chosen model advertised it; the composer cannot
         // offer an effort the catalog did not report for that model.
-        ...(effort === undefined ? {} : { effort })
+        // Swarm overrides the picked effort with the model's maximum, and the
+        // composer shows that -- so what is sent must match what is shown.
+        ...(swarmEffortFor(models, route.model, swarm, effort) === undefined
+          ? {}
+          : { effort: swarmEffortFor(models, route.model, swarm, effort)! })
       })
       if (!response.ok) {
         activeRunIdRef.current = undefined
@@ -422,7 +450,7 @@ export default function App(): ReactElement {
 
   return (
     <div className="lc-shell">
-      <TitleBar workspaceName="Local workspace" runningCount={running ? 1 : 0} />
+      <TitleBar workspaceName="Local workspace" runningCount={running ? 1 : 0} swarm={swarm} />
       <div className="lc-body">
         <Sidebar
           runtimes={runtimes}
@@ -534,6 +562,17 @@ export default function App(): ReactElement {
             models={models}
             effort={effort}
             onEffortChange={setEffort}
+            swarm={swarm}
+            onSwarmChange={(next) => {
+              // Optimistic, then reconciled with what the store actually
+              // saved -- a rejected write must not leave the chip claiming a
+              // setting that is not on disk.
+              setSwarm(next)
+              void window.desktop
+                ?.writeWorkspaceSettings({ swarm: next })
+                .then((settings) => setSwarm(settings.swarm === true))
+                .catch(() => setSwarm(!next))
+            }}
             error={noRuntimeReady && runtimeState.phase === 'ready' ? undefined : undefined}
             onStart={startMission}
             onCancel={cancelMission}

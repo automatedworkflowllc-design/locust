@@ -3,7 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import type { PublicTeammate, TeammateHue, TeammateRole } from '../shared/ipc.js'
+import type { PublicTeammate, TeammateHue, TeammateRole, WorkspaceSettings } from '../shared/ipc.js'
 
 /**
  * Teammates are local identity plus routing defaults: a name, an avatar hue, a
@@ -39,13 +39,18 @@ export interface TeammateStore {
   /** Remember which teammate a mission belongs to. */
   assignMission(teammateId: unknown, missionId: unknown): Promise<void>
   missionOwners(): Promise<Readonly<Record<string, string>>>
+  readSettings(): Promise<WorkspaceSettings>
+  writeSettings(settings: unknown): Promise<WorkspaceSettings>
 }
 
 interface StoredFile {
   readonly schemaVersion: typeof SCHEMA_VERSION
   readonly teammates: readonly PublicTeammate[]
   readonly missionOwners: Readonly<Record<string, string>>
+  readonly settings: WorkspaceSettings
 }
+
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false }
 
 function isHue(value: unknown): value is TeammateHue {
   return typeof value === 'string' && (TEAMMATE_HUES as readonly string[]).includes(value)
@@ -93,7 +98,12 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
 }
 
 function parsedFile(text: string): StoredFile {
-  const empty: StoredFile = { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {} }
+  const empty: StoredFile = {
+    schemaVersion: SCHEMA_VERSION,
+    teammates: [],
+    missionOwners: {},
+    settings: DEFAULT_SETTINGS
+  }
   let value: unknown
   try {
     value = JSON.parse(text) as unknown
@@ -125,7 +135,16 @@ function parsedFile(text: string): StoredFile {
     }
   }
 
-  return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners }
+  // Settings default rather than fail: a corrupt flag must not take the
+  // roster with it, and `off` is the safe reading of an unreadable switch.
+  const rawSettings = record.settings
+  const settings: WorkspaceSettings = {
+    swarm: typeof rawSettings === 'object' && rawSettings !== null
+      ? (rawSettings as Record<string, unknown>).swarm === true
+      : false
+  }
+
+  return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, settings }
 }
 
 export function createTeammateStore(options: { readonly rootDirectory: string }): TeammateStore {
@@ -147,11 +166,11 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
     try {
       const text = await readFile(path, 'utf8')
       if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) {
-        return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {} }
+        return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, settings: DEFAULT_SETTINGS }
       }
       return parsedFile(text)
     } catch {
-      return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {} }
+      return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, settings: DEFAULT_SETTINGS }
     }
   }
 
@@ -229,6 +248,26 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
 
     missionOwners(): Promise<Readonly<Record<string, string>>> {
       return serialize(async () => (await read()).missionOwners)
+    },
+
+    readSettings(): Promise<WorkspaceSettings> {
+      return serialize(async () => (await read()).settings)
+    },
+
+    writeSettings(settings: unknown): Promise<WorkspaceSettings> {
+      return serialize(async () => {
+        // Only a literal true turns it on. Anything else -- absent, a string,
+        // a truthy object -- is off, so a malformed message cannot enable a
+        // workspace-wide setting.
+        const next: WorkspaceSettings = {
+          swarm: typeof settings === 'object' && settings !== null
+            ? (settings as Record<string, unknown>).swarm === true
+            : false
+        }
+        const file = await read()
+        await write({ ...file, settings: next })
+        return next
+      })
     }
   }
 }

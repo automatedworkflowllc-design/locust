@@ -8,6 +8,7 @@ import type {
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
 import { runtimeIsUsable } from '../status.js'
+import mark from '../assets/locust-mark.svg'
 import { Icon } from './Icon.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
@@ -48,6 +49,8 @@ export interface ComposerProps {
   readonly models: readonly PublicModel[]
   readonly effort: string | undefined
   readonly onEffortChange: (effort: string | undefined) => void
+  readonly swarm: boolean
+  readonly onSwarmChange: (swarm: boolean) => void
   readonly onStart: (prompt: string) => Promise<boolean>
   readonly onCancel: () => void
   readonly onOpenRoutePicker: () => void
@@ -77,6 +80,8 @@ export function Composer({
   models,
   effort,
   onEffortChange,
+  swarm,
+  onSwarmChange,
   onStart,
   onCancel,
   onOpenRoutePicker
@@ -131,6 +136,11 @@ export function Composer({
   // design's rule is that an unsupported effort must show as unsupported
   // rather than be sent as a silent no-op.
   const supportedEfforts = models.find((model) => model.id === route.model)?.supportedEfforts ?? []
+  // Swarm means "this model's maximum", and the catalog orders efforts lowest
+  // to highest, so the maximum is the last one THIS model reported -- not a
+  // fixed name that some models do not have.
+  const swarmEffort = supportedEfforts[supportedEfforts.length - 1]
+  const effectiveEffort = swarm ? swarmEffort : effort
 
   const runtimeLabel = selected?.displayName ?? (route.runtime === 'claude' ? 'Claude Code' : 'Codex CLI')
   const modelLabel = activeRoute?.model ?? route.model
@@ -275,19 +285,38 @@ export function Composer({
                   className="lc-control"
                   aria-haspopup="menu"
                   aria-expanded={effortOpen}
-                  disabled={running || supportedEfforts.length === 0}
+                  disabled={running || supportedEfforts.length === 0 || swarm}
                   title={
                     supportedEfforts.length === 0
                       ? 'This route does not report reasoning effort, so none is sent.'
-                      : 'Reasoning effort'
+                      : swarm
+                        ? 'Swarm mode is holding this at the model maximum.'
+                        : 'Reasoning effort'
                   }
                   onClick={() => setEffortOpen(!effortOpen)}
                 >
                   <span className="lc-control__mono">
-                    {supportedEfforts.length === 0 ? 'no effort' : (effort ?? 'default')}
+                    {supportedEfforts.length === 0 ? 'no effort' : (effectiveEffort ?? 'default')}
                   </span>
                 </button>
               </span>
+              <button
+                type="button"
+                className={`lc-swarm${swarm ? ' is-on' : ''}`}
+                aria-pressed={swarm}
+                aria-label="Swarm mode"
+                disabled={running || swarmEffort === undefined}
+                title={
+                  swarmEffort === undefined
+                    ? 'Swarm needs a model that reports effort levels.'
+                    : swarm
+                      ? `Swarm on — every mission runs at ${swarmEffort}`
+                      : 'Swarm: run every mission at its model maximum'
+                }
+                onClick={() => onSwarmChange(!swarm)}
+              >
+                <img src={mark} alt="" aria-hidden="true" />
+              </button>
             </div>
           </div>
         </form>

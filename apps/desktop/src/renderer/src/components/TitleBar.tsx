@@ -10,16 +10,20 @@ import { Icon } from './Icon.js'
  */
 export function TitleBar({
   workspaceName,
-  runningCount
+  runningCount,
+  swarm
 }: {
   readonly workspaceName: string
   readonly runningCount: number
+  readonly swarm: boolean
 }): ReactElement {
   return (
     <header className="lc-titlebar" onDoubleClick={() => window.desktop?.toggleMaximize()}>
       <span />
       <span className="lc-titlebar__title">{workspaceName}</span>
       <div className="lc-titlebar__right" onDoubleClick={(event) => event.stopPropagation()}>
+        {/* A workspace-wide setting deserves a persistent, visible statement. */}
+        {swarm && <span className="lc-swarmchip">Swarm · every mission at max effort</span>}
         {runningCount > 0 && (
           <span className="lc-runstate">
             <span className="lc-dot is-pulsing lc-tone-lime" />

@@ -2112,3 +2112,58 @@ textarea {
   right: 0;
   width: 220px;
 }
+
+/* --- Swarm ------------------------------------------------------------- */
+
+.lc-swarm {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-swarm img {
+  height: 15px;
+  width: auto;
+  opacity: 0.55;
+}
+
+.lc-swarm:hover:not(:disabled) img {
+  opacity: 0.85;
+}
+
+.lc-swarm.is-on {
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+}
+
+.lc-swarm.is-on img {
+  opacity: 1;
+}
+
+.lc-swarm:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.lc-swarmchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  padding: 1px var(--lc-space-4);
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+  color: var(--lc-lime-text);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}

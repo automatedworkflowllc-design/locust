@@ -10,6 +10,8 @@ export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
 export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
 export const MODEL_CATALOG_CHANNEL = 'models:list'
+export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
+export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
@@ -134,6 +136,15 @@ export interface PublicModel {
 export type ModelCatalogResponse =
   | { readonly ok: true; readonly data: { readonly models: readonly PublicModel[] } }
   | { readonly ok: false; readonly error: { readonly code: 'MODELS_UNAVAILABLE'; readonly message: string } }
+
+/**
+ * Workspace-wide settings. `swarm` runs every mission at its model's MAXIMUM
+ * supported effort -- which is only meaningful because the catalog reports
+ * effort per model, so "maximum" is a real value rather than a guess.
+ */
+export interface WorkspaceSettings {
+  readonly swarm: boolean
+}
 
 /** What the runtime is asking permission to do. */
 export type MissionApprovalKind = 'command' | 'file-change' | 'question'
@@ -315,6 +326,8 @@ export interface DesktopApi {
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */
   listModels(): Promise<ModelCatalogResponse>
+  readWorkspaceSettings(): Promise<WorkspaceSettings>
+  writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>
