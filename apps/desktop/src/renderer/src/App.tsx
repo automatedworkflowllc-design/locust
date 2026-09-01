@@ -19,6 +19,7 @@ import { CommandPalette } from './components/CommandPalette.js'
 import type { PaletteAction } from './components/CommandPalette.js'
 import { Inspector } from './components/Inspector.js'
 import { MissionsScreen, SettingsScreen, TeammatesScreen } from './components/Screens.js'
+import type { RouteChoice } from './components/RoutePicker.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
@@ -137,6 +138,7 @@ export default function App(): ReactElement {
   const [screen, setScreen] = useState<Screen>('workroom')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [mode, setMode] = useState<MissionMode>('ask')
+  const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
   const [teammateError, setTeammateError] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const activeRunIdRef = useRef<string | undefined>(undefined)
@@ -466,6 +468,8 @@ export default function App(): ReactElement {
             activeRoute={liveRun?.data}
             mode={mode}
             onModeChange={setMode}
+            route={route}
+            onRouteChange={setRoute}
             error={noRuntimeReady && runtimeState.phase === 'ready' ? undefined : undefined}
             onStart={startMission}
             onCancel={cancelMission}

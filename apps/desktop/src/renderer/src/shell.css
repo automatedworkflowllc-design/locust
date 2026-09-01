@@ -1938,3 +1938,114 @@ textarea {
   line-height: 1.4;
   text-wrap: pretty;
 }
+
+/* --- Route picker ------------------------------------------------------ */
+
+.lc-picker {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: 420px;
+  background: var(--lc-bg-raised-2);
+  border: 1px solid var(--lc-border-strong);
+  border-radius: 11px;
+  box-shadow: var(--lc-shadow-menu);
+  overflow: hidden;
+  z-index: 5;
+}
+
+.lc-picker__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px var(--lc-space-5);
+  border-bottom: 1px solid var(--lc-border-card);
+}
+
+.lc-picker__input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+}
+
+.lc-picker__input::placeholder {
+  color: var(--lc-text-label);
+}
+
+.lc-picker__list {
+  max-height: 330px;
+  overflow-y: auto;
+  padding: var(--lc-space-3);
+}
+
+.lc-picker__group {
+  padding: var(--lc-space-4) var(--lc-space-4) var(--lc-space-2);
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+  color: var(--lc-text-label);
+}
+
+.lc-picker__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--lc-space-4) 9px;
+  border: 1px solid transparent;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-picker__row:hover:not(:disabled) {
+  background: var(--lc-bg-selected);
+}
+
+.lc-picker__row.is-active {
+  background: var(--lc-lime-tint);
+  border-color: var(--lc-lime-border);
+}
+
+.lc-picker__row:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.lc-picker__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lc-picker__label {
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+}
+
+.lc-picker__detail {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
+.lc-picker__tag {
+  font-size: var(--lc-text-mono-label);
+  white-space: nowrap;
+}
+
+.lc-picker__foot {
+  padding: 10px var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-card);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}

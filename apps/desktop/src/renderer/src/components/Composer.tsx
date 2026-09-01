@@ -4,6 +4,8 @@ import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
 import type { MissionMode, MissionRouteSummary, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { runtimeIsUsable } from '../status.js'
 import { Icon } from './Icon.js'
+import { RoutePicker } from './RoutePicker.js'
+import type { RouteChoice } from './RoutePicker.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 
@@ -31,6 +33,8 @@ export interface ComposerProps {
   readonly error: string | undefined
   readonly mode: MissionMode
   readonly onModeChange: (mode: MissionMode) => void
+  readonly route: RouteChoice
+  readonly onRouteChange: (route: RouteChoice) => void
   readonly onStart: (prompt: string) => Promise<boolean>
   readonly onCancel: () => void
   readonly onOpenRoutePicker: () => void
@@ -55,26 +59,37 @@ export function Composer({
   error,
   mode,
   onModeChange,
+  route,
+  onRouteChange,
   onStart,
   onCancel,
   onOpenRoutePicker
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
   const [modeOpen, setModeOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
-  const codex = runtimes.find((runtime) => runtime.id === 'codex')
-  const codexReady = codex !== undefined && runtimeIsUsable(codex)
-  const canStart = codexReady && !running && value.trim().length > 0
+  const selected = runtimes.find((runtime) => runtime.id === route.runtime)
+  const selectedReady = selected !== undefined && runtimeIsUsable(selected)
+  // Only Codex can own a mission today. Claude is selectable -- discovery
+  // has proven it is there and signed in -- but starting on it would
+  // silently run something else, so the composer refuses and says why.
+  const routeCanRun = route.runtime === 'codex'
+  const canStart = selectedReady && routeCanRun && !running && value.trim().length > 0
 
   const placeholder = running
     ? 'A mission is running — stop it before starting another…'
-    : codexReady
-      ? 'Describe a mission for this workspace…'
-      : discoveryPhase === 'loading'
-        ? 'Checking local runtimes…'
-        : discoveryPhase === 'error'
-          ? 'Runtime discovery is unavailable…'
-          : 'Sign in to a local runtime to start a mission…'
+    : !routeCanRun
+      ? `The ${selected?.displayName ?? 'selected'} adapter is not finished — switch the route to run a mission…`
+      : selectedReady
+        ? mode === 'accept-edits'
+          ? 'Describe a mission. It may edit files in this workspace…'
+          : 'Describe a mission for this workspace…'
+        : discoveryPhase === 'loading'
+          ? 'Checking local runtimes…'
+          : discoveryPhase === 'error'
+            ? 'Runtime discovery is unavailable…'
+            : 'Sign in to a local runtime to start a mission…'
 
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()
@@ -92,8 +107,8 @@ export function Composer({
     }
   }
 
-  const runtimeLabel = activeRoute?.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'
-  const modelLabel = activeRoute?.model ?? (codex?.version === null ? 'account default' : 'account default')
+  const runtimeLabel = selected?.displayName ?? (route.runtime === 'claude' ? 'Claude Code' : 'Codex CLI')
+  const modelLabel = activeRoute?.model ?? route.model
 
   return (
     <div className="lc-composer">
@@ -180,18 +195,32 @@ export function Composer({
               </button>
             </div>
             <div className="lc-composer__group">
-              <button
-                type="button"
-                className="lc-control"
-                onClick={onOpenRoutePicker}
-                disabled={running}
-                aria-haspopup="listbox"
-              >
-                <span className={`lc-dot ${codexReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
-                {runtimeLabel}
-                <span className="lc-separator">/</span>
-                <span className="lc-control__mono">{modelLabel}</span>
-              </button>
+              <span className="lc-control__anchor">
+                {pickerOpen && (
+                  <RoutePicker
+                    runtimes={runtimes}
+                    active={route}
+                    onSelect={onRouteChange}
+                    onClose={() => setPickerOpen(false)}
+                  />
+                )}
+                <button
+                  type="button"
+                  className="lc-control"
+                  onClick={() => {
+                    onOpenRoutePicker()
+                    setPickerOpen(!pickerOpen)
+                  }}
+                  disabled={running}
+                  aria-haspopup="listbox"
+                  aria-expanded={pickerOpen}
+                >
+                  <span className={`lc-dot ${selectedReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
+                  {runtimeLabel}
+                  <span className="lc-separator">/</span>
+                  <span className="lc-control__mono">{modelLabel}</span>
+                </button>
+              </span>
               <button
                 type="button"
                 className="lc-control"
