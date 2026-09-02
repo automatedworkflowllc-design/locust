@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { isAbsolute } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { assertSafeRuntimeCommand } from "./commands.js";
@@ -18,6 +18,12 @@ interface RuntimeWritable {
 }
 
 export interface SpawnedRuntimeProcess {
+  /**
+   * The OS process id, when there is one. A test's fake process has none, so
+   * the tree kill below is a no-op for it rather than something a fake has to
+   * remember to opt out of.
+   */
+  readonly pid?: number;
   readonly stdin: RuntimeWritable;
   readonly stdout: RuntimeReadable;
   readonly stderr: RuntimeReadable;
@@ -279,6 +285,27 @@ const defaultSpawn: RuntimeSpawn = (executablePath, args, options) =>
  * errors. This transport splits stdout into raw JSONL records only; provider
  * schema parsing belongs in the Codex/Claude adapters above this boundary.
  */
+/**
+ * Where Windows keeps `taskkill`. Resolved absolutely: a bare command name is
+ * searched for in the application directory and the working directory first,
+ * so a planted `taskkill.exe` would run in this process's own context.
+ */
+function windowsTaskkillPath(): string {
+  const root = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows";
+  return `${root}\\System32\\taskkill.exe`;
+}
+
+/** Kill a process and everything it started. Windows needs help with this. */
+export function killProcessTree(pid: number | undefined): void {
+  if (process.platform !== "win32" || pid === undefined) return;
+  try {
+    execFileSync(windowsTaskkillPath(), ["/F", "/T", "/PID", String(pid)], { stdio: "ignore" });
+  } catch {
+    // Best effort. `child.kill` still runs, and the completion path does not
+    // depend on either of them succeeding.
+  }
+}
+
 export function createNodeRuntimeProcessRunner(
   options: NodeRuntimeProcessRunnerOptions = {},
 ): RuntimeProcessRunner {
@@ -464,6 +491,13 @@ export function createNodeRuntimeProcessRunner(
           if (settled) return;
           forcedTerminationAttempted = true;
           try {
+            // The TREE, not the process. On Windows `kill` terminates one pid,
+            // and the pid here is often a shim -- Claude Code is launched
+            // through a PowerShell script, so killing the host leaves the
+            // agent running. A stop that leaves a write-capable agent editing
+            // the workspace, while the ledger records the run as cancelled,
+            // is worse than no stop at all.
+            killProcessTree(child.pid);
             child.kill("SIGKILL");
           } catch {
             // Completion remains deterministic even if the platform rejects the signal.

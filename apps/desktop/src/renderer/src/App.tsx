@@ -254,11 +254,34 @@ export default function App(): ReactElement {
     }
     const response = await bridge.pruneMissions({ olderThanDays: days, dryRun: false })
     if (response.ok) {
-      // The history just changed. Re-read both from the host rather than
-      // adjusting counts here, where they could drift from the ledger.
-      const [next, listed] = await Promise.all([bridge.readStorageReport(), bridge.getMissionHistory()])
+      // A deleted mission has to leave the SCREEN as well as the disk. One
+      // left open kept showing a durable receipt for a record that no longer
+      // existed, and a reply to it was answered with "the earlier mission did
+      // not record a session" -- which is not what happened, and the person's
+      // message was never sent at all.
+      const gone = new Set(response.data.deleted)
+      setRuns((current) => {
+        const next = new Map(current)
+        for (const [key, run] of current) {
+          if (run.data !== undefined && gone.has(run.data.missionId)) next.delete(key)
+        }
+        return next
+      })
+      setShownKey((current) => {
+        if (current === undefined) return current
+        const shown = runsRef.current.get(current)
+        return shown?.data !== undefined && gone.has(shown.data.missionId) ? undefined : current
+      })
+      // The history and the roster changed with it. Re-read them from the
+      // host rather than adjusting counts here, where they could drift.
+      const [next, listed, roster] = await Promise.all([
+        bridge.readStorageReport(),
+        bridge.getMissionHistory(),
+        bridge.listTeammates()
+      ])
       if (next.ok) setStorage(next.data)
       if (listed.ok) setHistory(listed.data.missions)
+      if (roster.ok) setMissionOwners(roster.data.missionOwners)
     }
     return response
   }
@@ -302,6 +325,8 @@ export default function App(): ReactElement {
    */
   const liveRunRef = useRef<LiveRunState | undefined>(undefined)
   liveRunRef.current = liveRun
+  const runsRef = useRef<ReadonlyMap<string, LiveRunState>>(runs)
+  runsRef.current = runs
 
   const refreshHistory = (): void => {
     const bridge = window.desktop
@@ -432,11 +457,18 @@ export default function App(): ReactElement {
     setDecidingIds((current) => [...current, approvalId])
     void bridge
       .decideMissionApproval({ approvalId, decision })
-      .catch(() => undefined)
-      .finally(() => {
-        // The card goes once the answer is delivered, whatever it was --
-        // leaving it up would invite a second click on a settled action.
-        setApprovals((current) => current.filter((entry) => entry.approvalId !== approvalId))
+      .then((response) => {
+        // The card goes when the answer was DELIVERED. It used to go whatever
+        // happened, so a rejected call left the person believing they had
+        // denied a command while the runtime was still waiting to be told.
+        // This is the one control here where a dropped answer has a real
+        // consequence, so a failure keeps the card and stays clickable.
+        if (response.ok) {
+          setApprovals((current) => current.filter((entry) => entry.approvalId !== approvalId))
+        }
+        setDecidingIds((current) => current.filter((entry) => entry !== approvalId))
+      })
+      .catch(() => {
         setDecidingIds((current) => current.filter((entry) => entry !== approvalId))
       })
   }

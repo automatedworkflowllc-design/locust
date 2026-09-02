@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { seedAvatar } from '../shared/avatar.js'
-import { createTeammateStore, parsedTeammate, validName } from './teammate-store.js'
+import { createTeammateStore, MAX_MISSION_OWNERS, parsedTeammate, validName } from './teammate-store.js'
 
 const roots: string[] = []
 
@@ -135,6 +135,48 @@ describe('teammate store', () => {
     await teammates.create({ name: 'Wren', hue: 'lime', role: 'Docs & QA' })
     const { readdir } = await import('node:fs/promises')
     expect((await readdir(root)).filter((name) => name.endsWith('.tmp'))).toEqual([])
+  })
+})
+
+describe('how many missions the roster will hold', () => {
+  it('refuses a new assignment past its cap, instead of growing until the file empties itself', async () => {
+    // The file has a size cliff: past its byte limit it READS as empty, and
+    // the next write saves that empty file over the real one. Unbounded
+    // assignments walk straight into it, taking the roster with them.
+    const { root, store: teammates } = await store()
+    const wren = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+
+    const owners: Record<string, string> = {}
+    for (let index = 0; index < MAX_MISSION_OWNERS; index += 1) {
+      owners[`mission_${String(index)}`] = wren.teammateId
+    }
+    await writeFile(
+      join(root, 'teammates.json'),
+      JSON.stringify({ schemaVersion: 1, teammates: [wren], missionOwners: owners, settings: { swarm: false } }),
+      'utf8'
+    )
+
+    const reopened = createTeammateStore({ rootDirectory: root })
+    await expect(reopened.assignMission(wren.teammateId, 'mission_one_too_many')).rejects.toThrow()
+    // Re-assigning one it already holds is not growth, and stays allowed.
+    await expect(reopened.assignMission(wren.teammateId, 'mission_0')).resolves.toBeUndefined()
+  })
+
+  it('reads no more assignments than it would write', async () => {
+    const { root, store: teammates } = await store()
+    const wren = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    const owners: Record<string, string> = {}
+    for (let index = 0; index < MAX_MISSION_OWNERS + 50; index += 1) {
+      owners[`mission_${String(index)}`] = wren.teammateId
+    }
+    await writeFile(
+      join(root, 'teammates.json'),
+      JSON.stringify({ schemaVersion: 1, teammates: [wren], missionOwners: owners, settings: { swarm: false } }),
+      'utf8'
+    )
+
+    const held = await createTeammateStore({ rootDirectory: root }).missionOwners()
+    expect(Object.keys(held)).toHaveLength(MAX_MISSION_OWNERS)
   })
 })
 

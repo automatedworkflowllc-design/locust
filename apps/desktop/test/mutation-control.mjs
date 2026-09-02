@@ -28,8 +28,23 @@ const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const HISTORY = join(ROOT, 'src', 'main', 'mission-history.ts')
 const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
+const ROSTER = join(ROOT, 'src', 'main', 'teammate-store.ts')
 
 const MUTATIONS = [
+  {
+    file: ROSTER,
+    name: 'mission assignments grow without bound, until the file empties itself',
+    from: '        if (\n          file.missionOwners[missionId] === undefined\n          && Object.keys(file.missionOwners).length >= MAX_MISSION_OWNERS\n        ) {\n          throw new Error(\'Too many mission assignments\')\n        }\n',
+    to: '',
+    expect: 'refuses a new assignment past its cap, instead of growing until the file empties itself'
+  },
+  {
+    file: ROSTER,
+    name: 'the roster reads more assignments than it would ever write',
+    from: '      if (Object.keys(owners).length >= MAX_MISSION_OWNERS) break',
+    to: '      void owners',
+    expect: 'reads no more assignments than it would write'
+  },
   {
     file: MISSIONS,
     name: 'a read-only Cursor mission runs where nothing can hold it read-only',
@@ -592,7 +607,8 @@ const originals = new Map([
   [TEAMMATES, readFileSync(TEAMMATES, 'utf8')],
   [CATALOG, readFileSync(CATALOG, 'utf8')],
   [HISTORY, readFileSync(HISTORY, 'utf8')],
-  [RUNTIMES, readFileSync(RUNTIMES, 'utf8')]
+  [RUNTIMES, readFileSync(RUNTIMES, 'utf8')],
+  [ROSTER, readFileSync(ROSTER, 'utf8')]
 ])
 let problems = 0
 

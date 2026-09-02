@@ -1,13 +1,14 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, session, shell } from 'electron'
 import {
   createNodeProbeRunner,
+  killProcessTree,
   createNodeRuntimeProcessRunner,
   createPathExecutableLocator,
   discoverInstalledRuntimes
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
-import { execFileSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -66,14 +67,21 @@ let appServerServiceForShutdown: AppServerMissionService | undefined
 let ledgerForShutdown: MissionLedger | undefined
 let workroomForShutdown: Workroom | undefined
 
-const isAllowedExternalUrl = (url: string): boolean => {
-  try {
-    const parsed = new URL(url)
-    return parsed.protocol === 'https:' || parsed.protocol === 'mailto:'
-  } catch {
-    return false
-  }
-}
+/**
+ * The renderer names no destinations.
+ *
+ * `window.open` used to reach `shell.openExternal` for anything with an
+ * `https:` or `mailto:` protocol. That is a hole straight through the egress
+ * rules this file works to keep: the packaged build cancels every renderer
+ * request and refuses every permission, but `openExternal` hands the URL to
+ * the operating system, where none of that applies. Anything running in the
+ * renderer could have posted the mission ledger to a host of its choosing,
+ * one browser launch at a time.
+ *
+ * Nothing in this shell links out, so nothing is opened. A future feature
+ * that needs a link should name the exact URL here, in the host, rather than
+ * accept one from the window.
+ */
 
 const createWindow = (
   codexMissions: CodexMissionService,
@@ -121,10 +129,7 @@ const createWindow = (
     }
   })
 
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (isAllowedExternalUrl(url)) void shell.openExternal(url)
-    return { action: 'deny' }
-  })
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
   window.webContents.on('will-navigate', (event, url) => {
     const activeUrl = window.webContents.getURL()
@@ -133,6 +138,12 @@ const createWindow = (
 
   window.once('closed', () => {
     codexMissions.interrupt()
+    // The app-server transport was only ever stopped on quit, and macOS does
+    // not quit when the last window closes. Its runs are the write-capable
+    // ones, and once the window is gone their approval requests reach nobody:
+    // the run cannot finish, cannot be stopped, and pins a ledger record that
+    // then refuses to be deleted.
+    void appServerServiceForShutdown?.dispose().catch(() => undefined)
   })
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
@@ -199,7 +210,7 @@ if (!ownsSingleInstanceLock) {
         kill: () => {
           try {
             if (process.platform === 'win32' && child.pid !== undefined) {
-              execFileSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore' })
+              killProcessTree(child.pid)
               return
             }
           } catch {

@@ -19,6 +19,24 @@ import type { PublicTeammate, TeammateHue, TeammateRole, WorkspaceSettings } fro
  */
 
 export const MAX_TEAMMATES = 64
+
+/**
+ * How many mission-to-teammate assignments the roster will hold.
+ *
+ * Teammates were capped and assignments were not, and the file has a size
+ * cliff: past `MAX_FILE_BYTES` it reads as EMPTY, and the next write saves
+ * that empty file over the real one. A window that assigned missions in a
+ * loop could therefore delete the person's whole roster.
+ *
+ * The number has to sit well UNDER that cliff to be worth anything. An entry
+ * is roughly 65 bytes (a `mission_<uuid>` key and a teammate id), so five
+ * thousand is about a third of a megabyte against a one-megabyte limit --
+ * headroom enough for the teammates and settings beside it. My first attempt
+ * at this was 20,000, and the test written for it proved that a full roster
+ * crossed the cliff and emptied itself, which is the bug the cap exists to
+ * prevent. Five thousand is still more than a dozen missions a day for a year.
+ */
+export const MAX_MISSION_OWNERS = 5_000
 const MAX_FILE_BYTES = 1_000_000
 const SCHEMA_VERSION = 1 as const
 
@@ -137,6 +155,7 @@ function parsedFile(text: string): StoredFile {
   const owners: Record<string, string> = {}
   if (typeof record.missionOwners === 'object' && record.missionOwners !== null) {
     for (const [missionId, teammateId] of Object.entries(record.missionOwners as Record<string, unknown>)) {
+      if (Object.keys(owners).length >= MAX_MISSION_OWNERS) break
       if (!safeId(missionId) || !safeId(teammateId)) continue
       if (!teammates.some((teammate) => teammate.teammateId === teammateId)) continue
       owners[missionId] = teammateId
@@ -277,6 +296,14 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         const file = await read()
         if (!file.teammates.some((teammate) => teammate.teammateId === teammateId)) {
           throw new Error('Unknown teammate')
+        }
+        // Bounded on write as well as on read. Without this the file grows
+        // until it crosses the size cliff, and crossing it empties the roster.
+        if (
+          file.missionOwners[missionId] === undefined
+          && Object.keys(file.missionOwners).length >= MAX_MISSION_OWNERS
+        ) {
+          throw new Error('Too many mission assignments')
         }
         await write({
           ...file,

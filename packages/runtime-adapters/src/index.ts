@@ -115,3 +115,4 @@ export type { CursorEventNormalizer, CursorInvocationContext } from "./cursor-ev
 export { parseCursorModelList } from "./commands.js";
 export type { RuntimeModelName } from "./types.js";
 export { cursorCanEnforceReadOnly } from "./commands.js";
+export { killProcessTree } from "./process-runner.js";
