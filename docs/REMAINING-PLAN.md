@@ -93,8 +93,12 @@ motion. The live step is one avatar-led line -- a working face for a tool or
 turn step, a still face with staggered dots for reasoning -- with no bar or
 spinner anywhere. Deviation from "renderer only", by necessity: persisting
 the face touches the teammate store and its create request (one validated
-optional field), nothing else in the main process. Not done: editing an
-existing teammate's face (there is no edit flow for teammates yet).
+optional field), nothing else in the main process. Editing a teammate (name,
+hue, face, role) reuses the same dialog from the roster; the id and the
+missions filed under it stay. Runtime notices raised before a mission's first
+step (Codex's skills-budget warning, a config warning) are the runtime
+talking about its own setup, so they stay in the Signal Rail and out of the
+thread; notices raised during the work still show.
 
 **Housekeeping.** The window/taskbar icon is the bare Locust mark on a
 transparent ground (`apps/desktop/resources/icon.png`, from

@@ -14,7 +14,8 @@ import {
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
-  TEAMMATE_REMOVE_CHANNEL
+  TEAMMATE_REMOVE_CHANNEL,
+  TEAMMATE_UPDATE_CHANNEL
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
@@ -33,7 +34,8 @@ import type {
   WorkspaceSettings,
   TeammateCreateRequest,
   TeammateListResponse,
-  TeammateMutationResponse
+  TeammateMutationResponse,
+  TeammateUpdateRequest
 } from '../shared/ipc.js'
 
 export type {
@@ -77,6 +79,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TEAMMATE_CREATE_CHANNEL, request) as Promise<TeammateMutationResponse>,
   removeTeammate: (teammateId: string) =>
     ipcRenderer.invoke(TEAMMATE_REMOVE_CHANNEL, teammateId) as Promise<TeammateMutationResponse>,
+  updateTeammate: (request: TeammateUpdateRequest) =>
+    ipcRenderer.invoke(TEAMMATE_UPDATE_CHANNEL, request) as Promise<TeammateMutationResponse>,
   assignMission: (teammateId: string, missionId: string) =>
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
   startCodexMission: (request: CodexMissionStartRequest) =>

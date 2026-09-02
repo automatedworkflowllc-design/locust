@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
-import type { TeammateHue, TeammateRole } from '../../../shared/ipc.js'
+import type { PublicTeammate, TeammateHue, TeammateRole } from '../../../shared/ipc.js'
 import { PixelFace } from './PixelFace.js'
 
 const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
@@ -32,16 +32,22 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
 export function NewTeammateDialog({
   onCancel,
   onCreate,
-  error
+  error,
+  initial
 }: {
   readonly onCancel: () => void
   readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; avatar: AvatarSpec }) => void
   readonly error: string | undefined
+  /** Set to edit an existing teammate: the same dialog, filled in, saving instead of creating. */
+  readonly initial?: PublicTeammate
 }): ReactElement {
-  const [name, setName] = useState('')
-  const [hue, setHue] = useState<TeammateHue>('lime')
-  const [avatar, setAvatar] = useState<AvatarSpec>(() => seedAvatar(`draft_${Date.now()}_${Math.random()}`))
-  const [role, setRole] = useState<TeammateRole>('Code & Migrations')
+  const editing = initial !== undefined
+  const [name, setName] = useState(initial?.name ?? '')
+  const [hue, setHue] = useState<TeammateHue>(initial?.hue ?? 'lime')
+  const [avatar, setAvatar] = useState<AvatarSpec>(
+    () => initial?.avatar ?? seedAvatar(`draft_${Date.now()}_${Math.random()}`)
+  )
+  const [role, setRole] = useState<TeammateRole>(initial?.role ?? 'Code & Migrations')
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -60,9 +66,9 @@ export function NewTeammateDialog({
 
   return (
     <div className="lc-scrim" onKeyDown={onKeyDown}>
-      <div className="lc-dialog" role="dialog" aria-modal="true" aria-label="New teammate">
+      <div className="lc-dialog" role="dialog" aria-modal="true" aria-label={editing ? 'Edit teammate' : 'New teammate'}>
         <div className="lc-dialog__head">
-          <span className="lc-dialog__title">New teammate</span>
+          <span className="lc-dialog__title">{editing ? 'Edit teammate' : 'New teammate'}</span>
           <span className="lc-dialog__sub lc-mono">lives on this machine</span>
           <button type="button" className="lc-dialog__close" aria-label="Close" onClick={onCancel}>
             ✕
@@ -166,7 +172,7 @@ export function NewTeammateDialog({
             disabled={!canCreate}
             onClick={() => onCreate({ name: trimmed, hue, role, avatar })}
           >
-            Create teammate
+            {editing ? 'Save changes' : 'Create teammate'}
           </button>
         </div>
       </div>

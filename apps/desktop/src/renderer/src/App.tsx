@@ -221,6 +221,8 @@ export default function App(): ReactElement {
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
+  /** The teammate being edited in the same dialog, when it is open for editing. */
+  const [editingTeammate, setEditingTeammate] = useState<PublicTeammate>()
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [screen, setScreen] = useState<Screen>('workroom')
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -616,6 +618,30 @@ export default function App(): ReactElement {
       .catch(() => setTeammateError('That teammate could not be created.'))
   }
 
+  const updateTeammate = (
+    teammateId: string,
+    input: { name: string; hue: TeammateHue; role: TeammateRole; avatar: AvatarSpec }
+  ): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .updateTeammate({ teammateId, ...input })
+      .then((response) => {
+        if (!response.ok) {
+          setTeammateError(response.error.message)
+          return
+        }
+        setTeammateError(undefined)
+        setEditingTeammate(undefined)
+        return bridge.listTeammates().then((listed) => {
+          if (!listed.ok) return
+          setTeammates(listed.data.teammates)
+          setMissionOwners(listed.data.missionOwners)
+        })
+      })
+      .catch(() => setTeammateError('That teammate could not be updated.'))
+  }
+
   const removeTeammate = (teammateId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -783,6 +809,10 @@ export default function App(): ReactElement {
               onNewTeammate={() => {
                 setTeammateError(undefined)
                 setNewTeammateOpen(true)
+              }}
+              onEdit={(teammate) => {
+                setTeammateError(undefined)
+                setEditingTeammate(teammate)
               }}
               onRemove={removeTeammate}
             />
@@ -991,6 +1021,15 @@ export default function App(): ReactElement {
           error={teammateError}
           onCancel={() => setNewTeammateOpen(false)}
           onCreate={createTeammate}
+        />
+      )}
+      {editingTeammate !== undefined && (
+        <NewTeammateDialog
+          key={editingTeammate.teammateId}
+          initial={editingTeammate}
+          error={teammateError}
+          onCancel={() => setEditingTeammate(undefined)}
+          onCreate={(input) => updateTeammate(editingTeammate.teammateId, input)}
         />
       )}
     </div>

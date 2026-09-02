@@ -162,6 +162,44 @@ try {
   }))`))
   check('every drawn pixel is a whole number of device pixels', sizes.every((entry) => Number.isInteger(entry.px) && entry.px >= 2), JSON.stringify(sizes))
 
+  say('3b. editing a teammate changes the name and keeps the face')
+  const edited = await cdp.eval(`(async () => {
+    const before = [...document.querySelectorAll('.lc-teammate .lc-face__layer')].map(l => getComputedStyle(l).boxShadow).join('|')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true, bubbles: true }))
+    await new Promise(r => setTimeout(r, 300))
+    const editButton = document.querySelector('.lc-rostercard__edit')
+    if (!editButton) return JSON.stringify({ opened: false })
+    editButton.click()
+    await new Promise(r => setTimeout(r, 300))
+    const dialog = document.querySelector('.lc-dialog')
+    const title = dialog ? dialog.querySelector('.lc-dialog__title').innerText : ''
+    const field = document.getElementById('lc-teammate-name')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    setter.call(field, 'Wrenna')
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 100))
+    const save = [...document.querySelectorAll('.lc-dialog .lc-primarybutton')].find(b => /Save changes/.test(b.innerText))
+    if (!save) return JSON.stringify({ opened: true, title, saved: false })
+    save.click()
+    for (let i = 0; i < 40; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      if (!document.querySelector('.lc-dialog')) break
+    }
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true, bubbles: true }))
+    await new Promise(r => setTimeout(r, 200))
+    // Back to the workroom so the sidebar and composer are the ones under test.
+    const row = [...document.querySelectorAll('.lc-row--button')][0]
+    row.click()
+    await new Promise(r => setTimeout(r, 300))
+    const after = [...document.querySelectorAll('.lc-teammate .lc-face__layer')].map(l => getComputedStyle(l).boxShadow).join('|')
+    const names = [...document.querySelectorAll('.lc-teammate .lc-row__name')].map(n => n.innerText.trim())
+    return JSON.stringify({ opened: true, title, saved: true, names, faceUnchanged: before === after })
+  })()`)
+  const editState = JSON.parse(edited)
+  check('the roster offers Edit and opens the same dialog in edit mode', editState.opened === true && editState.title === 'Edit teammate', JSON.stringify(editState))
+  check('saving renames the teammate', editState.saved === true && (editState.names ?? []).includes('Wrenna'), JSON.stringify(editState.names))
+  check('the rename did not change the face', editState.faceUnchanged === true)
+
   say('4. while the first Wren works, only their face moves')
   await cdp.eval(`(async () => {
     const row = [...document.querySelectorAll('.lc-row--button')][0]

@@ -34,7 +34,8 @@ import {
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
-  TEAMMATE_REMOVE_CHANNEL
+  TEAMMATE_REMOVE_CHANNEL,
+  TEAMMATE_UPDATE_CHANNEL
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
@@ -362,6 +363,23 @@ if (!ownsSingleInstanceLock) {
         // The store's own validation is the authority; the renderer is told
         // that it was refused, never why in terms it could probe.
         return teammateRejected('That teammate could not be created. Check the name, hue and role.')
+      }
+    })
+
+    ipcMain.handle(TEAMMATE_UPDATE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return teammateRejected('The teammate could not be updated.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        const teammate = await teammates.update({
+          teammateId: input.teammateId,
+          name: input.name,
+          hue: input.hue,
+          role: input.role,
+          avatar: input.avatar
+        })
+        return { ok: true, data: { teammate } } as const
+      } catch {
+        return teammateRejected('That teammate could not be updated. Check the name, hue and role.')
       }
     })
 

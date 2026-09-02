@@ -145,6 +145,8 @@ describe('thread composition', () => {
   it('surfaces provider limits and diagnostics as their own items', () => {
     const thread = buildThread(
       [
+        // Work has begun, so a notice here is about the mission, not the setup.
+        toolStart('t1', 'shell', 'pnpm test'),
         event('route.limit_detected', { kind: 'temporary-rate-limit', message: 'Slow down' }),
         event('adapter.diagnostic', { level: 'warning', code: 'x', message: 'Heads up', terminal: false })
       ],
@@ -382,5 +384,41 @@ describe('the running step', () => {
     const acting = buildThread([stepEvent('turn')], { running: true }).find((item) => item.type === 'live-step')
     expect(thinking).toMatchObject({ type: 'live-step', kind: 'reasoning', label: 'Thinking' })
     expect(acting).toMatchObject({ type: 'live-step', kind: 'turn', label: 'Working' })
+  })
+})
+
+describe('runtime notices in the thread', () => {
+  const at = '2026-09-01T15:00:00.000Z'
+  function notice(id: string, sequence: number): NormalizedRuntimeEvent {
+    return {
+      id,
+      runId: 'run_1',
+      missionId: 'mission_1',
+      sequence,
+      type: 'adapter.diagnostic',
+      occurredAt: at,
+      sourceAdapter: 'codex',
+      payload: { level: 'warning', code: 'codex.item_error', message: 'Skill descriptions were shortened.', terminal: false, evidence: { redacted: true } }
+    } as unknown as NormalizedRuntimeEvent
+  }
+  const step = {
+    id: 's1',
+    runId: 'run_1',
+    missionId: 'mission_1',
+    sequence: 2,
+    type: 'step.started',
+    occurredAt: at,
+    sourceAdapter: 'codex',
+    payload: { stepKind: 'turn', evidence: { redacted: true } }
+  } as unknown as NormalizedRuntimeEvent
+
+  it('keeps a notice raised before any work out of the thread, as setup talk', () => {
+    const items = buildThread([notice('d1', 1), step], { running: false })
+    expect(items.some((item) => item.type === 'diagnostic')).toBe(false)
+  })
+
+  it('shows a notice raised while the work was under way', () => {
+    const items = buildThread([step, notice('d2', 3)], { running: false })
+    expect(items.some((item) => item.type === 'diagnostic')).toBe(true)
   })
 })

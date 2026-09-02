@@ -37,6 +37,8 @@ export interface TeammateStore {
   list(): Promise<readonly PublicTeammate[]>
   create(input: { name: unknown; hue: unknown; role: unknown; avatar?: unknown }): Promise<PublicTeammate>
   remove(teammateId: unknown): Promise<void>
+  /** Change what a person may change; the id and the missions filed under it stay. */
+  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; avatar: unknown }): Promise<PublicTeammate>
   /** Remember which teammate a mission belongs to. */
   assignMission(teammateId: unknown, missionId: unknown): Promise<void>
   missionOwners(): Promise<Readonly<Record<string, string>>>
@@ -222,6 +224,34 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         }
         await write({ ...file, teammates: [...file.teammates, teammate] })
         return teammate
+      })
+    },
+
+    update(input): Promise<PublicTeammate> {
+      return serialize(async () => {
+        if (!safeId(input.teammateId)) throw new Error('Teammate id is invalid')
+        if (!validName(input.name)) throw new Error('Teammate name is invalid')
+        if (!isHue(input.hue)) throw new Error('Teammate hue is invalid')
+        if (!isRole(input.role)) throw new Error('Teammate role is invalid')
+        if (!isAvatarSpec(input.avatar)) throw new Error('Teammate avatar is invalid')
+        const file = await read()
+        const existing = file.teammates.find((teammate) => teammate.teammateId === input.teammateId)
+        if (existing === undefined) throw new Error('Unknown teammate')
+        // Identity is the id and the creation time; everything else is theirs
+        // to change. Mission ownership is keyed by id, so it follows for free.
+        const updated: PublicTeammate = {
+          teammateId: existing.teammateId,
+          name: input.name.trim(),
+          hue: input.hue,
+          role: input.role,
+          avatar: input.avatar,
+          createdAt: existing.createdAt
+        }
+        await write({
+          ...file,
+          teammates: file.teammates.map((teammate) => (teammate.teammateId === updated.teammateId ? updated : teammate))
+        })
+        return updated
       })
     },
 

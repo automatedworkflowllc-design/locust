@@ -240,3 +240,37 @@ describe('teammate faces', () => {
     expect(parsedTeammate({ ...base, avatar: { headwear: 'cap' } })?.avatar).toEqual(seedAvatar('tm_abc'))
   })
 })
+
+describe('editing a teammate', () => {
+  it('changes name, hue, role and face while the id and its missions stay', async () => {
+    const { root, store: teammates } = await store()
+    const created = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    await teammates.assignMission(created.teammateId, 'mission_1')
+    const look = { headwear: 5 as const, accessory: 2 as const, mouth: 2 as const }
+
+    const updated = await teammates.update({
+      teammateId: created.teammateId,
+      name: '  Wrenna ',
+      hue: 'violet',
+      role: 'Docs & QA',
+      avatar: look
+    })
+
+    expect(updated).toEqual({ ...created, name: 'Wrenna', hue: 'violet', role: 'Docs & QA', avatar: look })
+    const reopened = createTeammateStore({ rootDirectory: root })
+    expect(await reopened.list()).toEqual([updated])
+    expect(await reopened.missionOwners()).toEqual({ mission_1: created.teammateId })
+  })
+
+  it('refuses an unknown teammate and an invalid field, changing nothing', async () => {
+    const { store: teammates } = await store()
+    const created = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    await expect(
+      teammates.update({ teammateId: 'tm_nobody', name: 'X', hue: 'lime', role: 'Custom', avatar: created.avatar })
+    ).rejects.toThrow('Unknown teammate')
+    await expect(
+      teammates.update({ teammateId: created.teammateId, name: 'X', hue: 'lime', role: 'Custom', avatar: { headwear: 99 } })
+    ).rejects.toThrow('avatar is invalid')
+    expect(await teammates.list()).toEqual([created])
+  })
+})

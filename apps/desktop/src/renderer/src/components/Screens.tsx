@@ -125,11 +125,13 @@ export function TeammatesScreen({
   teammates,
   missionOwners,
   onNewTeammate,
+  onEdit,
   onRemove
 }: {
   readonly teammates: readonly PublicTeammate[]
   readonly missionOwners: Readonly<Record<string, string>>
   readonly onNewTeammate: () => void
+  readonly onEdit: (teammate: PublicTeammate) => void
   readonly onRemove: (teammateId: string) => void
 }): ReactElement {
   return (
@@ -159,13 +161,18 @@ export function TeammatesScreen({
                   <dt>Mode</dt>
                   <dd className="lc-mono">read-only</dd>
                 </dl>
-                <button
-                  type="button"
-                  className="lc-rostercard__remove"
-                  onClick={() => onRemove(teammate.teammateId)}
-                >
-                  Remove
-                </button>
+                <div className="lc-rostercard__actions">
+                  <button type="button" className="lc-rostercard__edit" onClick={() => onEdit(teammate)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="lc-rostercard__remove"
+                    onClick={() => onRemove(teammate.teammateId)}
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             )
           })}

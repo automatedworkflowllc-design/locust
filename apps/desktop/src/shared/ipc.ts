@@ -11,6 +11,7 @@ export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
+export const TEAMMATE_UPDATE_CHANNEL = 'teammates:update'
 export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
 export const MODEL_CATALOG_CHANNEL = 'models:list'
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
@@ -70,6 +71,18 @@ export interface TeammateCreateRequest {
   readonly role: TeammateRole
   /** The look chosen in the dialog; omitted, the store seeds one from the new id. */
   readonly avatar?: AvatarSpec
+}
+
+/**
+ * Everything about a teammate a person may change. The id is what they are
+ * and stays; missions filed under them stay filed.
+ */
+export interface TeammateUpdateRequest {
+  readonly teammateId: string
+  readonly name: string
+  readonly hue: TeammateHue
+  readonly role: TeammateRole
+  readonly avatar: AvatarSpec
 }
 
 export type TeammateListResponse =
@@ -436,6 +449,7 @@ export interface DesktopApi {
   getMissionHistory(): Promise<MissionHistoryResponse>
   listTeammates(): Promise<TeammateListResponse>
   createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
+  updateTeammate(request: TeammateUpdateRequest): Promise<TeammateMutationResponse>
   removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */

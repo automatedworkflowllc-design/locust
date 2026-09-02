@@ -167,10 +167,16 @@ export function buildThread(
     | { label: string; detail: string | undefined; startedAt: string; kind: 'turn' | 'reasoning' | 'item' }
     | undefined
   let plan: readonly PlanStep[] = []
+  // Notices that arrive before the run has done anything are the runtime
+  // talking about its own setup (a skills budget, a config warning), not
+  // about the mission. They stay in the Signal Rail; the thread keeps only
+  // notices raised while the work was under way.
+  let workBegan = false
 
   for (const event of events) {
     switch (event.type) {
       case 'tool.started': {
+        workBegan = true
         const detail: ActivityDetail = {
           kind: toolKindOf(event),
           name: event.payload.command ?? event.payload.name,
@@ -191,6 +197,7 @@ export function buildThread(
         break
       }
       case 'step.started': {
+        workBegan = true
         const message = event.payload.message
         runningStep = {
           label: message ?? (event.payload.stepKind === 'turn' ? 'Working' : 'Thinking'),
@@ -201,6 +208,7 @@ export function buildThread(
         break
       }
       case 'plan.updated': {
+        workBegan = true
         plan = readPlan(event.payload.plan)
         break
       }
@@ -219,6 +227,7 @@ export function buildThread(
         break
       }
       case 'adapter.diagnostic': {
+        if (!workBegan) break
         items.push({
           key: event.id,
           type: 'diagnostic',

@@ -2513,3 +2513,24 @@ textarea {
     animation: none !important;
   }
 }
+
+.lc-rostercard__actions {
+  display: flex;
+  gap: var(--lc-space-3);
+  align-items: center;
+}
+
+.lc-rostercard__edit {
+  border: 1px solid var(--lc-border-card);
+  background: transparent;
+  color: var(--lc-text-secondary, #a8adab);
+  font: inherit;
+  font-size: var(--lc-text-caption, 12px);
+  padding: 4px 10px;
+  border-radius: var(--lc-radius-button, 7px);
+  cursor: pointer;
+}
+
+.lc-rostercard__edit:hover {
+  background: rgba(255, 255, 255, 0.06);
+}

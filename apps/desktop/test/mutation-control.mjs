@@ -29,6 +29,20 @@ const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const MUTATIONS = [
   {
     file: VIEW,
+    name: 'the runtime’s setup talk lands in the thread',
+    from: '        if (!workBegan) break\n        items.push({',
+    to: '        items.push({',
+    expect: 'keeps a notice raised before any work out of the thread, as setup talk'
+  },
+  {
+    file: TEAMMATES,
+    name: 'an edit hands the teammate a new id, orphaning their missions',
+    from: '          teammateId: existing.teammateId,\n          name: input.name.trim(),',
+    to: "          teammateId: `tm_${randomUUID().replace(/-/g, '').slice(0, 24)}`,\n          name: input.name.trim(),",
+    expect: 'changes name, hue, role and face while the id and its missions stay'
+  },
+  {
+    file: VIEW,
     name: 'every running step is filed as action, so thought draws as work',
     from: "          kind: event.payload.stepKind\n        }",
     to: "          kind: 'turn'\n        }",
