@@ -1,29 +1,42 @@
 # Live smokes
 
-Two scripts that run the product against a **real provider**, not a fake runner.
-Neither is part of `pnpm check`: both need a signed-in Codex CLI and the second
-needs a desktop session, so they are run by hand and their results reported.
+Scripts that run the product against a **real provider** or a **real build**,
+not a fake runner. None is part of `pnpm check`: most need a signed-in CLI and
+a desktop session, so they are run by hand and their results reported.
 
-| script | what it proves | what it cannot see |
-| --- | --- | --- |
-| `live-ledger-smoke.mjs` | discovery -> transport -> normalizer -> durable ledger -> recovery by a fresh reader, on a real Codex run | the renderer |
-| `renderer-smoke.mjs` | the same run driven through the built Electron UI, asserted on what the screen says | nothing above it |
-| `write-mode-smoke.mjs` | that the mission sandbox is real: the same prompt is refused under `read-only` and succeeds under `workspace-write` | the UI |
-| `app-server-smoke.mjs` | the shipped JSON-RPC client against a real `codex app-server`: handshake, real model list, a turn, and an approval request answered | anything above the transport |
+Each exits non-zero on any failed assertion, and each kills the app it started.
+
+## What each one proves
+
+| script | what it proves | what it cannot see | costs quota |
+| --- | --- | --- | --- |
+| `live-ledger-smoke.mjs` | discovery → transport → normalizer → durable ledger → recovery by a fresh reader, on a real Codex run | the renderer | yes |
+| `renderer-smoke.mjs` | the same run driven through the built UI, asserted on what the screen says | nothing above it | yes |
+| `write-mode-smoke.mjs` | that the sandbox is real: one prompt refused under `read-only`, the same one writing under `workspace-write` | the UI | yes |
+| `app-server-smoke.mjs` | the shipped JSON-RPC client against a real `codex app-server`: handshake, model list, a turn, an approval answered | anything above the transport | yes |
+| `handoff-smoke.mjs` | a live Codex mission handed to Claude Code mid-flight, with the checkpoint and divider on screen | whether the second runtime was cheapest | yes, twice |
+| `side-by-side-smoke.mjs` | two teammates running at once, thread switching mid-run, and that a busy teammate refuses a second mission | more than two at once | yes, twice |
+| `workroom-smoke.mjs` | one teammate's finding reaching another's briefing, asserted on screen, in the channel file, and in both ledgers | delivery to a teammate who never runs | yes, twice |
+| `model-choice-smoke.mjs` | each runtime offering its own models, and the picked model being the one that runs and is recorded | models the account cannot run | yes |
+| `cursor-smoke.mjs` | Cursor Agent as a route end to end: its own models, its own command, its own normalizer, recorded as Cursor's | the other runtimes | yes (cheap) |
+| `follow-up-smoke.mjs` | that a reply CONTINUES the conversation: the model recalls a passphrase, the ledger records a `follow-up`, and both turns share one runtime session | routes other than the one passed | yes (cheap; `--route=`) |
+| `avatar-smoke.mjs` | generated faces against the design spec: seeded by id, only the working teammate animates, all still when idle | taste | yes |
+| `retention-smoke.mjs` | pruning old missions from Settings: the preview names what it keeps, deletes nothing, and the confirm removes exactly what it named | — | **no** |
+| `picker-smoke.mjs` | that one runtime with 217 models cannot bury the others: every group capped, the cap counted, search lifting it | — | **no** |
+| `packaged-smoke.mjs` | the built `Locust.exe` from its asar: it boots, discovery finds the CLIs with PATH cut to System32, renderer egress is refused, brand faces load | anything needing a provider run | **no** |
 
 ```
-node _smoke/live-ledger-smoke.mjs
-node _smoke/renderer-smoke.mjs      # requires apps/desktop to be built
-node _smoke/write-mode-smoke.mjs    # writes only inside a throwaway temp repo
-node _smoke/app-server-smoke.mjs   # refuses every approval it is asked for
+node _smoke/picker-smoke.mjs        # no provider run at all
+node _smoke/retention-smoke.mjs     # seeds a ledger by hand
+node _smoke/packaged-smoke.mjs      # requires a packaged build in apps/desktop/release
+node _smoke/cursor-smoke.mjs        # requires apps/desktop to be built
+node _smoke/follow-up-smoke.mjs --route=cursor --model="Composer 2.5"
 ```
 
-Each exits non-zero on any failed assertion.
+## The ones that carry a negative control
 
-## Both carry their own negative control
-
-A green check that could never go red is worth nothing, so each script proves
-its own assertions are live:
+A green check that could never go red is worth nothing, so several prove their
+own assertions are live:
 
 - **`live-ledger-smoke.mjs`** copies the ledger it just wrote, smuggles a NUL
   into one body record, and requires recovery to come back *short, flagged and
@@ -38,21 +51,18 @@ its own assertions are live:
   private `--user-data-dir`, because the app restores mission history from the
   ledger on launch and a shared profile would put a previous run's answer on
   screen before this one starts.
-
-Two of this file's own checks were wrong before they were right, both in the
-same family: one waited for the send button to be *enabled* before typing, when
-it is correctly disabled until a prompt exists — a condition that could never go
-green; the other passed on a stale receipt restored from a shared profile. Both
-are now assertions that mean something.
-
-`write-mode-smoke.mjs` carries its control inline rather than as a separate
-step: the read-only run IS the control. Without it, a build that ignored the
-sandbox argument entirely -- or always passed `workspace-write` -- would still
-produce a green "it wrote the file" result.
-
-`app-server-smoke.mjs` replaces the two throwaway spikes that first proved the
-protocol. It answers every approval request with a REFUSAL: a smoke must not be
-able to run a command on this machine in order to prove that it could have. It
-also asserts that the six models do NOT all report the same supported efforts,
-because an effort control that degrades honestly needs per-model data and a
-uniform list would let a wrong assumption pass.
+- **`write-mode-smoke.mjs`** runs the read-only half FIRST and requires the file
+  to be absent. Without that half, a build that ignored the sandbox flag
+  entirely would pass.
+- **`follow-up-smoke.mjs`** asks for a passphrase the model cannot guess, and
+  requires all three of the recall, the ledger's `follow-up` link, and one
+  shared runtime session id. Any one alone can be true while replies are
+  broken: the transcript can be re-sent without resuming, and a resumed session
+  can still be recorded as an unrelated mission.
+- **`retention-smoke.mjs`** checks the file count on disk after the PREVIEW and
+  requires it unchanged, so a preview that quietly deleted would fail before
+  the confirmation step is reached.
+- **`packaged-smoke.mjs`** attempts an outbound request from the packaged
+  renderer and requires it to be refused, and runs discovery with PATH reduced
+  to `C:\Windows\System32` so a CLI found only because the dev shell knew where
+  it was would report missing.

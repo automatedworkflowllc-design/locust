@@ -134,13 +134,13 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the complete test suite: 350 tests as of 2026-09-01.
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite: 449 tests as of 2026-09-02.
 
 Green tests are not the evidence here. Each package carries a mutation
 control (`test/mutation-control.mjs`) that breaks one behaviour at a time and
 requires the NAMED test to fail, rejecting any mutation that stops the file
 running -- a red suite caused by a broken file proves nothing about any test
-in it. 97 mutations, all caught. Run them with `node test/mutation-control.mjs`
+in it. 133 mutations, all caught. Run them with `node test/mutation-control.mjs`
 from a package directory.
 
 ## Working on it from another agent session
