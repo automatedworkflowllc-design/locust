@@ -156,7 +156,7 @@ invalidation); the test now re-creates the same id and requires it to be as
 fresh as the first time. Retention -- pruning old missions on a policy --
 remains open.
 
-**Builds are identifiable.** The desktop app is 0.4.0 (0.3.0 added Cursor; 0.2.0 deletion; from 0.1.0, which
+**Builds are identifiable.** The desktop app is 0.4.1 (0.4.0 added retention; 0.3.0 Cursor; 0.2.0 deletion; from 0.1.0, which
 every build had been), the installer is named by version, and Settings shows
 `Locust <version>` with a development-build marker when unpackaged. There is
 still no auto-update: the app never checks for a new version, and adding that
