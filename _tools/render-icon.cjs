@@ -13,7 +13,9 @@ const { mkdirSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 
 const ROOT = resolve(__dirname, '..')
-const MARK = join(ROOT, 'apps', 'desktop', 'src', 'renderer', 'src', 'assets', 'locust-mark.svg')
+// The designer's app icon: the mark on its own rounded tile, drawn to fill
+// the square. Rendered as-is, with no padding or tile of ours.
+const MARK = join(ROOT, 'apps', 'desktop', 'src', 'renderer', 'src', 'assets', 'locust-app-icon.svg')
 const OUT_DIR = join(ROOT, 'apps', 'desktop', 'resources')
 const SIZES = [512, 256]
 
@@ -33,13 +35,11 @@ app.whenReady().then(async () => {
     transparent: true,
     webPreferences: { offscreen: true, sandbox: true, contextIsolation: true }
   })
-  // Just the mark, as large as the square allows, on nothing: no tile, no
-  // ground. Colin asked for it to read like the other marks in the taskbar,
-  // which are bare glyphs, and the locust is wide, so it fills the width.
+  // The icon file carries its own tile and inset; this page only sizes it.
   const html = `<!doctype html><html><head><style>
     html, body { margin: 0; width: ${size}px; height: ${size}px; background: transparent; overflow: hidden; }
     .tile { width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;
-            box-sizing: border-box; padding: ${Math.round(size * 0.03)}px; }
+            box-sizing: border-box; padding: 0; }
     svg { width: 100%; height: 100%; }
   </style></head><body><div class="tile">${svg}</div></body></html>`
   const page = join(OUT_DIR, '.icon.html')
