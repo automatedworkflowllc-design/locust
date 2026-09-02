@@ -79,6 +79,23 @@ Codex missions together ("2 running"), the thread switched between them
 while both were live, and both finished with their own receipts. The
 approve-each transport still runs one at a time.
 
+**Avatars — generative pixel faces. BUILT 2026-09-01** from the design
+agent's `design/locust-desktop/AVATARS.md`. A face is `hue x headwear x
+accessory x mouth` on an 8x8 grid, one element per layer with the rest as
+`box-shadow` offsets, seeded from the immutable teammate ID and persisted on
+the record (`avatar`, validated; a record without one gets the ID's face, so
+nothing changes on upgrade). The create dialog seeds a look on open, shuffles
+it, recolours it, and shows the working behaviour on a live 56px preview.
+Motion is status: a face works (bob, eyes, mouth) only while its teammate has
+a live run, in the sidebar and the workroom header; every other chip is
+still, and the presence dot plus the label carry the state under reduced
+motion. The live step is one avatar-led line -- a working face for a tool or
+turn step, a still face with staggered dots for reasoning -- with no bar or
+spinner anywhere. Deviation from "renderer only", by necessity: persisting
+the face touches the teammate store and its create request (one validated
+optional field), nothing else in the main process. Not done: editing an
+existing teammate's face (there is no edit flow for teammates yet).
+
 **Housekeeping.** The window/taskbar icon is the bare Locust mark on a
 transparent ground (`apps/desktop/resources/icon.png`, from
 `_tools/render-icon.cjs`; Colin asked for no tile, as large as the square

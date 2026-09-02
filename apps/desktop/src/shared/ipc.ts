@@ -1,5 +1,7 @@
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
+import type { AvatarSpec } from './avatar.js'
+
 export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
 export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
 export const CODEX_MISSION_CANCEL_CHANNEL = 'codex-mission:cancel'
@@ -38,6 +40,11 @@ export interface PublicTeammate {
   readonly name: string
   readonly hue: TeammateHue
   readonly role: TeammateRole
+  /**
+   * The face, persisted with the record. Seeded from the immutable id when a
+   * teammate is created without one, so a rename never changes it.
+   */
+  readonly avatar: AvatarSpec
   readonly createdAt: string
 }
 
@@ -61,6 +68,8 @@ export interface TeammateCreateRequest {
   readonly name: string
   readonly hue: TeammateHue
   readonly role: TeammateRole
+  /** The look chosen in the dialog; omitted, the store seeds one from the new id. */
+  readonly avatar?: AvatarSpec
 }
 
 export type TeammateListResponse =

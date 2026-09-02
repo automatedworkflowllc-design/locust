@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react'
 
 import type { PublicTeammate, TeammateRole } from '../../../shared/ipc.js'
-import { faceForName } from './NewTeammateDialog.js'
 import { PixelFace } from './PixelFace.js'
 
 /**
@@ -63,7 +62,7 @@ export function IdleTeammate({
   return (
     <div className="lc-empty">
       <div className="lc-empty__inner">
-        <PixelFace hue={teammate.hue} pixels={faceForName(teammate.name)} size={56} />
+        <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={56} />
         <h1>{teammate.name}</h1>
         <p>
           {teammate.role} · reads this workspace and explains what it finds. Nothing is changed

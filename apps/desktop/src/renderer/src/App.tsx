@@ -3,6 +3,8 @@ import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
+import type { AvatarSpec } from '../../shared/avatar.js'
+
 import type {
   CodexMissionUpdate,
   MissionRouteSummary,
@@ -27,7 +29,7 @@ import { MissionsScreen, SettingsScreen, TeammatesScreen } from './components/Sc
 import type { RouteChoice } from './components/RoutePicker.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
-import { faceForName, NewTeammateDialog } from './components/NewTeammateDialog.js'
+import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import { PixelFace } from './components/PixelFace.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
@@ -593,7 +595,7 @@ export default function App(): ReactElement {
       })
   }
 
-  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole }): void => {
+  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; avatar: AvatarSpec }): void => {
     const bridge = window.desktop
     if (!bridge) return
     void bridge
@@ -807,7 +809,19 @@ export default function App(): ReactElement {
                   {missionOwner === undefined ? (
                     <AgentAvatar size={32} />
                   ) : (
-                    <PixelFace hue={missionOwner.hue} pixels={faceForName(missionOwner.name)} size={32} />
+                    <PixelFace
+                      hue={missionOwner.hue}
+                      avatar={missionOwner.avatar}
+                      size={32}
+                      activity={running ? 'working' : 'still'}
+                      presence={
+                        running
+                          ? 'working'
+                          : shownApprovals.length > 0
+                            ? 'approval'
+                            : 'none'
+                      }
+                    />
                   )}
                   <div style={{ minWidth: 0 }}>
                     <div>

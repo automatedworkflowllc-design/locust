@@ -1,26 +1,38 @@
 import type { CSSProperties, ReactElement } from 'react'
 
+import type { TeammateHue } from '../../../shared/ipc.js'
+import { ACCESSORY, chipRadius, EYES, facePixelSize, HEADWEAR, layerGeometry, MOUTH } from '../../../shared/avatar.js'
+import type { AvatarSpec, FaceCell } from '../../../shared/avatar.js'
+
 /**
- * An 8-bit teammate face: a rounded square in the teammate's hue with a face
- * drawn as CSS pixels -- one base pixel plus `box-shadow` offsets on an 8x8
- * grid. No SVG, no emoji, crisp at every size, and it scales by recomputing
- * the pixel size rather than by resampling an image.
+ * A generated teammate face: a rounded chip in the teammate's hue, with the
+ * face drawn as CSS pixels on an 8x8 grid. Four elements at most -- features,
+ * eyes, mouth, and the chip -- each layer ONE span whose extra pixels are
+ * `box-shadow` offsets. No SVG, no images, crisp at every size.
  *
- * Grid coordinates are the even numbers 0-14 from the design spec, which are
- * half-cell units: cell = coordinate / 2, so (12,10) is the 7th column, 6th
- * row. Faces are decorative -- identity is always carried by adjacent text --
- * so the element is aria-hidden.
+ * Motion is a status signal, not decoration: a face moves only while that
+ * teammate is actually doing something. Every other state is perfectly still,
+ * and because motion can be off (reduced motion), state is always also carried
+ * by the presence dot and by adjacent text.
+ *
+ * Faces are decorative -- identity is the name beside them -- so the chip is
+ * aria-hidden.
  */
 
-export type PixelFaceHue = 'lime' | 'blue' | 'violet' | 'clay'
+export type PixelFaceHue = TeammateHue
 
-/** Half-cell coordinates on the 0-14 grid, exactly as the spec tabulates them. */
-export type FacePixel = readonly [x: number, y: number]
+/** What the teammate is doing, which is the only thing that may animate a face. */
+export type FaceActivity = 'working' | 'receiving' | 'still'
+
+/** The presence dot: lime working, amber approval pending, red blocked, none when idle. */
+export type FacePresence = 'working' | 'approval' | 'blocked' | 'none'
 
 export interface PixelFaceProps {
   readonly hue: PixelFaceHue
-  readonly pixels: readonly FacePixel[]
+  readonly avatar: AvatarSpec
   readonly size?: number
+  readonly activity?: FaceActivity
+  readonly presence?: FacePresence
   readonly className?: string
 }
 
@@ -38,87 +50,113 @@ const FACE_VARIABLE: Readonly<Record<PixelFaceHue, string>> = {
   clay: '--lc-hue-clay-face'
 }
 
-/** The four faces the design specifies, by the role each teammate plays. */
-export const FACE_PRESETS: Readonly<Record<string, readonly FacePixel[]>> = {
-  // Cropped hair, two eyes, small mouth.
-  wren: [
-    [2, 0], [4, 0], [6, 0], [8, 0], [10, 0], [12, 0], [2, 2], [12, 2],
-    [4, 6], [10, 6],
-    [6, 10], [8, 10]
-  ],
-  // Bangs, two eyes, flat mouth.
-  atlas: [
-    [4, 2], [6, 2], [8, 2], [10, 2],
-    [4, 6], [10, 6],
-    [4, 10], [6, 10], [8, 10], [10, 10]
-  ],
-  // Cowlick, two eyes, open mouth.
-  juno: [
-    [12, 0], [12, 2],
-    [4, 6], [10, 6],
-    [6, 10], [8, 10], [6, 12], [8, 12]
-  ],
-  // Brows, two eyes, small mouth.
-  sable: [
-    [2, 2], [4, 2], [10, 2], [12, 2],
-    [4, 6], [10, 6],
-    [6, 10], [8, 10]
-  ]
+const PRESENCE_TONE: Readonly<Record<FacePresence, string | undefined>> = {
+  working: 'lime',
+  approval: 'amber',
+  blocked: 'red',
+  none: undefined
 }
 
-/**
- * Pixel size is `round(size * 0.72 / 8)` per the spec, floored at 1 so a very
- * small avatar degrades to a visible face rather than to nothing.
- */
-export function facePixelSize(size: number): number {
-  return Math.max(1, Math.round((size * 0.72) / 8))
+function Layer({
+  cells,
+  pixel,
+  color,
+  animation,
+  origin
+}: {
+  readonly cells: readonly FaceCell[]
+  readonly pixel: number
+  readonly color: string
+  readonly animation: string | undefined
+  readonly origin: string | undefined
+}): ReactElement | null {
+  const geometry = layerGeometry(cells, pixel, color)
+  if (geometry === undefined) return null
+  const style: CSSProperties = {
+    position: 'absolute',
+    left: geometry.left,
+    top: geometry.top,
+    width: pixel,
+    height: pixel,
+    background: color,
+    display: 'block',
+    ...(geometry.shadow.length > 0 ? { boxShadow: geometry.shadow } : {}),
+    ...(origin === undefined ? {} : { transformOrigin: origin }),
+    ...(animation === undefined ? {} : { animation })
+  }
+  return <span className="lc-face__layer" style={style} />
 }
 
-function faceShadow(pixels: readonly FacePixel[], size: number): string {
+export function PixelFace({
+  hue,
+  avatar,
+  size = 32,
+  activity = 'still',
+  presence = 'none',
+  className
+}: PixelFaceProps): ReactElement {
   const pixel = facePixelSize(size)
-  // The grid is 8 cells wide in pixel units; center it in the chip.
-  const origin = Math.round((size - pixel * 8) / 2)
-  return pixels
-    .map(([x, y]) => `${origin + (x / 2) * pixel}px ${origin + (y / 2) * pixel}px 0 0 currentColor`)
-    .join(', ')
-}
+  const grid = pixel * 8
+  const color = `var(${FACE_VARIABLE[hue]})`
+  const working = activity === 'working'
+  const eyesMove = activity === 'working' || activity === 'receiving'
 
-export function PixelFace({ hue, pixels, size = 32, className }: PixelFaceProps): ReactElement {
-  const pixel = facePixelSize(size)
-  const chip: CSSProperties = {
-    // A span is inline by default, and width/height do not apply to inline
-    // boxes -- the avatar only looked right where its parent happened to be a
-    // flex container and blockified it. Set explicitly so the chip is the same
-    // size wherever it is placed.
+  const outer: CSSProperties = {
+    position: 'relative',
     display: 'inline-flex',
     width: size,
     height: size,
-    // The reference uses a small fixed radius at every avatar size (5px on a
-    // 30px chip), which reads as a pixel-art tile rather than a rounded app
-    // icon. A proportional radius rounds the corners off the illusion.
-    borderRadius: size >= 44 ? 7 : 5,
-    background: `var(${HUE_VARIABLE[hue]})`,
-    // Border is the chip hue at 50% alpha, so it reads as the same material.
-    border: `1px solid color-mix(in srgb, var(${HUE_VARIABLE[hue]}) 55%, transparent)`,
-    color: `var(${FACE_VARIABLE[hue]})`,
-    position: 'relative',
-    flexShrink: 0,
-    boxSizing: 'border-box'
+    flexShrink: 0
   }
-  const face: CSSProperties = {
+  const chip: CSSProperties = {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    width: pixel,
-    height: pixel,
-    // The base pixel is itself part of the face only if (0,0) is in the set;
-    // it is not in any preset, so it is transparent and the shadows draw it.
-    background: 'transparent',
-    boxShadow: faceShadow(pixels, size)
+    inset: 0,
+    borderRadius: chipRadius(size),
+    background: `var(${HUE_VARIABLE[hue]})`,
+    // Border is the chip hue at half alpha, so it reads as the same material.
+    border: `1px solid color-mix(in srgb, var(${HUE_VARIABLE[hue]}) 55%, transparent)`,
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+    ...(working ? { animation: 'lcBob 2.6s ease-in-out infinite' } : {})
   }
+  const box: CSSProperties = {
+    position: 'absolute',
+    left: Math.round((size - grid) / 2) - 1,
+    top: Math.round((size - grid) / 2) - 1,
+    width: grid,
+    height: grid,
+    display: 'block'
+  }
+  const tone = PRESENCE_TONE[presence]
+
   return (
-    <span className={className} style={chip} aria-hidden="true">
-      <span style={face} />
+    <span className={`lc-face${className === undefined ? '' : ` ${className}`}`} style={outer} aria-hidden="true">
+      <span className={`lc-face__chip${working ? ' is-working' : ''}`} style={chip}>
+        <span style={box}>
+          <Layer
+            cells={[...HEADWEAR[avatar.headwear]!, ...ACCESSORY[avatar.accessory]!]}
+            pixel={pixel}
+            color={color}
+            animation={undefined}
+            origin={undefined}
+          />
+          <Layer
+            cells={EYES}
+            pixel={pixel}
+            color={color}
+            animation={eyesMove ? 'lcEyes 5s ease-in-out infinite' : undefined}
+            origin="center"
+          />
+          <Layer
+            cells={MOUTH[avatar.mouth]!}
+            pixel={pixel}
+            color={color}
+            animation={working ? 'lcChat 1.5s ease-in-out infinite' : undefined}
+            origin="center top"
+          />
+        </span>
+      </span>
+      {tone !== undefined && <span className={`lc-presence lc-presence--${tone}`} />}
     </span>
   )
 }

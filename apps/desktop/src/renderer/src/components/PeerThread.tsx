@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
+import { seedAvatar } from '../../../shared/avatar.js'
+import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { PublicPeerMessage, PublicTeammate, TeammateHue } from '../../../shared/ipc.js'
-import { faceForName } from './NewTeammateDialog.js'
 import { PixelFace } from './PixelFace.js'
 
 /**
@@ -35,6 +36,10 @@ export function PeerThread({
   // the message) and gets a neutral face: inventing a hue for someone who is
   // no longer here would draw a teammate that does not exist.
   const peerHue: TeammateHue = peerProfile?.hue ?? 'clay'
+  // A departed teammate's face is the one their id seeds -- the same face
+  // they had, if they were created after faces were persisted from the id.
+  const faceOf = (teammateId: string, profile: PublicTeammate | undefined): AvatarSpec =>
+    profile?.avatar ?? seedAvatar(teammateId.length > 0 ? teammateId : 'unknown')
   const count = messages.length
   const label = `${count} message${count === 1 ? '' : 's'} with`
 
@@ -54,7 +59,7 @@ export function PeerThread({
         onClick={() => setOpen(!open)}
       >
         <span>{label}</span>
-        <PixelFace hue={peerHue} pixels={faceForName(peer.name)} size={16} />
+        <PixelFace hue={peerHue} avatar={faceOf(peer.teammateId, peerProfile)} size={16} />
         <span className={`lc-peer__name is-${peerHue}`}>{peer.name}</span>
         {open && (
           <>
@@ -69,9 +74,10 @@ export function PeerThread({
         <>
           {messages.map((message) => {
             const hue = hueFor(message.from.teammateId)
+            const author = teammates.find((teammate) => teammate.teammateId === message.from.teammateId)
             return (
               <div key={message.messageId} className="lc-peer__message">
-                <PixelFace hue={hue} pixels={faceForName(message.from.name)} size={20} />
+                <PixelFace hue={hue} avatar={faceOf(message.from.teammateId, author)} size={20} />
                 <div className="lc-peer__body">
                   <div className={`lc-peer__author is-${hue}`}>{message.from.name}</div>
                   <div className={`lc-peer__bubble${message.text === null ? ' is-missing' : ''}`}>

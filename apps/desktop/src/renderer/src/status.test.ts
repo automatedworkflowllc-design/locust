@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import {
   checkpointLabel,
+  faceActivityFor,
+  facePresenceFor,
   connectedRuntimeCount,
   handoffAvailability,
   handoffTitle,
@@ -196,5 +198,21 @@ describe('handoff availability', () => {
     expect(handoffTitle('available')).toMatch(/hand this mission/i)
     // Idle needs no explanation: the control is doing its ordinary job.
     expect(handoffTitle('idle')).toBeUndefined()
+  })
+})
+
+describe('face activity', () => {
+  it('moves a face only while its teammate is working', () => {
+    expect(faceActivityFor('working')).toBe('working')
+    expect(faceActivityFor('idle')).toBe('still')
+    expect(faceActivityFor('approval-needed')).toBe('still')
+    expect(faceActivityFor('blocked')).toBe('still')
+  })
+
+  it('carries every state on the presence dot, so a still face still reads', () => {
+    expect(facePresenceFor('working')).toBe('working')
+    expect(facePresenceFor('approval-needed')).toBe('approval')
+    expect(facePresenceFor('blocked')).toBe('blocked')
+    expect(facePresenceFor('idle')).toBe('none')
   })
 })

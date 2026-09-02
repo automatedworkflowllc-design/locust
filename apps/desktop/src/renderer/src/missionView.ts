@@ -38,6 +38,12 @@ export type ThreadItem =
       readonly detail: string | undefined
       /** When the step began, so the card can show elapsed time as it runs. */
       readonly startedAt: string
+      /**
+       * What kind of step: a tool or turn is the teammate DOING something and
+       * their face works; reasoning is thought, shown as a still face with
+       * staggered dots. Never a bar or a synthetic percentage.
+       */
+      readonly kind: 'turn' | 'reasoning' | 'item'
     }
   | {
       readonly key: string
@@ -157,7 +163,9 @@ export function buildThread(
   const items: ThreadItem[] = []
   const openTools = new Map<string, ActivityDetail>()
   const activity: ActivityDetail[] = []
-  let runningStep: { label: string; detail: string | undefined; startedAt: string } | undefined
+  let runningStep:
+    | { label: string; detail: string | undefined; startedAt: string; kind: 'turn' | 'reasoning' | 'item' }
+    | undefined
   let plan: readonly PlanStep[] = []
 
   for (const event of events) {
@@ -187,7 +195,8 @@ export function buildThread(
         runningStep = {
           label: message ?? (event.payload.stepKind === 'turn' ? 'Working' : 'Thinking'),
           detail: event.payload.itemType,
-          startedAt: event.occurredAt
+          startedAt: event.occurredAt,
+          kind: event.payload.stepKind
         }
         break
       }
@@ -262,7 +271,8 @@ export function buildThread(
       type: 'live-step',
       label: runningStep.label,
       detail: runningStep.detail,
-      startedAt: runningStep.startedAt
+      startedAt: runningStep.startedAt,
+      kind: runningStep.kind
     })
   }
 

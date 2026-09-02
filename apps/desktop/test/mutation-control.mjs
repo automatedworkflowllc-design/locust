@@ -24,8 +24,37 @@ const PEERS = join(ROOT, 'src', 'main', 'peer-exchange.ts')
 const BRIEFING = join(ROOT, 'src', 'main', 'workroom-briefing.ts')
 const SHARE = join(ROOT, 'src', 'shared', 'peer-share.ts')
 const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
+const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
 
 const MUTATIONS = [
+  {
+    file: VIEW,
+    name: 'every running step is filed as action, so thought draws as work',
+    from: "          kind: event.payload.stepKind\n        }",
+    to: "          kind: 'turn'\n        }",
+    expect: 'carries the step kind, so thought and action draw differently'
+  },
+  {
+    file: STATUS,
+    name: 'an idle face keeps moving',
+    from: "  return status === 'working' ? 'working' : 'still'",
+    to: "  return 'working'",
+    expect: 'moves a face only while its teammate is working'
+  },
+  {
+    file: TEAMMATES,
+    name: 'a face is seeded from the name, so a rename would change it',
+    from: '          avatar: input.avatar ?? seedAvatar(teammateId),',
+    to: '          avatar: input.avatar ?? seedAvatar(input.name.trim()),',
+    expect: 'seeds a face from the id, never the name'
+  },
+  {
+    file: TEAMMATES,
+    name: 'a persisted face is thrown away on read',
+    from: '    avatar: isAvatarSpec(record.avatar) ? record.avatar : seedAvatar(record.teammateId),',
+    to: '    avatar: seedAvatar(record.teammateId),',
+    expect: 'keeps a persisted face rather than re-seeding it, and seeds one for a record without'
+  },
   {
     file: MISSIONS,
     name: 'a handoff waits for every live run, not its own',
@@ -381,7 +410,8 @@ const originals = new Map([
   [PEERS, readFileSync(PEERS, 'utf8')],
   [BRIEFING, readFileSync(BRIEFING, 'utf8')],
   [SHARE, readFileSync(SHARE, 'utf8')],
-  [VIEW, readFileSync(VIEW, 'utf8')]
+  [VIEW, readFileSync(VIEW, 'utf8')],
+  [TEAMMATES, readFileSync(TEAMMATES, 'utf8')]
 ])
 let problems = 0
 

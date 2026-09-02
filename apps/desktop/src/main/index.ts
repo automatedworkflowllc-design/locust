@@ -356,7 +356,7 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return teammateRejected('The teammate could not be created.')
       const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
       try {
-        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role })
+        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, avatar: input.avatar })
         return { ok: true, data: { teammate } } as const
       } catch {
         // The store's own validation is the authority; the renderer is told

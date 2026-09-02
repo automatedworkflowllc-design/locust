@@ -223,3 +223,19 @@ export function handoffTitle(availability: HandoffAvailability): string | undefi
   if (availability === 'switching') return 'Handing this mission over'
   return undefined
 }
+
+/**
+ * A face moves only while its teammate is doing something. Everything else --
+ * idle, waiting on an approval, blocked -- is still, and says so through the
+ * presence dot and the label instead.
+ */
+export function faceActivityFor(status: TeammateStatus): 'working' | 'still' {
+  return status === 'working' ? 'working' : 'still'
+}
+
+export function facePresenceFor(status: TeammateStatus): 'working' | 'approval' | 'blocked' | 'none' {
+  if (status === 'working') return 'working'
+  if (status === 'approval-needed') return 'approval'
+  if (status === 'blocked') return 'blocked'
+  return 'none'
+}

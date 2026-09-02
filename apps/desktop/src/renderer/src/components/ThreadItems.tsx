@@ -1,19 +1,35 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
+import { seedAvatar } from '../../../shared/avatar.js'
 import type { PlanStep } from '../missionView.js'
-import { FACE_PRESETS, PixelFace } from './PixelFace.js'
+import { PixelFace } from './PixelFace.js'
 import { Icon } from './Icon.js'
 
+/** One fixed face for the runtime itself, when a mission belongs to nobody. */
+const RUNTIME_FACE = seedAvatar('locust-runtime')
+
 /**
- * The agent's face beside its turns. Until teammates are real (P2) this is the
- * runtime's own identity rather than a person's, so it uses one fixed hue and
- * face -- a generated-looking avatar for an unnamed agent would imply a
- * teammate that does not exist.
+ * The face beside a mission's turns: the teammate's own when the mission has
+ * one, otherwise the runtime's fixed face -- a generated-looking avatar for an
+ * unnamed agent would imply a teammate that does not exist. Thread faces are
+ * always still: the header and the sidebar carry the working motion, and a
+ * transcript of moving faces would be noise.
  */
-export function AgentAvatar({ size = 24 }: { readonly size?: number }): ReactElement {
-  return <PixelFace hue="lime" pixels={FACE_PRESETS.wren!} size={size} />
+export function AgentAvatar({
+  size = 24,
+  teammate
+}: {
+  readonly size?: number
+  readonly teammate?: { readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike }
+}): ReactElement {
+  return teammate === undefined
+    ? <PixelFace hue="lime" avatar={RUNTIME_FACE} size={size} />
+    : <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={size} />
 }
+
+type PixelFaceHueLike = Parameters<typeof PixelFace>[0]['hue']
+type AvatarSpecLike = Parameters<typeof PixelFace>[0]['avatar']
 
 export function PlanCard({
   steps,
@@ -54,18 +70,25 @@ function elapsedLabel(startedAt: string, now: number): string {
 }
 
 /**
- * The live step. Elapsed time ticks from the event's own timestamp rather than
- * from when this component mounted, so a step that was already running when the
- * view opened reports its real age instead of restarting at zero.
+ * The running step, as one avatar-led line. A tool or turn step is the
+ * teammate doing something, so their face works; a reasoning step is thought,
+ * so the face is still and three staggered dots carry the "still going". No
+ * bar, no spinner, no synthetic percentage -- elapsed time from the event's
+ * own timestamp (so a step already running when the view opened reports its
+ * real age) and whatever the runtime actually said.
  */
 export function LiveStepCard({
   label,
   detail,
-  startedAt
+  startedAt,
+  kind,
+  owner
 }: {
   readonly label: string
   readonly detail: string | undefined
   readonly startedAt: string
+  readonly kind: 'turn' | 'reasoning' | 'item'
+  readonly owner: { readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike } | undefined
 }): ReactElement {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -73,22 +96,27 @@ export function LiveStepCard({
     return () => clearInterval(timer)
   }, [])
   const elapsed = elapsedLabel(startedAt, now)
+  const thinking = kind === 'reasoning'
+  const face = owner ?? { hue: 'lime' as const, avatar: RUNTIME_FACE }
   return (
-    <div className="lc-card is-live">
-      <div className="lc-card__head">
-        <span className="lc-livestep__label">
-          <span className="lc-dot is-pulsing lc-tone-lime" /> {label}
-        </span>
-        <span className="lc-rail__meta">
-          {detail !== undefined && `${detail} · `}
-          {elapsed}
-        </span>
-      </div>
-      <div className="lc-card__body">
-        <div className="lc-progress">
-          <span />
-        </div>
-      </div>
+    <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind}>
+      <PixelFace hue={face.hue} avatar={face.avatar} size={26} activity={thinking ? 'still' : 'working'} />
+      <span className="lc-livestep__label">
+        {label}
+        {thinking && (
+          <span className="lc-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+        )}
+      </span>
+      {/* The clock sits beside the word, not at the far edge: "Working · 57s"
+          reads as one statement about what is happening right now. */}
+      <span className="lc-rail__meta lc-livestep__meta">
+        {detail !== undefined && `${detail} · `}
+        {elapsed}
+      </span>
     </div>
   )
 }

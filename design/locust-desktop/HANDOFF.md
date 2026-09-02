@@ -89,17 +89,54 @@ Author these once (CSS custom properties or a TS token module) and consume every
 
 **Rule:** lime is the only decorative-ish color and only for *active/ready*. Blue/amber/red must carry meaning — never used for hierarchy or delight.
 
-### Teammate avatar palette (8-bit faces)
-Each teammate = a rounded square in its hue with a **CSS-pixel face** (one 2–5px base pixel + `box-shadow` offsets on an 8×8 grid, pixel size = `round(size × 0.72 / 8)`). Crisp at every size; no SVG, no emoji.
+### Teammate avatars — generative pixel faces
 
-| Teammate | Chip | Face pixels | Grid cells (x,y on 0–14 even) |
+Faces are **composed from a small parts library, not drawn per teammate.** One renderer covers every bot a user creates.
+
+```
+face = hue  ×  headwear  ×  accessory  ×  mouth
+```
+
+Grid: 8×8 cells. Pixel size `p = max(2, round(size × 0.72 / 8))`; grid box `p × 8`, centered in the chip, `overflow: hidden`. Cell coordinates below use an even 0–14 scale (`col = x / 2`).
+
+**Layers** — each is ONE DOM node: a single base pixel plus `box-shadow` offsets for its remaining pixels (four nodes max per face):
+1. `features` — headwear + accessory, static
+2. `highlight` — optional lighter pixels (hair streak, visor glint) at 45–60% white
+3. `eyes` — always `(4,6) (10,6)`; **animated**
+4. `mouth` — **animated**, `transform-origin: center top`
+
+Eyes and mouth are always the same structural layer, so **every generated face animates identically** — no per-bot animation work.
+
+**Parts**
+
+| Slot | Options |
+| --- | --- |
+| headwear | `plain` · `cans` (band + side cans) · `bangs` · `buns` · `cap` · `antenna` |
+| accessory | none · goggle frame `(2,6)(12,6)` · brows `(2,4)(12,4)` |
+| mouth | line-2 `(6,10)(8,10)` · line-4 · open `(6,10)(8,10)(6,12)(8,12)` · smirk `(6,10)(8,12)` |
+| hue (chip / pixel) | lime `#A9D93F`/`#151A0C` · blue `#5E9BF0`/`#0D1520` · violet `#A98BE8`/`#150F1E` · coral `#E4857A`/`#1E100F` · border = chip at ~50% alpha |
+
+≈288 distinct faces from four hue pairs. Scale by adding hues, not drawings.
+
+**Assignment:** derive part indices from a stable hash of the teammate **id** (`hash % options.length` per slot) so a face is reproducible across restarts; the create dialog lets the user override with the hue picker and "Shuffle look" (advances the look index). Persist `{hue, headwear, accessory, mouth}` on the teammate record — never re-derive from a mutable name.
+
+The four teammates in the reference are outputs of this system: Wren = lime + cans, Atlas = blue + bangs + goggle frame, Juno = violet + buns + open mouth, Sable = coral + cap + brows.
+
+### Avatar activity — animation only while actually working
+
+**Rule: a face animates only when that teammate is doing something.** Idle, blocked, awaiting-approval and completed teammates are perfectly still — motion is a status signal, so it must never be decorative.
+
+| Animation | Keyframe | Applies to | Timing |
 | --- | --- | --- | --- |
-| Wren | `#A9D93F` | `#151A0C` | cropped hair `(2,0)(4,0)(6,0)(8,0)(10,0)(12,0)(2,2)(12,2)`, eyes `(4,6)(10,6)`, mouth `(6,10)(8,10)` |
-| Atlas | `#5E9BF0` | `#0D1520` | bangs `(4,2)(6,2)(8,2)(10,2)`, eyes `(4,6)(10,6)`, flat mouth `(4,10)(6,10)(8,10)(10,10)` |
-| Juno | `#A98BE8` | `#150F1E` | cowlick `(12,0)(12,2)`, eyes `(4,6)(10,6)`, open mouth `(6,10)(8,10)(6,12)(8,12)` |
-| Sable | `#E4857A` | `#1E100F` | brows `(2,2)(4,2)(10,2)(12,2)`, eyes `(4,6)(10,6)`, mouth `(6,10)(8,10)` |
+| body bob | `lcBob` — `translateY(0 → -7%)` | the chip, while working | 2.6s ease-in-out |
+| eyes | `lcEyes` — blink (`scaleY(0.12)` at 38–43%) then glance `translateX(±100%)` | eye layer, while working | 5s ease-in-out |
+| mouth | `lcChat` — `scaleY(1 → 0.45)` | mouth layer, while streaming | 1.5s ease-in-out |
 
-Sizes used: 16 (inline), 20–24 (thread), 28–32 (header, sidebar, rail), 36 (roster), 56 (empty state). Border = chip hue at 50% alpha. Presence dot (8px, 2px window-colored ring) pins to bottom-right in the compact rail.
+`translateX(100%)` equals exactly one pixel because the eye layer is `p` wide — the same keyframes work at every avatar size with no per-size values.
+
+Bind to real state: **working / streaming → all three**; **receiving a peer message → eyes only**; **idle · approval-pending · blocked · signed-out · completed → none**. In the reference this is `teammateBusy` (live + handoff states) driving an `sc-if` pair per avatar instance.
+
+**This replaces the indeterminate progress bar** in the live step card — the working teammate's own motion is the activity indicator. Keep the textual step line and counters; do not reintroduce a spinner or bar. All of it sits under `prefers-reduced-motion: reduce`, which stops every animation — so status must also be legible from text and the presence dot alone.
 
 ### Typography
 - UI: **Geist** (fallback Helvetica → system sans). Weights 400/500 only — no bold headings inside the app.
@@ -112,7 +149,7 @@ Sizes used: 16 (inline), 20–24 (thread), 28–32 (header, sidebar, rail), 36 (
 - 8px system; 2/4/6px allowed for icon gaps and pixel-face internals.
 - Radii: 6–7px small controls · 8px buttons/rows · 9–10px cards · 11–13px popovers and the window · 50% dots.
 - Elevation: only popovers/overlays get shadow — `0 24px 60px rgba(0,0,0,0.6)` (menus), `0 40px 100px rgba(0,0,0,0.65)` (palette), `0 32px 80px rgba(0,0,0,0.55)` (window). Cards use borders, never shadows.
-- Motion: 120ms press, 140ms hover/color, 180ms panel open. Keyframes: `lcPulse` (live dot, 1.6s), `lcCaret` (streaming caret, 1s step-end), `lcBar` (indeterminate progress, 1.5s linear).
+- Motion: 120ms press, 140ms hover/color, 180ms panel open. Keyframes: `lcPulse` (live dot, 1.6s), `lcCaret` (streaming caret, 1s step-end), plus the avatar set `lcBob` / `lcEyes` / `lcChat` (see Avatar activity).
 - `@media (prefers-reduced-motion: reduce)` disables all animation and transition.
 
 ### Interaction states
@@ -155,7 +192,7 @@ Each state below is a designed thread composition, not a modal. `Locust Desktop.
 | **Detected accounts** | Codex row lime-tinted (`LIVE`), Claude `sign-in required`, local/API dashed and optional | Show version + route source |
 | **Idle teammate** | 56px avatar, capability sentence, 3 starter missions | Lead with what they're good at |
 | **Mission planning** | Plan card: step list with done / running / needs-approval markers, "2 of 4 done" | Name which step needs approval and why |
-| **Live streaming** | Collapsed activity card (`Edited 6 files · ran 2 commands`, expandable to file/shell rows) + live step card with indeterminate bar + streaming text with caret | Logs never dump into the thread |
+| **Live streaming** | Collapsed activity card (`Edited 3 files · ran 2 commands`, expandable to file/shell rows) + a single avatar-led working line (tool step: animated avatar + name + counters; reasoning step: static avatar + staggered dots) + streaming text with caret. **No bar, spinner or percentage** — see `AVATARS.md` | Logs never dump into the thread |
 | **Teammate question** | Blue-headed card, question, 2 concrete options with consequences, "answer in the composer" note | State that work is paused and nothing changed |
 | **Approval (consequential)** | Amber-headed card + 4-field grid: TARGET (app/account/identity), DATA SENT, REVERSIBLE, SCOPE (exact call) + Approve once / Always allow / Deny | Requester shown as `Wren · Codex CLI` |
 | **Peer update** | Collapsed line `2 messages with 🟦 Atlas`; expands to the exchange with `UNTRUSTED` tag and "claims, never verified facts" | Peer content is never rendered as fact |
@@ -211,7 +248,8 @@ Normalized events, newest first, colored by class: `tool.*` lime/violet, `checkp
 
 1. **Teammate creation** is designed as a dialog (sidebar `+` or the roster's "New teammate" card): name field, avatar hue picker with live pixel-face preview, role grid (Code & Migrations · Research & Briefs · Ops & Scheduling · Docs & QA · Data & Reporting · Custom…), default route and approval mode summary, "tools follow the role, narrow them in Settings → Permissions". Still to decide: what "Custom…" collects (free-text role → tool inference?), whether the pixel face is chosen or generated from a name seed, and how tool grants are edited at creation vs. later.
 2. **Swarm scope details:** quota warning before engaging, persistence across restart, per-mission override. The Settings toggle and the composer locust mark are two views of one workspace value — bind both to the same state (the reference does).
-3. **Connections detail screen** (per-service auth, scopes, which teammates may use it) is referenced but not drawn.
-4. **Missions screen** row actions (open receipt, resume, delete with retention rules) need definition.
-5. Settings sub-pages beyond Runtimes/Fallback/Privacy are listed in the sub-nav but only those three are specified.
-6. **Cloud computer** must stay visibly `PLANNED` and non-interactive until real.
+3. **Avatar system scale:** hues beyond four (and whether users may pick arbitrary hues), and whether `antenna`/`plain` headwear should be reserved for non-human-named bots.
+4. **Connections detail screen** (per-service auth, scopes, which teammates may use it) is referenced but not drawn.
+5. **Missions screen** row actions (open receipt, resume, delete with retention rules) need definition.
+6. Settings sub-pages beyond Runtimes/Fallback/Privacy are listed in the sub-nav but only those three are specified.
+7. **Cloud computer** must stay visibly `PLANNED` and non-interactive until real.

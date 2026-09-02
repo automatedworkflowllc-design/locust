@@ -3,6 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
+import { isAvatarSpec, seedAvatar } from '../shared/avatar.js'
 import type { PublicTeammate, TeammateHue, TeammateRole, WorkspaceSettings } from '../shared/ipc.js'
 
 /**
@@ -34,7 +35,7 @@ export const TEAMMATE_ROLES: readonly TeammateRole[] = [
 
 export interface TeammateStore {
   list(): Promise<readonly PublicTeammate[]>
-  create(input: { name: unknown; hue: unknown; role: unknown }): Promise<PublicTeammate>
+  create(input: { name: unknown; hue: unknown; role: unknown; avatar?: unknown }): Promise<PublicTeammate>
   remove(teammateId: unknown): Promise<void>
   /** Remember which teammate a mission belongs to. */
   assignMission(teammateId: unknown, missionId: unknown): Promise<void>
@@ -93,6 +94,9 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     name: (record.name as string).trim(),
     hue: record.hue,
     role: record.role,
+    // A record from before faces were persisted gets the face its id seeds --
+    // the same face every reader would derive, so nothing changes on upgrade.
+    avatar: isAvatarSpec(record.avatar) ? record.avatar : seedAvatar(record.teammateId),
     createdAt: record.createdAt
   }
 }
@@ -206,11 +210,14 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         if (!isRole(input.role)) throw new Error('Teammate role is invalid')
         const file = await read()
         if (file.teammates.length >= MAX_TEAMMATES) throw new Error('Too many teammates')
+        if (input.avatar !== undefined && !isAvatarSpec(input.avatar)) throw new Error('Teammate avatar is invalid')
+        const teammateId = `tm_${randomUUID().replace(/-/g, '').slice(0, 24)}`
         const teammate: PublicTeammate = {
-          teammateId: `tm_${randomUUID().replace(/-/g, '').slice(0, 24)}`,
+          teammateId,
           name: input.name.trim(),
           hue: input.hue,
           role: input.role,
+          avatar: input.avatar ?? seedAvatar(teammateId),
           createdAt: new Date().toISOString()
         }
         await write({ ...file, teammates: [...file.teammates, teammate] })

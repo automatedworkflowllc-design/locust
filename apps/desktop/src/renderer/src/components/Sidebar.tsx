@@ -3,8 +3,14 @@ import type { ReactElement } from 'react'
 import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
-import { connectedRuntimeCount, missionPhaseView, shortMissionId, teammateStatusView } from '../status.js'
-import { faceForName } from './NewTeammateDialog.js'
+import {
+  connectedRuntimeCount,
+  faceActivityFor,
+  facePresenceFor,
+  missionPhaseView,
+  shortMissionId,
+  teammateStatusView
+} from '../status.js'
 import { PixelFace } from './PixelFace.js'
 import { Icon } from './Icon.js'
 
@@ -102,7 +108,13 @@ export function Sidebar({
                 title={`Message ${teammate.name}`}
                 onClick={() => onSelectTeammate(teammate.teammateId)}
               >
-                <PixelFace hue={teammate.hue} pixels={faceForName(teammate.name)} size={30} />
+                <PixelFace
+                  hue={teammate.hue}
+                  avatar={teammate.avatar}
+                  size={30}
+                  activity={faceActivityFor(status.status)}
+                  presence={facePresenceFor(status.status)}
+                />
                 <span className="lc-row__text">
                   <span className="lc-row__name">
                     {teammate.name}

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement } from 'react'
 
+import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
+import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { TeammateHue, TeammateRole } from '../../../shared/ipc.js'
-import { FACE_PRESETS, PixelFace } from './PixelFace.js'
+import { PixelFace } from './PixelFace.js'
 
 const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
   { hue: 'lime', label: 'Lime' },
@@ -20,31 +22,25 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
   { role: 'Custom', description: 'Describe the work yourself' }
 ]
 
-const FACE_ORDER = ['wren', 'atlas', 'juno', 'sable'] as const
-
 /**
- * The face is generated from the name rather than chosen: the user picks a hue
- * and gets a face, which is one decision instead of two and still gives every
- * teammate a stable, distinguishable identity. The seed is the trimmed name, so
- * the preview a user sees while typing is the face they get.
+ * The face is generated, then owned: the dialog seeds a look the moment it
+ * opens (from a throwaway id, so two dialogs opened in a row start from
+ * different faces), the person can shuffle it or recolour it, and whatever is
+ * on the preview when they create is what gets persisted with the record.
+ * Never derived from the name -- a rename must not change a face.
  */
-export function faceForName(name: string): readonly (readonly [number, number])[] {
-  const seed = [...name.trim().toLowerCase()].reduce((total, character) => total + character.charCodeAt(0), 0)
-  const key = FACE_ORDER[seed % FACE_ORDER.length]!
-  return FACE_PRESETS[key]!
-}
-
 export function NewTeammateDialog({
   onCancel,
   onCreate,
   error
 }: {
   readonly onCancel: () => void
-  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole }) => void
+  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; avatar: AvatarSpec }) => void
   readonly error: string | undefined
 }): ReactElement {
   const [name, setName] = useState('')
   const [hue, setHue] = useState<TeammateHue>('lime')
+  const [avatar, setAvatar] = useState<AvatarSpec>(() => seedAvatar(`draft_${Date.now()}_${Math.random()}`))
   const [role, setRole] = useState<TeammateRole>('Code & Migrations')
   const nameRef = useRef<HTMLInputElement>(null)
 
@@ -75,7 +71,8 @@ export function NewTeammateDialog({
 
         <div className="lc-dialog__body">
           <div className="lc-dialog__identity">
-            <PixelFace hue={hue} pixels={faceForName(trimmed.length > 0 ? trimmed : 'a')} size={56} />
+            {/* The preview works, so the person sees the behaviour a live teammate has. */}
+            <PixelFace hue={hue} avatar={avatar} size={56} activity="working" presence="working" />
             <div className="lc-dialog__fields">
               <label className="lc-fieldlabel lc-mono" htmlFor="lc-teammate-name">
                 Name
@@ -101,9 +98,16 @@ export function NewTeammateDialog({
                     className={`lc-hue${hue === option.hue ? ' is-selected' : ''}`}
                     onClick={() => setHue(option.hue)}
                   >
-                    <PixelFace hue={option.hue} pixels={faceForName(trimmed.length > 0 ? trimmed : 'a')} size={24} />
+                    <PixelFace hue={option.hue} avatar={avatar} size={24} />
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className="lc-ghostbutton lc-shuffle"
+                  onClick={() => setAvatar((current) => shuffledAvatar(current))}
+                >
+                  Shuffle look
+                </button>
               </div>
             </div>
           </div>
@@ -160,7 +164,7 @@ export function NewTeammateDialog({
             type="button"
             className="lc-primarybutton"
             disabled={!canCreate}
-            onClick={() => onCreate({ name: trimmed, hue, role })}
+            onClick={() => onCreate({ name: trimmed, hue, role, avatar })}
           >
             Create teammate
           </button>

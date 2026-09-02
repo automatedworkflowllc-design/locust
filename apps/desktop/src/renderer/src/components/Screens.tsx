@@ -4,7 +4,6 @@ import type { ReactElement } from 'react'
 import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
 import { missionPhaseView, routeRowStatus } from '../status.js'
 import type { IntegrationLevel } from '../status.js'
-import { faceForName } from './NewTeammateDialog.js'
 import { PixelFace } from './PixelFace.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
@@ -146,7 +145,7 @@ export function TeammatesScreen({
             return (
               <div className="lc-rostercard" key={teammate.teammateId}>
                 <div className="lc-rostercard__head">
-                  <PixelFace hue={teammate.hue} pixels={faceForName(teammate.name)} size={36} />
+                  <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={36} />
                   <div className="lc-rostercard__id">
                     <div className="lc-rostercard__name">{teammate.name}</div>
                     <div className="lc-rostercard__role">{teammate.role}</div>

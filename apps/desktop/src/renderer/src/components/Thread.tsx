@@ -25,14 +25,20 @@ import type { PeerGroup, ThreadItem } from '../missionView.js'
  * TWO of them -- what the first runtime did, the divider, then what the second
  * one did -- without either half being re-derived differently from the other.
  */
-function ThreadItems({ items }: { readonly items: readonly ThreadItem[] }): ReactElement {
+function ThreadItems({
+  items,
+  owner
+}: {
+  readonly items: readonly ThreadItem[]
+  readonly owner: PublicTeammate | undefined
+}): ReactElement {
   return (
     <>
       {items.map((item) => {
         if (item.type === 'agent-message') {
           return (
             <div className="lc-agentline" key={item.key}>
-              <AgentAvatar />
+              <AgentAvatar teammate={owner} />
               <p>
                 {item.text}
                 {item.streaming && <span className="lc-caret" />}
@@ -53,6 +59,8 @@ function ThreadItems({ items }: { readonly items: readonly ThreadItem[] }): Reac
               label={item.label}
               detail={item.detail}
               startedAt={item.startedAt}
+              kind={item.kind}
+              owner={owner}
             />
           )
         }
@@ -262,7 +270,7 @@ export function Thread({
 
         {handoff !== undefined && (
           <>
-            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} />
+            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} owner={peers.self} />
             <HandoffDivider
               from={handoff.from}
               to={handoff.to}
@@ -279,7 +287,7 @@ export function Thread({
         */}
         {exchanges.filter((group) => group.received).map(peerCard)}
 
-        <ThreadItems items={items} />
+        <ThreadItems items={items} owner={peers.self} />
 
         {exchanges.filter((group) => !group.received).map(peerCard)}
         {peers.notices.map((notice, index) => (

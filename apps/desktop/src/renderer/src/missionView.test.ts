@@ -362,3 +362,25 @@ describe('reopening a handed-off mission', () => {
     expect(rootMission(a, new Map([['a', a], ['b', b]]))).toBeDefined()
   })
 })
+
+describe('the running step', () => {
+  function stepEvent(stepKind: 'turn' | 'reasoning' | 'item'): NormalizedRuntimeEvent {
+    return {
+      id: `e_${stepKind}`,
+      runId: 'run_1',
+      missionId: 'mission_1',
+      sequence: 1,
+      type: 'step.started',
+      occurredAt: '2026-09-01T15:00:00.000Z',
+      sourceAdapter: 'codex',
+      payload: { stepKind, evidence: { redacted: true } }
+    } as unknown as NormalizedRuntimeEvent
+  }
+
+  it('carries the step kind, so thought and action draw differently', () => {
+    const thinking = buildThread([stepEvent('reasoning')], { running: true }).find((item) => item.type === 'live-step')
+    const acting = buildThread([stepEvent('turn')], { running: true }).find((item) => item.type === 'live-step')
+    expect(thinking).toMatchObject({ type: 'live-step', kind: 'reasoning', label: 'Thinking' })
+    expect(acting).toMatchObject({ type: 'live-step', kind: 'turn', label: 'Working' })
+  })
+})

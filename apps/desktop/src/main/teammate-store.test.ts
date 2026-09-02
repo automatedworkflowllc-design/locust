@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { seedAvatar } from '../shared/avatar.js'
 import { createTeammateStore, parsedTeammate, validName } from './teammate-store.js'
 
 const roots: string[] = []
@@ -203,5 +204,39 @@ describe('workspace settings', () => {
     await teammates.create({ name: 'Wren', hue: 'lime', role: 'Docs & QA' })
     await teammates.writeSettings({ swarm: true })
     expect(await teammates.list()).toHaveLength(1)
+  })
+})
+
+describe('teammate faces', () => {
+  it('seeds a face from the id, never the name', async () => {
+    const { store: teammates } = await store()
+    const first = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    const second = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    expect(first.avatar).toEqual(seedAvatar(first.teammateId))
+    expect(second.avatar).toEqual(seedAvatar(second.teammateId))
+    // Same name, different ids: a face is identity, and identity is the id.
+    expect(first.teammateId).not.toBe(second.teammateId)
+  })
+
+  it('keeps the look chosen in the dialog, and refuses one outside the tables', async () => {
+    const { root, store: teammates } = await store()
+    const chosen = { headwear: 4 as const, accessory: 1 as const, mouth: 3 as const }
+    const created = await teammates.create({ name: 'Atlas', hue: 'blue', role: 'Research & Briefs', avatar: chosen })
+    expect(created.avatar).toEqual(chosen)
+    const reopened = await createTeammateStore({ rootDirectory: root }).list()
+    expect(reopened[0]?.avatar).toEqual(chosen)
+    await expect(
+      teammates.create({ name: 'Nova', hue: 'violet', role: 'Docs & QA', avatar: { headwear: 9, accessory: 0, mouth: 0 } })
+    ).rejects.toThrow('avatar is invalid')
+  })
+
+  it('keeps a persisted face rather than re-seeding it, and seeds one for a record without', () => {
+    const base = { teammateId: 'tm_abc', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-01T00:00:00.000Z' }
+    const chosen = { headwear: 2, accessory: 2, mouth: 1 }
+    expect(parsedTeammate({ ...base, avatar: chosen })?.avatar).toEqual(chosen)
+    // A roster written before faces were persisted: the id's face, the same
+    // one every reader derives, so nothing changes on upgrade.
+    expect(parsedTeammate(base)?.avatar).toEqual(seedAvatar('tm_abc'))
+    expect(parsedTeammate({ ...base, avatar: { headwear: 'cap' } })?.avatar).toEqual(seedAvatar('tm_abc'))
   })
 })
