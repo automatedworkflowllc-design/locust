@@ -155,6 +155,13 @@ export interface RuntimeCommandOptions {
   /** A reasoning effort the runtime reported supporting for that model. */
   readonly effort?: string;
   readonly sandbox?: MissionSandbox;
+  /**
+   * The runtime's own session handle, to continue that conversation instead of
+   * starting a blank one. Codex calls it a thread id and Claude Code a session
+   * id; both take it back on the command line, which is what makes a second
+   * turn a reply rather than a stranger.
+   */
+  readonly resumeThreadId?: string;
 }
 
 const EFFORT = /^[a-z]{1,16}$/;
@@ -197,7 +204,20 @@ export function createCodexExecCommand(
 ): RuntimeCommandSpec {
   // Writes, when allowed at all, are confined to the workspace Codex is given.
   // The host chooses that directory; the renderer only ever chooses the mode.
-  const args = ["exec", "--json", "--sandbox", sandboxArgument(options.sandbox), "-C", options.workspacePath];
+  // `codex exec resume <SESSION_ID>` is a subcommand, not a flag, so the verb
+  // itself changes when a conversation is being continued.
+  const args = options.resumeThreadId === undefined
+    ? ["exec", "--json", "--sandbox", sandboxArgument(options.sandbox), "-C", options.workspacePath]
+    : [
+        "exec",
+        "resume",
+        requireText(options.resumeThreadId, "Session id"),
+        "--json",
+        "--sandbox",
+        sandboxArgument(options.sandbox),
+        "-C",
+        options.workspacePath,
+      ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
   }
@@ -233,6 +253,9 @@ export function createClaudePrintCommand(
   }
   if (options.effort !== undefined) {
     args.push("--effort", requireEffort(options.effort));
+  }
+  if (options.resumeThreadId !== undefined) {
+    args.push("--resume", requireText(options.resumeThreadId, "Session id"));
   }
   return baseSpec("claude", executable, options.workspacePath, args);
 }

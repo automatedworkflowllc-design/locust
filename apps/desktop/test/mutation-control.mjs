@@ -29,6 +29,41 @@ const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: MISSIONS,
+    name: 'a reply starts a blank run instead of resuming the conversation',
+    from: '            ...(resumeThreadId === undefined ? {} : { resumeThreadId })',
+    to: '',
+    expect: 'resumes the earlier mission’s own session, and records what it continued'
+  },
+  {
+    file: MISSIONS,
+    name: 'a conversation with no recorded session is continued anyway',
+    from: '          if (prior === undefined || priorThread === undefined) {',
+    to: '          if (false) {',
+    expect: 'refuses to continue a conversation that recorded no session, rather than starting blank'
+  },
+  {
+    file: MISSIONS,
+    name: 'a reply crosses runtimes without a handoff',
+    from: '          if (prior.metadata.runtime !== runtime) {',
+    to: '          if (false) {',
+    expect: 'refuses to continue another runtime’s conversation, and says which'
+  },
+  {
+    file: VIEW,
+    name: 'a handoff divider is drawn across an ordinary reply',
+    from: "  if (link === undefined || link.reason !== 'route-switch') return undefined",
+    to: '  if (link === undefined) return undefined',
+    expect: 'draws no handoff divider across an ordinary reply'
+  },
+  {
+    file: VIEW,
+    name: 'a reply shows only itself, losing the conversation above it',
+    from: "    if (link === undefined || link.reason !== 'follow-up') break",
+    to: '    break',
+    expect: 'walks a reply back to every earlier turn, oldest first'
+  },
+  {
     file: VIEW,
     name: 'an older mission overwrites the newest resolved model name',
     from: '    if (held === undefined || (Number.isFinite(at) && at > held.at)) {',
@@ -423,8 +458,8 @@ const MUTATIONS = [
   {
     file: MISSIONS,
     name: 'the continuation is not recorded, so the new mission looks unrelated',
-    from: '            ...(continuation === undefined ? {} : { continuesFrom: continuation })',
-    to: '            ...{}',
+    from: '              : { continuesFrom: continuation })',
+    to: '              : {})',
     expect: 'starts a NEW mission that records what it continues from'
   }
 ]

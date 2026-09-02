@@ -238,6 +238,13 @@ export interface CodexMissionStartRequest {
    * findings are shared. Absent for a mission that belongs to nobody.
    */
   readonly teammateId?: string
+  /**
+   * The mission this one replies to. The host looks up that mission's own
+   * session handle and resumes it, so a second message is the next turn of a
+   * conversation rather than a stranger arriving mid-thought. A mission that
+   * cannot be resumed is refused rather than silently started blank.
+   */
+  readonly followUpOf?: string
 }
 
 /**
@@ -265,6 +272,8 @@ export interface MissionRouteSummary {
  * a type error instead of a supported route.
  */
 export interface CodexMissionStartData extends MissionRouteSummary {
+  /** Set when this run continued an earlier mission's conversation. */
+  readonly followsUp?: { readonly missionId: string; readonly runtimeThreadId: string }
   /** Workroom messages quoted into this mission's prompt, oldest first. */
   readonly peerMessages: readonly PublicPeerMessage[]
   /**
@@ -423,7 +432,12 @@ export interface PublicRecoveredMission {
    * show the ROOT mission's prompt, because this mission's own recorded prompt
    * is the machine-written briefing.
    */
-  readonly continuesFrom?: { readonly missionId: string; readonly checkpointEpoch: number }
+  readonly continuesFrom?: {
+    readonly missionId: string
+    readonly checkpointEpoch: number
+    /** `route-switch` is a handoff; `follow-up` is the next turn of one conversation. */
+    readonly reason: 'route-switch' | 'follow-up'
+  }
 }
 
 export type MissionHistoryResponse =

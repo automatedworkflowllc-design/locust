@@ -70,8 +70,12 @@ try {
 }
 
 const profile = await mkdtemp(join(tmpdir(), 'locust-packaged-'))
+// Deliberately a BARE PATH: no CLI directories added. A packaged app launched
+// from the Start menu inherits no shell profile, and this build reported both
+// runtimes as missing on a machine where both were installed and working.
+// Discovery has to find them where their installers actually put them.
 const child = spawn(EXE, [`--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`], {
-  env: { ...process.env, PATH: `${CODEX_BIN_DIR};${NPM_DIR};${process.env.PATH ?? ''}` },
+  env: { ...process.env, PATH: 'C:\\Windows\\System32' },
   stdio: ['ignore', 'pipe', 'pipe']
 })
 const appOutput = []
@@ -136,6 +140,18 @@ try {
   say(`       ${shell.body ?? ''}`.slice(0, 200))
   check('discovery finished', !/never finished/.test(shell.placeholder), shell.placeholder)
   check('a runtime is reported as usable', /READY|Ready/.test(shell.body ?? ''), (shell.body ?? '').slice(0, 160))
+  // Both, by name: "not found" for an installed CLI is the bug this pins.
+  // Whitespace is normalised in Node, never inside the injected string: a
+  // `\s` written into a template literal collapses to `s` and would quietly
+  // delete every letter s from the text under test.
+  const rawRuntimeText = await cdp.eval(`(() => {
+    const open = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+    if (open) open.click()
+    return document.body.innerText
+  })()`)
+  const runtimeText = String(rawRuntimeText).replace(/\s+/g, ' ')
+  check('Codex CLI is found without help from PATH', !/Codex[^.]{0,40}not (found|installed)/i.test(runtimeText), runtimeText.slice(0, 200))
+  check('Claude Code is found without help from PATH', !/Claude[^.]{0,40}not (found|installed)/i.test(runtimeText), runtimeText.slice(0, 200))
 
   say('4. CONTROL: the packaged renderer has no network egress')
   // The main process cancels every http(s)/ws request when packaged. If this

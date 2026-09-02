@@ -21,8 +21,37 @@ const EVENTS = join(ROOT, 'src', 'app-server-events.ts')
 const COMMANDS = join(ROOT, 'src', 'commands.ts')
 
 const CLAUDE_EVENTS = join(ROOT, 'src', 'claude-events.ts')
+const LOCATOR = join(ROOT, 'src', 'path-locator.ts')
 
 const MUTATIONS = [
+  {
+    file: LOCATOR,
+    name: 'a CLI that is not on PATH is reported as missing',
+    from: '        ...(await installDirectories(commandName, environment, platform, readDirectory)),',
+    to: '',
+    expect: 'finds Codex in its versioned install root when PATH knows nothing'
+  },
+  {
+    file: LOCATOR,
+    name: 'an install root is searched for any command that asks',
+    from: '    if (root.command !== commandName) continue;',
+    to: '',
+    expect: 'searches no install root for a command it does not know'
+  },
+  {
+    file: COMMANDS,
+    name: 'a Claude follow-up silently starts a new conversation',
+    from: '  if (options.resumeThreadId !== undefined) {\n    args.push("--resume", requireText(options.resumeThreadId, "Session id"));\n  }',
+    to: '',
+    expect: 'resumes a Claude session by id'
+  },
+  {
+    file: COMMANDS,
+    name: 'a Codex follow-up silently starts a new conversation',
+    from: '  const args = options.resumeThreadId === undefined',
+    to: '  const args = true',
+    expect: 'resumes a Codex session through its subcommand, keeping the sandbox'
+  },
   {
     file: CLAUDE_EVENTS,
     name: 'an allowed usage snapshot is reported as a rate limit',
@@ -182,6 +211,7 @@ function runSuite() {
 }
 
 const originals = new Map([
+  [LOCATOR, readFileSync(LOCATOR, 'utf8')],
   [CLAUDE_EVENTS, readFileSync(CLAUDE_EVENTS, 'utf8')],
   [COMMANDS, readFileSync(COMMANDS, 'utf8')],
   [CLIENT, readFileSync(CLIENT, 'utf8')],

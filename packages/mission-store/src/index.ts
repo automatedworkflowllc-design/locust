@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 5 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 6 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -46,14 +46,21 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 5 as const
  * ones its work posted. The text lives in the workroom's own file, never here.
  * A v4 reader stops at the first record it cannot name, so a v5 file handed to
  * one would lose every record after the first peer link.
+ *
+ * v5 -> v6 widens `continuesFrom.reason` to include `follow-up`: a second turn
+ * in the same conversation. It is a NEW mission for the same reason a route
+ * switch is -- one mission holds one run, and a second turn is a second
+ * process -- but it is not a handoff, and a reader that assumed every
+ * continuation was a route switch would draw a handoff divider across an
+ * ordinary reply.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -107,10 +114,23 @@ export interface MissionLedgerMetadata {
   readonly continuesFrom?: MissionContinuation
 }
 
+/**
+ * `route-switch` is a handoff to another runtime; `follow-up` is the next turn
+ * of the same conversation with the same runtime. Both are new missions,
+ * because a mission records one run.
+ */
+export type MissionContinuationReason = 'route-switch' | 'follow-up'
+
 export interface MissionContinuation {
   readonly missionId: string
   readonly checkpointEpoch: number
-  readonly reason: 'route-switch'
+  readonly reason: MissionContinuationReason
+  /**
+   * The runtime's own session handle, when the continuation resumed one. A
+   * follow-up carries it so the record says which conversation was resumed
+   * rather than leaving that to be inferred.
+   */
+  readonly runtimeThreadId?: string
 }
 
 export type MissionHostFailureCode = 'runtime-start-failed' | 'runtime-transport-failed'
@@ -304,9 +324,12 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
     if (
       !Number.isSafeInteger(metadata.continuesFrom.checkpointEpoch)
       || metadata.continuesFrom.checkpointEpoch < 1
-      || metadata.continuesFrom.reason !== 'route-switch'
+      || (metadata.continuesFrom.reason !== 'route-switch' && metadata.continuesFrom.reason !== 'follow-up')
     ) {
       throw new Error('Mission continuation is invalid')
+    }
+    if (metadata.continuesFrom.runtimeThreadId !== undefined) {
+      requireText(metadata.continuesFrom.runtimeThreadId, 'continuesFrom.runtimeThreadId', 2_048)
     }
   }
   return metadata
@@ -390,6 +413,10 @@ function parsedMetadata(
   }
   // Same rule for continuation: no writer before v4 could produce one.
   if (schemaVersion < 4 && candidate.continuesFrom !== undefined) {
+    return undefined
+  }
+  // And no writer before v6 could call one a follow-up.
+  if (schemaVersion < 6 && candidate.continuesFrom?.reason === 'follow-up') {
     return undefined
   }
   if (

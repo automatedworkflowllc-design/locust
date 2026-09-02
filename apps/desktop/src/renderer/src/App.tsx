@@ -36,7 +36,7 @@ import type { SidebarMission } from './components/Sidebar.js'
 import { Thread } from './components/Thread.js'
 import { AgentAvatar } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
-import { resolvedModelNames, rootMission, stitchedHandoff } from './missionView.js'
+import { conversationTurns, resolvedModelNames, rootMission, stitchedHandoff } from './missionView.js'
 import { shortMissionId } from './status.js'
 
 /**
@@ -73,6 +73,16 @@ interface LiveRunState {
   readonly restoredMission?: PublicRecoveredMission
   /** Who the run was messaged to, known before the host has even assigned a missionId. */
   readonly teammateId?: string
+  /**
+   * Earlier turns of this conversation, oldest first. Held in renderer state
+   * so a reply shows the exchange immediately rather than after a history
+   * refresh; recovered missions rebuild the same list from the ledger.
+   */
+  readonly earlierTurns?: readonly {
+    readonly missionId: string
+    readonly prompt: string
+    readonly events: readonly NormalizedRuntimeEvent[]
+  }[]
   /**
    * What this run continues, when it was started by a route switch. Held in
    * renderer state rather than re-read from the ledger because the thread has
@@ -416,11 +426,31 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     const teammateId = selectedTeammate?.teammateId
     const key = `pending:${++pendingKeyCounter.current}`
+    // A reply continues the conversation on screen, when there IS one to
+    // continue: the same teammate's finished mission, on the route it ran on.
+    // Anything else is a new mission, which is what a person means when they
+    // switch teammate or route first.
+    const shown = liveRunRef.current
+    const continuing =
+      shown !== undefined
+      && shown.data !== undefined
+      && !liveRunIsActive(shown)
+      && ownerOf(shown) === teammateId
+      && shown.data.runtime === route.runtime
+        ? shown
+        : undefined
+    const earlierTurns = continuing === undefined
+      ? []
+      : [
+          ...(continuing.earlierTurns ?? []),
+          { missionId: continuing.data!.missionId, prompt: continuing.prompt, events: continuing.events }
+        ]
     const starting: LiveRunState = {
       prompt,
       phase: 'starting',
       events: [],
-      ...(teammateId === undefined ? {} : { teammateId })
+      ...(teammateId === undefined ? {} : { teammateId }),
+      ...(earlierTurns.length === 0 ? {} : { earlierTurns })
     }
     setRuns((current) => withNewRun(current, key, starting))
     setShownKey(key)
@@ -438,6 +468,7 @@ export default function App(): ReactElement {
         runtime: route.runtime,
         model: route.model,
         ...(teammateId === undefined ? {} : { teammateId }),
+        ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
         // Only sent when the chosen model advertised it; the composer cannot
         // offer an effort the catalog did not report for that model.
         // Swarm overrides the picked effort with the model's maximum, and the
@@ -708,10 +739,23 @@ export default function App(): ReactElement {
     if (mission === undefined) return
     const restored = restoredLiveRun(mission)
     const handoff = stitchedHandoff(mission, historyById)
+    // Every earlier turn of this conversation, rebuilt from the ledger, so a
+    // reopened exchange reads the way it did when it happened.
+    const turns = conversationTurns(mission, historyById)
+    const earlier = turns.slice(0, -1)
     setRuns((current) =>
       withNewRun(current, mission.runId, {
         ...restored,
         prompt: rootMission(mission, historyById).prompt,
+        ...(earlier.length === 0
+          ? {}
+          : {
+              earlierTurns: earlier.map((turn) => ({
+                missionId: turn.missionId,
+                prompt: turn.prompt,
+                events: turn.events
+              }))
+            }),
         ...(handoff === undefined ? {} : { handoff })
       })
     )
@@ -892,6 +936,7 @@ export default function App(): ReactElement {
               </header>
               <Thread
                 prompt={liveRun.prompt}
+                earlierTurns={liveRun.earlierTurns ?? []}
                 events={liveRun.events}
                 running={running}
                 missionId={liveRun.data?.missionId}

@@ -92,7 +92,8 @@ export function publicRecoveredMission(
       : {
           continuesFrom: {
             missionId: mission.metadata.continuesFrom.missionId,
-            checkpointEpoch: mission.metadata.continuesFrom.checkpointEpoch
+            checkpointEpoch: mission.metadata.continuesFrom.checkpointEpoch,
+            reason: mission.metadata.continuesFrom.reason
           }
         })
   }

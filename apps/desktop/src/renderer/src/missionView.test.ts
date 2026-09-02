@@ -9,6 +9,7 @@ import {
   buildSignalRail,
   buildThread,
   cancellationSummary,
+  conversationTurns,
   peerGroups,
   resolvedModelNames,
   rootMission,
@@ -338,7 +339,7 @@ describe('reopening a handed-off mission', () => {
     runtime: 'claude',
     prompt: 'You are continuing work that another agent (Codex) started...',
     createdAt: '2026-09-01T15:02:00.000Z',
-    continuesFrom: { missionId: 'mission_1', checkpointEpoch: 1 }
+    continuesFrom: { missionId: 'mission_1', checkpointEpoch: 1, reason: 'route-switch' as const }
   })
   const byId = new Map([
     ['mission_1', first],
@@ -357,11 +358,11 @@ describe('reopening a handed-off mission', () => {
   })
 
   it('stops walking a chain whose earlier mission is missing, and a cyclic one', () => {
-    const orphan = mission({ missionId: 'mission_3', continuesFrom: { missionId: 'mission_gone', checkpointEpoch: 1 } })
+    const orphan = mission({ missionId: 'mission_3', continuesFrom: { missionId: 'mission_gone', checkpointEpoch: 1, reason: 'route-switch' as const } })
     expect(rootMission(orphan, new Map([['mission_3', orphan]]))).toBe(orphan)
     expect(stitchedHandoff(orphan, new Map([['mission_3', orphan]]))).toBeUndefined()
-    const a = mission({ missionId: 'a', continuesFrom: { missionId: 'b', checkpointEpoch: 1 } })
-    const b = mission({ missionId: 'b', continuesFrom: { missionId: 'a', checkpointEpoch: 1 } })
+    const a = mission({ missionId: 'a', continuesFrom: { missionId: 'b', checkpointEpoch: 1, reason: 'route-switch' as const } })
+    const b = mission({ missionId: 'b', continuesFrom: { missionId: 'a', checkpointEpoch: 1, reason: 'route-switch' as const } })
     expect(rootMission(a, new Map([['a', a], ['b', b]]))).toBeDefined()
   })
 })
@@ -483,5 +484,73 @@ describe('what a model alias resolved to', () => {
     expect(resolvedModelNames([ranOn('m1', 'fable', undefined, '2026-09-01T10:00:00.000Z')]).size).toBe(0)
     // `fable -> fable` is not a resolution, it is the same word back.
     expect(resolvedModelNames([ranOn('m2', 'fable', 'fable', '2026-09-01T10:00:00.000Z')]).size).toBe(0)
+  })
+})
+
+describe('a conversation across turns', () => {
+  function turn(
+    missionId: string,
+    prompt: string,
+    continuesFrom?: { missionId: string; reason: 'follow-up' | 'route-switch' }
+  ): PublicRecoveredMission {
+    return {
+      missionId,
+      runId: `run_${missionId}`,
+      prompt,
+      runtime: 'claude',
+      model: 'sonnet',
+      requestedRouteId: 'claude',
+      resolvedRouteId: 'claude-account:default',
+      cliVersion: null,
+      createdAt: '2026-09-02T10:00:00.000Z',
+      lastUpdatedAt: '2026-09-02T10:00:00.000Z',
+      phase: 'completed',
+      events: [],
+      eventCount: 0,
+      eventsTruncated: false,
+      integrityIssueCount: 0,
+      sandbox: 'read-only',
+      checkpoints: [],
+      peerMessages: [],
+      ...(continuesFrom === undefined
+        ? {}
+        : { continuesFrom: { ...continuesFrom, checkpointEpoch: 1 } })
+    }
+  }
+
+  const first = turn('m1', 'check the google stock price')
+  const second = turn('m2', 'cant you look it up for me?', { missionId: 'm1', reason: 'follow-up' })
+  const third = turn('m3', 'what about yesterday?', { missionId: 'm2', reason: 'follow-up' })
+  const byId = new Map([first, second, third].map((mission) => [mission.missionId, mission] as const))
+
+  it('walks a reply back to every earlier turn, oldest first', () => {
+    expect(conversationTurns(third, byId).map((entry) => entry.prompt)).toEqual([
+      'check the google stock price',
+      'cant you look it up for me?',
+      'what about yesterday?'
+    ])
+  })
+
+  it('is just itself for a first turn', () => {
+    expect(conversationTurns(first, byId).map((entry) => entry.missionId)).toEqual(['m1'])
+  })
+
+  it('does not walk a route switch, which is a handoff and keeps its divider', () => {
+    const handed = turn('m4', 'briefing text', { missionId: 'm1', reason: 'route-switch' })
+    const withHandoff = new Map([...byId, ['m4', handed] as const])
+    expect(conversationTurns(handed, withHandoff).map((entry) => entry.missionId)).toEqual(['m4'])
+  })
+
+  it('stops at a missing or cyclic link rather than spinning', () => {
+    const orphan = turn('m9', 'reply', { missionId: 'gone', reason: 'follow-up' })
+    expect(conversationTurns(orphan, new Map([['m9', orphan]])).map((e) => e.missionId)).toEqual(['m9'])
+    const a = turn('a', 'a', { missionId: 'b', reason: 'follow-up' })
+    const b = turn('b', 'b', { missionId: 'a', reason: 'follow-up' })
+    const cyclic = new Map([['a', a], ['b', b]] as const)
+    expect(conversationTurns(a, cyclic).length).toBeLessThanOrEqual(2)
+  })
+
+  it('draws no handoff divider across an ordinary reply', () => {
+    expect(stitchedHandoff(second, byId)).toBeUndefined()
   })
 })

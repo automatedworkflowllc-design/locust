@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(5)
-    expect(header.schemaVersion).toBe(5)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(6)
+    expect(header.schemaVersion).toBe(6)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -313,6 +313,55 @@ describe('ledger schema versions', () => {
     ])).rejects.toThrow()
   })
 
+  it('round-trips a follow-up continuation, session handle and all', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission({
+      ...v1Metadata({
+        continuesFrom: {
+          missionId: 'mission_before',
+          checkpointEpoch: 1,
+          reason: 'follow-up',
+          runtimeThreadId: 'session-abc'
+        }
+      })
+    } as unknown as MissionLedgerMetadata)
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.continuesFrom).toEqual({
+      missionId: 'mission_before',
+      checkpointEpoch: 1,
+      reason: 'follow-up',
+      runtimeThreadId: 'session-abc'
+    })
+  })
+
+  it('refuses a follow-up in a file written before version 6', async () => {
+    const root = await temporaryRoot()
+    // No writer before v6 could call a continuation a follow-up, so a v1 file
+    // saying so was hand-edited -- and believing it would draw an ordinary
+    // reply as though it continued some other conversation.
+    await writeV1Ledger(root, [], {
+      continuesFrom: { missionId: 'mission_other', checkpointEpoch: 1, reason: 'follow-up' }
+    })
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered).toBeUndefined()
+  })
+
+  it('refuses a continuation reason it does not know', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await expect(ledger.createMission({
+      ...v1Metadata({
+        continuesFrom: { missionId: 'mission_before', checkpointEpoch: 1, reason: 'guessed' }
+      })
+    } as unknown as MissionLedgerMetadata)).rejects.toThrow()
+  })
+
   it('rejects a file whose version this reader does not know', async () => {
     const root = await temporaryRoot()
     const metadata = v1Metadata()
@@ -320,7 +369,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 6,
+        schemaVersion: 7,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

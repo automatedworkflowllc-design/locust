@@ -550,7 +550,10 @@ export function stitchedHandoff(
   byId: ReadonlyMap<string, PublicRecoveredMission>
 ): StitchedHandoff | undefined {
   const link = mission.continuesFrom
-  if (link === undefined) return undefined
+  // A follow-up continues the same runtime's own conversation: there is no
+  // seam to draw, and a "Codex to Codex" divider across an ordinary reply
+  // would invent an event that never happened.
+  if (link === undefined || link.reason !== 'route-switch') return undefined
   const prior = byId.get(link.missionId)
   if (prior === undefined) return undefined
   const checkpoint = prior.checkpoints.find((entry) => entry.epoch === link.checkpointEpoch)
@@ -604,4 +607,45 @@ export function resolvedModelNames(
 
 export function resolvedModelKey(runtime: MissionRuntimeId, model: string): string {
   return `${runtime}:${model}`
+}
+
+export interface ConversationTurn {
+  readonly missionId: string
+  /** What the person typed for this turn. */
+  readonly prompt: string
+  readonly events: readonly NormalizedRuntimeEvent[]
+  readonly peerMessages: PublicRecoveredMission['peerMessages']
+}
+
+/**
+ * A mission and every earlier turn of its conversation, oldest first.
+ *
+ * Each turn is its own mission -- one mission holds one run, and a second turn
+ * is a second process -- so the thread has to walk the `follow-up` links back
+ * to rebuild what a person experienced as one exchange. Only follow-ups are
+ * walked: a route switch is a different kind of continuation and keeps its
+ * divider. Bounded, so a hand-edited cycle cannot spin.
+ */
+export function conversationTurns(
+  mission: PublicRecoveredMission,
+  byId: ReadonlyMap<string, PublicRecoveredMission>
+): readonly ConversationTurn[] {
+  const chain: PublicRecoveredMission[] = [mission]
+  let current = mission
+  for (let hops = 0; hops < 64; hops += 1) {
+    const link = current.continuesFrom
+    if (link === undefined || link.reason !== 'follow-up') break
+    const prior = byId.get(link.missionId)
+    if (prior === undefined || chain.some((held) => held.missionId === prior.missionId)) break
+    chain.push(prior)
+    current = prior
+  }
+  return chain
+    .reverse()
+    .map((turn) => ({
+      missionId: turn.missionId,
+      prompt: turn.prompt,
+      events: turn.events,
+      peerMessages: turn.peerMessages
+    }))
 }

@@ -13,9 +13,11 @@ const { mkdirSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 
 const ROOT = resolve(__dirname, '..')
-// The designer's app icon: the mark on its own rounded tile, drawn to fill
-// the square. Rendered as-is, with no padding or tile of ours.
-const MARK = join(ROOT, 'apps', 'desktop', 'src', 'renderer', 'src', 'assets', 'locust-app-icon.svg')
+// The bare mark on nothing: no tile, no ground, filling the square. Colin
+// asked for it to read like the other marks in a taskbar, which are glyphs
+// rather than tiles -- the designer's tiled variant is kept in
+// design/locust-desktop/brand for wherever a tile IS wanted.
+const MARK = join(ROOT, 'apps', 'desktop', 'src', 'renderer', 'src', 'assets', 'locust-mark.svg')
 const OUT_DIR = join(ROOT, 'apps', 'desktop', 'resources')
 const SIZES = [512, 256]
 
@@ -35,11 +37,11 @@ app.whenReady().then(async () => {
     transparent: true,
     webPreferences: { offscreen: true, sandbox: true, contextIsolation: true }
   })
-  // The icon file carries its own tile and inset; this page only sizes it.
+  // Transparent ground, a hair of padding so the wings do not touch the edge.
   const html = `<!doctype html><html><head><style>
     html, body { margin: 0; width: ${size}px; height: ${size}px; background: transparent; overflow: hidden; }
     .tile { width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;
-            box-sizing: border-box; padding: 0; }
+            box-sizing: border-box; padding: ${Math.round(size * 0.02)}px; }
     svg { width: 100%; height: 100%; }
   </style></head><body><div class="tile">${svg}</div></body></html>`
   const page = join(OUT_DIR, '.icon.html')

@@ -1,5 +1,5 @@
 import { constants as fsConstants } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { access, readdir, stat } from "node:fs/promises";
 import { posix, win32 } from "node:path";
 import type { ExecutableLaunch, ExecutableLocator } from "./types.js";
 
@@ -7,7 +7,42 @@ export interface PathExecutableLocatorOptions {
   readonly environment?: Readonly<Record<string, string | undefined>>;
   readonly platform?: NodeJS.Platform;
   readonly isExecutableFile?: (candidate: string, platform: NodeJS.Platform) => Promise<boolean>;
+  /** Test seam for the versioned-install search; defaults to reading the directory. */
+  readonly readDirectory?: (directory: string) => Promise<readonly string[]>;
 }
+
+/**
+ * Where a CLI installs itself when it does not put itself on PATH.
+ *
+ * A terminal finds `codex` because the shell's own profile adds it; an app
+ * launched from the Start menu inherits no such thing, and reported the CLI as
+ * missing on a machine where it was plainly installed. These are the official
+ * per-user install roots, read-only and by exact command name -- nothing here
+ * searches the disk, guesses at names, or looks at anything but directories a
+ * runtime's own installer creates.
+ *
+ * `versioned` roots hold one directory per installed version, so the newest by
+ * modification time is the one a person would get from a terminal.
+ */
+interface InstallRoot {
+  readonly command: string;
+  /** Environment variable naming the base directory, e.g. LOCALAPPDATA. */
+  readonly base: string;
+  readonly segments: readonly string[];
+  readonly versioned: boolean;
+}
+
+const WINDOWS_INSTALL_ROOTS: readonly InstallRoot[] = [
+  // Codex installs into %LOCALAPPDATA%\OpenAI\Codex\bin\<version hash>\.
+  { command: "codex", base: "LOCALAPPDATA", segments: ["OpenAI", "Codex", "bin"], versioned: true },
+  { command: "codex", base: "APPDATA", segments: ["npm"], versioned: false },
+  { command: "claude", base: "APPDATA", segments: ["npm"], versioned: false },
+  { command: "claude", base: "LOCALAPPDATA", segments: ["Programs", "claude"], versioned: false },
+  // Windows PowerShell's own home. Claude Code installs as a `.ps1` shim, and
+  // running it needs a host; on a PATH that does not name one, the shim was
+  // found and then discarded for want of an interpreter that is always there.
+  { command: "powershell", base: "SystemRoot", segments: ["System32", "WindowsPowerShell", "v1.0"], versioned: false },
+];
 
 const SAFE_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
@@ -84,17 +119,75 @@ async function locateNativeWindowsCommand(
   return undefined;
 }
 
+async function defaultReadDirectory(directory: string): Promise<readonly string[]> {
+  try {
+    const entries = await readdir(directory, { withFileTypes: true });
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Directories a given command is known to install into, newest version first.
+ * Returns nothing when the base variable is unset or the root does not exist,
+ * so a machine without that runtime simply contributes no candidates.
+ */
+async function installDirectories(
+  commandName: string,
+  environment: Readonly<Record<string, string | undefined>>,
+  platform: NodeJS.Platform,
+  readDirectory: (directory: string) => Promise<readonly string[]>,
+): Promise<readonly string[]> {
+  if (platform !== "win32") return [];
+  const found: string[] = [];
+  for (const root of WINDOWS_INSTALL_ROOTS) {
+    if (root.command !== commandName) continue;
+    const base = environmentValue(environment, root.base, platform);
+    if (base === undefined || base.length === 0 || !win32.isAbsolute(base)) continue;
+    const directory = win32.join(base, ...root.segments);
+    if (!root.versioned) {
+      found.push(directory);
+      continue;
+    }
+    const versions = await readDirectory(directory);
+    // Newest first. The names are opaque version hashes, so their order says
+    // nothing; when several are installed, the one a terminal would run is the
+    // most recently written.
+    const stamped = await Promise.all(
+      versions.map(async (name) => {
+        const candidate = win32.join(directory, name);
+        try {
+          return { candidate, at: (await stat(candidate)).mtimeMs };
+        } catch {
+          return { candidate, at: 0 };
+        }
+      }),
+    );
+    stamped.sort((left, right) => right.at - left.at);
+    for (const entry of stamped) found.push(entry.candidate);
+  }
+  return found;
+}
+
 export function createPathExecutableLocator(
   options: PathExecutableLocatorOptions = {},
 ): ExecutableLocator {
   const environment = options.environment ?? process.env;
   const platform = options.platform ?? process.platform;
   const isExecutableFile = options.isExecutableFile ?? defaultIsExecutableFile;
-  const directories = pathDirectories(environment, platform);
+  const readDirectory = options.readDirectory ?? defaultReadDirectory;
+  const pathOnly = pathDirectories(environment, platform);
 
   return {
     async find(commandName): Promise<ExecutableLaunch | undefined> {
       if (!SAFE_COMMAND_NAME.test(commandName)) return undefined;
+
+      // PATH first: what a terminal would run wins over anything inferred.
+      const directories = [
+        ...pathOnly,
+        ...(await installDirectories(commandName, environment, platform, readDirectory)),
+      ];
 
       if (platform !== "win32") {
         for (const directory of directories) {
@@ -131,9 +224,13 @@ export function createPathExecutableLocator(
         const script = win32.join(directory, `${commandName}.ps1`);
         if (!(await isExecutableFile(script, "win32"))) continue;
 
+        const hostDirectories = [
+          ...directories,
+          ...(await installDirectories("powershell", environment, platform, readDirectory)),
+        ];
         const powershell =
-          (await locateNativeWindowsCommand("pwsh", directories, isExecutableFile)) ??
-          (await locateNativeWindowsCommand("powershell", directories, isExecutableFile));
+          (await locateNativeWindowsCommand("pwsh", hostDirectories, isExecutableFile)) ??
+          (await locateNativeWindowsCommand("powershell", hostDirectories, isExecutableFile));
         if (!powershell) continue;
 
         return {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -65,12 +65,17 @@ function ThreadItems({
           )
         }
         if (item.type === 'limit') {
+          // Red is for a run that cannot continue. An approaching-limit
+          // warning is not that: the mission ran fine, and a full-width red
+          // card on every turn trains a person to ignore the colour that is
+          // supposed to mean "stopped".
+          if (item.kind === 'temporary-rate-limit') {
+            return <DiagnosticLine key={item.key} level="warning" message={item.message} />
+          }
           return (
             <div className="lc-card is-red" key={item.key}>
               <div className="lc-card__head">
-                <span>
-                  {item.kind === 'quota-exhausted' ? 'Usage limit reached' : 'Provider rate limit'}
-                </span>
+                <span>Usage limit reached</span>
                 <span className="lc-tag is-red">{item.kind}</span>
               </div>
               <div className="lc-card__body">{item.message}</div>
@@ -168,6 +173,16 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
 
 export interface ThreadProps {
   readonly prompt: string
+  /**
+   * Earlier turns of the same conversation, oldest first, each with the words
+   * the person typed for it. Empty for a first turn. They render above this
+   * turn so the exchange reads as one, which is what it was.
+   */
+  readonly earlierTurns: readonly {
+    readonly missionId: string
+    readonly prompt: string
+    readonly events: readonly NormalizedRuntimeEvent[]
+  }[]
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean
   readonly missionId: string | undefined
@@ -213,6 +228,7 @@ export interface ThreadProps {
 
 export function Thread({
   prompt,
+  earlierTurns,
   events,
   running,
   missionId,
@@ -262,10 +278,18 @@ export function Thread({
         )}
 
         {/*
-          The user's own words, once. A handed-off run is launched with a
-          machine-written briefing instead, and drawing THAT as a user bubble
-          would attribute to the person something they never said.
+          Every turn the person actually typed, in order. A handed-off run is
+          launched with a machine-written briefing instead, and drawing THAT as
+          a user bubble would attribute to them something they never said --
+          which is why a handoff contributes no bubble of its own here.
         */}
+        {earlierTurns.map((turn) => (
+          <Fragment key={turn.missionId}>
+            <div className="lc-bubble">{turn.prompt}</div>
+            <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} />
+          </Fragment>
+        ))}
+
         <div className="lc-bubble">{prompt}</div>
 
         {handoff !== undefined && (

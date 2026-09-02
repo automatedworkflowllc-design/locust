@@ -114,7 +114,37 @@ renderer network egress is refused in a packaged build.
 rendered by `_tools/render-icon.cjs`. A packaged build will need an `.ico`
 and a packaging config, which do not exist yet.
 
+**Replies continue the conversation. BUILT 2026-09-02, not yet live-verified.**
+Colin found that every message opened a fresh mission with no memory: a
+follow-up answered "your message got cut off -- I don't have context". Both
+CLIs can resume a session (`claude --resume`, `codex exec resume`) and the
+runtime's own session id was already recorded, so a reply to the finished
+mission on screen now resumes THAT conversation. It is still a new mission --
+one mission holds one run -- recorded at ledger schema v6 with
+`continuesFrom.reason: 'follow-up'` and the session handle. The thread shows
+every turn the person typed, and a follow-up draws no handoff divider,
+because nothing was handed off. A reply is refused, in words, when the
+earlier mission recorded no session or belongs to another runtime; a blank
+run pretending to be a reply is the failure being prevented.
+
+**Discovery finds a CLI that never joined PATH. DONE 2026-09-02.** The
+packaged app reported "Codex CLI was not found on this machine" on a machine
+where Codex was installed and working: it installs into
+`%LOCALAPPDATA%\OpenAI\Codexin\<version>\`, which no PATH names, and a
+window launched from the Start menu inherits no shell profile. The locator
+now also checks the official per-user install roots (newest version first),
+and finds the PowerShell host for Claude Code's `.ps1` shim the same way.
+PATH still wins. `_smoke/packaged-smoke.mjs` now launches with a bare
+`C:\Windows\System32` PATH and requires both runtimes to be found anyway.
+
+**An approaching limit is no longer a red card.** A `temporary-rate-limit`
+renders as a quiet line; red is kept for a run that actually stopped.
+
 ## Still open, in the order I would take them
+
+**Mission deletion and retention.** Colin asked directly. Ledgers only ever
+grow and nothing can remove a mission or its workroom messages.
+
 
 **Models and effort. DONE 2026-09-01.** Each runtime offers its own models:
 Codex's from a live `model/list`, Claude Code's from the aliases its own

@@ -486,6 +486,7 @@ if (!ownsSingleInstanceLock) {
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       try {
         const peer = await peerContextFor(payload.teammateId)
+        const followUpOf = typeof payload.followUpOf === 'string' ? payload.followUpOf : undefined
         const response = await codexMissions.start(
           prompt,
           runtime,
@@ -497,7 +498,8 @@ if (!ownsSingleInstanceLock) {
             }
           },
           undefined,
-          peer
+          peer,
+          followUpOf
         )
         if (response.ok) await assignOwner(peer?.self.teammateId, response.data.missionId)
         return response

@@ -12,7 +12,7 @@ import type {
   RuntimeProcessRun,
   RuntimeProcessRunner
 } from '@teammate/runtime-adapters'
-import type { MissionContinuation, MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
+import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionSandbox } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
@@ -77,7 +77,9 @@ export interface CodexMissionService {
      * from the roster it read itself: the renderer names a teammate id and
      * the host decides whether that id is anyone.
      */
-    peer?: MissionPeerContext
+    peer?: MissionPeerContext,
+    /** The mission whose conversation this one continues, if any. */
+    followUpOf?: string
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   handOff(
@@ -183,6 +185,23 @@ function validPrompt(value: unknown): value is string {
     && value.trim().length > 0
     && value.length <= MAX_PROMPT_LENGTH
     && !value.includes('\0')
+}
+
+/**
+ * The runtime's own handle for a finished mission's conversation, from its own
+ * records. `run.started` states it at the beginning and the terminal events
+ * repeat it; the last one that carries it wins, since a resumed session can
+ * report a new id.
+ */
+export function runtimeThreadIdOf(mission: RecoveredMission): string | undefined {
+  let held: string | undefined
+  for (const event of mission.events) {
+    const payload = event.payload as { readonly runtimeThreadId?: unknown }
+    if (typeof payload.runtimeThreadId === 'string' && payload.runtimeThreadId.length > 0) {
+      held = payload.runtimeThreadId
+    }
+  }
+  return held
 }
 
 function validRunId(value: unknown): value is string {
@@ -337,7 +356,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       route: { readonly model?: string; readonly effort?: string },
       emit: (update: CodexMissionUpdate) => void,
       continuation?: MissionContinuation,
-      peer?: MissionPeerContext
+      peer?: MissionPeerContext,
+      followUpOf?: string
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -420,6 +440,33 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           ) as CodexMissionStartResponse
         }
 
+        // A reply resumes the earlier mission's own session. The handle comes
+        // from the durable record of THAT mission, never from the renderer:
+        // the renderer names a mission, and the host decides what that means.
+        let resumeThreadId: string | undefined
+        let resumedMissionId: string | undefined
+        if (followUpOf !== undefined) {
+          const prior = await options.ledger.getMission(followUpOf).catch(() => undefined)
+          const priorThread = prior === undefined ? undefined : runtimeThreadIdOf(prior)
+          if (prior === undefined || priorThread === undefined) {
+            return error(
+              'RUNTIME_START_FAILED',
+              'That conversation cannot be continued: the earlier mission did not record a session to resume.'
+            ) as CodexMissionStartResponse
+          }
+          if (prior.metadata.runtime !== runtime) {
+            // Resuming across runtimes is a handoff, and that has its own path
+            // with a checkpoint and a briefing. Silently starting blank here
+            // would look like a reply and behave like a stranger.
+            return error(
+              'RUNTIME_START_FAILED',
+              `That conversation belongs to ${prior.metadata.runtime === 'claude' ? 'Claude Code' : 'Codex'}. Switch the route back, or hand the mission over instead.`
+            ) as CodexMissionStartResponse
+          }
+          resumeThreadId = priorThread
+          resumedMissionId = prior.metadata.missionId
+        }
+
         const runId = `run_${createId()}`
         const missionId = `mission_${createId()}`
         const controller = new AbortController()
@@ -472,7 +519,21 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             sandbox: effectiveSandbox,
             executionPolicyVersion: 1,
             createdAt,
-            ...(continuation === undefined ? {} : { continuesFrom: continuation })
+            ...(continuation === undefined
+              ? resumedMissionId === undefined || resumeThreadId === undefined
+                ? {}
+                : {
+                    continuesFrom: {
+                      missionId: resumedMissionId,
+                      // Follow-ups do not reconcile: nothing stopped, so there
+                      // is no checkpoint to point at. Epoch 1 is the mission's
+                      // own first, which is the only one a reader could mean.
+                      checkpointEpoch: 1,
+                      reason: 'follow-up' as const,
+                      runtimeThreadId: resumeThreadId
+                    }
+                  }
+              : { continuesFrom: continuation })
           })
         } catch {
           return error(
@@ -529,7 +590,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const chosenEffort = route.effort
           const choice = {
             ...(chosenModel === undefined ? {} : { model: chosenModel }),
-            ...(chosenEffort === undefined ? {} : { effort: chosenEffort })
+            ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
+            ...(resumeThreadId === undefined ? {} : { resumeThreadId })
           }
           const command = runtime === 'claude'
             ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath, ...choice })
@@ -588,7 +650,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             cliVersion: chosen.version?.version ?? null,
             sandbox: effectiveSandbox,
             peerMessages: delivered.map((message) => publicPeerMessage(message, 'received')),
-            peerDeliveryFailed
+            peerDeliveryFailed,
+            ...(resumedMissionId === undefined || resumeThreadId === undefined
+              ? {}
+              : { followsUp: { missionId: resumedMissionId, runtimeThreadId: resumeThreadId } })
           }
         }
       } finally {

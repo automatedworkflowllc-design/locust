@@ -22,6 +22,20 @@ const WORKROOM = join(ROOT, 'src', 'workroom.ts')
 
 const MUTATIONS = [
   {
+    file: INDEX,
+    name: 'a pre-v6 file may call a continuation a follow-up',
+    from: "  if (schemaVersion < 6 && candidate.continuesFrom?.reason === 'follow-up') {\n    return undefined\n  }\n",
+    to: '',
+    expect: 'refuses a follow-up in a file written before version 6'
+  },
+  {
+    file: INDEX,
+    name: 'any continuation reason is accepted',
+    from: "      || (metadata.continuesFrom.reason !== 'route-switch' && metadata.continuesFrom.reason !== 'follow-up')",
+    to: '      || false',
+    expect: 'refuses a continuation reason it does not know'
+  },
+  {
     name: 'an action that never reported an outcome is dropped from the record',
     file: CHECKPOINT,
     from: '  const unsettledActions = [...open.values()]',

@@ -269,3 +269,93 @@ describe("model and effort on the command line", () => {
     expect(parseClaudeModelHints("Usage: claude [options]")).toBeUndefined();
   });
 });
+
+describe("continuing a conversation", () => {
+  const executable = {
+    commandName: "x",
+    discoveredPath: process.platform === "win32" ? "C:\\tools\\x.exe" : "/tools/x",
+    executablePath: process.platform === "win32" ? "C:\\tools\\x.exe" : "/tools/x",
+    prefixArgs: [],
+    kind: "native" as const,
+  };
+  const workspacePath = process.platform === "win32" ? "C:\\work" : "/work";
+
+  it("resumes a Claude session by id", () => {
+    const spec = createClaudePrintCommand(executable, { workspacePath, resumeThreadId: "sess-42" });
+    expect(spec.args[spec.args.indexOf("--resume") + 1]).toBe("sess-42");
+  });
+
+  it("resumes a Codex session through its subcommand, keeping the sandbox", () => {
+    const spec = createCodexExecCommand(executable, {
+      workspacePath,
+      resumeThreadId: "thread-42",
+      sandbox: "read-only",
+    });
+    expect(spec.args.slice(0, 3)).toEqual(["exec", "resume", "thread-42"]);
+    expect(spec.args[spec.args.indexOf("--sandbox") + 1]).toBe("read-only");
+    // The prompt still arrives on stdin, so the trailing `-` must survive.
+    expect(spec.args.at(-1)).toBe("-");
+  });
+
+  it("starts a fresh conversation when no session is given", () => {
+    const spec = createCodexExecCommand(executable, { workspacePath });
+    expect(spec.args.includes("resume")).toBe(false);
+    expect(createClaudePrintCommand(executable, { workspacePath }).args.includes("--resume")).toBe(false);
+  });
+
+  it("refuses a session id that is not plain text", () => {
+    expect(() => createCodexExecCommand(executable, { workspacePath, resumeThreadId: "" })).toThrow();
+    expect(() =>
+      createClaudePrintCommand(executable, { workspacePath, resumeThreadId: `bad${String.fromCharCode(0)}id` }),
+    ).toThrow();
+  });
+});
+
+describe("finding a CLI that never put itself on PATH", () => {
+  const LOCAL = "C:\\Users\\x\\AppData\\Local";
+  const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+
+  function locator(files: readonly string[], versions: readonly string[] = [], path = "") {
+    return createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: path, LOCALAPPDATA: LOCAL, APPDATA: ROAMING },
+      isExecutableFile: async (candidate) => files.includes(candidate),
+      readDirectory: async (directory) =>
+        directory === `${LOCAL}\\OpenAI\\Codex\\bin` ? versions : [],
+    });
+  }
+
+  it("finds Codex in its versioned install root when PATH knows nothing", async () => {
+    // The exact shape that reported "not found" in a packaged build on a
+    // machine where Codex was installed and working in a terminal.
+    const exe = `${LOCAL}\\OpenAI\\Codex\\bin\\abc123\\codex.exe`;
+    const found = await locator([exe], ["abc123"]).find("codex");
+    expect(found?.executablePath).toBe(exe);
+    expect(found?.kind).toBe("native");
+  });
+
+  it("prefers what PATH says over an install root", async () => {
+    const onPath = "C:\\tools\\codex.exe";
+    const installed = `${LOCAL}\\OpenAI\\Codex\\bin\\abc123\\codex.exe`;
+    const found = await locator([onPath, installed], ["abc123"], "C:\\tools").find("codex");
+    expect(found?.executablePath).toBe(onPath);
+  });
+
+  it("finds Claude Code's npm shim without PATH", async () => {
+    const shim = `${ROAMING}\\npm\\claude.ps1`;
+    const powershell = `${ROAMING}\\npm\\powershell.exe`;
+    const found = await locator([shim, powershell]).find("claude");
+    expect(found?.kind).toBe("powershell-shim");
+    expect(found?.discoveredPath).toBe(shim);
+  });
+
+  it("reports nothing when the runtime is genuinely absent", async () => {
+    expect(await locator([], ["abc123"]).find("codex")).toBeUndefined();
+    expect(await locator([]).find("claude")).toBeUndefined();
+  });
+
+  it("searches no install root for a command it does not know", async () => {
+    const stray = `${LOCAL}\\OpenAI\\Codex\\bin\\abc123\\somethingelse.exe`;
+    expect(await locator([stray], ["abc123"]).find("somethingelse")).toBeUndefined();
+  });
+});

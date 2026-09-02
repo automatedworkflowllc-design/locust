@@ -1400,3 +1400,130 @@ describe('missions side by side', () => {
     expect(createCheckpoint).toHaveBeenCalledWith(atlas.data.missionId, 'route-switch')
   })
 })
+
+describe('continuing a conversation', () => {
+  function finished(overrides: Record<string, unknown> = {}) {
+    return {
+      metadata: {
+        missionId: 'mission_prior',
+        runId: 'run_prior',
+        prompt: 'check the google stock price',
+        runtime: 'codex',
+        model: 'account-default',
+        requestedRouteId: 'codex',
+        resolvedRouteId: 'codex-account:default',
+        cliVersion: null,
+        workspaceId: 'ws_test',
+        sandbox: 'read-only',
+        executionPolicyVersion: 1,
+        createdAt: NOW,
+        ...overrides
+      },
+      events: [
+        {
+          id: 'e1',
+          runId: 'run_prior',
+          missionId: 'mission_prior',
+          sequence: 1,
+          type: 'run.started',
+          occurredAt: NOW,
+          sourceAdapter: 'codex',
+          payload: { runtimeThreadId: 'thread-prior', evidence: { redacted: true } }
+        }
+      ],
+      hostFailures: [],
+      checkpoints: [],
+      peerLinks: [],
+      phase: 'completed',
+      lastUpdatedAt: NOW,
+      ledgerSequence: 2,
+      issues: []
+    } as never
+  }
+
+  it('resumes the earlier mission\u2019s own session, and records what it continued', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'thread.started', thread_id: 'thread-prior' }, { type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const { service } = scheduledService({ start }, fakeLedger({
+      createMission,
+      getMission: async () => finished()
+    }))
+
+    const response = await service.start(
+      'cant you look it up for me?', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior'
+    )
+
+    expect(response.ok).toBe(true)
+    if (!response.ok) return
+    // The runtime is told to resume that session rather than start blank.
+    const spec = start.mock.calls[0]?.[0] as { args: readonly string[] }
+    expect(spec.args.slice(0, 3)).toEqual(['exec', 'resume', 'thread-prior'])
+    // And the record says so, so a reopened thread can rebuild the exchange.
+    expect(createMission.mock.calls[0]?.[0]?.continuesFrom).toEqual({
+      missionId: 'mission_prior',
+      checkpointEpoch: 1,
+      reason: 'follow-up',
+      runtimeThreadId: 'thread-prior'
+    })
+    expect(response.data.followsUp).toEqual({ missionId: 'mission_prior', runtimeThreadId: 'thread-prior' })
+  })
+
+  it('refuses to continue a conversation that recorded no session, rather than starting blank', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => ({ ...(finished() as never as Record<string, unknown>), events: [] }) as never
+    }))
+
+    const response = await service.start(
+      'go on', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior'
+    )
+
+    expect(response).toMatchObject({
+      ok: false,
+      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('did not record a session') }
+    })
+    // Nothing was launched: a blank run pretending to be a reply is the failure.
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('refuses to continue another runtime\u2019s conversation, and says which', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => finished({ runtime: 'claude' })
+    }))
+
+    const response = await service.start(
+      'go on', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior'
+    )
+
+    expect(response).toMatchObject({
+      ok: false,
+      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('Claude Code') }
+    })
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('starts a fresh conversation when nothing is being continued', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const { service } = scheduledService({ start }, fakeLedger({ createMission }))
+
+    await service.start('a first question', 'codex', 'ask', {}, () => undefined)
+
+    const spec = start.mock.calls[0]?.[0] as { args: readonly string[] }
+    expect(spec.args.includes('resume')).toBe(false)
+    expect(createMission.mock.calls[0]?.[0]?.continuesFrom).toBeUndefined()
+  })
+})
