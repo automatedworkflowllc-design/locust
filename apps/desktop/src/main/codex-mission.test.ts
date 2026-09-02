@@ -111,6 +111,7 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
     appendHostFailure: async () => undefined,
     createCheckpoint: async () => { throw new Error('not used in this test') },
     appendPeerLinks: async () => undefined,
+    deleteMission: async () => true,
     getMission: async () => undefined,
     listMissions: async () => ({ missions: [], issues: [] }),
     flush: async () => undefined,

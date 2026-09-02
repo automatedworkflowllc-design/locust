@@ -15,7 +15,7 @@ import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
 import { createModelCatalog } from './model-catalog.js'
 import { createTeammateStore } from './teammate-store.js'
-import { readMissionHistory } from './mission-history.js'
+import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
@@ -27,6 +27,8 @@ import {
   MISSION_APPROVAL_CHANNEL,
   MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HANDOFF_CHANNEL,
+  APP_INFO_CHANNEL,
+  MISSION_DELETE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
@@ -416,6 +418,29 @@ if (!ownsSingleInstanceLock) {
         } as const
       }
       return readMissionHistory(missionLedger, workroom)
+    })
+
+    ipcMain.handle(APP_INFO_CHANNEL, (event) => {
+      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged } as const
+      // The version electron-builder stamped, which is the one on the installer.
+      return { name: 'Locust', version: app.getVersion(), packaged: app.isPackaged } as const
+    })
+
+    ipcMain.handle(MISSION_DELETE_CHANNEL, async (event, missionId: unknown) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The deletion was rejected.' } } as const
+      }
+      const response = await deleteMissionRecord(
+        missionLedger,
+        missionId,
+        (id) => codexMissions.hasMission(id) || appServerMissions.hasMission(id)
+      )
+      // Ownership follows the record out, so the roster never lists a
+      // mission that no longer exists.
+      if (response.ok && typeof missionId === 'string') {
+        await teammates.unassignMission(missionId).catch(() => undefined)
+      }
+      return response
     })
 
     ipcMain.handle(CODEX_MISSION_START_CHANNEL, async (event, request: unknown) => {

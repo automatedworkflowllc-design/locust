@@ -142,8 +142,26 @@ renders as a quiet line; red is kept for a run that actually stopped.
 
 ## Still open, in the order I would take them
 
-**Mission deletion and retention.** Colin asked directly. Ledgers only ever
-grow and nothing can remove a mission or its workroom messages.
+**Mission deletion. DONE 2026-09-02.** Colin asked directly. A finished
+mission can be deleted for good from the workroom header -- two clicks, the
+second of which says "Delete for good?" -- and the host refuses while it is
+live, naming the remedy. The ledger's one destructive operation is exactly as
+narrow as it sounds: the file goes, nothing else is rewritten. Other missions
+that pointed at it keep their pointers, which readers already treat as "stop
+here", and its workroom messages stay, attributed, because the person they
+were sent to still has a right to see them. Ownership follows the record out.
+The mutation control caught my first test for this passing for the wrong
+reason (the append after deletion failed at open with or without the cache
+invalidation); the test now re-creates the same id and requires it to be as
+fresh as the first time. Retention -- pruning old missions on a policy --
+remains open.
+
+**Builds are identifiable.** The desktop app is 0.2.0 (from 0.1.0, which
+every build had been), the installer is named by version, and Settings shows
+`Locust <version>` with a development-build marker when unpackaged. There is
+still no auto-update: the app never checks for a new version, and adding that
+needs a publish target and, honestly, a signing certificate -- both Colin's
+decisions.
 
 
 **Models and effort. DONE 2026-09-01.** Each runtime offers its own models:

@@ -2534,3 +2534,16 @@ textarea {
 .lc-rostercard__edit:hover {
   background: rgba(255, 255, 255, 0.06);
 }
+
+.lc-workroom__actions {
+  display: flex;
+  gap: var(--lc-space-3);
+  align-items: center;
+}
+
+/* Armed for something that cannot be undone: the button itself says so. */
+.lc-button--danger {
+  border-color: var(--lc-red-border, rgba(228, 104, 93, 0.45));
+  color: var(--lc-red-text, #f5d9d4);
+  background: var(--lc-red-tint, rgba(228, 104, 93, 0.1));
+}

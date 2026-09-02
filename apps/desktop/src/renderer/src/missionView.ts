@@ -199,7 +199,10 @@ export function buildThread(
         break
       }
       case 'step.started': {
-        workBegan = true
+        // A turn opening is not work yet: Codex raises its setup notices
+        // right after it, before any tool runs, and counting the turn as work
+        // put "skill descriptions were shortened" back in every thread.
+        if (event.payload.stepKind !== 'turn') workBegan = true
         const message = event.payload.message
         runningStep = {
           label: message ?? (event.payload.stepKind === 'turn' ? 'Working' : 'Thinking'),

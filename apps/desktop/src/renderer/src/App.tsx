@@ -226,6 +226,7 @@ function missionTitle(prompt: string): string {
 
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
+  const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean }>()
   /** Every run the shell knows about, keyed by runId (or a pending key until the receipt arrives). */
   const [runs, setRuns] = useState<RunMap>(() => new Map())
   /** Which run's thread is on screen; undefined shows the addressed teammate's idle state. */
@@ -308,6 +309,13 @@ export default function App(): ReactElement {
         return current
       })
     })
+
+    void bridge
+      .getAppInfo()
+      .then((info) => {
+        if (active) setBuild({ version: info.version, packaged: info.packaged })
+      })
+      .catch(() => undefined)
 
     void bridge
       .getLocalRuntimes()
@@ -762,6 +770,45 @@ export default function App(): ReactElement {
     setShownKey(mission.runId)
   }
 
+  /**
+   * Delete the shown mission's record for good. The host refuses while it is
+   * live, and that refusal is shown rather than swallowed. On success the
+   * mission leaves every list it was in and the thread empties, because
+   * showing a thread whose record is gone would be showing a ghost.
+   */
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const [deleteError, setDeleteError] = useState<string>()
+  const deleteShownMission = (): void => {
+    const bridge = window.desktop
+    const missionId = liveRun?.data?.missionId
+    if (!bridge || missionId === undefined) return
+    void bridge
+      .deleteMission(missionId)
+      .then((response) => {
+        setDeleteArmed(false)
+        if (!response.ok) {
+          setDeleteError(response.error.message)
+          return
+        }
+        setDeleteError(undefined)
+        setRuns((current) => {
+          const next = new Map(current)
+          for (const [key, run] of current) if (run.data?.missionId === missionId) next.delete(key)
+          return next
+        })
+        setHistory((current) => current.filter((mission) => mission.missionId !== missionId))
+        setMissionOwners((current) => {
+          const { [missionId]: _gone, ...rest } = current
+          return rest
+        })
+        setShownKey(undefined)
+      })
+      .catch(() => {
+        setDeleteArmed(false)
+        setDeleteError('The mission could not be deleted.')
+      })
+  }
+
   /** Address a teammate, and look at what they are doing (or their idle state). */
   const selectTeammate = (teammateId: string): void => {
     setSelectedTeammateId(teammateId)
@@ -866,7 +913,7 @@ export default function App(): ReactElement {
               onRemove={removeTeammate}
             />
           ) : screen === 'settings' ? (
-            <SettingsScreen runtimes={runtimes} ledgerPath={undefined} />
+            <SettingsScreen runtimes={runtimes} ledgerPath={undefined} build={build} />
           ) : liveRun === undefined ? (
             // A teammate with nothing running gets their own capability-led
             // state; with no teammates at all, the runtime story comes first.
@@ -925,15 +972,45 @@ export default function App(): ReactElement {
                     </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className={`lc-button${inspectorOpen ? ' is-active' : ''}`}
-                  aria-pressed={inspectorOpen}
-                  onClick={() => setInspectorOpen(!inspectorOpen)}
-                >
-                  <Icon name="activity" size={13} /> Activity
-                </button>
+                <div className="lc-workroom__actions">
+                  {/*
+                    Two clicks, and the second says what it does. Deletion is
+                    the one thing here that cannot be undone, so it is never
+                    one click away and never hidden in a menu either.
+                  */}
+                  {!running && (
+                    <button
+                      type="button"
+                      className={`lc-button${deleteArmed ? ' lc-button--danger' : ''}`}
+                      title={deleteArmed ? 'This removes the record for good' : 'Delete this mission'}
+                      onClick={() => {
+                        if (deleteArmed) deleteShownMission()
+                        else {
+                          setDeleteError(undefined)
+                          setDeleteArmed(true)
+                        }
+                      }}
+                      onBlur={() => setDeleteArmed(false)}
+                    >
+                      {deleteArmed ? 'Delete for good?' : 'Delete'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={`lc-button${inspectorOpen ? ' is-active' : ''}`}
+                    aria-pressed={inspectorOpen}
+                    onClick={() => setInspectorOpen(!inspectorOpen)}
+                  >
+                    <Icon name="activity" size={13} /> Activity
+                  </button>
+                </div>
               </header>
+              {deleteError !== undefined && (
+                <div className="lc-diagnostic lc-tone-red" role="alert">
+                  <Icon name="shield" size={12} />
+                  <span>{deleteError}</span>
+                </div>
+              )}
               <Thread
                 prompt={liveRun.prompt}
                 earlierTurns={liveRun.earlierTurns ?? []}

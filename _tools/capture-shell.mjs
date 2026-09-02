@@ -18,7 +18,9 @@ const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe
 const PORT = 9229
 const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
 const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
-const OUT = resolve(process.argv[2] ?? join(APP_DIR, '..', '..', 'docs', 'assets', 'shell.png'))
+// Flags and the output path may come in any order; `--idle` is not a path.
+const positional = process.argv.slice(2).filter((argument) => !argument.startsWith('--'))
+const OUT = resolve(positional[0] ?? join(APP_DIR, '..', '..', 'docs', 'assets', 'shell.png'))
 
 const PROMPT =
   'Read the README at the top of this workspace and tell me, in three short sentences, what this project is and what it can do today.'

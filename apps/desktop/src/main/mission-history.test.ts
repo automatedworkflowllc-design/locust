@@ -1,7 +1,7 @@
 import type { MissionLedger, RecoveredMission, WorkroomMessage } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
-import { describe, expect, it } from 'vitest'
-import { publicRecoveredMission, withinByteBudget, readMissionHistory } from './mission-history.js'
+import { describe, expect, it, vi } from 'vitest'
+import { deleteMissionRecord, publicRecoveredMission, withinByteBudget, readMissionHistory } from './mission-history.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 
@@ -152,6 +152,7 @@ describe('peer messages in history', () => {
       appendHostFailure: async () => undefined,
       createCheckpoint: async () => { throw new Error('not used in this test') },
       appendPeerLinks: async () => undefined,
+      deleteMission: async () => true,
       getMission: async () => undefined,
       listMissions: async () => ({ missions: [], issues: [] }),
       flush: async () => undefined,
@@ -167,6 +168,7 @@ describe('mission history reads', () => {
     appendHostFailure: async () => undefined,
     createCheckpoint: async () => { throw new Error('not used in this test') },
     appendPeerLinks: async () => undefined,
+    deleteMission: async () => true,
     getMission: async () => undefined,
     listMissions: async () => ({ missions: [], issues: [] }),
     flush: async () => undefined,
@@ -247,5 +249,46 @@ describe('history byte budget', () => {
       publicRecoveredMission(sized('mission_2', 10))
     ]
     expect(withinByteBudget(missions, 1_000_000)).toHaveLength(2)
+  })
+})
+
+describe('deleting a mission', () => {
+  function ledger(overrides: Partial<MissionLedger>): MissionLedger {
+    return {
+      createMission: async () => undefined,
+      appendEvents: async () => undefined,
+      appendHostFailure: async () => undefined,
+      createCheckpoint: async () => { throw new Error('not used in this test') },
+      appendPeerLinks: async () => undefined,
+      deleteMission: async () => true,
+      getMission: async () => undefined,
+      listMissions: async () => ({ missions: [], issues: [] }),
+      flush: async () => undefined,
+      ...overrides
+    }
+  }
+
+  it('refuses to delete a mission that is still running, and names the remedy', async () => {
+    const deleteMission = vi.fn<MissionLedger['deleteMission']>(async () => true)
+    const response = await deleteMissionRecord(ledger({ deleteMission }), 'mission_1', () => true)
+    expect(response).toEqual({
+      ok: false,
+      error: { code: 'LIVE', message: 'That mission is still running. Stop it first, then delete it.' }
+    })
+    // Refused means untouched: the file is never asked to go.
+    expect(deleteMission).not.toHaveBeenCalled()
+  })
+
+  it('deletes a finished mission and says when there was nothing to delete', async () => {
+    expect(await deleteMissionRecord(ledger({}), 'mission_1', () => false)).toEqual({ ok: true })
+    expect(await deleteMissionRecord(ledger({ deleteMission: async () => false }), 'mission_9', () => false))
+      .toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+  })
+
+  it('refuses an id that could name any other file, before touching the store', async () => {
+    const deleteMission = vi.fn<MissionLedger['deleteMission']>(async () => true)
+    const response = await deleteMissionRecord(ledger({ deleteMission }), '../escape', () => false)
+    expect(response).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+    expect(deleteMission).not.toHaveBeenCalled()
   })
 })

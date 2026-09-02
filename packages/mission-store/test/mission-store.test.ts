@@ -345,3 +345,65 @@ describe('recency-aware scanning past the file cap', () => {
     expect(capIssue?.message).toContain('most recently updated')
   })
 })
+
+describe('deleting a mission', () => {
+  it('removes the record for good and reports whether there was one', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission(metadata())
+
+    expect(await ledger.deleteMission('mission_1')).toBe(true)
+    expect(await ledger.getMission('mission_1')).toBeUndefined()
+    expect((await ledger.listMissions()).missions).toEqual([])
+    // Gone is gone: a second delete finds nothing, and says so plainly.
+    expect(await ledger.deleteMission('mission_1')).toBe(false)
+  })
+
+  it('refuses to append to a mission that was deleted, rather than resurrecting it', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission(metadata())
+    await ledger.deleteMission('mission_1')
+
+    await expect(
+      ledger.appendHostFailure('mission_1', {
+        code: 'runtime-transport-failed',
+        message: 'late',
+        occurredAt: NOW
+      })
+    ).rejects.toThrow()
+    expect(await ledger.getMission('mission_1')).toBeUndefined()
+
+    // The part that is easy to get wrong: the writer caches offsets and
+    // sequences per mission. If deletion left those behind, a mission created
+    // again under the same id would be written against the OLD file's
+    // bookkeeping and fail as "changed outside the active writer". The same
+    // id must be as fresh as the first time.
+    await ledger.createMission(metadata())
+    await ledger.appendHostFailure('mission_1', {
+      code: 'runtime-transport-failed',
+      message: 'fresh',
+      occurredAt: NOW
+    })
+    const reborn = await ledger.getMission('mission_1')
+    expect(reborn?.issues).toEqual([])
+    expect(reborn?.hostFailures.map((failure) => failure.message)).toEqual(['fresh'])
+  })
+
+  it('leaves every other mission untouched', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission(metadata())
+    await ledger.createMission(metadata({ missionId: 'mission_2', runId: 'run_2' }))
+
+    await ledger.deleteMission('mission_1')
+
+    expect((await ledger.listMissions()).missions.map((m) => m.metadata.missionId)).toEqual(['mission_2'])
+  })
+
+  it('refuses an id that could name any other file', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await expect(ledger.deleteMission('../escape')).rejects.toThrow()
+  })
+})

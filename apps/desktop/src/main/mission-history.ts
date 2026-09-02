@@ -1,5 +1,10 @@
 import type { MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
-import type { MissionHistoryResponse, PublicPeerMessage, PublicRecoveredMission } from '../shared/ipc.js'
+import type {
+  MissionDeleteResponse,
+  MissionHistoryResponse,
+  PublicPeerMessage,
+  PublicRecoveredMission
+} from '../shared/ipc.js'
 
 const MAX_HISTORY_MISSIONS = 20
 const MAX_HISTORY_EVENTS = 500
@@ -158,5 +163,38 @@ export async function readMissionHistory(
         message: 'Local mission history could not be read.'
       }
     }
+  }
+}
+
+/**
+ * Delete a mission's record, unless it is still running.
+ *
+ * Deleting a live mission would orphan a process that keeps writing into a
+ * file that no longer exists -- and it would take the person's only stop
+ * control with it. So the answer is a refusal that names the remedy. Nothing
+ * here touches the workroom: a deleted mission's messages stay, attributed,
+ * because the person they were sent to still has a right to see them.
+ */
+export async function deleteMissionRecord(
+  ledger: MissionLedger,
+  missionId: unknown,
+  isLive: (missionId: string) => boolean
+): Promise<MissionDeleteResponse> {
+  if (typeof missionId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(missionId)) {
+    return { ok: false, error: { code: 'NOT_FOUND', message: 'That mission does not exist.' } }
+  }
+  if (isLive(missionId)) {
+    return {
+      ok: false,
+      error: { code: 'LIVE', message: 'That mission is still running. Stop it first, then delete it.' }
+    }
+  }
+  try {
+    const removed = await ledger.deleteMission(missionId)
+    return removed
+      ? { ok: true }
+      : { ok: false, error: { code: 'NOT_FOUND', message: 'That mission does not exist.' } }
+  } catch {
+    return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The mission could not be deleted.' } }
   }
 }

@@ -197,14 +197,24 @@ export function TeammatesScreen({
  */
 export function SettingsScreen({
   runtimes,
-  ledgerPath
+  ledgerPath,
+  build
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly ledgerPath: string | undefined
+  /** Which build this is; undefined until the host has answered. */
+  readonly build: { readonly version: string; readonly packaged: boolean } | undefined
 }): ReactElement {
   return (
     <div className="lc-screen">
-      <ScreenHeader title="Settings" meta="workspace · local only" />
+      <ScreenHeader
+        title="Settings"
+        meta={
+          build === undefined
+            ? 'workspace · local only'
+            : `Locust ${build.version}${build.packaged ? '' : ' · development build'} · local only`
+        }
+      />
       <div className="lc-screen__scroll">
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>

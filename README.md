@@ -1,16 +1,32 @@
-# AI Teammate Platform
+<p align="center">
+  <img src="docs/assets/locust-logo.svg" alt="Locust" width="420">
+</p>
 
-A local-first, open-source platform for autonomous AI teammates with explicit model control, durable mission state, safe approvals, and transparent fallback across Codex, Claude, free-tier APIs, and local models.
+<p align="center">
+  A local-first desktop app that runs AI coding agents as a team you can watch,
+  on runtimes and models you choose, with a durable record of everything they did.
+</p>
 
-The working product name is intentionally generic until naming is settled.
+---
 
-![Teammate live Codex control room](docs/assets/control-room.png)
+**Locust** puts Codex CLI and Claude Code side by side under one roof. You give
+a teammate a mission; it runs on your machine, under your own provider
+accounts, in a read-only sandbox unless you say otherwise. Every event is
+written to an append-only local ledger before it reaches the screen, so what
+you are shown is what was recorded, and a mission survives a restart.
 
-The screenshot is a real read-only Codex smoke mission rendered from the normalized local CLI event stream.
+![The Locust shell running a real Codex mission](docs/assets/shell.png)
+
+A real read-only Codex mission in the built app: four teammates in the roster,
+Wren's mission filed under Wren, and the thread as it was recorded. Captured by
+`_tools/capture-shell.mjs`, which runs the mission rather than mocking it.
 
 ## Why this exists
 
-Current autonomous-agent products often hide the runtime, model, provider, permissions, and failure state behind one opaque “agent.” This project separates them and makes every important decision inspectable.
+Most agent products hide the runtime, the model, the provider, the permissions
+and the failure state behind one opaque "agent". Locust separates them and
+makes every one of those decisions inspectable -- and, where it matters,
+yours to make.
 
 ```text
 Mission control plane

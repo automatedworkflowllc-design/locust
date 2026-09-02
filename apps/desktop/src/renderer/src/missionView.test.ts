@@ -415,12 +415,14 @@ describe('runtime notices in the thread', () => {
   } as unknown as NormalizedRuntimeEvent
 
   it('keeps a notice raised before any work out of the thread, as setup talk', () => {
-    const items = buildThread([notice('d1', 1), step], { running: false })
-    expect(items.some((item) => item.type === 'diagnostic')).toBe(false)
+    expect(buildThread([notice('d1', 1), step], { running: false }).some((item) => item.type === 'diagnostic')).toBe(false)
+    // Codex's real shape: the turn opens, THEN the setup notice arrives, and
+    // only after that does anything run. The turn opening is not work.
+    expect(buildThread([step, notice('d1', 3)], { running: false }).some((item) => item.type === 'diagnostic')).toBe(false)
   })
 
   it('shows a notice raised while the work was under way', () => {
-    const items = buildThread([step, notice('d2', 3)], { running: false })
+    const items = buildThread([step, toolStart('t1', 'shell', 'pnpm test'), notice('d2', 4)], { running: false })
     expect(items.some((item) => item.type === 'diagnostic')).toBe(true)
   })
 })

@@ -8,6 +8,15 @@ export const CODEX_MISSION_CANCEL_CHANNEL = 'codex-mission:cancel'
 export const MISSION_HANDOFF_CHANNEL = 'mission:hand-off'
 export const CODEX_MISSION_UPDATE_CHANNEL = 'codex-mission:update'
 export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
+export const MISSION_DELETE_CHANNEL = 'mission:delete'
+export const APP_INFO_CHANNEL = 'app:info'
+
+/** What this build is, so a person can say which one they are running. */
+export interface AppInfo {
+  readonly name: string
+  readonly version: string
+  readonly packaged: boolean
+}
 export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
@@ -456,13 +465,27 @@ export type MissionHistoryResponse =
       }
     }
 
+export type MissionDeleteResponse =
+  | { readonly ok: true }
+  | {
+      readonly ok: false
+      readonly error: {
+        /** `LIVE` is the only refusal with a remedy: stop the run, then delete. */
+        readonly code: 'LIVE' | 'NOT_FOUND' | 'INTERNAL_ERROR'
+        readonly message: string
+      }
+    }
+
 export interface DesktopApi {
   readonly platform: string
   minimize(): void
   toggleMaximize(): void
   close(): void
+  getAppInfo(): Promise<AppInfo>
   getLocalRuntimes(): Promise<RuntimeDiscoveryResponse>
   getMissionHistory(): Promise<MissionHistoryResponse>
+  /** Remove a finished mission's record for good. Refused while it is live. */
+  deleteMission(missionId: string): Promise<MissionDeleteResponse>
   listTeammates(): Promise<TeammateListResponse>
   createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
   updateTeammate(request: TeammateUpdateRequest): Promise<TeammateMutationResponse>

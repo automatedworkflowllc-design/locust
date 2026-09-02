@@ -89,6 +89,8 @@ export interface CodexMissionService {
     route: { readonly model?: string; readonly effort?: string },
     emit: (update: CodexMissionUpdate) => void
   ): Promise<MissionHandoffResponse>
+  /** Whether this transport owns a live run of that mission. */
+  hasMission(missionId: string): boolean
   interrupt(): void
   dispose(): Promise<void>
 }
@@ -776,6 +778,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           unsettledCount: checkpoint.unsettledActions.length
         }
       }
+    },
+
+    hasMission(missionId: string): boolean {
+      return [...active.values()].some((mission) => mission.missionId === missionId)
     },
 
     interrupt(): void {

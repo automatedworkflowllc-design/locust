@@ -6,7 +6,7 @@ import type {
   RedactedJsonValue
 } from '@teammate/runtime-adapters'
 import { constants as fsConstants } from 'node:fs'
-import { mkdir, open, readdir, stat } from 'node:fs/promises'
+import { mkdir, open, readdir, stat, unlink } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
@@ -210,6 +210,20 @@ export interface MissionLedger {
   createCheckpoint(missionId: string, reason: CheckpointReason): Promise<ReconciledCheckpoint>
   /** Record which workroom messages this mission was shown, or produced. */
   appendPeerLinks(missionId: string, links: readonly MissionPeerLink[]): Promise<void>
+  /**
+   * Remove a mission's record for good. Returns false when there was none.
+   *
+   * This is the one destructive operation the ledger has, and it is exactly
+   * as narrow as it sounds: the file goes, nothing else is rewritten. Other
+   * missions that pointed at it (a continuation, a workroom message) keep
+   * their pointers, which now resolve to nothing -- readers already treat a
+   * missing link as "stop here", so the truthful state after a deletion is a
+   * thread that ends where the deleted part began, not one that pretends the
+   * part never existed. Whether a LIVE mission may be deleted is not decided
+   * here; the store cannot know what is running, and refuses nothing it is
+   * not in a position to judge.
+   */
+  deleteMission(missionId: string): Promise<boolean>
   getMission(missionId: string): Promise<RecoveredMission | undefined>
   listMissions(options?: MissionLedgerListOptions): Promise<MissionLedgerSnapshot>
   flush(): Promise<void>
@@ -1095,6 +1109,26 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         })
         await appendRecords(missionId, records)
         nextSequences.set(missionId, sequence)
+      })
+    },
+
+    deleteMission(missionId: string): Promise<boolean> {
+      return serialize(async () => {
+        requireSafeId(missionId, 'missionId')
+        // No cache to clear here, on purpose. An append after this either
+        // re-creates the mission (which rewrites every cached counter) or
+        // opens the file without O_CREAT (which fails on the missing file
+        // and clears the cache in its own error path). A clearing line was
+        // here once; the mutation control proved no test could tell whether
+        // it ran, and a line no test can see is a line nobody maintains.
+        try {
+          await unlink(missionPath(rootDirectory, missionId))
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+          throw error
+        }
+        await syncDirectoryBestEffort(rootDirectory)
+        return true
       })
     },
 

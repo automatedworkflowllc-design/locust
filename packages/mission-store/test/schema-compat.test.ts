@@ -340,12 +340,28 @@ describe('ledger schema versions', () => {
 
   it('refuses a follow-up in a file written before version 6', async () => {
     const root = await temporaryRoot()
-    // No writer before v6 could call a continuation a follow-up, so a v1 file
-    // saying so was hand-edited -- and believing it would draw an ordinary
-    // reply as though it continued some other conversation.
-    await writeV1Ledger(root, [], {
+    // A v5 file, deliberately: v4 and v5 may carry a continuation, so the
+    // only thing standing between this file and a reader is the v6 rule. (A
+    // v1 file would be refused for carrying ANY continuation, which would
+    // let this test pass with the v6 rule deleted.) No writer before v6
+    // could call a continuation a follow-up, so this one was hand-edited,
+    // and believing it would draw an ordinary reply as though it continued
+    // some other conversation.
+    const metadata = v1Metadata({
       continuesFrom: { missionId: 'mission_other', checkpointEpoch: 1, reason: 'follow-up' }
     })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 5,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}
+`,
+      'utf8'
+    )
 
     const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
 

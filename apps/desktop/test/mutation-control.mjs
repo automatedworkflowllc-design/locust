@@ -26,8 +26,23 @@ const SHARE = join(ROOT, 'src', 'shared', 'peer-share.ts')
 const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
+const HISTORY = join(ROOT, 'src', 'main', 'mission-history.ts')
 
 const MUTATIONS = [
+  {
+    file: VIEW,
+    name: 'a turn opening counts as work, so setup notices land in the thread',
+    from: "        if (event.payload.stepKind !== 'turn') workBegan = true",
+    to: '        workBegan = true',
+    expect: 'keeps a notice raised before any work out of the thread, as setup talk'
+  },
+  {
+    file: HISTORY,
+    name: 'a live mission can be deleted out from under its own process',
+    from: '  if (isLive(missionId)) {',
+    to: '  if (false) {',
+    expect: 'refuses to delete a mission that is still running, and names the remedy'
+  },
   {
     file: MISSIONS,
     name: 'a reply starts a blank run instead of resuming the conversation',
@@ -504,7 +519,8 @@ const originals = new Map([
   [SHARE, readFileSync(SHARE, 'utf8')],
   [VIEW, readFileSync(VIEW, 'utf8')],
   [TEAMMATES, readFileSync(TEAMMATES, 'utf8')],
-  [CATALOG, readFileSync(CATALOG, 'utf8')]
+  [CATALOG, readFileSync(CATALOG, 'utf8')],
+  [HISTORY, readFileSync(HISTORY, 'utf8')]
 ])
 let problems = 0
 

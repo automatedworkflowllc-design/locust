@@ -41,6 +41,8 @@ export interface TeammateStore {
   update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; avatar: unknown }): Promise<PublicTeammate>
   /** Remember which teammate a mission belongs to. */
   assignMission(teammateId: unknown, missionId: unknown): Promise<void>
+  /** Forget which teammate a mission belonged to, once the mission is gone. */
+  unassignMission(missionId: unknown): Promise<void>
   missionOwners(): Promise<Readonly<Record<string, string>>>
   readSettings(): Promise<WorkspaceSettings>
   writeSettings(settings: unknown): Promise<WorkspaceSettings>
@@ -280,6 +282,16 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...file,
           missionOwners: { ...file.missionOwners, [missionId]: teammateId }
         })
+      })
+    },
+
+    unassignMission(missionId): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(missionId)) throw new Error('Mission id is invalid')
+        const file = await read()
+        if (!(missionId in file.missionOwners)) return
+        const { [missionId]: _gone, ...missionOwners } = file.missionOwners
+        await write({ ...file, missionOwners })
       })
     },
 
