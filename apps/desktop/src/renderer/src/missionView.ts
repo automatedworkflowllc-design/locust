@@ -1,5 +1,7 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
+import type { MissionRuntimeId } from '@teammate/runtime-adapters'
+
 import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
 
@@ -560,4 +562,46 @@ export function stitchedHandoff(
     omittedBriefing: [],
     priorEvents: prior.events
   }
+}
+
+/**
+ * What a route's model actually turned out to be, learned from missions that
+ * already ran.
+ *
+ * Claude Code takes an ALIAS -- `fable`, `opus`, `sonnet` -- and resolves it
+ * to whichever model is newest in that family, so the shell cannot know the
+ * real name up front without asking, and asking costs a turn. It does not
+ * have to: the runtime states the resolved model in its own start record, so
+ * every finished mission on that alias is a free, current answer. Keyed
+ * `runtime:model`, newest mission wins.
+ *
+ * This is earned knowledge, never a guess: an alias nobody has run yet simply
+ * has no entry, and the picker says what it does know instead of inventing a
+ * version number that would rot.
+ */
+export function resolvedModelNames(
+  missions: readonly PublicRecoveredMission[]
+): ReadonlyMap<string, string> {
+  const byRoute = new Map<string, { readonly at: number; readonly name: string }>()
+  for (const mission of missions) {
+    const started = mission.events.find((event) => event.type === 'run.started')
+    if (started === undefined || started.type !== 'run.started') continue
+    const raw = started.payload.evidence.raw
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) continue
+    const name = (raw as Record<string, unknown>).model
+    // Only a real, different name is worth showing: `fable -> fable` teaches
+    // nothing, and a blank teaches less.
+    if (typeof name !== 'string' || name.length === 0 || name === mission.model) continue
+    const key = `${mission.runtime}:${mission.model}`
+    const at = Date.parse(mission.createdAt)
+    const held = byRoute.get(key)
+    if (held === undefined || (Number.isFinite(at) && at > held.at)) {
+      byRoute.set(key, { at: Number.isFinite(at) ? at : 0, name })
+    }
+  }
+  return new Map([...byRoute].map(([key, held]) => [key, held.name]))
+}
+
+export function resolvedModelKey(runtime: MissionRuntimeId, model: string): string {
+  return `${runtime}:${model}`
 }

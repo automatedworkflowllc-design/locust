@@ -36,7 +36,7 @@ import type { SidebarMission } from './components/Sidebar.js'
 import { Thread } from './components/Thread.js'
 import { AgentAvatar } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
-import { rootMission, stitchedHandoff } from './missionView.js'
+import { resolvedModelNames, rootMission, stitchedHandoff } from './missionView.js'
 import { shortMissionId } from './status.js'
 
 /**
@@ -666,6 +666,8 @@ export default function App(): ReactElement {
     () => new Map(history.map((mission) => [mission.missionId, mission] as const)),
     [history]
   )
+  // What each route's model turned out to be, from missions that already ran.
+  const resolvedModels = useMemo(() => resolvedModelNames(history), [history])
 
   // Re-read history whenever ANY run settles, so a finished mission stays in
   // the sidebar after the next one starts instead of vanishing until restart.
@@ -935,6 +937,7 @@ export default function App(): ReactElement {
               setEffort(undefined)
             }}
             models={models}
+            resolvedModels={resolvedModels}
             effort={effort}
             onEffortChange={setEffort}
             swarm={swarm}

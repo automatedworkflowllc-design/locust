@@ -10,6 +10,7 @@ import {
   buildThread,
   cancellationSummary,
   peerGroups,
+  resolvedModelNames,
   rootMission,
   stitchedHandoff,
   railLabel
@@ -420,5 +421,67 @@ describe('runtime notices in the thread', () => {
   it('shows a notice raised while the work was under way', () => {
     const items = buildThread([step, notice('d2', 3)], { running: false })
     expect(items.some((item) => item.type === 'diagnostic')).toBe(true)
+  })
+})
+
+describe('what a model alias resolved to', () => {
+  function ranOn(missionId: string, model: string, resolved: string | undefined, createdAt: string) {
+    return {
+      missionId,
+      runId: `run_${missionId}`,
+      prompt: 'x',
+      runtime: 'claude' as const,
+      model,
+      requestedRouteId: 'claude',
+      resolvedRouteId: 'claude-account:default',
+      cliVersion: null,
+      createdAt,
+      lastUpdatedAt: createdAt,
+      phase: 'completed' as const,
+      events: [
+        {
+          id: `e_${missionId}`,
+          runId: `run_${missionId}`,
+          missionId,
+          sequence: 1,
+          type: 'run.started',
+          occurredAt: createdAt,
+          sourceAdapter: 'claude',
+          payload: {
+            runtimeThreadId: 'thread',
+            evidence: { redacted: true, raw: resolved === undefined ? {} : { model: resolved } }
+          }
+        }
+      ] as unknown as NormalizedRuntimeEvent[],
+      eventCount: 1,
+      eventsTruncated: false,
+      integrityIssueCount: 0,
+      sandbox: 'read-only' as const,
+      checkpoints: [],
+      peerMessages: []
+    }
+  }
+
+  it('learns the real name the runtime reported for an alias', () => {
+    const resolved = resolvedModelNames([ranOn('m1', 'fable', 'claude-fable-5-1', '2026-09-01T10:00:00.000Z')])
+    expect(resolved.get('claude:fable')).toBe('claude-fable-5-1')
+  })
+
+  it('prefers the newest mission, so a new release replaces an old name', () => {
+    // Newest FIRST, which is the order history arrives in. Listed the other
+    // way round, plain last-write-wins would land on the right answer by
+    // accident and the comparison this pins would not be doing any work.
+    const resolved = resolvedModelNames([
+      ranOn('new', 'fable', 'claude-fable-5-1', '2026-09-01T10:00:00.000Z'),
+      ranOn('old', 'fable', 'claude-fable-5', '2026-08-01T10:00:00.000Z')
+    ])
+    expect(resolved.get('claude:fable')).toBe('claude-fable-5-1')
+  })
+
+  it('says nothing about an alias nobody has run, or one that taught it nothing', () => {
+    expect(resolvedModelNames([]).size).toBe(0)
+    expect(resolvedModelNames([ranOn('m1', 'fable', undefined, '2026-09-01T10:00:00.000Z')]).size).toBe(0)
+    // `fable -> fable` is not a resolution, it is the same word back.
+    expect(resolvedModelNames([ranOn('m2', 'fable', 'fable', '2026-09-01T10:00:00.000Z')]).size).toBe(0)
   })
 })

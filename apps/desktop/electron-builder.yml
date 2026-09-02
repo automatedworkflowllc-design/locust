@@ -1,0 +1,52 @@
+# Packaging for Locust.
+#
+# The app is unsigned: there is no certificate, and pretending otherwise would
+# only move the warning somewhere less honest. Windows SmartScreen will say the
+# publisher is unknown on first run, which is exactly what an unsigned build
+# is. NSIS is chosen over a one-file portable exe so the app installs, gets a
+# Start-menu entry and its own icon, and can be uninstalled cleanly.
+appId: com.automatedworkflow.locust
+productName: Locust
+copyright: Copyright © 2026 Automated Workflow
+
+directories:
+  output: release
+  buildResources: resources
+
+# `out` is what electron-vite produced; the workspace packages are already
+# bundled into it, so nothing from node_modules needs to ship.
+files:
+  - out/**/*
+  - package.json
+
+# Never ship the caller's mission ledger, smoke profiles, or source maps.
+asar: true
+
+win:
+  icon: resources/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # No signing configured on purpose; see the note above.
+  signAndEditExecutable: true
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Locust
+  uninstallDisplayName: Locust
+  artifactName: Locust-${version}-setup.${ext}
+
+linux:
+  icon: resources/icon.png
+  category: Development
+  target:
+    - AppImage
+
+mac:
+  icon: resources/icon.png
+  category: public.app-category.developer-tools

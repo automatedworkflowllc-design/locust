@@ -4,4 +4,7 @@ packages:
 
 allowBuilds:
   electron: true
+  # Squirrel-target helper. We package with NSIS, so its build script is
+  # refused rather than run: nothing here needs it.
+  electron-winstaller: false
   esbuild: true

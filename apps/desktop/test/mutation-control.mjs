@@ -29,6 +29,20 @@ const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'an older mission overwrites the newest resolved model name',
+    from: '    if (held === undefined || (Number.isFinite(at) && at > held.at)) {',
+    to: '    if (true) {',
+    expect: 'prefers the newest mission, so a new release replaces an old name'
+  },
+  {
+    file: VIEW,
+    name: 'the alias echoed back is shown as if it were a resolved name',
+    from: "    if (typeof name !== 'string' || name.length === 0 || name === mission.model) continue",
+    to: "    if (typeof name !== 'string' || name.length === 0) continue",
+    expect: 'says nothing about an alias nobody has run, or one that taught it nothing'
+  },
+  {
     file: CATALOG,
     name: 'a signed-out Claude still offers its models',
     from: "  if (claude?.readiness !== 'ready' || hints === undefined) return []",

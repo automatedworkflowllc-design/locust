@@ -37,7 +37,8 @@ const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
 function buildRows(
   runtimes: readonly PublicRuntimeStatus[],
   models: readonly PublicModel[],
-  active: RouteChoice
+  active: RouteChoice,
+  resolved: ReadonlyMap<string, string>
 ): readonly RouteRow[] {
   const rows: RouteRow[] = []
   for (const runtime of runtimes) {
@@ -52,14 +53,20 @@ function buildRows(
     const forRuntime = models.filter((model) => model.runtime === runtime.id)
     const entries =
       forRuntime.length > 0
-        ? forRuntime.map((model) => ({
-            model: model.id,
-            label: model.displayName,
-            detail:
+        ? forRuntime.map((model) => {
+            const efforts =
               model.supportedEfforts.length > 0
                 ? `${model.supportedEfforts.length} effort levels · ${model.supportedEfforts.join(', ')}`
                 : 'no effort levels reported'
-          }))
+            // The name the runtime itself reported the last time a mission ran
+            // on this route. Absent until one has, which is the honest state.
+            const name = resolved.get(`${runtime.id}:${model.id}`)
+            return {
+              model: model.id,
+              label: model.displayName,
+              detail: name === undefined ? efforts : `${name} · ${efforts}`
+            }
+          })
         : [{ model: 'account-default', label: 'account-default', detail: status.detail }]
 
     for (const entry of entries) {
@@ -82,6 +89,7 @@ function buildRows(
 export function RoutePicker({
   runtimes,
   models,
+  resolvedModels,
   active,
   onSelect,
   onClose,
@@ -89,6 +97,8 @@ export function RoutePicker({
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly models: readonly PublicModel[]
+  /** What each route's model resolved to last time, keyed `runtime:model`. */
+  readonly resolvedModels: ReadonlyMap<string, string>
   readonly active: RouteChoice
   readonly onSelect: (choice: RouteChoice) => void
   readonly onClose: () => void
@@ -106,7 +116,10 @@ export function RoutePicker({
     inputRef.current?.focus()
   }, [])
 
-  const rows = useMemo(() => buildRows(runtimes, models, active), [runtimes, models, active])
+  const rows = useMemo(
+    () => buildRows(runtimes, models, active, resolvedModels),
+    [runtimes, models, active, resolvedModels]
+  )
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return rows

@@ -80,8 +80,13 @@ export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   return hints.aliases.map((alias) => ({
     id: alias,
     runtime: 'claude',
-    displayName: `${alias.charAt(0).toUpperCase()}${alias.slice(1)} (latest)`,
-    description: `The newest ${alias} model, as the Claude Code CLI resolves it`,
+    // The alias IS the name here. Claude Code resolves it to whichever model
+    // is newest in that family at the moment a mission starts, so a version
+    // number printed here would be this build's guess about the runtime's
+    // future -- the shell shows the resolved name once a mission has reported
+    // one instead.
+    displayName: `${alias.charAt(0).toUpperCase()}${alias.slice(1)}`,
+    description: `Newest ${alias} model · resolved by Claude Code at launch`,
     supportedEfforts: hints.efforts
   }))
 }

@@ -100,6 +100,15 @@ step (Codex's skills-budget warning, a config warning) are the runtime
 talking about its own setup, so they stay in the Signal Rail and out of the
 thread; notices raised during the work still show.
 
+**Packaging. DONE 2026-09-02.** `pnpm --filter @teammate/desktop package`
+builds `Locust-0.1.0-setup.exe` (NSIS, per-user, its own icon and Start-menu
+entry) from `apps/desktop/electron-builder.yml`. The build is UNSIGNED: there
+is no certificate, so Windows SmartScreen will name the publisher as unknown
+on first run, which is what an unsigned build is. `_smoke/packaged-smoke.mjs`
+drives the packaged exe: window titled Locust, renderer loaded from the asar
+with its brand fonts, discovery finding the local CLIs, and a control proving
+renderer network egress is refused in a packaged build.
+
 **Housekeeping.** The window/taskbar icon is the design agent's app icon
 (the mark on its own rounded dark tile, `locust-app-icon-rounded.svg`),
 rendered by `_tools/render-icon.cjs`. A packaged build will need an `.ico`

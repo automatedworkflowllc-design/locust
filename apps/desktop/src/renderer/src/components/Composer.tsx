@@ -47,6 +47,8 @@ export interface ComposerProps {
   readonly route: RouteChoice
   readonly onRouteChange: (route: RouteChoice) => void
   readonly models: readonly PublicModel[]
+  /** What each route's model resolved to last time, keyed `runtime:model`. */
+  readonly resolvedModels: ReadonlyMap<string, string>
   readonly effort: string | undefined
   readonly onEffortChange: (effort: string | undefined) => void
   readonly swarm: boolean
@@ -95,6 +97,7 @@ export function Composer({
   route,
   onRouteChange,
   models,
+  resolvedModels,
   effort,
   onEffortChange,
   swarm,
@@ -166,8 +169,15 @@ export function Composer({
   const swarmEffort = supportedEfforts[supportedEfforts.length - 1]
   const effectiveEffort = swarm ? swarmEffort : effort
 
-  const runtimeLabel = selected?.displayName ?? (route.runtime === 'claude' ? 'Claude Code' : 'Codex CLI')
-  const modelLabel = activeRoute?.model ?? route.model
+  // While a mission runs, the control states what IT is on. Otherwise it
+  // states what the next mission will use -- which is what the person just
+  // picked. Reading the live run's model when nothing is running left a
+  // finished mission's `account-default` on screen over a chosen model.
+  const shownRuntime = running ? activeRoute?.runtime ?? route.runtime : route.runtime
+  const shownModel = running ? activeRoute?.model ?? route.model : route.model
+  const shownRuntimeStatus = runtimes.find((runtime) => runtime.id === shownRuntime)
+  const runtimeLabel = shownRuntimeStatus?.displayName ?? (shownRuntime === 'claude' ? 'Claude Code' : 'Codex CLI')
+  const modelLabel = shownModel
   // What the RUNNING mission is actually on, which is not always what the
   // composer's next-run route says. A handoff has to be measured against the
   // live run, or picking "the same" route would still stop it.
@@ -267,6 +277,7 @@ export function Composer({
                   <RoutePicker
                     runtimes={runtimes}
                     models={models}
+                    resolvedModels={resolvedModels}
                     active={running ? activeChoice : route}
                     onSelect={(choice) => {
                       setPickerOpen(false)
