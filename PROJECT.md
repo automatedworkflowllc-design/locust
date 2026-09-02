@@ -58,7 +58,7 @@ In a separate run, validate the full workspace:
 pnpm check
 ```
 
-Last verified on 2026-08-31 (after the durable-ledger milestone, its hardening pass, and the checkpoint record): the production build and every workspace TypeScript check passed, with 89/89 tests passing across runtime adapters, runtime core, the mission store, and desktop services.
+Last verified on 2026-09-02: the production build and every workspace TypeScript check passed, with 449 tests passing across runtime adapters, runtime core, the mission store, and desktop services.
 
 The checkpoint suite is verified by mutation, not by being green: `packages/mission-store/test/mutation-control.mjs` breaks thirteen behaviours one at a time and requires the NAMED test to fail, rejecting any mutation that stops the file running (a red suite caused by a broken file proves nothing about any test in it). It found two tests of mine that passed for the wrong reason — a digest test comparing transcripts of different lengths, which a constant-per-event digest satisfies, and a shutdown test that called `dispose()` before the run settled, which passed against a service with the line it names removed.
 
@@ -75,24 +75,32 @@ The Locust desktop shell design landed 2026-08-31 (`design/locust-desktop/` — 
 
 ## Where it is now
 
-2026-09-01. Both runtimes own real missions; missions run side by side, one
-per teammate; teammates exchange findings through a durable workroom; a
-running mission can be handed between runtimes from a reconciled checkpoint;
-and per-action approvals run on the app-server transport. `docs/REMAINING-PLAN.md`
-holds the ordered record of what landed and what is still open, each entry
-saying plainly which parts were verified live and which were not.
+2026-09-02. THREE runtimes own real missions -- Codex CLI, Claude Code and
+Cursor Agent -- each offering its own models from its own CLI, with the
+chosen reasoning effort actually reaching the ones that take one. Missions
+run side by side, one per teammate; teammates exchange findings through a
+durable workroom; a running mission can be handed between runtimes from a
+reconciled checkpoint; per-action approvals run on the app-server transport;
+a reply continues its conversation by resuming the runtime's own session; a
+mission can be deleted, and old ones pruned on request after a preview that
+cannot lie about what it will take. The app ships as a signed-less NSIS
+installer with a version people can read in Settings.
+`docs/REMAINING-PLAN.md` holds the ordered record of what landed and what is
+still open, each entry saying plainly which parts were verified live.
 
-Verification, as of this date: 350 tests across the workspace; 97 mutations
-caught across three mutation controls (18 + 24 + 55); and nine live smokes in
-`_smoke/` driving the built app against the real CLIs over CDP -- ledger,
-renderer, write mode, app-server, handoff, workroom, side-by-side, avatars
-and model choice. Each carries a negative control, because a green check that could
+Verification, as of this date: 449 tests across the workspace; 133 mutations
+caught across three mutation controls (27 + 34 + 72); and fourteen live
+smokes in `_smoke/` driving the built app over CDP -- see `_smoke/README.md`
+for what each proves, what it cannot see, and which three spend no provider
+quota. Each carries a negative control, because a green check that could
 never go red proves nothing.
 
-Still open, in the order I would take them: connections (the composer names
-Connectors with nothing behind it), mission deletion and retention (ledgers
-only ever grow), the curated OmniRoute gateway with Ask/Automatic fallback,
-and packaging (there is no `.ico` or packaging config yet).
+Still open, in the order I would take them: auto-update (needs a publish
+target the owner chooses, and ideally a signing certificate); the curated
+OmniRoute gateway with Ask/Automatic fallback; Gemini through Antigravity,
+which is blocked on one value only the owner can read out of that IDE; and
+the swarm decisions (a quota warning before engaging, a per-mission
+override).
 
 ## Earlier milestone notes
 
