@@ -1,4 +1,4 @@
-import type { RuntimeModelHints } from "./types.js";
+import type { RuntimeModelHints, RuntimeModelName } from "./types.js";
 import type {
   ExecutableLaunch,
   MissionRuntimeId,
@@ -235,6 +235,23 @@ export function parseClaudeModelHints(helpText: string): RuntimeModelHints | und
     : [];
   if (aliases.length === 0 && efforts.length === 0) return undefined;
   return { aliases: [...new Set(aliases)], efforts: [...new Set(efforts)] };
+}
+
+/**
+ * Read `cursor-agent --list-models` as it prints: a heading, then one
+ * `<id> - <display name>` per line. Measured 2026-09-02; the ids carry the
+ * effort (`cursor-grok-4.6-high`), which is why no effort list comes back.
+ * Nothing is listed that the CLI did not print.
+ */
+export function parseCursorModelList(text: string): RuntimeModelHints | undefined {
+  const models: RuntimeModelName[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^([a-z0-9][a-z0-9.-]{0,60})\s+-\s+(.{1,80})$/.exec(line.trim());
+    if (match === null || models.some((model) => model.id === match[1])) continue;
+    models.push({ id: match[1]!, displayName: match[2]!.trim() });
+  }
+  if (models.length === 0) return undefined;
+  return { aliases: models.map((model) => model.id), efforts: [], models };
 }
 
 function sandboxArgument(sandbox: MissionSandbox | undefined): MissionSandbox {

@@ -91,6 +91,24 @@ export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   }))
 }
 
+/**
+ * Cursor Agent's models, from what `--list-models` printed at discovery. The
+ * ids carry the effort (`cursor-grok-4.6-high`), so no effort list is offered
+ * and the builder refuses one; the name beside each id is Cursor's own.
+ */
+export function cursorModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonly PublicModel[] {
+  const cursor = runtimes.find((entry) => entry.id === 'cursor')
+  const models = cursor?.modelHints?.models
+  if (cursor?.readiness !== 'ready' || models === undefined) return []
+  return models.map((model) => ({
+    id: model.id,
+    runtime: 'cursor',
+    displayName: model.displayName,
+    description: 'Listed by cursor-agent --list-models',
+    supportedEfforts: []
+  }))
+}
+
 export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
   const now = options.now ?? (() => Date.now())
   let cached: { readonly at: number; readonly response: ModelCatalogResponse } | undefined
@@ -99,12 +117,13 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
   const probe = async (): Promise<ModelCatalogResponse> => {
     const runtimes = await options.discover()
     // Each runtime's models come from its own source and fail on their own:
-    // Claude's from what its CLI advertised, Codex's from a live server read.
-    const claudeModels = claudeModelsFrom(runtimes)
+    // Claude's and Cursor's from what their CLIs advertised at discovery,
+    // Codex's from a live server read.
+    const advertisedModels = [...claudeModelsFrom(runtimes), ...cursorModelsFrom(runtimes)]
     const codex = runtimes.find((entry) => entry.id === 'codex')
     if (codex?.readiness !== 'ready' || codex.executable === undefined) {
-      return claudeModels.length > 0
-        ? { ok: true, data: { models: claudeModels } }
+      return advertisedModels.length > 0
+        ? { ok: true, data: { models: advertisedModels } }
         : { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }
     }
 
@@ -126,14 +145,14 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       await client.request('initialize', { clientInfo: { name: 'locust', version: '0.1.0' } })
       client.notify('initialized')
       const result = await client.request('model/list', {})
-      const models = [...parseModels(result), ...claudeModels]
+      const models = [...parseModels(result), ...advertisedModels]
       if (models.length === 0) {
         return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'No models were reported.' } }
       }
       return { ok: true, data: { models } }
     } catch {
-      return claudeModels.length > 0
-        ? { ok: true, data: { models: claudeModels } }
+      return advertisedModels.length > 0
+        ? { ok: true, data: { models: advertisedModels } }
         : {
             ok: false,
             error: { code: 'MODELS_UNAVAILABLE', message: 'The model list could not be read.' }

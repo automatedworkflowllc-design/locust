@@ -183,28 +183,61 @@ channel now tries the exec service and then this one, instead of telling a
 person their live approve-each run "is no longer active"; a handoff of one
 is refused explicitly rather than reported as dead.
 
-**Cursor Agent and Gemini CLI, found and signed into. DONE 2026-09-02;
-missions under them NOT yet.** Both CLIs were installed on the dev machine
-(Cursor's official Windows installer; `@google/gemini-cli` 0.58 from npm) and
-measured. Discovery finds them (Cursor in `%LOCALAPPDATA%\cursor-agent`,
-which its installer adds only to the USER PATH), reads their versions, and
-reads sign-in state the way each actually reports it: `cursor-agent status`
-prints "Not logged in" and exits 0, so its text is read; `gemini
---list-sessions` exits 41 without an auth method, so its exit code is. The
-command builders exist and are tested (Cursor: `--print --output-format
-stream-json --stream-partial-output`, `--mode plan` for read-only, never
-`--force`; Gemini: `--output-format stream-json --skip-trust --approval-mode
-plan|auto_edit`, never `yolo`), and the ledger's schema is v7 so a mission
-may record either runtime. What does NOT exist is an event normalizer for
-either, because neither stream has been measured -- both CLIs refuse to run
-signed out, and signing in is the owner's action. Until then the host
-refuses a mission under either BY NAME before recording anything, and the
-picker draws their rows as planned. Two things are unverified until the
-first signed-in run: that Cursor reads its prompt from stdin (its help does
-not say), and that Gemini's `--resume` accepts a session id rather than only
-`latest` or an index. Next: sign in, capture one read-only stream each into
-fixtures, build the normalizers against them, then the model lists
-(`cursor-agent --list-models`; Gemini has no list command).
+**Cursor Agent. DONE 2026-09-02, live-verified.** Installed with Cursor's
+official Windows installer, signed in (the CLI opened the browser; Colin
+approved), and measured under the exact argv the builder produces. Three
+real streams are fixtures in `packages/runtime-adapters/test/fixtures/cursor/`
+and the normalizer is built against them: fragments then one complete
+message that replaces them (and closes its item, so a later message does not
+overwrite an earlier one), `thinking` deltas redacted and shown as a
+reasoning step, typed tool calls with `rejected` results reported as failed,
+`--resume <session_id>` continuing the earlier conversation. Discovery reads
+sign-in from the text of `cursor-agent status` (it exits 0 either way) and
+the model list off `--list-models`: 217 models on this account, effort baked
+into the id (`cursor-grok-4.6-high`), so no effort menu -- the builder
+refuses one. Read-only runs in `--mode plan`; write mode is the default
+mode without `--force`, where shell commands are simply not run. The host
+passes `--trust` because a headless run in an unseen directory otherwise
+stops on a trust prompt. Per-action approvals are refused for it by name (the
+app-server is Codex's). `_smoke/cursor-smoke.mjs`: picked Cursor Agent /
+composer-2.5 in the UI, the run answered "I am Composer, a language model
+trained by Cursor", and the ledger recorded runtime cursor, model
+composer-2.5, resolved name "Composer 2.5", every event signed by the Cursor
+normalizer, reasoning redacted. Open: 217 rows in one picker group wants a
+filter; the packaged smoke does not yet require cursor-agent found.
+
+**Gemini CLI. Found; cannot run, by Google's decision.** Installed
+(`@google/gemini-cli` 0.58), discovered, and Colin's Google sign-in went
+through -- then Google refused the CLI: "IneligibleTierError: This client is
+no longer supported for Gemini Code Assist for individuals". Since
+2026-06-18 Gemini CLI serves only API keys and enterprise licences; free, AI
+Pro and AI Ultra accounts are all sent to Antigravity. Colin's account is AI
+Pro; it makes no difference. Readiness reads that refusal from the text
+(the status command exits 0 with it), with a test from the measured output
+and a mutation. The command builders exist and are tested; there is no
+normalizer because no stream can be captured without an API key, so the host
+refuses a Gemini mission by name. Gemini 3.7 Flash is reachable through
+Cursor today. Making Gemini CLI itself work needs an AI Studio key in
+`~/.gemini/.env`, which is the owner's.
+
+**Antigravity, as the consumer Gemini route. INVESTIGATED 2026-09-02, not
+built.** Colin's point stands: most people have Gemini through their Google
+account, not an API key, and Antigravity is where Google sends them. Its
+language server (`resources/bin/language_server.exe`, built 2026-08-26)
+has an `agentapi` subcommand -- `new-conversation
+[--model=flash_lite|flash|pro] <prompt>`, `send-message <recipient_id>
+<content>`, `get-conversation-metadata <id>` -- reached over gRPC on the
+running IDE's port with `ANTIGRAVITY_LS_ADDRESS` and `ANTIGRAVITY_CSRF_TOKEN`
+(the token is on the running server's command line). Measured: metadata of
+a real conversation came back in full; `new-conversation` is refused with
+"project_id is required when providing project_env_config", and any guessed
+`ANTIGRAVITY_PROJECT_ID` with "file does not exist". The id names something
+on disk the IDE creates per project and nothing local revealed its form. The
+one cheap next step is the owner's: open a terminal inside Antigravity and
+run `set ANTIGRAVITY_` -- the IDE sets these for its own terminals, and the
+real values show the id's shape and where it points. Also note the API
+speaks in conversations and messages, not a JSONL event stream, so a
+runtime built on it would be a different transport from the three CLIs.
 
 **Muse Spark.** Meta's coding model, on an OpenAI-compatible API at
 `api.meta.ai/v1` (`muse-spark-1.2`, and `muse-spark-1.2-contributor` at

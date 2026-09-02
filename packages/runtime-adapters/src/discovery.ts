@@ -6,6 +6,7 @@ import {
   GEMINI_REQUIRED_FEATURES,
   OMNIROUTE_REQUIRED_FEATURES,
   parseClaudeModelHints,
+  parseCursorModelList,
 } from "./commands.js";
 import type {
   CommandResult,
@@ -39,6 +40,8 @@ interface IntegrationDefinition {
    * whole answer.
    */
   readonly readyWhen?: (result: CommandResult) => boolean;
+  /** A command that prints the runtime's model list, run only once it is ready. */
+  readonly modelsArgs?: readonly string[];
 }
 
 const DEFINITIONS: readonly IntegrationDefinition[] = [
@@ -75,6 +78,7 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
     versionArgs: ["--version"],
     capabilityArgs: ["--help"],
     readinessArgs: ["status"],
+    modelsArgs: ["--list-models"],
     requiredFeatures: CURSOR_REQUIRED_FEATURES,
     // Measured: `cursor-agent status` prints "Not logged in" and exits 0.
     readyWhen: (result) => !/not logged in/i.test(`${result.stdout}\n${result.stderr}`),
@@ -227,7 +231,7 @@ async function discoverOne(
     ? detectSupportedFeatures(definition.id, capabilityText)
     : [];
   // The same help text names the models the CLI accepts; only Claude's does.
-  const modelHints = definition.id === "claude" ? parseClaudeModelHints(capabilityText) : undefined;
+  let modelHints = definition.id === "claude" ? parseClaudeModelHints(capabilityText) : undefined;
 
   if (!succeeded(capabilityOutcome)) {
     diagnostics.push(
@@ -287,6 +291,13 @@ async function discoverOne(
         }),
       );
     }
+  }
+
+  // A model list is read only from a signed-in runtime: measured, the
+  // signed-out command prints an error instead of a list.
+  if (definition.modelsArgs !== undefined && readiness === "ready") {
+    const modelsOutcome = await runProbe(runner, executable, "models", definition.modelsArgs);
+    if (succeeded(modelsOutcome)) modelHints = parseCursorModelList(modelsOutcome.result.stdout);
   }
 
   const base: RuntimeDiscovery = {

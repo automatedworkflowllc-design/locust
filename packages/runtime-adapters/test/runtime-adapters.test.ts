@@ -9,6 +9,7 @@ import {
   createGeminiPrintCommand,
   CURSOR_REQUIRED_FEATURES,
   parseClaudeModelHints,
+  parseCursorModelList,
   createNodeProbeRunner,
   createPathExecutableLocator,
   discoverInstalledRuntimes,
@@ -169,17 +170,37 @@ describe("installed runtime discovery", () => {
     expect(cursor?.supportedFeatures).toEqual(expect.arrayContaining([...CURSOR_REQUIRED_FEATURES]));
   });
 
-  it("reports a signed-in Cursor Agent ready", async () => {
+  // The first lines of the real list, as printed on 2026-09-02.
+  const CURSOR_MODELS = "Available models\n\nauto - Auto (default)\ncursor-grok-4.6-high - Cursor Grok 4.6\ncomposer-2.5 - Composer 2.5\n";
+
+  it("reports a signed-in Cursor Agent ready and reads its models off --list-models", async () => {
     const runner: CommandRunner = {
       run: async (command) => {
         if (command.purpose === "version") return { exitCode: 0, stdout: "2026.08.31-4057e58", stderr: "" };
         if (command.purpose === "capabilities") return { exitCode: 0, stdout: CURSOR_HELP, stderr: "" };
+        if (command.purpose === "models") {
+          expect(command.args).toEqual(["--list-models"]);
+          return { exitCode: 0, stdout: CURSOR_MODELS, stderr: "" };
+        }
         return { exitCode: 0, stdout: "Logged in as someone@example.com\n", stderr: "" };
       },
     };
     const [cursor] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("cursor-agent") }))
       .filter((entry) => entry.id === "cursor");
     expect(cursor?.readiness).toBe("ready");
+    expect(cursor?.modelHints?.models).toEqual([
+      { id: "auto", displayName: "Auto (default)" },
+      { id: "cursor-grok-4.6-high", displayName: "Cursor Grok 4.6" },
+      { id: "composer-2.5", displayName: "Composer 2.5" },
+    ]);
+    expect(cursor?.modelHints?.efforts).toEqual([]);
+  });
+
+  it("reads no models from a Cursor that is signed out, and none from a list it cannot read", async () => {
+    expect(parseCursorModelList("Error: Authentication required.")).toBeUndefined();
+    expect(parseCursorModelList("")).toBeUndefined();
+    // A duplicated id is listed once; a line without the dash is not a model.
+    expect(parseCursorModelList("x - X\nx - X again\njust words")?.models).toEqual([{ id: "x", displayName: "X" }]);
   });
 
   it("reads a Gemini sign-in that Google then refused, which exits 0 with the refusal in its text", async () => {

@@ -39,7 +39,7 @@ import {
   TEAMMATE_REMOVE_CHANNEL,
   TEAMMATE_UPDATE_CHANNEL
 } from '../shared/ipc.js'
-import { isMissionRuntime } from '../shared/runtimes.js'
+import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import type {
   CodexMissionCancelRequest,
   CodexMissionStartRequest,
@@ -466,7 +466,18 @@ if (!ownsSingleInstanceLock) {
       // rather than being passed through to discovery as-is.
       const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
       // `approve-each` is the only mode that needs a runtime able to stop and
-      // ask, so it is the only one routed to the experimental transport.
+      // ask, so it is the only one routed to the experimental transport --
+      // which is Codex's app-server. Another runtime asked for it would have
+      // been started on Codex without a word; it is refused instead.
+      if (mode === 'approve-each' && runtime !== 'codex') {
+        return {
+          ok: false,
+          error: {
+            code: 'RUNTIME_START_FAILED',
+            message: `Per-action approvals run on Codex CLI only. Pick another mode for ${runtimeDisplayName(runtime)}, or switch the route.`
+          }
+        } as const
+      }
       if (mode === 'approve-each') {
         if (typeof prompt !== 'string' || prompt.trim().length === 0) {
           return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const

@@ -2,7 +2,9 @@ import {
   createClaudeEventNormalizer,
   createClaudePrintCommand,
   createCodexEventNormalizer,
-  createCodexExecCommand
+  createCodexExecCommand,
+  createCursorEventNormalizer,
+  createCursorPrintCommand
 } from '@teammate/runtime-adapters'
 import type {
   ClaudeEventNormalizer,
@@ -482,7 +484,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const createdAt = now().toISOString()
         const routeId = runtime === 'claude' ? 'claude' : 'codex'
         // ONE definition of what this run may touch, computed before anything
-        // records it. Only Codex takes a sandbox flag today, so a Claude run is
+        // records it. Codex and Cursor take a sandbox; Claude Code does not, so a Claude run is
         // restricted whatever the composer asked for -- and the durable header
         // and the receipt must agree about that, or the ledger claims a run
         // could write when it could not.
@@ -498,7 +500,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         }
         const normalizer = runtime === 'claude'
           ? createClaudeEventNormalizer(normalizerContext)
-          : createCodexEventNormalizer(normalizerContext)
+          : runtime === 'cursor'
+            ? createCursorEventNormalizer(normalizerContext)
+            : createCodexEventNormalizer(normalizerContext)
 
         // What the runtime is SENT is the person's words plus their teammates'
         // waiting messages and the share form. The ledger keeps the person's
@@ -604,11 +608,17 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
           const command = runtime === 'claude'
             ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath, ...choice })
-            : createCodexExecCommand(chosen.executable, {
-                workspacePath: options.workspacePath,
-                sandbox: effectiveSandbox,
-                ...choice
-              })
+            : runtime === 'cursor'
+              ? createCursorPrintCommand(chosen.executable, {
+                  workspacePath: options.workspacePath,
+                  sandbox: effectiveSandbox,
+                  ...choice
+                })
+              : createCodexExecCommand(chosen.executable, {
+                  workspacePath: options.workspacePath,
+                  sandbox: effectiveSandbox,
+                  ...choice
+                })
           process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
         } catch {
           try {

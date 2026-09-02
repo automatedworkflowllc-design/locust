@@ -26,9 +26,9 @@ interface RouteRow {
 const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
   codex: 'live',
   claude: 'live',
-  // Found and signed into like the others; a mission cannot run under them
-  // until the host can read their event streams.
-  cursor: 'planned',
+  cursor: 'live',
+  // Found and signed into like the others; a mission cannot run under it
+  // until the host can read its event stream.
   gemini: 'planned',
   omniroute: 'planned'
 }

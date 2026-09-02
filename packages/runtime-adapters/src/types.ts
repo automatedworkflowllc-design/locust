@@ -78,7 +78,7 @@ export interface ExecutableLaunch {
 }
 
 export interface ProbeCommand {
-  readonly purpose: "version" | "capabilities" | "readiness";
+  readonly purpose: "version" | "capabilities" | "readiness" | "models";
   readonly executablePath: string;
   readonly args: readonly string[];
   readonly timeoutMs: number;
@@ -109,6 +109,13 @@ export interface ExecutableLocator {
 export interface RuntimeModelHints {
   readonly aliases: readonly string[];
   readonly efforts: readonly string[];
+  /** Ids with the names the runtime printed beside them, when it printed a list. */
+  readonly models?: readonly RuntimeModelName[];
+}
+
+export interface RuntimeModelName {
+  readonly id: string;
+  readonly displayName: string;
 }
 
 export interface RuntimeDiscovery {

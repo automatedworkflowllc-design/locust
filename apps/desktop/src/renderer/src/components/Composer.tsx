@@ -118,9 +118,9 @@ export function Composer({
 
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   const selectedReady = selected !== undefined && runtimeIsUsable(selected)
-  // Both runtimes can own a mission now. Readiness still comes from discovery,
+  // Three runtimes can own a mission. Readiness still comes from discovery,
   // so a route that is installed but signed out cannot be started.
-  const routeCanRun = route.runtime === 'codex' || route.runtime === 'claude'
+  const routeCanRun = route.runtime === 'codex' || route.runtime === 'claude' || route.runtime === 'cursor'
   const canStart = selectedReady && routeCanRun && busyWith === undefined && value.trim().length > 0
 
   const placeholder = busyWith !== undefined
@@ -130,7 +130,7 @@ export function Composer({
       : selectedReady
         ? mode === 'approve-each' && route.runtime === 'codex'
           ? 'Describe a mission. You will be asked before each action…'
-          : mode === 'accept-edits' && route.runtime === 'codex'
+          : mode === 'accept-edits' && route.runtime !== 'claude'
           ? 'Describe a mission. It may edit files in this workspace…'
           : route.runtime === 'claude'
             ? 'Describe a mission. Claude Code runs read-only for now…'

@@ -725,16 +725,71 @@ describe('runtime selection', () => {
   it('refuses a runtime whose event stream it cannot read yet, by name, recording nothing', async () => {
     const createMission = vi.fn(async () => undefined)
     const { service, start } = serviceWith(
-      [{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }],
+      [{ ...codexRuntime(), id: 'gemini', displayName: 'Gemini CLI', optional: true }],
       fakeLedger({ createMission })
     )
 
-    await expect(service.start('Do work.', 'cursor', 'ask', {}, () => undefined)).resolves.toMatchObject({
+    await expect(service.start('Do work.', 'gemini', 'ask', {}, () => undefined)).resolves.toMatchObject({
       ok: false,
-      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('Cursor Agent') }
+      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('Gemini CLI') }
     })
     expect(start).not.toHaveBeenCalled()
     expect(createMission).not.toHaveBeenCalled()
+  })
+
+  it('runs a Cursor mission under its own command and its own normalizer', async () => {
+    // Two records as Cursor prints them, so the normalizer's signature on the
+    // events is the fact under test -- a Codex normalizer would sign them as
+    // Codex, or read nothing it recognises.
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([
+        { type: 'system', subtype: 'init', session_id: 'cursor-session-1', model: 'Composer 2.5', permissionMode: 'default' },
+        { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'pebble' }] } },
+        { type: 'result', subtype: 'success', is_error: false, result: 'pebble' }
+      ]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const appendEvents = vi.fn<MissionLedger['appendEvents']>(async () => undefined)
+    const cursor = { ...codexRuntime(), id: 'cursor' as const, displayName: 'Cursor Agent', optional: true }
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [cursor],
+      runner: { start },
+      ledger: fakeLedger({ createMission, appendEvents }),
+      createId: (() => { let n = 0; return () => String(++n) })(),
+      now: () => new Date(NOW),
+      schedule: (task) => scheduledTasks.push(task)
+    })
+    const scheduledTasks: Array<() => void> = []
+    const updates: CodexMissionUpdate[] = []
+
+    const response = await service.start('Do work.', 'cursor', 'ask', {}, (update) => {
+      updates.push(update)
+    })
+    expect(response).toMatchObject({ ok: true, data: { runtime: 'cursor', sandbox: 'read-only' } })
+    const spec = start.mock.calls[0]?.[0]
+    expect(spec?.runtime).toBe('cursor')
+    expect(spec?.args).toEqual(expect.arrayContaining(['--print', '--trust', '--mode', 'plan']))
+    expect(spec?.args).not.toContain('--force')
+    expect(createMission).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'cursor' }))
+
+    scheduledTasks[0]?.()
+    await vi.waitFor(() => {
+      expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.completed')).toBe(true)
+    })
+    const recorded = appendEvents.mock.calls.flatMap(([, events]) => events)
+    expect(recorded.map(({ type }) => type)).toEqual(['run.started', 'message.delta', 'run.completed'])
+    expect(recorded.every((event) => event.sourceAdapter === 'cursor')).toBe(true)
+    expect(recorded[0]?.runtimeThreadId).toBe('cursor-session-1')
+  })
+
+  it('lets a Cursor mission edit when asked, and never forces its commands', async () => {
+    const { service, start } = serviceWith([{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }])
+    await service.start('Do work.', 'cursor', 'accept-edits', {}, () => undefined)
+    const spec = start.mock.calls[0]?.[0]
+    expect(spec?.args).not.toContain('--mode')
+    expect(spec?.args).not.toContain('--force')
   })
 
   it('names the runtime the user actually chose when it is unavailable', async () => {

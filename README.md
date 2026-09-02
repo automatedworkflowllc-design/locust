@@ -50,17 +50,24 @@ smoke against the real CLIs, not by tests alone. The smokes live in `_smoke/`
 and are run by hand: they need a signed-in provider and a desktop session, so
 they are not part of `pnpm check`.
 
-**Two runtimes, side by side.** Codex CLI and Claude Code are both selectable
+**Runtimes, side by side.** Codex CLI and Claude Code are both selectable
 and both own real missions end to end. Discovery is read-only and reports
 version and authentication readiness without reading credential files; a
 runtime that is not ready is never drawn as available.
 
-**Two more runtimes found, not yet run.** Cursor Agent and Gemini CLI are
-discovered, versioned and asked about sign-in the same way, and the ledger
-can record a mission under either. A mission cannot run under them yet: an
-event normalizer is built only from a stream measured off the real CLI, and
-neither has been captured. Until it is, the app says so by name instead of
-starting a process nobody can read.
+**Cursor Agent, as a third runtime.** Found, versioned and asked about
+sign-in like the other two, with its models read off `cursor-agent
+--list-models` (Grok, Composer, Gemini Flash and the Claude and GPT lines,
+effort baked into each id). A mission under it runs read-only in Cursor's
+plan mode or in write mode without forced commands, streams into the same
+thread, resumes its own session on a reply, and is recorded as Cursor's by
+a normalizer built from streams measured off the real CLI. Live-verified by
+`_smoke/cursor-smoke.mjs`.
+
+**Gemini CLI, found but refused.** Discovered and signed into, then refused
+by Google: since June 2026 the CLI serves only API keys and enterprise
+licences, not consumer accounts, and the app says so rather than starting a
+process it cannot read. Gemini models are reachable through Cursor.
 
 **Each runtime's own models, and effort that is actually sent.** Codex's
 models come from a live `model/list`; Claude Code's from the aliases its own

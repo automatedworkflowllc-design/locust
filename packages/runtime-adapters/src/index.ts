@@ -112,3 +112,5 @@ export {
 } from "./commands.js";
 export { createCursorEventNormalizer } from "./cursor-events.js";
 export type { CursorEventNormalizer, CursorInvocationContext } from "./cursor-events.js";
+export { parseCursorModelList } from "./commands.js";
+export type { RuntimeModelName } from "./types.js";

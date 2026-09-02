@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 
-import { claudeModelsFrom, createModelCatalog, parseModels } from './model-catalog.js'
+import { claudeModelsFrom, createModelCatalog, cursorModelsFrom, parseModels } from './model-catalog.js'
 import type { AppServerProcess } from './app-server-mission.js'
 
 const REAL_RESULT = {
@@ -177,6 +177,39 @@ describe('the catalog probe', () => {
     await catalog.read()
 
     expect(spawn).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('Cursor models from what its CLI listed', () => {
+  const cursor = (readiness: RuntimeDiscovery['readiness'], hints?: RuntimeDiscovery['modelHints']): RuntimeDiscovery => ({
+    ...codexRuntime(readiness),
+    id: 'cursor',
+    displayName: 'Cursor Agent',
+    ...(hints === undefined ? {} : { modelHints: hints })
+  })
+
+  it('offers each listed model under Cursor by its own name, with no effort levels', () => {
+    const models = cursorModelsFrom([
+      cursor('ready', {
+        aliases: ['composer-2.5', 'cursor-grok-4.6-high'],
+        efforts: [],
+        models: [
+          { id: 'composer-2.5', displayName: 'Composer 2.5' },
+          { id: 'cursor-grok-4.6-high', displayName: 'Cursor Grok 4.6' }
+        ]
+      })
+    ])
+    expect(models.map((model) => [model.id, model.displayName])).toEqual([
+      ['composer-2.5', 'Composer 2.5'],
+      ['cursor-grok-4.6-high', 'Cursor Grok 4.6']
+    ])
+    expect(models.every((model) => model.runtime === 'cursor' && model.supportedEfforts.length === 0)).toBe(true)
+  })
+
+  it('offers nothing for a Cursor that is signed out, or that listed nothing', () => {
+    expect(cursorModelsFrom([cursor('authentication-required', { aliases: ['composer-2.5'], efforts: [], models: [{ id: 'composer-2.5', displayName: 'Composer 2.5' }] })])).toEqual([])
+    expect(cursorModelsFrom([cursor('ready', { aliases: [], efforts: [] })])).toEqual([])
+    expect(cursorModelsFrom([codexRuntime()])).toEqual([])
   })
 })
 

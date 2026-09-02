@@ -27,6 +27,13 @@ const CURSOR_EVENTS = join(ROOT, 'src', 'cursor-events.ts')
 
 const MUTATIONS = [
   {
+    file: DISCOVERY,
+    name: "Cursor's model list is never read",
+    from: '    if (succeeded(modelsOutcome)) modelHints = parseCursorModelList(modelsOutcome.result.stdout);\n',
+    to: '',
+    expect: 'reports a signed-in Cursor Agent ready and reads its models off --list-models'
+  },
+  {
     file: CURSOR_EVENTS,
     name: "a complete Cursor message appends to its fragments instead of replacing them",
     from: '          operation: "replace",\n          text: boundedMessageText(text),\n          final: true,',

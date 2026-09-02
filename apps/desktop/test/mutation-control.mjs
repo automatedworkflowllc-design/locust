@@ -31,9 +31,23 @@ const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 
 const MUTATIONS = [
   {
+    file: MISSIONS,
+    name: 'a Cursor mission is launched as a Codex command',
+    from: "            : runtime === 'cursor'\n              ? createCursorPrintCommand(chosen.executable, {\n                  workspacePath: options.workspacePath,\n                  sandbox: effectiveSandbox,\n                  ...choice\n                })\n",
+    to: '',
+    expect: 'runs a Cursor mission under its own command and its own normalizer'
+  },
+  {
+    file: MISSIONS,
+    name: "a Cursor mission's stream is read by the Codex normalizer",
+    from: "          : runtime === 'cursor'\n            ? createCursorEventNormalizer(normalizerContext)\n",
+    to: '',
+    expect: 'runs a Cursor mission under its own command and its own normalizer'
+  },
+  {
     file: RUNTIMES,
     name: 'a runtime whose events the host cannot read is started anyway',
-    from: "  return runtime === 'codex' || runtime === 'claude'\n",
+    from: "  return runtime === 'codex' || runtime === 'claude' || runtime === 'cursor'\n",
     to: '  return true\n',
     expect: 'refuses a runtime whose event stream it cannot read yet, by name, recording nothing'
   },
@@ -110,7 +124,7 @@ const MUTATIONS = [
   {
     file: CATALOG,
     name: 'a Codex failure hides the Claude models too',
-    from: "      return claudeModels.length > 0\n        ? { ok: true, data: { models: claudeModels } }\n        : { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }",
+    from: "      return advertisedModels.length > 0\n        ? { ok: true, data: { models: advertisedModels } }\n        : { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }",
     to: "      return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }",
     expect: 'lists Claude models even when Codex cannot be read'
   },

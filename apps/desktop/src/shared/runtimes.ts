@@ -23,11 +23,12 @@ export function runtimeDisplayName(runtime: MissionRuntimeId): string {
 
 /**
  * The runtimes whose event streams the host has a normalizer for, each built
- * from fixtures measured off the real CLI. Cursor Agent and Gemini CLI are
- * found and signed into like the others, but a mission under either would be
- * a process whose output nobody can read yet -- so it is refused, by name,
- * before anything is recorded.
+ * from fixtures measured off the real CLI. Gemini CLI is found and signed
+ * into like the others, but its stream has never been captured (Google now
+ * refuses the CLI to consumer accounts), so a mission under it would be a
+ * process whose output nobody can read -- and it is refused, by name, before
+ * anything is recorded.
  */
-export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' {
-  return runtime === 'codex' || runtime === 'claude'
+export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' | 'cursor' {
+  return runtime === 'codex' || runtime === 'claude' || runtime === 'cursor'
 }
