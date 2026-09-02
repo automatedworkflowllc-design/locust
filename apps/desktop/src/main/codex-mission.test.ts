@@ -722,6 +722,21 @@ describe('runtime selection', () => {
     }))
   })
 
+  it('refuses a runtime whose event stream it cannot read yet, by name, recording nothing', async () => {
+    const createMission = vi.fn(async () => undefined)
+    const { service, start } = serviceWith(
+      [{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }],
+      fakeLedger({ createMission })
+    )
+
+    await expect(service.start('Do work.', 'cursor', 'ask', {}, () => undefined)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('Cursor Agent') }
+    })
+    expect(start).not.toHaveBeenCalled()
+    expect(createMission).not.toHaveBeenCalled()
+  })
+
   it('names the runtime the user actually chose when it is unavailable', async () => {
     const { service } = serviceWith([codexRuntime()])
 

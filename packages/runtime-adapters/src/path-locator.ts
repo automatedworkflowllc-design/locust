@@ -38,6 +38,11 @@ const WINDOWS_INSTALL_ROOTS: readonly InstallRoot[] = [
   { command: "codex", base: "APPDATA", segments: ["npm"], versioned: false },
   { command: "claude", base: "APPDATA", segments: ["npm"], versioned: false },
   { command: "claude", base: "LOCALAPPDATA", segments: ["Programs", "claude"], versioned: false },
+  // Cursor's installer copies the launchers to %LOCALAPPDATA%\cursor-agent and
+  // appends that directory to the USER PATH -- which a packaged app started
+  // from the shell does not see until the next sign-in.
+  { command: "cursor-agent", base: "LOCALAPPDATA", segments: ["cursor-agent"], versioned: false },
+  { command: "gemini", base: "APPDATA", segments: ["npm"], versioned: false },
   // Windows PowerShell's own home. Claude Code installs as a `.ps1` shim, and
   // running it needs a host; on a PATH that does not name one, the shim was
   // found and then discarded for want of an interpreter that is always there.

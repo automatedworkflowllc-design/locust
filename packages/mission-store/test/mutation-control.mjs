@@ -23,6 +23,13 @@ const WORKROOM = join(ROOT, 'src', 'workroom.ts')
 const MUTATIONS = [
   {
     file: INDEX,
+    name: 'a pre-v7 file may name a runtime no writer of its version knew',
+    from: "  if (schemaVersion < 7 && candidate.runtime !== 'codex' && candidate.runtime !== 'claude') {\n    return undefined\n  }\n",
+    to: '',
+    expect: 'refuses a Gemini mission in a file written before version 7'
+  },
+  {
+    file: INDEX,
     name: 'a pre-v6 file may call a continuation a follow-up',
     from: "  if (schemaVersion < 6 && candidate.continuesFrom?.reason === 'follow-up') {\n    return undefined\n  }\n",
     to: '',

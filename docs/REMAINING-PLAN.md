@@ -183,6 +183,43 @@ channel now tries the exec service and then this one, instead of telling a
 person their live approve-each run "is no longer active"; a handoff of one
 is refused explicitly rather than reported as dead.
 
+**Cursor Agent and Gemini CLI, found and signed into. DONE 2026-09-02;
+missions under them NOT yet.** Both CLIs were installed on the dev machine
+(Cursor's official Windows installer; `@google/gemini-cli` 0.58 from npm) and
+measured. Discovery finds them (Cursor in `%LOCALAPPDATA%\cursor-agent`,
+which its installer adds only to the USER PATH), reads their versions, and
+reads sign-in state the way each actually reports it: `cursor-agent status`
+prints "Not logged in" and exits 0, so its text is read; `gemini
+--list-sessions` exits 41 without an auth method, so its exit code is. The
+command builders exist and are tested (Cursor: `--print --output-format
+stream-json --stream-partial-output`, `--mode plan` for read-only, never
+`--force`; Gemini: `--output-format stream-json --skip-trust --approval-mode
+plan|auto_edit`, never `yolo`), and the ledger's schema is v7 so a mission
+may record either runtime. What does NOT exist is an event normalizer for
+either, because neither stream has been measured -- both CLIs refuse to run
+signed out, and signing in is the owner's action. Until then the host
+refuses a mission under either BY NAME before recording anything, and the
+picker draws their rows as planned. Two things are unverified until the
+first signed-in run: that Cursor reads its prompt from stdin (its help does
+not say), and that Gemini's `--resume` accepts a session id rather than only
+`latest` or an index. Next: sign in, capture one read-only stream each into
+fixtures, build the normalizers against them, then the model lists
+(`cursor-agent --list-models`; Gemini has no list command).
+
+**Muse Spark.** Meta's coding model, on an OpenAI-compatible API at
+`api.meta.ai/v1` (`muse-spark-1.2`, and `muse-spark-1.2-contributor` at
+roughly a tenth of the price). Its own agent CLI, Muse Code, has a launcher
+that supports only macOS and Linux, so it cannot be a native runtime here.
+The cheap path needs no runtime at all: a Meta API key configured as a Codex
+CLI model provider, so Codex's own stream carries it. Needs the key, which is
+the owner's.
+
+**Auto-update.** Nothing exists. The repo is private, and GitHub Releases on
+a private repo would need a token inside every installed app, which is out.
+Proposed: a separate PUBLIC repo holding only installers, electron-updater
+pointed at it, no secret in the app. Signing is separate spend and only
+affects SmartScreen. Waiting on the owner's yes.
+
 **Connections.** The composer's `+` menu names Connectors with a "needs
 reconnection" hint in the reference; nothing behind it exists. Either a real
 screen over discovered MCP servers or the row must not be drawn.

@@ -39,6 +39,7 @@ import {
   TEAMMATE_REMOVE_CHANNEL,
   TEAMMATE_UPDATE_CHANNEL
 } from '../shared/ipc.js'
+import { isMissionRuntime } from '../shared/runtimes.js'
 import type {
   CodexMissionCancelRequest,
   CodexMissionStartRequest,
@@ -463,7 +464,7 @@ if (!ownsSingleInstanceLock) {
         payload.mode === 'accept-edits' || payload.mode === 'approve-each' ? payload.mode : 'ask'
       // Same shape as the mode: an unrecognized runtime falls back to Codex
       // rather than being passed through to discovery as-is.
-      const runtime = payload.runtime === 'claude' ? 'claude' : 'codex'
+      const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
       // `approve-each` is the only mode that needs a runtime able to stop and
       // ask, so it is the only one routed to the experimental transport.
       if (mode === 'approve-each') {
@@ -577,7 +578,7 @@ if (!ownsSingleInstanceLock) {
       // an unrecognized runtime is Codex. A handoff must not become the way a
       // malformed request buys itself write access.
       const mode = payload.mode === 'accept-edits' ? 'accept-edits' : 'ask'
-      const runtime = payload.runtime === 'claude' ? 'claude' : 'codex'
+      const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       // An approve-each run cannot be handed off yet, and saying "no longer

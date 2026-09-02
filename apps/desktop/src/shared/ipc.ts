@@ -28,7 +28,7 @@ export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
-export type LocalRuntimeId = 'codex' | 'claude' | 'omniroute'
+export type LocalRuntimeId = 'codex' | 'claude' | 'cursor' | 'gemini' | 'omniroute'
 
 export type TeammateHue = 'lime' | 'blue' | 'violet' | 'clay'
 

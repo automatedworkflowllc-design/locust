@@ -4,6 +4,9 @@ import {
   assertSafeRuntimeCommand,
   createClaudePrintCommand,
   createCodexExecCommand,
+  createCursorPrintCommand,
+  createGeminiPrintCommand,
+  CURSOR_REQUIRED_FEATURES,
   parseClaudeModelHints,
   createNodeProbeRunner,
   createPathExecutableLocator,
@@ -15,6 +18,7 @@ import type {
   ExecutableLaunch,
   ExecutableLocator,
   ProbeCommand,
+  RuntimeReadiness,
   SpawnedProbeProcess,
 } from "../src/index.js";
 
@@ -128,8 +132,129 @@ describe("installed runtime discovery", () => {
     expect(result.map(({ id, availability, readiness }) => ({ id, availability, readiness }))).toEqual([
       { id: "codex", availability: "available", readiness: "authentication-required" },
       { id: "claude", availability: "available", readiness: "ready" },
+      { id: "cursor", availability: "unavailable", readiness: "unknown" },
+      { id: "gemini", availability: "unavailable", readiness: "unknown" },
       { id: "omniroute", availability: "unavailable", readiness: "unknown" },
     ]);
+  });
+
+  // Both CLIs measured on this machine the day they were installed.
+  const CURSOR_HELP =
+    "-p, --print  --output-format <format> text | json | stream-json  --stream-partial-output  --mode <mode> plan: read-only  --workspace <path>  --resume [chatId]  --model <model>";
+  const GEMINI_HELP =
+    "-p, --prompt  Run in non-interactive (headless) mode. Appended to input on stdin  -o, --output-format  text json stream-json  --approval-mode default auto_edit yolo plan  -r, --resume";
+
+  function newcomerLocator(name: string): ExecutableLocator {
+    return {
+      find: async (command) =>
+        command === name
+          ? { ...nativeExecutable, commandName: name, discoveredPath: `C:\\tools\\${name}.exe`, executablePath: `C:\\tools\\${name}.exe` }
+          : undefined,
+    };
+  }
+
+  it("reads a logged-out Cursor Agent from its text, because its status command exits 0 either way", async () => {
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "version") return { exitCode: 0, stdout: "2026.08.31-4057e58", stderr: "" };
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: CURSOR_HELP, stderr: "" };
+        return { exitCode: 0, stdout: "Not logged in\n", stderr: "" };
+      },
+    };
+    const [cursor] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("cursor-agent") }))
+      .filter((entry) => entry.id === "cursor");
+    expect(cursor?.availability).toBe("available");
+    expect(cursor?.readiness).toBe("authentication-required");
+    expect(cursor?.supportedFeatures).toEqual(expect.arrayContaining([...CURSOR_REQUIRED_FEATURES]));
+  });
+
+  it("reports a signed-in Cursor Agent ready", async () => {
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "version") return { exitCode: 0, stdout: "2026.08.31-4057e58", stderr: "" };
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: CURSOR_HELP, stderr: "" };
+        return { exitCode: 0, stdout: "Logged in as someone@example.com\n", stderr: "" };
+      },
+    };
+    const [cursor] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("cursor-agent") }))
+      .filter((entry) => entry.id === "cursor");
+    expect(cursor?.readiness).toBe("ready");
+  });
+
+  it("reads Gemini CLI's sign-in state from its session listing's exit code", async () => {
+    const answers = new Map<number, RuntimeReadiness>([[41, "authentication-required"], [0, "ready"]]);
+    for (const [exitCode, expected] of answers) {
+      const runner: CommandRunner = {
+        run: async (command) => {
+          if (command.purpose === "version") return { exitCode: 0, stdout: "0.58.0", stderr: "" };
+          if (command.purpose === "capabilities") return { exitCode: 0, stdout: GEMINI_HELP, stderr: "" };
+          expect(command.args).toEqual(["--list-sessions"]);
+          return { exitCode, stdout: "", stderr: exitCode === 0 ? "" : "Please set an Auth method" };
+        },
+      };
+      const [gemini] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("gemini") }))
+        .filter((entry) => entry.id === "gemini");
+      expect(gemini?.readiness).toBe(expected);
+    }
+  });
+});
+
+describe("Cursor Agent and Gemini CLI commands", () => {
+  const workspacePath = "C:\\work\\repo";
+
+  it("runs a read-only Cursor mission in plan mode and never forces commands", () => {
+    const spec = createCursorPrintCommand(nativeExecutable, { workspacePath });
+    expect(spec.runtime).toBe("cursor");
+    expect(spec.stdin).toBe("prompt");
+    expect(spec.args).toEqual([
+      "--print", "--output-format", "stream-json", "--stream-partial-output", "--workspace", workspacePath, "--mode", "plan",
+    ]);
+  });
+
+  it("lets a workspace-write Cursor mission edit, still without --force", () => {
+    const spec = createCursorPrintCommand(nativeExecutable, { workspacePath, sandbox: "workspace-write", model: "composer-1", resumeThreadId: "chat_1" });
+    expect(spec.args).not.toContain("--mode");
+    expect(spec.args).not.toContain("--force");
+    expect(spec.args.slice(-4)).toEqual(["--model", "composer-1", "--resume", "chat_1"]);
+  });
+
+  it("refuses an effort for a runtime that has no effort flag", () => {
+    expect(() => createCursorPrintCommand(nativeExecutable, { workspacePath, effort: "high" })).toThrow(/effort/);
+    expect(() => createGeminiPrintCommand(nativeExecutable, { workspacePath, effort: "high" })).toThrow(/effort/);
+  });
+
+  it("runs Gemini headless with the prompt on stdin, trusting only this workspace", () => {
+    const spec = createGeminiPrintCommand(nativeExecutable, { workspacePath });
+    expect(spec.runtime).toBe("gemini");
+    expect(spec.stdin).toBe("prompt");
+    expect(spec.args).toEqual(["--output-format", "stream-json", "--skip-trust", "--approval-mode", "plan"]);
+    const writing = createGeminiPrintCommand(nativeExecutable, { workspacePath, sandbox: "workspace-write", model: "gemini-3-flash", resumeThreadId: "s1" });
+    expect(writing.args).toContain("auto_edit");
+    expect(writing.args.slice(-4)).toEqual(["--model", "gemini-3-flash", "--resume", "s1"]);
+  });
+
+  it("refuses Gemini's yolo mode and Cursor's force flag in any spelling", () => {
+    for (const args of [["--approval-mode", "yolo"], ["--approval-mode=yolo"], ["-y"], ["--force"], ["-f"], ["--yolo"]]) {
+      expect(() =>
+        assertSafeRuntimeCommand({ runtime: "gemini", executablePath: "C:\\x.exe", args, cwd: workspacePath, stdin: "prompt", stdout: "jsonl" }),
+      ).toThrow(/Forbidden/);
+    }
+  });
+
+  it("finds Cursor's launcher in its own install directory without PATH", async () => {
+    // The installer writes `cursor-agent.cmd` and `cursor-agent.ps1` side by
+    // side; the `.ps1` is the one the locator knows how to host safely.
+    const LOCAL = "C:\\Users\\x\\AppData\\Local";
+    const launcher = `${LOCAL}\\cursor-agent\\cursor-agent.ps1`;
+    const powershell = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: "", LOCALAPPDATA: LOCAL, APPDATA: "C:\\Users\\x\\AppData\\Roaming", SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) => candidate === launcher || candidate === powershell,
+      readDirectory: async () => [],
+    }).find("cursor-agent");
+    expect(found?.kind).toBe("powershell-shim");
+    expect(found?.discoveredPath).toBe(launcher);
   });
 });
 

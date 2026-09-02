@@ -27,6 +27,7 @@ import { composeHandoffPrompt } from './handoff.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
+import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 /**
@@ -438,7 +439,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         ) {
           return error(
             'CODEX_UNAVAILABLE',
-            `${runtime === 'claude' ? 'Claude Code' : 'Codex CLI'} is not ready. Install or sign in to it, then retry discovery.`
+            `${runtimeDisplayName(runtime)} is not ready. Install or sign in to it, then retry discovery.`
+          ) as CodexMissionStartResponse
+        }
+        if (!hostReadsEventsOf(runtime)) {
+          return error(
+            'RUNTIME_START_FAILED',
+            `${runtimeDisplayName(runtime)} is installed and signed in, but Locust cannot read its event stream yet. Choose Codex CLI or Claude Code for this mission.`
           ) as CodexMissionStartResponse
         }
 
@@ -462,7 +469,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             // would look like a reply and behave like a stranger.
             return error(
               'RUNTIME_START_FAILED',
-              `That conversation belongs to ${prior.metadata.runtime === 'claude' ? 'Claude Code' : 'Codex'}. Switch the route back, or hand the mission over instead.`
+              `That conversation belongs to ${runtimeDisplayName(prior.metadata.runtime)}. Switch the route back, or hand the mission over instead.`
             ) as CodexMissionStartResponse
           }
           resumeThreadId = priorThread
@@ -708,7 +715,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       }
 
       const fromMissionId = previous.missionId
-      const fromRuntime = previous.runtime === 'claude' ? 'Claude Code' : 'Codex'
+      const fromRuntime = runtimeDisplayName(previous.runtime)
       const originalPrompt = previous.prompt
 
       // Stop the run, then WAIT for its own records to settle before

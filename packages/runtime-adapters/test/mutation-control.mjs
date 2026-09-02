@@ -22,8 +22,30 @@ const COMMANDS = join(ROOT, 'src', 'commands.ts')
 
 const CLAUDE_EVENTS = join(ROOT, 'src', 'claude-events.ts')
 const LOCATOR = join(ROOT, 'src', 'path-locator.ts')
+const DISCOVERY = join(ROOT, 'src', 'discovery.ts')
 
 const MUTATIONS = [
+  {
+    file: DISCOVERY,
+    name: 'a logged-out Cursor Agent is reported ready',
+    from: '    if (succeeded(readinessOutcome) && (definition.readyWhen?.(readinessOutcome.result) ?? true)) {',
+    to: '    if (succeeded(readinessOutcome)) {',
+    expect: 'reads a logged-out Cursor Agent from its text, because its status command exits 0 either way'
+  },
+  {
+    file: COMMANDS,
+    name: 'a read-only Cursor mission runs with edits allowed',
+    from: '  if (sandboxArgument(options.sandbox) === "read-only") {\n    args.push("--mode", "plan");\n  }',
+    to: '  sandboxArgument(options.sandbox);',
+    expect: 'runs a read-only Cursor mission in plan mode and never forces commands'
+  },
+  {
+    file: LOCATOR,
+    name: "Cursor's install directory is never searched",
+    from: '  { command: "cursor-agent", base: "LOCALAPPDATA", segments: ["cursor-agent"], versioned: false },\n',
+    to: '',
+    expect: "finds Cursor's launcher in its own install directory without PATH"
+  },
   {
     file: LOCATOR,
     name: 'a CLI that is not on PATH is reported as missing',
@@ -212,6 +234,7 @@ function runSuite() {
 
 const originals = new Map([
   [LOCATOR, readFileSync(LOCATOR, 'utf8')],
+  [DISCOVERY, readFileSync(DISCOVERY, 'utf8')],
   [CLAUDE_EVENTS, readFileSync(CLAUDE_EVENTS, 'utf8')],
   [COMMANDS, readFileSync(COMMANDS, 'utf8')],
   [CLIENT, readFileSync(CLIENT, 'utf8')],

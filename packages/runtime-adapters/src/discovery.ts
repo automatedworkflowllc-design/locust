@@ -1,7 +1,9 @@
 import {
   CLAUDE_REQUIRED_FEATURES,
   CODEX_REQUIRED_FEATURES,
+  CURSOR_REQUIRED_FEATURES,
   detectSupportedFeatures,
+  GEMINI_REQUIRED_FEATURES,
   OMNIROUTE_REQUIRED_FEATURES,
   parseClaudeModelHints,
 } from "./commands.js";
@@ -30,6 +32,13 @@ interface IntegrationDefinition {
   readonly capabilityArgs: readonly string[];
   readonly readinessArgs: readonly string[];
   readonly requiredFeatures: readonly RuntimeFeature[];
+  /**
+   * Whether a readiness probe that EXITED cleanly actually reported ready.
+   * Most CLIs say so with their exit code; one says "Not logged in" and
+   * exits 0, so its text has to be read. Absent means the exit code is the
+   * whole answer.
+   */
+  readonly readyWhen?: (result: CommandResult) => boolean;
 }
 
 const DEFINITIONS: readonly IntegrationDefinition[] = [
@@ -54,6 +63,35 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
     capabilityArgs: ["--help"],
     readinessArgs: ["auth", "status"],
     requiredFeatures: CLAUDE_REQUIRED_FEATURES,
+  },
+  {
+    id: "cursor",
+    kind: "agent-runtime",
+    displayName: "Cursor Agent",
+    // The installer puts both `agent` and `cursor-agent` on disk; the longer
+    // name is the one nothing else on a machine is likely to be called.
+    commandName: "cursor-agent",
+    optional: true,
+    versionArgs: ["--version"],
+    capabilityArgs: ["--help"],
+    readinessArgs: ["status"],
+    requiredFeatures: CURSOR_REQUIRED_FEATURES,
+    // Measured: `cursor-agent status` prints "Not logged in" and exits 0.
+    readyWhen: (result) => !/not logged in/i.test(`${result.stdout}\n${result.stderr}`),
+  },
+  {
+    id: "gemini",
+    kind: "agent-runtime",
+    displayName: "Gemini CLI",
+    commandName: "gemini",
+    optional: true,
+    versionArgs: ["--version"],
+    capabilityArgs: ["--help"],
+    // Measured: with no auth method configured this exits 41 and names the
+    // ways to sign in; signed in, it lists sessions and exits 0. It is the
+    // cheapest command the CLI has that touches its credentials.
+    readinessArgs: ["--list-sessions"],
+    requiredFeatures: GEMINI_REQUIRED_FEATURES,
   },
   {
     id: "omniroute",
@@ -219,7 +257,7 @@ async function discoverOne(
       "readiness",
       definition.readinessArgs,
     );
-    if (succeeded(readinessOutcome)) {
+    if (succeeded(readinessOutcome) && (definition.readyWhen?.(readinessOutcome.result) ?? true)) {
       readiness = "ready";
     } else if (
       definition.id !== "omniroute" &&

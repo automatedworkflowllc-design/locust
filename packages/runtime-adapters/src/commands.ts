@@ -1,6 +1,7 @@
 import type { RuntimeModelHints } from "./types.js";
 import type {
   ExecutableLaunch,
+  MissionRuntimeId,
   RuntimeCommandSpec,
   RuntimeFeature,
   RuntimeIntegrationId,
@@ -26,6 +27,30 @@ export const CLAUDE_REQUIRED_FEATURES = [
   "tool-denylist",
 ] as const satisfies readonly RuntimeFeature[];
 
+/**
+ * Cursor's agent CLI (`cursor-agent`), read off its own `--help`: a print mode
+ * with a `stream-json` output format, partial text deltas, and a read-only
+ * `--mode plan`. It names no stdin prompt, so that is not required of it.
+ */
+export const CURSOR_REQUIRED_FEATURES = [
+  "non-interactive",
+  "jsonl-events",
+  "partial-messages",
+  "plan-permission-mode",
+  "workspace-selection",
+] as const satisfies readonly RuntimeFeature[];
+
+/**
+ * Gemini CLI: a headless `--prompt` mode that also reads stdin, `stream-json`
+ * output, and a read-only `--approval-mode plan`.
+ */
+export const GEMINI_REQUIRED_FEATURES = [
+  "non-interactive",
+  "jsonl-events",
+  "stdin-prompt",
+  "plan-permission-mode",
+] as const satisfies readonly RuntimeFeature[];
+
 export const OMNIROUTE_REQUIRED_FEATURES = [
   "json-health-check",
 ] as const satisfies readonly RuntimeFeature[];
@@ -38,6 +63,11 @@ const FORBIDDEN_ARGUMENTS = new Set([
   "--dangerously-skip-permissions",
   "--allow-dangerously-skip-permissions",
   "--full-auto",
+  // Cursor Agent: "force allow commands unless explicitly denied".
+  "--force",
+  "-f",
+  // Gemini CLI: "-y" is the short form of its yolo mode.
+  "-y",
 ]);
 
 function requireText(value: string, label: string): string {
@@ -77,6 +107,17 @@ export function detectSupportedFeatures(
     add("plan-permission-mode", scan(helpText, "--permission-mode") && scan(helpText, "plan"));
     add("tool-allowlist", scan(helpText, "--tools"));
     add("tool-denylist", scan(helpText, "--disallowedTools"));
+  } else if (runtime === "cursor") {
+    add("non-interactive", scan(helpText, "--print"));
+    add("jsonl-events", scan(helpText, "--output-format") && scan(helpText, "stream-json"));
+    add("partial-messages", scan(helpText, "--stream-partial-output"));
+    add("plan-permission-mode", scan(helpText, "--mode") && scan(helpText, "plan"));
+    add("workspace-selection", scan(helpText, "--workspace"));
+  } else if (runtime === "gemini") {
+    add("non-interactive", scan(helpText, "--prompt"));
+    add("jsonl-events", scan(helpText, "--output-format") && scan(helpText, "stream-json"));
+    add("stdin-prompt", scan(helpText, "stdin"));
+    add("plan-permission-mode", scan(helpText, "--approval-mode") && scan(helpText, "plan"));
   } else {
     add("json-health-check", scan(helpText, "--json"));
   }
@@ -117,11 +158,17 @@ export function assertSafeRuntimeCommand(spec: RuntimeCommandSpec): void {
     if (argument === "never" && spec.args[index - 1] === "--ask-for-approval") {
       throw new Error("Forbidden Codex approval mode: never");
     }
+    if (argument === "--approval-mode=yolo") {
+      throw new Error("Forbidden Gemini approval mode: yolo");
+    }
+    if (argument === "yolo" && spec.args[index - 1] === "--approval-mode") {
+      throw new Error("Forbidden Gemini approval mode: yolo");
+    }
   }
 }
 
 function baseSpec(
-  runtime: "codex" | "claude",
+  runtime: MissionRuntimeId,
   executable: ExecutableLaunch,
   cwd: string,
   args: readonly string[],
@@ -258,4 +305,73 @@ export function createClaudePrintCommand(
     args.push("--resume", requireText(options.resumeThreadId, "Session id"));
   }
   return baseSpec("claude", executable, options.workspacePath, args);
+}
+
+/**
+ * Cursor Agent in its print mode. A read-only mission runs in `--mode plan`,
+ * which its help describes as "read-only/planning (analyze, propose plans, no
+ * edits)"; a workspace-write mission runs in the default mode, where edits are
+ * allowed and commands that need approval are simply not run, because the
+ * only flag that would run them anyway is `--force` and that is refused.
+ *
+ * The CLI names no effort flag, so an effort is refused rather than dropped:
+ * a caller that was shown an effort and had it silently ignored would believe
+ * a claim nothing honoured.
+ */
+export function createCursorPrintCommand(
+  executable: ExecutableLaunch,
+  options: RuntimeCommandOptions,
+): RuntimeCommandSpec {
+  const args = [
+    "--print",
+    "--output-format",
+    "stream-json",
+    "--stream-partial-output",
+    "--workspace",
+    options.workspacePath,
+  ];
+  if (sandboxArgument(options.sandbox) === "read-only") {
+    args.push("--mode", "plan");
+  }
+  if (options.model !== undefined) {
+    args.push("--model", requireText(options.model, "Model"));
+  }
+  if (options.effort !== undefined) {
+    throw new Error("Cursor Agent takes no effort level");
+  }
+  if (options.resumeThreadId !== undefined) {
+    args.push("--resume", requireText(options.resumeThreadId, "Session id"));
+  }
+  return baseSpec("cursor", executable, options.workspacePath, args);
+}
+
+/**
+ * Gemini CLI, headless. The prompt arrives on stdin, which its help says a
+ * headless run reads. `--skip-trust` trusts the workspace for this run only:
+ * measured on an untrusted folder, the CLI silently overrode plan mode to its
+ * default, so without it a read-only mission would not be one.
+ *
+ * `yolo` is never an approval mode here, and `-y` is refused outright.
+ */
+export function createGeminiPrintCommand(
+  executable: ExecutableLaunch,
+  options: RuntimeCommandOptions,
+): RuntimeCommandSpec {
+  const args = [
+    "--output-format",
+    "stream-json",
+    "--skip-trust",
+    "--approval-mode",
+    sandboxArgument(options.sandbox) === "read-only" ? "plan" : "auto_edit",
+  ];
+  if (options.model !== undefined) {
+    args.push("--model", requireText(options.model, "Model"));
+  }
+  if (options.effort !== undefined) {
+    throw new Error("Gemini CLI takes no effort level");
+  }
+  if (options.resumeThreadId !== undefined) {
+    args.push("--resume", requireText(options.resumeThreadId, "Session id"));
+  }
+  return baseSpec("gemini", executable, options.workspacePath, args);
 }

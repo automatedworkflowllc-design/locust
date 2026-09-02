@@ -19,6 +19,7 @@ import type {
   TeammateHue,
   TeammateRole
 } from '../../shared/ipc.js'
+import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { Composer } from './components/Composer.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
 import { CommandPalette } from './components/CommandPalette.js'
@@ -956,7 +957,7 @@ export default function App(): ReactElement {
                       </span>
                       <span className="lc-workroom__role">
                         {missionOwner === undefined ? '' : `${missionOwner.role} · `}
-                        {liveRun.data?.runtime === 'claude' ? 'Claude Code' : 'Codex CLI'}
+                        {runtimeDisplayName(liveRun.data?.runtime ?? 'codex')}
                       </span>
                     </div>
                     <div className="lc-workroom__mission">

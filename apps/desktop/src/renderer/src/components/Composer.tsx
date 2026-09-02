@@ -7,6 +7,7 @@ import type {
   PublicModel,
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { handoffAvailability, handoffTitle, runtimeIsUsable } from '../status.js'
 import mark from '../assets/locust-mark.svg'
 import { Icon } from './Icon.js'
@@ -176,7 +177,7 @@ export function Composer({
   const shownRuntime = running ? activeRoute?.runtime ?? route.runtime : route.runtime
   const shownModel = running ? activeRoute?.model ?? route.model : route.model
   const shownRuntimeStatus = runtimes.find((runtime) => runtime.id === shownRuntime)
-  const runtimeLabel = shownRuntimeStatus?.displayName ?? (shownRuntime === 'claude' ? 'Claude Code' : 'Codex CLI')
+  const runtimeLabel = shownRuntimeStatus?.displayName ?? runtimeDisplayName(shownRuntime)
   const modelLabel = shownModel
   // What the RUNNING mission is actually on, which is not always what the
   // composer's next-run route says. A handoff has to be measured against the

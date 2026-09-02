@@ -27,8 +27,16 @@ const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const HISTORY = join(ROOT, 'src', 'main', 'mission-history.ts')
+const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 
 const MUTATIONS = [
+  {
+    file: RUNTIMES,
+    name: 'a runtime whose events the host cannot read is started anyway',
+    from: "  return runtime === 'codex' || runtime === 'claude'\n",
+    to: '  return true\n',
+    expect: 'refuses a runtime whose event stream it cannot read yet, by name, recording nothing'
+  },
   {
     file: VIEW,
     name: 'a turn opening counts as work, so setup notices land in the thread',
@@ -520,7 +528,8 @@ const originals = new Map([
   [VIEW, readFileSync(VIEW, 'utf8')],
   [TEAMMATES, readFileSync(TEAMMATES, 'utf8')],
   [CATALOG, readFileSync(CATALOG, 'utf8')],
-  [HISTORY, readFileSync(HISTORY, 'utf8')]
+  [HISTORY, readFileSync(HISTORY, 'utf8')],
+  [RUNTIMES, readFileSync(RUNTIMES, 'utf8')]
 ])
 let problems = 0
 

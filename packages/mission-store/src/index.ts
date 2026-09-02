@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 6 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 7 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -53,14 +53,19 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 6 as const
  * process -- but it is not a handoff, and a reader that assumed every
  * continuation was a route switch would draw a handoff divider across an
  * ordinary reply.
+ *
+ * v6 -> v7 widens `runtime` again, to Cursor Agent and Gemini CLI. A v6 reader
+ * handed a Gemini mission would refuse its header as invalid and report the
+ * whole mission unreadable, so the number moves for the same reason it moved
+ * from 1 to 2.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -314,13 +319,20 @@ function requireTimestamp(value: string, label: string): string {
   return value
 }
 
+/** Every runtime a mission may record. Widening this is a schema version. */
+const MISSION_RUNTIMES: readonly string[] = ['codex', 'claude', 'cursor', 'gemini']
+
+function isMissionRuntime(value: unknown): value is MissionRuntimeId {
+  return typeof value === 'string' && MISSION_RUNTIMES.includes(value)
+}
+
 function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadata {
   requireSafeId(metadata.missionId, 'missionId')
   requireSafeId(metadata.runId, 'runId')
   requireText(metadata.prompt, 'prompt', MAX_PROMPT_LENGTH)
   requireText(metadata.requestedRouteId, 'requestedRouteId', 256)
   requireText(metadata.resolvedRouteId, 'resolvedRouteId', 256)
-  if (metadata.runtime !== 'codex' && metadata.runtime !== 'claude') {
+  if (!isMissionRuntime(metadata.runtime)) {
     throw new Error('Mission runtime metadata is invalid')
   }
   requireText(metadata.model, 'model', 256)
@@ -433,11 +445,15 @@ function parsedMetadata(
   if (schemaVersion < 6 && candidate.continuesFrom?.reason === 'follow-up') {
     return undefined
   }
+  // And no writer before v7 knew Cursor Agent or Gemini CLI.
+  if (schemaVersion < 7 && candidate.runtime !== 'codex' && candidate.runtime !== 'claude') {
+    return undefined
+  }
   if (
     typeof candidate.missionId !== 'string'
     || typeof candidate.runId !== 'string'
     || typeof candidate.prompt !== 'string'
-    || (candidate.runtime !== 'codex' && candidate.runtime !== 'claude')
+    || !isMissionRuntime(candidate.runtime)
     || typeof candidate.model !== 'string'
     || typeof candidate.requestedRouteId !== 'string'
     || typeof candidate.resolvedRouteId !== 'string'

@@ -55,6 +55,13 @@ and both own real missions end to end. Discovery is read-only and reports
 version and authentication readiness without reading credential files; a
 runtime that is not ready is never drawn as available.
 
+**Two more runtimes found, not yet run.** Cursor Agent and Gemini CLI are
+discovered, versioned and asked about sign-in the same way, and the ledger
+can record a mission under either. A mission cannot run under them yet: an
+event normalizer is built only from a stream measured off the real CLI, and
+neither has been captured. Until it is, the app says so by name instead of
+starting a process nobody can read.
+
 **Each runtime's own models, and effort that is actually sent.** Codex's
 models come from a live `model/list`; Claude Code's from the aliases its own
 `--help` advertises. Nothing is offered that the installed CLI did not name,

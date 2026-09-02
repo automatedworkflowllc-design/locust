@@ -1,4 +1,10 @@
-export type RuntimeIntegrationId = "codex" | "claude" | "omniroute";
+/**
+ * Every integration this package knows how to find. Cursor Agent and Gemini
+ * CLI are found, versioned and asked about sign-in like the other two; whether
+ * a mission may RUN under them is the host's decision, made per runtime on the
+ * strength of a measured event stream.
+ */
+export type RuntimeIntegrationId = "codex" | "claude" | "cursor" | "gemini" | "omniroute";
 
 /**
  * A runtime that can actually own a mission. OmniRoute is a gateway to other

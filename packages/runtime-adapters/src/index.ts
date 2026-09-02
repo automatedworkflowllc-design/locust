@@ -104,3 +104,9 @@ export type {
 } from "./types.js";
 export { parseClaudeModelHints } from "./commands.js";
 export type { RuntimeModelHints } from "./types.js";
+export {
+  createCursorPrintCommand,
+  createGeminiPrintCommand,
+  CURSOR_REQUIRED_FEATURES,
+  GEMINI_REQUIRED_FEATURES,
+} from "./commands.js";

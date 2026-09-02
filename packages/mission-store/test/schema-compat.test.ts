@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(6)
-    expect(header.schemaVersion).toBe(6)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(7)
+    expect(header.schemaVersion).toBe(7)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -368,6 +368,39 @@ describe('ledger schema versions', () => {
     expect(recovered).toBeUndefined()
   })
 
+  it('refuses a Gemini mission in a file written before version 7', async () => {
+    const root = await temporaryRoot()
+    // A v6 file: every other rule accepts it, so only the v7 rule can refuse
+    // it. No writer before v7 knew Gemini, so this header was hand-edited.
+    const metadata = v1Metadata({ runtime: 'gemini', model: 'gemini-3-flash' })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 6,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}\n`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
+  it('round-trips a Cursor Agent mission at the current version', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission(
+      v1Metadata({ runtime: 'cursor', model: 'composer-1' }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.runtime).toBe('cursor')
+  })
+
   it('refuses a continuation reason it does not know', async () => {
     const root = await temporaryRoot()
     const ledger = createFileMissionLedger({ rootDirectory: root })
@@ -385,7 +418,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 7,
+        schemaVersion: 8,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,
