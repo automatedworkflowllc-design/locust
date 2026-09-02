@@ -110,11 +110,21 @@ try {
   await cdp.send('Runtime.enable')
 
   say('2. it is really the packaged build, and it says Locust')
-  const identity = await cdp.eval(`JSON.stringify({
-    title: document.title,
-    url: location.protocol,
-    brand: document.querySelector('.lc-brand__wordmark') !== null
-  })`)
+  // Wait for the first paint before reading the shell. Sampling the DOM the
+  // instant the debugger attaches raced React's first render and failed at
+  // random, which is worse than no check: a smoke that cries wolf gets
+  // ignored on the day it is right.
+  const identity = await cdp.eval(`(async () => {
+    for (let i = 0; i < 80; i += 1) {
+      if (document.querySelector('.lc-brand__wordmark')) break
+      await new Promise(r => setTimeout(r, 250))
+    }
+    return JSON.stringify({
+      title: document.title,
+      url: location.protocol,
+      brand: document.querySelector('.lc-brand__wordmark') !== null
+    })
+  })()`)
   const id = JSON.parse(identity)
   check('the window is titled Locust', id.title === 'Locust', id.title)
   // A packaged renderer loads from file:, not from the dev server.

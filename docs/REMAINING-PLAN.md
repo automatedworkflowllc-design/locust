@@ -156,7 +156,7 @@ invalidation); the test now re-creates the same id and requires it to be as
 fresh as the first time. Retention -- pruning old missions on a policy --
 remains open.
 
-**Builds are identifiable.** The desktop app is 0.3.0 (0.2.0 added deletion; from 0.1.0, which
+**Builds are identifiable.** The desktop app is 0.4.0 (0.3.0 added Cursor; 0.2.0 deletion; from 0.1.0, which
 every build had been), the installer is named by version, and Settings shows
 `Locust <version>` with a development-build marker when unpackaged. There is
 still no auto-update: the app never checks for a new version, and adding that
@@ -267,9 +267,13 @@ in the built app and starts no mission, so it costs no provider quota: six
 rows for Cursor plus "211 more models", 15 rows standing above the last
 runtime rather than 217, and 14 rows with no cap line when "grok" is typed.
 
-**Connections.** The composer's `+` menu names Connectors with a "needs
-reconnection" hint in the reference; nothing behind it exists. Either a real
-screen over discovered MCP servers or the row must not be drawn.
+**Connections. SETTLED 2026-09-02, by checking rather than building.** The
+reference draws a `+` menu with Connectors and a "needs reconnection" hint.
+This build never drew that row: the `+` control is present, disabled, and
+titled "Attachments and slash commands are not built yet", which is the
+honest half of the requirement already met. A Connections screen over
+discovered MCP servers stays unbuilt, and nothing in the shell claims
+otherwise. Re-open this only if the row is ever drawn live.
 
 **Retention. DONE 2026-09-02, live-verified.** Settings now states what the
 local history costs -- how many missions, how many bytes, and how far back it
