@@ -40,10 +40,15 @@ import { shortMissionId } from './status.js'
 /**
  * The Locust shell.
  *
- * The mission state machine below is carried over unchanged from the previous
- * shell -- persist-before-emit ordering, queued updates for a run whose start
- * response has not arrived yet, a restored receipt that becomes live again on
- * any update, and one active run at a time. Only the rendering is new.
+ * Missions run side by side now, one per teammate. Every run the shell knows
+ * about -- live, finished this session, or reopened from the ledger -- lives
+ * in one map keyed by its runId, and ONE of them is on screen. Host updates
+ * are addressed by runId, so a run keeps receiving them whether or not it is
+ * the one being looked at; that is what makes switching threads mid-run safe.
+ *
+ * Carried over unchanged from the single-run shell: persist-before-emit
+ * ordering, queued updates for a run whose start receipt has not arrived
+ * yet, and a restored receipt that becomes live again on any update.
  */
 
 type LiveRunPhase =
@@ -64,6 +69,8 @@ interface LiveRunState {
   readonly errorIsPersistence?: boolean
   readonly restored?: boolean
   readonly restoredMission?: PublicRecoveredMission
+  /** Who the run was messaged to, known before the host has even assigned a missionId. */
+  readonly teammateId?: string
   /**
    * What this run continues, when it was started by a route switch. Held in
    * renderer state rather than re-read from the ledger because the thread has
@@ -88,8 +95,14 @@ type RuntimeDiscoveryState =
   | { readonly phase: 'ready'; readonly runtimes: readonly PublicRuntimeStatus[] }
   | { readonly phase: 'error' }
 
+type RunMap = ReadonlyMap<string, LiveRunState>
+
 function liveRunIsActive(run: LiveRunState | undefined): boolean {
   return run !== undefined && (run.phase === 'starting' || run.phase === 'running' || run.phase === 'cancelling')
+}
+
+function isTerminal(phase: LiveRunPhase): boolean {
+  return phase === 'completed' || phase === 'failed' || phase === 'cancelled'
 }
 
 function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): LiveRunState {
@@ -153,6 +166,28 @@ function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
   }
 }
 
+/** A map with one entry replaced, or unchanged when the key is absent. */
+function withRun(runs: RunMap, key: string, next: (run: LiveRunState) => LiveRunState): RunMap {
+  const current = runs.get(key)
+  if (current === undefined) return runs
+  const copy = new Map(runs)
+  copy.set(key, next(current))
+  return copy
+}
+
+function withNewRun(runs: RunMap, key: string, run: LiveRunState): RunMap {
+  const copy = new Map(runs)
+  copy.set(key, run)
+  return copy
+}
+
+function withoutRun(runs: RunMap, key: string): RunMap {
+  if (!runs.has(key)) return runs
+  const copy = new Map(runs)
+  copy.delete(key)
+  return copy
+}
+
 /**
  * The effort a mission should actually be started with. Swarm means this
  * model's maximum, so it is the last effort THIS model reported rather than a
@@ -176,7 +211,10 @@ function missionTitle(prompt: string): string {
 
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
-  const [liveRun, setLiveRun] = useState<LiveRunState>()
+  /** Every run the shell knows about, keyed by runId (or a pending key until the receipt arrives). */
+  const [runs, setRuns] = useState<RunMap>(() => new Map())
+  /** Which run's thread is on screen; undefined shows the addressed teammate's idle state. */
+  const [shownKey, setShownKey] = useState<string>()
   const [history, setHistory] = useState<readonly PublicRecoveredMission[]>([])
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
@@ -200,17 +238,28 @@ export default function App(): ReactElement {
    */
   const [selectedTeammateId, setSelectedTeammateId] = useState<string>()
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
-  const activeRunIdRef = useRef<string | undefined>(undefined)
+  const pendingKeyCounter = useRef(0)
+
+  const liveRun = shownKey === undefined ? undefined : runs.get(shownKey)
   /**
-   * The live run as of the LAST render, for handlers that run after an await.
-   * A handoff is decided inside an async callback, and reading `liveRun` from
-   * that callback's closure can hand it the value from whichever render
-   * created the callback -- which, for a control that opens a menu and waits
-   * for a click, is often the render before the mission even had a runId.
-   * Mirroring into a ref is the same shape `activeRunIdRef` already uses.
+   * The shown run as of the LAST render, for handlers that run after an
+   * await. A handoff is decided inside an async callback, and reading state
+   * from that callback's closure can hand it the value from whichever render
+   * created the callback -- often the render before the mission had a runId.
    */
   const liveRunRef = useRef<LiveRunState | undefined>(undefined)
   liveRunRef.current = liveRun
+
+  const refreshHistory = (): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .getMissionHistory()
+      .then((response) => {
+        if (response.ok) setHistory(response.data.missions)
+      })
+      .catch(() => undefined)
+  }
 
   useEffect(() => {
     let active = true
@@ -231,10 +280,12 @@ export default function App(): ReactElement {
     })
 
     const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
-      setLiveRun((current) => {
-        if (current !== undefined && (current.data?.runId === update.runId || activeRunIdRef.current === update.runId)) {
-          return applyMissionUpdate(current, update)
+      setRuns((current) => {
+        if (current.has(update.runId)) {
+          return withRun(current, update.runId, (run) => applyMissionUpdate(run, update))
         }
+        // A run whose start receipt has not come back yet: hold its updates
+        // until the receipt names its runId, then replay them in order.
         const queued = pendingUpdatesRef.current.get(update.runId) ?? []
         pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
         return current
@@ -287,12 +338,15 @@ export default function App(): ReactElement {
         setHistory(response.data.missions)
         const latest = response.data.missions[0]
         if (latest === undefined) return
-        setLiveRun((current) => {
-          if (current !== undefined) return current
+        // The most recent mission opens on launch, restored from the ledger.
+        // Any update addressed to it (a run the host still owns) makes it live.
+        setRuns((current) => {
+          if (current.size > 0) return current
           const queued = pendingUpdatesRef.current.get(latest.runId) ?? []
           pendingUpdatesRef.current.delete(latest.runId)
-          return queued.reduce(applyMissionUpdate, restoredLiveRun(latest))
+          return withNewRun(current, latest.runId, queued.reduce(applyMissionUpdate, restoredLiveRun(latest)))
         })
+        setShownKey((current) => current ?? latest.runId)
       })
       .catch(() => {
         // History recovery is optional at startup; discovery remains usable.
@@ -347,17 +401,26 @@ export default function App(): ReactElement {
   const selectedTeammate =
     teammates.find((teammate) => teammate.teammateId === selectedTeammateId) ?? teammates[0]
 
+  /** Who a run belongs to: what it was started with, or what the host recorded. */
+  const ownerOf = (run: LiveRunState): string | undefined =>
+    run.teammateId ?? (run.data === undefined ? undefined : missionOwners[run.data.missionId])
+
   const startMission = async (prompt: string): Promise<boolean> => {
     const bridge = window.desktop
     const teammateId = selectedTeammate?.teammateId
-    activeRunIdRef.current = undefined
-    pendingUpdatesRef.current.clear()
-    setLiveRun({ prompt, phase: 'starting', events: [] })
-    // A new mission cannot inherit the previous one's pending questions.
-    setApprovals([])
-    setDecidingIds([])
+    const key = `pending:${++pendingKeyCounter.current}`
+    const starting: LiveRunState = {
+      prompt,
+      phase: 'starting',
+      events: [],
+      ...(teammateId === undefined ? {} : { teammateId })
+    }
+    setRuns((current) => withNewRun(current, key, starting))
+    setShownKey(key)
     if (!bridge) {
-      setLiveRun({ prompt, phase: 'failed', events: [], error: 'The secure desktop bridge is unavailable.' })
+      setRuns((current) =>
+        withRun(current, key, (run) => ({ ...run, phase: 'failed', error: 'The secure desktop bridge is unavailable.' }))
+      )
       return false
     }
 
@@ -377,57 +440,57 @@ export default function App(): ReactElement {
           : { effort: swarmEffortFor(models, route.model, swarm, effort)! })
       })
       if (!response.ok) {
-        activeRunIdRef.current = undefined
-        setLiveRun({ prompt, phase: 'failed', events: [], error: response.error.message })
+        setRuns((current) =>
+          withRun(current, key, (run) => ({ ...run, phase: 'failed', error: response.error.message }))
+        )
         return false
       }
 
-      activeRunIdRef.current = response.data.runId
+      const runId = response.data.runId
       // The host recorded the owner; mirror it so the sidebar files the
       // mission under the teammate at once rather than after a refresh.
       if (teammateId !== undefined) {
         const missionId = response.data.missionId
         setMissionOwners((current) => ({ ...current, [missionId]: teammateId }))
       }
-      const queued = pendingUpdatesRef.current.get(response.data.runId) ?? []
-      pendingUpdatesRef.current.delete(response.data.runId)
-      setLiveRun((current) => {
+      const queued = pendingUpdatesRef.current.get(runId) ?? []
+      pendingUpdatesRef.current.delete(runId)
+      setRuns((current) => {
         let next: LiveRunState = {
-          prompt,
+          ...starting,
           data: response.data,
-          phase:
-            current?.phase === 'completed' || current?.phase === 'failed' || current?.phase === 'cancelled'
-              ? current.phase
-              : 'running',
-          events: current?.prompt === prompt ? current.events : [],
-          ...(current?.error === undefined ? {} : { error: current.error }),
+          phase: 'running',
           peerMessages: response.data.peerMessages,
           ...(response.data.peerDeliveryFailed
             ? { peerNotices: ['Messages from teammates could not be read for this mission. Whatever was waiting is still waiting.'] }
             : {})
         }
         for (const update of queued) next = applyMissionUpdate(next, update)
-        return next
+        return withNewRun(withoutRun(current, key), runId, next)
       })
+      // Follow the run under its real key only if the person is still looking
+      // at it; they may have moved to another teammate's thread meanwhile.
+      setShownKey((current) => (current === key ? runId : current))
       return true
     } catch {
-      activeRunIdRef.current = undefined
-      setLiveRun({ prompt, phase: 'failed', events: [], error: 'The mission could not be started.' })
+      setRuns((current) =>
+        withRun(current, key, (run) => ({ ...run, phase: 'failed', error: 'The mission could not be started.' }))
+      )
       return false
     }
   }
 
   /**
-   * Move a running mission to another runtime.
+   * Move the shown run to another runtime.
    *
-   * The host stops the current run, reconciles it, and starts a NEW mission
-   * briefed from that checkpoint -- so what comes back is a different runId and
-   * missionId, and the renderer has to carry the old run's events forward
-   * itself if the thread is to keep reading as one piece of work.
+   * The host stops it, reconciles it, and starts a NEW mission briefed from
+   * that checkpoint -- so what comes back is a different runId and missionId,
+   * and the renderer carries the old run's events forward itself if the
+   * thread is to keep reading as one piece of work.
    *
-   * Everything about a refusal is surfaced verbatim, because every refusal path
-   * in the host describes a mission that is now STOPPED. Swallowing one would
-   * leave a dead run looking live.
+   * Everything about a refusal is surfaced verbatim, because every refusal
+   * path in the host describes a mission that is now STOPPED. Swallowing one
+   * would leave a dead run looking live.
    */
   const handOffMission = async (choice: RouteChoice): Promise<void> => {
     const bridge = window.desktop
@@ -438,12 +501,9 @@ export default function App(): ReactElement {
     const from = current.data?.runtime ?? route.runtime
     const priorEvents = current.events
     setHandingOff(true)
-    setLiveRun((existing) =>
-      existing?.data?.runId === runId ? { ...existing, phase: 'cancelling', error: undefined } : existing
-    )
+    setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
     // The new run cannot inherit questions asked of the old one.
-    setApprovals([])
-    setDecidingIds([])
+    setApprovals((all) => all.filter((entry) => entry.runId !== runId))
 
     try {
       const response = await bridge.handOffMission({
@@ -457,34 +517,30 @@ export default function App(): ReactElement {
       })
 
       if (!response.ok) {
-        activeRunIdRef.current = undefined
         // Failed, not cancelled: the mission is over and the reason has to be
         // the thing on screen.
-        setLiveRun((existing) =>
-          existing?.data?.runId === runId
-            ? { ...existing, phase: 'failed', error: response.error.message }
-            : existing
-        )
+        setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: response.error.message })))
         return
       }
 
-      activeRunIdRef.current = response.data.runId
+      const newRunId = response.data.runId
       setRoute(choice)
-      const ownerId = missionOwners[response.data.continuesFrom.missionId]
+      const ownerId = ownerOf(current)
       if (ownerId !== undefined) {
         const missionId = response.data.missionId
         setMissionOwners((owners) => ({ ...owners, [missionId]: ownerId }))
       }
-      const queued = pendingUpdatesRef.current.get(response.data.runId) ?? []
-      pendingUpdatesRef.current.delete(response.data.runId)
-      setLiveRun((existing) => {
+      const queued = pendingUpdatesRef.current.get(newRunId) ?? []
+      pendingUpdatesRef.current.delete(newRunId)
+      setRuns((all) => {
         let next: LiveRunState = {
           // The ORIGINAL words, not the generated briefing: the person never
           // typed the briefing, so it must not appear as something they said.
-          prompt: existing?.prompt ?? current.prompt,
+          prompt: current.prompt,
           data: response.data,
           phase: 'running',
           events: [],
+          ...(ownerId === undefined ? {} : { teammateId: ownerId }),
           peerMessages: response.data.peerMessages,
           handoff: {
             from,
@@ -496,14 +552,15 @@ export default function App(): ReactElement {
           }
         }
         for (const update of queued) next = applyMissionUpdate(next, update)
-        return next
+        // The stopped run's own terminal receipt still arrives under its old
+        // runId; it stays in the map so the sidebar shows both missions, which
+        // is what the durable record holds.
+        return withNewRun(all, newRunId, next)
       })
+      setShownKey((shown) => (shown === runId ? newRunId : shown))
     } catch {
-      activeRunIdRef.current = undefined
-      setLiveRun((existing) =>
-        existing?.data?.runId === runId
-          ? { ...existing, phase: 'failed', error: 'The handoff request could not be delivered.' }
-          : existing
+      setRuns((all) =>
+        withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: 'The handoff request could not be delivered.' }))
       )
     } finally {
       setHandingOff(false)
@@ -514,24 +571,24 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     const runId = liveRun?.data?.runId
     if (!bridge || runId === undefined || !liveRunIsActive(liveRun)) return
-    setLiveRun((current) =>
-      current?.data?.runId === runId ? { ...current, phase: 'cancelling', error: undefined } : current
-    )
+    setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
     void bridge
       .cancelCodexMission({ runId })
       .then((response) => {
         if (response.ok) return
-        setLiveRun((current) =>
-          current?.data?.runId === runId && liveRunIsActive(current)
-            ? { ...current, phase: 'running', error: response.error.message }
-            : current
+        setRuns((all) =>
+          withRun(all, runId, (run) =>
+            liveRunIsActive(run) ? { ...run, phase: 'running', error: response.error.message } : run
+          )
         )
       })
       .catch(() => {
-        setLiveRun((current) =>
-          current?.data?.runId === runId && liveRunIsActive(current)
-            ? { ...current, phase: 'running', error: 'The cancellation request could not be delivered.' }
-            : current
+        setRuns((all) =>
+          withRun(all, runId, (run) =>
+            liveRunIsActive(run)
+              ? { ...run, phase: 'running', error: 'The cancellation request could not be delivered.' }
+              : run
+          )
         )
       })
   }
@@ -573,62 +630,85 @@ export default function App(): ReactElement {
 
   const runtimes = runtimeState.phase === 'ready' ? runtimeState.runtimes : []
   const running = liveRunIsActive(liveRun)
+  const runningCount = [...runs.values()].filter(liveRunIsActive).length
   const historyById = useMemo(
     () => new Map(history.map((mission) => [mission.missionId, mission] as const)),
     [history]
   )
 
-  // Re-read history whenever a run settles, so a finished mission stays in
+  // Re-read history whenever ANY run settles, so a finished mission stays in
   // the sidebar after the next one starts instead of vanishing until restart.
-  const livePhase = liveRun?.phase
+  const settledSignature = [...runs.entries()]
+    .filter(([, run]) => isTerminal(run.phase))
+    .map(([key]) => key)
+    .sort()
+    .join('|')
   useEffect(() => {
-    if (livePhase !== 'completed' && livePhase !== 'failed' && livePhase !== 'cancelled') return
-    const bridge = window.desktop
-    if (!bridge) return
-    void bridge
-      .getMissionHistory()
-      .then((response) => {
-        if (response.ok) setHistory(response.data.missions)
-      })
-      .catch(() => undefined)
-  }, [livePhase])
+    if (settledSignature.length === 0) return
+    refreshHistory()
+  }, [settledSignature])
+
+  /** The addressed teammate's live run, if they have one: they cannot be given a second. */
+  const busyRun = [...runs.values()].find(
+    (run) => liveRunIsActive(run) && selectedTeammate !== undefined && ownerOf(run) === selectedTeammate.teammateId
+  )
 
   /**
-   * Show a recovered mission's thread. Refused while a run is live: the live
-   * run's updates are addressed to the thread on screen, and swapping it out
-   * would strand them. A continuation is drawn as one thread -- the root's
-   * prompt, the prior run's events, the divider rebuilt from the checkpoint,
-   * then this run -- because that is what the durable record says happened.
+   * Show a run's thread. A run the shell already knows about is shown as it
+   * is, live or not; anything else is reopened from the ledger. A
+   * continuation opens stitched -- the root's prompt, the prior run's events,
+   * the divider rebuilt from the checkpoint, then this run -- because that is
+   * what the durable record says happened.
    */
   const openMission = (missionId: string): void => {
-    if (running) return
-    if (liveRun?.data?.missionId === missionId) return
+    // A run that is still starting is listed under its pending key.
+    if (runs.has(missionId)) {
+      setShownKey(missionId)
+      return
+    }
+    const known = [...runs.entries()].find(([, run]) => run.data?.missionId === missionId)
+    if (known !== undefined) {
+      setShownKey(known[0])
+      return
+    }
     const mission = historyById.get(missionId)
     if (mission === undefined) return
     const restored = restoredLiveRun(mission)
     const handoff = stitchedHandoff(mission, historyById)
-    setApprovals([])
-    setDecidingIds([])
-    setLiveRun({
-      ...restored,
-      prompt: rootMission(mission, historyById).prompt,
-      ...(handoff === undefined ? {} : { handoff })
-    })
+    setRuns((current) =>
+      withNewRun(current, mission.runId, {
+        ...restored,
+        prompt: rootMission(mission, historyById).prompt,
+        ...(handoff === undefined ? {} : { handoff })
+      })
+    )
+    setShownKey(mission.runId)
+  }
+
+  /** Address a teammate, and look at what they are doing (or their idle state). */
+  const selectTeammate = (teammateId: string): void => {
+    setSelectedTeammateId(teammateId)
+    setScreen('workroom')
+    const theirs = [...runs.entries()].filter(([, run]) => ownerOf(run) === teammateId)
+    const live = theirs.find(([, run]) => liveRunIsActive(run)) ?? theirs.at(-1)
+    setShownKey(live?.[0])
   }
 
   const sidebarMissions = useMemo<readonly SidebarMission[]>(() => {
     const rows: SidebarMission[] = []
-    if (liveRun?.data !== undefined) {
+    for (const [key, run] of runs.entries()) {
+      // A run that is still starting has no missionId yet; it is listed under
+      // its pending key so the teammate reads as working from the first
+      // moment, not from the first receipt.
+      const missionId = run.data?.missionId ?? key
+      if (rows.some((row) => row.missionId === missionId)) continue
       rows.push({
-        missionId: liveRun.data.missionId,
-        // The live thread already shows the root's words for a continuation.
-        title: missionTitle(liveRun.prompt),
-        phase: running
-          ? 'running'
-          : liveRun.phase === 'completed' || liveRun.phase === 'failed' || liveRun.phase === 'cancelled'
-            ? liveRun.phase
-            : 'interrupted',
-        integrityIssueCount: liveRun.restoredMission?.integrityIssueCount ?? 0
+        missionId,
+        ...(run.teammateId === undefined ? {} : { ownerId: run.teammateId }),
+        // A run's thread already shows the root's words for a continuation.
+        title: missionTitle(run.prompt),
+        phase: liveRunIsActive(run) ? 'running' : isTerminal(run.phase) ? (run.phase as 'completed' | 'failed' | 'cancelled') : 'interrupted',
+        integrityIssueCount: run.restoredMission?.integrityIssueCount ?? 0
       })
     }
     for (const mission of history) {
@@ -643,7 +723,7 @@ export default function App(): ReactElement {
       })
     }
     return rows
-  }, [history, historyById, liveRun, running])
+  }, [history, historyById, runs])
 
   const noRuntimeReady =
     runtimeState.phase !== 'ready' || !runtimes.some((runtime) => runtime.ready && runtime.status === 'ready')
@@ -651,27 +731,32 @@ export default function App(): ReactElement {
   // Whose mission is on screen: the owner the host recorded, never the
   // composer's current target, which may already be someone else.
   const missionOwner =
-    liveRun?.data === undefined
+    liveRun === undefined
       ? undefined
-      : teammates.find((teammate) => teammate.teammateId === missionOwners[liveRun.data!.missionId])
+      : teammates.find((teammate) => teammate.teammateId === ownerOf(liveRun))
+  const shownRunId = liveRun?.data?.runId
+  const shownApprovals = approvals.filter((request) => request.runId === shownRunId)
+  const pendingApprovalsByOwner = new Map<string, number>()
+  for (const request of approvals) {
+    const run = runs.get(request.runId)
+    const owner = run === undefined ? undefined : ownerOf(run)
+    if (owner !== undefined) pendingApprovalsByOwner.set(owner, (pendingApprovalsByOwner.get(owner) ?? 0) + 1)
+  }
 
   return (
     <div className="lc-shell">
-      <TitleBar workspaceName="Local workspace" runningCount={running ? 1 : 0} swarm={swarm} />
+      <TitleBar workspaceName="Local workspace" runningCount={runningCount} swarm={swarm} />
       <div className="lc-body">
         <Sidebar
           runtimes={runtimes}
           missions={sidebarMissions}
           teammates={teammates}
           missionOwners={missionOwners}
-          selectedMissionId={liveRun?.data?.missionId}
+          selectedMissionId={liveRun?.data?.missionId ?? shownKey}
           selectedTeammateId={selectedTeammate?.teammateId}
           onSelectMission={openMission}
-          openLocked={running}
-          onSelectTeammate={(teammateId) => {
-            setSelectedTeammateId(teammateId)
-            setScreen('workroom')
-          }}
+          pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
+          onSelectTeammate={selectTeammate}
           onNewTeammate={() => {
             setTeammateError(undefined)
             setNewTeammateOpen(true)
@@ -707,7 +792,7 @@ export default function App(): ReactElement {
             teammates.length > 0 && runtimes.some((entry) => entry.ready && entry.status === 'ready') ? (
               <IdleTeammate
                 teammate={selectedTeammate ?? teammates[0]!}
-                canStart
+                canStart={busyRun === undefined}
                 onStarter={(prompt) => {
                   void startMission(prompt)
                 }}
@@ -743,7 +828,7 @@ export default function App(): ReactElement {
                               : liveRun.restored === true
                                 ? 'restored from the local ledger'
                                 : liveRun.phase
-                          } · read-only`}
+                          } · ${liveRun.data.sandbox === 'workspace-write' ? 'may edit the workspace' : 'read-only'}`}
                     </div>
                   </div>
                 </div>
@@ -764,7 +849,7 @@ export default function App(): ReactElement {
                 restoredMission={liveRun.restored === true ? liveRun.restoredMission : undefined}
                 error={liveRun.error}
                 errorIsPersistence={liveRun.errorIsPersistence === true}
-                approvals={approvals}
+                approvals={shownApprovals}
                 onDecide={decideApproval}
                 decidingIds={decidingIds}
                 cancelled={liveRun.phase === 'cancelled'}
@@ -823,6 +908,7 @@ export default function App(): ReactElement {
             onHandOff={(choice) => { void handOffMission(choice) }}
             handingOff={handingOff}
             teammateName={selectedTeammate?.name}
+            busyWith={busyRun === undefined ? undefined : (selectedTeammate?.name ?? 'This teammate')}
           />
           )}
         </main>

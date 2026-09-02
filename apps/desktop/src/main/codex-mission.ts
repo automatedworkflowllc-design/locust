@@ -29,6 +29,15 @@ import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
 const MAX_PROMPT_LENGTH = 8_000
+/**
+ * Missions run side by side now, one per teammate. The cap is a resource
+ * bound, not a product rule: each live mission is a provider process holding
+ * a bounded record queue and a ledger writer, and four of them is already
+ * more than one person can follow.
+ */
+export const MAX_LIVE_MISSIONS = 4
+/** Owner key for a mission that belongs to nobody; those still run one at a time. */
+const NOBODY = ''
 
 interface ActiveCodexMission {
   readonly runId: string
@@ -194,20 +203,25 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   const schedule = options.schedule ?? ((task: () => void) => {
     setImmediate(task)
   })
-  let active: ActiveCodexMission | undefined
-  let startingToken: symbol | undefined
+  /** Live missions by runId. */
+  const active = new Map<string, ActiveCodexMission>()
+  /** Owners with a start in flight, between the guard and activation. */
+  const starting = new Set<string>()
+  /** Each live mission's consume loop, so a handoff can wait for ITS run alone. */
+  const settling = new Map<string, Promise<void>>()
   let lifecycleVersion = 0
   let disposed = false
-  let interruptedMissionId: string | undefined
+  const interruptedMissionIds = new Set<string>()
   const startOperations = new Set<Promise<void>>()
   const consumeOperations = new Set<Promise<void>>()
+  const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.self.teammateId ?? NOBODY
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined
       ? undefined
       : createPeerExchange({ workroom: options.workroom, ledger: options.ledger })
 
   const clearActive = (candidate: ActiveCodexMission): void => {
-    if (active === candidate) active = undefined
+    if (active.get(candidate.runId) === candidate) active.delete(candidate.runId)
   }
 
   const consume = async (mission: ActiveCodexMission): Promise<void> => {
@@ -305,9 +319,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       resolveOperation = resolve
     })
     consumeOperations.add(operation)
+    settling.set(mission.runId, operation)
     schedule(() => {
       void consume(mission).finally(() => {
         consumeOperations.delete(operation)
+        settling.delete(mission.runId)
         resolveOperation()
       })
     })
@@ -337,7 +353,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         resolveStartOperation = resolve
       })
       startOperations.add(startOperation)
-      let token: symbol | undefined
+      const owner = ownerKeyOf(peer)
+      let claimed = false
       try {
         if (disposed) {
           return error(
@@ -351,16 +368,29 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             `Enter a mission between 1 and ${MAX_PROMPT_LENGTH.toLocaleString('en-US')} characters.`
           ) as CodexMissionStartResponse
         }
-        if (startingToken !== undefined || active !== undefined) {
+        // One live mission per teammate: a teammate is one identity doing one
+        // piece of work, and two runs sharing a name would share a workroom
+        // voice. Missions of nobody keep the old rule and run one at a time.
+        const ownerBusy =
+          starting.has(owner) || [...active.values()].some((mission) => ownerKeyOf(mission.peer) === owner)
+        if (ownerBusy) {
           return error(
             'RUN_ALREADY_ACTIVE',
-            'Wait for the active Codex mission to finish or cancel it first.'
+            peer === undefined
+              ? 'Wait for the active Codex mission to finish or cancel it first.'
+              : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
+          ) as CodexMissionStartResponse
+        }
+        if (starting.size + active.size >= MAX_LIVE_MISSIONS) {
+          return error(
+            'RUN_ALREADY_ACTIVE',
+            `Up to ${MAX_LIVE_MISSIONS} missions can run at once. Wait for one to finish or stop it first.`
           ) as CodexMissionStartResponse
         }
 
-        token = Symbol('codex-mission-start')
         const startLifecycleVersion = lifecycleVersion
-        startingToken = token
+        starting.add(owner)
+        claimed = true
         let runtimes: readonly RuntimeDiscovery[]
         try {
           runtimes = await options.discover()
@@ -532,7 +562,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           peer,
           transcript: createTranscriptTracker()
         }
-        active = mission
+        active.set(runId, mission)
         scheduleConsume(mission)
 
         // Marked delivered only now that the run is live, so a start that
@@ -554,24 +584,25 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
         }
       } finally {
-        if (token !== undefined && startingToken === token) startingToken = undefined
+        if (claimed) starting.delete(owner)
         startOperations.delete(startOperation)
         resolveStartOperation()
       }
     },
 
     cancel(runId: unknown): CodexMissionCancelResponse {
-      if (!validRunId(runId) || active === undefined || active.runId !== runId) {
+      const mission = validRunId(runId) ? active.get(runId) : undefined
+      if (mission === undefined) {
         return error(
           'RUN_NOT_ACTIVE',
           'That Codex mission is no longer active.'
         ) as CodexMissionCancelResponse
       }
-      active.controller.abort()
+      mission.controller.abort()
       return {
         ok: true,
         data: {
-          runId: active.runId,
+          runId: mission.runId,
           state: 'cancellation-requested'
         }
       }
@@ -584,13 +615,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       route: { readonly model?: string; readonly effort?: string },
       emit: (update: CodexMissionUpdate) => void
     ): Promise<MissionHandoffResponse> {
-      if (!validRunId(runId) || active === undefined || active.runId !== runId) {
+      const previous = validRunId(runId) ? active.get(runId) : undefined
+      if (previous === undefined) {
         return error(
           'RUN_NOT_ACTIVE',
           'That mission is no longer active, so there is nothing to hand off.'
         ) as MissionHandoffResponse
       }
-      const previous = active
       // Refuse a handoff to the runtime already running it. Stopping a run to
       // restart it on the same route would cost the user their progress and
       // buy nothing, and it is much more likely to be a misclick than a wish.
@@ -610,8 +641,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       // consume loop and report actions as unsettled that were about to
       // report back -- the checkpoint would be pessimistic, and the briefing
       // would tell the next runtime to re-verify work that had finished.
+      // THIS run's loop only. Other teammates' missions keep going, and a
+      // handoff that waited for them would stall until strangers finished.
       previous.controller.abort()
-      await Promise.allSettled([...consumeOperations])
+      await settling.get(previous.runId)
 
       let checkpoint
       try {
@@ -674,32 +707,37 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
     interrupt(): void {
       lifecycleVersion += 1
-      startingToken = undefined
-      // Remember which mission the host cut short. `interrupt()` is synchronous
-      // and the consume loop clears `active` once the aborted process settles,
-      // so by the time `dispose()` can await a durable write there is nothing
-      // left to name -- the id has to be captured here or not at all.
-      if (active !== undefined) interruptedMissionId = active.missionId
-      active?.controller.abort()
+      starting.clear()
+      // Remember which missions the host cut short. `interrupt()` is
+      // synchronous and the consume loops clear `active` once each aborted
+      // process settles, so by the time `dispose()` can await a durable write
+      // there is nothing left to name -- the ids are captured here or not at all.
+      for (const mission of active.values()) {
+        interruptedMissionIds.add(mission.missionId)
+        mission.controller.abort()
+      }
     },
 
     async dispose(): Promise<void> {
       disposed = true
       lifecycleVersion += 1
-      startingToken = undefined
-      if (active !== undefined) interruptedMissionId = active.missionId
-      active?.controller.abort()
+      starting.clear()
+      for (const mission of active.values()) {
+        interruptedMissionIds.add(mission.missionId)
+        mission.controller.abort()
+      }
       await Promise.allSettled([...startOperations, ...consumeOperations])
-      if (interruptedMissionId === undefined) return
-      try {
-        // Reconcile AFTER the run's own records have settled, so the checkpoint
-        // describes the finished ledger rather than racing it. On the next
-        // launch this is what says which actions were left in doubt.
-        await options.ledger.createCheckpoint(interruptedMissionId, 'shutdown')
-      } catch {
-        // Best effort by design. A mission that cannot be checkpointed still
-        // recovers from its events, and refusing to shut down over a bookkeeping
-        // write would be a worse failure than the missing record.
+      for (const missionId of interruptedMissionIds) {
+        try {
+          // Reconcile AFTER each run's own records have settled, so the
+          // checkpoint describes the finished ledger rather than racing it. On
+          // the next launch this is what says which actions were left in doubt.
+          await options.ledger.createCheckpoint(missionId, 'shutdown')
+        } catch {
+          // Best effort by design. A mission that cannot be checkpointed still
+          // recovers from its events, and refusing to shut down over a
+          // bookkeeping write would be a worse failure than the missing record.
+        }
       }
     }
   }

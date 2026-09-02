@@ -9,6 +9,11 @@ import { PixelFace } from './PixelFace.js'
 import { Icon } from './Icon.js'
 
 export interface SidebarMission {
+  /**
+   * Who the mission belongs to, when the shell knows before the host has
+   * recorded it -- a run that is still starting has no missionId to look up.
+   */
+  readonly ownerId?: string
   readonly missionId: string
   readonly title: string
   readonly phase: PublicRecoveredMission['phase'] | 'running'
@@ -31,7 +36,7 @@ export function Sidebar({
   selectedMissionId,
   selectedTeammateId,
   onSelectMission,
-  openLocked,
+  pendingApprovals,
   onSelectTeammate,
   onNewTeammate,
   onOpenSettings
@@ -44,14 +49,14 @@ export function Sidebar({
   /** Who the composer is addressing. Selecting a teammate makes them the next mission's owner. */
   readonly selectedTeammateId: string | undefined
   readonly onSelectMission: (missionId: string) => void
-  /** True while a run is live: other missions cannot be opened over it. */
-  readonly openLocked: boolean
+  /** Approvals waiting on each teammate's live run, by teammate id. */
+  readonly pendingApprovals: Readonly<Record<string, number>>
   readonly onSelectTeammate: (teammateId: string) => void
   readonly onNewTeammate: () => void
   readonly onOpenSettings: () => void
 }): ReactElement {
   const connected = connectedRuntimeCount(runtimes)
-  const unowned = missions.filter((mission) => missionOwners[mission.missionId] === undefined)
+  const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
   return (
     <nav className="lc-sidebar" aria-label="Workspace">
       <div className="lc-sidebar__brand">
@@ -78,11 +83,13 @@ export function Sidebar({
       <div className="lc-sidebar__scroll">
         {teammates.length > 0 && <div className="lc-sectionlabel">Teammates</div>}
         {teammates.map((teammate) => {
-          const owned = missions.filter((mission) => missionOwners[mission.missionId] === teammate.teammateId)
+          const owned = missions.filter(
+            (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
+          )
           const status = teammateStatusView({
             runtime: runtimes.find((entry) => entry.id === 'codex'),
             hasRunningMission: owned.some((mission) => mission.phase === 'running'),
-            pendingApprovals: 0,
+            pendingApprovals: pendingApprovals[teammate.teammateId] ?? 0,
             roleLabel: teammate.role
           })
           const selected = teammate.teammateId === selectedTeammateId
@@ -115,12 +122,6 @@ export function Sidebar({
                       className={`lc-teammate__mission${
                         mission.missionId === selectedMissionId ? ' is-active' : ''
                       }`}
-                      disabled={openLocked && mission.missionId !== selectedMissionId}
-                      title={
-                        openLocked && mission.missionId !== selectedMissionId
-                          ? 'Wait for the running mission to finish before opening another'
-                          : undefined
-                      }
                       onClick={() => onSelectMission(mission.missionId)}
                     >
                       <span
@@ -146,12 +147,6 @@ export function Sidebar({
                   key={mission.missionId}
                   className="lc-row"
                   aria-current={mission.missionId === selectedMissionId}
-                  disabled={openLocked && mission.missionId !== selectedMissionId}
-                  title={
-                    openLocked && mission.missionId !== selectedMissionId
-                      ? 'Wait for the running mission to finish before opening another'
-                      : undefined
-                  }
                   onClick={() => onSelectMission(mission.missionId)}
                 >
                   <span

@@ -65,10 +65,19 @@ continuation's own recorded prompt is the briefing), the prior run's events,
 the divider rebuilt from the route-switch checkpoint it resumed from, then
 this run. Live-verified by step 8 of `_smoke/workroom-smoke.mjs`.
 
-**P6b — Side-by-side missions.** The one-active-run limit. Per-mission process
-ownership and per-mission ledger writers already exist in shape; the service
-and the renderer both assume one live run. Only after P6a, because a second
-live thread needs somewhere to be shown.
+**P6b — Side-by-side missions. DONE 2026-09-01.** Missions run at once, one
+live mission per teammate (a mission of nobody's still runs alone), capped at
+four. The service keys live runs by runId, a handoff waits on ITS run's loop
+only, and interrupt/dispose stop and checkpoint every live run. The shell
+keeps every run it knows about in one map keyed by runId with one on screen;
+host updates are addressed by runId, so switching threads mid-run strands
+nothing. A run that is still starting is listed under its teammate from the
+first moment. The composer refuses a second mission for a teammate who is
+working, by name, and starting is per teammate rather than per workspace.
+Live-verified by `_smoke/side-by-side-smoke.mjs`: Atlas and Wren ran real
+Codex missions together ("2 running"), the thread switched between them
+while both were live, and both finished with their own receipts. The
+approve-each transport still runs one at a time.
 
 **Housekeeping.** The window/taskbar icon is the bare Locust mark on a
 transparent ground (`apps/desktop/resources/icon.png`, from

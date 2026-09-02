@@ -65,6 +65,12 @@ export interface ComposerProps {
   readonly handingOff: boolean
   /** Who the next mission is messaged to; the placeholder says so. */
   readonly teammateName: string | undefined
+  /**
+   * Set when the addressed teammate already has a live mission somewhere.
+   * Starting is refused for THEM, not for the workspace: another teammate's
+   * run being on screen does not block this one.
+   */
+  readonly busyWith: string | undefined
 }
 
 /**
@@ -98,7 +104,8 @@ export function Composer({
   onOpenRoutePicker,
   onHandOff,
   handingOff,
-  teammateName
+  teammateName,
+  busyWith
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
   const [modeOpen, setModeOpen] = useState(false)
@@ -110,10 +117,10 @@ export function Composer({
   // Both runtimes can own a mission now. Readiness still comes from discovery,
   // so a route that is installed but signed out cannot be started.
   const routeCanRun = route.runtime === 'codex' || route.runtime === 'claude'
-  const canStart = selectedReady && routeCanRun && !running && value.trim().length > 0
+  const canStart = selectedReady && routeCanRun && busyWith === undefined && value.trim().length > 0
 
-  const placeholder = running
-    ? 'A mission is running — stop it before starting another…'
+  const placeholder = busyWith !== undefined
+    ? `${busyWith} is still working — stop that mission or pick another teammate…`
     : !routeCanRun
       ? `The ${selected?.displayName ?? 'selected'} adapter is not finished — switch the route to run a mission…`
       : selectedReady

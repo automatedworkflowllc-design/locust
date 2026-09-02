@@ -1261,3 +1261,142 @@ describe('the workroom around a mission', () => {
     expect(start.mock.calls[0]?.[1]).toBe('Task.')
   })
 })
+
+describe('missions side by side', () => {
+  const ATLAS = { self: { teammateId: 'tm_atlas', name: 'Atlas', role: 'Research & Briefs' }, others: [] }
+  const WREN = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }
+  const NOVA = { self: { teammateId: 'tm_nova', name: 'Nova', role: 'Docs & QA' }, others: [] }
+  const KAI = { self: { teammateId: 'tm_kai', name: 'Kai', role: 'Custom' }, others: [] }
+  const ORION = { self: { teammateId: 'tm_orion', name: 'Orion', role: 'Custom' }, others: [] }
+
+  /** A run that lasts until its signal aborts, so several can be live at once. */
+  function openEnded() {
+    const signals: AbortSignal[] = []
+    const start = vi.fn((_spec, _prompt, options): RuntimeProcessRun => {
+      const signal = options?.signal
+      if (signal) signals.push(signal)
+      let release!: () => void
+      const released = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let finish!: (value: RuntimeProcessCompletion) => void
+      const done = new Promise<RuntimeProcessCompletion>((resolve) => {
+        finish = resolve
+      })
+      signal?.addEventListener('abort', () => {
+        release()
+        finish(completion({ exitCode: null, signal: 'SIGINT', recordCount: 1, cancelled: true }))
+      }, { once: true })
+      return {
+        records: {
+          async *[Symbol.asyncIterator]() {
+            yield { sequence: 1, raw: JSON.stringify({ type: 'thread.started', thread_id: 'thread-open' }) }
+            await released
+          },
+          drainAvailable: () => []
+        },
+        completion: done
+      }
+    }) satisfies RuntimeProcessRunner['start']
+    return { start, signals }
+  }
+
+  it('runs two teammates\u2019 missions at once, and stops each by its own run id', async () => {
+    const { start, signals } = openEnded()
+    const { service, scheduled } = scheduledService({ start })
+
+    const atlas = await service.start('Atlas works.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS)
+    const wren = await service.start('Wren works.', 'codex', 'ask', {}, () => undefined, undefined, WREN)
+    expect(atlas.ok && wren.ok).toBe(true)
+    if (!atlas.ok || !wren.ok) return
+    expect(atlas.data.runId).not.toBe(wren.data.runId)
+    while (scheduled.length > 0) scheduled.shift()!()
+
+    expect(service.cancel(atlas.data.runId)).toMatchObject({ ok: true })
+    expect(signals[0]?.aborted).toBe(true)
+    // Stopping one is not stopping the other.
+    expect(signals[1]?.aborted).toBe(false)
+    expect(service.cancel(wren.data.runId)).toMatchObject({ ok: true })
+    expect(signals[1]?.aborted).toBe(true)
+  })
+
+  it('refuses a second live mission for the same teammate, by name', async () => {
+    const { start } = openEnded()
+    const { service } = scheduledService({ start })
+    await service.start('Atlas works.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS)
+    await expect(
+      service.start('Atlas again.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS)
+    ).resolves.toEqual({
+      ok: false,
+      error: { code: 'RUN_ALREADY_ACTIVE', message: 'Atlas already has a mission running. Wait for it to finish or stop it first.' }
+    })
+  })
+
+  it('caps how many missions can be live at once, and says the number', async () => {
+    const { start } = openEnded()
+    const { service } = scheduledService({ start })
+    for (const peer of [ATLAS, WREN, NOVA, KAI]) {
+      await expect(service.start('Work.', 'codex', 'ask', {}, () => undefined, undefined, peer)).resolves.toMatchObject({ ok: true })
+    }
+    await expect(service.start('One too many.', 'codex', 'ask', {}, () => undefined, undefined, ORION)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'RUN_ALREADY_ACTIVE', message: expect.stringContaining('Up to 4 missions') }
+    })
+  })
+
+  it('hands off one teammate\u2019s run without waiting for another teammate\u2019s to finish', async () => {
+    const { start } = openEnded()
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async (missionId) => ({
+      schemaVersion: 1,
+      missionId,
+      runId: 'run_x',
+      epoch: 1,
+      reason: 'route-switch',
+      reconciledThroughSequence: 1,
+      settledActions: [],
+      unsettledActions: [],
+      resumeSafety: 'safe',
+      safetyReason: 'nothing in flight',
+      transcriptDigest: 'digest',
+      assistantSummary: '',
+      createdAt: NOW
+    }))
+    const scheduledTasks: Array<() => void> = []
+    let nextId = 0
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [
+        codexRuntime(),
+        {
+          ...codexRuntime(),
+          id: 'claude',
+          displayName: 'Claude Code',
+          executable: {
+            commandName: 'claude',
+            discoveredPath: process.platform === 'win32' ? 'C:\tools\claude.exe' : '/tools/claude',
+            executablePath: process.platform === 'win32' ? 'C:\tools\claude.exe' : '/tools/claude',
+            prefixArgs: [],
+            kind: 'native'
+          }
+        }
+      ],
+      runner: { start },
+      ledger: fakeLedger({ createCheckpoint }),
+      createId: () => String(++nextId),
+      now: () => new Date(NOW),
+      schedule: (task) => scheduledTasks.push(task)
+    })
+
+    const atlas = await service.start('Atlas works.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS)
+    const wren = await service.start('Wren works.', 'codex', 'ask', {}, () => undefined, undefined, WREN)
+    expect(atlas.ok && wren.ok).toBe(true)
+    if (!atlas.ok) return
+    while (scheduledTasks.length > 0) scheduledTasks.shift()!()
+
+    // Wren's run is still open-ended. A handoff that waited on every live
+    // loop would never return here.
+    const handed = await service.handOff(atlas.data.runId, 'claude', 'ask', {}, () => undefined)
+    expect(handed).toMatchObject({ ok: true })
+    expect(createCheckpoint).toHaveBeenCalledWith(atlas.data.missionId, 'route-switch')
+  })
+})

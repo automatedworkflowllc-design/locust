@@ -27,6 +27,27 @@ const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 
 const MUTATIONS = [
   {
+    file: MISSIONS,
+    name: 'a handoff waits for every live run, not its own',
+    from: '      await settling.get(previous.runId)',
+    to: '      await Promise.allSettled([...consumeOperations])',
+    expect: 'hands off one teammate’s run without waiting for another teammate’s to finish'
+  },
+  {
+    file: MISSIONS,
+    name: 'a teammate may run two missions at once',
+    from: '          starting.has(owner) || [...active.values()].some((mission) => ownerKeyOf(mission.peer) === owner)',
+    to: '          false',
+    expect: 'refuses a second live mission for the same teammate, by name'
+  },
+  {
+    file: MISSIONS,
+    name: 'the live-mission cap is never reached',
+    from: '        if (starting.size + active.size >= MAX_LIVE_MISSIONS) {',
+    to: '        if (starting.size + active.size >= 99) {',
+    expect: 'caps how many missions can be live at once, and says the number'
+  },
+  {
     file: VIEW,
     name: 'a reopened continuation shows the briefing as what the person said',
     from: "    const priorId = current.continuesFrom?.missionId",
@@ -295,7 +316,7 @@ const MUTATIONS = [
   {
     file: MISSIONS,
     name: 'the checkpoint is taken before the stopped run has settled',
-    from: '      previous.controller.abort()\n      await Promise.allSettled([...consumeOperations])',
+    from: '      previous.controller.abort()\n      await settling.get(previous.runId)',
     to: '      previous.controller.abort()',
     expect: 'reconciles only after the stopped run has settled'
   },
