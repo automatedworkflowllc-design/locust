@@ -393,6 +393,13 @@ export interface PublicRecoveredMission {
   readonly checkpoints: readonly PublicMissionCheckpoint[]
   /** Workroom messages this mission received or posted, in ledger order. */
   readonly peerMessages: readonly PublicPeerMessage[]
+  /**
+   * Set when this mission continued another after a route switch. The
+   * renderer uses it to draw the pair as one thread under a divider -- and to
+   * show the ROOT mission's prompt, because this mission's own recorded prompt
+   * is the machine-written briefing.
+   */
+  readonly continuesFrom?: { readonly missionId: string; readonly checkpointEpoch: number }
 }
 
 export type MissionHistoryResponse =

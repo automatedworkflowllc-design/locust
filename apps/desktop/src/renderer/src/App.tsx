@@ -34,6 +34,7 @@ import type { SidebarMission } from './components/Sidebar.js'
 import { Thread } from './components/Thread.js'
 import { AgentAvatar } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
+import { rootMission, stitchedHandoff } from './missionView.js'
 import { shortMissionId } from './status.js'
 
 /**
@@ -572,12 +573,55 @@ export default function App(): ReactElement {
 
   const runtimes = runtimeState.phase === 'ready' ? runtimeState.runtimes : []
   const running = liveRunIsActive(liveRun)
+  const historyById = useMemo(
+    () => new Map(history.map((mission) => [mission.missionId, mission] as const)),
+    [history]
+  )
+
+  // Re-read history whenever a run settles, so a finished mission stays in
+  // the sidebar after the next one starts instead of vanishing until restart.
+  const livePhase = liveRun?.phase
+  useEffect(() => {
+    if (livePhase !== 'completed' && livePhase !== 'failed' && livePhase !== 'cancelled') return
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .getMissionHistory()
+      .then((response) => {
+        if (response.ok) setHistory(response.data.missions)
+      })
+      .catch(() => undefined)
+  }, [livePhase])
+
+  /**
+   * Show a recovered mission's thread. Refused while a run is live: the live
+   * run's updates are addressed to the thread on screen, and swapping it out
+   * would strand them. A continuation is drawn as one thread -- the root's
+   * prompt, the prior run's events, the divider rebuilt from the checkpoint,
+   * then this run -- because that is what the durable record says happened.
+   */
+  const openMission = (missionId: string): void => {
+    if (running) return
+    if (liveRun?.data?.missionId === missionId) return
+    const mission = historyById.get(missionId)
+    if (mission === undefined) return
+    const restored = restoredLiveRun(mission)
+    const handoff = stitchedHandoff(mission, historyById)
+    setApprovals([])
+    setDecidingIds([])
+    setLiveRun({
+      ...restored,
+      prompt: rootMission(mission, historyById).prompt,
+      ...(handoff === undefined ? {} : { handoff })
+    })
+  }
 
   const sidebarMissions = useMemo<readonly SidebarMission[]>(() => {
     const rows: SidebarMission[] = []
     if (liveRun?.data !== undefined) {
       rows.push({
         missionId: liveRun.data.missionId,
+        // The live thread already shows the root's words for a continuation.
         title: missionTitle(liveRun.prompt),
         phase: running
           ? 'running'
@@ -591,13 +635,15 @@ export default function App(): ReactElement {
       if (rows.some((row) => row.missionId === mission.missionId)) continue
       rows.push({
         missionId: mission.missionId,
-        title: missionTitle(mission.prompt),
+        // A continuation's own prompt is the briefing; name it by the words
+        // the person typed at the start of the chain.
+        title: missionTitle(rootMission(mission, historyById).prompt),
         phase: mission.phase,
         integrityIssueCount: mission.integrityIssueCount
       })
     }
     return rows
-  }, [history, liveRun, running])
+  }, [history, historyById, liveRun, running])
 
   const noRuntimeReady =
     runtimeState.phase !== 'ready' || !runtimes.some((runtime) => runtime.ready && runtime.status === 'ready')
@@ -620,7 +666,8 @@ export default function App(): ReactElement {
           missionOwners={missionOwners}
           selectedMissionId={liveRun?.data?.missionId}
           selectedTeammateId={selectedTeammate?.teammateId}
-          onSelectMission={() => undefined}
+          onSelectMission={openMission}
+          openLocked={running}
           onSelectTeammate={(teammateId) => {
             setSelectedTeammateId(teammateId)
             setScreen('workroom')
@@ -637,7 +684,10 @@ export default function App(): ReactElement {
               missions={history}
               teammates={teammates}
               missionOwners={missionOwners}
-              onOpen={() => setScreen('workroom')}
+              onOpen={(missionId) => {
+                openMission(missionId)
+                setScreen('workroom')
+              }}
             />
           ) : screen === 'teammates' ? (
             <TeammatesScreen

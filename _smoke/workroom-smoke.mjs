@@ -388,6 +388,35 @@ try {
   check('the mission is recorded as Wren\u2019s', wrenLedger !== undefined && roster2.missionOwners[wrenLedger.missionId] === 'tm_wren')
   check('the ledger sequence is contiguous through the peer records',
     (wrenLedger?.records ?? []).every((r, i) => r.ledgerSequence === i + 1))
+
+  say('8. Atlas\u2019s finished mission is still in the sidebar, and reopens')
+  // What Colin saw watching the first run: Wren's thread replaced Atlas's and
+  // Atlas's row was gone. History was only read at startup, and nothing could
+  // be reopened. Both must hold now.
+  const reopened = await cdp.eval(`(async () => {
+    let row
+    for (let i = 0; i < 40; i += 1) {
+      row = [...document.querySelectorAll('.lc-teammate__mission, .lc-sidebar .lc-row')]
+        .find(b => b.tagName === 'BUTTON' && b.innerText.includes('Read package.json'))
+      if (row) break
+      await new Promise(r => setTimeout(r, 250))
+    }
+    if (!row) return JSON.stringify({ found: false })
+    const disabled = row.disabled
+    row.click()
+    await new Promise(r => setTimeout(r, 400))
+    const bubble = (document.querySelector('.lc-bubble') || { innerText: '' }).innerText
+    const peer = (document.querySelector('.lc-peer') || { innerText: '' }).innerText
+    return JSON.stringify({ found: true, disabled, bubble, peer })
+  })()`)
+  const reopenState = JSON.parse(reopened)
+  check('Atlas\u2019s mission row is still listed after Wren\u2019s ran', reopenState.found === true)
+  if (reopenState.found) {
+    const peerText = String(reopenState.peer).replace(/\s+/g, ' ')
+    check('the row is clickable once nothing is running', reopenState.disabled === false)
+    check('clicking it shows Atlas\u2019s own prompt', reopenState.bubble.trim() === ATLAS_PROMPT, reopenState.bubble.slice(0, 80))
+    check('the reopened thread carries the exchange with Wren', /1 message with\s*Wren/i.test(peerText), peerText)
+  }
 } finally {
   child.kill()
   await sleep(500)

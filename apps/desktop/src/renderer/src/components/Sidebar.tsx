@@ -31,6 +31,7 @@ export function Sidebar({
   selectedMissionId,
   selectedTeammateId,
   onSelectMission,
+  openLocked,
   onSelectTeammate,
   onNewTeammate,
   onOpenSettings
@@ -43,6 +44,8 @@ export function Sidebar({
   /** Who the composer is addressing. Selecting a teammate makes them the next mission's owner. */
   readonly selectedTeammateId: string | undefined
   readonly onSelectMission: (missionId: string) => void
+  /** True while a run is live: other missions cannot be opened over it. */
+  readonly openLocked: boolean
   readonly onSelectTeammate: (teammateId: string) => void
   readonly onNewTeammate: () => void
   readonly onOpenSettings: () => void
@@ -112,6 +115,12 @@ export function Sidebar({
                       className={`lc-teammate__mission${
                         mission.missionId === selectedMissionId ? ' is-active' : ''
                       }`}
+                      disabled={openLocked && mission.missionId !== selectedMissionId}
+                      title={
+                        openLocked && mission.missionId !== selectedMissionId
+                          ? 'Wait for the running mission to finish before opening another'
+                          : undefined
+                      }
                       onClick={() => onSelectMission(mission.missionId)}
                     >
                       <span
@@ -137,6 +146,12 @@ export function Sidebar({
                   key={mission.missionId}
                   className="lc-row"
                   aria-current={mission.missionId === selectedMissionId}
+                  disabled={openLocked && mission.missionId !== selectedMissionId}
+                  title={
+                    openLocked && mission.missionId !== selectedMissionId
+                      ? 'Wait for the running mission to finish before opening another'
+                      : undefined
+                  }
                   onClick={() => onSelectMission(mission.missionId)}
                 >
                   <span

@@ -27,6 +27,20 @@ const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'a reopened continuation shows the briefing as what the person said',
+    from: "    const priorId = current.continuesFrom?.missionId",
+    to: "    const priorId = undefined",
+    expect: 'shows the words the person typed, not the briefing the host wrote'
+  },
+  {
+    file: VIEW,
+    name: 'a reopened divider forgets what was left in doubt',
+    from: "    unsettledCount: checkpoint?.unsettledActions.length ?? 0,",
+    to: "    unsettledCount: 0,",
+    expect: 'rebuilds the divider from the route-switch checkpoint it resumed from'
+  },
+  {
     file: APPROVALS,
     name: 'an approval-mode run is sent the bare prompt, never the briefing',
     from: "        input: [{ type: 'text', text: runtimePrompt }]",

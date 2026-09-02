@@ -33,12 +33,13 @@ app.whenReady().then(async () => {
     transparent: true,
     webPreferences: { offscreen: true, sandbox: true, contextIsolation: true }
   })
-  // Rounded dark tile, the mark inset so it reads at taskbar size. The tile
-  // colour is the shell's window ground (#090a0c), the mark stays white.
+  // Just the mark, as large as the square allows, on nothing: no tile, no
+  // ground. Colin asked for it to read like the other marks in the taskbar,
+  // which are bare glyphs, and the locust is wide, so it fills the width.
   const html = `<!doctype html><html><head><style>
     html, body { margin: 0; width: ${size}px; height: ${size}px; background: transparent; overflow: hidden; }
-    .tile { width: ${size}px; height: ${size}px; border-radius: ${Math.round(size * 0.22)}px; background: #090a0c;
-            display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: ${Math.round(size * 0.14)}px; }
+    .tile { width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;
+            box-sizing: border-box; padding: ${Math.round(size * 0.03)}px; }
     svg { width: 100%; height: 100%; }
   </style></head><body><div class="tile">${svg}</div></body></html>`
   const page = join(OUT_DIR, '.icon.html')

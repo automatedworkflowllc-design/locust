@@ -86,7 +86,15 @@ export function publicRecoveredMission(
         name: action.name
       }))
     })),
-    peerMessages: publicPeerMessages(mission, workroomMessages)
+    peerMessages: publicPeerMessages(mission, workroomMessages),
+    ...(mission.metadata.continuesFrom === undefined
+      ? {}
+      : {
+          continuesFrom: {
+            missionId: mission.metadata.continuesFrom.missionId,
+            checkpointEpoch: mission.metadata.continuesFrom.checkpointEpoch
+          }
+        })
   }
 }
 

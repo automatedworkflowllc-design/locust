@@ -54,22 +54,27 @@ and proved nothing starts without a click.
 
 ## Next, in order
 
-**P6a — Reopen a past mission.** Colin watched the smoke and saw Atlas's
-thread replaced by Wren's the moment Wren's run started, with no way back.
-The data is durable (channel file, both ledgers), but selecting a mission in
-the sidebar is a no-op. Selecting one should show its recovered thread --
-including its peer cards and, for a handoff pair, the continuation stitched
-under one divider. Small, and it is the first thing a person reaches for once
-two teammates have threads.
+**P6a — Reopen a past mission. DONE 2026-09-01.** Colin watched the smoke and
+saw Atlas's thread replaced by Wren's the moment Wren's run started, and
+Atlas's row gone from the sidebar. Two causes: history was read once at
+startup, and selecting a mission was a no-op. Now history re-reads whenever a
+run settles, sidebar and Missions-screen rows open a recovered thread (with
+its peer cards) when nothing is running, and are disabled with a reason while
+something is. A continuation opens stitched: the ROOT mission's prompt (the
+continuation's own recorded prompt is the briefing), the prior run's events,
+the divider rebuilt from the route-switch checkpoint it resumed from, then
+this run. Live-verified by step 8 of `_smoke/workroom-smoke.mjs`.
 
 **P6b — Side-by-side missions.** The one-active-run limit. Per-mission process
 ownership and per-mission ledger writers already exist in shape; the service
 and the renderer both assume one live run. Only after P6a, because a second
 live thread needs somewhere to be shown.
 
-**Housekeeping.** The window/taskbar icon is the Locust mark now
-(`apps/desktop/resources/icon.png`, from `_tools/render-icon.cjs`); a packaged
-build will need an `.ico` and a packaging config, which do not exist yet.
+**Housekeeping.** The window/taskbar icon is the bare Locust mark on a
+transparent ground (`apps/desktop/resources/icon.png`, from
+`_tools/render-icon.cjs`; Colin asked for no tile, as large as the square
+allows). A packaged build will need an `.ico` and a packaging config, which
+do not exist yet.
 
 ## Rules carried into all of it
 

@@ -1,6 +1,6 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
-import type { PublicPeerMessage } from '../../shared/ipc.js'
+import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
 
 /**
@@ -485,4 +485,60 @@ export function peerGroups(messages: readonly PublicPeerMessage[]): readonly Pee
     messages: [...group.messages].sort((left, right) => Date.parse(left.at) - Date.parse(right.at)),
     received: group.received
   }))
+}
+
+/**
+ * The mission a continuation chain started from. A handed-off mission's own
+ * recorded prompt is the briefing the host wrote, so the words a person
+ * actually typed live on the FIRST mission of the chain. Bounded walk: a
+ * cycle in hand-edited ledgers must not spin forever.
+ */
+export function rootMission(
+  mission: PublicRecoveredMission,
+  byId: ReadonlyMap<string, PublicRecoveredMission>
+): PublicRecoveredMission {
+  let current = mission
+  for (let hops = 0; hops < 32; hops += 1) {
+    const priorId = current.continuesFrom?.missionId
+    if (priorId === undefined) return current
+    const prior = byId.get(priorId)
+    if (prior === undefined) return current
+    current = prior
+  }
+  return current
+}
+
+export interface StitchedHandoff {
+  readonly from: PublicRecoveredMission['runtime']
+  readonly to: PublicRecoveredMission['runtime']
+  readonly at: string | undefined
+  readonly unsettledCount: number
+  readonly omittedBriefing: readonly string[]
+  readonly priorEvents: readonly NormalizedRuntimeEvent[]
+}
+
+/**
+ * The divider for a recovered continuation, rebuilt from the durable record.
+ * The unsettled count is the prior mission's route-switch checkpoint -- the
+ * same number the live divider showed -- and not a recount, so a reopened
+ * thread says what it said at the time. What the briefing omitted was never
+ * recorded, so it is reported as nothing rather than guessed.
+ */
+export function stitchedHandoff(
+  mission: PublicRecoveredMission,
+  byId: ReadonlyMap<string, PublicRecoveredMission>
+): StitchedHandoff | undefined {
+  const link = mission.continuesFrom
+  if (link === undefined) return undefined
+  const prior = byId.get(link.missionId)
+  if (prior === undefined) return undefined
+  const checkpoint = prior.checkpoints.find((entry) => entry.epoch === link.checkpointEpoch)
+  return {
+    from: prior.runtime,
+    to: mission.runtime,
+    at: new Date(mission.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+    unsettledCount: checkpoint?.unsettledActions.length ?? 0,
+    omittedBriefing: [],
+    priorEvents: prior.events
+  }
 }

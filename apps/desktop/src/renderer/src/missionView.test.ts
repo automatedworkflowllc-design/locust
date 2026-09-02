@@ -1,4 +1,6 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+
+import type { PublicRecoveredMission } from '../../shared/ipc.js'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -8,6 +10,8 @@ import {
   buildThread,
   cancellationSummary,
   peerGroups,
+  rootMission,
+  stitchedHandoff,
   railLabel
 } from './missionView.js'
 
@@ -285,5 +289,76 @@ describe('peer messages in the thread', () => {
     expect(groups[0]?.messages.map((message) => message.messageId)).toEqual(['wm_1', 'wm_2'])
     expect(groups[0]?.received).toBe(true)
     expect(groups[1]?.received).toBe(false)
+  })
+})
+
+describe('reopening a handed-off mission', () => {
+  function mission(overrides: Partial<PublicRecoveredMission>): PublicRecoveredMission {
+    return {
+      missionId: 'mission_1',
+      runId: 'run_1',
+      prompt: 'Inspect the workspace.',
+      runtime: 'codex',
+      model: 'account-default',
+      requestedRouteId: 'codex',
+      resolvedRouteId: 'codex-account:default',
+      cliVersion: null,
+      createdAt: '2026-09-01T15:00:00.000Z',
+      lastUpdatedAt: '2026-09-01T15:00:00.000Z',
+      phase: 'completed',
+      events: [],
+      eventCount: 0,
+      eventsTruncated: false,
+      integrityIssueCount: 0,
+      sandbox: 'read-only',
+      checkpoints: [],
+      peerMessages: [],
+      ...overrides
+    }
+  }
+  const first = mission({
+    missionId: 'mission_1',
+    runtime: 'codex',
+    checkpoints: [
+      {
+        epoch: 1,
+        reason: 'route-switch',
+        resumeSafety: 'approval-required',
+        safetyReason: 'one action never reported back',
+        createdAt: '2026-09-01T15:01:00.000Z',
+        unsettledActions: [{ itemId: 'tool_1', name: 'shell' }]
+      }
+    ]
+  })
+  const second = mission({
+    missionId: 'mission_2',
+    runtime: 'claude',
+    prompt: 'You are continuing work that another agent (Codex) started...',
+    createdAt: '2026-09-01T15:02:00.000Z',
+    continuesFrom: { missionId: 'mission_1', checkpointEpoch: 1 }
+  })
+  const byId = new Map([
+    ['mission_1', first],
+    ['mission_2', second]
+  ])
+
+  it('shows the words the person typed, not the briefing the host wrote', () => {
+    expect(rootMission(second, byId).prompt).toBe('Inspect the workspace.')
+    expect(rootMission(first, byId)).toBe(first)
+  })
+
+  it('rebuilds the divider from the route-switch checkpoint it resumed from', () => {
+    const stitched = stitchedHandoff(second, byId)
+    expect(stitched).toMatchObject({ from: 'codex', to: 'claude', unsettledCount: 1, omittedBriefing: [] })
+    expect(stitchedHandoff(first, byId)).toBeUndefined()
+  })
+
+  it('stops walking a chain whose earlier mission is missing, and a cyclic one', () => {
+    const orphan = mission({ missionId: 'mission_3', continuesFrom: { missionId: 'mission_gone', checkpointEpoch: 1 } })
+    expect(rootMission(orphan, new Map([['mission_3', orphan]]))).toBe(orphan)
+    expect(stitchedHandoff(orphan, new Map([['mission_3', orphan]]))).toBeUndefined()
+    const a = mission({ missionId: 'a', continuesFrom: { missionId: 'b', checkpointEpoch: 1 } })
+    const b = mission({ missionId: 'b', continuesFrom: { missionId: 'a', checkpointEpoch: 1 } })
+    expect(rootMission(a, new Map([['a', a], ['b', b]]))).toBeDefined()
   })
 })
