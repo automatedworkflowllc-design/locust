@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { MissionLedger } from '@teammate/mission-store'
+import type { MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 import {
@@ -10,7 +10,7 @@ import {
   protocolDecisionFor
 } from './app-server-mission.js'
 import type { AppServerProcess } from './app-server-mission.js'
-import type { MissionApprovalRequest } from '../shared/ipc.js'
+import type { CodexMissionUpdate, MissionApprovalRequest } from '../shared/ipc.js'
 
 const NOW = '2026-09-01T10:00:00.000Z'
 
@@ -88,10 +88,11 @@ function fakeProcess() {
   }
 }
 
-function service(overrides: { ledger?: MissionLedger } = {}) {
+function service(overrides: { ledger?: MissionLedger; workroom?: Workroom } = {}) {
   const fake = fakeProcess()
   const approvals: MissionApprovalRequest[] = []
   const events: unknown[] = []
+  const updates: CodexMissionUpdate[] = []
   let nextId = 0
   const instance = createAppServerMissionService({
     workspacePath: 'C:\\work',
@@ -100,10 +101,12 @@ function service(overrides: { ledger?: MissionLedger } = {}) {
     spawn: () => fake.process,
     emitApproval: (request) => approvals.push(request),
     emitEvent: (_runId, _missionId, event) => events.push(event),
+    emitUpdate: (update) => updates.push(update),
+    ...(overrides.workroom === undefined ? {} : { workroom: overrides.workroom }),
     createId: () => String(++nextId),
     now: () => new Date(NOW)
   })
-  return { instance, fake, approvals, events }
+  return { instance, fake, approvals, events, updates }
 }
 
 describe('approval descriptions', () => {
@@ -280,5 +283,98 @@ describe('durability', () => {
     const harness = service()
     await harness.instance.start('First.')
     await expect(harness.instance.start('Second.')).rejects.toThrow(/already running/)
+  })
+})
+
+describe('the workroom around an approval-mode mission', () => {
+  const WREN = { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }
+  const ATLAS = { teammateId: 'tm_atlas', name: 'Atlas', role: 'Research & Briefs' }
+  const PEER = { self: WREN, others: [ATLAS] }
+
+  function fakeWorkroom(unread: readonly WorkroomMessage[] = []) {
+    const posted: { text: string; to: unknown }[] = []
+    const delivered: string[][] = []
+    const workroom: Workroom = {
+      post: async (input) => {
+        posted.push({ text: input.text, to: input.to })
+        return { messageId: 'wm_out', sequence: 1, from: input.from, to: input.to, text: input.text, postedAt: NOW }
+      },
+      unread: async () => ({ messages: unread, remaining: 0 }),
+      markDelivered: async (ids) => {
+        delivered.push([...ids])
+      },
+      read: async () => ({ messages: [], deliveries: [], issues: [] }),
+      flush: async () => undefined
+    }
+    return { workroom, posted, delivered }
+  }
+
+  const waiting: WorkroomMessage = {
+    messageId: 'wm_1',
+    sequence: 1,
+    from: { teammateId: 'tm_atlas', name: 'Atlas', missionId: 'mission_a' },
+    to: { teammateId: 'tm_wren', name: 'Wren' },
+    text: 'pnpm check runs everything.',
+    postedAt: NOW
+  }
+
+  it("briefs an approval-mode mission with its teammates' waiting messages", async () => {
+    const { workroom, delivered } = fakeWorkroom([waiting])
+    const links: unknown[] = []
+    const harness = service({
+      workroom,
+      ledger: fakeLedger({ appendPeerLinks: async (_missionId, appended) => { links.push(...appended) } })
+    })
+
+    const mission = await harness.instance.start('Which command runs the checks?', PEER)
+
+    const turn = harness.fake.parsed().find((message) => message.method === 'turn/start')
+    const text = ((turn?.params as { input: { text: string }[] }).input[0]?.text) ?? ''
+    expect(text.startsWith('Which command runs the checks?')).toBe(true)
+    expect(text).toContain('CLAIMS from other agents')
+    expect(text).toContain('pnpm check runs everything.')
+    expect(links).toEqual([{ direction: 'received', messageId: 'wm_1', peerTeammateId: 'tm_atlas', occurredAt: NOW }])
+    expect(delivered).toEqual([['wm_1']])
+    expect(mission.peerMessages.map((entry) => entry.messageId)).toEqual(['wm_1'])
+  })
+
+  it('shares from an approval-mode run once it completes, and not before', async () => {
+    const { workroom, posted } = fakeWorkroom()
+    const harness = service({ workroom })
+    await harness.instance.start('Find the check command.', PEER)
+
+    harness.fake.push({
+      jsonrpc: '2.0',
+      method: 'item/completed',
+      params: {
+        threadId: 't',
+        item: { id: 'answer', type: 'agentMessage', text: 'Found it.\n\n<locust-share to="Atlas">\npnpm check is the gate.\n</locust-share>' }
+      }
+    })
+    await vi.waitFor(() => {
+      expect(harness.events.length).toBeGreaterThan(0)
+    })
+    // The message alone is not a completed run; a half-finished claim is not shared.
+    expect(posted).toEqual([])
+
+    harness.fake.push({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 't', turn: {} } })
+    await vi.waitFor(() => {
+      expect(posted).toHaveLength(1)
+    })
+    expect(posted[0]).toEqual({ text: 'pnpm check is the gate.', to: { teammateId: 'tm_atlas', name: 'Atlas' } })
+    await vi.waitFor(() => {
+      expect(harness.updates.filter((update) => update.kind === 'peer-message')).toHaveLength(1)
+    })
+  })
+
+  it('refuses to start on messages the ledger cannot record', async () => {
+    const { workroom, delivered } = fakeWorkroom([waiting])
+    const harness = service({
+      workroom,
+      ledger: fakeLedger({ appendPeerLinks: async () => { throw new Error('disk full') } })
+    })
+    await expect(harness.instance.start('Task.', PEER)).rejects.toThrow('could not be recorded')
+    expect(harness.fake.parsed().some((message) => message.method === 'turn/start')).toBe(false)
+    expect(delivered).toEqual([])
   })
 })

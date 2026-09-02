@@ -27,6 +27,20 @@ const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 
 const MUTATIONS = [
   {
+    file: APPROVALS,
+    name: 'an approval-mode run is sent the bare prompt, never the briefing',
+    from: "        input: [{ type: 'text', text: runtimePrompt }]",
+    to: "        input: [{ type: 'text', text: prompt }]",
+    expect: "briefs an approval-mode mission with its teammates' waiting messages"
+  },
+  {
+    file: APPROVALS,
+    name: 'an approval-mode run shares before it has completed',
+    from: '    if (!wasComplete && mission.transcript.completed && mission.peer !== undefined && peerExchange !== undefined) {',
+    to: '    if (mission.peer !== undefined && peerExchange !== undefined) {',
+    expect: 'shares from an approval-mode run once it completes, and not before'
+  },
+  {
     file: BRIEFING,
     name: 'a received message is quoted with its share tags intact',
     from: '  const body = sanitizeInbound(message.text).replace(/\\n/g, \'\\n  \')',

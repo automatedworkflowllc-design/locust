@@ -136,6 +136,35 @@ describe('the workroom channel', () => {
     await expect(postFromAtlas(workroom, 'after the break')).rejects.toThrow('Workroom is unavailable')
   })
 
+  it('refuses a self-addressed record on read, not only on write', async () => {
+    const root = await temporaryRoot()
+    const workroom = workroomAt(root)
+    // The writer refuses these too, so this plants one by hand: a reader that
+    // trusted the writer would deliver it to its own author as a colleague's
+    // claim.
+    await writeFile(
+      join(root, 'workroom.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: WORKROOM_SCHEMA_VERSION,
+        recordType: 'workroom.message',
+        sequence: 1,
+        occurredAt: NOW,
+        message: {
+          messageId: 'wm_self',
+          from: { ...ATLAS, missionId: 'mission_a1' },
+          to: ATLAS,
+          text: 'note to self',
+          postedAt: NOW
+        }
+      })}
+`
+    )
+    const snapshot = await workroom.read()
+    expect(snapshot.messages).toEqual([])
+    expect(snapshot.issues.map((entry) => entry.code)).toEqual(['invalid-record'])
+    await expect(workroom.unread('tm_atlas', 5)).rejects.toThrow('Workroom is unavailable')
+  })
+
   it('refuses a delivery record for a message the file does not hold', async () => {
     const root = await temporaryRoot()
     const workroom = workroomAt(root)

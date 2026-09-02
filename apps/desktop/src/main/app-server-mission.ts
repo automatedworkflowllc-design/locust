@@ -7,13 +7,19 @@ import type {
   JsonValue,
   RuntimeDiscovery
 } from '@teammate/runtime-adapters'
-import type { MissionLedger } from '@teammate/mission-store'
+import type { MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
+import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type {
+  CodexMissionUpdate,
   MissionApprovalAnswer,
   MissionApprovalKind,
-  MissionApprovalRequest
+  MissionApprovalRequest,
+  PublicPeerMessage
 } from '../shared/ipc.js'
+import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
+import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
+import type { MissionPeerContext } from './workroom-briefing.js'
 
 /**
  * A mission driven over `codex app-server`.
@@ -44,6 +50,10 @@ export interface AppServerMissionOptions {
   readonly spawn: (executablePath: string, args: readonly string[]) => AppServerProcess
   readonly emitApproval: (request: MissionApprovalRequest) => void
   readonly emitEvent: (runId: string, missionId: string, event: unknown) => void
+  /** Non-event updates: what the mission's work posted to teammates, or could not. */
+  readonly emitUpdate?: (update: CodexMissionUpdate) => void
+  /** The teammate channel. Without it, missions here belong to nobody's exchange. */
+  readonly workroom?: Workroom
   readonly createId?: () => string
   readonly now?: () => Date
 }
@@ -52,10 +62,16 @@ export interface AppServerMission {
   readonly runId: string
   readonly missionId: string
   readonly runtimeThreadId: string | undefined
+  /** Workroom messages quoted into the prompt, oldest first. */
+  readonly peerMessages: readonly PublicPeerMessage[]
+  readonly peerDeliveryFailed: boolean
 }
 
+/** Thrown when the ledger refuses to record the messages a mission was shown. */
+export class PeerRecordError extends Error {}
+
 export interface AppServerMissionService {
-  start(prompt: string): Promise<AppServerMission>
+  start(prompt: string, peer?: MissionPeerContext): Promise<AppServerMission>
   decide(answer: MissionApprovalAnswer): boolean
   cancel(): void
   dispose(): Promise<void>
@@ -143,17 +159,43 @@ export function createAppServerMissionService(
 
   let process: AppServerProcess | undefined
   let client: AppServerClient | undefined
-  let active: { runId: string; missionId: string } | undefined
+  let active:
+    | {
+        runId: string
+        missionId: string
+        peer: MissionPeerContext | undefined
+        transcript: TranscriptTracker
+      }
+    | undefined
   let normalizer: ReturnType<typeof createAppServerEventNormalizer> | undefined
   const approvals = new Map<string, Pending>()
   let disposed = false
+  const peerExchange: PeerExchange | undefined =
+    options.workroom === undefined
+      ? undefined
+      : createPeerExchange({ workroom: options.workroom, ledger: options.ledger })
 
   const persistAndEmit = async (events: readonly unknown[]): Promise<void> => {
     if (active === undefined || events.length === 0) return
+    const mission = active
     // Persist-before-emit, exactly as the exec path does. A receipt the user
     // has seen must already be on disk.
-    await options.ledger.appendEvents(active.missionId, events as never)
-    for (const event of events) options.emitEvent(active.runId, active.missionId, event)
+    await options.ledger.appendEvents(mission.missionId, events as never)
+    // Tracked only once durable, so a share is read from what the ledger holds.
+    const wasComplete = mission.transcript.completed
+    mission.transcript.track(events as readonly NormalizedRuntimeEvent[])
+    for (const event of events) options.emitEvent(mission.runId, mission.missionId, event)
+    // Same rule as the exec path: only a run that finished on its own terms
+    // speaks for its teammate, and exactly once.
+    if (!wasComplete && mission.transcript.completed && mission.peer !== undefined && peerExchange !== undefined) {
+      const text = mission.transcript.latestFinal
+      if (text !== undefined) {
+        await peerExchange.share(
+          { runId: mission.runId, missionId: mission.missionId, peer: mission.peer, text },
+          (update) => options.emitUpdate?.(update)
+        )
+      }
+    }
   }
 
   return {
@@ -161,7 +203,7 @@ export function createAppServerMissionService(
       return approvals.size
     },
 
-    async start(prompt: string): Promise<AppServerMission> {
+    async start(prompt: string, peer?: MissionPeerContext): Promise<AppServerMission> {
       if (disposed) throw new Error('The mission service is shutting down.')
       if (active !== undefined) throw new Error('A mission is already running.')
 
@@ -174,6 +216,19 @@ export function createAppServerMissionService(
       const runId = `run_${createId()}`
       const missionId = `mission_${createId()}`
       const createdAt = now().toISOString()
+
+      // Same shape as the exec path: the person's words are the recorded
+      // prompt; what the runtime is sent adds the waiting messages and the
+      // share form, and the ledger names the delivered messages by id.
+      let runtimePrompt = prompt
+      let delivered: readonly WorkroomMessage[] = []
+      let peerDeliveryFailed = false
+      if (peer !== undefined && peerExchange !== undefined) {
+        const prepared = await peerExchange.prepare(prompt, peer)
+        runtimePrompt = prepared.runtimePrompt
+        delivered = prepared.delivered
+        peerDeliveryFailed = prepared.failed
+      }
 
       await options.ledger.createMission({
         missionId,
@@ -192,7 +247,20 @@ export function createAppServerMissionService(
         createdAt
       })
 
-      active = { runId, missionId }
+      if (peerExchange !== undefined && delivered.length > 0) {
+        try {
+          await peerExchange.recordReceived(missionId, delivered, createdAt)
+        } catch {
+          await options.ledger.appendHostFailure(missionId, {
+            code: 'runtime-start-failed',
+            message: 'The messages this mission was shown could not be recorded in the local ledger.',
+            occurredAt: now().toISOString()
+          }).catch(() => undefined)
+          throw new PeerRecordError('The messages this mission was shown could not be recorded in the durable local ledger.')
+        }
+      }
+
+      active = { runId, missionId, peer, transcript: createTranscriptTracker() }
       normalizer = createAppServerEventNormalizer({
         runId,
         missionId,
@@ -273,10 +341,19 @@ export function createAppServerMissionService(
       await rpc.request('turn/start', {
         threadId,
         approvalPolicy: 'untrusted',
-        input: [{ type: 'text', text: prompt }]
+        input: [{ type: 'text', text: runtimePrompt }]
       })
 
-      return { runId, missionId, runtimeThreadId: normalizer.runtimeThreadId }
+      // Marked delivered only now that the turn is live.
+      if (peerExchange !== undefined) await peerExchange.markDelivered(missionId, delivered)
+
+      return {
+        runId,
+        missionId,
+        runtimeThreadId: normalizer.runtimeThreadId,
+        peerMessages: delivered.map((message) => publicPeerMessage(message, 'received')),
+        peerDeliveryFailed
+      }
     },
 
     decide(answer: MissionApprovalAnswer): boolean {

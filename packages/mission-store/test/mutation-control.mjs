@@ -168,7 +168,7 @@ const MUTATIONS = [
     file: WORKROOM,
     from: '    || from.teammateId === to.teammateId\n  ) return undefined',
     to: '  ) return undefined',
-    expect: 'refuses a self-addressed message, an oversized one, and control characters'
+    expect: 'refuses a self-addressed record on read, not only on write'
   },
   {
     name: 'a second delivery of the same message is written',

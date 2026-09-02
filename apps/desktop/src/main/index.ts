@@ -12,7 +12,7 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
-import { createAppServerMissionService } from './app-server-mission.js'
+import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
 import { createModelCatalog } from './model-catalog.js'
 import { createTeammateStore } from './teammate-store.js'
 import { readMissionHistory } from './mission-history.js'
@@ -82,6 +82,11 @@ const createWindow = (
     titleBarStyle: 'hidden',
     titleBarOverlay: false,
     backgroundColor: '#090a0c',
+    // The Locust mark, rasterised by `_tools/render-icon.cjs`. Resolved from
+    // the build output, which sits two levels below the app directory both in
+    // dev and in the unpackaged build; a packaged build will carry its own
+    // `.ico` when packaging exists.
+    icon: join(__dirname, '../../resources/icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       sandbox: true,
@@ -222,7 +227,14 @@ if (!ownsSingleInstanceLock) {
         if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
           target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, { kind: 'event', runId, missionId, event })
         }
-      }
+      },
+      emitUpdate: (update) => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
+        }
+      },
+      workroom
     })
 
     ipcMain.handle(MODEL_CATALOG_CHANNEL, async (event) => {
@@ -415,12 +427,10 @@ if (!ownsSingleInstanceLock) {
         if (typeof prompt !== 'string' || prompt.trim().length === 0) {
           return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const
         }
+        const peer = await peerContextFor(payload.teammateId)
         try {
-          const mission = await appServerMissions.start(prompt)
-          // The approval transport does not take part in the workroom yet:
-          // the mission is still the teammate's, but it is shown no messages
-          // and shares none, and the receipt says so with an empty list.
-          await assignOwner(await peerContextFor(payload.teammateId).then((peer) => peer?.self.teammateId), mission.missionId)
+          const mission = await appServerMissions.start(prompt, peer)
+          await assignOwner(peer?.self.teammateId, mission.missionId)
           return {
             ok: true,
             data: {
@@ -431,11 +441,14 @@ if (!ownsSingleInstanceLock) {
               resolvedRouteId: 'codex-app-server:default',
               cliVersion: null,
               sandbox: 'workspace-write',
-              peerMessages: [],
-              peerDeliveryFailed: false
+              peerMessages: mission.peerMessages,
+              peerDeliveryFailed: mission.peerDeliveryFailed
             }
           } as const
-        } catch {
+        } catch (error) {
+          if (error instanceof PeerRecordError) {
+            return { ok: false, error: { code: 'PERSISTENCE_FAILED', message: error.message } } as const
+          }
           return {
             ok: false,
             error: {
