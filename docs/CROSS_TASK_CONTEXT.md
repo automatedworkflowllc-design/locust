@@ -67,9 +67,9 @@ Run the complete validation suite with:
 pnpm check
 ```
 
-Last verified on 2026-08-31 after the durable-ledger milestone: production build and all TypeScript checks passed with 63/63 tests, and the Electron app boots cleanly with the ledger wired in. The `LIVE_UI_OK` smoke from earlier that day ran on the pre-hardening build; re-run the live smoke when Codex quota allows.
+Last verified on 2026-09-01: production build and every workspace TypeScript check pass, with 350 tests and 97 mutations caught across three mutation controls. Nine live smokes in `_smoke/` drive the built app against the real CLIs over CDP; they need a signed-in provider and a desktop session, so they are run by hand rather than by `pnpm check`.
 
-The next milestone is the reconciled checkpoint record, then Claude runtime parity — see `docs/ROADMAP.md`, which also records the 2026-08-31 owner direction (Cursor x Grok Bot thesis, Claude obviously selectable, teammate workroom, simple avatar-first UI with model choice on the main surface). Contract fixtures must remain authentication-free.
+Read `docs/REMAINING-PLAN.md` first — it is the ordered record of what landed and what is still open, and each entry says which parts were verified live and which were not. In short, as of this date: both runtimes own real missions, missions run side by side one per teammate, teammates exchange findings through the durable workroom, a running mission can be handed between runtimes from a reconciled checkpoint, and per-action approvals run on the app-server transport. Still open: connections, mission deletion and retention, the curated OmniRoute gateway with Ask/Automatic fallback, and packaging. Contract fixtures must remain authentication-free.
 
 ## Important implementation invariants
 
