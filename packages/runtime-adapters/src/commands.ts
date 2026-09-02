@@ -327,6 +327,10 @@ export function createCursorPrintCommand(
     "--output-format",
     "stream-json",
     "--stream-partial-output",
+    // Measured: without this a headless run in a directory Cursor has not seen
+    // stops on a "Workspace Trust Required" prompt nobody can answer. The
+    // host chose this workspace, so trusting it for this run is the truth.
+    "--trust",
     "--workspace",
     options.workspacePath,
   ];

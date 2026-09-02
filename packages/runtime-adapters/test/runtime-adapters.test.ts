@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   assertSafeRuntimeCommand,
@@ -181,6 +182,20 @@ describe("installed runtime discovery", () => {
     expect(cursor?.readiness).toBe("ready");
   });
 
+  it("reads a Gemini sign-in that Google then refused, which exits 0 with the refusal in its text", async () => {
+    const refusal = readFileSync(new URL("./fixtures/gemini-ineligible-tier.txt", import.meta.url), "utf8");
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "version") return { exitCode: 0, stdout: "0.58.0", stderr: "" };
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: GEMINI_HELP, stderr: "" };
+        return { exitCode: 0, stdout: "No previous sessions found for this project.", stderr: refusal };
+      },
+    };
+    const [gemini] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("gemini") }))
+      .filter((entry) => entry.id === "gemini");
+    expect(gemini?.readiness).toBe("authentication-required");
+  });
+
   it("reads Gemini CLI's sign-in state from its session listing's exit code", async () => {
     const answers = new Map<number, RuntimeReadiness>([[41, "authentication-required"], [0, "ready"]]);
     for (const [exitCode, expected] of answers) {
@@ -207,7 +222,7 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     expect(spec.runtime).toBe("cursor");
     expect(spec.stdin).toBe("prompt");
     expect(spec.args).toEqual([
-      "--print", "--output-format", "stream-json", "--stream-partial-output", "--workspace", workspacePath, "--mode", "plan",
+      "--print", "--output-format", "stream-json", "--stream-partial-output", "--trust", "--workspace", workspacePath, "--mode", "plan",
     ]);
   });
 

@@ -92,6 +92,10 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
     // cheapest command the CLI has that touches its credentials.
     readinessArgs: ["--list-sessions"],
     requiredFeatures: GEMINI_REQUIRED_FEATURES,
+    // Also measured, after a sign-in Google then refused: the same command
+    // prints "Error authenticating: IneligibleTierError ..." and exits 0. So
+    // the exit code is not the whole answer here either.
+    readyWhen: (result) => !/error authenticating|please set an auth method/i.test(`${result.stdout}\n${result.stderr}`),
   },
   {
     id: "omniroute",

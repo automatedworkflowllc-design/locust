@@ -23,8 +23,51 @@ const COMMANDS = join(ROOT, 'src', 'commands.ts')
 const CLAUDE_EVENTS = join(ROOT, 'src', 'claude-events.ts')
 const LOCATOR = join(ROOT, 'src', 'path-locator.ts')
 const DISCOVERY = join(ROOT, 'src', 'discovery.ts')
+const CURSOR_EVENTS = join(ROOT, 'src', 'cursor-events.ts')
 
 const MUTATIONS = [
+  {
+    file: CURSOR_EVENTS,
+    name: "a complete Cursor message appends to its fragments instead of replacing them",
+    from: '          operation: "replace",\n          text: boundedMessageText(text),\n          final: true,',
+    to: '          operation: "append",\n          text: boundedMessageText(text),\n          final: true,',
+    expect: 'rebuilds each message from its fragments and lets the complete message replace, not double, them'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: 'every Cursor message shares one item, so the answer overwrites what came before',
+    from: '      messageIndex += 1;\n',
+    to: '',
+    expect: 'keeps the two messages apart: the answer does not overwrite what was said before the tool ran'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: 'a rejected Cursor shell command is reported as completed',
+    from: '      const rejected = isObject(result.rejected);',
+    to: '      const rejected = false;',
+    expect: 'reports a rejected shell command as a tool that failed, never as one that completed'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: "Cursor's reasoning text is written into the ledger",
+    from: '      const scrubbed = { type, subtype: parsed.subtype, text: "[redacted]" };',
+    to: '      const scrubbed = parsed;',
+    expect: 'shows reasoning as a step and never lets its text into the ledger'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: 'a clean exit without a result record is a success',
+    from: '      if (!sawResult || completion.exitCode !== 0) {',
+    to: '      if (completion.exitCode !== 0) {',
+    expect: 'is a failure when the CLI exits clean without ever saying it finished'
+  },
+  {
+    file: DISCOVERY,
+    name: "a Gemini sign-in Google refused is reported ready",
+    from: "    readyWhen: (result) => !/error authenticating|please set an auth method/i.test(`${result.stdout}\\n${result.stderr}`),\n",
+    to: '',
+    expect: 'reads a Gemini sign-in that Google then refused, which exits 0 with the refusal in its text'
+  },
   {
     file: DISCOVERY,
     name: 'a logged-out Cursor Agent is reported ready',
@@ -235,6 +278,7 @@ function runSuite() {
 const originals = new Map([
   [LOCATOR, readFileSync(LOCATOR, 'utf8')],
   [DISCOVERY, readFileSync(DISCOVERY, 'utf8')],
+  [CURSOR_EVENTS, readFileSync(CURSOR_EVENTS, 'utf8')],
   [CLAUDE_EVENTS, readFileSync(CLAUDE_EVENTS, 'utf8')],
   [COMMANDS, readFileSync(COMMANDS, 'utf8')],
   [CLIENT, readFileSync(CLIENT, 'utf8')],

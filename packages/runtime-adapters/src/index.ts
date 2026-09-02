@@ -110,3 +110,5 @@ export {
   CURSOR_REQUIRED_FEATURES,
   GEMINI_REQUIRED_FEATURES,
 } from "./commands.js";
+export { createCursorEventNormalizer } from "./cursor-events.js";
+export type { CursorEventNormalizer, CursorInvocationContext } from "./cursor-events.js";
