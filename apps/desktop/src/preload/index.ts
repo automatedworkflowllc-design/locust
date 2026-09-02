@@ -7,6 +7,8 @@ import {
   MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HANDOFF_CHANNEL,
   APP_INFO_CHANNEL,
+  MISSION_PRUNE_CHANNEL,
+  MISSION_STORAGE_CHANNEL,
   MISSION_DELETE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
@@ -31,6 +33,9 @@ import type {
   MissionHandoffRequest,
   MissionHandoffResponse,
   AppInfo,
+  MissionPruneRequest,
+  MissionPruneResponse,
+  StorageReportResponse,
   MissionDeleteResponse,
   MissionHistoryResponse,
   ModelCatalogResponse,
@@ -77,6 +82,9 @@ const desktopApi: DesktopApi = {
   toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   close: () => ipcRenderer.send('window:close'),
   getAppInfo: () => ipcRenderer.invoke(APP_INFO_CHANNEL) as Promise<AppInfo>,
+  readStorageReport: () => ipcRenderer.invoke(MISSION_STORAGE_CHANNEL) as Promise<StorageReportResponse>,
+  pruneMissions: (request: MissionPruneRequest) =>
+    ipcRenderer.invoke(MISSION_PRUNE_CHANNEL, request) as Promise<MissionPruneResponse>,
   getLocalRuntimes: () => ipcRenderer.invoke(RUNTIME_DISCOVERY_CHANNEL) as Promise<RuntimeDiscoveryResponse>,
   getMissionHistory: () => ipcRenderer.invoke(MISSION_HISTORY_CHANNEL) as Promise<MissionHistoryResponse>,
   deleteMission: (missionId: string) =>

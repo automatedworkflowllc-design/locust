@@ -23,6 +23,55 @@ const WORKROOM = join(ROOT, 'src', 'workroom.ts')
 const MUTATIONS = [
   {
     file: INDEX,
+    name: 'the history is dated by the file timestamp rather than the record',
+    from: '        const updatedAt = parsed.mission === undefined ? undefined : Date.parse(parsed.mission.lastUpdatedAt)',
+    to: '        const updatedAt = Date.now()',
+    expect: 'counts the missions and their bytes, and dates the oldest by the record a prune would judge'
+  },
+  {
+    file: INDEX,
+    name: 'a preview deletes the files it is only supposed to describe',
+    from: '        if (options.dryRun === true) {\n          deleted.push(missionId)\n          continue\n        }\n',
+    to: '',
+    expect: 'previews exactly what it would delete, and deletes nothing'
+  },
+  {
+    file: INDEX,
+    name: 'a prune deletes the earlier turns of a conversation it is keeping',
+    from: '          if (candidates.has(cursor)) {\n            candidates.delete(cursor)\n            keptForContinuity.add(cursor)\n          }\n',
+    to: '',
+    expect: 'keeps an old mission that a kept conversation continues from'
+  },
+  {
+    file: INDEX,
+    name: 'a prune walks back only one turn, not the whole conversation',
+    from: '          cursor = parents.get(cursor)\n        }\n      }',
+    to: '          cursor = undefined\n        }\n      }',
+    expect: 'keeps the whole chain behind a kept mission, not just its parent'
+  },
+  {
+    file: INDEX,
+    name: 'a prune deletes a mission the caller said was running',
+    from: '        if (running.has(entry.missionId)) {',
+    to: '        if (false) {',
+    expect: 'never deletes a mission the caller says is running'
+  },
+  {
+    file: INDEX,
+    name: 'a prune treats an unreadable file as old enough to delete',
+    from: '        const old = entry.readable\n',
+    to: '        const old = true || entry.readable\n',
+    expect: 'leaves a file it cannot read alone rather than guessing its age'
+  },
+  {
+    file: INDEX,
+    name: 'a prune accepts a cutoff that is not a timestamp',
+    from: "      const cutoff = Date.parse(requireTimestamp(options.before, 'before'))",
+    to: '      const cutoff = Date.parse(options.before)',
+    expect: 'refuses a cutoff that is not a timestamp'
+  },
+  {
+    file: INDEX,
     name: 'a pre-v7 file may name a runtime no writer of its version knew',
     from: "  if (schemaVersion < 7 && candidate.runtime !== 'codex' && candidate.runtime !== 'claude') {\n    return undefined\n  }\n",
     to: '',

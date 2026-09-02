@@ -10,6 +10,8 @@ import type {
   MissionRouteSummary,
   PublicRecoveredMission,
   PublicRuntimeStatus,
+  PublicStorageReport,
+  MissionPruneResponse,
   MissionApprovalDecision,
   MissionApprovalRequest,
   MissionMode,
@@ -228,6 +230,32 @@ function missionTitle(prompt: string): string {
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
   const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean }>()
+  const [storage, setStorage] = useState<PublicStorageReport>()
+
+  /** Ask the host what a prune would do. Nothing is deleted by this. */
+  const previewPrune = async (days: number): Promise<MissionPruneResponse> => {
+    const bridge = window.desktop
+    if (!bridge) {
+      return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The host is not available.' } }
+    }
+    return bridge.pruneMissions({ olderThanDays: days, dryRun: true })
+  }
+
+  const prune = async (days: number): Promise<MissionPruneResponse> => {
+    const bridge = window.desktop
+    if (!bridge) {
+      return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The host is not available.' } }
+    }
+    const response = await bridge.pruneMissions({ olderThanDays: days, dryRun: false })
+    if (response.ok) {
+      // The history just changed. Re-read both from the host rather than
+      // adjusting counts here, where they could drift from the ledger.
+      const [next, listed] = await Promise.all([bridge.readStorageReport(), bridge.getMissionHistory()])
+      if (next.ok) setStorage(next.data)
+      if (listed.ok) setHistory(listed.data.missions)
+    }
+    return response
+  }
   /** Every run the shell knows about, keyed by runId (or a pending key until the receipt arrives). */
   const [runs, setRuns] = useState<RunMap>(() => new Map())
   /** Which run's thread is on screen; undefined shows the addressed teammate's idle state. */
@@ -310,6 +338,13 @@ export default function App(): ReactElement {
         return current
       })
     })
+
+    void bridge
+      .readStorageReport()
+      .then((response) => {
+        if (active && response.ok) setStorage(response.data)
+      })
+      .catch(() => undefined)
 
     void bridge
       .getAppInfo()
@@ -914,7 +949,14 @@ export default function App(): ReactElement {
               onRemove={removeTeammate}
             />
           ) : screen === 'settings' ? (
-            <SettingsScreen runtimes={runtimes} ledgerPath={undefined} build={build} />
+            <SettingsScreen
+              runtimes={runtimes}
+              ledgerPath={undefined}
+              build={build}
+              storage={storage}
+              onPreviewPrune={previewPrune}
+              onPrune={prune}
+            />
           ) : liveRun === undefined ? (
             // A teammate with nothing running gets their own capability-led
             // state; with no teammates at all, the runtime story comes first.

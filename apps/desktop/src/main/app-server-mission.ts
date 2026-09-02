@@ -83,6 +83,8 @@ export interface AppServerMissionService {
   has(runId: string): boolean
   /** Whether this transport owns a live run of that mission. */
   hasMission(missionId: string): boolean
+  /** The missions this transport is running right now. */
+  liveMissionIds(): readonly string[]
   dispose(): Promise<void>
   readonly pendingApprovalCount: number
 }
@@ -250,6 +252,10 @@ export function createAppServerMissionService(
 
     hasMission(missionId: string): boolean {
       return [...runs.values()].some((run) => run.missionId === missionId)
+    },
+
+    liveMissionIds(): readonly string[] {
+      return [...runs.values()].map((run) => run.missionId)
     },
 
     async start(

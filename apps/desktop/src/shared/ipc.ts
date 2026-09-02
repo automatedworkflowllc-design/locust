@@ -10,6 +10,43 @@ export const CODEX_MISSION_UPDATE_CHANNEL = 'codex-mission:update'
 export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 export const MISSION_DELETE_CHANNEL = 'mission:delete'
 export const APP_INFO_CHANNEL = 'app:info'
+export const MISSION_STORAGE_CHANNEL = 'mission:storage'
+export const MISSION_PRUNE_CHANNEL = 'mission:prune'
+
+/** What the local mission history costs on this machine. */
+export interface PublicStorageReport {
+  readonly missionCount: number
+  readonly byteTotal: number
+  readonly oldestUpdatedAt?: string
+}
+
+export type StorageReportResponse =
+  | { readonly ok: true; readonly data: PublicStorageReport }
+  | { readonly ok: false; readonly error: { readonly code: 'STORAGE_UNAVAILABLE'; readonly message: string } }
+
+export interface MissionPruneRequest {
+  /** Missions untouched for longer than this are candidates. */
+  readonly olderThanDays: number
+  /** Ask what would happen. The preview and the deletion are one code path. */
+  readonly dryRun: boolean
+}
+
+export interface MissionPruneData {
+  readonly deleted: readonly string[]
+  /** Old missions kept because a mission that survives continues from them. */
+  readonly keptForContinuity: readonly string[]
+  /** Old missions kept because they are running right now. */
+  readonly keptAsRunning: readonly string[]
+  /** Whether this was a preview. A preview deleted nothing. */
+  readonly previewed: boolean
+}
+
+export type MissionPruneResponse =
+  | { readonly ok: true; readonly data: MissionPruneData }
+  | {
+      readonly ok: false
+      readonly error: { readonly code: 'PRUNE_REFUSED' | 'INTERNAL_ERROR'; readonly message: string }
+    }
 
 /** What this build is, so a person can say which one they are running. */
 export interface AppInfo {
@@ -482,6 +519,8 @@ export interface DesktopApi {
   toggleMaximize(): void
   close(): void
   getAppInfo(): Promise<AppInfo>
+  readStorageReport(): Promise<StorageReportResponse>
+  pruneMissions(request: MissionPruneRequest): Promise<MissionPruneResponse>
   getLocalRuntimes(): Promise<RuntimeDiscoveryResponse>
   getMissionHistory(): Promise<MissionHistoryResponse>
   /** Remove a finished mission's record for good. Refused while it is live. */

@@ -94,6 +94,8 @@ export interface CodexMissionService {
   ): Promise<MissionHandoffResponse>
   /** Whether this transport owns a live run of that mission. */
   hasMission(missionId: string): boolean
+  /** The missions this transport is running right now. */
+  liveMissionIds(): readonly string[]
   interrupt(): void
   dispose(): Promise<void>
 }
@@ -799,6 +801,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
     hasMission(missionId: string): boolean {
       return [...active.values()].some((mission) => mission.missionId === missionId)
+    },
+
+    liveMissionIds(): readonly string[] {
+      return [...active.values()].map((mission) => mission.missionId)
     },
 
     interrupt(): void {

@@ -46,6 +46,8 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
     },
     appendPeerLinks: async () => undefined,
     deleteMission: async () => true,
+    storageReport: async () => ({ missionCount: 0, byteTotal: 0 }),
+    pruneMissions: async () => ({ deleted: [], keptForContinuity: [], keptAsRunning: [] }),
     getMission: async () => undefined,
     listMissions: async () => ({ missions: [], issues: [] }),
     flush: async () => undefined,

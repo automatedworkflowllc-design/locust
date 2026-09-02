@@ -302,3 +302,49 @@ export function capRouteRows<TRow extends { readonly group: string; readonly tag
   }
   return { rows: kept, hiddenByGroup: hidden }
 }
+
+/** Bytes, in the largest unit that keeps the number readable. */
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return 'unknown'
+  if (bytes < 1024) return `${String(Math.round(bytes))} B`
+  const units = ['KB', 'MB', 'GB']
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value < 10 ? value.toFixed(1) : String(Math.round(value))} ${units[unit]}`
+}
+
+/**
+ * What a prune preview says out loud, before anyone agrees to it.
+ *
+ * The count of what would go is never the whole story: some old missions are
+ * kept because a conversation being kept continues from them, and some
+ * because they are running. A preview that mentioned only the deletions would
+ * read as though the rest had been missed.
+ */
+export function prunePreviewSummary(preview: {
+  readonly deleted: readonly string[]
+  readonly keptForContinuity: readonly string[]
+  readonly keptAsRunning: readonly string[]
+}): string {
+  const missions = (count: number): string => `${String(count)} mission${count === 1 ? '' : 's'}`
+  if (preview.deleted.length === 0) {
+    const because: string[] = []
+    if (preview.keptForContinuity.length > 0) {
+      because.push(`${missions(preview.keptForContinuity.length)} still part of a conversation you are keeping`)
+    }
+    if (preview.keptAsRunning.length > 0) because.push(`${missions(preview.keptAsRunning.length)} running right now`)
+    return because.length === 0
+      ? 'Nothing is old enough to delete.'
+      : `Nothing would be deleted: ${because.join(', and ')}.`
+  }
+  const kept: string[] = []
+  if (preview.keptForContinuity.length > 0) {
+    kept.push(`${missions(preview.keptForContinuity.length)} kept as part of a conversation you are keeping`)
+  }
+  if (preview.keptAsRunning.length > 0) kept.push(`${missions(preview.keptAsRunning.length)} kept because they are running`)
+  return `Delete ${missions(preview.deleted.length)} for good${kept.length === 0 ? '' : `, with ${kept.join(' and ')}`}.`
+}

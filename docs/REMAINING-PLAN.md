@@ -271,8 +271,42 @@ runtime rather than 217, and 14 rows with no cap line when "grok" is typed.
 reconnection" hint in the reference; nothing behind it exists. Either a real
 screen over discovered MCP servers or the row must not be drawn.
 
-**Mission deletion and retention.** Ledgers only ever grow. A person cannot
-remove a mission or its workroom messages, and the store scans every file.
+**Retention. DONE 2026-09-02, live-verified.** Settings now states what the
+local history costs -- how many missions, how many bytes, and how far back it
+goes -- and offers to delete finished missions older than 30 days, 90 days or
+a year.
+
+Nothing is ever pruned automatically. A durable local record is this app's
+whole claim, and deleting one on a timer, with nobody present and no undo,
+would quietly take history no one agreed to lose. So the first press only
+ASKS, and what comes back is the host's own plan, computed by the same code
+that does the deleting -- a separate preview implementation could disagree
+with the real one, and the disagreement would only ever be discovered after
+the files were gone. A mutation proves the preview deletes nothing.
+
+The rule that made this worth building carefully: a reply is a NEW mission
+that continues an older one, so an unguarded "delete everything older than a
+month" would gut a conversation you are still in. The prune walks back from
+everything that survives and keeps the whole chain behind it, not just the
+immediate parent. Both of those have mutations. It also never deletes a
+mission the transports report as running, and leaves a file it cannot read
+alone rather than guessing its age.
+
+Two things the host decides rather than the window: the cutoff, computed from
+the host's own clock (a window sends a number of days, never an instant, so
+it cannot send a date in the future and take everything), and which missions
+are live. Anything but an explicit `dryRun: false` is a preview, so a
+malformed request can never be the thing that deletes a history.
+
+`_smoke/retention-smoke.mjs` drives it in the built app on a seeded ledger
+and starts no mission, so it costs no provider quota. It caught one real
+defect: the report dated the history by the FILE's timestamp while the prune
+judges by the record, so a copied ledger directory would have shown "oldest:
+today" over missions from months ago -- exactly the number someone reads
+while deciding to delete. Both now read the record.
+
+Still open here: workroom messages are not pruned with their missions, and
+the store still scans every mission file to list.
 
 **Swarm decisions.** The reference leaves two open: a quota warning before
 engaging, and whether swarm survives restart (it does today, as a workspace

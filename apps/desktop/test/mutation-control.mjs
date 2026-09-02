@@ -32,6 +32,20 @@ const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 const MUTATIONS = [
   {
     file: STATUS,
+    name: 'a prune preview counts the deletions and stays quiet about what it kept',
+    from: "  return `Delete ${missions(preview.deleted.length)} for good${kept.length === 0 ? '' : `, with ${kept.join(' and ')}`}.`",
+    to: '  return `Delete ${missions(preview.deleted.length)} for good.`',
+    expect: 'states the count that would go, and names everything held back'
+  },
+  {
+    file: STATUS,
+    name: 'a prune that would do nothing does not say why',
+    from: "    return because.length === 0\n      ? 'Nothing is old enough to delete.'\n      : `Nothing would be deleted: ${because.join(', and ')}.`",
+    to: "    return 'Nothing is old enough to delete.'",
+    expect: 'says why nothing would go, rather than just saying nothing'
+  },
+  {
+    file: STATUS,
     name: 'a long picker group is truncated without saying so',
     from: '    hidden.set(row.group, (hidden.get(row.group) ?? 0) + 1)\n  }\n  return { rows: kept, hiddenByGroup: hidden }',
     to: '  }\n  return { rows: kept, hiddenByGroup: hidden }',

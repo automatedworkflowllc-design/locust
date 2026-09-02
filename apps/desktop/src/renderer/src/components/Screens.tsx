@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
-import { missionPhaseView, routeRowStatus } from '../status.js'
+import type {
+  MissionPruneResponse,
+  PublicRecoveredMission,
+  PublicRuntimeStatus,
+  PublicStorageReport,
+  PublicTeammate
+} from '../../../shared/ipc.js'
+import { formatBytes, missionPhaseView, prunePreviewSummary, routeRowStatus } from '../status.js'
 import type { IntegrationLevel } from '../status.js'
 import { PixelFace } from './PixelFace.js'
 
@@ -11,6 +17,8 @@ export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
 const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
   codex: 'live',
   claude: 'live',
+  cursor: 'live',
+  gemini: 'planned',
   omniroute: 'planned'
 }
 
@@ -195,15 +203,123 @@ export function TeammatesScreen({
  * fallback needs route switching, and swarm needs a route that reports whether
  * it honours effort. Neither is rendered as a working toggle that does nothing.
  */
+/** The ages offered. Long by default: history is the point of the ledger. */
+const RETENTION_CHOICES = [30, 90, 365] as const
+
+/**
+ * Deleting old missions in bulk, in two deliberate steps.
+ *
+ * Nothing is ever pruned automatically, and the first press only ASKS. What
+ * comes back is the host's own plan, computed by the same code that does the
+ * deleting, and it names what would be kept as well as what would go. Only
+ * then does a second, differently-worded press carry it out.
+ */
+function RetentionControl({
+  report,
+  onPreview,
+  onPrune
+}: {
+  readonly report: PublicStorageReport | undefined
+  readonly onPreview: (days: number) => Promise<MissionPruneResponse>
+  readonly onPrune: (days: number) => Promise<MissionPruneResponse>
+}): ReactElement {
+  const [days, setDays] = useState<number>(90)
+  const [state, setState] = useState<
+    | { readonly kind: 'idle' }
+    | { readonly kind: 'working' }
+    | { readonly kind: 'preview'; readonly days: number; readonly summary: string; readonly count: number }
+    | { readonly kind: 'done'; readonly summary: string }
+    | { readonly kind: 'error'; readonly message: string }
+  >({ kind: 'idle' })
+
+  const ask = async (chosen: number): Promise<void> => {
+    setState({ kind: 'working' })
+    const response = await onPreview(chosen)
+    if (!response.ok) {
+      setState({ kind: 'error', message: response.error.message })
+      return
+    }
+    setState({
+      kind: 'preview',
+      days: chosen,
+      summary: prunePreviewSummary(response.data),
+      count: response.data.deleted.length
+    })
+  }
+
+  const confirm = async (chosen: number): Promise<void> => {
+    setState({ kind: 'working' })
+    const response = await onPrune(chosen)
+    if (!response.ok) {
+      setState({ kind: 'error', message: response.error.message })
+      return
+    }
+    const gone = response.data.deleted.length
+    setState({
+      kind: 'done',
+      summary: `Deleted ${String(gone)} mission${gone === 1 ? '' : 's'}.`
+    })
+  }
+
+  return (
+    <div className="lc-retention">
+      <div className="lc-retention__row">
+        <span className="lc-settings__note">Delete finished missions older than</span>
+        {RETENTION_CHOICES.map((choice) => (
+          <button
+            key={choice}
+            type="button"
+            className={`lc-chip${choice === days ? ' is-on' : ''}`}
+            aria-pressed={choice === days}
+            onClick={() => {
+              setDays(choice)
+              setState({ kind: 'idle' })
+            }}
+          >
+            {choice === 365 ? '1 year' : `${String(choice)} days`}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="lc-button"
+          disabled={state.kind === 'working' || report?.missionCount === 0}
+          onClick={() => void ask(days)}
+        >
+          {state.kind === 'working' ? 'Working…' : 'Review'}
+        </button>
+      </div>
+      {state.kind === 'preview' && (
+        <div className="lc-retention__plan">
+          <span className="lc-settings__note">{state.summary}</span>
+          {state.count > 0 && (
+            <button type="button" className="lc-button lc-button--danger" onClick={() => void confirm(state.days)}>
+              Delete them for good
+            </button>
+          )}
+        </div>
+      )}
+      {state.kind === 'done' && <span className="lc-settings__note">{state.summary}</span>}
+      {state.kind === 'error' && <span className="lc-settings__note lc-tone-red">{state.message}</span>}
+    </div>
+  )
+}
+
 export function SettingsScreen({
   runtimes,
   ledgerPath,
-  build
+  build,
+  storage,
+  onPreviewPrune,
+  onPrune
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly ledgerPath: string | undefined
   /** Which build this is; undefined until the host has answered. */
   readonly build: { readonly version: string; readonly packaged: boolean } | undefined
+  /** What the local history costs; undefined until the host has answered. */
+  readonly storage: PublicStorageReport | undefined
+  readonly onPreviewPrune: (days: number) => Promise<MissionPruneResponse>
+  readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
   return (
     <div className="lc-screen">
@@ -281,9 +397,25 @@ export function SettingsScreen({
           <dl className="lc-receipt lc-receipt--flush">
             <dt>Ledger</dt>
             <dd className="lc-mono">{ledgerPath ?? 'in this profile'}</dd>
+            <dt>On disk</dt>
+            <dd className="lc-mono">
+              {storage === undefined
+                ? 'measuring…'
+                : `${String(storage.missionCount)} mission${storage.missionCount === 1 ? '' : 's'} · ${formatBytes(storage.byteTotal)}${
+                    storage.oldestUpdatedAt === undefined
+                      ? ''
+                      : ` · oldest ${new Date(storage.oldestUpdatedAt).toLocaleDateString()}`
+                  }`}
+            </dd>
             <dt>Network</dt>
             <dd>The window itself makes no outbound requests; runtimes talk to their own providers.</dd>
           </dl>
+          <p className="lc-settings__lede">
+            Nothing here is ever deleted on a timer. Missions go when you ask, after you have been
+            shown exactly what would go — and a mission an ongoing conversation continues from is
+            kept even when it is old.
+          </p>
+          <RetentionControl report={storage} onPreview={onPreviewPrune} onPrune={onPrune} />
         </section>
       </div>
     </div>

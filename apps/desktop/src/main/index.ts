@@ -29,6 +29,8 @@ import {
   MISSION_HANDOFF_CHANNEL,
   APP_INFO_CHANNEL,
   MISSION_DELETE_CHANNEL,
+  MISSION_PRUNE_CHANNEL,
+  MISSION_STORAGE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
@@ -40,6 +42,7 @@ import {
   TEAMMATE_UPDATE_CHANNEL
 } from '../shared/ipc.js'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
+import { pruneMissionRecords, readStorageReport } from './retention.js'
 import type {
   CodexMissionCancelRequest,
   CodexMissionStartRequest,
@@ -425,6 +428,36 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged } as const
       // The version electron-builder stamped, which is the one on the installer.
       return { name: 'Locust', version: app.getVersion(), packaged: app.isPackaged } as const
+    })
+
+    ipcMain.handle(MISSION_STORAGE_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) {
+        return {
+          ok: false,
+          error: { code: 'STORAGE_UNAVAILABLE', message: 'The request was rejected.' }
+        } as const
+      }
+      return readStorageReport(missionLedger)
+    })
+
+    ipcMain.handle(MISSION_PRUNE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The request was rejected.' } } as const
+      }
+      const response = await pruneMissionRecords(
+        missionLedger,
+        request,
+        () => [...codexMissions.liveMissionIds(), ...appServerMissions.liveMissionIds()],
+        () => new Date()
+      )
+      // Ownership follows the records out, exactly as it does for a single
+      // deletion, so the roster never lists a mission that no longer exists.
+      if (response.ok && !response.data.previewed) {
+        for (const missionId of response.data.deleted) {
+          await teammates.unassignMission(missionId).catch(() => undefined)
+        }
+      }
+      return response
     })
 
     ipcMain.handle(MISSION_DELETE_CHANNEL, async (event, missionId: unknown) => {

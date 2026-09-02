@@ -11,6 +11,8 @@ import {
   ledgerVerificationLabel,
   missionPhaseView,
   capRouteRows,
+  formatBytes,
+  prunePreviewSummary,
   ROUTE_GROUP_LIMIT,
   routeRowStatus,
   runtimeIsUsable,
@@ -263,5 +265,46 @@ describe('a picker group that would not fit', () => {
     const capped = capRouteRows(rows, ROUTE_GROUP_LIMIT, true)
     expect(capped.rows).toEqual(rows)
     expect(capped.hiddenByGroup.size).toBe(0)
+  })
+})
+
+describe('what a prune says before it happens', () => {
+  const preview = (deleted: number, continuity = 0, running = 0) => ({
+    deleted: Array.from({ length: deleted }, (_, i) => `d${String(i)}`),
+    keptForContinuity: Array.from({ length: continuity }, (_, i) => `c${String(i)}`),
+    keptAsRunning: Array.from({ length: running }, (_, i) => `r${String(i)}`)
+  })
+
+  it('states the count that would go, and names everything held back', () => {
+    expect(prunePreviewSummary(preview(3, 2, 1))).toBe(
+      'Delete 3 missions for good, with 2 missions kept as part of a conversation you are keeping and 1 mission kept because they are running.'
+    )
+  })
+
+  it('says why nothing would go, rather than just saying nothing', () => {
+    expect(prunePreviewSummary(preview(0, 2))).toBe(
+      'Nothing would be deleted: 2 missions still part of a conversation you are keeping.'
+    )
+    expect(prunePreviewSummary(preview(0))).toBe('Nothing is old enough to delete.')
+  })
+
+  it('counts one mission as one', () => {
+    expect(prunePreviewSummary(preview(1))).toBe('Delete 1 mission for good.')
+  })
+})
+
+describe('sizes a person can read', () => {
+  it('scales to the largest unit that keeps the number short', () => {
+    expect(formatBytes(0)).toBe('0 B')
+    expect(formatBytes(900)).toBe('900 B')
+    expect(formatBytes(2048)).toBe('2.0 KB')
+    expect(formatBytes(15 * 1024)).toBe('15 KB')
+    expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB')
+    expect(formatBytes(3 * 1024 * 1024 * 1024)).toBe('3.0 GB')
+  })
+
+  it('says unknown rather than printing nonsense', () => {
+    expect(formatBytes(Number.NaN)).toBe('unknown')
+    expect(formatBytes(-1)).toBe('unknown')
   })
 })
