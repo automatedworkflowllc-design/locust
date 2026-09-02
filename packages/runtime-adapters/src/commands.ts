@@ -243,6 +243,18 @@ export function parseClaudeModelHints(helpText: string): RuntimeModelHints | und
  * effort (`cursor-grok-4.6-high`), which is why no effort list comes back.
  * Nothing is listed that the CLI did not print.
  */
+/**
+ * Whether Cursor can actually hold a mission read-only on this platform.
+ *
+ * Its sandbox is the only thing that enforces it, and the CLI refuses to
+ * enable one anywhere but macOS and Linux -- measured on Windows, where the
+ * command exits 1 with that message. Where this is false, a read-only Cursor
+ * mission must be refused rather than run under a label nothing upholds.
+ */
+export function cursorCanEnforceReadOnly(platform: NodeJS.Platform): boolean {
+  return platform === "darwin" || platform === "linux";
+}
+
 export function parseCursorModelList(text: string): RuntimeModelHints | undefined {
   const models: RuntimeModelName[] = [];
   for (const line of text.split(/\r?\n/)) {
@@ -325,11 +337,20 @@ export function createClaudePrintCommand(
 }
 
 /**
- * Cursor Agent in its print mode. A read-only mission runs in `--mode plan`,
- * which its help describes as "read-only/planning (analyze, propose plans, no
- * edits)"; a workspace-write mission runs in the default mode, where edits are
- * allowed and commands that need approval are simply not run, because the
- * only flag that would run them anyway is `--force` and that is refused.
+ * Cursor Agent in its print mode.
+ *
+ * MEASURED 2026-09-02, and it corrects something this file used to claim.
+ * `--mode plan` is described by the CLI as "read-only/planning (analyze,
+ * propose plans, no edits)", and a plainly-worded mission does respect it.
+ * It is NOT enforcement: told insistently to write, a plan-mode run created
+ * two files with its edit tool. Its shell calls were rejected, so plan mode
+ * gates commands and not edits.
+ *
+ * The enforcement Cursor does have is `--sandbox enabled`, and on Windows it
+ * answers "Sandbox mode is enabled but not available on this system. Sandbox
+ * requires macOS or Linux." So a read-only mission asks for BOTH, and the
+ * host refuses to start one where the sandbox cannot run rather than record
+ * a containment it cannot keep.
  *
  * The CLI names no effort flag, so an effort is refused rather than dropped:
  * a caller that was shown an effort and had it silently ignored would believe
@@ -352,7 +373,10 @@ export function createCursorPrintCommand(
     options.workspacePath,
   ];
   if (sandboxArgument(options.sandbox) === "read-only") {
-    args.push("--mode", "plan");
+    // Plan mode is the instruction; the sandbox is the enforcement. Asking
+    // for the instruction alone would put a read-only label on a run that can
+    // still edit files.
+    args.push("--mode", "plan", "--sandbox", "enabled");
   }
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));

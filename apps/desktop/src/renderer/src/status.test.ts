@@ -11,6 +11,8 @@ import {
   ledgerVerificationLabel,
   missionPhaseView,
   capRouteRows,
+  integrationOf,
+  RUNTIME_INTEGRATION,
   formatBytes,
   prunePreviewSummary,
   ROUTE_GROUP_LIMIT,
@@ -306,5 +308,24 @@ describe('sizes a person can read', () => {
   it('says unknown rather than printing nonsense', () => {
     expect(formatBytes(Number.NaN)).toBe('unknown')
     expect(formatBytes(-1)).toBe('unknown')
+  })
+})
+
+describe('how far each integration goes', () => {
+  it('says live only for the runtimes that can own a mission today', () => {
+    expect(RUNTIME_INTEGRATION.codex).toBe('live')
+    expect(RUNTIME_INTEGRATION.claude).toBe('live')
+    expect(RUNTIME_INTEGRATION.cursor).toBe('live')
+  })
+
+  it('does not claim a runtime the host refuses to run', () => {
+    // Gemini CLI is discovered and can be signed into, but no mission can run
+    // under it, so no screen may draw it as ready.
+    expect(RUNTIME_INTEGRATION.gemini).toBe('planned')
+    expect(RUNTIME_INTEGRATION.omniroute).toBe('planned')
+  })
+
+  it('treats a runtime it has never heard of as planned, not as live', () => {
+    expect(integrationOf('something-new')).toBe('planned')
   })
 })

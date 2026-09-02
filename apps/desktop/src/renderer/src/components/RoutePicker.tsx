@@ -3,8 +3,8 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
-import { capRouteRows, ROUTE_GROUP_LIMIT, routeRowStatus } from '../status.js'
-import type { IntegrationLevel, RouteTag } from '../status.js'
+import { capRouteRows, integrationOf, ROUTE_GROUP_LIMIT, routeRowStatus } from '../status.js'
+import type { RouteTag } from '../status.js'
 
 export interface RouteChoice {
   readonly runtime: MissionRuntimeId
@@ -23,16 +23,6 @@ interface RouteRow {
   readonly selectable: boolean
 }
 
-const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
-  codex: 'live',
-  claude: 'live',
-  cursor: 'live',
-  // Found and signed into like the others; a mission cannot run under it
-  // until the host can read its event stream.
-  gemini: 'planned',
-  omniroute: 'planned'
-}
-
 /**
  * Rows come from discovery, and models come from the runtime's own catalog.
  * There are still no invented entries: when the catalog cannot be read the row
@@ -47,7 +37,7 @@ function buildRows(
   const rows: RouteRow[] = []
   for (const runtime of runtimes) {
     if (runtime.id === 'omniroute') continue
-    const integration = INTEGRATION[runtime.id] ?? 'planned'
+    const integration = integrationOf(runtime.id)
     const status = routeRowStatus(runtime, integration, false)
     const group = `${runtime.displayName} · your account`
 

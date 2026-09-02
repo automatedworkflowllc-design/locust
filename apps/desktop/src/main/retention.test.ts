@@ -22,8 +22,8 @@ function ledgerWith(overrides: Partial<MissionLedger> = {}): MissionLedger {
     },
     appendPeerLinks: async () => undefined,
     deleteMission: async () => true,
-    storageReport: async () => ({ missionCount: 0, byteTotal: 0 }),
-    pruneMissions: async () => ({ deleted: [], keptForContinuity: [], keptAsRunning: [] }),
+    storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
+    pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
     getMission: async () => undefined,
     listMissions: async () => ({ missions: [], issues: [] }),
     flush: async () => undefined,
@@ -55,6 +55,8 @@ describe('pruning, as the host offers it', () => {
   it('previews by default, and only an explicit false actually deletes', async () => {
     const pruneMissions = vi.fn(async (_options: MissionPruneOptions) => ({
       deleted: ['mission_1'],
+      failed: [],
+      unreadable: [],
       keptForContinuity: [],
       keptAsRunning: []
     }))
@@ -87,6 +89,8 @@ describe('pruning, as the host offers it', () => {
   it('tells the ledger which missions are running, from the transports', async () => {
     const pruneMissions = vi.fn(async (_options: MissionPruneOptions) => ({
       deleted: [],
+      failed: [],
+      unreadable: [],
       keptForContinuity: [],
       keptAsRunning: ['mission_live']
     }))
@@ -100,7 +104,7 @@ describe('pruning, as the host offers it', () => {
   })
 
   it('refuses an age it will not honour, without touching the ledger', async () => {
-    const pruneMissions = vi.fn(async () => ({ deleted: [], keptForContinuity: [], keptAsRunning: [] }))
+    const pruneMissions = vi.fn(async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }))
     const response = await pruneMissionRecords(
       ledgerWith({ pruneMissions }),
       { olderThanDays: 0, dryRun: false },
@@ -129,11 +133,11 @@ describe('pruning, as the host offers it', () => {
 describe('what the history costs', () => {
   it('passes the ledger report through', async () => {
     const response = await readStorageReport(
-      ledgerWith({ storageReport: async () => ({ missionCount: 4, byteTotal: 2048, oldestUpdatedAt: '2026-01-01T00:00:00.000Z' }) })
+      ledgerWith({ storageReport: async () => ({ missionCount: 4, byteTotal: 2048, unreadableCount: 0, oldestUpdatedAt: '2026-01-01T00:00:00.000Z' }) })
     )
     expect(response).toEqual({
       ok: true,
-      data: { missionCount: 4, byteTotal: 2048, oldestUpdatedAt: '2026-01-01T00:00:00.000Z' }
+      data: { missionCount: 4, byteTotal: 2048, unreadableCount: 0, oldestUpdatedAt: '2026-01-01T00:00:00.000Z' }
     })
   })
 

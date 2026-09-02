@@ -112,8 +112,8 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
     createCheckpoint: async () => { throw new Error('not used in this test') },
     appendPeerLinks: async () => undefined,
     deleteMission: async () => true,
-    storageReport: async () => ({ missionCount: 0, byteTotal: 0 }),
-    pruneMissions: async () => ({ deleted: [], keptForContinuity: [], keptAsRunning: [] }),
+    storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
+    pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
     getMission: async () => undefined,
     listMissions: async () => ({ missions: [], issues: [] }),
     flush: async () => undefined,
@@ -756,6 +756,9 @@ describe('runtime selection', () => {
     const cursor = { ...codexRuntime(), id: 'cursor' as const, displayName: 'Cursor Agent', optional: true }
     const service = createCodexMissionService({
       workspacePath: WORKSPACE,
+      // Where Cursor's sandbox exists, so a read-only mission is allowed to
+      // start; the refusal on other platforms has its own test.
+      platform: 'darwin',
       discover: async () => [cursor],
       runner: { start },
       ledger: fakeLedger({ createMission, appendEvents }),
@@ -772,7 +775,7 @@ describe('runtime selection', () => {
     expect(response).toMatchObject({ ok: true, data: { runtime: 'cursor', sandbox: 'read-only' } })
     const spec = start.mock.calls[0]?.[0]
     expect(spec?.runtime).toBe('cursor')
-    expect(spec?.args).toEqual(expect.arrayContaining(['--print', '--trust', '--mode', 'plan']))
+    expect(spec?.args).toEqual(expect.arrayContaining(['--print', '--trust', '--mode', 'plan', '--sandbox', 'enabled']))
     expect(spec?.args).not.toContain('--force')
     expect(createMission).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'cursor' }))
 
@@ -792,6 +795,48 @@ describe('runtime selection', () => {
     const spec = start.mock.calls[0]?.[0]
     expect(spec?.args).not.toContain('--mode')
     expect(spec?.args).not.toContain('--force')
+  })
+
+  it('refuses a read-only Cursor mission where its sandbox cannot run, rather than mislabelling it', async () => {
+    // Measured 2026-09-02 on Windows: `--mode plan` did not stop a Cursor run
+    // from creating files, and `--sandbox enabled` is refused outright there.
+    // Recording such a run as read-only would be a claim nothing upholds.
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const start = vi.fn() satisfies RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      platform: 'win32',
+      discover: async () => [{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }],
+      runner: { start },
+      ledger: fakeLedger({ createMission })
+    })
+
+    await expect(service.start('Do work.', 'cursor', 'ask', {}, () => undefined)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('read-only') }
+    })
+    expect(start).not.toHaveBeenCalled()
+    expect(createMission).not.toHaveBeenCalled()
+  })
+
+  it('runs a read-only Cursor mission where the sandbox is real, and asks for it', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      platform: 'darwin',
+      discover: async () => [{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }],
+      runner: { start },
+      ledger: fakeLedger(),
+      createId: (() => { let n = 0; return () => String(++n) })(),
+      now: () => new Date(NOW),
+      schedule: () => undefined
+    })
+
+    await expect(service.start('Do work.', 'cursor', 'ask', {}, () => undefined)).resolves.toMatchObject({ ok: true })
+    expect(start.mock.calls[0]?.[0]?.args).toEqual(expect.arrayContaining(['--mode', 'plan', '--sandbox', 'enabled']))
   })
 
   it('names the runtime the user actually chose when it is unavailable', async () => {

@@ -31,6 +31,13 @@ const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 
 const MUTATIONS = [
   {
+    file: MISSIONS,
+    name: 'a read-only Cursor mission runs where nothing can hold it read-only',
+    from: '          && !cursorCanEnforceReadOnly(hostPlatform)',
+    to: '          && false',
+    expect: 'refuses a read-only Cursor mission where its sandbox cannot run, rather than mislabelling it'
+  },
+  {
     file: VIEW,
     name: 'a run that never opened a session still claims one a reply can resume',
     from: "    if (typeof held === 'string' && held.length > 0) return held",

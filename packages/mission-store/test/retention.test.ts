@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -167,6 +167,87 @@ describe('pruning old missions', () => {
     expect(await remaining(root)).toEqual(['mission_broken'])
   })
 
+  it('protects an old parent named by a file the full reader refuses', async () => {
+    const root = await temporaryRoot()
+    await seed(root, [['mission_first', 40]])
+    // A reply whose file the strict reader will not accept -- a record after
+    // the header that does not parse -- but whose FIRST line still says which
+    // conversation it belongs to. Deleting its parent would gut a
+    // conversation the user still has.
+    // Written at a schema version this build does not know -- the shape a
+    // ledger takes after the app is rolled back one release. The strict
+    // reader refuses the whole file; its first line still names the
+    // conversation it belongs to.
+    const header = {
+      schemaVersion: 8,
+      recordType: 'mission.created',
+      ledgerSequence: 1,
+      occurredAt: at(1),
+      metadata: metadata('mission_reply', at(1), 'mission_first')
+    }
+    await writeFile(join(root, 'mission_reply.jsonl'), `${JSON.stringify(header)}\n`, 'utf8')
+
+    const result = await createFileMissionLedger({ rootDirectory: root })
+      .pruneMissions({ before: at(30) })
+
+    expect(result.deleted).toEqual([])
+    expect(result.keptForContinuity).toEqual(['mission_first'])
+    expect(await remaining(root)).toEqual(['mission_first', 'mission_reply'])
+  })
+
+  it('deletes nothing at all while any ledger cannot be read', async () => {
+    const root = await temporaryRoot()
+    await seed(root, [['mission_old', 40]])
+    // A directory wearing a mission's name. Listing skips it in silence; its
+    // links are unknowable, and one of them could be the newest turn of
+    // mission_old's own conversation.
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(join(root, 'mission_locked.jsonl'))
+
+    const result = await createFileMissionLedger({ rootDirectory: root })
+      .pruneMissions({ before: at(30) })
+
+    expect(result.deleted).toEqual([])
+    expect(result.unreadable).toEqual(['mission_locked'])
+    expect(await remaining(root)).toContain('mission_old')
+  })
+
+  it('deletes only the missions the confirmation named, whatever else has aged', async () => {
+    const root = await temporaryRoot()
+    await seed(root, [['mission_shown', 40], ['mission_aged_since', 40]])
+
+    // The preview showed one mission. Between then and the confirmation
+    // another crossed the line -- or was always there and simply was not in
+    // the plan. The confirmation deletes what it promised, and no more.
+    const result = await createFileMissionLedger({ rootDirectory: root })
+      .pruneMissions({ before: at(30), only: ['mission_shown'] })
+
+    expect(result.deleted).toEqual(['mission_shown'])
+    expect(await remaining(root)).toEqual(['mission_aged_since'])
+  })
+
+  it('reports a file it could not delete instead of losing the ones it did', async () => {
+    const root = await temporaryRoot()
+    await seed(root, [['mission_one', 40], ['mission_two', 40], ['mission_three', 40]])
+    // A lock on one file, which is what a virus scanner or a sync client does
+    // in the middle of a bulk delete on Windows.
+    const ledger = createFileMissionLedger({
+      rootDirectory: root,
+      removeFile: async (path) => {
+        if (path.includes('mission_two')) throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' })
+        await rm(path)
+      }
+    })
+
+    const result = await ledger.pruneMissions({ before: at(30) })
+
+    // The ones that went are reported as gone -- the failure in the middle
+    // must not turn an irreversible deletion into "nothing happened".
+    expect([...result.deleted].sort()).toEqual(['mission_one', 'mission_three'])
+    expect(result.failed).toEqual(['mission_two'])
+    expect(await remaining(root)).toEqual(['mission_two'])
+  })
+
   it('refuses a cutoff that is not a timestamp', async () => {
     const root = await temporaryRoot()
     await seed(root, [['mission_old', 40]])
@@ -185,6 +266,7 @@ describe('what the local history costs', () => {
     const report = await createFileMissionLedger({ rootDirectory: root }).storageReport()
 
     expect(report.missionCount).toBe(2)
+    expect(report.unreadableCount).toBe(0)
     expect(report.byteTotal).toBeGreaterThan(0)
     // Both files were written moments ago, so a report dated by the file's
     // own timestamp would say the history began today. It began 40 days ago.
@@ -193,6 +275,21 @@ describe('what the local history costs', () => {
 
   it('reports an empty history as empty rather than failing', async () => {
     const report = await createFileMissionLedger({ rootDirectory: await temporaryRoot() }).storageReport()
-    expect(report).toEqual({ missionCount: 0, byteTotal: 0 })
+    expect(report).toEqual({ missionCount: 0, byteTotal: 0, unreadableCount: 0 })
+  })
+
+  it('counts a file it cannot read separately, instead of leaving it out of a date it is inside', async () => {
+    const root = await temporaryRoot()
+    await seed(root, [['mission_one', 40]])
+    await writeFile(join(root, 'mission_broken.jsonl'), 'not json at all\n', 'utf8')
+
+    const report = await createFileMissionLedger({ rootDirectory: root }).storageReport()
+
+    // Both files are on disk, so both are counted and both bytes are real.
+    // Only one has a date, and the report says so rather than implying the
+    // other is simply older or newer.
+    expect(report.missionCount).toBe(2)
+    expect(report.unreadableCount).toBe(1)
+    expect(report.oldestUpdatedAt).toBe(at(40))
   })
 })

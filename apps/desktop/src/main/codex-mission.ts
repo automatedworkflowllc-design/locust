@@ -4,7 +4,8 @@ import {
   createCodexEventNormalizer,
   createCodexExecCommand,
   createCursorEventNormalizer,
-  createCursorPrintCommand
+  createCursorPrintCommand,
+  cursorCanEnforceReadOnly
 } from '@teammate/runtime-adapters'
 import type {
   ClaudeEventNormalizer,
@@ -102,6 +103,8 @@ export interface CodexMissionService {
 
 interface CodexMissionServiceOptions {
   readonly workspacePath: string
+  /** Test seam. Which platform's containment rules apply. */
+  readonly platform?: NodeJS.Platform
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
   readonly runner: RuntimeProcessRunner
   readonly ledger: MissionLedger
@@ -219,6 +222,11 @@ function validRunId(value: unknown): value is string {
 }
 
 export function createCodexMissionService(options: CodexMissionServiceOptions): CodexMissionService {
+  // Resolved here, not inside `start`: that scope declares its own `process`
+  // for the child, which shadows Node's global and is in its temporal dead
+  // zone at the point this is needed.
+  const hostPlatform: NodeJS.Platform = options.platform ?? process.platform
+
   if (!isAbsolute(options.workspacePath)) {
     throw new Error('Codex mission workspace must be an absolute path')
   }
@@ -491,6 +499,21 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // and the receipt must agree about that, or the ledger claims a run
         // could write when it could not.
         const effectiveSandbox: MissionSandbox = runtime === 'claude' ? 'read-only' : sandbox
+        // Cursor's plan mode asks a model not to write; only its sandbox stops
+        // one, and that sandbox exists on macOS and Linux alone. Measured on
+        // Windows: a plan-mode run told firmly to write created two files.
+        // Rather than record `read-only` over a run that can edit, the mission
+        // is refused and the person is told which mode does what they meant.
+        if (
+          runtime === 'cursor'
+          && effectiveSandbox === 'read-only'
+          && !cursorCanEnforceReadOnly(hostPlatform)
+        ) {
+          return error(
+            'RUNTIME_START_FAILED',
+            'Cursor Agent cannot be held read-only on this system: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files. Choose "Accept edits" if it may change this workspace, or run this on Codex CLI or Claude Code.'
+          ) as CodexMissionStartResponse
+        }
         const resolvedRouteId = `${routeId}-account:default`
         const normalizerContext = {
           runId,

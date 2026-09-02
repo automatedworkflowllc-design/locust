@@ -27,6 +27,48 @@ const CURSOR_EVENTS = join(ROOT, 'src', 'cursor-events.ts')
 
 const MUTATIONS = [
   {
+    file: CURSOR_EVENTS,
+    name: 'a command that ran and failed is recorded as a completed tool',
+    from: '  if (exitCode !== undefined && exitCode !== 0) {',
+    to: '  if (false) {',
+    expect: 'reports a command that RAN and FAILED as failed, with its exit code'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: 'an outcome this build has never seen is recorded as a success',
+    from: '  if (key !== "success") return { failed: true, status: key };',
+    to: '  if (key === "never") return { failed: true, status: key };',
+    expect: 'treats an outcome it has never seen as a failure, not as a success'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: 'a refused command is recorded without saying what it was',
+    from: '        ?? stringValue(refused?.command)\n',
+    to: '',
+    expect: 'names the commands it refused to run, which is the fact a rejection exists to record'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: 'a Cursor run reports no usage at all',
+    from: '      if (isObject(parsed.usage)) usage = sanitizedUsage(parsed.usage);\n',
+    to: '',
+    expect: 'records what the run cost, the way the other adapters do'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: 'a glob is recorded without the directory it searched',
+    from: '  return directory === undefined ? pattern : `${pattern} in ${directory}`;',
+    to: '  void directory; return pattern;',
+    expect: 'reports the edit and the glob as completed tools with their targets'
+  },
+  {
+    file: COMMANDS,
+    name: 'a read-only Cursor mission asks for plan mode without the sandbox that enforces it',
+    from: '    args.push("--mode", "plan", "--sandbox", "enabled");',
+    to: '    args.push("--mode", "plan");',
+    expect: 'runs a read-only Cursor mission in plan mode and never forces commands'
+  },
+  {
     file: DISCOVERY,
     name: "Cursor's model list is never read",
     from: '    if (succeeded(modelsOutcome)) modelHints = parseCursorModelList(modelsOutcome.result.stdout);\n',
@@ -50,8 +92,8 @@ const MUTATIONS = [
   {
     file: CURSOR_EVENTS,
     name: 'a rejected Cursor shell command is reported as completed',
-    from: '      const rejected = isObject(result.rejected);',
-    to: '      const rejected = false;',
+    from: '  const key = Object.keys(result)[0];',
+    to: '  const key = "success";',
     expect: 'reports a rejected shell command as a tool that failed, never as one that completed'
   },
   {
@@ -85,8 +127,8 @@ const MUTATIONS = [
   {
     file: COMMANDS,
     name: 'a read-only Cursor mission runs with edits allowed',
-    from: '  if (sandboxArgument(options.sandbox) === "read-only") {\n    args.push("--mode", "plan");\n  }',
-    to: '  sandboxArgument(options.sandbox);',
+    from: '  if (sandboxArgument(options.sandbox) === "read-only") {',
+    to: '  if (!sandboxArgument(options.sandbox)) {',
     expect: 'runs a read-only Cursor mission in plan mode and never forces commands'
   },
   {

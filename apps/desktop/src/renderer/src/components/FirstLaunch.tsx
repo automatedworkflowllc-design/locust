@@ -2,8 +2,7 @@ import type { ReactElement } from 'react'
 
 import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
 import logo from '../assets/locust-logo.svg'
-import { routeRowStatus } from '../status.js'
-import type { IntegrationLevel } from '../status.js'
+import { integrationOf, routeRowStatus } from '../status.js'
 
 /**
  * First launch, and the empty state generally.
@@ -14,12 +13,6 @@ import type { IntegrationLevel } from '../status.js'
  * below reports what discovery actually found -- including that a runtime is
  * installed but signed out, which is a different problem from missing.
  */
-const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
-  codex: 'live',
-  claude: 'live',
-  omniroute: 'planned'
-}
-
 export function FirstLaunch({
   runtimes,
   discoveryPhase
@@ -49,7 +42,7 @@ export function FirstLaunch({
         {discoveryPhase === 'ready' && (
           <div className="lc-runtimelist">
             {runtimes.map((runtime) => {
-              const status = routeRowStatus(runtime, INTEGRATION[runtime.id] ?? 'planned', false)
+              const status = routeRowStatus(runtime, integrationOf(runtime.id), false)
               return (
                 <div
                   key={runtime.id}

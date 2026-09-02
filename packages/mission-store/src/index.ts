@@ -74,6 +74,13 @@ const MAX_RECORD_BYTES = 512 * 1024
 const MAX_APPEND_BYTES = 2 * 1024 * 1024
 const MAX_LEDGER_BYTES = 64 * 1024 * 1024
 const MAX_MISSION_FILES = 500
+
+/**
+ * How many ledgers to hold open at once. Opening every file concurrently
+ * exhausts the process's descriptors on a large history, and an `EMFILE`
+ * is indistinguishable from a corrupt ledger to the code that reads it.
+ */
+const READ_CONCURRENCY = 16
 const DEFAULT_MISSION_LIST_LIMIT = 20
 const MAX_EVENTS_PER_APPEND = 100
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/
@@ -257,11 +264,24 @@ export interface MissionStorageReport {
   readonly byteTotal: number
   /** When the least recently updated mission was last written, if any. */
   readonly oldestUpdatedAt?: string
+  /**
+   * Files counted above whose contents could not be read. They are part of
+   * the count and the bytes -- they are on disk -- but they have no date, and
+   * a prune will not touch them. Stating the number keeps the other three
+   * from describing a population they do not cover.
+   */
+  readonly unreadableCount: number
 }
 
 export interface MissionPruneOptions {
   /** Missions last updated strictly before this instant are candidates. */
   readonly before: string
+  /**
+   * Delete nothing outside this set. A confirmation passes the exact ids its
+   * preview showed, so the deletion can only ever be NARROWER than what the
+   * person agreed to -- never wider, whatever changed in between.
+   */
+  readonly only?: readonly string[]
   /**
    * Missions the caller knows are running. The store cannot see processes, so
    * it cannot judge this -- it only promises not to delete what it is told.
@@ -279,6 +299,19 @@ export interface MissionPruneOptions {
 export interface MissionPruneResult {
   readonly deleted: readonly string[]
   /**
+   * Missions whose file could not be removed. Deleting is not all-or-nothing
+   * on a real filesystem: a lock on one file must not discard the true record
+   * of the ones already gone.
+   */
+  readonly failed: readonly string[]
+  /**
+   * Set when the prune refused to delete anything because some ledger could
+   * not be read at all. An unreadable file may be the newest turn of an old
+   * conversation, and deleting its parent would gut a conversation still in
+   * use -- so nothing is deleted until it can be read.
+   */
+  readonly unreadable: readonly string[]
+  /**
    * Old missions kept because a mission that SURVIVES continues from them.
    * Deleting these would leave a kept conversation missing its earlier turns,
    * which is a worse outcome than keeping a few old files.
@@ -292,6 +325,12 @@ export interface FileMissionLedgerOptions {
   readonly rootDirectory: string
   /** Test seam. Checkpoints are stamped by the ledger, never by a caller. */
   readonly now?: () => Date
+  /**
+   * Test seam for the one destructive call. A locked or virus-scanned file
+   * cannot be simulated portably, and the behaviour when unlink fails is
+   * exactly the behaviour worth proving.
+   */
+  readonly removeFile?: (path: string) => Promise<void>
 }
 
 interface CreatedRecord {
@@ -905,6 +944,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
   const schemaVersions = new Map<string, MissionLedgerSchemaVersion>()
   let directoryReady: Promise<void> | undefined
   let writeTail: Promise<void> = Promise.resolve()
+  const removeFile = options.removeFile ?? ((path: string) => unlink(path))
 
   const ensureDirectory = (): Promise<void> => {
     directoryReady ??= mkdir(rootDirectory, { recursive: true, mode: 0o700 }).then(() => undefined)
@@ -1012,6 +1052,71 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
   }
 
   /**
+   * Run `work` over `items` a few at a time.
+   *
+   * These loops opened every ledger at once. With a few hundred missions that
+   * exhausts the process's file descriptors, and an `EMFILE` reads exactly
+   * like a corrupt ledger -- which, for a prune, is the difference between
+   * protecting a conversation and deleting its opening turns.
+   */
+  async function mapLimited<TIn, TOut>(
+    items: readonly TIn[],
+    limit: number,
+    work: (item: TIn) => Promise<TOut>
+  ): Promise<TOut[]> {
+    const results: TOut[] = new Array<TOut>(items.length)
+    let next = 0
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (let index = next++; index < items.length; index = next++) {
+        results[index] = await work(items[index]!)
+      }
+    })
+    await Promise.all(workers)
+    return results
+  }
+
+  /**
+   * The mission a file says it continues, read from its first line alone.
+   *
+   * A full read can refuse a file for reasons that say nothing about its first
+   * line: a corrupt record near the end, a file over the size cap, a schema
+   * from a newer build. The link still matters -- it is what stops an old
+   * parent being deleted out from under a conversation still in use -- so it
+   * is read leniently here, and used ONLY to protect, never to delete.
+   */
+  async function continuationHint(missionId: string): Promise<
+    { readonly ok: true; readonly continuesFrom?: string } | { readonly ok: false }
+  > {
+    let handle
+    try {
+      handle = await open(missionPath(rootDirectory, missionId), 'r')
+    } catch (error) {
+      // A file that is not there cannot protect anything and is not a failure.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: true }
+      return { ok: false }
+    }
+    try {
+      const head = Buffer.alloc(64 * 1024)
+      const { bytesRead } = await handle.read(head, 0, head.length, 0)
+      const text = head.subarray(0, bytesRead).toString('utf8')
+      const firstLine = text.split('\n', 1)[0] ?? ''
+      const value: unknown = JSON.parse(firstLine)
+      if (!isObject(value) || !isObject(value.metadata)) return { ok: true }
+      const link = (value.metadata as { readonly continuesFrom?: unknown }).continuesFrom
+      const parent = isObject(link) ? link.missionId : undefined
+      return typeof parent === 'string' && SAFE_ID.test(parent)
+        ? { ok: true, continuesFrom: parent }
+        : { ok: true }
+    } catch {
+      // Unparseable is not unreadable: the file was opened and read. It simply
+      // declares no link, which is the same as having none.
+      return { ok: true }
+    } finally {
+      await handle.close().catch(() => undefined)
+    }
+  }
+
+  /**
    * Remove one mission file. No cache is cleared here, on purpose. An append
    * afterwards either re-creates the mission (which rewrites every cached
    * counter) or opens the file without O_CREAT (which fails on the missing
@@ -1022,7 +1127,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
   async function removeMissionFile(missionId: string): Promise<boolean> {
     requireSafeId(missionId, 'missionId')
     try {
-      await unlink(missionPath(rootDirectory, missionId))
+      await removeFile(missionPath(rootDirectory, missionId))
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
       throw error
@@ -1209,7 +1314,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       try {
         entries = await readdir(rootDirectory, { withFileTypes: true })
       } catch {
-        return { missionCount: 0, byteTotal: 0 }
+        return { missionCount: 0, byteTotal: 0, unreadableCount: 0 }
       }
       const ids = entries
         .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
@@ -1218,7 +1323,8 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       let byteTotal = 0
       let oldest: number | undefined
       let counted = 0
-      await Promise.all(ids.map(async (missionId) => {
+      let unreadableCount = 0
+      await mapLimited(ids, READ_CONCURRENCY, async (missionId) => {
         try {
           const file = await stat(missionPath(rootDirectory, missionId))
           byteTotal += file.size
@@ -1234,13 +1340,18 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         // ledger directory is enough to make the two disagree.
         const parsed = await readLedgerFile(missionPath(rootDirectory, missionId), missionId)
         const updatedAt = parsed.mission === undefined ? undefined : Date.parse(parsed.mission.lastUpdatedAt)
-        if (updatedAt !== undefined && Number.isFinite(updatedAt) && (oldest === undefined || updatedAt < oldest)) {
-          oldest = updatedAt
+        if (updatedAt === undefined || !Number.isFinite(updatedAt)) {
+          // Counted in the total above, so its absence from the date has to be
+          // stated rather than left to look like a mission with no history.
+          unreadableCount += 1
+          return
         }
-      }))
+        if (oldest === undefined || updatedAt < oldest) oldest = updatedAt
+      })
       return {
         missionCount: counted,
         byteTotal,
+        unreadableCount,
         ...(oldest === undefined ? {} : { oldestUpdatedAt: new Date(oldest).toISOString() })
       }
     },
@@ -1248,88 +1359,127 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
     async pruneMissions(options: MissionPruneOptions): Promise<MissionPruneResult> {
       const cutoff = Date.parse(requireTimestamp(options.before, 'before'))
       const running = new Set(options.protectMissionIds ?? [])
-      await writeTail
+      // A confirmation names the exact missions its preview showed. Deleting
+      // is then bounded by that list, so whatever changed between the two --
+      // the clock, a new reply, a mission deleted by hand -- the result can
+      // only ever be NARROWER than what the person agreed to.
+      const only = options.only === undefined ? undefined : new Set(options.only)
       await ensureDirectory()
-      let entries
-      try {
-        entries = await readdir(rootDirectory, { withFileTypes: true })
-      } catch {
-        return { deleted: [], keptForContinuity: [], keptAsRunning: [] }
-      }
-      const ids = entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
-        .map((entry) => entry.name.slice(0, -'.jsonl'.length))
-        .filter((missionId) => SAFE_ID.test(missionId))
-
-      // Read every header once: which missions are old enough, and which
-      // mission each one continues from.
-      const held = await Promise.all(ids.map(async (missionId) => {
-        const parsed = await readLedgerFile(missionPath(rootDirectory, missionId), missionId)
-        const mission = parsed.mission
-        return {
-          missionId,
-          // A file whose header cannot be read has no date to judge and no
-          // links to protect; it is left alone rather than guessed about.
-          readable: mission !== undefined,
-          lastUpdatedAt: mission === undefined ? undefined : Date.parse(mission.lastUpdatedAt),
-          continuesFrom: mission?.metadata.continuesFrom?.missionId
+      // The whole prune runs as one queued operation. Reading the directory
+      // outside the queue let a mission be created between the read and the
+      // unlink, and a reply written in that gap left its parent unprotected.
+      return serialize(async () => {
+        let entries
+        try {
+          entries = await readdir(rootDirectory, { withFileTypes: true })
+        } catch {
+          return { deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }
         }
-      }))
-      const parents = new Map<string, string>()
-      for (const entry of held) {
-        if (entry.continuesFrom !== undefined) parents.set(entry.missionId, entry.continuesFrom)
-      }
+        const named = entries
+          .filter((entry) => entry.name.endsWith('.jsonl'))
+          .map((entry) => ({ missionId: entry.name.slice(0, -'.jsonl'.length), isFile: entry.isFile() }))
+          .filter((entry) => SAFE_ID.test(entry.missionId))
+        const ids = named.filter((entry) => entry.isFile).map((entry) => entry.missionId)
+        // A mission's name occupied by something that is not a regular file
+        // cannot be read, and its links cannot be known. Listing skips such an
+        // entry silently; a prune must not, because the thing it cannot read
+        // may be the newest turn of a conversation it is about to cut off.
+        const occupied = named.filter((entry) => !entry.isFile).map((entry) => entry.missionId)
 
-      const keptAsRunning: string[] = []
-      const candidates = new Set<string>()
-      const survivors: string[] = []
-      for (const entry of held) {
-        const old = entry.readable
-          && entry.lastUpdatedAt !== undefined
-          && Number.isFinite(entry.lastUpdatedAt)
-          && entry.lastUpdatedAt < cutoff
-        if (!old) {
-          survivors.push(entry.missionId)
-          continue
-        }
-        if (running.has(entry.missionId)) {
-          keptAsRunning.push(entry.missionId)
-          survivors.push(entry.missionId)
-          continue
-        }
-        candidates.add(entry.missionId)
-      }
-
-      // Walk back from everything that survives. A conversation is a chain of
-      // missions, so the whole chain behind a survivor is protected, not just
-      // its immediate parent -- three turns back is still that conversation.
-      const keptForContinuity = new Set<string>()
-      for (const survivor of survivors) {
-        let cursor = parents.get(survivor)
-        const seen = new Set<string>([survivor])
-        while (cursor !== undefined && !seen.has(cursor)) {
-          seen.add(cursor)
-          if (candidates.has(cursor)) {
-            candidates.delete(cursor)
-            keptForContinuity.add(cursor)
+        // Read every header once: which missions are old enough, and which
+        // mission each one continues from.
+        const held = await mapLimited(ids, READ_CONCURRENCY, async (missionId) => {
+          const parsed = await readLedgerFile(missionPath(rootDirectory, missionId), missionId)
+          const mission = parsed.mission
+          // A file the full reader refuses can still declare who it continues,
+          // and that link is what protects an old parent. Read leniently, and
+          // separately note a file that could not be read AT ALL.
+          const hint = mission === undefined ? await continuationHint(missionId) : { ok: true as const }
+          return {
+            missionId,
+            readable: mission !== undefined,
+            openable: hint.ok,
+            lastUpdatedAt: mission === undefined ? undefined : Date.parse(mission.lastUpdatedAt),
+            continuesFrom: mission?.metadata.continuesFrom?.missionId
+              ?? (hint.ok ? hint.continuesFrom : undefined)
           }
-          cursor = parents.get(cursor)
-        }
-      }
+        })
 
-      const deleted: string[] = []
-      for (const missionId of candidates) {
-        if (options.dryRun === true) {
-          deleted.push(missionId)
-          continue
+        // If a ledger cannot be opened, its links are unknowable, and one of
+        // them may be the newest turn of a conversation whose opening mission
+        // is a candidate here. Nothing is deleted until it can be read.
+        const unreadable = [...occupied, ...held.filter((entry) => !entry.openable).map((entry) => entry.missionId)]
+        if (unreadable.length > 0) {
+          return { deleted: [], failed: [], unreadable, keptForContinuity: [], keptAsRunning: [] }
         }
-        if (await serialize(() => removeMissionFile(missionId))) deleted.push(missionId)
-      }
-      return {
-        deleted,
-        keptForContinuity: [...keptForContinuity],
-        keptAsRunning
-      }
+
+        const parents = new Map<string, string>()
+        for (const entry of held) {
+          if (entry.continuesFrom !== undefined) parents.set(entry.missionId, entry.continuesFrom)
+        }
+
+        const keptAsRunning: string[] = []
+        const candidates = new Set<string>()
+        const survivors: string[] = []
+        for (const entry of held) {
+          const old = entry.readable
+            && entry.lastUpdatedAt !== undefined
+            && Number.isFinite(entry.lastUpdatedAt)
+            && entry.lastUpdatedAt < cutoff
+          if (!old || (only !== undefined && !only.has(entry.missionId))) {
+            survivors.push(entry.missionId)
+            continue
+          }
+          if (running.has(entry.missionId)) {
+            keptAsRunning.push(entry.missionId)
+            survivors.push(entry.missionId)
+            continue
+          }
+          candidates.add(entry.missionId)
+        }
+
+        // Walk back from everything that survives. A conversation is a chain
+        // of missions, so the whole chain behind a survivor is protected, not
+        // just its immediate parent -- three turns back is still that
+        // conversation.
+        const keptForContinuity = new Set<string>()
+        for (const survivor of survivors) {
+          let cursor = parents.get(survivor)
+          const seen = new Set<string>([survivor])
+          while (cursor !== undefined && !seen.has(cursor)) {
+            seen.add(cursor)
+            if (candidates.has(cursor)) {
+              candidates.delete(cursor)
+              keptForContinuity.add(cursor)
+            }
+            cursor = parents.get(cursor)
+          }
+        }
+
+        const deleted: string[] = []
+        const failed: string[] = []
+        for (const missionId of candidates) {
+          if (options.dryRun === true) {
+            deleted.push(missionId)
+            continue
+          }
+          // Per file. A lock on one must not throw away the true record of
+          // the ones already gone, which would report "nothing happened"
+          // about something irreversible.
+          try {
+            if (await removeMissionFile(missionId)) deleted.push(missionId)
+          } catch {
+            failed.push(missionId)
+          }
+        }
+        return {
+          deleted,
+          failed,
+          unreadable: [],
+          keptForContinuity: [...keptForContinuity],
+          keptAsRunning
+        }
+      })
     },
 
     async getMission(missionId: string): Promise<RecoveredMission | undefined> {

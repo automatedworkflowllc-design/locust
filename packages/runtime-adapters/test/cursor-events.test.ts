@@ -6,6 +6,7 @@ import {
   cursorToolKind,
   isCursorMessageFragment,
   summarizeCursorInit,
+  toolOutcome,
 } from "../src/cursor-events.js";
 import type { NormalizedRuntimeEvent } from "../src/codex-events.js";
 import type { RuntimeProcessCompletion } from "../src/process-runner.js";
@@ -130,6 +131,37 @@ describe("a write-mode Cursor run whose shell commands were rejected, as capture
     expect((completed[0]?.payload as { command: string }).command).toBe("ls -la");
   });
 
+  it("names the commands it refused to run, which is the fact a rejection exists to record", () => {
+    // A rejected call carries no `args` at all; what it wanted to run is
+    // inside the rejection. Reading only `args` left four identical blank
+    // rows where the audit trail should be.
+    const refused = events
+      .filter((event) => event.type === "tool.failed")
+      .map((event) => (event.payload as { command?: string }).command);
+    expect(refused).toEqual(["dir", "dir", "cmd.exe /c dir", "dir"]);
+  });
+
+  it("reports a command that RAN and FAILED as failed, with its exit code", () => {
+    // Cursor puts the command's own outcome inside the `success` wrapper:
+    // success means the tool was allowed to run, not that it worked.
+    expect(toolOutcome({ success: { command: "npm test", exitCode: 1 } }))
+      .toEqual({ failed: true, status: "exit", exitCode: 1 });
+    expect(toolOutcome({ success: { command: "ls", exitCode: 0 } })).toEqual({ failed: false, exitCode: 0 });
+  });
+
+  it("treats an outcome it has never seen as a failure, not as a success", () => {
+    for (const shape of [{ aborted: {} }, { timedOut: {} }, { denied: {} }, {}]) {
+      expect(toolOutcome(shape).failed).toBe(true);
+    }
+  });
+
+  it("records what the run cost, the way the other adapters do", () => {
+    const completed = events.at(-1);
+    expect(completed?.type).toBe("run.completed");
+    expect((completed?.payload as { usage?: Record<string, number> }).usage)
+      .toMatchObject({ inputTokens: 15012, outputTokens: 1125 });
+  });
+
   it("reports the edit and the glob as completed tools with their targets", () => {
     const kinds = events
       .filter((event) => event.type === "tool.completed")
@@ -137,6 +169,10 @@ describe("a write-mode Cursor run whose shell commands were rejected, as capture
     expect(kinds).toEqual(expect.arrayContaining(["edit", "glob"]));
     const edit = events.find((event) => event.type === "tool.completed" && (event.payload as { toolKind: string }).toolKind === "edit");
     expect((edit?.payload as { command: string }).command).toContain("NOTES.md");
+    // A glob names a pattern AND the directory it was run in; the pattern
+    // alone ("*") says nothing about where it looked.
+    const glob = events.find((event) => event.type === "tool.completed" && (event.payload as { toolKind: string }).toolKind === "glob");
+    expect((glob?.payload as { command: string }).command).toBe("* in C:\\work\\scratch");
   });
 
   it("carries the resolved model name out of init", () => {

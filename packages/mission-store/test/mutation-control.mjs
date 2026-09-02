@@ -23,6 +23,55 @@ const WORKROOM = join(ROOT, 'src', 'workroom.ts')
 const MUTATIONS = [
   {
     file: INDEX,
+    name: 'a name occupied by something unreadable is skipped in silence',
+    from: '        const unreadable = [...occupied, ...held',
+    to: '        const unreadable = [...held',
+    expect: 'deletes nothing at all while any ledger cannot be read'
+  },
+  {
+    file: INDEX,
+    name: 'a prune runs while a mission is being written, outside the queue',
+    from: '      return serialize(async () => {\n        let entries',
+    to: '      return (async () => {\n        let entries',
+    expect: 'deletes only the missions the confirmation named, whatever else has aged'
+  },
+  {
+    file: INDEX,
+    name: 'a file the full reader refuses contributes no link, so its parent is deleted',
+    from: '          const hint = mission === undefined ? await continuationHint(missionId) : { ok: true as const }',
+    to: '          const hint = { ok: true as const }',
+    expect: 'protects an old parent named by a file the full reader refuses'
+  },
+  {
+    file: INDEX,
+    name: 'a prune deletes anyway when a ledger cannot be opened at all',
+    from: '        if (unreadable.length > 0) {\n          return { deleted: [], failed: [], unreadable, keptForContinuity: [], keptAsRunning: [] }\n        }\n',
+    to: '',
+    expect: 'deletes nothing at all while any ledger cannot be read'
+  },
+  {
+    file: INDEX,
+    name: 'a confirmation deletes everything old, not only what it showed',
+    from: '          if (!old || (only !== undefined && !only.has(entry.missionId))) {',
+    to: '          if (!old) {',
+    expect: 'deletes only the missions the confirmation named, whatever else has aged'
+  },
+  {
+    file: INDEX,
+    name: 'one file that cannot be deleted throws away the record of the ones that were',
+    from: '          try {\n            if (await removeMissionFile(missionId)) deleted.push(missionId)\n          } catch {\n            failed.push(missionId)\n          }',
+    to: '          if (await removeMissionFile(missionId)) deleted.push(missionId)',
+    expect: 'reports a file it could not delete instead of losing the ones it did'
+  },
+  {
+    file: INDEX,
+    name: 'the storage report leaves an unreadable file out of its own count',
+    from: '          unreadableCount += 1\n          return',
+    to: '          return',
+    expect: 'counts a file it cannot read separately, instead of leaving it out of a date it is inside'
+  },
+  {
+    file: INDEX,
     name: 'the history is dated by the file timestamp rather than the record',
     from: '        const updatedAt = parsed.mission === undefined ? undefined : Date.parse(parsed.mission.lastUpdatedAt)',
     to: '        const updatedAt = Date.now()',
@@ -31,22 +80,22 @@ const MUTATIONS = [
   {
     file: INDEX,
     name: 'a preview deletes the files it is only supposed to describe',
-    from: '        if (options.dryRun === true) {\n          deleted.push(missionId)\n          continue\n        }\n',
+    from: '          if (options.dryRun === true) {\n            deleted.push(missionId)\n            continue\n          }\n',
     to: '',
     expect: 'previews exactly what it would delete, and deletes nothing'
   },
   {
     file: INDEX,
     name: 'a prune deletes the earlier turns of a conversation it is keeping',
-    from: '          if (candidates.has(cursor)) {\n            candidates.delete(cursor)\n            keptForContinuity.add(cursor)\n          }\n',
+    from: '            if (candidates.has(cursor)) {\n              candidates.delete(cursor)\n              keptForContinuity.add(cursor)\n            }\n',
     to: '',
     expect: 'keeps an old mission that a kept conversation continues from'
   },
   {
     file: INDEX,
     name: 'a prune walks back only one turn, not the whole conversation',
-    from: '          cursor = parents.get(cursor)\n        }\n      }',
-    to: '          cursor = undefined\n        }\n      }',
+    from: '            cursor = parents.get(cursor)\n          }\n        }',
+    to: '            cursor = undefined\n          }\n        }',
     expect: 'keeps the whole chain behind a kept mission, not just its parent'
   },
   {

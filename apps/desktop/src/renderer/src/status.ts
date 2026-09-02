@@ -35,6 +35,29 @@ export type IntegrationLevel =
   /** Drawn in the design, not implemented at all. */
   | 'planned'
 
+/**
+ * How far each integration actually goes, in ONE place.
+ *
+ * This lived in three files -- the route picker, Settings and the first-launch
+ * panel -- and drifted the moment a runtime was added. On 2026-09-02 the same
+ * screen showed Cursor Agent as READY in Settings and PLANNED in the welcome
+ * panel, which is precisely the "you can always tell what is really in play"
+ * claim failing at the only moment a newcomer looks. A new runtime is now one
+ * edit, not three.
+ */
+export const RUNTIME_INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
+  codex: 'live',
+  claude: 'live',
+  cursor: 'live',
+  gemini: 'planned',
+  omniroute: 'planned'
+}
+
+/** What a runtime this build does not know should be treated as. */
+export function integrationOf(runtimeId: string): IntegrationLevel {
+  return RUNTIME_INTEGRATION[runtimeId] ?? 'planned'
+}
+
 export interface RouteRowStatus {
   readonly tag: RouteTag
   /** Whether the row may be chosen as the active route right now. */

@@ -242,8 +242,11 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     const spec = createCursorPrintCommand(nativeExecutable, { workspacePath });
     expect(spec.runtime).toBe("cursor");
     expect(spec.stdin).toBe("prompt");
+    // Plan mode is the instruction and the sandbox is the enforcement; a
+    // read-only mission asks for both, because plan mode alone was measured
+    // letting a run edit files.
     expect(spec.args).toEqual([
-      "--print", "--output-format", "stream-json", "--stream-partial-output", "--trust", "--workspace", workspacePath, "--mode", "plan",
+      "--print", "--output-format", "stream-json", "--stream-partial-output", "--trust", "--workspace", workspacePath, "--mode", "plan", "--sandbox", "enabled",
     ]);
   });
 

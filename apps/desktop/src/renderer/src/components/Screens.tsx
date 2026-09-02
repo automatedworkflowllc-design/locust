@@ -8,19 +8,16 @@ import type {
   PublicStorageReport,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { formatBytes, missionPhaseView, prunePreviewSummary, routeRowStatus } from '../status.js'
-import type { IntegrationLevel } from '../status.js'
+import {
+  formatBytes,
+  integrationOf,
+  missionPhaseView,
+  prunePreviewSummary,
+  routeRowStatus
+} from '../status.js'
 import { PixelFace } from './PixelFace.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
-
-const INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
-  codex: 'live',
-  claude: 'live',
-  cursor: 'live',
-  gemini: 'planned',
-  omniroute: 'planned'
-}
 
 function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
   return (
@@ -340,7 +337,7 @@ export function SettingsScreen({
           </p>
           <div className="lc-runtimelist">
             {runtimes.map((runtime) => {
-              const status = routeRowStatus(runtime, INTEGRATION[runtime.id] ?? 'planned', false)
+              const status = routeRowStatus(runtime, integrationOf(runtime.id), false)
               return (
                 <div className="lc-runtimerow" key={runtime.id}>
                   <div className="lc-runtimerow__text">
