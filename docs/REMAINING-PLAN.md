@@ -203,8 +203,9 @@ app-server is Codex's). `_smoke/cursor-smoke.mjs`: picked Cursor Agent /
 composer-2.5 in the UI, the run answered "I am Composer, a language model
 trained by Cursor", and the ledger recorded runtime cursor, model
 composer-2.5, resolved name "Composer 2.5", every event signed by the Cursor
-normalizer, reasoning redacted. Open: 217 rows in one picker group wants a
-filter; the packaged smoke does not yet require cursor-agent found.
+normalizer, reasoning redacted. Open: the packaged smoke does not yet
+require cursor-agent found (it did pass with three runtimes connected on a
+bare PATH, so discovery does find it there).
 
 **Gemini CLI. Found; cannot run, by Google's decision.** Installed
 (`@google/gemini-cli` 0.58), discovered, and Colin's Google sign-in went
@@ -252,6 +253,19 @@ a private repo would need a token inside every installed app, which is out.
 Proposed: a separate PUBLIC repo holding only installers, electron-updater
 pointed at it, no secret in the app. Signing is separate spend and only
 affects SmartScreen. Waiting on the owner's yes.
+
+**A picker one runtime could bury. DONE 2026-09-02, live-verified.** Cursor
+lists 217 models on this account, and the picker drew all of them in one
+group: the list scrolls, so the three runtimes underneath were not visibly
+there at all. Each group is now capped at six rows until someone types, and
+a capped group states how many rows it is holding back -- never a silent
+truncation. The row you are currently on is always kept, even when it sits
+below the cut, because a picker that hides your own route cannot be read.
+Searching lifts the cap entirely: narrowing a person's own search a second
+time would misreport what matched. `_smoke/picker-smoke.mjs` verifies this
+in the built app and starts no mission, so it costs no provider quota: six
+rows for Cursor plus "211 more models", 15 rows standing above the last
+runtime rather than 217, and 14 rows with no cap line when "grok" is typed.
 
 **Connections.** The composer's `+` menu names Connectors with a "needs
 reconnection" hint in the reference; nothing behind it exists. Either a real

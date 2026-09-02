@@ -2024,6 +2024,14 @@ textarea {
   color: var(--lc-text-label);
 }
 
+.lc-picker__more {
+  margin: 0;
+  padding: 2px var(--lc-space-4) var(--lc-space-2) 30px;
+  font-size: 10px;
+  letter-spacing: var(--lc-tracking-label-wide);
+  color: var(--lc-text-label);
+}
+
 .lc-picker__row {
   width: 100%;
   display: flex;

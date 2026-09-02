@@ -239,3 +239,66 @@ export function facePresenceFor(status: TeammateStatus): 'working' | 'approval' 
   if (status === 'blocked') return 'blocked'
   return 'none'
 }
+
+/**
+ * How many rows of one runtime's models the picker shows before it stops and
+ * says how many more there are.
+ *
+ * A route group is usually a handful of rows. One runtime here lists 217, and
+ * an unannounced wall of them buries every other runtime below it -- the list
+ * scrolls, so the rows underneath are not visibly there at all. The cap is a
+ * presentation choice and must never read as "this is all there is", so what
+ * it holds back is COUNTED and stated, and typing in the picker's search
+ * lifts it entirely.
+ */
+export const ROUTE_GROUP_LIMIT = 6
+
+export interface CappedRouteRows<TRow> {
+  readonly rows: readonly TRow[]
+  /** Rows held back per group, by group name. A group at the cap is absent. */
+  readonly hiddenByGroup: ReadonlyMap<string, number>
+}
+
+/**
+ * Cap each group to `limit` rows, keeping the order they arrived in.
+ *
+ * Two rules make the cap safe to show:
+ * - The ACTIVE row is always kept, even when it sits below the cut. A picker
+ *   that hides the route you are on cannot be read as a picker at all.
+ * - Nothing is dropped silently: every group over the cap reports how many
+ *   rows it is not showing, and the caller must say so.
+ *
+ * While a search is running there is no cap: the person has narrowed the list
+ * themselves, and a second, invisible narrowing on top of theirs would make
+ * the result a lie about what matched.
+ */
+export function capRouteRows<TRow extends { readonly group: string; readonly tag: RouteTag }>(
+  rows: readonly TRow[],
+  limit: number,
+  searching: boolean
+): CappedRouteRows<TRow> {
+  if (searching) return { rows, hiddenByGroup: new Map() }
+  const counts = new Map<string, number>()
+  const kept: TRow[] = []
+  const hidden = new Map<string, number>()
+  for (const row of rows) {
+    const seen = counts.get(row.group) ?? 0
+    counts.set(row.group, seen + 1)
+    if (seen < limit) {
+      kept.push(row)
+      continue
+    }
+    // Below the cut. The active row displaces the last kept row of its group
+    // rather than being hidden, so the count shown stays exactly `limit`.
+    if (row.tag === 'ACTIVE') {
+      const last = kept.map((entry) => entry.group).lastIndexOf(row.group)
+      if (last >= 0) {
+        kept.splice(last, 1, row)
+        hidden.set(row.group, (hidden.get(row.group) ?? 0) + 1)
+        continue
+      }
+    }
+    hidden.set(row.group, (hidden.get(row.group) ?? 0) + 1)
+  }
+  return { rows: kept, hiddenByGroup: hidden }
+}

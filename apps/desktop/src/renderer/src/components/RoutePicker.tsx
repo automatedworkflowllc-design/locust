@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
-import { routeRowStatus } from '../status.js'
+import { capRouteRows, ROUTE_GROUP_LIMIT, routeRowStatus } from '../status.js'
 import type { IntegrationLevel, RouteTag } from '../status.js'
 
 export interface RouteChoice {
@@ -124,11 +124,20 @@ export function RoutePicker({
     () => buildRows(runtimes, models, active, resolvedModels),
     [runtimes, models, active, resolvedModels]
   )
-  const shown = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    if (needle.length === 0) return rows
-    return rows.filter((row) => `${row.group} ${row.label}`.toLowerCase().includes(needle))
-  }, [rows, query])
+  const needle = query.trim().toLowerCase()
+  const matched = useMemo(
+    () =>
+      needle.length === 0
+        ? rows
+        : rows.filter((row) => `${row.group} ${row.label}`.toLowerCase().includes(needle)),
+    [rows, needle]
+  )
+  // One runtime can list hundreds of models. Every group is capped until the
+  // person searches, and each capped group says how many it is not showing.
+  const { rows: shown, hiddenByGroup } = useMemo(
+    () => capRouteRows(matched, ROUTE_GROUP_LIMIT, needle.length > 0),
+    [matched, needle]
+  )
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === 'Escape') {
@@ -155,9 +164,11 @@ export function RoutePicker({
       </div>
       {notice !== undefined && <div className="lc-picker__notice">{notice}</div>}
       <div className="lc-picker__list">
-        {shown.map((row) => {
+        {shown.map((row, index) => {
           const header = row.group === lastGroup ? undefined : row.group
           lastGroup = row.group
+          // The last row of a capped group carries the count it held back.
+          const hidden = shown[index + 1]?.group === row.group ? 0 : hiddenByGroup.get(row.group) ?? 0
           const isActive = row.tag === 'ACTIVE'
           return (
             <div key={row.key}>
@@ -199,6 +210,11 @@ export function RoutePicker({
                   {row.tag}
                 </span>
               </button>
+              {hidden > 0 && (
+                <p className="lc-picker__more lc-mono">
+                  {hidden} more {hidden === 1 ? 'model' : 'models'} · type to search them
+                </p>
+              )}
             </div>
           )
         })}

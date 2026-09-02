@@ -31,6 +31,27 @@ const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 
 const MUTATIONS = [
   {
+    file: STATUS,
+    name: 'a long picker group is truncated without saying so',
+    from: '    hidden.set(row.group, (hidden.get(row.group) ?? 0) + 1)\n  }\n  return { rows: kept, hiddenByGroup: hidden }',
+    to: '  }\n  return { rows: kept, hiddenByGroup: hidden }',
+    expect: 'caps a long group and counts every row it is not showing'
+  },
+  {
+    file: STATUS,
+    name: 'the cap hides the route the person is actually on',
+    from: "    if (row.tag === 'ACTIVE') {",
+    to: '    if (false) {',
+    expect: 'never hides the route you are on, and still shows the cap'
+  },
+  {
+    file: STATUS,
+    name: 'a search result is capped a second time, under the person',
+    from: '  if (searching) return { rows, hiddenByGroup: new Map() }',
+    to: '  void searching',
+    expect: 'lifts the cap entirely once someone is searching'
+  },
+  {
     file: MISSIONS,
     name: 'a Cursor mission is launched as a Codex command',
     from: "            : runtime === 'cursor'\n              ? createCursorPrintCommand(chosen.executable, {\n                  workspacePath: options.workspacePath,\n                  sandbox: effectiveSandbox,\n                  ...choice\n                })\n",

@@ -10,11 +10,14 @@ import {
   handoffTitle,
   ledgerVerificationLabel,
   missionPhaseView,
+  capRouteRows,
+  ROUTE_GROUP_LIMIT,
   routeRowStatus,
   runtimeIsUsable,
   shortMissionId,
   teammateStatusView
 } from './status.js'
+import type { RouteTag } from './status.js'
 
 function runtime(overrides: Partial<PublicRuntimeStatus> = {}): PublicRuntimeStatus {
   return {
@@ -214,5 +217,51 @@ describe('face activity', () => {
     expect(facePresenceFor('approval-needed')).toBe('approval')
     expect(facePresenceFor('blocked')).toBe('blocked')
     expect(facePresenceFor('idle')).toBe('none')
+  })
+})
+
+describe('a picker group that would not fit', () => {
+  // One runtime lists 217 models on a real account. These stand in for them.
+  const many = (group: string, count: number, activeIndex?: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      group,
+      label: `model-${String(index)}`,
+      tag: (index === activeIndex ? 'ACTIVE' : 'READY') as RouteTag
+    }))
+
+  it('leaves a group that fits exactly as it is, and says nothing about it', () => {
+    const rows = many('Codex CLI', ROUTE_GROUP_LIMIT)
+    const capped = capRouteRows(rows, ROUTE_GROUP_LIMIT, false)
+    expect(capped.rows).toEqual(rows)
+    expect(capped.hiddenByGroup.size).toBe(0)
+  })
+
+  it('caps a long group and counts every row it is not showing', () => {
+    const capped = capRouteRows(many('Cursor Agent', 217), ROUTE_GROUP_LIMIT, false)
+    expect(capped.rows).toHaveLength(ROUTE_GROUP_LIMIT)
+    expect(capped.hiddenByGroup.get('Cursor Agent')).toBe(217 - ROUTE_GROUP_LIMIT)
+  })
+
+  it('keeps the runtimes below a long group reachable', () => {
+    const capped = capRouteRows(
+      [...many('Cursor Agent', 217), ...many('Claude Code', 3)],
+      ROUTE_GROUP_LIMIT,
+      false
+    )
+    expect(capped.rows.filter((row) => row.group === 'Claude Code')).toHaveLength(3)
+  })
+
+  it('never hides the route you are on, and still shows the cap', () => {
+    const capped = capRouteRows(many('Cursor Agent', 217, 180), ROUTE_GROUP_LIMIT, false)
+    expect(capped.rows).toHaveLength(ROUTE_GROUP_LIMIT)
+    expect(capped.rows.some((row) => row.tag === 'ACTIVE')).toBe(true)
+    expect(capped.hiddenByGroup.get('Cursor Agent')).toBe(217 - ROUTE_GROUP_LIMIT)
+  })
+
+  it('lifts the cap entirely once someone is searching', () => {
+    const rows = many('Cursor Agent', 217)
+    const capped = capRouteRows(rows, ROUTE_GROUP_LIMIT, true)
+    expect(capped.rows).toEqual(rows)
+    expect(capped.hiddenByGroup.size).toBe(0)
   })
 })
