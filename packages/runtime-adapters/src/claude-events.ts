@@ -94,10 +94,18 @@ export function summarizeInit(value: unknown): JsonObject {
  * treating it as exhaustion would fall back to a worse model on every long
  * session while the good one still works.
  */
-export function limitKindFor(status: unknown): "quota-exhausted" | "temporary-rate-limit" {
+/**
+ * A rate-limit snapshot only means something when it says something. Claude
+ * sends one of these on ordinary turns to report usage, and `allowed` means
+ * the request went through -- surfacing that as a limit puts a red card over
+ * a run that was never in trouble. `allowed_warning` is the approaching-limit
+ * warning, and anything else (a rejection) is the real thing.
+ */
+export function limitKindFor(status: unknown): "quota-exhausted" | "temporary-rate-limit" | undefined {
   const text = typeof status === "string" ? status.toLowerCase() : "";
+  if (text === "allowed") return undefined;
   if (text.includes("allowed")) return "temporary-rate-limit";
-  if (text.length === 0) return "temporary-rate-limit";
+  if (text.length === 0) return undefined;
   return "quota-exhausted";
 }
 
@@ -167,6 +175,8 @@ export function createClaudeEventNormalizer(
     if (type === "rate_limit_event") {
       const info = isObject(parsed.rate_limit_info) ? parsed.rate_limit_info : {};
       const kind = limitKindFor(info.status);
+      // Nothing to say: the request was allowed, so this is a usage snapshot.
+      if (kind === undefined) return [];
       const resets = resetsAtIso(info.resetsAt);
       const window = stringValue(info.rateLimitType) ?? "window";
       const status = stringValue(info.status) ?? "unknown";

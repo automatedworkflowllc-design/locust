@@ -158,7 +158,8 @@ export function Composer({
   // Effort is offered ONLY where the chosen model says it is supported. The
   // design's rule is that an unsupported effort must show as unsupported
   // rather than be sent as a silent no-op.
-  const supportedEfforts = models.find((model) => model.id === route.model)?.supportedEfforts ?? []
+  const supportedEfforts =
+    models.find((model) => model.runtime === route.runtime && model.id === route.model)?.supportedEfforts ?? []
   // Swarm means "this model's maximum", and the catalog orders efforts lowest
   // to highest, so the maximum is the last one THIS model reported -- not a
   // fixed name that some models do not have.

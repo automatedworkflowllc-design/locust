@@ -4,6 +4,7 @@ import {
   assertSafeRuntimeCommand,
   createClaudePrintCommand,
   createCodexExecCommand,
+  parseClaudeModelHints,
   createNodeProbeRunner,
   createPathExecutableLocator,
   discoverInstalledRuntimes,
@@ -218,5 +219,53 @@ describe("bounded Node probe runner", () => {
     });
     expect(result.timedOut).toBe(true);
     expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+});
+
+describe("model and effort on the command line", () => {
+  const executable = {
+    commandName: "x",
+    discoveredPath: process.platform === "win32" ? "C:\\tools\\x.exe" : "/tools/x",
+    executablePath: process.platform === "win32" ? "C:\\tools\\x.exe" : "/tools/x",
+    prefixArgs: [],
+    kind: "native" as const,
+  };
+  const workspacePath = process.platform === "win32" ? "C:\\work" : "/work";
+
+  it("passes the chosen model and effort to Claude Code", () => {
+    const spec = createClaudePrintCommand(executable, { workspacePath, model: "fable", effort: "high" });
+    expect(spec.args).toContain("--model");
+    expect(spec.args[spec.args.indexOf("--model") + 1]).toBe("fable");
+    expect(spec.args[spec.args.indexOf("--effort") + 1]).toBe("high");
+  });
+
+  it("passes effort to codex exec through the config override its docs describe", () => {
+    const spec = createCodexExecCommand(executable, { workspacePath, model: "gpt-5.6-sol", effort: "xhigh" });
+    expect(spec.args[spec.args.indexOf("-c") + 1]).toBe("model_reasoning_effort=xhigh");
+  });
+
+  it("refuses an effort that is not one plain word", () => {
+    expect(() => createClaudePrintCommand(executable, { workspacePath, effort: "high; rm -rf" })).toThrow("Effort is invalid");
+    expect(() => createCodexExecCommand(executable, { workspacePath, effort: "" })).toThrow("Effort is invalid");
+  });
+
+  it("reads the aliases and effort levels the Claude CLI advertises in its own help", () => {
+    const help = [
+      "  --model <model>                       Model for the current session. Provide",
+      "                                        an alias for the latest model (e.g.",
+      "                                        'fable', 'opus', or 'sonnet') or a",
+      "                                        model's full name (e.g.",
+      "                                        'claude-fable-5').",
+      "  --effort <level>                      Effort level for the current session",
+      "                                        (low, medium, high, xhigh, max)",
+    ].join("\n");
+    expect(parseClaudeModelHints(help)).toEqual({
+      aliases: ["fable", "opus", "sonnet"],
+      efforts: ["low", "medium", "high", "xhigh", "max"],
+    });
+  });
+
+  it("names nothing when the help does not", () => {
+    expect(parseClaudeModelHints("Usage: claude [options]")).toBeUndefined();
   });
 });

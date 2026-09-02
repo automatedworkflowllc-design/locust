@@ -446,8 +446,13 @@ if (!ownsSingleInstanceLock) {
           return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const
         }
         const peer = await peerContextFor(payload.teammateId)
+        const approveModel = typeof payload.model === 'string' ? payload.model : undefined
+        const approveEffort = typeof payload.effort === 'string' ? payload.effort : undefined
         try {
-          const mission = await appServerMissions.start(prompt, peer)
+          const mission = await appServerMissions.start(prompt, peer, {
+            ...(approveModel === undefined ? {} : { model: approveModel }),
+            ...(approveEffort === undefined ? {} : { effort: approveEffort })
+          })
           await assignOwner(peer?.self.teammateId, mission.missionId)
           return {
             ok: true,
@@ -455,7 +460,7 @@ if (!ownsSingleInstanceLock) {
               runId: mission.runId,
               missionId: mission.missionId,
               runtime: 'codex',
-              model: 'account-default',
+              model: approveModel !== undefined && approveModel !== 'account-default' ? approveModel : 'account-default',
               resolvedRouteId: 'codex-app-server:default',
               cliVersion: null,
               sandbox: 'workspace-write',
@@ -521,7 +526,15 @@ if (!ownsSingleInstanceLock) {
       const runId = typeof request === 'object' && request !== null
         ? (request as Partial<CodexMissionCancelRequest>).runId
         : undefined
-      return codexMissions.cancel(runId)
+      const viaExec = codexMissions.cancel(runId)
+      if (viaExec.ok || typeof runId !== 'string') return viaExec
+      // Not an exec run: the approval transport owns its own runs, and a stop
+      // control that only knew one transport reported "no longer active" at a
+      // run that was very much still going.
+      if (appServerMissions.cancel(runId)) {
+        return { ok: true, data: { runId, state: 'cancellation-requested' } } as const
+      }
+      return viaExec
     })
 
     ipcMain.handle(MISSION_HANDOFF_CHANNEL, async (event, request: unknown) => {
@@ -540,6 +553,18 @@ if (!ownsSingleInstanceLock) {
       const runtime = payload.runtime === 'claude' ? 'claude' : 'codex'
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
+      // An approve-each run cannot be handed off yet, and saying "no longer
+      // active" about a run that is still going would be a lie. Refused
+      // without touching the run.
+      if (typeof payload.runId === 'string' && appServerMissions.has(payload.runId)) {
+        return {
+          ok: false,
+          error: {
+            code: 'HANDOFF_REFUSED',
+            message: 'A mission running with per-action approvals cannot be handed to another runtime yet. It is still running.'
+          }
+        } as const
+      }
       try {
         const response = await codexMissions.handOff(
           payload.runId,

@@ -523,12 +523,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // Claude's print command carries its own restricted argv; only Codex
           // takes a sandbox flag, so write mode is a Codex capability today and
           // a Claude mission stays read-only whatever the composer said.
+          // Model and effort go to whichever runtime runs. Effort is only ever
+          // one the catalog reported for that model; the builder refuses
+          // anything but a plain word regardless.
+          const chosenEffort = route.effort
+          const choice = {
+            ...(chosenModel === undefined ? {} : { model: chosenModel }),
+            ...(chosenEffort === undefined ? {} : { effort: chosenEffort })
+          }
           const command = runtime === 'claude'
-            ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath })
+            ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath, ...choice })
             : createCodexExecCommand(chosen.executable, {
                 workspacePath: options.workspacePath,
                 sandbox: effectiveSandbox,
-                ...(chosenModel === undefined ? {} : { model: chosenModel })
+                ...choice
               })
           process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
         } catch {

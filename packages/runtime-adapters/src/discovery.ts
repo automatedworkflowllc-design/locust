@@ -3,6 +3,7 @@ import {
   CODEX_REQUIRED_FEATURES,
   detectSupportedFeatures,
   OMNIROUTE_REQUIRED_FEATURES,
+  parseClaudeModelHints,
 } from "./commands.js";
 import type {
   CommandResult,
@@ -177,12 +178,14 @@ async function discoverOne(
     "capabilities",
     definition.capabilityArgs,
   );
+  const capabilityText = succeeded(capabilityOutcome)
+    ? `${capabilityOutcome.result.stdout}\n${capabilityOutcome.result.stderr}`
+    : "";
   const supportedFeatures = succeeded(capabilityOutcome)
-    ? detectSupportedFeatures(
-        definition.id,
-        `${capabilityOutcome.result.stdout}\n${capabilityOutcome.result.stderr}`,
-      )
+    ? detectSupportedFeatures(definition.id, capabilityText)
     : [];
+  // The same help text names the models the CLI accepts; only Claude's does.
+  const modelHints = definition.id === "claude" ? parseClaudeModelHints(capabilityText) : undefined;
 
   if (!succeeded(capabilityOutcome)) {
     diagnostics.push(
@@ -255,6 +258,7 @@ async function discoverOne(
     supportedFeatures,
     requiredFeatures: definition.requiredFeatures,
     diagnostics,
+    ...(modelHints === undefined ? {} : { modelHints }),
   };
   return version ? { ...base, version } : base;
 }

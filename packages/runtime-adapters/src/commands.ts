@@ -1,3 +1,4 @@
+import type { RuntimeModelHints } from "./types.js";
 import type {
   ExecutableLaunch,
   RuntimeCommandSpec,
@@ -151,7 +152,35 @@ export type MissionSandbox = "read-only" | "workspace-write";
 export interface RuntimeCommandOptions {
   readonly workspacePath: string;
   readonly model?: string;
+  /** A reasoning effort the runtime reported supporting for that model. */
+  readonly effort?: string;
   readonly sandbox?: MissionSandbox;
+}
+
+const EFFORT = /^[a-z]{1,16}$/;
+
+/** An effort level is one plain word; anything else never reaches an argv. */
+function requireEffort(value: string): string {
+  if (!EFFORT.test(value)) throw new Error("Effort is invalid");
+  return value;
+}
+
+/**
+ * Read what the Claude Code CLI says about models in its own `--help`: the
+ * aliases it accepts for the newest model of each family, and the effort
+ * levels it takes. Missing text yields nothing, never a guess.
+ */
+export function parseClaudeModelHints(helpText: string): RuntimeModelHints | undefined {
+  const aliasClause = /alias for the latest model \(e\.g\.\s*([^)]*)\)/.exec(helpText);
+  const aliases = aliasClause
+    ? [...aliasClause[1]!.matchAll(/'([a-z0-9][a-z0-9.-]{0,30})'/g)].map((match) => match[1]!)
+    : [];
+  const effortClause = /--effort <level>[\s\S]{0,200}?\(([a-z, ]+)\)/.exec(helpText);
+  const efforts = effortClause
+    ? effortClause[1]!.split(",").map((entry) => entry.trim()).filter((entry) => EFFORT.test(entry))
+    : [];
+  if (aliases.length === 0 && efforts.length === 0) return undefined;
+  return { aliases: [...new Set(aliases)], efforts: [...new Set(efforts)] };
 }
 
 function sandboxArgument(sandbox: MissionSandbox | undefined): MissionSandbox {
@@ -171,6 +200,11 @@ export function createCodexExecCommand(
   const args = ["exec", "--json", "--sandbox", sandboxArgument(options.sandbox), "-C", options.workspacePath];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
+  }
+  if (options.effort !== undefined) {
+    // `codex exec` has no effort flag; the config override is how the CLI's
+    // own docs set reasoning effort for a run.
+    args.push("-c", `model_reasoning_effort=${requireEffort(options.effort)}`);
   }
   args.push("-");
   return baseSpec("codex", executable, options.workspacePath, args);
@@ -196,6 +230,9 @@ export function createClaudePrintCommand(
   ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
+  }
+  if (options.effort !== undefined) {
+    args.push("--effort", requireEffort(options.effort));
   }
   return baseSpec("claude", executable, options.workspacePath, args);
 }

@@ -25,8 +25,37 @@ const BRIEFING = join(ROOT, 'src', 'main', 'workroom-briefing.ts')
 const SHARE = join(ROOT, 'src', 'shared', 'peer-share.ts')
 const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
+const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: CATALOG,
+    name: 'a signed-out Claude still offers its models',
+    from: "  if (claude?.readiness !== 'ready' || hints === undefined) return []",
+    to: '  if (hints === undefined) return []',
+    expect: 'offers nothing for a Claude that is not ready, or that advertised nothing'
+  },
+  {
+    file: CATALOG,
+    name: 'a Codex failure hides the Claude models too',
+    from: "      return claudeModels.length > 0\n        ? { ok: true, data: { models: claudeModels } }\n        : { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }",
+    to: "      return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }",
+    expect: 'lists Claude models even when Codex cannot be read'
+  },
+  {
+    file: APPROVALS,
+    name: 'stopping one approve-each run kills every run',
+    from: "    run.client?.dispose(why)\n    run.process?.kill()\n  }",
+    to: "    run.client?.dispose(why)\n    for (const each of [...runs.values(), run]) each.process?.kill()\n  }",
+    expect: 'stops one approve-each run by its id and leaves the other going'
+  },
+  {
+    file: APPROVALS,
+    name: 'stopping one approve-each run refuses every pending approval',
+    from: '      if (pending.runId !== runId) continue\n',
+    to: '',
+    expect: 'answers only the stopped run’s approvals with a refusal'
+  },
   {
     file: VIEW,
     name: 'the runtime’s setup talk lands in the thread',
@@ -114,8 +143,8 @@ const MUTATIONS = [
   {
     file: APPROVALS,
     name: 'an approval-mode run shares before it has completed',
-    from: '    if (!wasComplete && mission.transcript.completed && mission.peer !== undefined && peerExchange !== undefined) {',
-    to: '    if (mission.peer !== undefined && peerExchange !== undefined) {',
+    from: '    if (!wasComplete && run.transcript.completed && run.peer !== undefined && peerExchange !== undefined) {',
+    to: '    if (run.peer !== undefined && peerExchange !== undefined) {',
     expect: 'shares from an approval-mode run once it completes, and not before'
   },
   {
@@ -275,8 +304,8 @@ const MUTATIONS = [
   {
     file: APPROVALS,
     name: 'a dead runtime leaves approvals pending forever',
-    from: "        for (const [, pending] of approvals) pending.resolve({ decision: 'reject' })\n        approvals.clear()\n        active = undefined",
-    to: '        active = undefined',
+    from: "        child.onExit(() => {\n          stop(run, 'transport-lost', 'The runtime exited.')\n        })",
+    to: "        child.onExit(() => {\n          runs.delete(run.runId)\n        })",
     expect: 'releases a pending approval when the runtime dies'
   },
   {
@@ -425,7 +454,8 @@ const originals = new Map([
   [BRIEFING, readFileSync(BRIEFING, 'utf8')],
   [SHARE, readFileSync(SHARE, 'utf8')],
   [VIEW, readFileSync(VIEW, 'utf8')],
-  [TEAMMATES, readFileSync(TEAMMATES, 'utf8')]
+  [TEAMMATES, readFileSync(TEAMMATES, 'utf8')],
+  [CATALOG, readFileSync(CATALOG, 'utf8')]
 ])
 let problems = 0
 

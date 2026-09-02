@@ -6,12 +6,14 @@ import type { PublicModel } from '../../shared/ipc.js'
 const MODELS: readonly PublicModel[] = [
   {
     id: 'sol',
+    runtime: 'codex',
     displayName: 'Sol',
     description: '',
     supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
   },
-  { id: 'luna', displayName: 'Luna', description: '', supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
-  { id: 'plain', displayName: 'Plain', description: '', supportedEfforts: [] }
+  { id: 'luna', runtime: 'codex', displayName: 'Luna', description: '', supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+  { id: 'plain', runtime: 'codex', displayName: 'Plain', description: '', supportedEfforts: [] },
+  { id: 'fable', runtime: 'claude', displayName: 'Fable (latest)', description: '', supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max'] }
 ]
 
 describe('swarm effort', () => {
@@ -39,5 +41,12 @@ describe('swarm effort', () => {
     // The composer shows the maximum while swarm is on, so what is SENT has to
     // match what is shown.
     expect(swarmEffortFor(MODELS, 'sol', true, 'low')).toBe('ultra')
+  })
+})
+
+describe('swarm effort per runtime', () => {
+  it("reads a Claude alias's maximum from the Claude entry, never a Codex one", () => {
+    expect(swarmEffortFor(MODELS, 'fable', true, undefined, 'claude')).toBe('max')
+    expect(swarmEffortFor(MODELS, 'fable', true, undefined, 'codex')).toBeUndefined()
   })
 })

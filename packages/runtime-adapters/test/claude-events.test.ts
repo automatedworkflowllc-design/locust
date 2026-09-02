@@ -134,7 +134,10 @@ describe("trap 1: the answer arrives twice", () => {
 describe("trap 3: a rate-limit warning is not exhaustion", () => {
   it("maps allowed_warning to a temporary limit", () => {
     expect(limitKindFor("allowed_warning")).toBe("temporary-rate-limit");
-    expect(limitKindFor("allowed")).toBe("temporary-rate-limit");
+    // `allowed` was ALSO a temporary limit here until a live run put a red
+    // "Provider rate limit" card over a mission that had just completed
+    // normally. It reports that the request went through: nothing to say.
+    expect(limitKindFor("allowed")).toBeUndefined();
     // Falling back to a worse model while the good one still works is the
     // failure this prevents.
     expect(limitKindFor("rejected")).toBe("quota-exhausted");
@@ -166,6 +169,27 @@ describe("trap 3: a rate-limit warning is not exhaustion", () => {
     expect(event?.type).toBe("route.limit_detected");
     expect(event?.type === "route.limit_detected" && event.payload.kind).toBe("temporary-rate-limit");
     expect(event?.type === "route.limit_detected" && event.payload.message).toContain("seven_day");
+  });
+
+  it("says nothing about a snapshot that reports the request was allowed", () => {
+    // Claude reports usage on ordinary turns. A live run surfaced one of these
+    // as a red "Provider rate limit" card over a mission that had just
+    // completed normally; `allowed` means nothing was wrong.
+    expect(
+      normalizer().accept(
+        record({
+          type: "rate_limit_event",
+          rate_limit_info: { status: "allowed", rateLimitType: "five_hour", resetsAt: 1788764400 },
+        }),
+      ),
+    ).toEqual([]);
+    expect(limitKindFor("allowed")).toBeUndefined();
+    expect(limitKindFor(undefined)).toBeUndefined();
+  });
+
+  it("still reports an approaching limit and a rejection", () => {
+    expect(limitKindFor("allowed_warning")).toBe("temporary-rate-limit");
+    expect(limitKindFor("rejected")).toBe("quota-exhausted");
   });
 });
 

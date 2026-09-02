@@ -71,12 +71,27 @@ export interface AppServerMission {
 export class PeerRecordError extends Error {}
 
 export interface AppServerMissionService {
-  start(prompt: string, peer?: MissionPeerContext): Promise<AppServerMission>
+  start(
+    prompt: string,
+    peer?: MissionPeerContext,
+    route?: { readonly model?: string; readonly effort?: string }
+  ): Promise<AppServerMission>
   decide(answer: MissionApprovalAnswer): boolean
-  cancel(): void
+  /** Stop one run. False when no such run is live here. */
+  cancel(runId: string): boolean
+  /** Whether this transport owns a live run by that id. */
+  has(runId: string): boolean
   dispose(): Promise<void>
   readonly pendingApprovalCount: number
 }
+
+/**
+ * Same bound as the exec transport, for the same reason: each live run is a
+ * provider process tree holding a ledger writer, and four is already more
+ * than one person can follow.
+ */
+export const MAX_LIVE_APP_SERVER_MISSIONS = 4
+const NOBODY = ''
 
 const MAX_APPROVAL_DETAIL = 4_000
 const MAX_PENDING_APPROVALS = 16
@@ -154,48 +169,72 @@ export function createAppServerMissionService(
   const now = options.now ?? (() => new Date())
 
   interface Pending {
+    readonly runId: string
     readonly resolve: (value: JsonValue) => void
   }
 
-  let process: AppServerProcess | undefined
-  let client: AppServerClient | undefined
-  let active:
-    | {
-        runId: string
-        missionId: string
-        peer: MissionPeerContext | undefined
-        transcript: TranscriptTracker
-      }
-    | undefined
-  let normalizer: ReturnType<typeof createAppServerEventNormalizer> | undefined
+  /** One live run: its process tree, its client, and what it has said. */
+  interface LiveRun {
+    readonly runId: string
+    readonly missionId: string
+    readonly peer: MissionPeerContext | undefined
+    readonly transcript: TranscriptTracker
+    readonly normalizer: ReturnType<typeof createAppServerEventNormalizer>
+    process: AppServerProcess | undefined
+    client: AppServerClient | undefined
+  }
+
+  // Runs side by side, one per teammate, exactly as the exec transport does.
+  const runs = new Map<string, LiveRun>()
+  const starting = new Set<string>()
   const approvals = new Map<string, Pending>()
   let disposed = false
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined
       ? undefined
       : createPeerExchange({ workroom: options.workroom, ledger: options.ledger })
+  const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.self.teammateId ?? NOBODY
 
-  const persistAndEmit = async (events: readonly unknown[]): Promise<void> => {
-    if (active === undefined || events.length === 0) return
-    const mission = active
+  const persistAndEmit = async (run: LiveRun, events: readonly unknown[]): Promise<void> => {
+    if (events.length === 0) return
     // Persist-before-emit, exactly as the exec path does. A receipt the user
     // has seen must already be on disk.
-    await options.ledger.appendEvents(mission.missionId, events as never)
+    await options.ledger.appendEvents(run.missionId, events as never)
     // Tracked only once durable, so a share is read from what the ledger holds.
-    const wasComplete = mission.transcript.completed
-    mission.transcript.track(events as readonly NormalizedRuntimeEvent[])
-    for (const event of events) options.emitEvent(mission.runId, mission.missionId, event)
+    const wasComplete = run.transcript.completed
+    run.transcript.track(events as readonly NormalizedRuntimeEvent[])
+    for (const event of events) options.emitEvent(run.runId, run.missionId, event)
     // Same rule as the exec path: only a run that finished on its own terms
     // speaks for its teammate, and exactly once.
-    if (!wasComplete && mission.transcript.completed && mission.peer !== undefined && peerExchange !== undefined) {
-      const text = mission.transcript.latestFinal
+    if (!wasComplete && run.transcript.completed && run.peer !== undefined && peerExchange !== undefined) {
+      const text = run.transcript.latestFinal
       if (text !== undefined) {
         await peerExchange.share(
-          { runId: mission.runId, missionId: mission.missionId, peer: mission.peer, text },
+          { runId: run.runId, missionId: run.missionId, peer: run.peer, text },
           (update) => options.emitUpdate?.(update)
         )
       }
     }
+  }
+
+  /** Answer every approval a run still holds open with a refusal, and forget them. */
+  const releaseApprovals = (runId: string): void => {
+    for (const [approvalId, pending] of approvals) {
+      if (pending.runId !== runId) continue
+      approvals.delete(approvalId)
+      pending.resolve({ decision: 'reject' })
+    }
+  }
+
+  const stop = (run: LiveRun, reason: 'cancelled' | 'transport-lost', why: string): void => {
+    if (runs.get(run.runId) !== run) return
+    runs.delete(run.runId)
+    const produced = run.normalizer.finish(reason)
+    void persistAndEmit(run, produced).catch(() => undefined)
+    // Never leave a person staring at a card nothing will answer.
+    releaseApprovals(run.runId)
+    run.client?.dispose(why)
+    run.process?.kill()
   }
 
   return {
@@ -203,156 +242,196 @@ export function createAppServerMissionService(
       return approvals.size
     },
 
-    async start(prompt: string, peer?: MissionPeerContext): Promise<AppServerMission> {
+    has(runId: string): boolean {
+      return runs.has(runId)
+    },
+
+    async start(
+      prompt: string,
+      peer?: MissionPeerContext,
+      route?: { readonly model?: string; readonly effort?: string }
+    ): Promise<AppServerMission> {
       if (disposed) throw new Error('The mission service is shutting down.')
-      if (active !== undefined) throw new Error('A mission is already running.')
-
-      const runtimes = await options.discover()
-      const codex = runtimes.find((entry) => entry.id === 'codex')
-      if (codex?.readiness !== 'ready' || codex.executable === undefined) {
-        throw new Error('Codex CLI is not ready.')
+      const owner = ownerKeyOf(peer)
+      // One live mission per teammate, and missions of nobody's one at a time.
+      if (starting.has(owner) || [...runs.values()].some((run) => ownerKeyOf(run.peer) === owner)) {
+        throw new Error(
+          peer === undefined
+            ? 'A mission is already running.'
+            : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
+        )
       }
-
-      const runId = `run_${createId()}`
-      const missionId = `mission_${createId()}`
-      const createdAt = now().toISOString()
-
-      // Same shape as the exec path: the person's words are the recorded
-      // prompt; what the runtime is sent adds the waiting messages and the
-      // share form, and the ledger names the delivered messages by id.
-      let runtimePrompt = prompt
-      let delivered: readonly WorkroomMessage[] = []
-      let peerDeliveryFailed = false
-      if (peer !== undefined && peerExchange !== undefined) {
-        const prepared = await peerExchange.prepare(prompt, peer)
-        runtimePrompt = prepared.runtimePrompt
-        delivered = prepared.delivered
-        peerDeliveryFailed = prepared.failed
+      if (starting.size + runs.size >= MAX_LIVE_APP_SERVER_MISSIONS) {
+        throw new Error(`Up to ${MAX_LIVE_APP_SERVER_MISSIONS} missions can run at once. Wait for one to finish or stop it first.`)
       }
-
-      await options.ledger.createMission({
-        missionId,
-        runId,
-        prompt,
-        runtime: 'codex',
-        model: 'account-default',
-        requestedRouteId: 'codex',
-        resolvedRouteId: 'codex-app-server:default',
-        cliVersion: codex.version?.version ?? null,
-        workspaceId: `ws_${createId()}`.slice(0, 40),
-        // Approvals only mean something when the agent could otherwise act, so
-        // this mode runs write-capable and stops to ask.
-        sandbox: 'workspace-write',
-        executionPolicyVersion: 1,
-        createdAt
-      })
-
-      if (peerExchange !== undefined && delivered.length > 0) {
-        try {
-          await peerExchange.recordReceived(missionId, delivered, createdAt)
-        } catch {
-          await options.ledger.appendHostFailure(missionId, {
-            code: 'runtime-start-failed',
-            message: 'The messages this mission was shown could not be recorded in the local ledger.',
-            occurredAt: now().toISOString()
-          }).catch(() => undefined)
-          throw new PeerRecordError('The messages this mission was shown could not be recorded in the durable local ledger.')
+      starting.add(owner)
+      try {
+        const runtimes = await options.discover()
+        const codex = runtimes.find((entry) => entry.id === 'codex')
+        if (codex?.readiness !== 'ready' || codex.executable === undefined) {
+          throw new Error('Codex CLI is not ready.')
         }
-      }
 
-      active = { runId, missionId, peer, transcript: createTranscriptTracker() }
-      normalizer = createAppServerEventNormalizer({
-        runId,
-        missionId,
-        runtime: 'codex',
-        ...(codex.version?.version === undefined ? {} : { cliVersion: codex.version.version }),
-        now
-      })
+        const runId = `run_${createId()}`
+        const missionId = `mission_${createId()}`
+        const createdAt = now().toISOString()
 
-      const child = options.spawn(codex.executable.executablePath, [
-        ...codex.executable.prefixArgs,
-        'app-server'
-      ])
-      process = child
+        // Same shape as the exec path: the person's words are the recorded
+        // prompt; what the runtime is sent adds the waiting messages and the
+        // share form, and the ledger names the delivered messages by id.
+        let runtimePrompt = prompt
+        let delivered: readonly WorkroomMessage[] = []
+        let peerDeliveryFailed = false
+        if (peer !== undefined && peerExchange !== undefined) {
+          const prepared = await peerExchange.prepare(prompt, peer)
+          runtimePrompt = prepared.runtimePrompt
+          delivered = prepared.delivered
+          peerDeliveryFailed = prepared.failed
+        }
 
-      const rpc = createAppServerClient({
-        transport: {
-          send: (line) => child.write(line),
-          close: () => child.kill()
-        },
-        onNotification: (notification) => {
-          const produced = normalizer?.accept(notification) ?? []
-          void persistAndEmit(produced).catch(() => undefined)
-        },
-        onRequest: async (request) => {
-          const described = describeApproval(request)
-          if (described === undefined) {
-            // A request this build does not understand is refused rather than
-            // guessed at. Approving something unnamed is the one answer that
-            // can never be right.
-            return { decision: 'reject' }
+        await options.ledger.createMission({
+          missionId,
+          runId,
+          prompt,
+          runtime: 'codex',
+          model: route?.model !== undefined && route.model !== 'account-default' ? route.model : 'account-default',
+          requestedRouteId: 'codex',
+          resolvedRouteId: 'codex-app-server:default',
+          cliVersion: codex.version?.version ?? null,
+          workspaceId: `ws_${createId()}`.slice(0, 40),
+          // Approvals only mean something when the agent could otherwise act,
+          // so this mode runs write-capable and stops to ask.
+          sandbox: 'workspace-write',
+          executionPolicyVersion: 1,
+          createdAt
+        })
+
+        if (peerExchange !== undefined && delivered.length > 0) {
+          try {
+            await peerExchange.recordReceived(missionId, delivered, createdAt)
+          } catch {
+            await options.ledger.appendHostFailure(missionId, {
+              code: 'runtime-start-failed',
+              message: 'The messages this mission was shown could not be recorded in the local ledger.',
+              occurredAt: now().toISOString()
+            }).catch(() => undefined)
+            throw new PeerRecordError('The messages this mission was shown could not be recorded in the durable local ledger.')
           }
-          if (approvals.size >= MAX_PENDING_APPROVALS) return { decision: 'reject' }
-          const approvalId = `ap_${createId()}`
-          return await new Promise<JsonValue>((resolve) => {
-            approvals.set(approvalId, { resolve })
-            options.emitApproval({
-              approvalId,
-              runId,
-              missionId,
-              kind: described.kind,
-              summary: described.summary,
-              detail: described.detail,
-              cwd: described.cwd,
-              requestedAt: now().toISOString()
+        }
+
+        const normalizer = createAppServerEventNormalizer({
+          runId,
+          missionId,
+          runtime: 'codex',
+          ...(codex.version?.version === undefined ? {} : { cliVersion: codex.version.version }),
+          now
+        })
+        const run: LiveRun = {
+          runId,
+          missionId,
+          peer,
+          transcript: createTranscriptTracker(),
+          normalizer,
+          process: undefined,
+          client: undefined
+        }
+        runs.set(runId, run)
+
+        const child = options.spawn(codex.executable.executablePath, [
+          ...codex.executable.prefixArgs,
+          'app-server'
+        ])
+        run.process = child
+
+        const rpc = createAppServerClient({
+          transport: {
+            send: (line) => child.write(line),
+            close: () => child.kill()
+          },
+          onNotification: (notification) => {
+            const produced = normalizer.accept(notification)
+            void persistAndEmit(run, produced).catch(() => undefined)
+          },
+          onRequest: async (request) => {
+            const described = describeApproval(request)
+            if (described === undefined) {
+              // A request this build does not understand is refused rather
+              // than guessed at. Approving something unnamed is the one answer
+              // that can never be right.
+              return { decision: 'reject' }
+            }
+            if (approvals.size >= MAX_PENDING_APPROVALS) return { decision: 'reject' }
+            const approvalId = `ap_${createId()}`
+            return await new Promise<JsonValue>((resolve) => {
+              approvals.set(approvalId, { runId, resolve })
+              options.emitApproval({
+                approvalId,
+                runId,
+                missionId,
+                kind: described.kind,
+                summary: described.summary,
+                detail: described.detail,
+                cwd: described.cwd,
+                requestedAt: now().toISOString()
+              })
             })
+          },
+          onDiagnostic: () => undefined
+        })
+        run.client = rpc
+
+        child.onData((chunk) => rpc.accept(chunk))
+        child.onExit(() => {
+          stop(run, 'transport-lost', 'The runtime exited.')
+        })
+
+        try {
+          await rpc.request('initialize', {
+            clientInfo: { name: 'locust', version: '0.1.0' }
           })
-        },
-        onDiagnostic: () => undefined
-      })
-      client = rpc
+          rpc.notify('initialized')
+          const thread = await rpc.request('thread/start', {
+            cwd: options.workspacePath,
+            sandbox: 'workspace-write',
+            approvalPolicy: 'untrusted'
+          })
+          const threadRecord = (typeof thread === 'object' && thread !== null ? thread : {}) as Record<string, unknown>
+          const inner = (typeof threadRecord.thread === 'object' && threadRecord.thread !== null
+            ? threadRecord.thread
+            : {}) as Record<string, unknown>
+          const threadId = typeof inner.id === 'string' ? inner.id : undefined
+          if (threadId === undefined) throw new Error('The runtime did not start a thread.')
 
-      child.onData((chunk) => rpc.accept(chunk))
-      child.onExit(() => {
-        const produced = normalizer?.finish('transport-lost') ?? []
-        void persistAndEmit(produced).catch(() => undefined)
-        // Never leave a person staring at a card nothing will answer.
-        for (const [, pending] of approvals) pending.resolve({ decision: 'reject' })
-        approvals.clear()
-        active = undefined
-      })
+          // Route and effort are per-turn parameters on this transport. Only
+          // a plain word is passed as effort, whatever the request said.
+          const model = route?.model !== undefined && route.model !== 'account-default' ? route.model : undefined
+          const effort = route?.effort !== undefined && /^[a-z]{1,16}$/.test(route.effort) ? route.effort : undefined
+          await rpc.request('turn/start', {
+            threadId,
+            approvalPolicy: 'untrusted',
+            input: [{ type: 'text', text: runtimePrompt }],
+            ...(model === undefined ? {} : { model }),
+            ...(effort === undefined ? {} : { effort })
+          })
+        } catch (error) {
+          // A run that never got its turn is not left half-registered: the
+          // process goes, the slot frees, and the caller hears why.
+          stop(run, 'transport-lost', 'The runtime did not start.')
+          throw error
+        }
 
-      await rpc.request('initialize', {
-        clientInfo: { name: 'locust', version: '0.1.0' }
-      })
-      rpc.notify('initialized')
-      const thread = await rpc.request('thread/start', {
-        cwd: options.workspacePath,
-        sandbox: 'workspace-write',
-        approvalPolicy: 'untrusted'
-      })
-      const threadRecord = (typeof thread === 'object' && thread !== null ? thread : {}) as Record<string, unknown>
-      const inner = (typeof threadRecord.thread === 'object' && threadRecord.thread !== null
-        ? threadRecord.thread
-        : {}) as Record<string, unknown>
-      const threadId = typeof inner.id === 'string' ? inner.id : undefined
-      if (threadId === undefined) throw new Error('The runtime did not start a thread.')
+        // Marked delivered only now that the turn is live.
+        if (peerExchange !== undefined) await peerExchange.markDelivered(missionId, delivered)
 
-      await rpc.request('turn/start', {
-        threadId,
-        approvalPolicy: 'untrusted',
-        input: [{ type: 'text', text: runtimePrompt }]
-      })
-
-      // Marked delivered only now that the turn is live.
-      if (peerExchange !== undefined) await peerExchange.markDelivered(missionId, delivered)
-
-      return {
-        runId,
-        missionId,
-        runtimeThreadId: normalizer.runtimeThreadId,
-        peerMessages: delivered.map((message) => publicPeerMessage(message, 'received')),
-        peerDeliveryFailed
+        return {
+          runId,
+          missionId,
+          runtimeThreadId: normalizer.runtimeThreadId,
+          peerMessages: delivered.map((message) => publicPeerMessage(message, 'received')),
+          peerDeliveryFailed
+        }
+      } finally {
+        starting.delete(owner)
       }
     },
 
@@ -366,22 +445,21 @@ export function createAppServerMissionService(
       return true
     },
 
-    cancel(): void {
-      const produced = normalizer?.finish('cancelled') ?? []
-      void persistAndEmit(produced).catch(() => undefined)
-      for (const [, pending] of approvals) pending.resolve({ decision: 'reject' })
-      approvals.clear()
-      client?.dispose('The mission was stopped.')
-      process?.kill()
-      active = undefined
+    cancel(runId: string): boolean {
+      const run = runs.get(runId)
+      if (run === undefined) return false
+      stop(run, 'cancelled', 'The mission was stopped.')
+      return true
     },
 
     async dispose(): Promise<void> {
       disposed = true
-      for (const [, pending] of approvals) pending.resolve({ decision: 'reject' })
-      approvals.clear()
-      client?.dispose('The app is closing.')
-      process?.kill()
+      for (const run of [...runs.values()]) {
+        runs.delete(run.runId)
+        releaseApprovals(run.runId)
+        run.client?.dispose('The app is closing.')
+        run.process?.kill()
+      }
       await options.ledger.flush()
     }
   }

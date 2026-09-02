@@ -174,6 +174,8 @@ export type MissionMode = 'ask' | 'accept-edits' | 'approve-each'
  */
 export interface PublicModel {
   readonly id: string
+  /** The runtime this model belongs to; a model is never offered under another. */
+  readonly runtime: MissionRuntimeId
   readonly displayName: string
   readonly description: string
   readonly supportedEfforts: readonly string[]

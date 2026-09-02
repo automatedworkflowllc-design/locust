@@ -46,10 +46,10 @@ function buildRows(
     const status = routeRowStatus(runtime, integration, false)
     const group = `${runtime.displayName} · your account`
 
-    // The catalog is read from Codex's own app-server, so it describes that
-    // runtime only. Offering its models under Claude would be a claim nothing
-    // has checked.
-    const forRuntime = runtime.id === 'codex' ? models : []
+    // Every catalog model names its runtime -- Codex's from a live server
+    // read, Claude's from what its CLI advertised -- and is offered only
+    // there. A model under the wrong runtime would be a claim nothing checked.
+    const forRuntime = models.filter((model) => model.runtime === runtime.id)
     const entries =
       forRuntime.length > 0
         ? forRuntime.map((model) => ({

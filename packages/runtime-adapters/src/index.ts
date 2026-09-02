@@ -102,3 +102,5 @@ export type {
   RuntimeIntegrationKind,
   RuntimeReadiness,
 } from "./types.js";
+export { parseClaudeModelHints } from "./commands.js";
+export type { RuntimeModelHints } from "./types.js";

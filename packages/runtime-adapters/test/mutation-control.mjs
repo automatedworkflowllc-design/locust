@@ -18,8 +18,39 @@ import { dirname, join } from 'node:path'
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const CLIENT = join(ROOT, 'src', 'app-server.ts')
 const EVENTS = join(ROOT, 'src', 'app-server-events.ts')
+const COMMANDS = join(ROOT, 'src', 'commands.ts')
+
+const CLAUDE_EVENTS = join(ROOT, 'src', 'claude-events.ts')
 
 const MUTATIONS = [
+  {
+    file: CLAUDE_EVENTS,
+    name: 'an allowed usage snapshot is reported as a rate limit',
+    from: '  if (text === "allowed") return undefined;',
+    to: '  if (text === "allowed") return "temporary-rate-limit";',
+    expect: 'says nothing about a snapshot that reports the request was allowed'
+  },
+  {
+    file: COMMANDS,
+    name: 'the chosen effort is shown but never sent to Claude Code',
+    from: '  if (options.effort !== undefined) {\n    args.push("--effort", requireEffort(options.effort));\n  }',
+    to: '',
+    expect: 'passes the chosen model and effort to Claude Code'
+  },
+  {
+    file: COMMANDS,
+    name: 'the chosen effort is shown but never sent to codex exec',
+    from: '    args.push("-c", `model_reasoning_effort=${requireEffort(options.effort)}`);',
+    to: '    void options.effort;',
+    expect: 'passes effort to codex exec through the config override its docs describe'
+  },
+  {
+    file: COMMANDS,
+    name: 'model aliases are invented rather than read from the help',
+    from: '  const aliasClause = /alias for the latest model \\(e\\.g\\.\\s*([^)]*)\\)/.exec(helpText);',
+    to: '  const aliasClause = ["", "\'fable\', \'opus\', \'sonnet\'"];',
+    expect: 'names nothing when the help does not'
+  },
   {
     file: CLIENT,
     name: 'a server request is mistaken for a response',
@@ -151,6 +182,8 @@ function runSuite() {
 }
 
 const originals = new Map([
+  [CLAUDE_EVENTS, readFileSync(CLAUDE_EVENTS, 'utf8')],
+  [COMMANDS, readFileSync(COMMANDS, 'utf8')],
   [CLIENT, readFileSync(CLIENT, 'utf8')],
   [EVENTS, readFileSync(EVENTS, 'utf8')]
 ])

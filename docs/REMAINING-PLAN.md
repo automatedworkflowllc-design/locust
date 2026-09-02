@@ -100,11 +100,42 @@ step (Codex's skills-budget warning, a config warning) are the runtime
 talking about its own setup, so they stay in the Signal Rail and out of the
 thread; notices raised during the work still show.
 
-**Housekeeping.** The window/taskbar icon is the bare Locust mark on a
-transparent ground (`apps/desktop/resources/icon.png`, from
-`_tools/render-icon.cjs`; Colin asked for no tile, as large as the square
-allows). A packaged build will need an `.ico` and a packaging config, which
-do not exist yet.
+**Housekeeping.** The window/taskbar icon is the design agent's app icon
+(the mark on its own rounded dark tile, `locust-app-icon-rounded.svg`),
+rendered by `_tools/render-icon.cjs`. A packaged build will need an `.ico`
+and a packaging config, which do not exist yet.
+
+## Still open, in the order I would take them
+
+**Models and effort. DONE 2026-09-01.** Each runtime offers its own models:
+Codex's from a live `model/list`, Claude Code's from the aliases its own
+`--help` advertises (fable, opus, sonnet), so a release like Fable 5.1
+appears without a code change and nothing is listed that the installed CLI
+did not name. Effort now actually reaches both runtimes -- `--effort` for
+Claude, `-c model_reasoning_effort=` for `codex exec`, and per-turn on the
+app-server transport -- where before it was chosen in the UI and dropped.
+Live-verified by `_smoke/model-choice-smoke.mjs`: picking Claude Code /
+fable at high effort ran a mission that answered "I am Claude Fable 5.1",
+and the ledger recorded runtime claude, model fable.
+
+**Approve-each side by side. DONE 2026-09-01.** The app-server transport
+keys runs by runId like the exec one, one live mission per teammate, capped
+at four, each with its own process tree and client. Stopping one answers
+only its own pending approvals and leaves the others going. The cancel
+channel now tries the exec service and then this one, instead of telling a
+person their live approve-each run "is no longer active"; a handoff of one
+is refused explicitly rather than reported as dead.
+
+**Connections.** The composer's `+` menu names Connectors with a "needs
+reconnection" hint in the reference; nothing behind it exists. Either a real
+screen over discovered MCP servers or the row must not be drawn.
+
+**Mission deletion and retention.** Ledgers only ever grow. A person cannot
+remove a mission or its workroom messages, and the store scans every file.
+
+**Swarm decisions.** The reference leaves two open: a quota warning before
+engaging, and whether swarm survives restart (it does today, as a workspace
+setting). A per-mission swarm override is a third.
 
 ## Rules carried into all of it
 

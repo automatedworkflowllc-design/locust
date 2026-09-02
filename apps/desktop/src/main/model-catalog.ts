@@ -59,12 +59,31 @@ export function parseModels(result: unknown): readonly PublicModel[] {
     }
     models.push({
       id,
+      runtime: 'codex',
       displayName: typeof entry.displayName === 'string' && entry.displayName.length > 0 ? entry.displayName : id,
       description: typeof entry.description === 'string' ? entry.description.slice(0, 200) : '',
       supportedEfforts: efforts
     })
   }
   return models
+}
+
+/**
+ * Claude Code's models, from what its CLI advertised at discovery. An alias
+ * resolves to the newest model of that family on the runtime's side, which is
+ * why it is offered as the alias rather than as a version this build guessed.
+ */
+export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonly PublicModel[] {
+  const claude = runtimes.find((entry) => entry.id === 'claude')
+  const hints = claude?.modelHints
+  if (claude?.readiness !== 'ready' || hints === undefined) return []
+  return hints.aliases.map((alias) => ({
+    id: alias,
+    runtime: 'claude',
+    displayName: `${alias.charAt(0).toUpperCase()}${alias.slice(1)} (latest)`,
+    description: `The newest ${alias} model, as the Claude Code CLI resolves it`,
+    supportedEfforts: hints.efforts
+  }))
 }
 
 export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
@@ -74,9 +93,14 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
 
   const probe = async (): Promise<ModelCatalogResponse> => {
     const runtimes = await options.discover()
+    // Each runtime's models come from its own source and fail on their own:
+    // Claude's from what its CLI advertised, Codex's from a live server read.
+    const claudeModels = claudeModelsFrom(runtimes)
     const codex = runtimes.find((entry) => entry.id === 'codex')
     if (codex?.readiness !== 'ready' || codex.executable === undefined) {
-      return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }
+      return claudeModels.length > 0
+        ? { ok: true, data: { models: claudeModels } }
+        : { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }
     }
 
     const child = options.spawn(codex.executable.executablePath, [
@@ -97,16 +121,18 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       await client.request('initialize', { clientInfo: { name: 'locust', version: '0.1.0' } })
       client.notify('initialized')
       const result = await client.request('model/list', {})
-      const models = parseModels(result)
+      const models = [...parseModels(result), ...claudeModels]
       if (models.length === 0) {
         return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'No models were reported.' } }
       }
       return { ok: true, data: { models } }
     } catch {
-      return {
-        ok: false,
-        error: { code: 'MODELS_UNAVAILABLE', message: 'The model list could not be read.' }
-      }
+      return claudeModels.length > 0
+        ? { ok: true, data: { models: claudeModels } }
+        : {
+            ok: false,
+            error: { code: 'MODELS_UNAVAILABLE', message: 'The model list could not be read.' }
+          }
     } finally {
       // Always take the server down. This probe exists to answer one question.
       client.dispose('model catalog read finished')

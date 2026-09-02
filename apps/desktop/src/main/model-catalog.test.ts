@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 
-import { createModelCatalog, parseModels } from './model-catalog.js'
+import { claudeModelsFrom, createModelCatalog, parseModels } from './model-catalog.js'
 import type { AppServerProcess } from './app-server-mission.js'
 
 const REAL_RESULT = {
@@ -177,5 +177,42 @@ describe('the catalog probe', () => {
     await catalog.read()
 
     expect(spawn).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('Claude models from what its CLI advertised', () => {
+  const claude = (readiness: RuntimeDiscovery['readiness'], hints?: RuntimeDiscovery['modelHints']): RuntimeDiscovery => ({
+    ...codexRuntime(readiness),
+    id: 'claude',
+    displayName: 'Claude Code',
+    ...(hints === undefined ? {} : { modelHints: hints })
+  })
+
+  it('offers each advertised alias, tagged as Claude, with the advertised efforts', () => {
+    const models = claudeModelsFrom([
+      claude('ready', { aliases: ['fable', 'opus', 'sonnet'], efforts: ['low', 'medium', 'high', 'xhigh', 'max'] })
+    ])
+    expect(models.map((model) => model.id)).toEqual(['fable', 'opus', 'sonnet'])
+    expect(models.every((model) => model.runtime === 'claude')).toBe(true)
+    expect(models[0]?.supportedEfforts).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
+  })
+
+  it('offers nothing for a Claude that is not ready, or that advertised nothing', () => {
+    expect(claudeModelsFrom([claude('authentication-required', { aliases: ['fable'], efforts: [] })])).toEqual([])
+    expect(claudeModelsFrom([claude('ready')])).toEqual([])
+    expect(claudeModelsFrom([codexRuntime()])).toEqual([])
+  })
+
+  it('lists Claude models even when Codex cannot be read', async () => {
+    const catalog = createModelCatalog({
+      discover: async () => [codexRuntime('authentication-required'), claude('ready', { aliases: ['opus'], efforts: ['high'] })],
+      spawn: () => {
+        throw new Error('must not spawn')
+      }
+    })
+    const response = await catalog.read()
+    expect(response.ok).toBe(true)
+    if (!response.ok) return
+    expect(response.data.models.map((model) => `${model.runtime}:${model.id}`)).toEqual(['claude:opus'])
   })
 })

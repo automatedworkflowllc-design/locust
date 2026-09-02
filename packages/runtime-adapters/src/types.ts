@@ -94,6 +94,17 @@ export interface ExecutableLocator {
   find(commandName: string): Promise<ExecutableLaunch | undefined>;
 }
 
+/**
+ * What a runtime's own CLI advertises about models, read from its help text at
+ * discovery. Aliases resolve to the newest model in a family on the runtime's
+ * side, so a new release appears here without a code change -- and nothing is
+ * listed that the installed CLI did not itself name.
+ */
+export interface RuntimeModelHints {
+  readonly aliases: readonly string[];
+  readonly efforts: readonly string[];
+}
+
 export interface RuntimeDiscovery {
   readonly id: RuntimeIntegrationId;
   readonly kind: RuntimeIntegrationKind;
@@ -106,6 +117,7 @@ export interface RuntimeDiscovery {
   readonly supportedFeatures: readonly RuntimeFeature[];
   readonly requiredFeatures: readonly RuntimeFeature[];
   readonly diagnostics: readonly RuntimeDiagnostic[];
+  readonly modelHints?: RuntimeModelHints;
 }
 
 /** A future runner may bind the prompt to stdin; this package does not execute it. */

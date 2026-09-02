@@ -166,8 +166,8 @@ describe('decisions', () => {
 describe('the approval round trip', () => {
   async function started() {
     const harness = service()
-    await harness.instance.start('Do something consequential.')
-    return harness
+    const mission = await harness.instance.start('Do something consequential.')
+    return { ...harness, mission }
   }
 
   it('surfaces an approval request to the UI and answers it when decided', async () => {
@@ -235,7 +235,7 @@ describe('the approval round trip', () => {
     await vi.waitFor(() => {
       expect(first.approvals).toHaveLength(1)
     })
-    first.instance.cancel()
+    expect(first.instance.cancel(first.mission.runId)).toBe(true)
     expect(first.instance.pendingApprovalCount).toBe(0)
     expect(first.fake.isKilled()).toBe(true)
 
@@ -376,5 +376,77 @@ describe('the workroom around an approval-mode mission', () => {
     await expect(harness.instance.start('Task.', PEER)).rejects.toThrow('could not be recorded')
     expect(harness.fake.parsed().some((message) => message.method === 'turn/start')).toBe(false)
     expect(delivered).toEqual([])
+  })
+})
+
+describe('approve-each runs side by side', () => {
+  const ATLAS = { self: { teammateId: 'tm_atlas', name: 'Atlas', role: 'Research & Briefs' }, others: [] }
+  const WREN = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }
+
+  /** A fresh fake app-server per spawn, so two runs have two process trees. */
+  function multi() {
+    const fakes: ReturnType<typeof fakeProcess>[] = []
+    const approvals: MissionApprovalRequest[] = []
+    let nextId = 0
+    const instance = createAppServerMissionService({
+      workspacePath: 'C:\\work',
+      ledger: fakeLedger(),
+      discover: async () => [codexRuntime()],
+      spawn: () => {
+        const fake = fakeProcess()
+        fakes.push(fake)
+        return fake.process
+      },
+      emitApproval: (request) => approvals.push(request),
+      emitEvent: () => undefined,
+      createId: () => String(++nextId),
+      now: () => new Date(NOW)
+    })
+    return { instance, fakes, approvals }
+  }
+
+  it('runs two teammates\u2019 missions at once, each on its own process', async () => {
+    const { instance, fakes } = multi()
+    const atlas = await instance.start('Atlas works.', ATLAS)
+    const wren = await instance.start('Wren works.', WREN)
+    expect(atlas.runId).not.toBe(wren.runId)
+    expect(fakes).toHaveLength(2)
+    expect(instance.has(atlas.runId) && instance.has(wren.runId)).toBe(true)
+  })
+
+  it('stops one approve-each run by its id and leaves the other going', async () => {
+    const { instance, fakes } = multi()
+    const atlas = await instance.start('Atlas works.', ATLAS)
+    await instance.start('Wren works.', WREN)
+    expect(instance.cancel(atlas.runId)).toBe(true)
+    expect(fakes[0]?.isKilled()).toBe(true)
+    expect(fakes[1]?.isKilled()).toBe(false)
+    expect(instance.has(atlas.runId)).toBe(false)
+    expect(instance.cancel('run_nope')).toBe(false)
+  })
+
+  it('refuses a second live mission for the same teammate, by name', async () => {
+    const { instance } = multi()
+    await instance.start('Atlas works.', ATLAS)
+    await expect(instance.start('Atlas again.', ATLAS)).rejects.toThrow('Atlas already has a mission running')
+  })
+
+  it('answers only the stopped run\u2019s approvals with a refusal', async () => {
+    const { instance, fakes, approvals } = multi()
+    const atlas = await instance.start('Atlas works.', ATLAS)
+    await instance.start('Wren works.', WREN)
+    fakes[0]!.push({ jsonrpc: '2.0', id: 'a1', method: 'item/commandExecution/requestApproval', params: { command: 'x' } })
+    fakes[1]!.push({ jsonrpc: '2.0', id: 'w1', method: 'item/commandExecution/requestApproval', params: { command: 'y' } })
+    await vi.waitFor(() => {
+      expect(approvals).toHaveLength(2)
+    })
+    const atlasApproval = approvals.find((request) => request.runId === atlas.runId)!
+    instance.cancel(atlas.runId)
+    // Atlas's card is released (its process is going anyway); Wren's is still
+    // waiting on the person, and only the person may answer it.
+    expect(instance.pendingApprovalCount).toBe(1)
+    expect(instance.decide({ approvalId: atlasApproval.approvalId, decision: 'approve-once' })).toBe(false)
+    expect(fakes[1]!.parsed().find((message) => message.id === 'w1')).toBeUndefined()
+    expect(fakes[1]!.isKilled()).toBe(false)
   })
 })

@@ -199,10 +199,13 @@ export function swarmEffortFor(
   models: readonly PublicModel[],
   modelId: string,
   swarm: boolean,
-  chosen: string | undefined
+  chosen: string | undefined,
+  runtime?: MissionRuntimeId
 ): string | undefined {
   if (!swarm) return chosen
-  const supported = models.find((model) => model.id === modelId)?.supportedEfforts ?? []
+  const supported =
+    models.find((model) => model.id === modelId && (runtime === undefined || model.runtime === runtime))
+      ?.supportedEfforts ?? []
   return supported[supported.length - 1]
 }
 
@@ -439,9 +442,9 @@ export default function App(): ReactElement {
         // offer an effort the catalog did not report for that model.
         // Swarm overrides the picked effort with the model's maximum, and the
         // composer shows that -- so what is sent must match what is shown.
-        ...(swarmEffortFor(models, route.model, swarm, effort) === undefined
+        ...(swarmEffortFor(models, route.model, swarm, effort, route.runtime) === undefined
           ? {}
-          : { effort: swarmEffortFor(models, route.model, swarm, effort)! })
+          : { effort: swarmEffortFor(models, route.model, swarm, effort, route.runtime)! })
       })
       if (!response.ok) {
         setRuns((current) =>
@@ -515,9 +518,9 @@ export default function App(): ReactElement {
         runtime: choice.runtime,
         mode,
         model: choice.model,
-        ...(swarmEffortFor(models, choice.model, swarm, effort) === undefined
+        ...(swarmEffortFor(models, choice.model, swarm, effort, choice.runtime) === undefined
           ? {}
-          : { effort: swarmEffortFor(models, choice.model, swarm, effort)! })
+          : { effort: swarmEffortFor(models, choice.model, swarm, effort, choice.runtime)! })
       })
 
       if (!response.ok) {
