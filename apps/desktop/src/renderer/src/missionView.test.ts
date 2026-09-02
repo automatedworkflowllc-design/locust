@@ -14,6 +14,7 @@ import {
   resolvedModelNames,
   rootMission,
   stitchedHandoff,
+  resumableSessionOf,
   railLabel
 } from './missionView.js'
 
@@ -32,6 +33,13 @@ function event(type: string, payload: Record<string, unknown>): NormalizedRuntim
     type,
     payload: { evidence: { redacted: false }, ...payload }
   } as unknown as NormalizedRuntimeEvent
+}
+
+function startedEvent(runtimeThreadId?: string): NormalizedRuntimeEvent {
+  const started = event('run.started', { runtimeThreadId: runtimeThreadId ?? '' })
+  return runtimeThreadId === undefined
+    ? started
+    : ({ ...started, runtimeThreadId } as unknown as NormalizedRuntimeEvent)
 }
 
 function toolStart(itemId: string, name: string, command?: string): NormalizedRuntimeEvent {
@@ -554,5 +562,24 @@ describe('a conversation across turns', () => {
 
   it('draws no handoff divider across an ordinary reply', () => {
     expect(stitchedHandoff(second, byId)).toBeUndefined()
+  })
+})
+
+describe('whether a finished run can be replied to', () => {
+  it('names the session a reply would resume', () => {
+    expect(resumableSessionOf([startedEvent('thread-7'), event('run.completed', {})])).toBe('thread-7')
+  })
+
+  it('has nothing to resume when the run failed before its runtime started', () => {
+    // What a start failure looks like: the host recorded the failure and the
+    // runtime never opened a session. A reply here would be refused by the
+    // host, so the shell must send it as a new mission instead.
+    expect(resumableSessionOf([event('run.failed', { kind: 'process-failed', message: 'Codex CLI is not ready.' })]))
+      .toBeUndefined()
+    expect(resumableSessionOf([])).toBeUndefined()
+  })
+
+  it('ignores an empty session id rather than treating it as one', () => {
+    expect(resumableSessionOf([startedEvent()])).toBeUndefined()
   })
 })

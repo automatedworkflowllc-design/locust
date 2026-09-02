@@ -31,6 +31,13 @@ const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'a run that never opened a session still claims one a reply can resume',
+    from: "    if (typeof held === 'string' && held.length > 0) return held",
+    to: "    return typeof held === 'string' ? held : 'thread-7'",
+    expect: 'has nothing to resume when the run failed before its runtime started'
+  },
+  {
     file: STATUS,
     name: 'a prune preview counts the deletions and stays quiet about what it kept',
     from: "  return `Delete ${missions(preview.deleted.length)} for good${kept.length === 0 ? '' : `, with ${kept.join(' and ')}`}.`",

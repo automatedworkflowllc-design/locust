@@ -275,6 +275,25 @@ honest half of the requirement already met. A Connections screen over
 discovered MCP servers stays unbuilt, and nothing in the shell claims
 otherwise. Re-open this only if the row is ever drawn live.
 
+**A reply continues the conversation. LIVE-VERIFIED 2026-09-02.** This was
+the owner's own bug report -- "when I respond, instead of keeping that chat it
+opens a whole new chat" -- and until now the fix had only unit tests behind
+it. `_smoke/follow-up-smoke.mjs` runs two real turns through the built app on
+the cheapest route and requires all three claims at once: the model gives back
+a passphrase it could only have from the first turn, the ledger records the
+reply as a NEW mission continuing the first with reason `follow-up`, and both
+turns carry the same runtime session id, so the CLI was resumed rather than
+restarted. It takes `--route=` and `--model=` so the same proof can be run on
+Codex and Claude Code when there is quota to spend on it.
+
+Writing it surfaced a defect beside it. The shell treated ANY finished mission
+on screen as something to reply to, including one that failed before its
+runtime ever started -- where no session exists, so the host refuses the
+reply and the person's message is turned into an error card instead of being
+sent. A reply now needs a session the run actually recorded; without one, the
+message starts a fresh mission, which is what the person meant. Mutation:
+claim a session that was never opened, and the test fails.
+
 **Retention. DONE 2026-09-02, live-verified.** Settings now states what the
 local history costs -- how many missions, how many bytes, and how far back it
 goes -- and offers to delete finished missions older than 30 days, 90 days or

@@ -39,7 +39,13 @@ import type { SidebarMission } from './components/Sidebar.js'
 import { Thread } from './components/Thread.js'
 import { AgentAvatar } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
-import { conversationTurns, resolvedModelNames, rootMission, stitchedHandoff } from './missionView.js'
+import {
+  conversationTurns,
+  resolvedModelNames,
+  resumableSessionOf,
+  rootMission,
+  stitchedHandoff
+} from './missionView.js'
 import { shortMissionId } from './status.js'
 
 /**
@@ -471,9 +477,11 @@ export default function App(): ReactElement {
     const teammateId = selectedTeammate?.teammateId
     const key = `pending:${++pendingKeyCounter.current}`
     // A reply continues the conversation on screen, when there IS one to
-    // continue: the same teammate's finished mission, on the route it ran on.
-    // Anything else is a new mission, which is what a person means when they
-    // switch teammate or route first.
+    // continue: the same teammate's finished mission, on the route it ran on,
+    // that actually left a runtime session behind. Anything else is a new
+    // mission -- which is what a person means when they switch teammate or
+    // route first, and the only thing that can work after a run that failed
+    // before its runtime ever started.
     const shown = liveRunRef.current
     const continuing =
       shown !== undefined
@@ -481,6 +489,7 @@ export default function App(): ReactElement {
       && !liveRunIsActive(shown)
       && ownerOf(shown) === teammateId
       && shown.data.runtime === route.runtime
+      && resumableSessionOf(shown.events) !== undefined
         ? shown
         : undefined
     const earlierTurns = continuing === undefined

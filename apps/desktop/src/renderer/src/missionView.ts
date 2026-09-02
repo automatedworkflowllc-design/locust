@@ -652,3 +652,26 @@ export function conversationTurns(
       peerMessages: turn.peerMessages
     }))
 }
+
+/**
+ * The runtime session a reply could resume, if the run left one.
+ *
+ * A mission that ended is not automatically a conversation you can continue.
+ * When a run fails BEFORE its runtime ever started -- the CLI was not ready,
+ * the process could not launch -- no session was ever opened, and the host
+ * has nothing to resume. Treating the next message as a reply there turns an
+ * ordinary sentence into an error card, and the person's message is not sent
+ * at all. A fresh mission is what they meant, and what they get.
+ *
+ * The session id is read from the events the run actually produced, so this
+ * cannot claim one that was never recorded.
+ */
+export function resumableSessionOf(
+  events: readonly NormalizedRuntimeEvent[]
+): string | undefined {
+  for (const event of events) {
+    const held = (event as { readonly runtimeThreadId?: unknown }).runtimeThreadId
+    if (typeof held === 'string' && held.length > 0) return held
+  }
+  return undefined
+}
