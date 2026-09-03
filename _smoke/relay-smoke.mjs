@@ -11,8 +11,8 @@
 //   2. Booty answers with a share block; Wren's next turn starts by itself
 //      as a FOLLOW-UP of Wren's first mission, so the answer lands in the
 //      thread that asked.
-//   3. It stops there. Two hops, then nothing else starts, and the ledger
-//      holds exactly three missions with the links that say why.
+//   3. It ends on its own when a reply has nothing more to say, and the
+//      ledger holds the missions with the links that say why.
 //
 // The answer is a passphrase Wren asks Booty to repeat, so "the reply
 // arrived" is checked on a word that could only have come from Booty's run.
@@ -260,10 +260,17 @@ try {
   say(`       thread tail: ${(seen.excerpt ?? '').replace(/\s+/g, ' ').slice(-300)}`)
   check("Wren's thread carries Booty's answer with the passphrase", seen.found === true)
 
-  say('6. it stops there')
-  await sleep(25_000)
-  const names = await ledgers()
-  check('exactly three missions: the question, the answer, the answer arriving', names.length === 3, `ledgers: ${names.length}`)
+  say('6. it ends on its own')
+  // The exchange ends when a reply has nothing more to say. Wren's follow-up
+  // may add a word back, which is allowed; what is not allowed is an
+  // exchange that keeps going, so: quiet for 40s, and well under the cap.
+  let names = await ledgers()
+  for (let i = 0; i < 40; i += 1) {
+    await sleep(1000)
+    const now = await ledgers()
+    if (now.length !== names.length) { names = now; i = 0 }
+  }
+  check('the exchange ended on its own: three missions, or one courtesy more', names.length === 3 || names.length === 4, `ledgers: ${names.length}`)
 
   const headers = await Promise.all(names.map(async (name) => JSON.parse((await readFile(join(LEDGER_DIR, name), 'utf8')).split('\n')[0]).metadata))
   headers.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))

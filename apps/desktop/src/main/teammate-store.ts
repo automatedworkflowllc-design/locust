@@ -73,7 +73,9 @@ interface StoredFile {
   readonly settings: WorkspaceSettings
 }
 
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: false }
+// Relay is ON unless switched off: teammates talking to each other is the
+// point of having more than one, and the hop cap is what bounds the spend.
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true }
 
 function isHue(value: unknown): value is TeammateHue {
   return typeof value === 'string' && (TEAMMATE_HUES as readonly string[]).includes(value)
@@ -169,9 +171,10 @@ function parsedFile(text: string): StoredFile {
     swarm: typeof rawSettings === 'object' && rawSettings !== null
       ? (rawSettings as Record<string, unknown>).swarm === true
       : false,
+    // Only a literal false turns replies off; absent or malformed keeps the default.
     relay: typeof rawSettings === 'object' && rawSettings !== null
-      ? (rawSettings as Record<string, unknown>).relay === true
-      : false
+      ? (rawSettings as Record<string, unknown>).relay !== false
+      : true
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, settings }
@@ -343,8 +346,8 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             ? (settings as Record<string, unknown>).swarm === true
             : false,
           relay: typeof settings === 'object' && settings !== null
-            ? (settings as Record<string, unknown>).relay === true
-            : false
+            ? (settings as Record<string, unknown>).relay !== false
+            : true
         }
         const file = await read()
         await write({ ...file, settings: next })

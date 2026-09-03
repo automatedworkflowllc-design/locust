@@ -287,9 +287,10 @@ export interface WorkspaceSettings {
   readonly swarm: boolean
   /**
    * Teammates reply to each other on their own: a share to a teammate starts
-   * a run for them, and their answer starts the sender's next turn. Off by
-   * default because every hop is a real run on a real account; capped at
-   * two hops so two agents cannot thank each other until the quota is gone.
+   * a run for them, and their answer starts the sender's next turn. On by
+   * default -- talking to each other is the point of having more than one --
+   * and it ends when a reply has nothing more to say; a hop cap is the
+   * backstop that bounds the spend.
    */
   readonly relay: boolean
 }

@@ -444,7 +444,7 @@ export default function App(): ReactElement {
   const [models, setModels] = useState<readonly PublicModel[]>([])
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
-  const [relay, setRelay] = useState(false)
+  const [relay, setRelay] = useState(true)
   // Read inside the update listener, which is bound once.
   const historyByIdRef = useRef<ReadonlyMap<string, PublicRecoveredMission>>(new Map())
   const [teammateError, setTeammateError] = useState<string>()

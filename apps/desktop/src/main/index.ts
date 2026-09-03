@@ -418,21 +418,21 @@ if (!ownsSingleInstanceLock) {
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
 
     ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: false } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true } as const
       try {
         return await teammates.readSettings()
       } catch {
-        // An unreadable switch reads as off. That is the safe direction.
-        return { swarm: false, relay: false } as const
+        // An unreadable switch reads as its default: swarm off, replies on.
+        return { swarm: false, relay: true } as const
       }
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: false } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true } as const
       try {
         return await teammates.writeSettings(settings)
       } catch {
-        return { swarm: false, relay: false } as const
+        return { swarm: false, relay: true } as const
       }
     })
 

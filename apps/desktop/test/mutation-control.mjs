@@ -37,7 +37,7 @@ const MUTATIONS = [
   {
     file: RELAY,
     name: 'teammates reply on their own even when the setting is off',
-    from: "  if (!input.enabled) {\n    return { start: false, reason: 'Teammate replies are off in Settings; the message waits for their next run.' }\n  }\n",
+    from: "  if (!input.enabled) {\n    return { start: false, reason: 'Teammate replies are switched off in Settings; the message waits for their next run.' }\n  }\n",
     to: '',
     expect: 'starts nothing when off, and stays quiet about it'
   },
@@ -51,7 +51,7 @@ const MUTATIONS = [
   {
     file: RELAY,
     name: 'the reply back starts a stranger instead of the next turn of the thread that asked',
-    from: '        const followUpOf = origin.hop >= MAX_RELAY_HOPS ? origin.originMissionId : undefined',
+    from: '        const followUpOf = origin.lastMissionOf[recipientId]',
     to: '        const followUpOf = undefined',
     expect: 'the reply back follows up the mission that asked, so it lands in that thread'
   },

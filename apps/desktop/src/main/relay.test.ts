@@ -70,10 +70,10 @@ function harness(options: { enabled?: boolean; startResult?: CodexMissionStartRe
 }
 
 describe('deciding whether a teammate replies on their own', () => {
-  it('is off by default, and says the message waits', () => {
+  it('when switched off, says the message waits', () => {
     const decision = decideRelay({ enabled: false, hop: 0, recipientName: 'Booty' })
     expect(decision.start).toBe(false)
-    expect(decision.start ? '' : decision.reason).toMatch(/off in Settings/)
+    expect(decision.start ? '' : decision.reason).toMatch(/switched off in Settings/)
   })
 
   it('starts the first hop when switched on', () => {
@@ -87,24 +87,28 @@ describe('deciding whether a teammate replies on their own', () => {
     expect(decision.start ? '' : decision.reason).toContain(String(MAX_RELAY_HOPS))
   })
 
-  it('caps at two hops: one question, one answer', () => {
-    expect(MAX_RELAY_HOPS).toBe(2)
+  it('the cap is a backstop, not a conversation length', () => {
+    // Three round trips. An exchange normally ends earlier, when a reply
+    // has nothing more to say and posts no share.
+    expect(MAX_RELAY_HOPS).toBe(6)
   })
 })
 
 describe('the brief a relayed run is started with', () => {
-  it('names the sender, asks for a share block back, and forbids unrelated work', () => {
+  it('names the sender, shows how to write back, and forbids unrelated work', () => {
     const prompt = relayPrompt({ sender: WREN, recipient: BOOTY, hop: 1 })
-    expect(prompt).toContain('Wren (Code & Migrations)')
+    expect(prompt).toContain('Wren (Code & Migrations) sent you a message')
     expect(prompt).toContain('<locust-share to="Wren">')
     expect(prompt).toContain('Do not start unrelated work')
   })
 
-  it('on the way back, does not demand another reply', () => {
-    const prompt = relayPrompt({ sender: BOOTY, recipient: WREN, hop: MAX_RELAY_HOPS })
-    expect(prompt).toContain('Booty (Custom) replied')
-    expect(prompt).not.toContain('exactly one')
-    expect(prompt).toContain('otherwise end with no share block')
+  it('every hop is told that silence is how an exchange finishes', () => {
+    for (const hop of [1, 2, 5]) {
+      const prompt = relayPrompt({ sender: BOOTY, recipient: WREN, hop })
+      expect(prompt).toContain('Write back only if that helps finish the work')
+      expect(prompt).toContain('end with no share block')
+    }
+    expect(relayPrompt({ sender: BOOTY, recipient: WREN, hop: 2 })).toContain('Booty (Custom) replied to you')
   })
 })
 
@@ -126,7 +130,7 @@ describe('relaying a share', () => {
       model: 'composer-2.5',
       peer: bootyPeer,
       followUpOf: undefined,
-      relay: { hop: 1, originMissionId: 'mission_wren1' }
+      relay: { hop: 1, lastMissionOf: { tm_wren: 'mission_wren1' } }
     })
     expect(starts[0]?.prompt).toContain('Wren (Code & Migrations) sent you a message')
     expect(owners).toEqual([[BOOTY.teammateId, 'mission_1']])
@@ -146,25 +150,40 @@ describe('relaying a share', () => {
       runId: 'run_booty',
       missionId: 'mission_booty',
       peer: bootyPeer,
-      relay: { hop: 1, originMissionId: 'mission_wren1' }
+      relay: { hop: 1, lastMissionOf: { tm_wren: 'mission_wren1' } }
     })
     await relay.onShared(bootyRun, [{ ...message(WREN), from: { ...BOOTY, missionId: 'mission_booty' } } as WorkroomMessage])
     expect(starts).toHaveLength(1)
     expect(starts[0]).toMatchObject({
       peer: wrenPeer,
       followUpOf: 'mission_wren1',
-      relay: { hop: 2, originMissionId: 'mission_wren1' }
+      relay: { hop: 2, lastMissionOf: { tm_wren: 'mission_wren1', tm_booty: 'mission_booty' } }
+    })
+  })
+
+  it("a third hop continues the recipient's OWN earlier turn, so their side reads as one thread too", async () => {
+    const { relay, starts } = harness()
+    const wrenAgain = sharing({
+      runId: 'run_wren2',
+      missionId: 'mission_wren2',
+      relay: { hop: 2, lastMissionOf: { tm_wren: 'mission_wren1', tm_booty: 'mission_booty' } }
+    })
+    await relay.onShared(wrenAgain, [message(BOOTY, 'One more thing.')])
+    expect(starts[0]).toMatchObject({
+      peer: bootyPeer,
+      followUpOf: 'mission_booty',
+      relay: { hop: 3, lastMissionOf: { tm_wren: 'mission_wren2', tm_booty: 'mission_booty' } }
     })
   })
 
   it('stops after the cap and says so in the thread that shared', async () => {
     const { relay, starts, notices } = harness()
-    const capped = sharing({ runId: 'run_wren2', missionId: 'mission_wren2', relay: { hop: 2, originMissionId: 'mission_wren1' } })
+    const capped = sharing({ runId: 'run_wren2', missionId: 'mission_wren2', relay: { hop: MAX_RELAY_HOPS, lastMissionOf: { tm_wren: 'mission_wren1' } } })
     await relay.onShared(capped, [message(BOOTY)])
     expect(starts).toHaveLength(0)
     expect(notices).toHaveLength(1)
     expect(notices[0]).toMatchObject({ kind: 'relay-notice', runId: 'run_wren2', missionId: 'mission_wren2' })
-    expect(notices[0]?.kind === 'relay-notice' ? notices[0].message : '').toContain('Stopped after 2')
+    expect(notices[0]?.kind === 'relay-notice' ? notices[0].message : '').toContain(`Stopped after ${String(MAX_RELAY_HOPS)}`)
   })
 
   it("says why when the recipient's run could not start, and lets the message wait", async () => {

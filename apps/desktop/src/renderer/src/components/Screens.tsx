@@ -514,13 +514,14 @@ export function SettingsScreen({
           <p className="lc-settings__lede">
             When a teammate writes to another, the other can answer on their own: Locust starts a run
             for them with the message as its brief, and their answer starts the sender's next turn, so
-            it lands in the thread that asked. Two hops, then it stops and waits for you. Every hop is
-            a real run on the sender's route, so this is off until you turn it on.
+            it lands in the thread that asked. They keep going while a reply helps finish the work, and
+            stop when one has nothing more to say -- or after six automatic runs, as a backstop. Each is a
+            real run on the sender's route; switch this off to make messages wait for you instead.
           </p>
           <div className="lc-retention">
             <div className="lc-retention__row">
               <span className="lc-settings__note">
-                {relay ? 'Teammates reply to each other, up to two hops per exchange.' : 'Messages wait for the recipient\'s next run.'}
+                {relay ? 'Teammates reply to each other until the work is done.' : 'Messages wait for the recipient\'s next run.'}
               </span>
               <button
                 type="button"

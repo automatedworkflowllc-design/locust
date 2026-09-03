@@ -17,10 +17,13 @@ import type { MissionPeerContext, PeerRosterEntry } from './workroom-briefing.js
  *
  * Three limits, each load-bearing:
  *
- *   - OFF by default. Every hop is a real run on a real account. Nobody's
- *     quota is spent on a conversation they did not switch on.
- *   - A hop cap. Two hops is one question and one answer. Without a cap two
- *     agents can thank each other until the account is empty.
+ *   - A switch in Settings, on by default. Talking to each other is the
+ *     point of having more than one teammate; the cap is what bounds it.
+ *   - The exchange ends when a reply carries no message: each hop is asked
+ *     to write back only if that helps finish the work, and a run that
+ *     posts no share starts nothing. The hop cap is a backstop for two
+ *     agents thanking each other until the account is empty, not the
+ *     length of a conversation.
  *   - The recipient's run uses the SENDER's runtime, model and mode -- the
  *     route a person already chose and paid for -- and is refused, not
  *     widened, when that route cannot start.
@@ -30,14 +33,22 @@ import type { MissionPeerContext, PeerRosterEntry } from './workroom-briefing.js
  * was shown are recorded by id exactly as they are for a person's mission.
  */
 
-/** Hops per exchange: the recipient's reply (1) and the sender's next turn (2). */
-export const MAX_RELAY_HOPS = 2
+/**
+ * Automatic runs per exchange before the host stops and waits for a person.
+ * A backstop, not a target: an exchange normally ends when a reply has
+ * nothing more to say. Three round trips is generous for finishing a job.
+ */
+export const MAX_RELAY_HOPS = 6
 
 export interface RelayOrigin {
   /** How many automatic runs preceded this one in the exchange. 0 for a person's mission. */
   readonly hop: number
-  /** The person-started mission the exchange began from; a reply back follows it up. */
-  readonly originMissionId: string
+  /**
+   * Each participant's latest mission in this exchange, so their next hop
+   * continues THEIR conversation rather than starting a stranger. The
+   * person-started mission is the first entry.
+   */
+  readonly lastMissionOf: Readonly<Record<string, string>>
 }
 
 export type RelayDecision =
@@ -54,7 +65,7 @@ export function decideRelay(input: {
   readonly recipientName: string
 }): RelayDecision {
   if (!input.enabled) {
-    return { start: false, reason: 'Teammate replies are off in Settings; the message waits for their next run.' }
+    return { start: false, reason: 'Teammate replies are switched off in Settings; the message waits for their next run.' }
   }
   if (input.hop >= MAX_RELAY_HOPS) {
     return {
@@ -77,17 +88,15 @@ export function relayPrompt(input: {
   readonly hop: number
 }): string {
   const who = `${input.sender.name} (${input.sender.role})`
-  if (input.hop >= MAX_RELAY_HOPS) {
-    return [
-      `${who} replied to your message; it is quoted below.`,
-      'Take it into account. Reply only if they asked you something you can answer from this workspace; otherwise end with no share block.',
-      'Do not start unrelated work.'
-    ].join(' ')
-  }
+  const opening = input.hop <= 1
+    ? `${who} sent you a message; it is quoted below with anything else waiting for you.`
+    : `${who} replied to you; it is quoted below.`
   return [
-    `${who} sent you a message and is waiting for a reply; it is quoted below with anything else waiting for you.`,
-    'Answer what they asked with what you actually know from this workspace. If you cannot help, say so briefly.',
-    `End with exactly one <locust-share to="${input.sender.name}"> block holding your reply. Do not start unrelated work.`
+    opening,
+    'Do what it asks if that is within your role and this workspace, using what you actually know; if you cannot help, say so briefly.',
+    `Write back only if that helps finish the work: end with one <locust-share to="${input.sender.name}"> block holding your reply.`,
+    'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
+    'Do not start unrelated work.'
   ].join(' ')
 }
 
@@ -160,12 +169,13 @@ export function createRelay(options: RelayOptions): Relay {
         }
         const origin: RelayOrigin = {
           hop: decision.hop,
-          originMissionId: mission.relay?.originMissionId ?? mission.missionId
+          lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
         }
-        // The reply back to whoever started the exchange is their next turn,
-        // so the answer lands in the thread that asked. The first hop starts
-        // the recipient fresh: they were not in a conversation about this.
-        const followUpOf = origin.hop >= MAX_RELAY_HOPS ? origin.originMissionId : undefined
+        // Each hop is the next turn of ITS teammate's conversation in this
+        // exchange, so both sides read as one thread. A recipient who has
+        // not spoken in it yet starts fresh: they were not in a conversation
+        // about this.
+        const followUpOf = origin.lastMissionOf[recipientId]
         const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop })
         let response: CodexMissionStartResponse
         try {

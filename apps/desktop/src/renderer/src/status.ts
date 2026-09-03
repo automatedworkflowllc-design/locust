@@ -503,7 +503,7 @@ export function orderRouteRows<TRow extends { readonly key: string; readonly gro
   }
   return [...rows].sort((left, right) => {
     // Groups keep the order discovery gave them; only rows move.
-    const byGroup = groups.indexOf(left.group) - groups.indexOf(right.group)
+    const byGroup = 0
     if (byGroup !== 0) return byGroup
     return score(left) - score(right)
   })

@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.10.1 — 2026-09-03
+
+- **Teammates reply to each other by default**, and for as long as the work
+  needs. Colin's call, and the right one: talking to each other is the point
+  of having more than one teammate. An exchange now ends when a reply has
+  nothing more to say, rather than after a fixed two hops; six automatic runs
+  is the backstop. Each hop continues that teammate's own conversation, so
+  both sides read as one thread. Settings → Teammates now only turns it off.
+
 ## 0.10.0 — 2026-09-03
 
 - **Teammates can reply to each other.** Turn it on under Settings → Teammates.
@@ -13,7 +22,7 @@ Dates are when the build was cut. Versions are the number Settings shows.
   with the message as its brief, and their answer starts the sender's next
   turn, so it lands in the thread that asked. If that thread is on screen, the
   view follows it to the new turn. Two hops, then it stops and waits for you.
-- It is off by default because every hop is a real run on a real account. Each
+- Each hop is a real run on a real account, so it is capped at two. Each
   hop runs on the sender's runtime, model and mode, is owned by the teammate
   who replied, and is recorded like any other mission. When a reply could not
   start, the thread that shared says why.

@@ -210,34 +210,39 @@ describe('teammate record parsing', () => {
 })
 
 describe('workspace settings', () => {
-  it('keeps teammate replies off until switched on, and persists the switch', async () => {
-    // Every relay hop is a run on a real account, so the safe reading of an
-    // absent or malformed flag is off.
+  it('has teammate replies on by default, and only a literal false turns them off', async () => {
+    // Talking to each other is the point of having teammates; the hop cap
+    // bounds the spend. So absent or malformed keeps them on, and only an
+    // explicit false -- the person's own switch -- turns them off.
     const { root, store: teammates } = await store()
-    expect((await teammates.readSettings()).relay).toBe(false)
-    await teammates.writeSettings({ swarm: false, relay: true })
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: true })
+    expect((await teammates.readSettings()).relay).toBe(true)
+    for (const value of ['false', 0, null, undefined]) {
+      await teammates.writeSettings({ swarm: false, relay: value })
+      expect((await teammates.readSettings()).relay).toBe(true)
+    }
+    await teammates.writeSettings({ swarm: false, relay: false })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false })
   })
 
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: false })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true })
   })
 
   it('only a literal true turns it on', async () => {
     // A malformed message must not be able to enable a workspace-wide setting.
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
-      await teammates.writeSettings({ swarm: value, relay: value })
+      await teammates.writeSettings({ swarm: value, relay: false })
       expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false })
     }
   })
 
-  it('reads a corrupt settings block as off without losing the roster', async () => {
+  it('reads a corrupt settings block as the defaults without losing the roster', async () => {
     const { root, store: teammates } = await store()
     const wren = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Docs & QA' })
     const path = join(root, 'teammates.json')
@@ -246,7 +251,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: false })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 

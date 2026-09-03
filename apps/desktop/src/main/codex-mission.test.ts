@@ -1779,7 +1779,7 @@ describe('what a completed share hands to the relay', () => {
         shared.push({ mission })
       }
     })
-    const origin = { hop: 1, originMissionId: 'mission_origin' }
+    const origin = { hop: 1, lastMissionOf: { tm_wren: 'mission_origin' } }
     const response = await service.start('Reply to Wren.', 'codex', 'ask', {}, () => undefined, undefined, { self: ATLAS, others: [WREN] }, undefined, origin)
     expect(response.ok).toBe(true)
     while (scheduled.length > 0) scheduled.shift()!()
