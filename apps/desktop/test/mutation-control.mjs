@@ -65,9 +65,9 @@ const MUTATIONS = [
   {
     file: RELAY,
     name: 'a relayed run runs with write access whatever the sender had',
-    from: "            mode: mission.sandbox === 'workspace-write' ? 'accept-edits' : 'ask',",
-    to: "            mode: 'accept-edits',",
-    expect: 'a read-only sender gets a read-only reply'
+    from: "          mode: mission.sandbox === 'workspace-write' ? ('accept-edits' as const) : ('ask' as const)",
+    to: "          mode: 'accept-edits' as const",
+    expect: 'a read-only sender gets a read-only reply when the recipient has no route'
   },
   {
     file: VIEW,
