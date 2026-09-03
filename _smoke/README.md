@@ -24,9 +24,11 @@ Each exits non-zero on any failed assertion, and each kills the app it started.
 | `retention-smoke.mjs` | pruning old missions from Settings: the preview names what it keeps, deletes nothing, and the confirm removes exactly what it named | — | **no** |
 | `picker-smoke.mjs` | that one runtime with 217 models cannot bury the others: every group capped, the cap counted, search lifting it | — | **no** |
 | `diff-smoke.mjs` | the inline diff against a real edit: file row, unified rows with signs, derived hunk range, intra-line marks, and both design rules checked on screen -- card total equals the sum of its file rows, and the open file ends in a completeness statement | a change too large to record inline | yes (cheap) |
+| `update-smoke.mjs` | the packaged build asks the real release channel and gets an answer: `Up to date.` when it matches the newest release, or the version it found | that an install actually completes | **no** (network only) |
 | `packaged-smoke.mjs` | the built `Locust.exe` from its asar: it boots, discovery finds the CLIs with PATH cut to System32, renderer egress is refused, brand faces load | anything needing a provider run | **no** |
 
 ```
+node _smoke/update-smoke.mjs        # needs network, no provider
 node _smoke/diff-smoke.mjs          # one cheap Cursor edit in a throwaway workspace
 node _smoke/picker-smoke.mjs        # no provider run at all
 node _smoke/retention-smoke.mjs     # seeds a ledger by hand
