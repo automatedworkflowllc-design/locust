@@ -12,6 +12,8 @@ import type {
 } from '../../../shared/ipc.js'
 import { buildThread, cancellationSummary, peerGroups, readPlan, threadMarkers } from '../missionView.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
+import { liveActivityOf } from '../faceState.js'
+import type { FaceActivity } from '../faceState.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { ActivityCard } from './ActivityCard.js'
 import { Icon } from './Icon.js'
@@ -30,10 +32,13 @@ import type { PeerGroup, ThreadItem } from '../missionView.js'
  */
 function ThreadItems({
   items,
-  owner
+  owner,
+  activity
 }: {
   readonly items: readonly ThreadItem[]
   readonly owner: PublicTeammate | undefined
+  /** What the live run is doing; only the working line draws it. */
+  readonly activity: FaceActivity
 }): ReactElement {
   return (
     <>
@@ -71,6 +76,7 @@ function ThreadItems({
               startedAt={item.startedAt}
               kind={item.kind}
               owner={owner}
+              activity={activity}
             />
           )
         }
@@ -277,7 +283,7 @@ export function Thread({
                 <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
               )}
               <div className="lc-bubble">{turn.prompt}</div>
-              <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} />
+              <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} activity="idle" />
             </Fragment>
           )
         })}
@@ -289,7 +295,7 @@ export function Thread({
 
         {handoff !== undefined && (
           <>
-            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} owner={peers.self} />
+            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} owner={peers.self} activity="idle" />
             <HandoffDivider
               from={handoff.from}
               to={handoff.to}
@@ -306,7 +312,7 @@ export function Thread({
         */}
         {exchanges.filter((group) => group.received).map(peerCard)}
 
-        <ThreadItems items={items} owner={peers.self} />
+        <ThreadItems items={items} owner={peers.self} activity={liveActivityOf(events, running)} />
 
         {exchanges.filter((group) => !group.received).map(peerCard)}
         {peers.notices.map((notice, index) => (

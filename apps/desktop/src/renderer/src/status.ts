@@ -1,3 +1,5 @@
+import { faceLabel, teammateActivity } from './faceState.js'
+import type { FaceActivity, LiveActivity } from './faceState.js'
 import type { MissionMode, PublicRecoveredMission, PublicRuntimeStatus } from '../../shared/ipc.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
@@ -152,6 +154,8 @@ export type TeammateStatus = 'working' | 'approval-needed' | 'idle' | 'blocked'
 
 export interface TeammateStatusView {
   readonly status: TeammateStatus
+  /** What their face does, decided here so every surface draws the same thing. */
+  readonly activity: FaceActivity
   readonly label: string
   /** Semantic token name, never a literal color. */
   readonly tone: 'lime' | 'amber' | 'muted' | 'red'
@@ -171,11 +175,22 @@ export function teammateStatusView(input: {
   readonly hasRunningMission: boolean
   readonly pendingApprovals: number
   readonly roleLabel: string
+  /** What their live run is doing right now; `idle` when there is none. */
+  readonly liveActivity?: LiveActivity
+  readonly recentlyDone?: boolean
+  readonly recentlyReceived?: boolean
 }): TeammateStatusView {
+  const activity = teammateActivity({
+    blocked: input.anyRuntimeUsable === false || (input.runtime !== undefined && !runtimeIsUsable(input.runtime)),
+    waitingOnYou: input.pendingApprovals > 0,
+    live: input.hasRunningMission ? (input.liveActivity ?? 'working') : 'idle',
+    recentlyDone: input.recentlyDone === true,
+    recentlyReceived: input.recentlyReceived === true
+  })
   // Nobody can work when nothing is signed in, whatever this teammate has
   // done before.
   if (input.anyRuntimeUsable === false) {
-    return { status: 'blocked', label: 'Runtime sign-in required', tone: 'red', pulse: false }
+    return { status: 'blocked', activity, label: 'Runtime sign-in required', tone: 'red', pulse: false }
   }
   // A teammate whose OWN runtime cannot run is blocked, even if a mission
   // looks active in the renderer -- the sign-in wall outranks optimistic
@@ -183,18 +198,20 @@ export function teammateStatusView(input: {
   if (input.runtime !== undefined && !runtimeIsUsable(input.runtime)) {
     return {
       status: 'blocked',
+      activity,
       label: 'Runtime sign-in required',
       tone: 'red',
       pulse: false
     }
   }
   if (input.pendingApprovals > 0) {
-    return { status: 'approval-needed', label: 'Approval needed', tone: 'amber', pulse: false }
+    return { status: 'approval-needed', activity, label: `${input.roleLabel} · ${faceLabel(activity)}`, tone: 'amber', pulse: false }
   }
+  // Copy follows state: the word beside the face is the face's own word.
   if (input.hasRunningMission) {
-    return { status: 'working', label: `${input.roleLabel} · working`, tone: 'lime', pulse: true }
+    return { status: 'working', activity, label: `${input.roleLabel} · ${faceLabel(activity)}`, tone: 'lime', pulse: true }
   }
-  return { status: 'idle', label: `${input.roleLabel} · idle`, tone: 'muted', pulse: false }
+  return { status: 'idle', activity, label: `${input.roleLabel} · ${faceLabel(activity)}`, tone: 'muted', pulse: false }
 }
 
 export interface MissionPhaseView {
@@ -280,10 +297,6 @@ export function handoffTitle(availability: HandoffAvailability): string | undefi
  * idle, waiting on an approval, blocked -- is still, and says so through the
  * presence dot and the label instead.
  */
-export function faceActivityFor(status: TeammateStatus): 'working' | 'still' {
-  return status === 'working' ? 'working' : 'still'
-}
-
 export function facePresenceFor(status: TeammateStatus): 'working' | 'approval' | 'blocked' | 'none' {
   if (status === 'working') return 'working'
   if (status === 'approval-needed') return 'approval'

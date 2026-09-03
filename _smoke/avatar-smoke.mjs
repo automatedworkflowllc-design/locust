@@ -107,6 +107,8 @@ const faces = `JSON.stringify([...document.querySelectorAll('.lc-face')].map(fac
     name: (face.closest('.lc-teammate') || face.closest('.lc-workroom__header') || { querySelector: () => null }).querySelector?.('.lc-row__name, .lc-workroom__name')?.innerText?.trim() ?? '',
     size: face.getBoundingClientRect().width,
     animating: names,
+    activity: face.dataset.activity ?? '',
+    teammate: face.dataset.teammate ?? '',
     presence: dot ? [...dot.classList].find(c => c.startsWith('lc-presence--')) ?? 'dot' : 'none',
     shadow
   }
@@ -227,23 +229,46 @@ try {
   const workingSidebar = working.filter((face) => face.where === 'sidebar')
   const first = workingSidebar[0]
   const second = workingSidebar[1]
-  check('the working teammate\u2019s sidebar chip animates (bob, eyes, mouth)',
-    first !== undefined && ['lcBob', 'lcEyes', 'lcChat'].every((name) => first.animating.includes(name)), JSON.stringify(first))
+  // Which animations a state owns. Idle and blocked own none; every other
+  // state owns at least one, and the names say what the teammate is doing.
+  const MOTION = {
+    thinking: ['lcTilt', 'lcEyesUp'],
+    working: ['lcBob2', 'lcEyesDown'],
+    responding: ['lcBob', 'lcEyesFwd', 'lcChat'],
+    waiting: ['lcStare'],
+    receiving: ['lcGlance'],
+    done: ['lcHop'],
+    idle: [],
+    blocked: []
+  }
+  check('the working teammate is in a live state, and its sidebar chip moves the way that state moves',
+    first !== undefined && ['thinking', 'working', 'responding'].includes(first.activity)
+      && MOTION[first.activity].every((name) => first.animating.includes(name)), JSON.stringify(first))
+  check('no animation from the retired generic set is on any face', working.every((face) => !face.animating.includes('lcEyes')), JSON.stringify(working.map((f) => f.animating)))
+  // One teammate, one state, everywhere: every chip that carries this
+  // teammate's id -- sidebar, header, the working line -- resolves to the
+  // same state and the same computed animations at this instant.
+  const mine = working.filter((face) => first !== undefined && face.teammate === first.teammate && face.teammate !== '')
+  const states = new Set(mine.map((face) => face.activity))
+  const motions = new Set(mine.map((face) => [...face.animating].sort().join('+')))
+  check('every chip of the working teammate agrees on the state', mine.length >= 2 && states.size === 1, JSON.stringify(mine.map((f) => [f.where, f.activity])))
+  check('and on the computed animation-name, read off the DOM', mine.length >= 2 && motions.size === 1, JSON.stringify(mine.map((f) => [f.where, f.animating])))
   check('the working teammate wears the lime presence dot', first?.presence === 'lc-presence--lime', first?.presence)
   check('the other teammate\u2019s chip is perfectly still', second !== undefined && second.animating.length === 0 && second.presence === 'none', JSON.stringify(second))
   const header = working.find((face) => face.where === 'header')
-  check('the header chip works too', header !== undefined && header.animating.includes('lcBob'), JSON.stringify(header))
+  check('the header chip is live too', header !== undefined && header.animating.length > 0, JSON.stringify(header))
   const threadFaces = working.filter((face) => face.where === 'thread')
   check('faces beside transcript turns stay still', threadFaces.every((face) => face.animating.length === 0), JSON.stringify(threadFaces.map((f) => f.animating)))
   const step = await cdp.eval(`JSON.stringify((() => {
     const line = document.querySelector('.lc-livestep')
     if (!line) return null
-    return { kind: line.dataset.stepKind, hasFace: line.querySelector('.lc-face') !== null, hasBar: line.querySelector('.lc-progress') !== null, dots: line.querySelectorAll('.lc-dots').length, text: line.innerText.replace(/\\s+/g, ' ').trim() }
+    const face = line.querySelector('.lc-face')
+    return { kind: line.dataset.stepKind, activity: face ? face.dataset.activity : '', hasFace: face !== null, hasBar: line.querySelector('.lc-progress') !== null, dots: line.querySelectorAll('.lc-dots').length, text: line.innerText.replace(/\\s+/g, ' ').trim() }
   })())`)
   const stepState = JSON.parse(step)
   if (stepState !== null) {
     check('the running step is an avatar-led line without a bar', stepState.hasFace === true && stepState.hasBar === false, JSON.stringify(stepState))
-    check('a reasoning step shows dots; an action step does not', stepState.kind === 'reasoning' ? stepState.dots === 1 : stepState.dots === 0, JSON.stringify(stepState))
+    check('a thinking face shows dots; a working or replying one does not', stepState.activity === 'thinking' ? stepState.dots === 1 : stepState.dots === 0, JSON.stringify(stepState))
     say(`       step: ${stepState.kind} · ${stepState.text.slice(0, 80)}`)
   } else {
     say('       (no live step on screen at the sample moment)')
@@ -257,7 +282,7 @@ try {
   const reducedFirst = reduced.filter((face) => face.where === 'sidebar')[0]
   check('the working teammate still wears the presence dot', reducedFirst?.presence === 'lc-presence--lime', reducedFirst?.presence)
   const label = await cdp.eval(`[...document.querySelectorAll('.lc-teammate .lc-row__meta')].map(n => n.innerText).join(' | ')`)
-  check('and the text still says who is working', /working/.test(label), label)
+  check('and the text still says what they are doing', /thinking|working|replying/.test(label), label)
   await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: '' }] })
 
   say('6. when the mission ends, every face is still')
@@ -269,6 +294,14 @@ try {
     return false
   })()`)
   check('the mission finished', done === true)
+  // Finishing earns one hop, and a teammate who was just written to earns a
+  // glance -- moments, not states -- and then stillness. Nothing else moves.
+  const moment = JSON.parse(await cdp.eval(faces))
+  const MOMENT = { done: 'lcHop', receiving: 'lcGlance' }
+  check('at the end only moments move: a hop for the finisher, a glance for whoever was written to',
+    moment.every((face) => (face.activity in MOMENT ? face.animating.includes(MOMENT[face.activity]) : face.animating.length === 0)),
+    JSON.stringify(moment.map((f) => [f.where, f.activity, f.animating])))
+  await sleep(3200)
   const after = JSON.parse(await cdp.eval(faces))
   check('nothing animates once the work is done', after.every((face) => face.animating.length === 0), JSON.stringify(after.map((f) => f.animating)))
   check('no presence dot remains', after.filter((face) => face.where === 'sidebar').every((face) => face.presence === 'none'))

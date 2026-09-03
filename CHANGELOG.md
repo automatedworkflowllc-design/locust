@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.11.0 — 2026-09-03
+
+- **Faces that say what a teammate is doing.** Eight states, each with its own
+  motion: up thinks, down works, forward talks to you, sideways listens.
+  Thinking tilts and looks up with the dots beside it; working bobs with
+  weight and looks down; replying looks at you and talks; waiting on you holds
+  a stare inside a slow amber ring; a message arriving earns a glance; a
+  finished mission earns one hop. Idle and blocked are the only still faces,
+  and blocked shuts its eyes behind a red border so it never reads as idle.
+- **One teammate, one state, everywhere.** The sidebar row, the workroom
+  header and the working line in the thread now resolve the same teammate to
+  the same state at the same moment, and the word beside the face is that
+  state's word: "thinking", "working", "replying", "waiting on you".
+- Reduced motion turns every animation off; state still reads from the text
+  and the presence dot.
+
 ## 0.10.2 — 2026-09-03
 
 - **Each teammate stays the model you made them.** The route you last started

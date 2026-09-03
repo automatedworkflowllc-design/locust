@@ -2,11 +2,11 @@ import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
+import type { LiveActivity } from '../faceState.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
 import {
   connectedRuntimeCount,
-  faceActivityFor,
   facePresenceFor,
   missionPhaseView,
   missionsMatching,
@@ -67,6 +67,9 @@ export function Sidebar({
   onSelectMission,
   onMissionMenu,
   pendingApprovals,
+  liveActivity,
+  recentlyDone,
+  recentlyReceived,
   onSelectTeammate,
   onNewTeammate,
   onOpenSettings
@@ -83,6 +86,11 @@ export function Sidebar({
   readonly onMissionMenu: (missionId: string, at: { readonly x: number; readonly y: number }) => void
   /** Approvals waiting on each teammate's live run, by teammate id. */
   readonly pendingApprovals: Readonly<Record<string, number>>
+  /** What each teammate's live run is doing, by teammate id; absent means no live run. */
+  readonly liveActivity: Readonly<Record<string, LiveActivity>>
+  /** Teammates whose mission just finished, or who just received a message. */
+  readonly recentlyDone: readonly string[]
+  readonly recentlyReceived: readonly string[]
   readonly onSelectTeammate: (teammateId: string) => void
   readonly onNewTeammate: () => void
   readonly onOpenSettings: () => void
@@ -146,7 +154,10 @@ export function Sidebar({
             anyRuntimeUsable: runtimes.some(runtimeIsUsable),
             hasRunningMission: owned.some((mission) => mission.phase === 'running'),
             pendingApprovals: pendingApprovals[teammate.teammateId] ?? 0,
-            roleLabel: teammate.role
+            roleLabel: teammate.role,
+            ...(liveActivity[teammate.teammateId] === undefined ? {} : { liveActivity: liveActivity[teammate.teammateId] }),
+            recentlyDone: recentlyDone.includes(teammate.teammateId),
+            recentlyReceived: recentlyReceived.includes(teammate.teammateId)
           })
           const selected = teammate.teammateId === selectedTeammateId
           return (
@@ -162,8 +173,9 @@ export function Sidebar({
                   hue={teammate.hue}
                   avatar={teammate.avatar}
                   size={30}
-                  activity={faceActivityFor(status.status)}
+                  activity={status.activity}
                   presence={facePresenceFor(status.status)}
+                  teammateId={teammate.teammateId}
                 />
                 <span className="lc-row__text">
                   <span className="lc-row__name">

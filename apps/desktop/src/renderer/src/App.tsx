@@ -52,7 +52,9 @@ import {
   stitchedHandoff,
   typedPrompt
 } from './missionView.js'
-import { collapseConversations, modeRunsOn, modesFor, shortMissionId } from './status.js'
+import { collapseConversations, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView } from './status.js'
+import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
+import type { LiveActivity } from './faceState.js'
 
 /**
  * The Locust shell.
@@ -445,6 +447,11 @@ export default function App(): ReactElement {
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
   const [relay, setRelay] = useState(true)
+  // Faces that just finished or just heard something: a hop and a glance, each
+  // for a moment, then still. Keyed by teammate; cleared by their own timers.
+  const [recentlyDone, setRecentlyDone] = useState<readonly string[]>([])
+  const [recentlyReceived, setRecentlyReceived] = useState<readonly string[]>([])
+  const missionOwnersRef = useRef<Readonly<Record<string, string>>>({})
   // Read inside the update listener, which is bound once.
   const historyByIdRef = useRef<ReadonlyMap<string, PublicRecoveredMission>>(new Map())
   const [teammateError, setTeammateError] = useState<string>()
@@ -515,6 +522,20 @@ export default function App(): ReactElement {
     })
 
     const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
+      // A finished mission hops once; a message that just arrived earns a
+      // glance. Both are moments, so both clear themselves.
+      if (update.kind === 'event' && update.event.type === 'run.completed') {
+        const owner = missionOwnersRef.current[update.missionId]
+        if (owner !== undefined) {
+          setRecentlyDone((current) => [...current.filter((id) => id !== owner), owner])
+          setTimeout(() => setRecentlyDone((current) => current.filter((id) => id !== owner)), DONE_HOP_MS)
+        }
+      }
+      if (update.kind === 'peer-message' && update.message.direction === 'posted') {
+        const to = update.message.to.teammateId
+        setRecentlyReceived((current) => [...current.filter((id) => id !== to), to])
+        setTimeout(() => setRecentlyReceived((current) => current.filter((id) => id !== to)), RECEIVED_GLANCE_MS)
+      }
       if (update.kind === 'mission-started') {
         // A teammate replying on their own. The host started it; the renderer
         // adopts it exactly as it adopts a run it asked for, so the sidebar
@@ -1156,6 +1177,14 @@ export default function App(): ReactElement {
   // opened on, so it reads the rows through this.
   sidebarMissionsRef.current = sidebarMissions
   historyByIdRef.current = historyById
+  missionOwnersRef.current = missionOwners
+  // What each teammate's live run is doing, from its events -- the same
+  // function the thread's working line uses, so the two cannot disagree.
+  const liveActivityByOwner: Record<string, LiveActivity> = {}
+  for (const run of runs.values()) {
+    const owner = ownerOf(run)
+    if (owner !== undefined && liveRunIsActive(run)) liveActivityByOwner[owner] = liveActivityOf(run.events, true)
+  }
 
   const noRuntimeReady =
     runtimeState.phase !== 'ready' || !runtimes.some((runtime) => runtime.ready && runtime.status === 'ready')
@@ -1200,6 +1229,9 @@ export default function App(): ReactElement {
           onSelectMission={openMission}
           onMissionMenu={openMissionMenu}
           pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
+          liveActivity={liveActivityByOwner}
+          recentlyDone={recentlyDone}
+          recentlyReceived={recentlyReceived}
           onSelectTeammate={selectTeammate}
           onNewTeammate={() => {
             setTeammateError(undefined)
@@ -1285,7 +1317,21 @@ export default function App(): ReactElement {
                       hue={missionOwner.hue}
                       avatar={missionOwner.avatar}
                       size={32}
-                      activity={running ? 'working' : 'still'}
+                      teammateId={missionOwner.teammateId}
+                      activity={
+                        teammateStatusView({
+                          runtime: runtimes.find((entry) => entry.id === liveRun?.data?.runtime),
+                          anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+                          hasRunningMission: running,
+                          pendingApprovals: shownApprovals.length,
+                          roleLabel: missionOwner.role,
+                          ...(liveActivityByOwner[missionOwner.teammateId] === undefined
+                            ? {}
+                            : { liveActivity: liveActivityByOwner[missionOwner.teammateId] }),
+                          recentlyDone: recentlyDone.includes(missionOwner.teammateId),
+                          recentlyReceived: recentlyReceived.includes(missionOwner.teammateId)
+                        }).activity
+                      }
                       presence={
                         running
                           ? 'working'

@@ -4,6 +4,7 @@ import type { ReactElement } from 'react'
 import { seedAvatar } from '../../../shared/avatar.js'
 import type { PlanStep } from '../missionView.js'
 import { PixelFace } from './PixelFace.js'
+import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
 
 /** One fixed face for the runtime itself, when a mission belongs to nobody. */
@@ -82,13 +83,16 @@ export function LiveStepCard({
   detail,
   startedAt,
   kind,
-  owner
+  owner,
+  activity
 }: {
   readonly label: string
   readonly detail: string | undefined
   readonly startedAt: string
   readonly kind: 'turn' | 'reasoning' | 'item'
-  readonly owner: { readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike } | undefined
+  readonly owner: { readonly teammateId?: string; readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike } | undefined
+  /** Decided once from the events, the same way the sidebar and header decide it. */
+  readonly activity: FaceActivity
 }): ReactElement {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -96,11 +100,17 @@ export function LiveStepCard({
     return () => clearInterval(timer)
   }, [])
   const elapsed = elapsedLabel(startedAt, now)
-  const thinking = kind === 'reasoning'
+  const thinking = activity === 'thinking'
   const face = owner ?? { hue: 'lime' as const, avatar: RUNTIME_FACE }
   return (
     <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind}>
-      <PixelFace hue={face.hue} avatar={face.avatar} size={26} activity={thinking ? 'still' : 'working'} />
+      <PixelFace
+        hue={face.hue}
+        avatar={face.avatar}
+        size={26}
+        activity={activity}
+        {...(owner?.teammateId === undefined ? {} : { teammateId: owner.teammateId })}
+      />
       <span className="lc-livestep__label">
         {label}
         {thinking && (

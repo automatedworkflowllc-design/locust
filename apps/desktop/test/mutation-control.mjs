@@ -31,9 +31,31 @@ const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 const ROSTER = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const UPDATES = join(ROOT, 'src', 'main', 'updates.ts')
 const RELAY = join(ROOT, 'src', 'main', 'relay.ts')
+const FACES = join(ROOT, 'src', 'renderer', 'src', 'faceState.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: FACES,
+    name: 'an idle face moves',
+    from: "  idle: {}\n}",
+    to: "  idle: { chip: 'lcBob 2.8s ease-in-out infinite' }\n}",
+    expect: 'idle and blocked are the only motionless states, and every other state moves'
+  },
+  {
+    file: FACES,
+    name: 'a reasoning step is drawn as working',
+    from: "  if (reasoning) return 'thinking'",
+    to: "  if (reasoning) return 'working'",
+    expect: 'thinks during an open reasoning step'
+  },
+  {
+    file: FACES,
+    name: 'waiting on you falls through to the live state or to still',
+    from: "  if (input.waitingOnYou) return 'waiting'\n",
+    to: '',
+    expect: 'waiting on you never resolves to still, and outranks live work'
+  },
   {
     file: RELAY,
     name: "a teammate replies on the sender's route instead of their own",
@@ -831,6 +853,7 @@ const originals = new Map([
   [ROSTER, readFileSync(ROSTER, 'utf8')],
   [UPDATES, readFileSync(UPDATES, 'utf8')],
   [RELAY, readFileSync(RELAY, 'utf8')],
+  [FACES, readFileSync(FACES, 'utf8')],
   [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')]
 ])
 let problems = 0

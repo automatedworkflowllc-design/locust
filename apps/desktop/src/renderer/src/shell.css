@@ -2774,23 +2774,89 @@ textarea {
 
 /* --- Generated faces: motion means work ---------------------------------- */
 
+/*
+ * Every animation is named for the state it means; the old generic eye
+ * animation is retired, because a single "eyes move" was exactly how the
+ * header came to claim one state while the step line claimed another.
+ * Direction carries the meaning: up thinks, down works, forward talks to
+ * you, sideways listens. Eye offsets are whole pixels only -- the eye layer
+ * is exactly one pixel wide, so 100% is one pixel and nothing lands off-grid.
+ */
 @keyframes lcBob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-7%); }
 }
 
-@keyframes lcEyes {
-  0%, 34% { transform: translateX(0) scaleY(1); }
-  38% { transform: translateX(0) scaleY(0.12); }
-  43% { transform: translateX(0) scaleY(1); }
-  54%, 66% { transform: translateX(100%) scaleY(1); }
-  76%, 84% { transform: translateX(-100%) scaleY(1); }
-  92%, 100% { transform: translateX(0) scaleY(1); }
-}
-
 @keyframes lcChat {
   0%, 100% { transform: scaleY(1); }
   50% { transform: scaleY(0.45); }
+}
+
+/* Squash-and-stretch bob: working has weight, at +/-3% so the grid stays crisp. */
+@keyframes lcBob2 {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  45% { transform: translateY(-9%) scale(0.97, 1.03); }
+  72% { transform: translateY(0) scale(1.03, 0.97); }
+}
+
+/* Slow head tilt: thinking is alive, and not executing. */
+@keyframes lcTilt {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50% { transform: rotate(2.5deg); }
+}
+
+/* One hop, once: a mission just finished. */
+@keyframes lcHop {
+  0%, 70%, 100% { transform: translateY(0) scale(1, 1); }
+  77% { transform: translateY(-20%) scale(0.94, 1.06); }
+  87% { transform: translateY(0) scale(1.06, 0.94); }
+}
+
+@keyframes lcEyesUp {
+  0%, 26% { transform: translate(0, -100%) scaleY(1); }
+  34% { transform: translate(0, -100%) scaleY(0.15); }
+  41% { transform: translate(0, -100%) scaleY(1); }
+  58%, 74% { transform: translate(100%, -100%) scaleY(1); }
+  90%, 100% { transform: translate(0, -100%) scaleY(1); }
+}
+
+@keyframes lcEyesDown {
+  0%, 44% { transform: translateY(100%) scaleY(1); }
+  52% { transform: translateY(100%) scaleY(0.15); }
+  60%, 100% { transform: translateY(100%) scaleY(1); }
+}
+
+@keyframes lcEyesFwd {
+  0%, 72% { transform: scaleY(1); }
+  80% { transform: scaleY(0.15); }
+  88%, 100% { transform: scaleY(1); }
+}
+
+@keyframes lcStare {
+  0%, 86% { transform: scaleY(1); }
+  92% { transform: scaleY(0.15); }
+  98%, 100% { transform: scaleY(1); }
+}
+
+@keyframes lcGlance {
+  0%, 14% { transform: translateX(0); }
+  24%, 56% { transform: translateX(-100%); }
+  70%, 100% { transform: translateX(0); }
+}
+
+/* Waiting on you: a slow amber ring outside the chip. The one state whose
+   whole job is to get attention must never look abandoned. */
+@keyframes lcRingWait {
+  0% { transform: scale(0.92); opacity: 0.7; }
+  100% { transform: scale(1.32); opacity: 0; }
+}
+
+.lc-face__ring {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--lc-amber);
+  animation: lcRingWait 1.8s ease-out infinite;
+  pointer-events: none;
 }
 
 .lc-face {

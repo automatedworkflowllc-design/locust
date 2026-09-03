@@ -4,7 +4,6 @@ import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import {
   checkpointLabel,
   collapseConversations,
-  faceActivityFor,
   facePresenceFor,
   connectedRuntimeCount,
   handoffAvailability,
@@ -217,11 +216,14 @@ describe('handoff availability', () => {
 })
 
 describe('face activity', () => {
-  it('moves a face only while its teammate is working', () => {
-    expect(faceActivityFor('working')).toBe('working')
-    expect(faceActivityFor('idle')).toBe('still')
-    expect(faceActivityFor('approval-needed')).toBe('still')
-    expect(faceActivityFor('blocked')).toBe('still')
+  it('decides the face from the same inputs as the label, so the two agree', () => {
+    const base = { runtime: undefined, anyRuntimeUsable: true, hasRunningMission: false, pendingApprovals: 0, roleLabel: 'Docs & QA' }
+    expect(teammateStatusView({ ...base, hasRunningMission: true, liveActivity: 'thinking' })).toMatchObject({ activity: 'thinking', label: 'Docs & QA · thinking' })
+    expect(teammateStatusView({ ...base, hasRunningMission: true })).toMatchObject({ activity: 'working', label: 'Docs & QA · working' })
+    expect(teammateStatusView({ ...base, pendingApprovals: 1 })).toMatchObject({ activity: 'waiting', label: 'Docs & QA · waiting on you' })
+    expect(teammateStatusView({ ...base, anyRuntimeUsable: false })).toMatchObject({ activity: 'blocked' })
+    expect(teammateStatusView({ ...base, recentlyDone: true })).toMatchObject({ activity: 'done', label: 'Docs & QA · done' })
+    expect(teammateStatusView(base)).toMatchObject({ activity: 'idle', label: 'Docs & QA · idle' })
   })
 
   it('carries every state on the presence dot, so a still face still reads', () => {
