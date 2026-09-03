@@ -89,6 +89,7 @@ export function ActivityCard({
                 <div className="lc-filerow is-static">
                   <Icon name={entry.kind === 'tool' ? 'activity' : 'file'} size={14} />
                   <span className="lc-filerow__path">{entry.name}</span>
+                  {entry.tool !== undefined && <span className="lc-filerow__status">{entry.tool}</span>}
                   <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : 'is-running'}`}>
                     {!entry.settled
                       ? 'still running'

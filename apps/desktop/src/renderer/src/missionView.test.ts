@@ -9,6 +9,7 @@ import {
   activitySummary,
   assistantMessages,
   defaultOpenEntry,
+  threadMarkers,
   buildSignalRail,
   buildThread,
   cancellationSummary,
@@ -730,6 +731,16 @@ describe('the activity card reads the change, not a receipt of it', () => {
     expect(entries[0]?.kind).toBe('unreported')
   })
 
+  it('names the tool on a row whose target is the same path it edited', () => {
+    const entries = activityEntries([
+      { kind: 'tool', name: 'src/billing.ts', tool: 'read', settled: true },
+      { kind: 'tool', name: 'grep', tool: 'grep', settled: true }
+    ])
+    expect(entries[0]).toMatchObject({ kind: 'tool', name: 'src/billing.ts', tool: 'read' })
+    // A tool whose name IS its target says it once, not twice.
+    expect(entries[1]).toMatchObject({ tool: undefined })
+  })
+
   it('carries a command row with its exit result', () => {
     const entries = activityEntries([
       { kind: 'shell', name: 'pnpm test', settled: true, failed: true, exitCode: 1 }
@@ -768,5 +779,31 @@ describe('the activity card reads the change, not a receipt of it', () => {
     const card = thread.find((item) => item.type === 'activity')
     expect(card?.type === 'activity' ? card.reportedBy : undefined).toBe('codex')
     expect(card?.type === 'activity' ? activityCounts(card.details) : undefined).toEqual({ added: 2, removed: 1 })
+  })
+})
+
+describe('marking time in a long conversation', () => {
+  function turn(minute: number, count = 1) {
+    return Array.from({ length: count }, (_, index) =>
+      event('step.completed', { itemId: `s${String(minute)}_${String(index)}`, stepKind: 'turn' })
+    ).map((each, index) => ({
+      ...each,
+      occurredAt: new Date(Date.UTC(2026, 7, 31, 16, minute + index)).toISOString()
+    })) as unknown as import('@teammate/runtime-adapters').NormalizedRuntimeEvent[]
+  }
+
+  it('says nothing when turns follow each other closely', () => {
+    expect(threadMarkers([turn(0), turn(1)])).toEqual([])
+  })
+
+  it('marks a gap, with the elapsed mission time and how long the wait was', () => {
+    const markers = threadMarkers([turn(0), turn(40)])
+    expect(markers).toHaveLength(1)
+    expect(markers[0]).toMatchObject({ beforeTurn: 1, minutesIn: 40, note: 'waited 40 min' })
+  })
+
+  it('measures elapsed time from the mission first event, not the previous turn', () => {
+    const markers = threadMarkers([turn(0), turn(10), turn(30)])
+    expect(markers.map((marker) => marker.minutesIn)).toEqual([10, 30])
   })
 })

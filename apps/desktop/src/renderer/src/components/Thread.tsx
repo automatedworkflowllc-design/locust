@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, peerGroups, readPlan } from '../missionView.js'
+import { buildThread, cancellationSummary, peerGroups, readPlan, threadMarkers } from '../missionView.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { ActivityCard } from './ActivityCard.js'
@@ -19,6 +19,7 @@ import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
 import { AgentAvatar, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
 import { HandoffDivider } from './HandoffDivider.js'
+import { TimeMarker } from './TimeMarker.js'
 import { PeerThread } from './PeerThread.js'
 import type { PeerGroup, ThreadItem } from '../missionView.js'
 
@@ -225,6 +226,10 @@ export function Thread({
   peers
 }: ThreadProps): ReactElement {
   const items = buildThread(events, { running })
+  // The current turn is the last in the sequence, so its own marker is the
+  // one whose index is past every earlier turn.
+  const markers = threadMarkers([...earlierTurns.map((turn) => turn.events), events])
+  const currentMarker = markers.find((marker) => marker.beforeTurn === earlierTurns.length)
   const exchanges = peerGroups(peers.messages)
   const peerCard = (group: PeerGroup): ReactElement => (
     <PeerThread
@@ -264,13 +269,22 @@ export function Thread({
           a user bubble would attribute to them something they never said --
           which is why a handoff contributes no bubble of its own here.
         */}
-        {earlierTurns.map((turn) => (
-          <Fragment key={turn.missionId}>
-            <div className="lc-bubble">{turn.prompt}</div>
-            <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} />
-          </Fragment>
-        ))}
+        {earlierTurns.map((turn, index) => {
+          const marker = markers.find((candidate) => candidate.beforeTurn === index)
+          return (
+            <Fragment key={turn.missionId}>
+              {marker !== undefined && (
+                <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
+              )}
+              <div className="lc-bubble">{turn.prompt}</div>
+              <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} />
+            </Fragment>
+          )
+        })}
 
+        {currentMarker !== undefined && (
+          <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
+        )}
         <div className="lc-bubble">{prompt}</div>
 
         {handoff !== undefined && (

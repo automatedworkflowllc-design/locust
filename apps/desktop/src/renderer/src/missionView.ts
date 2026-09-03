@@ -20,6 +20,12 @@ import { stripShareBlocks } from '../../shared/peer-share.js'
 export interface ActivityDetail {
   readonly kind: string
   readonly name: string
+  /**
+   * What the runtime called the tool. `name` is often the target -- a path,
+   * a command -- so without this a read of a file it also edited renders as
+   * the same path twice with nothing to tell them apart.
+   */
+  readonly tool?: string
   readonly settled: boolean
   /** True only for a tool the runtime itself reported as failed. */
   readonly failed?: boolean
@@ -57,6 +63,8 @@ export type ActivityEntry =
       readonly kind: 'unreported' | 'tool'
       readonly key: string
       readonly name: string
+      /** The runtime's own word for what it did: `read`, `search`, `list`. */
+      readonly tool: string | undefined
       readonly settled: boolean
       readonly failed: boolean
     }
@@ -89,6 +97,7 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
         kind: detail.kind === 'edit' ? 'unreported' : 'tool',
         key: `item_${String(index)}`,
         name: detail.name,
+        tool: detail.tool === detail.name ? undefined : detail.tool,
         settled: detail.settled,
         failed
       })
@@ -162,6 +171,42 @@ export function minutesBetween(from: string, to: string): number {
  * reader deserves to know the mission sat still.
  */
 export const QUIET_GAP_MINUTES = 2
+
+export interface ThreadMarker {
+  /** Index of the turn this marker sits ABOVE. */
+  readonly beforeTurn: number
+  readonly at: string
+  readonly minutesIn: number
+  /** Said only when the gap is the point, e.g. `waited 6 min`. */
+  readonly note: string | undefined
+}
+
+/**
+ * Where a long conversation earns a time marker. A turn that follows the one
+ * before it within a couple of minutes needs no marker -- it reads as the
+ * same stretch of work. A gap longer than that is a fact about the mission
+ * (you were away, or it was waiting on you), and stating it beats leaving
+ * the reader to subtract two timestamps that are not on screen.
+ */
+export function threadMarkers(turns: readonly (readonly NormalizedRuntimeEvent[])[]): readonly ThreadMarker[] {
+  const origin = turns.flat()[0]?.occurredAt
+  if (origin === undefined) return []
+  const markers: ThreadMarker[] = []
+  for (let index = 1; index < turns.length; index += 1) {
+    const previous = turns[index - 1]?.at(-1)?.occurredAt
+    const next = turns[index]?.[0]?.occurredAt
+    if (previous === undefined || next === undefined) continue
+    const gap = minutesBetween(previous, next)
+    if (gap < QUIET_GAP_MINUTES) continue
+    markers.push({
+      beforeTurn: index,
+      at: next,
+      minutesIn: minutesBetween(origin, next),
+      note: `waited ${String(gap)} min`
+    })
+  }
+  return markers
+}
 
 export interface PlanStep {
   readonly text: string
@@ -330,6 +375,7 @@ export function buildThread(
         const detail: ActivityDetail = {
           kind: toolKindOf(event),
           name: event.payload.command ?? event.payload.name,
+          tool: event.payload.name,
           settled: false
         }
         openTools.set(event.payload.itemId, detail)

@@ -142,6 +142,46 @@ renders as a quiet line; red is kept for a run that actually stopped.
 
 ## Still open, in the order I would take them
 
+**The inline diff. DONE 2026-09-02, live-verified.** The app recorded every
+change and showed a filename, which is the difference between holding a
+receipt and reading it. The activity card is now three rungs: summary with
+`+N -M`, a row per file with its status and its own counts, and the unified
+diff itself -- 44/44/18/1fr grid, hunk headers carrying the enclosing symbol,
+intra-line spans on paired lines, folded context that names its exact count,
+two hunks then a quantified expand.
+
+Two rules from the design pass are enforced in code because both are the kind
+that regress silently. Counts are derived, never authored: the card total is
+summed from the rows it will draw, so a runtime header claiming +900 over
+three rendered lines cannot reach the screen, and a `@@` range is rebuilt
+from its rows rather than trusted. And no open file ends in silence -- there
+is always `All N hunks shown`, an expand naming what remains, or a stated
+remainder. An edit whose runtime reported no patch stays in the list as a row
+saying so, naming the runtime, because dropping it would understate the work.
+
+Getting the change into the record needed a first-class field: evidence
+strings cap at 8 KB, so `ToolPatch` carries the unified diff (64 KiB, with
+`truncated`) and its counts are taken from the whole text before bounding.
+Cursor supplies `diffString` on every completed edit. Codex's `file_change`
+items carry a path and a kind and no diff at all, which is why those rows say
+the runtime did not report the change instead of showing nothing. Verified by
+`_smoke/diff-smoke.mjs`: a real Cursor edit in a throwaway workspace, both
+rules asserted against the DOM.
+
+**Lime meant six things at once.** It carried active, ready, allowed, done,
+available and every check mark, which is the same as carrying nothing. Green
+now owns settled -- done plan steps, standing grants, reachable routes -- and
+lime keeps only "happening right now". Card weight tracks whether a card
+blocks work (raised) or already happened (recessed). The token gate gained
+the faint-token rule the design pass asked for, and writing it found the one
+real site in the app.
+
+**Still open from that pass:** syntax highlighting inside diff rows, binary
+and image change rows, staging or reverting a hunk from the thread (which
+would make this an editor surface rather than a record), and mounting the
+diff in the approval card for a pending repo write -- the app-server request
+carries `changes`, which is not surfaced yet.
+
 **Mission deletion. DONE 2026-09-02.** Colin asked directly. A finished
 mission can be deleted for good from the workroom header -- two clicks, the
 second of which says "Delete for good?" -- and the host refuses while it is
