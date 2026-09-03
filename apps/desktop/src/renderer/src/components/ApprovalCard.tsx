@@ -30,7 +30,7 @@ export function ApprovalCard({
         : 'Nothing is changed by answering.'
 
   return (
-    <div className="lc-card is-amber" role="group" aria-label="Approval required">
+    <div className="lc-card is-pending is-amber" role="group" aria-label="Approval required">
       <div className="lc-card__head">
         <span className="lc-approval__title">
           <Icon name="shield" size={13} />{' '}

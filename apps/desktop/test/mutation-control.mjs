@@ -34,6 +34,34 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'the activity total is taken from the runtime header instead of the rows',
+    from: '    if (entry.kind !== \'file\') continue\n    added += entry.counts.added\n    removed += entry.counts.removed',
+    to: '    if (entry.kind !== \'file\') continue\n    added += entry.reported?.added ?? entry.counts.added\n    removed += entry.reported?.removed ?? entry.counts.removed',
+    expect: 'sums the card total from the rows it will actually draw'
+  },
+  {
+    file: VIEW,
+    name: 'an edit with no recorded patch is dropped from the list',
+    from: '      entries.push({\n        kind: detail.kind === \'edit\' ? \'unreported\' : \'tool\',',
+    to: '      if (detail.kind === \'edit\') return\n      entries.push({\n        kind: \'tool\',',
+    expect: 'keeps an edit whose runtime reported no patch, as a row that says so'
+  },
+  {
+    file: VIEW,
+    name: 'a large file still opens by default and buries the rest',
+    from: '  return first.large ? undefined : first.key',
+    to: '  return first.key',
+    expect: 'opens the first file, unless opening it would bury everything after it'
+  },
+  {
+    file: VIEW,
+    name: 'the completion patch never reaches the activity row',
+    from: '              ...(patch === undefined ? {} : { patch, kind: \'edit\' })\n',
+    to: '',
+    expect: 'attaches a completion patch to the tool that opened, and names the runtime that reported it'
+  },
+  {
     file: STATUS,
     name: 'a read-only Cursor mode is offered where nothing can enforce it',
     from: "  if (mode === 'ask' && runtime === 'cursor' && platform === 'win32') return false",

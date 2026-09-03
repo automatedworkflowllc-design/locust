@@ -97,12 +97,12 @@ export function Inspector({
               </div>
               <div className="lc-permissions__rows">
                 <div className="lc-permissions__row">
-                  <span className="lc-tone-lime">allow</span>
+                  <span className="lc-tone-green">allow</span>
                   <span>read files in the host-selected workspace</span>
                 </div>
                 {writes ? (
                   <div className="lc-permissions__row">
-                    <span className="lc-tone-lime">allow</span>
+                    <span className="lc-tone-green">allow</span>
                     <span>write files inside that same workspace folder</span>
                   </div>
                 ) : (
@@ -171,7 +171,7 @@ export function Inspector({
               <dd
                 className={
                   ledgerVerificationLabel(restoredMission.integrityIssueCount) === 'verified'
-                    ? 'lc-tone-lime'
+                    ? 'lc-tone-green'
                     : 'lc-tone-amber'
                 }
               >

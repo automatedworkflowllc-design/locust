@@ -4,8 +4,11 @@ import type { PublicRecoveredMission } from '../../shared/ipc.js'
 import { describe, expect, it } from 'vitest'
 
 import {
+  activityCounts,
+  activityEntries,
   activitySummary,
   assistantMessages,
+  defaultOpenEntry,
   buildSignalRail,
   buildThread,
   cancellationSummary,
@@ -671,5 +674,99 @@ describe('the routes this person has actually run', () => {
 
   it('says nothing when nothing has been run', () => {
     expect(recentlyUsedRoutes([])).toEqual([])
+  })
+})
+
+describe('the activity card reads the change, not a receipt of it', () => {
+  const PATCH = [
+    '--- a/src/billing.ts',
+    '+++ b/src/billing.ts',
+    '@@ -12,2 +12,3 @@ handle()',
+    ' const a = 1;',
+    '-const b = 2;',
+    '+const b = 3;',
+    '+const c = 4;',
+    ''
+  ].join('\n')
+
+  function edited(patch: { text: string; added: number; removed: number; truncated: boolean }) {
+    return [
+      { kind: 'edit', name: 'apply_patch', settled: true, patch }
+    ]
+  }
+
+  it('turns one patch into a row per file it touched', () => {
+    const two = `${PATCH}--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-old\n+new\n`
+    const entries = activityEntries(edited({ text: two, added: 3, removed: 2, truncated: false }))
+    expect(entries.map((entry) => (entry.kind === 'file' ? entry.file.path : entry.kind))).toEqual([
+      'src/billing.ts',
+      'README.md'
+    ])
+  })
+
+  it('sums the card total from the rows it will actually draw', () => {
+    // The runtime's own header claims far more than the recorded text holds.
+    // The card shows what the diff below it can show, or the two disagree.
+    const entries = activityEntries(edited({ text: PATCH, added: 900, removed: 900, truncated: true }))
+    expect(activityCounts(edited({ text: PATCH, added: 900, removed: 900, truncated: true }))).toEqual({
+      added: 2,
+      removed: 1
+    })
+    expect(entries[0]?.kind === 'file' ? entries[0].counts : undefined).toEqual({ added: 2, removed: 1 })
+  })
+
+  it('keeps the runtime total beside a truncated single-file patch, and withholds it across several', () => {
+    const one = activityEntries(edited({ text: PATCH, added: 900, removed: 900, truncated: true }))[0]
+    expect(one?.kind === 'file' ? one.reported : undefined).toEqual({ added: 900, removed: 900 })
+    const many = activityEntries(
+      edited({ text: `${PATCH}--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n`, added: 900, removed: 900, truncated: true })
+    )[0]
+    expect(many?.kind === 'file' ? many.reported : 'missing').toBeUndefined()
+  })
+
+  it('keeps an edit whose runtime reported no patch, as a row that says so', () => {
+    const entries = activityEntries([{ kind: 'edit', name: 'apply_patch', settled: true }])
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.kind).toBe('unreported')
+  })
+
+  it('carries a command row with its exit result', () => {
+    const entries = activityEntries([
+      { kind: 'shell', name: 'pnpm test', settled: true, failed: true, exitCode: 1 }
+    ])
+    expect(entries[0]).toMatchObject({ kind: 'shell', command: 'pnpm test', failed: true, exitCode: 1 })
+  })
+
+  it('opens the first file, unless opening it would bury everything after it', () => {
+    const small = activityEntries(edited({ text: PATCH, added: 2, removed: 1, truncated: false }))
+    expect(defaultOpenEntry(small)).toBe(small[0]?.key)
+    const huge = [
+      '--- a/big.ts',
+      '+++ b/big.ts',
+      `@@ -1 +1,400 @@`,
+      ...Array.from({ length: 400 }, (_, i) => `+line ${String(i)}`)
+    ].join('\n')
+    const big = activityEntries(edited({ text: huge, added: 400, removed: 0, truncated: false }))
+    expect(big[0]?.kind === 'file' ? big[0].large : false).toBe(true)
+    expect(defaultOpenEntry(big)).toBeUndefined()
+  })
+
+  it('attaches a completion patch to the tool that opened, and names the runtime that reported it', () => {
+    const thread = buildThread(
+      [
+        event('tool.started', { itemId: 't1', toolKind: 'file_change', name: 'apply_patch', phase: 'started' }),
+        event('tool.completed', {
+          itemId: 't1',
+          toolKind: 'file_change',
+          name: 'apply_patch',
+          phase: 'completed',
+          patch: { text: PATCH, added: 2, removed: 1, truncated: false }
+        })
+      ],
+      { running: false }
+    )
+    const card = thread.find((item) => item.type === 'activity')
+    expect(card?.type === 'activity' ? card.reportedBy : undefined).toBe('codex')
+    expect(card?.type === 'activity' ? activityCounts(card.details) : undefined).toEqual({ added: 2, removed: 1 })
   })
 })

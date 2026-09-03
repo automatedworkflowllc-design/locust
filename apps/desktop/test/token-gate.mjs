@@ -24,10 +24,55 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const RENDERER = join(ROOT, 'src', 'renderer', 'src')
 const TOKENS = join(RENDERER, 'tokens.css')
 const COMPONENTS = join(RENDERER, 'components')
+const SHELL = join(RENDERER, 'shell.css')
 
 const HEX = /#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g
 /** Documentation-only grays from the spec. They must never appear in the app. */
 const FORBIDDEN_IN_APP = ['#616666', '#4e5353']
+
+/**
+ * `--lc-text-faint` (#7A807F) measures 4.2-4.4:1 and fails AA on copy. It is
+ * for NON-TEXT marks only: an icon's stroke via currentColor, a hairline, the
+ * `/` separator glyph. So `color:` may not take it, with these exceptions --
+ * each one a place where nothing readable is painted, and each one requiring
+ * a stated reason before it can be added.
+ */
+const FAINT_COLOR_EXCEPTIONS = new Map([
+  ['.lc-windowcontrols button', 'minimize/maximize/close: SVG strokes through currentColor, labelled by aria-label, no text inside'],
+  ['.lc-separator', 'the `/` glyph between route names, which the spec names explicitly']
+])
+
+const FAINT = ['var(--lc-text-faint)', '#7a807f']
+
+/**
+ * Every `color:` declaration in a stylesheet, with the selector it sits under.
+ * Deliberately simple: rules are flat in these sheets, so the last selector
+ * before an opening brace is the one that owns the declaration.
+ */
+function colorDeclarations(css) {
+  const found = []
+  let selector = ''
+  for (const raw of css.split('\n')) {
+    const line = raw.trim()
+    if (line.endsWith('{')) selector = line.slice(0, -1).trim()
+    else if (/^color:/.test(line)) found.push([selector, line])
+  }
+  return found
+}
+
+function faintTextFindings(label, css) {
+  const failures = []
+  for (const [selector, declaration] of colorDeclarations(css)) {
+    if (!FAINT.some((value) => declaration.toLowerCase().includes(value))) continue
+    const allowed = [...FAINT_COLOR_EXCEPTIONS.keys()].some((key) => selector.split(',').some((part) => part.trim() === key))
+    if (!allowed) {
+      failures.push(
+        `${label}: ${selector} sets ${declaration} -- the faint token fails AA on text; use --lc-text-muted, or add the selector to FAINT_COLOR_EXCEPTIONS with the reason nothing readable is painted there`
+      )
+    }
+  }
+  return failures
+}
 
 function walk(dir) {
   let out = []
@@ -92,7 +137,7 @@ const SURFACES = [
 ]
 const AA = 4.5
 
-function check(tokensCss, componentFiles) {
+function check(tokensCss, componentFiles, shellCss = '') {
   const failures = []
   const tokens = parseTokens(tokensCss)
 
@@ -127,6 +172,11 @@ function check(tokensCss, componentFiles) {
     for (const hex of source.match(HEX) ?? []) {
       failures.push(`${file}: literal color ${hex} -- use a token`)
     }
+  }
+
+  failures.push(...faintTextFindings('shell.css', shellCss))
+  for (const [file, source] of componentFiles) {
+    if (file.endsWith('.css')) failures.push(...faintTextFindings(file, source))
   }
 
   const appSurfaceText = `${tokensCss}\n${componentFiles.map(([, source]) => source).join('\n')}`.toLowerCase()
@@ -166,6 +216,12 @@ if (process.argv.includes('--self-test')) {
       tokensCss,
       [['fake/Component.tsx', 'color: var(--x) /* #616666 */']],
       /documentation-only gray/
+    ],
+    [
+      'the faint token used as text color',
+      tokensCss,
+      [['fake/Component.css', '.lc-madeup {\n  color: var(--lc-text-faint);\n}']],
+      /fails AA on text/
     ]
   ]
   let bad = 0
@@ -175,7 +231,7 @@ if (process.argv.includes('--self-test')) {
     if (!caught) bad += 1
     console.error(`  [${caught ? 'CAUGHT' : 'MISSED'}] ${label}`)
   }
-  const clean = check(tokensCss, loadComponents())
+  const clean = check(tokensCss, loadComponents(), readFileSync(SHELL, 'utf8'))
   if (clean.length > 0) {
     bad += 1
     console.error(`  [MISSED] a compliant tree must produce zero findings; got: ${clean.join('; ')}`)
@@ -186,7 +242,7 @@ if (process.argv.includes('--self-test')) {
   process.exit(bad === 0 ? 0 : 1)
 }
 
-const failures = check(tokensCss, loadComponents())
+const failures = check(tokensCss, loadComponents(), readFileSync(SHELL, 'utf8'))
 for (const failure of failures) console.error(`  [FAIL] ${failure}`)
 console.error(failures.length === 0 ? 'TOKEN GATE PASSED' : `TOKEN GATE FAILED (${failures.length})`)
 process.exit(failures.length === 0 ? 0 : 1)

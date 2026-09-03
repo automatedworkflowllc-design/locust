@@ -94,6 +94,16 @@
   --lc-lime-border: rgba(201, 240, 74, 0.3);
   --lc-lime-border-strong: rgba(201, 240, 74, 0.55);
 
+  /*
+   * Green is settled: allowed, passed, added, available. Lime is "happening
+   * right now" and nothing else. The two were one colour before, and lime
+   * carrying both meant neither read -- so this split is load-bearing.
+   */
+  --lc-green: #7fc97f;
+  --lc-green-text: #a9dda9;
+  --lc-green-tint: rgba(127, 201, 127, 0.12);
+  --lc-green-border: rgba(127, 201, 127, 0.32);
+
   --lc-blue: #6ea8fe;
   --lc-blue-text: #9dc2fb;
   --lc-blue-tint: rgba(110, 168, 254, 0.12);
@@ -115,6 +125,33 @@
 
   --lc-neutral: #4a4f4f;
 
+  /* --- Diff --------------------------------------------------------------
+   * Opaque pairs rather than alpha tints, so a row fill does not shift with
+   * whatever surface it lands on and would survive a light theme without
+   * being recomputed. Never lime for additions: a diff records what already
+   * happened, and lime means happening now.
+   */
+  --lc-diff-add-bg: #14251a;
+  --lc-diff-add-mark: #7fc97f;
+  --lc-diff-add-word: #1f4029;
+  --lc-diff-del-bg: #2a1719;
+  --lc-diff-del-mark: #e4685d;
+  --lc-diff-del-word: #4a2429;
+  --lc-diff-hunk-bg: #1a1e20;
+  --lc-diff-surface: #16191a;
+  --lc-diff-gutter: #8b9190;
+  --lc-diff-code: #e7e3dc;
+
+  /* --- Card weight -------------------------------------------------------
+   * Weight tracks two facts, not severity: a card that BLOCKS work is
+   * raised and looks like it is waiting for you; a card about something
+   * that ALREADY HAPPENED is recessed and asks for nothing.
+   */
+  --lc-bg-pending: #1f2020;
+  --lc-bg-terminal: #141617;
+  --lc-shadow-pending: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --lc-shadow-terminal: inset 0 1px 0 rgba(0, 0, 0, 0.35);
+
   /* --- Teammate avatar hues (8-bit faces) ----------------------------- */
   --lc-hue-lime: #a9d93f;
   --lc-hue-lime-face: #151a0c;
@@ -133,7 +170,12 @@
   --lc-font-ui: 'Geist', Helvetica, ui-sans-serif, system-ui, sans-serif;
   --lc-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --lc-text-screen-title: 15px;
+  /*
+   * Two display moments only. Everything was <= 15px before, which read as
+   * density rather than calm; more display sizes would flatten it again.
+   */
+  --lc-text-display: 27px;
+  --lc-text-screen-title: 20px;
   --lc-text-teammate-name: 14.5px;
   --lc-text-body: 13.5px;
   --lc-text-control: 13px;

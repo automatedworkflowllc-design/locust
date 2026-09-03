@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -11,7 +11,9 @@ import type {
   PublicTeammate
 } from '../../../shared/ipc.js'
 import { buildThread, cancellationSummary, peerGroups, readPlan } from '../missionView.js'
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
+import { ActivityCard } from './ActivityCard.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
@@ -50,7 +52,14 @@ function ThreadItems({
           return <PlanCard key={item.key} steps={item.steps} doneCount={item.doneCount} />
         }
         if (item.type === 'activity') {
-          return <ActivityCard key={item.key} summary={item.summary} details={item.details} />
+          return (
+            <ActivityCard
+              key={item.key}
+              summary={item.summary}
+              details={item.details}
+              runtimeName={item.reportedBy === undefined ? undefined : runtimeDisplayName(item.reportedBy)}
+            />
+          )
         }
         if (item.type === 'live-step') {
           return (
@@ -73,7 +82,7 @@ function ThreadItems({
             return <DiagnosticLine key={item.key} level="warning" message={item.message} />
           }
           return (
-            <div className="lc-card is-red" key={item.key}>
+            <div className="lc-card is-terminal is-red" key={item.key}>
               <div className="lc-card__head">
                 <span>Usage limit reached</span>
                 <span className="lc-tag is-red">{item.kind}</span>
@@ -85,34 +94,6 @@ function ThreadItems({
         return <DiagnosticLine key={item.key} level={item.level} message={item.message} />
       })}
     </>
-  )
-}
-
-function ActivityCard({
-  summary,
-  details
-}: {
-  readonly summary: string
-  readonly details: readonly { readonly kind: string; readonly name: string; readonly settled: boolean }[]
-}): ReactElement {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="lc-card">
-      <button type="button" className="lc-activity" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span>{summary}</span>
-        <span className="lc-rail__meta">{open ? 'hide' : 'show'}</span>
-      </button>
-      {open && (
-        <div className="lc-activity__rows">
-          {details.map((detail, index) => (
-            <span key={`${detail.name}-${index}`}>
-              {detail.kind} · {detail.name}
-              {detail.settled ? '' : ' · still running'}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -129,7 +110,7 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
   const last = checkpoints.at(-1)
   const unsettled = last?.unsettledActions ?? []
   return (
-    <div className={`lc-card is-${view.tone === 'blue' ? 'blue' : view.tone === 'red' ? 'red' : 'amber'}`}>
+    <div className={`lc-card is-terminal is-${view.tone === 'blue' ? 'blue' : view.tone === 'red' ? 'red' : 'amber'}`}>
       <div className="lc-card__head">
         <span>
           <span className="lc-mono lc-rail__meta">DURABLE RECEIPT</span>{' '}
@@ -165,7 +146,7 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
           {mission.eventCount} recorded{mission.eventsTruncated ? ' · window truncated for display' : ''}
         </dd>
         <dt>Ledger</dt>
-        <dd className={verification === 'verified' ? 'lc-tone-lime' : 'lc-tone-amber'}>{verification}</dd>
+        <dd className={verification === 'verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
       </dl>
     </div>
   )
@@ -335,7 +316,7 @@ export function Thread({
         {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} />}
 
         {error !== undefined && (
-          <div className="lc-card is-red">
+          <div className="lc-card is-terminal is-red">
             <div className="lc-card__head">
               <span>
                 <Icon name="shield" size={13} />{' '}

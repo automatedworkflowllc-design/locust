@@ -298,6 +298,10 @@ textarea {
   color: var(--lc-lime-text);
 }
 
+.lc-tone-green {
+  color: var(--lc-green-text);
+}
+
 .lc-tone-amber {
   color: var(--lc-amber-text);
 }
@@ -357,10 +361,6 @@ textarea {
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
-}
-
-.lc-connected.is-live {
-  color: var(--lc-lime-text);
 }
 
 /* --- Workroom ---------------------------------------------------------- */
@@ -454,12 +454,24 @@ textarea {
   padding: var(--lc-space-7) var(--lc-space-6);
 }
 
+/*
+ * The gap is what groups a turn, not a container: items inside one turn sit
+ * 12px apart, and a new turn opens 22px down.
+ */
 .lc-thread__column {
   max-width: var(--lc-thread-max-width);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-5);
+}
+
+.lc-thread__column > .lc-bubble {
+  margin-top: 10px;
+}
+
+.lc-thread__column > .lc-bubble:first-child {
+  margin-top: 0;
 }
 
 .lc-thread__marker {
@@ -526,6 +538,31 @@ textarea {
   background: var(--lc-amber-tint);
 }
 
+/*
+ * Weight, not severity. `is-pending` blocks work and is raised toward the
+ * reader; `is-terminal` already happened and sits below the thread surface.
+ * A failure that still needs a decision keeps the recessed fill -- the event
+ * is past -- and puts the emphasis on its buttons instead.
+ */
+.lc-card.is-pending {
+  background: var(--lc-bg-pending);
+  box-shadow: var(--lc-shadow-pending);
+}
+
+.lc-card.is-pending.is-amber {
+  border-color: var(--lc-amber-border);
+  box-shadow: 0 0 0 3px var(--lc-amber-tint), var(--lc-shadow-pending);
+}
+
+.lc-card.is-terminal {
+  background: var(--lc-bg-terminal);
+  box-shadow: var(--lc-shadow-terminal);
+}
+
+.lc-card.is-terminal.is-red {
+  border-color: var(--lc-red-border);
+}
+
 .lc-card.is-red {
   border-color: var(--lc-red-border);
   background: var(--lc-red-tint);
@@ -561,13 +598,276 @@ textarea {
   background: var(--lc-hover-surface);
 }
 
-.lc-activity__rows {
+.lc-activity__counts {
+  margin-left: auto;
   display: flex;
-  flex-direction: column;
-  gap: var(--lc-space-3);
-  padding: 0 var(--lc-space-5) var(--lc-space-5);
+  gap: var(--lc-space-4);
+  font-size: var(--lc-text-mono-caption);
+}
+
+.lc-activity__chev {
+  display: flex;
+  color: var(--lc-text-muted);
+}
+
+.lc-activity__chev.is-alone {
+  margin-left: auto;
+}
+
+.lc-activity__list {
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+/*
+ * One list, two row kinds: a file carries counts and opens a diff, a command
+ * carries its exit result. They stay in the order they happened so "what it
+ * did" reads top to bottom.
+ */
+.lc-filerow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-5);
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border: 0;
+  background: transparent;
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-provenance);
+  color: var(--lc-text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-filerow.is-static {
+  cursor: default;
+}
+
+.lc-filerow:not(.is-static):hover {
+  background: var(--lc-hover-surface);
+}
+
+.lc-filerow > svg {
+  flex: none;
+  color: var(--lc-text-muted);
+}
+
+.lc-filerow.is-shell > svg {
+  color: var(--lc-violet);
+}
+
+.lc-filerow__path {
+  color: var(--lc-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-filerow__status {
+  flex: none;
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label);
+  color: var(--lc-text-label);
+}
+
+.lc-filerow__status.is-large {
+  color: var(--lc-amber-text);
+}
+
+.lc-filerow__result {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  gap: var(--lc-space-3);
+}
+
+.lc-filerow__result.is-ok {
+  color: var(--lc-green-text);
+}
+
+.lc-filerow__result.is-failed {
+  color: var(--lc-red-text);
+}
+
+.lc-filerow__result.is-running {
+  color: var(--lc-amber-text);
+}
+
+.lc-filerow__result.is-muted {
+  color: var(--lc-text-muted);
+}
+
+/* --- The diff itself --------------------------------------------------
+ * Unified, never side by side: the thread column caps at 760px and two
+ * panes would leave forty mono characters each. Content scrolls per row
+ * rather than wrapping, because wrapped code destroys the column
+ * alignment that makes a diff scannable in the first place.
+ */
+.lc-diff {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-provenance);
+  line-height: 1.85;
+  background: var(--lc-diff-surface);
+  border-top: 1px solid var(--lc-border-hairline);
+  border-bottom: 1px solid var(--lc-border-hairline);
+}
+
+.lc-diff__hunk {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-5);
+  padding: var(--lc-space-1) var(--lc-space-5);
+  background: var(--lc-diff-hunk-bg);
+  border-top: 1px solid var(--lc-border-hairline);
+  border-bottom: 1px solid var(--lc-border-hairline);
+  color: var(--lc-text-muted);
+}
+
+.lc-diff__row {
+  display: grid;
+  grid-template-columns: 44px 44px 18px 1fr;
+}
+
+.lc-diff__row.is-add {
+  background: var(--lc-diff-add-bg);
+}
+
+.lc-diff__row.is-del {
+  background: var(--lc-diff-del-bg);
+}
+
+/* Line numbers are not code: a copy of the diff must yield something that
+   pastes back into an editor. */
+.lc-diff__no {
+  text-align: right;
+  padding-right: 9px;
+  color: var(--lc-diff-gutter);
+  user-select: none;
+}
+
+/* The sign carries the same fact as the row fill, so the diff reads without
+   colour at all. */
+.lc-diff__sign {
+  text-align: center;
+  user-select: none;
+  color: transparent;
+}
+
+.lc-diff__row.is-add .lc-diff__sign {
+  color: var(--lc-diff-add-mark);
+}
+
+.lc-diff__row.is-del .lc-diff__sign {
+  color: var(--lc-diff-del-mark);
+}
+
+.lc-diff__code {
+  white-space: pre;
+  overflow-x: auto;
+  padding-right: var(--lc-space-6);
+  color: var(--lc-text-secondary);
+}
+
+.lc-diff__row.is-add .lc-diff__code,
+.lc-diff__row.is-del .lc-diff__code {
+  color: var(--lc-diff-code);
+}
+
+.lc-diff__word {
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+}
+
+.lc-diff__row.is-add .lc-diff__word {
+  background: var(--lc-diff-add-word);
+}
+
+.lc-diff__row.is-del .lc-diff__word {
+  background: var(--lc-diff-del-word);
+}
+
+.lc-diff__addmark {
+  color: var(--lc-diff-add-mark);
+}
+
+.lc-diff__delmark {
+  color: var(--lc-diff-del-mark);
+}
+
+.lc-diff__fold,
+.lc-diff__expand {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-1) var(--lc-space-5);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--lc-text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-diff__fold:hover,
+.lc-diff__expand:hover {
+  background: var(--lc-hover-surface);
+  color: var(--lc-text-secondary);
+}
+
+.lc-diff__foldmark {
+  width: 82px;
+  flex: none;
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+.lc-diff__expand {
+  justify-content: center;
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+/* The completeness statement. Never absent: silence after the last row
+   reads as "that was the whole change". */
+.lc-diff__foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid var(--lc-border-hairline);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-diff__foot > span {
+  padding: var(--lc-space-4) var(--lc-space-5);
+  text-align: center;
+}
+
+.lc-diff__foot .lc-diff__expand {
+  border-top: 0;
+}
+
+/* --- Time markers ------------------------------------------------------
+ * A long mission is a timeline, not a wall. Lighter than the MISSION rule
+ * above it, so the two read as different levels.
+ */
+.lc-timemark {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-5);
+  padding: var(--lc-space-3) 0;
+}
+
+.lc-timemark__line {
+  flex: 1;
+  height: 1px;
+  background: var(--lc-border-hairline);
+}
+
+.lc-timemark__text {
+  flex: none;
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
 
@@ -664,10 +964,13 @@ textarea {
   max-width: 100%;
 }
 
+/* One of the two display moments in the product. */
 .lc-empty h1 {
   margin: 0;
-  font-size: 19px;
+  font-size: var(--lc-text-display);
   font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .lc-empty p {
@@ -1162,8 +1465,8 @@ textarea {
 }
 
 .lc-plan__step.is-done .lc-plan__marker {
-  border-color: var(--lc-lime-border);
-  color: var(--lc-lime-text);
+  border-color: var(--lc-green-border);
+  color: var(--lc-green-text);
 }
 
 .lc-plan__step.is-running .lc-plan__marker {
@@ -1606,6 +1909,7 @@ textarea {
 .lc-screen__title {
   font-size: var(--lc-text-screen-title);
   font-weight: 500;
+  letter-spacing: -0.015em;
 }
 
 .lc-screen__meta {

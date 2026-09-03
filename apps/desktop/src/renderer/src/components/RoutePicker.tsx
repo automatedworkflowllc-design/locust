@@ -188,11 +188,13 @@ export function RoutePicker({
               >
                 <span
                   className={`lc-dot ${
-                    row.tag === 'ACTIVE' || row.tag === 'READY'
+                    row.tag === 'ACTIVE'
                       ? 'lc-tone-lime'
-                      : row.tag === 'PREVIEW'
-                        ? 'lc-tone-amber'
-                        : 'lc-tone-muted'
+                      : row.tag === 'READY'
+                        ? 'lc-tone-green'
+                        : row.tag === 'PREVIEW'
+                          ? 'lc-tone-amber'
+                          : 'lc-tone-muted'
                   }`}
                 />
                 <span className="lc-picker__text">

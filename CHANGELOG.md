@@ -6,6 +6,27 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.9.0 — 2026-09-02
+
+- **See the actual diff.** The activity card used to say a teammate edited a
+  file and stop there. Open it now and every changed file is listed with its
+  status and `+N −M`; click one and the change itself unfolds inline, line
+  numbers, hunk headers, and the exact span that changed on each line.
+  Unchanged runs collapse behind a button that names how many lines it hides,
+  and an open file always ends by saying whether you have seen all of it.
+- Every number on that card is counted from the lines shown, so the total,
+  each file, and each hunk header agree. If a change was too large to record
+  in full, the footer says so and gives the runtime's own total rather than
+  quietly showing less.
+- Commands sit in the same list as files, with their exit code, so what a
+  teammate did reads top to bottom in the order it happened.
+- **Colour means one thing again.** Lime is now only "happening right now".
+  Done plan steps, standing permissions, and reachable-but-idle routes moved
+  to green, so a glance at the window tells you what is live.
+- Cards that need a decision are raised toward you; cards about something
+  that already happened sit recessed. Screen titles and the two empty states
+  carry real display size.
+
 ## 0.8.0 — 2026-09-02
 
 - **Right-click a mission** in the sidebar for Open, Copy mission id, and

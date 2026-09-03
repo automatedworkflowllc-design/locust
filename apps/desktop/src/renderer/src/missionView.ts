@@ -1,4 +1,7 @@
-import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
+
+import { LARGE_FILE_LINES, fileCounts, parseUnifiedDiff } from './diff.js'
+import type { DiffCounts, DiffFile } from './diff.js'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
@@ -18,7 +21,147 @@ export interface ActivityDetail {
   readonly kind: string
   readonly name: string
   readonly settled: boolean
+  /** True only for a tool the runtime itself reported as failed. */
+  readonly failed?: boolean
+  readonly exitCode?: number
+  /** The change the tool made, when the runtime reported one. */
+  readonly patch?: ToolPatch
 }
+
+/**
+ * An activity row, ready to draw. Files carry their parsed diff; shell rows
+ * carry their result; an edit whose runtime reported no patch stays in the
+ * list as an `unreported` row rather than vanishing, because a missing row
+ * would understate what the teammate did.
+ */
+export type ActivityEntry =
+  | {
+      readonly kind: 'file'
+      readonly key: string
+      readonly file: DiffFile
+      readonly counts: DiffCounts
+      readonly truncated: boolean
+      /** The runtime's own total, when the recorded text was cut short. */
+      readonly reported: DiffCounts | undefined
+      readonly large: boolean
+    }
+  | {
+      readonly kind: 'shell'
+      readonly key: string
+      readonly command: string
+      readonly settled: boolean
+      readonly failed: boolean
+      readonly exitCode: number | undefined
+    }
+  | {
+      readonly kind: 'unreported' | 'tool'
+      readonly key: string
+      readonly name: string
+      readonly settled: boolean
+      readonly failed: boolean
+    }
+
+/**
+ * Expand each activity detail into the rows the card draws. One patch can
+ * touch several files, and each becomes its own row -- the same rows the
+ * counts are summed from, so the card's total and the diffs beneath it are
+ * two views of one array and cannot disagree.
+ */
+export function activityEntries(details: readonly ActivityDetail[]): readonly ActivityEntry[] {
+  const entries: ActivityEntry[] = []
+  details.forEach((detail, index) => {
+    const failed = detail.failed === true
+    if (detail.kind === 'shell') {
+      entries.push({
+        kind: 'shell',
+        key: `shell_${String(index)}`,
+        command: detail.name,
+        settled: detail.settled,
+        failed,
+        exitCode: detail.exitCode
+      })
+      return
+    }
+    const patch = detail.patch
+    const files = patch === undefined ? [] : parseUnifiedDiff(patch.text)
+    if (files.length === 0) {
+      entries.push({
+        kind: detail.kind === 'edit' ? 'unreported' : 'tool',
+        key: `item_${String(index)}`,
+        name: detail.name,
+        settled: detail.settled,
+        failed
+      })
+      return
+    }
+    files.forEach((file, fileIndex) => {
+      const counts = fileCounts(file)
+      entries.push({
+        kind: 'file',
+        key: `file_${String(index)}_${String(fileIndex)}`,
+        file,
+        counts,
+        truncated: patch?.truncated === true,
+        // A single-file patch can be checked against the runtime's own total;
+        // across several files the total belongs to none of them, so it is
+        // withheld rather than repeated on each row as if it were theirs.
+        reported:
+          patch !== undefined && patch.truncated && files.length === 1
+            ? { added: patch.added, removed: patch.removed }
+            : undefined,
+        large: counts.added + counts.removed > LARGE_FILE_LINES
+      })
+    })
+  })
+  return entries
+}
+
+/**
+ * The card's `+N -M`. Summed from the rendered rows, never from a runtime's
+ * header: if a patch was cut short, the header would promise lines the diff
+ * below cannot show.
+ */
+export function activityCounts(details: readonly ActivityDetail[]): DiffCounts {
+  let added = 0
+  let removed = 0
+  for (const entry of activityEntries(details)) {
+    if (entry.kind !== 'file') continue
+    added += entry.counts.added
+    removed += entry.counts.removed
+  }
+  return { added, removed }
+}
+
+/**
+ * Which file opens by default: the first one, unless it is large enough that
+ * opening it would bury everything after it.
+ */
+export function defaultOpenEntry(entries: readonly ActivityEntry[]): string | undefined {
+  const first = entries.find((entry) => entry.kind === 'file')
+  if (first === undefined || first.kind !== 'file') return undefined
+  return first.large ? undefined : first.key
+}
+
+/** `14:44`, in the host's own timezone. */
+export function clockTime(iso: string): string {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return '--:--'
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+}
+
+/** Whole minutes between two instants, floored, never negative. */
+export function minutesBetween(from: string, to: string): number {
+  const start = new Date(from).getTime()
+  const end = new Date(to).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end)) return 0
+  return Math.max(0, Math.floor((end - start) / 60_000))
+}
+
+/**
+ * A quiet gap worth marking. Below this a marker is noise; above it, the
+ * reader deserves to know the mission sat still.
+ */
+export const QUIET_GAP_MINUTES = 2
 
 export interface PlanStep {
   readonly text: string
@@ -32,6 +175,11 @@ export type ThreadItem =
       readonly type: 'activity'
       readonly summary: string
       readonly details: readonly ActivityDetail[]
+      /**
+       * Which runtime reported this work, so a row with no recorded change
+       * can name it. Read off the events, never assumed.
+       */
+      readonly reportedBy: MissionRuntimeId | undefined
     }
   | {
       readonly key: string
@@ -193,7 +341,18 @@ export function buildThread(
         const open = openTools.get(event.payload.itemId)
         if (open !== undefined) {
           const index = activity.indexOf(open)
-          if (index >= 0) activity[index] = { ...open, settled: true }
+          const patch = event.payload.patch
+          if (index >= 0) {
+            activity[index] = {
+              ...open,
+              settled: true,
+              failed: event.type === 'tool.failed',
+              ...(event.payload.exitCode === undefined ? {} : { exitCode: event.payload.exitCode }),
+              // A completion that carries a patch also names what it touched:
+              // the row's kind follows the evidence, not the tool's name.
+              ...(patch === undefined ? {} : { patch, kind: 'edit' })
+            }
+          }
           openTools.delete(event.payload.itemId)
         }
         break
@@ -260,7 +419,8 @@ export function buildThread(
       key: 'activity',
       type: 'activity',
       summary: activitySummary(activity),
-      details: activity
+      details: activity,
+      reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
     })
   }
 

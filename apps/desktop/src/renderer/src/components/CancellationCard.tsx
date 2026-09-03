@@ -25,7 +25,7 @@ export function CancellationCard({
     summary.settled.length === 0 && summary.interrupted.length === 0 && summary.neverStarted === 0
 
   return (
-    <div className="lc-card is-amber">
+    <div className="lc-card is-terminal is-amber">
       <div className="lc-card__head">
         <span className="lc-approval__title">
           You stopped this run{stoppedAt === undefined ? '' : ` at ${stoppedAt}`}

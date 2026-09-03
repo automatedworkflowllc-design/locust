@@ -248,7 +248,7 @@ export function Sidebar({
           <Icon name="settings" size={15} />
           <span>Settings</span>
         </button>
-        <span className={`lc-connected${connected > 0 ? ' is-live' : ''}`}>
+        <span className="lc-connected">
           {connected} connected
         </span>
       </div>
