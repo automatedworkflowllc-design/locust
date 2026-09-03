@@ -209,6 +209,28 @@ describe('teammate record parsing', () => {
   })
 })
 
+describe("a teammate's own route", () => {
+  it('is remembered when a person starts them, survives a rename, and is ignored when malformed', async () => {
+    const { root, store: teammates } = await store()
+    const booty = await teammates.create({ name: 'Booty', hue: 'violet', role: 'Custom' })
+    expect(booty.route).toBeUndefined()
+
+    await teammates.rememberRoute(booty.teammateId, { runtime: 'claude', model: 'sonnet', mode: 'ask' })
+    const reopened = createTeammateStore({ rootDirectory: root })
+    expect((await reopened.list())[0]?.route).toEqual({ runtime: 'claude', model: 'sonnet', mode: 'ask' })
+
+    // Renaming is theirs to do; it must not cost them their route.
+    const renamed = await reopened.update({ ...booty, name: 'Boots' })
+    expect(renamed.route).toEqual({ runtime: 'claude', model: 'sonnet', mode: 'ask' })
+
+    // A malformed route, an unknown runtime, or an unknown teammate changes nothing.
+    await reopened.rememberRoute(booty.teammateId, { runtime: 'grok-desktop', model: 'x', mode: 'ask' })
+    await reopened.rememberRoute(booty.teammateId, 'cursor')
+    await reopened.rememberRoute('tm_nobody', { runtime: 'cursor', model: 'composer-2.5', mode: 'accept-edits' })
+    expect((await reopened.list())[0]?.route).toEqual({ runtime: 'claude', model: 'sonnet', mode: 'ask' })
+  })
+})
+
 describe('workspace settings', () => {
   it('has teammate replies on by default, and only a literal false turns them off', async () => {
     // Talking to each other is the point of having teammates; the hop cap

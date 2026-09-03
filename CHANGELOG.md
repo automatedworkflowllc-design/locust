@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.10.2 — 2026-09-03
+
+- **Each teammate stays the model you made them.** The route you last started
+  a teammate on (runtime, model, mode) is now theirs. When they reply to
+  another teammate on their own, they reply on that route, never on whoever
+  wrote to them, so Grok argues as Grok and Claude answers as Claude. Picking
+  a teammate in the sidebar now also sets the composer to their route.
+- A teammate who has never run borrows the sender's route once, and the thread
+  says so, with the fix: message them once on the route they should keep.
+- Seen live: asked by a Cursor teammate to parrot a passphrase, a Claude
+  teammate declined and said why, because teammate messages are delivered as
+  claims, not orders. That is the point, and it survives across models.
+
 ## 0.10.1 — 2026-09-03
 
 - **Teammates reply to each other by default**, and for as long as the work

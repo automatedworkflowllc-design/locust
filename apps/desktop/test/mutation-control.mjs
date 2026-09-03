@@ -36,6 +36,13 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const MUTATIONS = [
   {
     file: RELAY,
+    name: "a teammate replies on the sender's route instead of their own",
+    from: '        const own = recipient.self.route',
+    to: '        const own = undefined',
+    expect: "starts the recipient's run on the recipient's OWN route, owned by the recipient"
+  },
+  {
+    file: RELAY,
     name: 'teammates reply on their own even when the setting is off',
     from: "  if (!input.enabled) {\n    return { start: false, reason: 'Teammate replies are switched off in Settings; the message waits for their next run.' }\n  }\n",
     to: '',

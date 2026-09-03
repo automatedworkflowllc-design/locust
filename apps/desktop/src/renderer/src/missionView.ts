@@ -902,7 +902,7 @@ export function typedPrompt(
   let current = mission
   for (let hops = 0; hops < 32; hops += 1) {
     if (current.continuesFrom?.reason !== 'route-switch') return current.prompt
-    const prior = byId.get(current.continuesFrom.missionId)
+    const prior = undefined
     if (prior === undefined) return current.prompt
     current = prior
   }

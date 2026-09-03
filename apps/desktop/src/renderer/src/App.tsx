@@ -787,6 +787,13 @@ export default function App(): ReactElement {
       if (teammateId !== undefined) {
         const missionId = response.data.missionId
         setMissionOwners((current) => ({ ...current, [missionId]: teammateId }))
+        // The host recorded this route as the teammate's own; mirror it so a
+        // reply they make on their own, and the composer next time they are
+        // picked, use it at once.
+        const kept = { runtime: response.data.runtime, model: response.data.model, mode }
+        setTeammates((current) =>
+          current.map((teammate) => (teammate.teammateId === teammateId ? { ...teammate, route: kept } : teammate))
+        )
       }
       const queued = pendingUpdatesRef.current.get(runId) ?? []
       pendingUpdatesRef.current.delete(runId)
@@ -1087,6 +1094,14 @@ export default function App(): ReactElement {
   const selectTeammate = (teammateId: string): void => {
     setSelectedTeammateId(teammateId)
     setScreen('workroom')
+    // Picking a teammate picks their route: the composer shows the runtime,
+    // model and mode they last ran on, so a person is not re-choosing a
+    // model every time they switch who they are talking to.
+    const own = teammates.find((teammate) => teammate.teammateId === teammateId)?.route
+    if (own !== undefined) {
+      setRoute({ runtime: own.runtime, model: own.model })
+      setMode(own.mode)
+    }
     const theirs = [...runs.entries()].filter(([, run]) => ownerOf(run) === teammateId)
     const startedAt = (run: LiveRunState): number =>
       Date.parse(run.restoredMission?.lastUpdatedAt ?? run.events[0]?.occurredAt ?? '') || 0

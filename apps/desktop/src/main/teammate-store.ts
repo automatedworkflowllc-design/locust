@@ -4,7 +4,8 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import { isAvatarSpec, seedAvatar } from '../shared/avatar.js'
-import type { PublicTeammate, TeammateHue, TeammateRole, WorkspaceSettings } from '../shared/ipc.js'
+import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings } from '../shared/ipc.js'
+import { isMissionRuntime } from '../shared/runtimes.js'
 
 /**
  * Teammates are local identity plus routing defaults: a name, an avatar hue, a
@@ -57,6 +58,8 @@ export interface TeammateStore {
   remove(teammateId: unknown): Promise<void>
   /** Change what a person may change; the id and the missions filed under it stay. */
   update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; avatar: unknown }): Promise<PublicTeammate>
+  /** Record the route a person just started this teammate on. Unknown teammate or bad route: nothing changes. */
+  rememberRoute(teammateId: unknown, route: unknown): Promise<void>
   /** Remember which teammate a mission belongs to. */
   assignMission(teammateId: unknown, missionId: unknown): Promise<void>
   /** Forget which teammate a mission belonged to, once the mission is gone. */
@@ -76,6 +79,18 @@ interface StoredFile {
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
 const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true }
+
+function isTeammateRoute(value: unknown): value is TeammateRoute {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Record<string, unknown>
+  return (
+    isMissionRuntime(record.runtime)
+    && typeof record.model === 'string'
+    && record.model.length > 0
+    && record.model.length <= 200
+    && (record.mode === 'ask' || record.mode === 'accept-edits' || record.mode === 'approve-each')
+  )
+}
 
 function isHue(value: unknown): value is TeammateHue {
   return typeof value === 'string' && (TEAMMATE_HUES as readonly string[]).includes(value)
@@ -121,7 +136,8 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     // A record from before faces were persisted gets the face its id seeds --
     // the same face every reader would derive, so nothing changes on upgrade.
     avatar: isAvatarSpec(record.avatar) ? record.avatar : seedAvatar(record.teammateId),
-    createdAt: record.createdAt
+    createdAt: record.createdAt,
+    ...(isTeammateRoute(record.route) ? { route: record.route } : {})
   }
 }
 
@@ -272,13 +288,30 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           hue: input.hue,
           role: input.role,
           avatar: input.avatar,
-          createdAt: existing.createdAt
+          createdAt: existing.createdAt,
+          ...(existing.route === undefined ? {} : { route: existing.route })
         }
         await write({
           ...file,
           teammates: file.teammates.map((teammate) => (teammate.teammateId === updated.teammateId ? updated : teammate))
         })
         return updated
+      })
+    },
+
+    rememberRoute(teammateId, route): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(teammateId) || !isTeammateRoute(route)) return
+        const file = await read()
+        const existing = file.teammates.find((teammate) => teammate.teammateId === teammateId)
+        if (existing === undefined) return
+        const kept: TeammateRoute = { runtime: route.runtime, model: route.model, mode: route.mode }
+        await write({
+          ...file,
+          teammates: file.teammates.map((teammate) =>
+            teammate.teammateId === teammateId ? { ...teammate, route: kept } : teammate
+          )
+        })
       })
     },
 

@@ -3,6 +3,7 @@ import type { MissionRuntimeId, MissionSandbox } from '@teammate/runtime-adapter
 
 import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode } from '../shared/ipc.js'
 import type { MissionPeerContext, PeerRosterEntry } from './workroom-briefing.js'
+import { runtimeDisplayName } from '../shared/runtimes.js'
 
 /**
  * Teammates replying to each other without a person in the loop.
@@ -24,9 +25,11 @@ import type { MissionPeerContext, PeerRosterEntry } from './workroom-briefing.js
  *     posts no share starts nothing. The hop cap is a backstop for two
  *     agents thanking each other until the account is empty, not the
  *     length of a conversation.
- *   - The recipient's run uses the SENDER's runtime, model and mode -- the
- *     route a person already chose and paid for -- and is refused, not
- *     widened, when that route cannot start.
+ *   - The recipient's run uses the RECIPIENT's own runtime, model and mode,
+ *     the route a person last started them on. Grok answers as Grok, Fable
+ *     as Fable; a teammate who has never run yet borrows the sender's route,
+ *     and the thread says so. A route that cannot start is refused, not
+ *     widened.
  *
  * Nothing about the record changes. A relayed run is an ordinary mission,
  * owned by the recipient, whose prompt is the host's brief; the messages it
@@ -177,13 +180,26 @@ export function createRelay(options: RelayOptions): Relay {
         // about this.
         const followUpOf = origin.lastMissionOf[recipientId]
         const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop })
+        // Their own route, so each teammate stays the model a person made
+        // them. Only a teammate who has never run borrows the sender's.
+        const own = recipient.self.route
+        const route = own ?? {
+          runtime: mission.runtime,
+          model: mission.model ?? 'account-default',
+          mode: mission.sandbox === 'workspace-write' ? ('accept-edits' as const) : ('ask' as const)
+        }
+        if (own === undefined) {
+          notice(
+            `${recipient.self.name} has not run on a route of their own yet, so this reply runs on ${mission.peer.self.name}'s ${runtimeDisplayName(route.runtime)} / ${route.model}. Message ${recipient.self.name} once on the route they should keep.`
+          )
+        }
         let response: CodexMissionStartResponse
         try {
           response = await options.start({
             prompt,
-            runtime: mission.runtime,
-            mode: mission.sandbox === 'workspace-write' ? 'accept-edits' : 'ask',
-            model: mission.model,
+            runtime: route.runtime,
+            mode: route.mode,
+            model: route.model === 'account-default' ? undefined : route.model,
             peer: recipient,
             followUpOf,
             relay: origin

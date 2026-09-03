@@ -9,8 +9,11 @@ import type { MissionPeerContext } from './workroom-briefing.js'
 const WREN = { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }
 const BOOTY = { teammateId: 'tm_booty', name: 'Booty', role: 'Custom' }
 
+const BOOTY_ROUTE = { runtime: 'claude' as const, model: 'sonnet', mode: 'ask' as const }
 const wrenPeer: MissionPeerContext = { self: WREN, others: [BOOTY] }
-const bootyPeer: MissionPeerContext = { self: BOOTY, others: [WREN] }
+const bootyPeer: MissionPeerContext = { self: { ...BOOTY, route: BOOTY_ROUTE }, others: [WREN] }
+/** Booty before anyone has run them: no route of their own. */
+const newBootyPeer: MissionPeerContext = { self: BOOTY, others: [WREN] }
 
 function message(to: { teammateId: string; name: string }, text = 'What is the build command?'): WorkroomMessage {
   return {
@@ -35,13 +38,14 @@ function sharing(overrides: Partial<SharingMission> = {}): SharingMission {
   }
 }
 
-function harness(options: { enabled?: boolean; startResult?: CodexMissionStartResponse } = {}) {
+function harness(options: { enabled?: boolean; startResult?: CodexMissionStartResponse; booty?: MissionPeerContext } = {}) {
   const starts: Parameters<RelayOptions['start']>[0][] = []
   const owners: [string, string][] = []
   const notices: CodexMissionUpdate[] = []
   const relay = createRelay({
     enabled: async () => options.enabled ?? true,
-    peerContextFor: async (id) => (id === BOOTY.teammateId ? bootyPeer : id === WREN.teammateId ? wrenPeer : undefined),
+    peerContextFor: async (id) =>
+      id === BOOTY.teammateId ? (options.booty ?? bootyPeer) : id === WREN.teammateId ? wrenPeer : undefined,
     start: async (input) => {
       starts.push(input)
       return (
@@ -120,28 +124,46 @@ describe('relaying a share', () => {
     expect(notices).toHaveLength(0)
   })
 
-  it("starts the recipient's run on the sender's route, mode and model, owned by the recipient", async () => {
+  it("starts the recipient's run on the recipient's OWN route, owned by the recipient", async () => {
+    // Wren is Cursor / composer-2.5 with edits; Booty is Claude Code / sonnet,
+    // read-only. Booty answers as Booty.
     const { relay, starts, owners, notices } = harness()
     await relay.onShared(sharing(), [message(BOOTY)])
     expect(starts).toHaveLength(1)
     expect(starts[0]).toMatchObject({
-      runtime: 'cursor',
-      mode: 'accept-edits',
-      model: 'composer-2.5',
+      runtime: 'claude',
+      mode: 'ask',
+      model: 'sonnet',
       peer: bootyPeer,
       followUpOf: undefined,
       relay: { hop: 1, lastMissionOf: { tm_wren: 'mission_wren1' } }
     })
+    expect(notices.some((update) => update.kind === 'relay-notice')).toBe(false)
     expect(starts[0]?.prompt).toContain('Wren (Code & Migrations) sent you a message')
     expect(owners).toEqual([[BOOTY.teammateId, 'mission_1']])
     const started = notices.find((update) => update.kind === 'mission-started')
     expect(started).toMatchObject({ kind: 'mission-started', teammateId: BOOTY.teammateId, hop: 1 })
   })
 
-  it('a read-only sender gets a read-only reply', async () => {
-    const { relay, starts } = harness()
+  it('a teammate who has never run borrows the sender\'s route, and the thread says so', async () => {
+    const { relay, starts, notices } = harness({ booty: newBootyPeer })
+    await relay.onShared(sharing(), [message(BOOTY)])
+    expect(starts[0]).toMatchObject({ runtime: 'cursor', model: 'composer-2.5', mode: 'accept-edits' })
+    const said = notices.find((update) => update.kind === 'relay-notice')
+    expect(said?.kind === 'relay-notice' ? said.message : '').toContain('has not run on a route of their own')
+    expect(said?.kind === 'relay-notice' ? said.message : '').toContain('Cursor Agent / composer-2.5')
+  })
+
+  it('a read-only sender gets a read-only reply when the recipient has no route', async () => {
+    const { relay, starts } = harness({ booty: newBootyPeer })
     await relay.onShared(sharing({ sandbox: 'read-only' }), [message(BOOTY)])
     expect(starts[0]?.mode).toBe('ask')
+  })
+
+  it("an account-default route is sent as no model, the way the composer sends it", async () => {
+    const { relay, starts } = harness({ booty: { self: { ...BOOTY, route: { runtime: 'codex', model: 'account-default', mode: 'ask' } }, others: [WREN] } })
+    await relay.onShared(sharing(), [message(BOOTY)])
+    expect(starts[0]).toMatchObject({ runtime: 'codex', model: undefined })
   })
 
   it("the reply back follows up the mission that asked, so it lands in that thread", async () => {

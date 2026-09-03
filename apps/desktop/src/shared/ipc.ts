@@ -133,6 +133,21 @@ export interface PublicTeammate {
    */
   readonly avatar: AvatarSpec
   readonly createdAt: string
+  /**
+   * The route this teammate last ran on, recorded by the host from the
+   * missions a person started for them. A teammate replying on their own
+   * runs HERE -- their own runtime, model and mode -- never on whoever
+   * wrote to them. People will pit one model against another on purpose,
+   * and that only means anything if each side stays itself.
+   */
+  readonly route?: TeammateRoute
+}
+
+export interface TeammateRoute {
+  readonly runtime: MissionRuntimeId
+  /** A model id from the catalog, or `account-default`. */
+  readonly model: string
+  readonly mode: MissionMode
 }
 
 /**

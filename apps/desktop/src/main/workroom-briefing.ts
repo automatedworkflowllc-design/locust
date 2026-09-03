@@ -1,5 +1,7 @@
 import type { WorkroomMessage } from '@teammate/mission-store'
 
+import type { TeammateRoute } from '../shared/ipc.js'
+
 import { sanitizeInbound, SHARE_TAG } from '../shared/peer-share.js'
 
 /**
@@ -26,6 +28,8 @@ export interface PeerRosterEntry {
   readonly teammateId: string
   readonly name: string
   readonly role: string
+  /** The teammate's own route, when they have run before. Never printed into a prompt. */
+  readonly route?: TeammateRoute
 }
 
 export interface MissionPeerContext {

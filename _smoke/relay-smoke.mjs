@@ -16,7 +16,13 @@
 //
 // The answer is a passphrase Wren asks Booty to repeat, so "the reply
 // arrived" is checked on a word that could only have come from Booty's run.
-// Needs a signed-in cursor-agent. Costs three short composer-2.5 runs.
+//
+// And each teammate stays the model a person made them. Booty is first run
+// by a person on Claude Code / sonnet; Wren on Cursor / composer-2.5. When
+// Booty replies on their own it must be on Claude, and Wren's next turn on
+// Cursor -- people will pit one model against another on purpose, and that
+// only means anything if each side stays itself.
+// Needs signed-in cursor-agent and claude. Costs four short runs.
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -139,6 +145,62 @@ try {
   })()`)
   check('discovery finished', discovered === true)
 
+  say("2a. a person runs Booty once on Claude Code / Sonnet: that route becomes Booty's")
+  const bootyFirst = await cdp.eval(`(async () => {
+    const booty = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Booty')
+    if (!booty) return JSON.stringify({ booty: false })
+    booty.click()
+    await new Promise(r => setTimeout(r, 400))
+    const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+    control.click()
+    await new Promise(r => setTimeout(r, 400))
+    let target
+    for (let attempt = 0; attempt < 90 && !target; attempt += 1) {
+      const picker = document.querySelector('.lc-picker')
+      if (!picker) { control.click(); await new Promise(r => setTimeout(r, 500)); continue }
+      const input = picker.querySelector('.lc-picker__input')
+      const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+      setInput.call(input, 'sonnet')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(r => setTimeout(r, 500))
+      let group = ''
+      for (const node of picker.querySelector('.lc-picker__list').children) {
+        const header = node.querySelector('.lc-picker__group')
+        if (header) group = header.innerText
+        const row = node.querySelector('.lc-picker__row')
+        const label = row ? row.innerText.trim().toLowerCase() : ''
+        if (row && !row.disabled && /claude/i.test(group) && label.startsWith('sonnet')) { target = row; break }
+      }
+      if (!target) await new Promise(r => setTimeout(r, 500))
+    }
+    if (!target) return JSON.stringify({ booty: true, picked: false })
+    target.click()
+    await new Promise(r => setTimeout(r, 400))
+    const field = document.querySelector('form.command-dock textarea')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(field, 'Reply with the single word READY. Do not read any files and do not run anything.')
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    for (let i = 0; i < 120; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      const send = document.querySelector('form.command-dock .send-button')
+      if (send && !send.disabled && send.getAttribute('aria-label') === 'Start mission') { send.click(); break }
+    }
+    let sawRunning = false
+    for (let i = 0; i < 300; i += 1) {
+      await new Promise(r => setTimeout(r, 1000))
+      const stop = document.querySelector('button[aria-label^="Stop the running"]')
+      if (stop) sawRunning = true
+      if (sawRunning && !stop && document.querySelector('.lc-thread__marker')) {
+        return JSON.stringify({ booty: true, picked: true, done: true, header: (document.querySelector('.lc-workroom__mission') || { innerText: '' }).innerText, error: (document.querySelector('.lc-card.is-red') || { innerText: '' }).innerText })
+      }
+    }
+    return JSON.stringify({ booty: true, picked: true, done: false })
+  })()`)
+  const bootyRun = JSON.parse(bootyFirst)
+  check("Booty's first run on Claude Code / Sonnet completed", bootyRun.done === true && !bootyRun.error, bootyFirst.slice(0, 300))
+  const bootyOwnRoute = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8')).teammates.find((t) => t.teammateId === 'tm_booty')?.route
+  check("the host recorded Claude Code / sonnet as Booty's own route", bootyOwnRoute?.runtime === 'claude' && bootyOwnRoute?.model === 'sonnet', JSON.stringify(bootyOwnRoute))
+
   say('2. message Wren on Cursor / Composer 2.5, Accept edits')
   const setup = await cdp.eval(`(async () => {
     const wren = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
@@ -218,7 +280,7 @@ try {
   }
 
   say("4. Booty's run starts on its own")
-  check('a second mission appeared without anyone typing', await waitForLedgers(2, 240), `ledgers: ${(await ledgers()).length}`)
+  check('a third mission appeared without anyone typing', await waitForLedgers(3, 300), `ledgers: ${(await ledgers()).length}`)
   const bootyWorking = await cdp.eval(`(async () => {
     for (let i = 0; i < 120; i += 1) {
       const name = [...document.querySelectorAll('.lc-row__name')].find(n => n.innerText.trim().startsWith('Booty'))
@@ -236,7 +298,7 @@ try {
   check("the sidebar shows Booty's run under Booty", bootyWorking.length > 0, bootyWorking)
 
   say("5. Booty's answer starts Wren's next turn, and it lands in Wren's thread")
-  check('a third mission appeared: the reply back', await waitForLedgers(3, 300), `ledgers: ${(await ledgers()).length}`)
+  check('a fourth mission appeared: the reply back', await waitForLedgers(4, 300), `ledgers: ${(await ledgers()).length}`)
   const thread = await cdp.eval(`(async () => {
     for (let i = 0; i < 300; i += 1) {
       const row = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
@@ -270,16 +332,19 @@ try {
     const now = await ledgers()
     if (now.length !== names.length) { names = now; i = 0 }
   }
-  check('the exchange ended on its own: three missions, or one courtesy more', names.length === 3 || names.length === 4, `ledgers: ${names.length}`)
+  check('the exchange ended on its own: four missions, or one courtesy more', names.length === 4 || names.length === 5, `ledgers: ${names.length}`)
 
   const headers = await Promise.all(names.map(async (name) => JSON.parse((await readFile(join(LEDGER_DIR, name), 'utf8')).split('\n')[0]).metadata))
   headers.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
-  const [first, second, third] = headers
+  // headers[0] is Booty's first, person-started run.
+  const [, first, second, third] = headers
   const owners = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8')).missionOwners ?? {}
   check("the second mission is Booty's", owners[second?.missionId] === 'tm_booty', JSON.stringify(owners))
   check("the second mission's prompt is the host's brief naming Wren", (second?.prompt ?? '').includes('Wren (Code & Migrations) sent you a message'), (second?.prompt ?? '').slice(0, 120))
   check("the third mission is Wren's and follows up the first", owners[third?.missionId] === 'tm_wren' && third?.continuesFrom?.missionId === first?.missionId && third?.continuesFrom?.reason === 'follow-up', JSON.stringify({ owner: owners[third?.missionId], continuesFrom: third?.continuesFrom }))
-  check('every hop ran on the route Wren chose', headers.every((h) => h.runtime === 'cursor' && h.model === 'composer-2.5'), JSON.stringify(headers.map((h) => [h.runtime, h.model])))
+  check("Booty's reply ran on Booty's own route, Claude Code / sonnet", second?.runtime === 'claude' && second?.model === 'sonnet', JSON.stringify([second?.runtime, second?.model]))
+  check("Wren's turns ran on Wren's route, Cursor / composer-2.5", first?.runtime === 'cursor' && first?.model === 'composer-2.5' && third?.runtime === 'cursor' && third?.model === 'composer-2.5', JSON.stringify(headers.map((h) => [h.runtime, h.model])))
+  check("a relayed run did not overwrite Booty's own route", (JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8')).teammates.find((t) => t.teammateId === 'tm_booty')?.route ?? {}).runtime === 'claude')
 } finally {
   child.kill()
   await sleep(500)

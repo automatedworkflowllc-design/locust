@@ -51,6 +51,7 @@ import {
   TEAMMATE_REMOVE_CHANNEL,
   TEAMMATE_UPDATE_CHANNEL
 } from '../shared/ipc.js'
+import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { createUpdateService } from './updates.js'
@@ -58,6 +59,8 @@ import type {
   CodexMissionCancelRequest,
   CodexMissionStartRequest,
   CodexMissionUpdate,
+  MissionMode,
+  PublicTeammate,
   MissionHandoffRequest
 } from '../shared/ipc.js'
 
@@ -349,11 +352,15 @@ if (!ownsSingleInstanceLock) {
       }
       const self = roster.find((entry) => entry.teammateId === teammateId)
       if (self === undefined) return undefined
+      const entry = (teammate: PublicTeammate) => ({
+        teammateId: teammate.teammateId,
+        name: teammate.name,
+        role: teammate.role,
+        ...(teammate.route === undefined ? {} : { route: teammate.route })
+      })
       return {
-        self: { teammateId: self.teammateId, name: self.name, role: self.role },
-        others: roster
-          .filter((entry) => entry.teammateId !== teammateId)
-          .map((entry) => ({ teammateId: entry.teammateId, name: entry.name, role: entry.role }))
+        self: entry(self),
+        others: roster.filter((other) => other.teammateId !== teammateId).map(entry)
       }
     }
 
@@ -363,6 +370,16 @@ if (!ownsSingleInstanceLock) {
     const assignOwner = async (teammateId: string | undefined, missionId: string): Promise<void> => {
       if (teammateId === undefined) return
       await teammates.assignMission(teammateId, missionId).catch(() => undefined)
+    }
+    // A PERSON starting a teammate on a route is what makes it theirs. A run
+    // the relay starts for them never re-records it, so a fallback onto the
+    // sender's route cannot quietly become the recipient's own.
+    const rememberRoute = async (
+      teammateId: string | undefined,
+      route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly mode: MissionMode }
+    ): Promise<void> => {
+      if (teammateId === undefined) return
+      await teammates.rememberRoute(teammateId, route).catch(() => undefined)
     }
 
     // Teammates replying to each other. Off unless the workspace switched it
@@ -645,6 +662,7 @@ if (!ownsSingleInstanceLock) {
             ...(approveEffort === undefined ? {} : { effort: approveEffort })
           })
           await assignOwner(peer?.self.teammateId, mission.missionId)
+          await rememberRoute(peer?.self.teammateId, { runtime: 'codex', model: approveModel ?? 'account-default', mode })
           return {
             ok: true,
             data: {
@@ -692,7 +710,10 @@ if (!ownsSingleInstanceLock) {
           peer,
           followUpOf
         )
-        if (response.ok) await assignOwner(peer?.self.teammateId, response.data.missionId)
+        if (response.ok) {
+          await assignOwner(peer?.self.teammateId, response.data.missionId)
+          await rememberRoute(peer?.self.teammateId, { runtime, model: model ?? 'account-default', mode })
+        }
         return response
       } catch {
         return {
