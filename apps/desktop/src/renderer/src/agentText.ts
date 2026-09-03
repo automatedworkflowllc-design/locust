@@ -31,9 +31,22 @@ export type AgentBlock =
       readonly closed: boolean
     }
 
+  | {
+      readonly kind: 'list'
+      readonly ordered: boolean
+      /** Item text, marker already removed. */
+      readonly items: readonly string[]
+    }
+
 export type InlineSpan =
   | { readonly kind: 'plain'; readonly text: string }
   | { readonly kind: 'code'; readonly text: string }
+  | { readonly kind: 'link'; readonly text: string; readonly href: string }
+
+/** `- item`, `* item`, `+ item`. */
+const BULLET = /^[ \t]*[-*+][ \t]+(.+)$/
+/** `1. item`, `2) item`. */
+const NUMBERED = /^[ \t]*\d+[.)][ \t]+(.+)$/
 
 /** ```lang, or ``` on its own. Leading spaces are allowed; models indent them. */
 const FENCE = /^[ \t]*(`{3,})[ \t]*(.*)$/
@@ -47,12 +60,57 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
   let prose: string[] = []
   let open: { readonly ticks: string; readonly language: string | undefined; readonly lines: string[] } | undefined
 
+  /**
+   * Prose, with any run of list lines lifted out as a list.
+   *
+   * MEASURED 2026-09-03: a model summarising its work wrote
+   * "Implemented the streak fix. - `currentStreak` now counts... - It resets
+   * once yesterday is missing. - Date arithmetic now uses UTC..." and the
+   * thread drew it as one run-on sentence, because a paragraph collapses the
+   * newlines the markers sat on. The list is the shape of the answer; drawing
+   * it flat throws that away.
+   */
   const flushProse = (): void => {
     if (prose.length === 0) return
-    const joined = prose.join('\n')
-    // Whitespace between blocks is layout, not content: the gap between a
-    // paragraph and the code under it is drawn by CSS, not by blank lines.
-    if (joined.trim().length > 0) blocks.push({ kind: 'text', text: joined.replace(/^\n+|\n+$/g, '') })
+    let paragraph: string[] = []
+    let items: string[] = []
+    let ordered = false
+    const flushParagraph = (): void => {
+      const joined = paragraph.join('\n')
+      // Whitespace between blocks is layout, not content: the gap between a
+      // paragraph and the code under it is drawn by CSS, not by blank lines.
+      if (joined.trim().length > 0) blocks.push({ kind: 'text', text: joined.replace(/^\n+|\n+$/g, '') })
+      paragraph = []
+    }
+    const flushList = (): void => {
+      if (items.length === 0) return
+      blocks.push({ kind: 'list', ordered, items })
+      items = []
+    }
+    for (const line of prose) {
+      const bullet = BULLET.exec(line)
+      const numbered = NUMBERED.exec(line)
+      if (bullet !== null || numbered !== null) {
+        const isOrdered = numbered !== null
+        // A change of list kind ends the one before it.
+        if (items.length > 0 && isOrdered !== ordered) flushList()
+        if (items.length === 0) {
+          flushParagraph()
+          ordered = isOrdered
+        }
+        items.push((numbered?.[1] ?? bullet![1]!).trim())
+        continue
+      }
+      // A blank line inside a list ends it; prose after it is prose.
+      if (items.length > 0 && line.trim().length === 0) {
+        flushList()
+        continue
+      }
+      flushList()
+      paragraph.push(line)
+    }
+    flushList()
+    flushParagraph()
     prose = []
   }
 
@@ -94,12 +152,22 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
  */
 export function splitInlineCode(text: string): readonly InlineSpan[] {
   const spans: InlineSpan[] = []
-  const pattern = /`([^`\n]+)`/g
+  // Inline code first, then links. Models write absolute paths inside link
+  // targets -- `[src/streak.test.js](C:/Users/.../streaks/src/streak.test.js)`
+  // -- and rendering the raw syntax put the whole path in the middle of a
+  // sentence. The label is what the sentence needs; the target is kept on the
+  // element's title so it is available without being in the way. Nothing is
+  // linked: a thread must not become a way to navigate the app somewhere.
+  const pattern = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)/g
   let cursor = 0
   for (const match of text.matchAll(pattern)) {
     const at = match.index
     if (at > cursor) spans.push({ kind: 'plain', text: text.slice(cursor, at) })
-    spans.push({ kind: 'code', text: match[1]! })
+    if (match[1] !== undefined) {
+      spans.push({ kind: 'code', text: match[1] })
+    } else {
+      spans.push({ kind: 'link', text: match[2]!, href: match[3]! })
+    }
     cursor = at + match[0].length
   }
   if (cursor < text.length) spans.push({ kind: 'plain', text: text.slice(cursor) })
@@ -113,7 +181,9 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
  */
 export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]): boolean {
   const kept = blocks
-    .map((block) => (block.kind === 'text' ? block.text : block.code))
+    .map((block) =>
+      block.kind === 'text' ? block.text : block.kind === 'code' ? block.code : block.items.join('\n')
+    )
     .join('\n')
     .replace(/\s+/g, ' ')
     .trim()
@@ -121,6 +191,10 @@ export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]):
     .replace(/\r\n/g, '\n')
     .split('\n')
     .filter((line) => !FENCE.test(line))
+    // A list marker is punctuation the renderer redraws, not words: the
+    // bullet becomes a real bullet. Everything AFTER the marker still has to
+    // survive, which is what this is checking.
+    .map((line) => line.replace(BULLET, '$1').replace(NUMBERED, '$1').trim())
     .join('\n')
     .replace(/\s+/g, ' ')
     .trim()

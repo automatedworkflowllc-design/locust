@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, defaultOpenEntry } from '../missionView.js'
+import { activityCounts, activityEntries, defaultOpenEntry, relativePath } from '../missionView.js'
 import type { ActivityDetail, ActivityEntry } from '../missionView.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
@@ -21,11 +21,14 @@ import { Icon } from './Icon.js'
 export function ActivityCard({
   summary,
   details,
-  runtimeName
+  runtimeName,
+  workspacePath
 }: {
   readonly summary: string
   readonly details: readonly ActivityDetail[]
   readonly runtimeName: string | undefined
+  /** The folder this mission ran in, so paths read the way a person writes them. */
+  readonly workspacePath: string | undefined
 }): ReactElement {
   const [open, setOpen] = useState(false)
   const entries = activityEntries(details)
@@ -63,7 +66,7 @@ export function ActivityCard({
                 <>
                   <button type="button" className="lc-filerow" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
                     <Icon name="file" size={14} />
-                    <span className="lc-filerow__path">{entry.file.path}</span>
+                    <span className="lc-filerow__path">{relativePath(entry.file.path, workspacePath)}</span>
                     <span className="lc-filerow__status">{entry.file.status}</span>
                     {entry.large && <span className="lc-filerow__status is-large">LARGE</span>}
                     <span className="lc-filerow__result">
@@ -88,7 +91,7 @@ export function ActivityCard({
                 // to see", which is the opposite of what happened.
                 <div className="lc-filerow is-static">
                   <Icon name={entry.kind === 'tool' ? 'activity' : 'file'} size={14} />
-                  <span className="lc-filerow__path">{entry.name}</span>
+                  <span className="lc-filerow__path">{relativePath(entry.name, workspacePath)}</span>
                   {entry.tool !== undefined && <span className="lc-filerow__status">{entry.tool}</span>}
                   <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : 'is-running'}`}>
                     {!entry.settled

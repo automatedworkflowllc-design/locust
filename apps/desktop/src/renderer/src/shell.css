@@ -605,6 +605,32 @@ textarea {
   min-width: 0;
 }
 
+/*
+ * A list the model wrote. It used to collapse into the sentence around it,
+ * which threw away the shape of the answer -- the markers ran together as
+ * "- one - two" mid-paragraph.
+ */
+.lc-list {
+  margin: 0;
+  padding-left: var(--lc-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
+.lc-list li {
+  text-wrap: pretty;
+}
+
+/*
+ * A link's label. Marked as a reference without being one: models write
+ * absolute paths as link targets, and the label is the part the sentence
+ * needs. Nothing here navigates.
+ */
+.lc-linklabel {
+  border-bottom: 1px solid var(--lc-border-button);
+}
+
 .lc-code--inline {
   padding: 1px 5px;
   border-radius: var(--lc-radius-control);

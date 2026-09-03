@@ -466,6 +466,8 @@ export default function App(): ReactElement {
   // Which folder this window works in. Every mission runs here; a person
   // with two projects open needs the title to say which is which.
   const [workspaceName, setWorkspaceName] = useState('Local workspace')
+  /** The folder itself, so activity rows can show paths the way a person writes them. */
+  const [workspacePath, setWorkspacePath] = useState<string | undefined>(undefined)
   // Faces that just finished or just heard something: a hop and a glance, each
   // for a moment, then still. Keyed by teammate; cleared by their own timers.
   const [recentlyDone, setRecentlyDone] = useState<readonly string[]>([])
@@ -618,6 +620,7 @@ export default function App(): ReactElement {
         if (active) {
           setBuild({ version: info.version, packaged: info.packaged, platform: info.platform })
           setWorkspaceName(info.workspaceName)
+          setWorkspacePath(info.workspacePath.length === 0 ? undefined : info.workspacePath)
         }
       })
       .catch(() => undefined)
@@ -1477,6 +1480,7 @@ export default function App(): ReactElement {
                 prompt={liveRun.prompt}
                 earlierTurns={liveRun.earlierTurns ?? []}
                 coldStart={liveRun.coldStart ?? false}
+                workspacePath={workspacePath}
                 onRunWithEdits={
                   // Offered only where it is genuinely the next thing a
                   // person wants: a finished READ-ONLY run whose reply
@@ -1530,7 +1534,15 @@ export default function App(): ReactElement {
             running={running}
             cancelling={liveRun?.phase === 'cancelling'}
             activeRoute={liveRun?.data}
-            mode={mode}
+            // What the composer SHOWS has to be what will actually run.
+            // A teammate can carry a stored mode their route cannot honour
+            // (Claude Code kept on Accept edits from before), and showing it
+            // would promise an edit the host is about to refuse.
+            mode={
+              modeRunsOn(mode, route.runtime, build?.platform)
+                ? mode
+                : modesFor(route.runtime, build?.platform)[0] ?? mode
+            }
             onModeChange={setMode}
             route={route}
             onRouteChange={(next) => {

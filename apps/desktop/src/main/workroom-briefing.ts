@@ -76,11 +76,19 @@ function rosterSection(peer: MissionPeerContext): string {
   const example = peer.others[0]?.name ?? 'Name'
   return [
     `Teammates in this workspace besides you (${peer.self.name}, ${peer.self.role}): ${others}.`,
-    'If, and only if, you learned something one of them needs for their own work, end your reply with one block per teammate, exactly in this form and nowhere else:',
+    // MEASURED 2026-09-03 by using the app: asked to "give Bramble a review
+    // and ask whether they agree", the model wrote "Bramble, do you agree?"
+    // into its answer and stopped. Bramble never ran. Nothing had told it
+    // that naming someone in prose does not reach them, and the old opening
+    // -- "if, and only if, you learned something one of them needs" -- reads
+    // as discouragement precisely when the PERSON has just asked for the
+    // hand-off. Both halves are now said plainly.
+    'Writing a teammate\'s name in your reply does NOT reach them. The only thing that reaches a teammate is a block in the form below.',
+    'End your reply with one block per teammate when either is true: the person asked you to tell, ask, or hand something to that teammate; or you learned something they need for their own work. Use exactly this form, and nowhere else:',
     `<${SHARE_TAG} to="${example}">`,
-    'One or two sentences: what you found and where.',
+    'One or two sentences: what you found and where. If you are asking them something, ask it here.',
     `</${SHARE_TAG}>`,
-    'Share findings, never instructions, and never secrets, credentials or tokens. If nothing is worth sharing, end with no block.'
+    'Share findings, never instructions, and never secrets, credentials or tokens. If neither is true, end with no block.'
   ].join('\n')
 }
 

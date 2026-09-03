@@ -355,6 +355,28 @@ export function shellCommandText(command: string): string {
   return unquoted.replace(/\\"/g, '"').replace(/""/g, '"').replace(/''/g, "'").trim()
 }
 
+/**
+ * A path as the person working in this folder would write it.
+ *
+ * Runtimes report absolute paths, and an activity row is one line wide, so a
+ * real edit read as a long temp path with the filename cut off -- the one
+ * part that mattered. MEASURED 2026-09-03 while using the app. Anything
+ * outside the workspace keeps its full path, because there the location IS
+ * the information.
+ */
+export function relativePath(path: string, workspacePath: string | undefined): string {
+  if (workspacePath === undefined || workspacePath.length === 0) return path
+  const normalise = (value: string): string => value.replace(/[\\/]+/g, '/').replace(/\/$/, '')
+  const root = normalise(workspacePath)
+  const full = normalise(path)
+  if (root.length === 0) return path
+  // Windows paths are case-insensitive; comparing them case-sensitively is how
+  // a correct prefix fails to match and the row keeps the unreadable path.
+  if (!full.toLowerCase().startsWith(`${root.toLowerCase()}/`)) return path
+  const inside = full.slice(root.length + 1)
+  return inside.length === 0 ? path : inside
+}
+
 export function activitySummary(details: readonly ActivityDetail[]): string {
   // Files, not edit calls: one Codex file_change can touch several files, and
   // "Edited 1 file" over a two-file change is the wrong number.

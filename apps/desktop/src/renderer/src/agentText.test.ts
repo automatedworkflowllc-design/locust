@@ -72,6 +72,65 @@ describe('splitting a reply into prose and code', () => {
   })
 })
 
+describe('lists', () => {
+  it('lifts a run of bullets out of the prose instead of running them together', () => {
+    // MEASURED 2026-09-03: this exact shape rendered as one sentence.
+    const blocks = parseAgentText(
+      lines('Implemented the streak fix.', '- currentStreak counts yesterday', '- It resets once missed', 'Verification: 3 tests passed.')
+    )
+    expect(blocks).toEqual([
+      { kind: 'text', text: 'Implemented the streak fix.' },
+      { kind: 'list', ordered: false, items: ['currentStreak counts yesterday', 'It resets once missed'] },
+      { kind: 'text', text: 'Verification: 3 tests passed.' }
+    ])
+  })
+
+  it('reads a numbered list as ordered', () => {
+    expect(parseAgentText(lines('1. first', '2) second'))).toEqual([
+      { kind: 'list', ordered: true, items: ['first', 'second'] }
+    ])
+  })
+
+  it('starts a new list when the kind changes', () => {
+    expect(parseAgentText(lines('- a', '1. b'))).toEqual([
+      { kind: 'list', ordered: false, items: ['a'] },
+      { kind: 'list', ordered: true, items: ['b'] }
+    ])
+  })
+
+  it('does not treat a sentence containing a dash as a list', () => {
+    const text = 'It resets - once yesterday is missing.'
+    expect(parseAgentText(text)).toEqual([{ kind: 'text', text }])
+  })
+
+  it('still drops nothing', () => {
+    for (const input of [
+      lines('intro', '- one', '- two'),
+      lines('- only'),
+      lines('1. a', '', 'after'),
+      lines('- a', '```', 'code', '```', '- b')
+    ]) {
+      expect(segmentsCoverInput(input, parseAgentText(input)), input).toBe(true)
+    }
+  })
+})
+
+describe('links', () => {
+  it('shows the label and keeps the target off the sentence', () => {
+    expect(splitInlineCode('see [src/streak.test.js](C:/w/src/streak.test.js) for the cases')).toEqual([
+      { kind: 'plain', text: 'see ' },
+      { kind: 'link', text: 'src/streak.test.js', href: 'C:/w/src/streak.test.js' },
+      { kind: 'plain', text: ' for the cases' }
+    ])
+  })
+
+  it('leaves brackets that are not a link alone', () => {
+    expect(splitInlineCode('an array [1, 2] and a note')).toEqual([
+      { kind: 'plain', text: 'an array [1, 2] and a note' }
+    ])
+  })
+})
+
 describe('inline code', () => {
   it('marks a matched pair and leaves the words around it alone', () => {
     expect(splitInlineCode('run `pnpm test` first')).toEqual([

@@ -450,6 +450,15 @@ export function modeRunsOn(
   // has no handle that holds it read-only, so only the mode that says so is
   // offered.
   if (mode === 'ask' && runtime === 'antigravity') return false
+  // The mirror image, and just as important: Claude Code is launched
+  // `--restricted --permission-mode plan --tools Read,Glob,Grep` every time,
+  // with no flag that would let it write. Offering "Accept edits" for it
+  // offered something the host will not do -- the composer said Accept edits
+  // while the mission header said read-only, on the same screen. MEASURED
+  // 2026-09-03 while using the app, and made worse by Accept edits becoming
+  // the default: picking Claude Code then read as a broken promise rather
+  // than a runtime that reads.
+  if (mode === 'accept-edits' && runtime === 'claude') return false
   // Cursor's read-only mode is only real where its sandbox can run. On
   // Windows the host refuses such a mission rather than record a containment
   // it cannot keep -- so offering the mode here would be offering a refusal,

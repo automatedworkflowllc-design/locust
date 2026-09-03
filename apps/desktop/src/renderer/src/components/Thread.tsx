@@ -35,12 +35,14 @@ import type { PeerGroup, ThreadItem } from '../missionView.js'
 function ThreadItems({
   items,
   owner,
-  activity
+  activity,
+  workspacePath
 }: {
   readonly items: readonly ThreadItem[]
   readonly owner: PublicTeammate | undefined
   /** What the live run is doing; only the working line draws it. */
   readonly activity: FaceActivity
+  readonly workspacePath: string | undefined
 }): ReactElement {
   return (
     <>
@@ -65,6 +67,7 @@ function ThreadItems({
               summary={item.summary}
               details={item.details}
               runtimeName={item.reportedBy === undefined ? undefined : runtimeDisplayName(item.reportedBy)}
+              workspacePath={workspacePath}
             />
           )
         }
@@ -170,6 +173,8 @@ export interface ThreadProps {
    * turn so the exchange reads as one, which is what it was.
    */
   readonly coldStart?: boolean
+  /** The folder missions run in; paths render relative to it. */
+  readonly workspacePath?: string
   /** Present only when re-running with edits allowed is possible; see App. */
   readonly onRunWithEdits?: () => void
   readonly earlierTurns: readonly {
@@ -225,6 +230,7 @@ export function Thread({
   earlierTurns,
   coldStart = false,
   onRunWithEdits,
+  workspacePath,
   events,
   running,
   missionId,
@@ -298,7 +304,7 @@ export function Thread({
                 <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
               )}
               <div className="lc-bubble">{turn.prompt}</div>
-              <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} activity="idle" />
+              <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} />
             </Fragment>
           )
         })}
@@ -310,7 +316,7 @@ export function Thread({
 
         {handoff !== undefined && (
           <>
-            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} owner={peers.self} activity="idle" />
+            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} />
             <HandoffDivider
               from={handoff.from}
               to={handoff.to}
@@ -327,7 +333,7 @@ export function Thread({
         */}
         {exchanges.filter((group) => group.received).map(peerCard)}
 
-        <ThreadItems items={items} owner={peers.self} activity={liveActivityOf(events, running)} />
+        <ThreadItems items={items} owner={peers.self} activity={liveActivityOf(events, running)} workspacePath={workspacePath} />
 
         {exchanges.filter((group) => !group.received).map(peerCard)}
         {peers.notices.map((notice, index) => (

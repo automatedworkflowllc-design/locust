@@ -46,6 +46,34 @@ type AvatarSpecLike = Parameters<typeof PixelFace>[0]['avatar']
  * markup. Wide code scrolls inside its own box rather than stretching the
  * thread.
  */
+/** One run of prose, with inline code and link labels drawn. */
+function inline(text: string): ReactElement {
+  return (
+    <>
+      {splitInlineCode(text).map((span, index) => {
+        if (span.kind === 'code') {
+          return (
+            <code className="lc-code--inline" key={`s${String(index)}`}>
+              {span.text}
+            </code>
+          )
+        }
+        if (span.kind === 'link') {
+          // Shown, not linked: a thread must not become a way to navigate the
+          // app somewhere. The target rides on the title so it is available
+          // without sitting in the middle of the sentence.
+          return (
+            <span className="lc-linklabel" key={`s${String(index)}`} title={span.href}>
+              {span.text}
+            </span>
+          )
+        }
+        return <span key={`s${String(index)}`}>{span.text}</span>
+      })}
+    </>
+  )
+}
+
 export function AgentText({
   text,
   streaming
@@ -67,17 +95,23 @@ export function AgentText({
             </pre>
           )
         }
+        if (block.kind === 'list') {
+          const items = block.items.map((item, itemIndex) => (
+            <li key={`i${String(itemIndex)}`}>{inline(item)}</li>
+          ))
+          return block.ordered ? (
+            <ol className="lc-list" key={`b${String(index)}`}>
+              {items}
+            </ol>
+          ) : (
+            <ul className="lc-list" key={`b${String(index)}`}>
+              {items}
+            </ul>
+          )
+        }
         return (
           <p key={`b${String(index)}`}>
-            {splitInlineCode(block.text).map((span, spanIndex) =>
-              span.kind === 'code' ? (
-                <code className="lc-code--inline" key={`s${String(spanIndex)}`}>
-                  {span.text}
-                </code>
-              ) : (
-                <span key={`s${String(spanIndex)}`}>{span.text}</span>
-              )
-            )}
+            {inline(block.text)}
             {streaming && last && <span className="lc-caret" />}
           </p>
         )

@@ -7,6 +7,7 @@ import {
   activityCounts,
   activityEntries,
   failureMessage,
+  relativePath,
   shellCommandText,
   activitySummary,
   assistantMessages,
@@ -97,6 +98,33 @@ describe('assistant text', () => {
       delta('b', 'second', 'append', true)
     ])
     expect(messages.map((m) => m.text)).toEqual(['first', 'second'])
+  })
+})
+
+describe('how a path is written in a row', () => {
+  const WS = String.raw`C:\Users\x\projects\streaks`
+
+  it('drops the workspace, because the row is one line and the filename is the point', () => {
+    expect(relativePath(String.raw`C:\Users\x\projects\streaks\src\streak.js`, WS)).toBe('src/streak.js')
+  })
+
+  it('matches case-insensitively, the way Windows does', () => {
+    expect(relativePath(String.raw`c:\users\x\projects\streaks\src\cli.js`, WS)).toBe('src/cli.js')
+  })
+
+  it('keeps a path outside the workspace whole, because there the location is the information', () => {
+    const outside = String.raw`C:\Users\x\other\thing.js`
+    expect(relativePath(outside, WS)).toBe(outside)
+  })
+
+  it('changes nothing when the workspace is unknown', () => {
+    const path = String.raw`C:\Users\x\projects\streaks\src\streak.js`
+    expect(relativePath(path, undefined)).toBe(path)
+    expect(relativePath(path, '')).toBe(path)
+  })
+
+  it('leaves a path that is already relative alone', () => {
+    expect(relativePath('src/streak.js', WS)).toBe('src/streak.js')
   })
 })
 
