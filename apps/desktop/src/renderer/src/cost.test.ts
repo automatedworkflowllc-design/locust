@@ -1,0 +1,63 @@
+import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import { describe, expect, it } from 'vitest'
+
+import { costLine, runCostOf, sumCosts } from './cost.js'
+
+function completed(usage: unknown): NormalizedRuntimeEvent {
+  return {
+    id: 'evt_1',
+    runId: 'run_1',
+    missionId: 'mission_1',
+    sequence: 1,
+    occurredAt: '2026-09-03T10:00:00.000Z',
+    sourceAdapter: 'codex',
+    type: 'run.completed',
+    payload: { evidence: { redacted: false }, process: {}, ...(usage === undefined ? {} : { usage }) }
+  } as unknown as NormalizedRuntimeEvent
+}
+
+describe('what a run cost, off its receipt', () => {
+  it('reads token counts in either spelling', () => {
+    expect(runCostOf([completed({ inputTokens: 19428, outputTokens: 161, cacheReadTokens: 16256 })])).toEqual({ inputTokens: 19428, outputTokens: 161 })
+    expect(runCostOf([completed({ input_tokens: 10, output_tokens: 47 })])).toEqual({ inputTokens: 10, outputTokens: 47 })
+  })
+
+  it("reads Claude Code's dollars and Copilot's premium requests as their own units", () => {
+    expect(runCostOf([completed({ usd: 0.0297808, inputTokens: 10, outputTokens: 47 })])).toEqual({ usd: 0.0297808, inputTokens: 10, outputTokens: 47 })
+    expect(runCostOf([completed({ premiumRequests: 1, nanoAiu: 383710000 })])).toEqual({ premiumRequests: 1 })
+  })
+
+  it('says nothing when the receipt carries nothing, rather than zero', () => {
+    expect(runCostOf([completed(undefined)])).toBeUndefined()
+    expect(runCostOf([completed({ nanoAiu: 5 })])).toBeUndefined()
+    expect(runCostOf([])).toBeUndefined()
+    expect(costLine(undefined)).toBeUndefined()
+  })
+
+  it('never reads a negative or non-numeric count', () => {
+    expect(runCostOf([completed({ inputTokens: -5, outputTokens: 'lots' })])).toBeUndefined()
+  })
+})
+
+describe('the one-line cost', () => {
+  it('prefers dollars, then premium requests, then tokens', () => {
+    expect(costLine({ usd: 0.0297808, inputTokens: 10, outputTokens: 47 })).toBe('$0.03')
+    expect(costLine({ usd: 0.001 })).toBe('< $0.01')
+    expect(costLine({ usd: 0 })).toBe('$0.00')
+    expect(costLine({ premiumRequests: 1 })).toBe('1 premium request')
+    expect(costLine({ premiumRequests: 3 })).toBe('3 premium requests')
+    expect(costLine({ inputTokens: 19428, outputTokens: 161 })).toBe('19k in · 161 out')
+    expect(costLine({ inputTokens: 1_250_000, outputTokens: 999 })).toBe('1.3M in · 999 out')
+  })
+})
+
+describe('adding costs up', () => {
+  it('sums each unit it saw and ignores runs that reported nothing', () => {
+    expect(sumCosts([{ usd: 0.02 }, undefined, { usd: 0.03, inputTokens: 5 }, { premiumRequests: 2 }])).toEqual({
+      usd: 0.05,
+      inputTokens: 5,
+      premiumRequests: 2
+    })
+    expect(sumCosts([undefined, undefined])).toBeUndefined()
+  })
+})

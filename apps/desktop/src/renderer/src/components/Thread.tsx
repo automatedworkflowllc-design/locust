@@ -13,6 +13,7 @@ import type {
 import { buildThread, cancellationSummary, peerGroups, readPlan, threadMarkers } from '../missionView.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
+import { costLine, runCostOf } from '../cost.js'
 import type { FaceActivity } from '../faceState.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { ActivityCard } from './ActivityCard.js'
@@ -152,6 +153,8 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
         <dd>
           {mission.eventCount} recorded{mission.eventsTruncated ? ' · window truncated for display' : ''}
         </dd>
+        <dt>Cost</dt>
+        <dd className="lc-mono">{costLine(runCostOf(mission.events)) ?? 'not reported by the runtime'}</dd>
         <dt>Ledger</dt>
         <dd className={verification === 'verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
       </dl>

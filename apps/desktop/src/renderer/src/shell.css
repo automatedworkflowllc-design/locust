@@ -1997,7 +1997,7 @@ textarea {
 
 .lc-missionrow {
   display: grid;
-  grid-template-columns: 14px 1fr 130px 190px 92px 104px;
+  grid-template-columns: 14px 1fr 130px 190px 92px 118px 104px;
   align-items: center;
   gap: 14px;
   padding: 13px var(--lc-space-6);
@@ -2028,7 +2028,8 @@ textarea {
 }
 
 .lc-missionrow__route,
-.lc-missionrow__stats {
+.lc-missionrow__stats,
+.lc-missionrow__cost {
   font-size: var(--lc-text-mono-provenance);
   color: var(--lc-text-muted);
   white-space: nowrap;

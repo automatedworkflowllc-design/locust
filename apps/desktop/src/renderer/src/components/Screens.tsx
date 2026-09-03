@@ -19,6 +19,7 @@ import {
 } from '../status.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
+import { costLine, runCostOf, sumCosts } from '../cost.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
@@ -95,6 +96,12 @@ export function MissionsScreen({
   const [filter, setFilter] = useState<Filter>('All')
   const shown = missions.filter((mission) => matchesFilter(mission, filter, runningMissionIds))
   const withIssues = missions.filter((mission) => mission.integrityIssueCount > 0).length
+  // What the shown missions cost, in whatever units their receipts carry.
+  // Runtimes that report nothing contribute nothing, and are counted as such
+  // rather than as free.
+  const costs = shown.map((mission) => runCostOf(mission.events))
+  const priced = costs.filter((cost) => cost !== undefined).length
+  const total = costLine(sumCosts(costs))
 
   return (
     <div className="lc-screen">
@@ -102,7 +109,7 @@ export function MissionsScreen({
         title="Missions"
         meta={`${missions.length} local · ${
           withIssues === 0 ? 'ledger verified' : `${withIssues} with an incomplete receipt`
-        }`}
+        }${total === undefined ? '' : ` · ${total} across ${priced} priced`}`}
       />
       <div className="lc-filters">
         {FILTERS.map((name) => (
@@ -150,6 +157,9 @@ export function MissionsScreen({
                   </span>
                   <span className="lc-missionrow__stats lc-mono">
                     {mission.checkpoints.length} ck · {elapsed}m
+                  </span>
+                  <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
+                    {costLine(runCostOf(mission.events)) ?? '—'}
                   </span>
                   <span className={`lc-missionrow__tag lc-mono lc-tone-${view.tone}`}>{view.tag}</span>
                 </button>

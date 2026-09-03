@@ -134,6 +134,11 @@ export function createClaudeEventNormalizer(
   let finalized = false;
   let sawResult = false;
   let terminalFailure: string | undefined;
+  // What the run cost, as Claude Code itself priced it. Measured 2026-09-03:
+  // the `result` record carries `total_cost_usd` and a `usage` block with
+  // `input_tokens` / `output_tokens`. Only the numbers travel; the record's
+  // model-usage table names the account's models and stays behind.
+  let completedUsage: Record<string, number> | undefined;
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -309,6 +314,17 @@ export function createClaudeEventNormalizer(
 
     if (type === "result") {
       sawResult = true;
+      const usage: Record<string, number> = {};
+      if (typeof parsed.total_cost_usd === "number" && Number.isFinite(parsed.total_cost_usd)) {
+        usage.usd = parsed.total_cost_usd;
+      }
+      if (isObject(parsed.usage)) {
+        for (const [from, to] of [["input_tokens", "inputTokens"], ["output_tokens", "outputTokens"]] as const) {
+          const held = parsed.usage[from];
+          if (typeof held === "number" && Number.isFinite(held)) usage[to] = held;
+        }
+      }
+      if (Object.keys(usage).length > 0) completedUsage = usage;
       const isError = parsed.is_error === true;
       const subtype = stringValue(parsed.subtype) ?? "";
       const reason = stringValue(parsed.terminal_reason) ?? subtype;
@@ -394,7 +410,13 @@ export function createClaudeEventNormalizer(
           }),
         ];
       }
-      return [emit("run.completed", { ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }), process })];
+      return [
+        emit("run.completed", {
+          ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
+          ...(completedUsage === undefined ? {} : { usage: completedUsage }),
+          process,
+        }),
+      ];
     },
   };
 }

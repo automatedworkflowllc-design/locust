@@ -33,6 +33,13 @@ const ANTIGRAVITY_EVENTS = join(ROOT, 'src', 'antigravity-events.ts')
 
 const MUTATIONS = [
   {
+    file: CLAUDE_EVENTS,
+    name: "the cost Claude Code reported never reaches the receipt",
+    from: '          ...(completedUsage === undefined ? {} : { usage: completedUsage }),\n',
+    to: '',
+    expect: 'carries the dollar figure and the token counts from the result record onto the receipt'
+  },
+  {
     file: ANTIGRAVITY_EVENTS,
     name: "the model's reasoning rides along in the evidence",
     from: '  const { thinking: _reasoning, ...rest } = parsed;',

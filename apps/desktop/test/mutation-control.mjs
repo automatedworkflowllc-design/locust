@@ -33,9 +33,24 @@ const UPDATES = join(ROOT, 'src', 'main', 'updates.ts')
 const RELAY = join(ROOT, 'src', 'main', 'relay.ts')
 const FACES = join(ROOT, 'src', 'renderer', 'src', 'faceState.ts')
 const ANTIGRAVITY = join(ROOT, 'src', 'main', 'antigravity-mission.ts')
+const COST = join(ROOT, 'src', 'renderer', 'src', 'cost.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: COST,
+    name: 'a receipt that reported no cost is shown as free',
+    from: "  return Object.keys(cost).length === 0 ? undefined : cost",
+    to: "  return cost",
+    expect: 'says nothing when the receipt carries nothing, rather than zero'
+  },
+  {
+    file: COST,
+    name: 'a dollar figure the runtime priced is dropped for a token count',
+    from: "  if (cost.usd !== undefined) return cost.usd === 0 ? '$0.00' : cost.usd < 0.01 ? '< $0.01' : `$${cost.usd.toFixed(2)}`",
+    to: "",
+    expect: 'prefers dollars, then premium requests, then tokens'
+  },
   {
     file: ANTIGRAVITY,
     name: "the agent's final answer never ends the watch",
@@ -898,6 +913,7 @@ const originals = new Map([
   [RELAY, readFileSync(RELAY, 'utf8')],
   [FACES, readFileSync(FACES, 'utf8')],
   [ANTIGRAVITY, readFileSync(ANTIGRAVITY, 'utf8')],
+  [COST, readFileSync(COST, 'utf8')],
   [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')]
 ])
 let problems = 0

@@ -313,3 +313,32 @@ describe("tool pairing and terminal state", () => {
     expect(events[0]?.type).toBe("adapter.diagnostic");
   });
 });
+
+describe("what the run cost, as Claude Code priced it", () => {
+  it("carries the dollar figure and the token counts from the result record onto the receipt", () => {
+    const claude = normalizer();
+    claude.accept(
+      record({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        total_cost_usd: 0.0297808,
+        usage: { input_tokens: 10, output_tokens: 47, cache_read_input_tokens: 17648 },
+        modelUsage: { "claude-haiku-4-5-20251001": { costUSD: 0.0297808 } },
+      }),
+    );
+    const [done] = claude.finish(completion({ exitCode: 0 }));
+    expect(done?.type).toBe("run.completed");
+    const usage = (done?.payload as { usage?: Record<string, number> }).usage;
+    expect(usage).toEqual({ usd: 0.0297808, inputTokens: 10, outputTokens: 47 });
+    // The per-model table names the account's models; it does not travel.
+    expect(JSON.stringify(done)).not.toContain("modelUsage");
+  });
+
+  it("says nothing about cost when the result record carried none", () => {
+    const claude = normalizer();
+    claude.accept(record({ type: "result", subtype: "success", is_error: false }));
+    const [done] = claude.finish(completion({ exitCode: 0 }));
+    expect((done?.payload as { usage?: unknown }).usage).toBeUndefined();
+  });
+});
