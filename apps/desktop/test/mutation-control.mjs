@@ -471,10 +471,10 @@ const MUTATIONS = [
   },
   {
     file: STATUS,
-    name: 'an idle face keeps moving',
-    from: "  return status === 'working' ? 'working' : 'still'",
-    to: "  return 'working'",
-    expect: 'moves a face only while its teammate is working'
+    name: 'a teammate with no live run is drawn as working',
+    from: "    live: input.hasRunningMission ? (input.liveActivity ?? 'working') : 'idle',",
+    to: "    live: 'working',",
+    expect: 'decides the face from the same inputs as the label, so the two agree'
   },
   {
     file: TEAMMATES,
