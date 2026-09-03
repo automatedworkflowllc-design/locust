@@ -12,6 +12,14 @@
 // catch -- it is what an empty or unreachable channel looks like.
 //
 // Needs network. Costs no provider quota.
+//
+//   node _smoke/update-smoke.mjs --installed
+//
+// runs the INSTALLED copy under %LOCALAPPDATA% on its real profile instead
+// of the fresh build, which is the only way to see a real upgrade offered:
+// an installed build behind the newest release must report the version it
+// found and download it. Nothing is installed by this smoke -- installing
+// restarts the app, and that is the person's click.
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
@@ -19,7 +27,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
-const EXE = join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
+const INSTALLED = process.argv.includes('--installed')
+const EXE = INSTALLED
+  ? join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Locust', 'Locust.exe')
+  : join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
 const PORT = 9232
 
 let failures = 0
@@ -60,9 +71,10 @@ class Cdp {
   }
 }
 
-const profile = await mkdtemp(join(tmpdir(), 'locust-update-smoke-'))
-await mkdir(profile, { recursive: true })
-const child = spawn(EXE, [`--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`], {
+// The installed copy keeps its own profile: that is the point of running it.
+const profile = INSTALLED ? undefined : await mkdtemp(join(tmpdir(), 'locust-update-smoke-'))
+if (profile !== undefined) await mkdir(profile, { recursive: true })
+const child = spawn(EXE, [`--remote-debugging-port=${PORT}`, ...(profile === undefined ? [] : [`--user-data-dir=${profile}`])], {
   cwd: APP_DIR,
   stdio: ['ignore', 'pipe', 'pipe']
 })
@@ -121,10 +133,10 @@ try {
     button.click()
     // Wait for the check to leave "Checking…" and settle on an answer.
     let line = ''
-    for (let i = 0; i < 240; i += 1) {
+    for (let i = 0; i < 480; i += 1) {
       await new Promise(r => setTimeout(r, 500))
       line = note()
-      if (line && !/Checking/.test(line) && line !== before) break
+      if (/Up to date|ready to install|could not complete/.test(line)) break
     }
     return JSON.stringify({ opened: true, section: true, before, button: true, buttonLabel: button.innerText.trim(), version, line })
   })()`)
@@ -135,13 +147,23 @@ try {
   check('the channel answered rather than failing', !/could not complete/i.test(state.line ?? ''), state.line)
   check(
     'the answer is one of the two the channel can give',
-    /^Up to date\.$/.test(state.line ?? '') || /is available|Downloading|ready to install/.test(state.line ?? ''),
+    /^Up to date\.$/.test(state.line ?? '') || /ready to install/.test(state.line ?? ''),
     state.line
   )
+  if (INSTALLED) {
+    const latest = await (await fetch('https://github.com/automatedworkflowllc-design/locust-releases/releases/latest/download/latest.yml')).text()
+    const newest = (latest.match(/^version:\s*(\S+)/m) || [])[1]
+    say(`       newest release: ${newest ?? '(unreadable)'}`)
+    if (newest !== undefined && newest !== state.version) {
+      check('an installed build behind the newest release downloads it and says so', new RegExp(`Version ${newest.replace(/[.]/g, '[.]')} is downloaded and ready to install`).test(state.line ?? ''), state.line)
+    } else {
+      check('an installed build at the newest release is up to date', /^Up to date\.$/.test(state.line ?? ''), state.line)
+    }
+  }
 } finally {
   child.kill()
   await sleep(500)
-  await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+  if (profile !== undefined) await rm(profile, { recursive: true, force: true }).catch(() => undefined)
 }
 
 console.error(failures === 0 ? '\nUPDATE SMOKE PASSED' : `\n${failures} UPDATE SMOKE FAILURE(S)`)
