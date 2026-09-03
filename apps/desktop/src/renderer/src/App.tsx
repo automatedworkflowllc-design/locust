@@ -46,6 +46,7 @@ import { AgentAvatar } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
 import {
   conversationTurns,
+  failureMessage,
   recentlyUsedRoutes,
   resolvedModelNames,
   resumableSessionOf,
@@ -87,6 +88,13 @@ interface LiveRunState {
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly error?: string
   readonly errorIsPersistence?: boolean
+  /**
+   * True when this turn continues the conversation on screen but the runtime
+   * had no session to resume -- the previous turn failed before one existed.
+   * The exchange is still one thread; the model just starts without it, and
+   * the thread says so rather than letting a person assume it remembers.
+   */
+  readonly coldStart?: boolean
   readonly restored?: boolean
   readonly restoredMission?: PublicRecoveredMission
   /** Who the run was messaged to, known before the host has even assigned a missionId. */
@@ -165,7 +173,8 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
   if (update.event.type === 'run.cancelled') return { ...live, events, phase: 'cancelled' }
   if (update.event.type === 'run.failed') {
-    return { ...live, events, phase: 'failed', error: update.event.payload.message }
+    // The payload's own sentence plus whatever the runtime actually said.
+    return { ...live, events, phase: 'failed', error: failureMessage(update.event.payload) }
   }
   return { ...live, events, phase: live.phase === 'starting' ? 'running' : live.phase }
 }
@@ -448,6 +457,9 @@ export default function App(): ReactElement {
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
   const [relay, setRelay] = useState(true)
+  // Which folder this window works in. Every mission runs here; a person
+  // with two projects open needs the title to say which is which.
+  const [workspaceName, setWorkspaceName] = useState('Local workspace')
   // Faces that just finished or just heard something: a hop and a glance, each
   // for a moment, then still. Keyed by teammate; cleared by their own timers.
   const [recentlyDone, setRecentlyDone] = useState<readonly string[]>([])
@@ -597,7 +609,10 @@ export default function App(): ReactElement {
     void bridge
       .getAppInfo()
       .then((info) => {
-        if (active) setBuild({ version: info.version, packaged: info.packaged, platform: info.platform })
+        if (active) {
+          setBuild({ version: info.version, packaged: info.packaged, platform: info.platform })
+          setWorkspaceName(info.workspaceName)
+        }
       })
       .catch(() => undefined)
 
@@ -741,15 +756,23 @@ export default function App(): ReactElement {
     // route first, and the only thing that can work after a run that failed
     // before its runtime ever started.
     const shown = liveRunRef.current
+    // Being the next turn of a conversation and resuming a runtime's session
+    // are two different things, and gating the first on the second is what
+    // made a reply after a failed run open a SECOND sidebar row and lose the
+    // turn before it from the screen (Colin, 2026-09-03: "the old bug where
+    // it starts new missions"). A run that failed before its runtime got
+    // going left no session to resume -- it did not stop being the turn the
+    // person was replying to. So the conversation continues either way, and
+    // whether the model gets the earlier messages is asked separately.
     const continuing =
       shown !== undefined
       && shown.data !== undefined
       && !liveRunIsActive(shown)
       && ownerOf(shown) === teammateId
       && shown.data.runtime === route.runtime
-      && resumableSessionOf(shown.events) !== undefined
         ? shown
         : undefined
+    const coldStart = continuing !== undefined && resumableSessionOf(continuing.events) === undefined
     const earlierTurns = continuing === undefined
       ? []
       : [
@@ -761,7 +784,8 @@ export default function App(): ReactElement {
       phase: 'starting',
       events: [],
       ...(teammateId === undefined ? {} : { teammateId }),
-      ...(earlierTurns.length === 0 ? {} : { earlierTurns })
+      ...(earlierTurns.length === 0 ? {} : { earlierTurns }),
+      ...(coldStart ? { coldStart: true } : {})
     }
     setRuns((current) => withNewRun(current, key, starting))
     setShownKey(key)
@@ -1226,7 +1250,7 @@ export default function App(): ReactElement {
 
   return (
     <div className="lc-shell">
-      <TitleBar workspaceName="Local workspace" runningCount={runningCount} swarm={swarm} />
+      <TitleBar workspaceName={workspaceName} runningCount={runningCount} swarm={swarm} />
       <div className="lc-body">
         {rowMenu !== undefined && (
           <ContextMenu
@@ -1258,6 +1282,8 @@ export default function App(): ReactElement {
             setNewTeammateOpen(true)
           }}
           onOpenSettings={() => setScreen(screen === 'settings' ? 'workroom' : 'settings')}
+          onOpenMissions={() => setScreen(screen === 'missions' ? 'workroom' : 'missions')}
+          onOpenTeammates={() => setScreen(screen === 'teammates' ? 'workroom' : 'teammates')}
         />
         <main className="lc-workroom">
           {screen === 'missions' ? (
@@ -1435,6 +1461,7 @@ export default function App(): ReactElement {
               <Thread
                 prompt={liveRun.prompt}
                 earlierTurns={liveRun.earlierTurns ?? []}
+                coldStart={liveRun.coldStart ?? false}
                 events={liveRun.events}
                 running={running}
                 missionId={liveRun.data?.missionId}

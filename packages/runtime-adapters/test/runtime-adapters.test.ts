@@ -47,6 +47,10 @@ describe("runtime command specifications", () => {
     expect(codex.args).toEqual([
       "exec",
       "--json",
+      // Without this, a workspace that is not a git repository fails the run
+      // before the model is reached. Containment is the sandbox argument
+      // below, not Codex's guess about version control.
+      "--skip-git-repo-check",
       "--sandbox",
       "read-only",
       "-C",

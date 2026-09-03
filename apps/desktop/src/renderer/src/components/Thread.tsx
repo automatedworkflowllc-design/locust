@@ -169,6 +169,7 @@ export interface ThreadProps {
    * the person typed for it. Empty for a first turn. They render above this
    * turn so the exchange reads as one, which is what it was.
    */
+  readonly coldStart?: boolean
   readonly earlierTurns: readonly {
     readonly missionId: string
     readonly prompt: string
@@ -220,6 +221,7 @@ export interface ThreadProps {
 export function Thread({
   prompt,
   earlierTurns,
+  coldStart = false,
   events,
   running,
   missionId,
@@ -335,6 +337,15 @@ export function Thread({
             onDecide={(decision) => onDecide(request.approvalId, decision)}
           />
         ))}
+
+        {coldStart && (
+          // Said plainly because the alternative is a person assuming the
+          // model read the turn above it. The conversation is one thread; the
+          // runtime's memory of it is not.
+          <div className="lc-thread__marker lc-mono">
+            Started without the earlier messages — the turn before this one left no session to resume
+          </div>
+        )}
 
         {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} />}
 

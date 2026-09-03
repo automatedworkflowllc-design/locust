@@ -378,13 +378,22 @@ export function createCodexExecCommand(
   // sandbox goes through the config override the subcommand does support,
   // and the working directory needs no flag because the process is spawned
   // in it.
+  // MEASURED 2026-09-03: without --skip-git-repo-check, a workspace that is
+  // not a git repository (and not on Codex's trusted list) fails the run
+  // before the model is ever reached -- exit 1 in half a second, stderr "Not
+  // inside a trusted directory and --skip-git-repo-check was not specified."
+  // That check is Codex protecting a folder it cannot undo changes in; here
+  // the host owns that decision instead, through the sandbox argument below,
+  // the approval gate, and a recorded diff of every write. Accepted by both
+  // `exec` and `exec resume` (both --help checked on 0.151.0-alpha.7.2).
   const args = options.resumeThreadId === undefined
-    ? ["exec", "--json", "--sandbox", sandboxArgument(options.sandbox), "-C", options.workspacePath]
+    ? ["exec", "--json", "--skip-git-repo-check", "--sandbox", sandboxArgument(options.sandbox), "-C", options.workspacePath]
     : [
         "exec",
         "resume",
         requireText(options.resumeThreadId, "Session id"),
         "--json",
+        "--skip-git-repo-check",
         "-c",
         `sandbox_mode=${sandboxArgument(options.sandbox)}`,
       ];

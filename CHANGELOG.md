@@ -6,6 +6,41 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.0 — 2026-09-03
+
+- **Updates now actually install.** "Install and restart" quit the app and
+  brought it back on the same version; the update it had downloaded was never
+  applied. If your copy has been stuck on an old version with "ready to
+  install" in Settings, this release fixes that. It cannot fix itself from
+  inside the stuck copy, so this one time: quit Locust, and run the installer
+  from the download page, or the one waiting in your updater folder.
+- **Codex edits name their files.** A change Codex made showed a row with no
+  path and "did not report the change"; a two-file change said "Edited 1
+  file". Every changed file is now its own row, and the count is files.
+- **The window is titled by your folder**, not "Local workspace".
+- **Missions and Teammates are one click away** in the sidebar footer, with
+  their shortcuts in the tooltips.
+- **A failure now says what the runtime said.** Every failure card showed the
+  app's own sentence -- "Codex invocation did not complete successfully" --
+  and threw away the runtime's explanation, which the ledger had been
+  recording all along. Two runs lost this way turned out to be a folder Codex
+  refused to work in and a Cursor account out of capacity; on screen both read
+  as the same shrug. The runtime's own last word is now on the card, and
+  capacity exhaustion is said in English instead of as `resource_exhausted`.
+- **Codex missions work in a folder that is not a git repository.** Codex CLI
+  refuses to start outside a repo unless asked not to check, so a mission in a
+  plain folder died in half a second before the model was ever reached. Locust
+  decides what a run may touch itself -- read-only or accept-edits, an approval
+  gate, and a recorded diff of every write -- so it now asks Codex to skip that
+  check.
+- **A reply after a failed run stays in the same conversation.** Being the next
+  turn and resuming a runtime's session are different things, and the second
+  was gating the first: replying to a run that failed before its runtime
+  started opened a second sidebar row and dropped the turn above it from the
+  screen. The conversation now continues either way, and when the runtime has
+  no session to resume the thread says the model started without the earlier
+  messages rather than letting you assume it remembers.
+
 ## 0.14.0 — 2026-09-03
 
 - **What a run cost.** The receipt, the inspector and a new column on Missions

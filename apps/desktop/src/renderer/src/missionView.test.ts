@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   activityCounts,
   activityEntries,
+  failureMessage,
   activitySummary,
   assistantMessages,
   defaultOpenEntry,
@@ -98,6 +99,41 @@ describe('assistant text', () => {
   })
 })
 
+describe('what a failure card says', () => {
+  const nl = String.fromCharCode(10)
+
+  it("shows the runtime's own last word, because the host's sentence names only the shape", () => {
+    // Measured 2026-09-03: this exact pair cost two runs that read on screen
+    // as the same shrug.
+    expect(
+      failureMessage({
+        message: 'Codex invocation did not complete successfully',
+        process: { stderr: 'Not inside a trusted directory and --skip-git-repo-check was not specified.' + nl }
+      })
+    ).toBe(
+      "Codex invocation did not complete successfully The runtime's own last word was: Not inside a trusted directory and --skip-git-repo-check was not specified."
+    )
+  })
+
+  it('says capacity exhaustion in English rather than passing the jargon through alone', () => {
+    const said = failureMessage({
+      message: 'Cursor Agent ended without a terminal result record.',
+      process: { stderr: 'RetriableError: [resource_exhausted] Error' + nl }
+    })
+    expect(said).toContain('out of capacity right now')
+    // The runtime's own text still rides along: a person reporting this
+    // upstream needs the words upstream uses.
+    expect(said).toContain('resource_exhausted')
+  })
+
+  it('adds nothing when the runtime said nothing', () => {
+    expect(failureMessage({ message: 'Codex CLI is not ready.' })).toBe('Codex CLI is not ready.')
+    expect(failureMessage({ message: 'Codex CLI is not ready.', process: { stderr: '   ' + nl } })).toBe(
+      'Codex CLI is not ready.'
+    )
+  })
+})
+
 describe('collapsed activity', () => {
   it('counts edits and commands separately from their tool events', () => {
     expect(
@@ -107,6 +143,20 @@ describe('collapsed activity', () => {
         { kind: 'shell', name: 'pnpm test', settled: true }
       ])
     ).toBe('Edited 2 files · ran 1 command')
+  })
+
+  it('counts files, not edit calls: one Codex file_change can name several', () => {
+    expect(activitySummary([{ kind: 'edit', name: 'C:/w/README.md' + String.fromCharCode(10) + 'C:/w/src/prices.ts', settled: true }])).toBe('Edited 2 files')
+  })
+
+  it('draws one row per file a runtime named without a diff, never one row named after the tool', () => {
+    const rows = activityEntries([
+      { kind: 'edit', name: 'C:/w/README.md' + String.fromCharCode(10) + 'C:/w/src/prices.ts', tool: 'C:/w/README.md' + String.fromCharCode(10) + 'C:/w/src/prices.ts', settled: true }
+    ])
+    expect(rows.map((row) => [row.kind, 'name' in row ? row.name : ''])).toEqual([
+      ['unreported', 'C:/w/README.md'],
+      ['unreported', 'C:/w/src/prices.ts']
+    ])
   })
 
   it('singularizes honestly', () => {

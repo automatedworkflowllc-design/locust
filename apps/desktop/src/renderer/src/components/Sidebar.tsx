@@ -74,7 +74,9 @@ export function Sidebar({
   recentlyReceived,
   onSelectTeammate,
   onNewTeammate,
-  onOpenSettings
+  onOpenSettings,
+  onOpenMissions,
+  onOpenTeammates
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
@@ -96,6 +98,8 @@ export function Sidebar({
   readonly onSelectTeammate: (teammateId: string) => void
   readonly onNewTeammate: () => void
   readonly onOpenSettings: () => void
+  readonly onOpenMissions: () => void
+  readonly onOpenTeammates: () => void
 }): ReactElement {
   const [query, setQuery] = useState('')
   const connected = connectedRuntimeCount(runtimes)
@@ -287,7 +291,15 @@ export function Sidebar({
       </div>
 
       <div className="lc-sidebar__footer">
-        <button type="button" onClick={onOpenSettings}>
+        <button type="button" onClick={onOpenMissions} title="All missions (Ctrl 1)">
+          <Icon name="inbox" size={15} />
+          <span>Missions</span>
+        </button>
+        <button type="button" onClick={onOpenTeammates} title="Teammates (Ctrl 2)">
+          <Icon name="users" size={15} />
+          <span>Teammates</span>
+        </button>
+        <button type="button" onClick={onOpenSettings} title="Settings (Ctrl 3)">
           <Icon name="settings" size={15} />
           <span>Settings</span>
         </button>

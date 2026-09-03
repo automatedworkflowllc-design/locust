@@ -34,6 +34,7 @@ Each exits non-zero on any failed assertion, and each kills the app it started.
 ```
 node _smoke/relay-smoke.mjs         # three short Cursor runs
 node _smoke/update-smoke.mjs        # needs network, no provider
+node _smoke/update-smoke.mjs --installed --install   # the INSTALLED copy: clicks Install, asserts the binary changed version
 node _smoke/diff-smoke.mjs          # one cheap Cursor edit in a throwaway workspace
 node _smoke/picker-smoke.mjs        # no provider run at all
 node _smoke/retention-smoke.mjs     # seeds a ledger by hand

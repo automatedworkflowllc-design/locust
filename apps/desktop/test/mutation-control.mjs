@@ -38,6 +38,34 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'a failure card drops the runtime own-stderr line and shows only the host sentence',
+    from: '  if (said === undefined) return payload.message',
+    to: '  if (said !== undefined) return payload.message',
+    expect: "shows the runtime's own last word, because the host's sentence names only the shape"
+  },
+  {
+    file: MISSIONS,
+    name: 'a follow-up is only linked when the earlier turn left a session to resume',
+    from: '              ? resumedMissionId === undefined',
+    to: '              ? resumedMissionId === undefined || resumeThreadId === undefined',
+    expect: 'continues a conversation whose earlier turn recorded no session, cold rather than not at all'
+  },
+  {
+    file: UPDATES,
+    name: 'install goes back to quitAndInstall, which the shutdown handler cancels',
+    from: '      options.requestQuit()\n      return { ok: true, data: state }',
+    to: '      options.updater.quitAndInstall(false, true)\n      return { ok: true, data: state }',
+    expect: 'installs by asking the app to quit, so the shutdown flush runs first and the updater installs on the real quit'
+  },
+  {
+    file: VIEW,
+    name: 'a multi-file edit is counted as one file',
+    from: "    .reduce((sum, detail) => sum + Math.max(1, detail.name.split('\\n').filter((line) => line.length > 0).length), 0)",
+    to: '    .length',
+    expect: 'counts files, not edit calls: one Codex file_change can name several'
+  },
+  {
     file: COST,
     name: 'a receipt that reported no cost is shown as free',
     from: "  return Object.keys(cost).length === 0 ? undefined : cost",
@@ -270,10 +298,10 @@ const MUTATIONS = [
   },
   {
     file: UPDATES,
-    name: 'the app installs a new version on its own at quit',
-    from: '    options.updater.autoInstallOnAppQuit = false',
-    to: '    options.updater.autoInstallOnAppQuit = true',
-    expect: 'downloads on its own, and never installs on its own'
+    name: 'auto-install at quit is switched back off, so the install never runs',
+    from: '    options.updater.autoInstallOnAppQuit = true',
+    to: '    options.updater.autoInstallOnAppQuit = false',
+    expect: 'downloads on its own, and installs only on a quit the app itself makes'
   },
   {
     file: UPDATES,
@@ -435,13 +463,6 @@ const MUTATIONS = [
     from: '            ...(resumeThreadId === undefined ? {} : { resumeThreadId })',
     to: '',
     expect: 'resumes the earlier mission’s own session, and records what it continued'
-  },
-  {
-    file: MISSIONS,
-    name: 'a conversation with no recorded session is continued anyway',
-    from: '          if (prior === undefined || priorThread === undefined) {',
-    to: '          if (false) {',
-    expect: 'refuses to continue a conversation that recorded no session, rather than starting blank'
   },
   {
     file: MISSIONS,

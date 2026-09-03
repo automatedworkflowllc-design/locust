@@ -1613,25 +1613,39 @@ describe('continuing a conversation', () => {
     expect(response.data.followsUp).toEqual({ missionId: 'mission_prior', runtimeThreadId: 'thread-prior' })
   })
 
-  it('refuses to continue a conversation that recorded no session, rather than starting blank', async () => {
+  it('continues a conversation whose earlier turn recorded no session, cold rather than not at all', async () => {
+    // A turn that failed before its runtime started leaves nothing to resume.
+    // Refusing the reply is what made a follow-up after a failure open a
+    // second sidebar row and drop the turn above it (Colin, 2026-09-03). The
+    // conversation is still that conversation; only the model starts blank.
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
       records: records([]),
       completion: Promise.resolve(completion())
     })) satisfies RuntimeProcessRunner['start']
+    const created: Record<string, unknown>[] = []
     const { service } = scheduledService({ start }, fakeLedger({
-      getMission: async () => ({ ...(finished() as never as Record<string, unknown>), events: [] }) as never
+      getMission: async () => ({ ...(finished() as never as Record<string, unknown>), events: [] }) as never,
+      createMission: async (metadata: Record<string, unknown>) => {
+        created.push(metadata)
+      }
     }))
 
     const response = await service.start(
       'go on', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior'
     )
 
-    expect(response).toMatchObject({
-      ok: false,
-      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('did not record a session') }
+    expect(response).toMatchObject({ ok: true })
+    // The record links the turns and claims no resume that did not happen.
+    expect(created.at(-1)?.continuesFrom).toEqual({
+      missionId: 'mission_prior',
+      checkpointEpoch: 1,
+      reason: 'follow-up'
     })
-    // Nothing was launched: a blank run pretending to be a reply is the failure.
-    expect(start).not.toHaveBeenCalled()
+    expect((response as { data: { followsUp?: unknown } }).data.followsUp).toEqual({ missionId: 'mission_prior' })
+    // And the process starts fresh: `exec resume` would need a session id.
+    expect(start).toHaveBeenCalled()
+    const spec = start.mock.calls[0]?.[0] as { args: string[] }
+    expect(spec.args).not.toContain('resume')
   })
 
   it('refuses to continue another runtime\u2019s conversation, and says which', async () => {

@@ -516,10 +516,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         if (followUpOf !== undefined) {
           const prior = await options.ledger.getMission(followUpOf).catch(() => undefined)
           const priorThread = prior === undefined ? undefined : runtimeThreadIdOf(prior)
-          if (prior === undefined || priorThread === undefined) {
+          if (prior === undefined) {
             return error(
               'RUNTIME_START_FAILED',
-              'That conversation cannot be continued: the earlier mission did not record a session to resume.'
+              'That conversation cannot be continued: its earlier mission is not in the ledger.'
             ) as CodexMissionStartResponse
           }
           if (prior.metadata.runtime !== runtime) {
@@ -531,6 +531,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               `That conversation belongs to ${runtimeDisplayName(prior.metadata.runtime)}. Switch the route back, or hand the mission over instead.`
             ) as CodexMissionStartResponse
           }
+          // A prior turn that failed before its runtime started recorded no
+          // session. That used to refuse the reply outright; now the turn is
+          // recorded as continuing that conversation and the runtime simply
+          // starts fresh, because a person replying to a failure is still
+          // replying to it. `resumeThreadId` staying undefined is what makes
+          // the run cold: no `exec resume`, no borrowed context.
           resumeThreadId = priorThread
           resumedMissionId = prior.metadata.missionId
         }
@@ -674,7 +680,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             executionPolicyVersion: 1,
             createdAt,
             ...(continuation === undefined
-              ? resumedMissionId === undefined || resumeThreadId === undefined
+              ? resumedMissionId === undefined
                 ? {}
                 : {
                     continuesFrom: {
@@ -684,7 +690,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                       // own first, which is the only one a reader could mean.
                       checkpointEpoch: 1,
                       reason: 'follow-up' as const,
-                      runtimeThreadId: resumeThreadId
+                      // Absent when the turn being continued left no session:
+                      // the record then says "this followed that" without
+                      // claiming a resume that never happened.
+                      ...(resumeThreadId === undefined ? {} : { runtimeThreadId: resumeThreadId })
                     }
                   }
               : { continuesFrom: continuation })
@@ -793,9 +802,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             sandbox: effectiveSandbox,
             peerMessages: delivered.map((message) => publicPeerMessage(message, 'received')),
             peerDeliveryFailed,
-            ...(resumedMissionId === undefined || resumeThreadId === undefined
+            ...(resumedMissionId === undefined
               ? {}
-              : { followsUp: { missionId: resumedMissionId, runtimeThreadId: resumeThreadId } })
+              : {
+                  followsUp: {
+                    missionId: resumedMissionId,
+                    ...(resumeThreadId === undefined ? {} : { runtimeThreadId: resumeThreadId })
+                  }
+                })
           }
         }
       } finally {

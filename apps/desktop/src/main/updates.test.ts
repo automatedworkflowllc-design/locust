@@ -6,12 +6,15 @@ import type { UpdaterLike } from './updates.js'
 function fakeUpdater(overrides: Partial<UpdaterLike> = {}): UpdaterLike & {
   readonly listeners: Map<string, (payload?: unknown) => void>
   readonly installs: number[]
+  readonly quits: number[]
 } {
   const listeners = new Map<string, (payload?: unknown) => void>()
   const installs: number[] = []
+  const quits: number[] = []
   return {
     listeners,
     installs,
+    quits,
     autoDownload: false,
     autoInstallOnAppQuit: true,
     checkForUpdates: async () => null,
@@ -28,19 +31,25 @@ function fakeUpdater(overrides: Partial<UpdaterLike> = {}): UpdaterLike & {
 }
 
 describe('what the app does about a new version', () => {
-  it('downloads on its own, and never installs on its own', () => {
+  it('downloads on its own, and installs only on a quit the app itself makes', () => {
     const updater = fakeUpdater()
     createUpdateService({
       updater,
       currentVersion: '0.5.0',
       supported: true,
-      liveMissionCount: () => 0
+      liveMissionCount: () => 0,
+      requestQuit: () => {
+        updater.quits.push(1)
+      }
     })
     // Downloading is quiet and safe. Installing swaps the binary and restarts,
     // which must never happen while nobody is watching -- including at quit,
     // which is just someone closing a window.
     expect(updater.autoDownload).toBe(true)
-    expect(updater.autoInstallOnAppQuit).toBe(false)
+    // On, deliberately: the install rides the app's own quit, which the
+    // shutdown handler owns. install() still never runs while a mission is
+    // live, because it refuses before asking for that quit.
+    expect(updater.autoInstallOnAppQuit).toBe(true)
   })
 
   it('refuses to install while a mission is running, and says why', () => {
@@ -51,7 +60,10 @@ describe('what the app does about a new version', () => {
       updater,
       currentVersion: '0.5.0',
       supported: true,
-      liveMissionCount: () => 1
+      liveMissionCount: () => 1,
+      requestQuit: () => {
+        updater.quits.push(1)
+      }
     })
     updater.listeners.get('update-downloaded')?.()
 
@@ -59,20 +71,27 @@ describe('what the app does about a new version', () => {
 
     expect(response).toMatchObject({ ok: false, error: { code: 'UPDATE_BUSY' } })
     expect(updater.installs).toHaveLength(0)
+    expect(updater.quits).toHaveLength(0)
   })
 
-  it('installs once nothing is running', () => {
+  it('installs by asking the app to quit, so the shutdown flush runs first and the updater installs on the real quit', () => {
     const updater = fakeUpdater()
     const service = createUpdateService({
       updater,
       currentVersion: '0.5.0',
       supported: true,
-      liveMissionCount: () => 0
+      liveMissionCount: () => 0,
+      requestQuit: () => {
+        updater.quits.push(1)
+      }
     })
     updater.listeners.get('update-downloaded')?.()
 
     expect(service.install()).toMatchObject({ ok: true })
-    expect(updater.installs).toHaveLength(1)
+    // Never quitAndInstall(): the app's own shutdown handler cancels that
+    // quit to flush the ledger, and the install was cancelled with it.
+    expect(updater.installs).toHaveLength(0)
+    expect(updater.quits).toHaveLength(1)
   })
 
   it('refuses to install what it has not downloaded', () => {
@@ -81,7 +100,10 @@ describe('what the app does about a new version', () => {
       updater,
       currentVersion: '0.5.0',
       supported: true,
-      liveMissionCount: () => 0
+      liveMissionCount: () => 0,
+      requestQuit: () => {
+        updater.quits.push(1)
+      }
     })
     expect(service.install()).toMatchObject({ ok: false, error: { code: 'UPDATE_NOT_READY' } })
     expect(updater.installs).toHaveLength(0)
@@ -96,7 +118,10 @@ describe('what the app does about a new version', () => {
       }),
       currentVersion: '0.5.0',
       supported: true,
-      liveMissionCount: () => 0
+      liveMissionCount: () => 0,
+      requestQuit: () => {
+        undefined
+      }
     })
 
     const response = await service.check()
@@ -111,7 +136,10 @@ describe('what the app does about a new version', () => {
       updater: fakeUpdater({ checkForUpdates: async () => ({ updateInfo: { version: '0.6.0' } }) }),
       currentVersion: '0.5.0',
       supported: true,
-      liveMissionCount: () => 0
+      liveMissionCount: () => 0,
+      requestQuit: () => {
+        undefined
+      }
     })
     await expect(newer.check()).resolves.toMatchObject({
       ok: true,
@@ -122,7 +150,10 @@ describe('what the app does about a new version', () => {
       updater: fakeUpdater({ checkForUpdates: async () => ({ updateInfo: { version: '0.5.0' } }) }),
       currentVersion: '0.5.0',
       supported: true,
-      liveMissionCount: () => 0
+      liveMissionCount: () => 0,
+      requestQuit: () => {
+        undefined
+      }
     })
     await expect(same.check()).resolves.toMatchObject({ ok: true, data: { phase: 'current' } })
   })
@@ -133,7 +164,10 @@ describe('what the app does about a new version', () => {
       updater,
       currentVersion: '0.5.0-dev',
       supported: false,
-      liveMissionCount: () => 0
+      liveMissionCount: () => 0,
+      requestQuit: () => {
+        updater.quits.push(1)
+      }
     })
 
     await expect(service.check()).resolves.toMatchObject({ ok: true, data: { phase: 'unsupported' } })
@@ -147,6 +181,7 @@ describe('what the app does about a new version', () => {
       updater,
       currentVersion: '0.5.0',
       supported: true,
+      requestQuit: () => undefined,
       liveMissionCount: () => 0,
       onStateChange: (state) => {
         if (state.message !== undefined) seen.push(state.message)

@@ -93,6 +93,25 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
     const patch = detail.patch
     const files = patch === undefined ? [] : parseUnifiedDiff(patch.text)
     if (files.length === 0) {
+      // An edit whose runtime named its files but sent no diff (Codex's
+      // file_change) is one row PER FILE, each saying the change was not
+      // reported -- never one row named after the tool with no path at all.
+      const named = detail.kind === 'edit' && detail.tool === detail.name && detail.name.includes('\n')
+        ? detail.name.split('\n').filter((path) => path.length > 0)
+        : undefined
+      if (named !== undefined && named.length > 0) {
+        named.forEach((path, fileIndex) => {
+          entries.push({
+            kind: 'unreported',
+            key: `item_${String(index)}_${String(fileIndex)}`,
+            name: path,
+            tool: undefined,
+            settled: detail.settled,
+            failed
+          })
+        })
+        return
+      }
       entries.push({
         kind: detail.kind === 'edit' ? 'unreported' : 'tool',
         key: `item_${String(index)}`,
@@ -304,7 +323,11 @@ function pluralize(count: number, singular: string): string {
  * a guess about what the model said it did.
  */
 export function activitySummary(details: readonly ActivityDetail[]): string {
-  const edits = details.filter((detail) => detail.kind === 'edit').length
+  // Files, not edit calls: one Codex file_change can touch several files, and
+  // "Edited 1 file" over a two-file change is the wrong number.
+  const edits = details
+    .filter((detail) => detail.kind === 'edit')
+    .reduce((sum, detail) => sum + Math.max(1, detail.name.split('\n').filter((line) => line.length > 0).length), 0)
   const commands = details.filter((detail) => detail.kind === 'shell').length
   const other = details.length - edits - commands
   const parts: string[] = []
@@ -872,6 +895,54 @@ export function conversationTurns(
  * The session id is read from the events the run actually produced, so this
  * cannot claim one that was never recorded.
  */
+/**
+ * Capacity exhaustion, in whatever words a runtime uses for it. Cursor says
+ * `RetriableError: [resource_exhausted]`, which names a real condition in
+ * language nobody outside its codebase can read.
+ */
+const EXHAUSTION_PATTERNS = [
+  /\bresource_exhausted\b/i,
+  /\binsufficient_quota\b/i,
+  /\bquota (?:exceeded|exhausted)\b/i,
+  /\brate[_ -]?limit(?:ed| exceeded)?\b/i,
+  /\btoo many requests\b/i,
+  /\bhttp\s*429\b/i
+] as const
+
+/** The last line of stderr that says something, or undefined. */
+function lastStderrLine(stderr: string | undefined): string | undefined {
+  if (stderr === undefined) return undefined
+  const lines = stderr
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+  return lines.at(-1)
+}
+
+/**
+ * What to put on a failure card.
+ *
+ * The host's own sentence names the SHAPE of the failure ("Codex invocation
+ * did not complete successfully", "Cursor Agent ended without a terminal
+ * result record") and never its cause. The cause is in the process's stderr,
+ * which the ledger has been recording all along and the card was throwing
+ * away: two runs Colin lost on 2026-09-03 were a folder Codex would not run
+ * in and a Cursor account out of capacity, and both read on screen as the
+ * same shrug. So the runtime's own last word is always shown, and the one
+ * condition whose wording is pure jargon is said in English instead.
+ */
+export function failureMessage(payload: {
+  readonly message: string
+  readonly process?: { readonly stderr?: string; readonly exitCode?: number | null }
+}): string {
+  const said = lastStderrLine(payload.process?.stderr)
+  if (said === undefined) return payload.message
+  if (EXHAUSTION_PATTERNS.some((pattern) => pattern.test(said))) {
+    return `${payload.message} The runtime reported that it is out of capacity right now — its own limit, not this machine's: ${said}`
+  }
+  return `${payload.message} The runtime's own last word was: ${said}`
+}
+
 export function resumableSessionOf(
   events: readonly NormalizedRuntimeEvent[]
 ): string | undefined {

@@ -651,7 +651,16 @@ export function createCodexEventNormalizer(
     phase: ToolPayload["phase"],
     evidence: CodexEventEvidence,
   ): ToolPayload => {
-    const command = stringValue(item.command);
+    // A file_change item names its files -- path and kind, no diff. The
+    // paths ARE the command for the activity row: without them the row read
+    // "file_change · Codex CLI did not report the change" beside an edit that
+    // had named two files. Measured 2026-09-03.
+    const changedPaths = Array.isArray(item.changes)
+      ? item.changes
+          .map((change) => (isObject(change) ? stringValue(change.path) : undefined))
+          .filter((path): path is string => path !== undefined)
+      : [];
+    const command = stringValue(item.command) ?? (changedPaths.length > 0 ? changedPaths.join("\n") : undefined);
     const status = identityValue(item.status);
     const exitCode = numberValue(item.exit_code) ?? numberValue(item.exitCode);
     const rawOutput = item.aggregated_output ?? item.output ?? item.result;

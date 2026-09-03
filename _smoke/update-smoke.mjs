@@ -20,6 +20,14 @@
 // an installed build behind the newest release must report the version it
 // found and download it. Nothing is installed by this smoke -- installing
 // restarts the app, and that is the person's click.
+//
+//   node _smoke/update-smoke.mjs --installed --install
+//
+// goes one step further: it clicks Install and restart, waits for the app
+// to quit, and then reads the installed binary's version. This is the check
+// that was missing on 2026-09-03, when five releases sat downloaded while
+// the installed copy stayed at 0.9.1 and every 'Up to date' smoke ran the
+// packaged build from release/ rather than the installed one.
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
@@ -28,6 +36,7 @@ import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const INSTALLED = process.argv.includes('--installed')
+const INSTALL = process.argv.includes('--install') && INSTALLED
 const EXE = INSTALLED
   ? join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Locust', 'Locust.exe')
   : join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
@@ -156,8 +165,43 @@ try {
     say(`       newest release: ${newest ?? '(unreadable)'}`)
     if (newest !== undefined && newest !== state.version) {
       check('an installed build behind the newest release downloads it and says so', new RegExp(`Version ${newest.replace(/[.]/g, '[.]')} is downloaded and ready to install`).test(state.line ?? ''), state.line)
+      if (INSTALL) {
+        say('3. click Install and restart, and read the binary that comes back')
+        const clicked = await cdp.eval(`(() => {
+          const button = [...document.querySelectorAll('button')].find(b => /Install and restart/.test(b.innerText))
+          if (!button) return 'no button'
+          button.click()
+          return 'clicked'
+        })()`).catch(() => 'clicked (page went away)')
+        check('the Install button was there to click', clicked !== 'no button', clicked)
+        // The app quits, the installer runs, the app comes back. Wait for the
+        // process we launched to exit, then for the installed version to move.
+        for (let i = 0; i < 120 && child.exitCode === null; i += 1) await sleep(1000)
+        check('the app quit to install', child.exitCode !== null, `exit ${String(child.exitCode)}`)
+        const { execFileSync } = await import('node:child_process')
+        const versionOf = () =>
+          execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `(Get-Item (Join-Path $env:LOCALAPPDATA 'Programs\Locust\Locust.exe')).VersionInfo.FileVersion`], { encoding: 'utf8' }).trim()
+        let after = state.version
+        for (let i = 0; i < 90; i += 1) {
+          await sleep(2000)
+          try {
+            after = versionOf()
+          } catch {
+            // mid-install; the exe is being replaced
+          }
+          if (after === newest) break
+        }
+        check('the installed copy is now the newest release', after === newest, `installed ${after}, newest ${newest}`)
+        // The installer relaunches the app; close it so the machine is left as found.
+        try {
+          execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-Process Locust -ErrorAction SilentlyContinue | Stop-Process -Force'], { encoding: 'utf8' })
+        } catch {
+          // nothing to close
+        }
+      }
     } else {
       check('an installed build at the newest release is up to date', /^Up to date\.$/.test(state.line ?? ''), state.line)
+      if (INSTALL) say('       (already newest; nothing to install)')
     }
   }
 } finally {

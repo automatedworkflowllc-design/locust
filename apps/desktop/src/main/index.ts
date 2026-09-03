@@ -14,7 +14,7 @@ import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
@@ -635,9 +635,16 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(APP_INFO_CHANNEL, (event) => {
-      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged, platform: process.platform } as const
+      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged, platform: process.platform, workspaceName: '', workspacePath: '' } as const
       // The version electron-builder stamped, which is the one on the installer.
-      return { name: 'Locust', version: app.getVersion(), packaged: app.isPackaged, platform: process.platform } as const
+      return {
+        name: 'Locust',
+        version: app.getVersion(),
+        packaged: app.isPackaged,
+        platform: process.platform,
+        workspaceName: basename(process.cwd()) || process.cwd(),
+        workspacePath: process.cwd()
+      } as const
     })
 
     // Updates. A packaged build can replace itself; a development build
@@ -648,6 +655,7 @@ if (!ownsSingleInstanceLock) {
       supported: app.isPackaged,
       liveMissionCount: () =>
         codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
+      requestQuit: () => app.quit(),
       onStateChange: (state) => {
         for (const target of BrowserWindow.getAllWindows()) {
           if (!target.isDestroyed()) target.webContents.send(APP_UPDATE_STATE_CHANNEL, state)

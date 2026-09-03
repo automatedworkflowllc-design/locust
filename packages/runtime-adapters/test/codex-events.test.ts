@@ -451,3 +451,27 @@ describe("ledger-writable bounds", () => {
     expect(strings.filter((entry) => entry.includes(NUL))).toEqual([]);
   });
 });
+
+describe("a file_change names its files", () => {
+  it("carries every changed path on the tool event, one per line, since Codex sends no diff", () => {
+    const codex = normalizer();
+    const nl = String.fromCharCode(10);
+    const events = codex.accept({
+      sequence: 1,
+      raw: JSON.stringify({
+        type: "item.completed",
+        item: {
+          id: "item_1",
+          type: "file_change",
+          status: "completed",
+          changes: [
+            { path: "/w/README.md", kind: "update" },
+            { path: "/w/src/prices.ts", kind: "update" },
+          ],
+        },
+      }),
+    });
+    const done = events.find((event) => event.type === "tool.completed");
+    expect((done?.payload as { command?: string }).command).toBe("/w/README.md" + nl + "/w/src/prices.ts");
+  });
+});

@@ -25,6 +25,15 @@ import type { AppUpdateResponse, AppUpdateState } from '../shared/ipc.js'
 /** What an updater must provide. Electron's is injected so this is testable. */
 export interface UpdaterLike {
   autoDownload: boolean
+  /**
+   * Whether the updater runs the installer when the app quits by any route.
+   * Kept ON: the app's own shutdown handler cancels the first quit to flush
+   * the ledger and then quits again itself, and a quitAndInstall() that
+   * relied on its own quit was cancelled with it. Measured 2026-09-03: five
+   * releases sat downloaded in the pending folder while the installed copy
+   * stayed at 0.9.1. With this on, the flush finishes, the real quit runs,
+   * and the installer runs after it.
+   */
   autoInstallOnAppQuit: boolean
   checkForUpdates(): Promise<{ readonly updateInfo: { readonly version: string } } | null>
   downloadUpdate(): Promise<unknown>
@@ -39,6 +48,8 @@ export interface UpdateServiceOptions {
   readonly supported: boolean
   /** Missions running right now; an install waits for them. */
   readonly liveMissionCount: () => number
+  /** Begin the app's own shutdown; the updater installs on the quit that follows. */
+  readonly requestQuit: () => void
   readonly onStateChange?: (state: AppUpdateState) => void
 }
 
@@ -65,7 +76,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
     // on its own -- not even at quit, which would swap the binary under a
     // person who only closed the window.
     options.updater.autoDownload = true
-    options.updater.autoInstallOnAppQuit = false
+    options.updater.autoInstallOnAppQuit = true
     options.updater.on('download-progress', (payload) => {
       const percent = (payload as { readonly percent?: number } | undefined)?.percent
       if (state.phase !== 'downloading' && state.phase !== 'available') return
@@ -152,7 +163,11 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
           }
         }
       }
-      options.updater.quitAndInstall(false, true)
+      // Ask the app to quit. The shutdown handler flushes the ledger and
+      // quits for real; the updater then installs on that quit, because
+      // autoInstallOnAppQuit is on. quitAndInstall() alone was cancelled by
+      // that very handler.
+      options.requestQuit()
       return { ok: true, data: state }
     }
   }

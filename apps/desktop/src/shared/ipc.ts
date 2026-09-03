@@ -93,6 +93,9 @@ export interface AppInfo {
    * window has to know, or it offers modes the host will refuse.
    */
   readonly platform: string
+  /** The folder every mission runs in: the app's working directory, by its last segment. */
+  readonly workspaceName: string
+  readonly workspacePath: string
 }
 export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
@@ -398,7 +401,12 @@ export interface MissionRouteSummary {
  */
 export interface CodexMissionStartData extends MissionRouteSummary {
   /** Set when this run continued an earlier mission's conversation. */
-  readonly followsUp?: { readonly missionId: string; readonly runtimeThreadId: string }
+  /**
+   * The turn this one continues. `runtimeThreadId` is absent when that turn
+   * left no session to resume -- the conversation still continues, the model
+   * just does not carry it.
+   */
+  readonly followsUp?: { readonly missionId: string; readonly runtimeThreadId?: string }
   /** Workroom messages quoted into this mission's prompt, oldest first. */
   readonly peerMessages: readonly PublicPeerMessage[]
   /**
