@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.8 — 2026-09-03
+
+- **A retrying mission stops looking frozen.** Against a dead endpoint Codex
+  retries five times across several minutes and reports each attempt. Every
+  one of those notices arrives before the first tool runs, and the thread
+  dropped everything that arrived that early -- so the mission sat reading
+  "running" with an empty thread while the runtime was working. Setup chatter
+  still stays hidden; trouble with the run itself no longer does.
+- **A mission from another day says which day.** The marker read `started
+  12:25 AM` with no date, which is unambiguous only until tomorrow.
+- **A teammate's card shows the mode they actually ran in.** It printed
+  `read-only` for everyone, whatever they had run in -- a fact the card never
+  had, and simply false once a runtime could edit.
+
 ## 0.15.7 — 2026-09-03
 
 - **Claude's activity rows say what they touched.** They read `Read done`,

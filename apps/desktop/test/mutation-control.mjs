@@ -39,6 +39,27 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: STATUS,
+    name: 'a roster card prints read-only for every teammate again',
+    from: "  if (mode === 'accept-edits') return 'accept edits'",
+    to: "  if (mode === 'accept-edits') return 'ask · read-only'",
+    expect: 'names the mode the teammate actually last ran in'
+  },
+  {
+    file: VIEW,
+    name: 'a run in trouble stays hidden until a tool has run, so a retrying mission looks frozen',
+    from: '        if (!workBegan && !/\\.runtime_error$/.test(event.payload.code)) break',
+    to: '        if (!workBegan) break',
+    expect: 'shows a run in trouble even before any tool has run'
+  },
+  {
+    file: VIEW,
+    name: 'a mission from another day is labelled with a bare time',
+    from: '  if (sameDay) return time',
+    to: '  if (true) return time',
+    expect: 'carries the date once the mission is not from today'
+  },
+  {
     file: VIEW,
     name: 'a target that only arrives with the completion never reaches the row',
     from: "              ...(event.payload.command === undefined || open.name !== open.tool",
@@ -559,7 +580,7 @@ const MUTATIONS = [
   {
     file: VIEW,
     name: 'the runtime’s setup talk lands in the thread',
-    from: '        if (!workBegan) break\n        items.push({',
+    from: '        if (!workBegan && !/\\.runtime_error$/.test(event.payload.code)) break\n        items.push({',
     to: '        items.push({',
     expect: 'keeps a notice raised before any work out of the thread, as setup talk'
   },

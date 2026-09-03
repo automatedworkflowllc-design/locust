@@ -15,6 +15,7 @@ import {
   formatBytes,
   integrationOf,
   missionPhaseView,
+  modeLabel,
   prunePreviewSummary,
   routeRowStatus
 } from '../status.js'
@@ -224,7 +225,9 @@ export function TeammatesScreen({
                   <dt>Missions</dt>
                   <dd className="lc-mono">{owned}</dd>
                   <dt>Mode</dt>
-                  <dd className="lc-mono">read-only</dd>
+                  {/* Their own last mode, not a constant. This printed
+                    * `read-only` for every teammate regardless. */}
+                  <dd className="lc-mono">{modeLabel(teammate.route?.mode)}</dd>
                 </dl>
                 <div className="lc-rostercard__actions">
                   <button type="button" className="lc-rostercard__edit" onClick={() => onEdit(teammate)}>

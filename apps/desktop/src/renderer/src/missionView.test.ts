@@ -8,6 +8,7 @@ import {
   activityEntries,
   failureMessage,
   relativePath,
+  startedLabel,
   shellCommandText,
   activitySummary,
   assistantMessages,
@@ -125,6 +126,35 @@ describe('how a path is written in a row', () => {
 
   it('leaves a path that is already relative alone', () => {
     expect(relativePath('src/streak.js', WS)).toBe('src/streak.js')
+  })
+})
+
+describe('when a mission says it began', () => {
+  const now = new Date('2026-09-03T14:00:00')
+
+  it('shows the bare time for a mission started today', () => {
+    // The locale decides 24-hour or AM/PM; what matters is that no date rides
+    // along on a mission from today.
+    const label = startedLabel('2026-09-03T09:15:00', now)
+    expect(label).toContain('09:15')
+    expect(label).not.toMatch(/Sep|\d{4}/)
+  })
+
+  it('carries the date once the mission is not from today', () => {
+    // `started 12:25 AM` with no date is unambiguous only while the app stays
+    // open; the next morning a mission from last night reads as recent.
+    const label = startedLabel('2026-09-02T23:25:00', now)
+    expect(label).toContain('Sep')
+    expect(label).toContain('2')
+  })
+
+  it('adds the year only when the mission is from another one', () => {
+    expect(startedLabel('2025-12-31T23:59:00', now)).toContain('2025')
+    expect(startedLabel('2026-09-01T10:00:00', now)).not.toContain('2026')
+  })
+
+  it('says nothing for a timestamp it cannot read', () => {
+    expect(startedLabel('not a date', now)).toBeUndefined()
   })
 })
 
@@ -567,6 +597,31 @@ describe('runtime notices in the thread', () => {
     // Codex's real shape: the turn opens, THEN the setup notice arrives, and
     // only after that does anything run. The turn opening is not work.
     expect(buildThread([step, notice('d1', 3)], { running: false }).some((item) => item.type === 'diagnostic')).toBe(false)
+  })
+
+  it('shows a run in trouble even before any tool has run', () => {
+    // MEASURED 2026-09-03: against a dead endpoint Codex retries five times
+    // over several minutes, reporting `Reconnecting... 2/5` each time. Those
+    // arrive before the first tool, so the gate above dropped every one and
+    // the mission sat reading "running" with an empty thread.
+    const reconnect = {
+      id: 'd9',
+      runId: 'run_1',
+      missionId: 'mission_1',
+      sequence: 1,
+      type: 'adapter.diagnostic',
+      occurredAt: at,
+      sourceAdapter: 'codex',
+      payload: {
+        level: 'error',
+        code: 'codex.runtime_error',
+        message: 'Reconnecting... 2/5',
+        terminal: false,
+        evidence: { redacted: true }
+      }
+    } as unknown as NormalizedRuntimeEvent
+    const items = buildThread([step, reconnect], { running: true })
+    expect(items.some((item) => item.type === 'diagnostic' && /Reconnecting/.test(item.message))).toBe(true)
   })
 
   it('shows a notice raised while the work was under way', () => {

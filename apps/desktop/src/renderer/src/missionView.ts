@@ -184,6 +184,31 @@ export function clockTime(iso: string): string {
   return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
 }
 
+/**
+ * When a mission began, said the way a person needs it.
+ *
+ * The marker read `started 12:25 AM` with no date, which is unambiguous for
+ * exactly as long as you keep the app open. Come back the next morning and a
+ * mission from last night reads as one from five minutes ago. Today keeps the
+ * bare time; anything older carries its date.
+ */
+export function startedLabel(iso: string, now: Date = new Date()): string | undefined {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return undefined
+  const time = at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const sameDay =
+    at.getFullYear() === now.getFullYear()
+    && at.getMonth() === now.getMonth()
+    && at.getDate() === now.getDate()
+  if (sameDay) return time
+  const day = at.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(at.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' })
+  })
+  return `${day}, ${time}`
+}
+
 /** Whole minutes between two instants, floored, never negative. */
 export function minutesBetween(from: string, to: string): number {
   const start = new Date(from).getTime()
@@ -522,7 +547,22 @@ export function buildThread(
         break
       }
       case 'adapter.diagnostic': {
-        if (!workBegan) break
+        // Before any tool runs, only trouble with the RUN ITSELF gets through.
+        //
+        // The gate exists because Codex comments on its own setup the moment a
+        // turn opens ("Skill descriptions were shortened...") and that belongs
+        // nowhere near the top of a thread. But it was swallowing something
+        // very different: MEASURED 2026-09-03, against a dead endpoint Codex
+        // retries five times across five to eight minutes and reports each
+        // attempt as `Reconnecting... 2/5`. Those arrive before the first tool
+        // too, so every one was dropped and the mission sat reading "running"
+        // with nothing on screen at all. The run was working; the thread
+        // refused to say so.
+        //
+        // The adapters already separate these: a `*.runtime_error` is the run
+        // in trouble, an item diagnostic is the provider talking about one
+        // item. Only the former is worth interrupting an empty thread for.
+        if (!workBegan && !/\.runtime_error$/.test(event.payload.code)) break
         items.push({
           key: event.id,
           type: 'diagnostic',

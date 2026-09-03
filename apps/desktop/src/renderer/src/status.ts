@@ -465,6 +465,21 @@ export function modeRunsOn(
 }
 
 /** The modes a route can actually run, in the order they are offered. */
+/**
+ * A mission mode in the words the composer uses for it.
+ *
+ * The roster card printed the literal string `read-only` for every teammate,
+ * whatever mode they had actually run in -- a fact the card never had. Once a
+ * runtime could edit, that line was simply false. MEASURED 2026-09-03 while
+ * reading the Teammates screen.
+ */
+export function modeLabel(mode: MissionMode | undefined): string {
+  if (mode === 'accept-edits') return 'accept edits'
+  if (mode === 'approve-each') return 'approve each action'
+  if (mode === 'ask') return 'ask · read-only'
+  return 'not set yet'
+}
+
 export function modesFor(runtime: MissionRuntimeId, platform?: string): readonly MissionMode[] {
   return (['ask', 'accept-edits', 'approve-each'] as const).filter((mode) =>
     modeRunsOn(mode, runtime, platform)

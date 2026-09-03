@@ -5,6 +5,7 @@ import {
   checkpointLabel,
   collapseConversations,
   listedAsMission,
+  modeLabel,
   routeSearchText,
   facePresenceFor,
   connectedRuntimeCount,
@@ -44,6 +45,20 @@ function runtime(overrides: Partial<PublicRuntimeStatus> = {}): PublicRuntimeSta
     ...overrides
   }
 }
+
+describe('the mode a roster card shows', () => {
+  it('names the mode the teammate actually last ran in', () => {
+    // The card printed the literal string `read-only` for every teammate,
+    // whatever they had run in -- false the moment a runtime could edit.
+    expect(modeLabel('accept-edits')).toBe('accept edits')
+    expect(modeLabel('approve-each')).toBe('approve each action')
+    expect(modeLabel('ask')).toContain('read-only')
+  })
+
+  it('says a teammate who has never run has no mode yet, rather than inventing one', () => {
+    expect(modeLabel(undefined)).toBe('not set yet')
+  })
+})
 
 describe('what belongs in the mission list', () => {
   it('keeps a run that has a mission id, settled or not', () => {

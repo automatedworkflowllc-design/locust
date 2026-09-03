@@ -51,6 +51,7 @@ import {
   resolvedModelNames,
   resumableSessionOf,
   rootMission,
+  startedLabel,
   stitchedHandoff,
   typedPrompt
 } from './missionView.js'
@@ -1519,10 +1520,7 @@ export default function App(): ReactElement {
                 startedAt={
                   liveRun.restoredMission === undefined
                     ? undefined
-                    : new Date(liveRun.restoredMission.createdAt).toLocaleTimeString(undefined, {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
+                    : startedLabel(liveRun.restoredMission.createdAt)
                 }
               />
             </>
