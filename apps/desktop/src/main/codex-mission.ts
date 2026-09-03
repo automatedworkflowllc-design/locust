@@ -547,11 +547,19 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const createdAt = now().toISOString()
         const routeId = runtime === 'claude' ? 'claude' : runtime === 'opencode' ? 'opencode' : runtime === 'copilot' ? 'copilot' : 'codex'
         // ONE definition of what this run may touch, computed before anything
-        // records it. Codex and Cursor take a sandbox; Claude Code does not, so a Claude run is
-        // restricted whatever the composer asked for -- and the durable header
-        // and the receipt must agree about that, or the ledger claims a run
-        // could write when it could not.
-        const effectiveSandbox: MissionSandbox = runtime === 'claude' ? 'read-only' : sandbox
+        // records it, so the durable header and the receipt agree with what
+        // the process was actually allowed to do.
+        //
+        // Claude Code used to be forced to `read-only` here on the reading
+        // that it takes no sandbox. It takes a different one: the permission
+        // mode and the tool list, which `createClaudePrintCommand` now sets
+        // from this very value -- `acceptEdits` with the editing tools named,
+        // or `plan` with a reading list. MEASURED 2026-09-03: while this line
+        // still forced read-only, a mission started in Accept edits recorded
+        // `sandbox: read-only`, ran in plan mode, and its Write came back
+        // "No such tool available: Write. Write is disabled for this
+        // session." The composer offered a mode the run never received.
+        const effectiveSandbox: MissionSandbox = sandbox
         // Cursor's plan mode asks a model not to write; only its sandbox stops
         // one, and that sandbox exists on macOS and Linux alone. Measured on
         // Windows: a plan-mode run told firmly to write created two files.
@@ -629,7 +637,16 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             })
           }
           return runtime === 'claude'
-            ? createClaudePrintCommand(executable, { workspacePath: options.workspacePath, ...choice })
+            ? createClaudePrintCommand(executable, {
+                workspacePath: options.workspacePath,
+                // Claude's containment IS this value: it picks the permission
+                // mode and the tool list. Leaving it out defaulted every
+                // Claude run to read-only, so a mission started in Accept
+                // edits ran in plan mode and answered "I don't have a Write
+                // tool available in this session" -- measured 2026-09-03.
+                sandbox: effectiveSandbox,
+                ...choice
+              })
             : runtime === 'cursor'
               ? createCursorPrintCommand(executable, {
                   workspacePath: options.workspacePath,

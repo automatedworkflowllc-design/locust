@@ -709,19 +709,47 @@ describe('runtime selection', () => {
     expect(args).not.toContain('--sandbox')
   })
 
-  it('reports a Claude run as read-only even when edits were requested', async () => {
-    // Only Codex takes a sandbox flag today, so accept-edits cannot widen a
-    // Claude run -- and the receipt must say what actually happened.
+  it('records a Claude run that may edit as one that may edit', async () => {
+    // This asserted the opposite until 2026-09-03, on the reading that only
+    // Codex takes a sandbox. Claude Code takes a different one -- the
+    // permission mode and tool list, set from this very value -- and forcing
+    // read-only here meant a mission started in Accept edits ran in plan mode
+    // and had its Write refused with "Write is disabled for this session".
+    // The receipt has to say what the run was actually allowed to do.
     const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
     const { service } = serviceWith([codexRuntime(), claudeRuntime()], fakeLedger({ createMission }))
 
     const response = await service.start('Edit something.', 'claude', 'accept-edits', {}, () => undefined)
 
-    expect(response).toMatchObject({ ok: true, data: { sandbox: 'read-only' } })
+    expect(response).toMatchObject({ ok: true, data: { sandbox: 'workspace-write' } })
     expect(createMission).toHaveBeenCalledWith(expect.objectContaining({
       runtime: 'claude',
-      sandbox: 'read-only'
+      sandbox: 'workspace-write'
     }))
+  })
+
+  it('sends Claude the mode it was started in, not a default', async () => {
+    // The receipt said workspace-write while the argv still said plan, because
+    // the Claude branch built its command without a sandbox at all. The run
+    // answered "I don't have a Write tool available in this session" while the
+    // ledger claimed it could edit -- the ledger and the process disagreeing
+    // is the one thing a receipt must never do.
+    const { service, start } = serviceWith([codexRuntime(), claudeRuntime()], fakeLedger())
+
+    await service.start('Edit something.', 'claude', 'accept-edits', {}, () => undefined)
+
+    const spec = start.mock.calls[0]?.[0] as { args: string[] }
+    expect(spec.args.join(' ')).toContain('--permission-mode acceptEdits')
+    expect(spec.args.join(' ')).toContain('Edit,Write,NotebookEdit,Bash')
+  })
+
+  it('still records a Claude run asked to read as read-only', async () => {
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const { service } = serviceWith([codexRuntime(), claudeRuntime()], fakeLedger({ createMission }))
+
+    const response = await service.start('Read something.', 'claude', 'ask', {}, () => undefined)
+
+    expect(response).toMatchObject({ ok: true, data: { sandbox: 'read-only' } })
   })
 
   it('refuses a runtime whose event stream it cannot read yet, by name, recording nothing', async () => {

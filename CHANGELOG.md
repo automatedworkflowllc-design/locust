@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.6 — 2026-09-03
+
+- **Claude Code really can edit now.** 0.15.5 said it could and it could not:
+  two places still forced read-only before the mode reached the process. The
+  host coerced Claude's sandbox to `read-only` outright, and the Claude branch
+  built its command without passing a sandbox at all. The receipt claimed
+  `workspace-write` while the run was in plan mode and answered "I don't have
+  a Write tool available in this session" -- the record and the process
+  disagreeing, which is the one thing a receipt must never do. Verified from
+  the ledger this time: a mission recorded `runtime: claude` and
+  `sandbox: workspace-write`, and Claude created a new file.
+  **0.15.5's note that this was "verified live" was wrong** -- the run used to
+  verify it was Codex, not Claude. Corrected here rather than quietly.
+
 ## 0.15.5 — 2026-09-03
 
 - **Claude Code can edit now, like it does in its own app.** It was launched
