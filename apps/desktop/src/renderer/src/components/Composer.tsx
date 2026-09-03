@@ -8,7 +8,13 @@ import type {
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
-import { handoffAvailability, handoffTitle, runtimeIsUsable } from '../status.js'
+import {
+  handoffAvailability,
+  handoffTitle,
+  modeRunsOn,
+  modeUnavailableReason,
+  runtimeIsUsable
+} from '../status.js'
 import mark from '../assets/locust-mark.svg'
 import { Icon } from './Icon.js'
 import { RoutePicker } from './RoutePicker.js'
@@ -50,6 +56,8 @@ export interface ComposerProps {
   readonly models: readonly PublicModel[]
   /** What each route's model resolved to last time, keyed `runtime:model`. */
   readonly resolvedModels: ReadonlyMap<string, string>
+  /** Routes this person has run, newest first, as `runtime:model`. */
+  readonly recentRoutes: readonly string[]
   readonly effort: string | undefined
   readonly onEffortChange: (effort: string | undefined) => void
   readonly swarm: boolean
@@ -99,6 +107,7 @@ export function Composer({
   onRouteChange,
   models,
   resolvedModels,
+  recentRoutes,
   effort,
   onEffortChange,
   swarm,
@@ -116,6 +125,11 @@ export function Composer({
   const [pickerOpen, setPickerOpen] = useState(false)
   const [effortOpen, setEffortOpen] = useState(false)
 
+  // A mode the chosen route cannot run is not the mode a mission would start
+  // in, so it is not the mode the control shows either. Switching route used
+  // to leave "Approve each action" selected against a runtime that refuses
+  // it, and every message was then rejected before it began.
+  const effectiveMode: MissionMode = modeRunsOn(mode, route.runtime) ? mode : 'ask'
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   const selectedReady = selected !== undefined && runtimeIsUsable(selected)
   // Three runtimes can own a mission. Readiness still comes from discovery,
@@ -236,25 +250,30 @@ export function Composer({
               <span className="lc-control__anchor">
                 {modeOpen && (
                   <div className="lc-menu" role="menu" aria-label="Permission mode">
-                    {MODES.map((option) => (
-                      <button
-                        key={option.mode}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={mode === option.mode}
-                        className="lc-menu__item"
-                        onClick={() => {
-                          onModeChange(option.mode)
-                          setModeOpen(false)
-                        }}
-                      >
-                        <span className="lc-menu__text">
-                          <span className="lc-menu__name">{option.name}</span>
-                          <span className="lc-menu__desc">{option.consequence}</span>
-                        </span>
-                        {mode === option.mode && <Icon name="check" size={13} />}
-                      </button>
-                    ))}
+                    {MODES.map((option) => {
+                      const unavailable = modeUnavailableReason(option.mode, route.runtime)
+                      return (
+                        <button
+                          key={option.mode}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={mode === option.mode}
+                          className="lc-menu__item"
+                          disabled={unavailable !== undefined}
+                          title={unavailable}
+                          onClick={() => {
+                            onModeChange(option.mode)
+                            setModeOpen(false)
+                          }}
+                        >
+                          <span className="lc-menu__text">
+                            <span className="lc-menu__name">{option.name}</span>
+                            <span className="lc-menu__desc">{unavailable ?? option.consequence}</span>
+                          </span>
+                          {mode === option.mode && <Icon name="check" size={13} />}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
                 <button
@@ -265,7 +284,7 @@ export function Composer({
                   disabled={running}
                   onClick={() => setModeOpen(!modeOpen)}
                 >
-                  {MODES.find((option) => option.mode === mode)?.name ?? 'Ask'}
+                  {MODES.find((option) => option.mode === effectiveMode)?.name ?? 'Ask'}
                 </button>
               </span>
               <button type="button" className="lc-control" disabled title="Attachments and slash commands are not built yet">
@@ -279,6 +298,7 @@ export function Composer({
                     runtimes={runtimes}
                     models={models}
                     resolvedModels={resolvedModels}
+                    recentRoutes={recentRoutes}
                     active={running ? activeChoice : route}
                     onSelect={(choice) => {
                       setPickerOpen(false)

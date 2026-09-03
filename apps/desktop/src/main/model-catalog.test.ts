@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 
-import { claudeModelsFrom, createModelCatalog, cursorModelsFrom, parseModels } from './model-catalog.js'
+import {
+  claudeModelsFrom,
+  createModelCatalog,
+  cursorModelsFrom,
+  parseModels,
+  splitCursorModelId
+} from './model-catalog.js'
 import type { AppServerProcess } from './app-server-mission.js'
 
 const REAL_RESULT = {
@@ -188,22 +194,48 @@ describe('Cursor models from what its CLI listed', () => {
     ...(hints === undefined ? {} : { modelHints: hints })
   })
 
-  it('offers each listed model under Cursor by its own name, with no effort levels', () => {
+  it('collapses the efforts Cursor lists as separate models into one model with efforts', () => {
+    // A real account lists 217 of these. They are not 217 models: they are a
+    // few dozen, each listed once per effort, which turned the picker into a
+    // wall nobody could read.
     const models = cursorModelsFrom([
       cursor('ready', {
-        aliases: ['composer-2.5', 'cursor-grok-4.6-high'],
+        aliases: [],
         efforts: [],
         models: [
           { id: 'composer-2.5', displayName: 'Composer 2.5' },
-          { id: 'cursor-grok-4.6-high', displayName: 'Cursor Grok 4.6' }
+          { id: 'composer-2.5-fast', displayName: 'Composer 2.5 Fast' },
+          { id: 'cursor-grok-4.6-low', displayName: 'Cursor Grok 4.6 Low' },
+          { id: 'cursor-grok-4.6-high', displayName: 'Cursor Grok 4.6' },
+          { id: 'cursor-grok-4.6-high-fast', displayName: 'Cursor Grok 4.6 Fast' }
         ]
       })
     ])
-    expect(models.map((model) => [model.id, model.displayName])).toEqual([
-      ['composer-2.5', 'Composer 2.5'],
-      ['cursor-grok-4.6-high', 'Cursor Grok 4.6']
-    ])
-    expect(models.every((model) => model.runtime === 'cursor' && model.supportedEfforts.length === 0)).toBe(true)
+
+    expect(models.map((model) => model.id)).toEqual(['composer-2.5', 'cursor-grok-4.6-low'])
+    const composer = models[0]
+    expect(composer?.displayName).toBe('Composer 2.5')
+    expect(composer?.supportedEfforts).toEqual(['fast'])
+    expect(composer?.variants).toEqual({ fast: 'composer-2.5-fast' })
+
+    // Grok appears only through its variants, so the family name is the id
+    // rather than one variant's label, and every effort is offered.
+    const grok = models[1]
+    expect(grok?.displayName).toBe('cursor-grok-4.6')
+    expect(grok?.supportedEfforts).toEqual(['low', 'high', 'high-fast'])
+    expect(grok?.variants).toEqual({
+      low: 'cursor-grok-4.6-low',
+      high: 'cursor-grok-4.6-high',
+      'high-fast': 'cursor-grok-4.6-high-fast'
+    })
+  })
+
+  it('splits an id into the model and the effort, longest suffix first', () => {
+    expect(splitCursorModelId('cursor-grok-4.6-high-fast')).toEqual({ family: 'cursor-grok-4.6', effort: 'high-fast' })
+    expect(splitCursorModelId('gpt-5.3-codex-xhigh')).toEqual({ family: 'gpt-5.3-codex', effort: 'xhigh' })
+    expect(splitCursorModelId('auto')).toEqual({ family: 'auto' })
+    // A name that IS an effort word must not be split into nothing.
+    expect(splitCursorModelId('fast')).toEqual({ family: 'fast' })
   })
 
   it('offers nothing for a Cursor that is signed out, or that listed nothing', () => {

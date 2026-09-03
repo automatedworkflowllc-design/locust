@@ -3,7 +3,14 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
-import { capRouteRows, integrationOf, ROUTE_GROUP_LIMIT, routeRowStatus, routeRowTag } from '../status.js'
+import {
+  capRouteRows,
+  integrationOf,
+  orderRouteRows,
+  ROUTE_GROUP_LIMIT,
+  routeRowStatus,
+  routeRowTag
+} from '../status.js'
 import type { RouteTag } from '../status.js'
 
 export interface RouteChoice {
@@ -32,7 +39,8 @@ function buildRows(
   runtimes: readonly PublicRuntimeStatus[],
   models: readonly PublicModel[],
   active: RouteChoice,
-  resolved: ReadonlyMap<string, string>
+  resolved: ReadonlyMap<string, string>,
+  recent: readonly string[]
 ): readonly RouteRow[] {
   const rows: RouteRow[] = []
   for (const runtime of runtimes) {
@@ -77,7 +85,8 @@ function buildRows(
       })
     }
   }
-  return rows
+  // The rows this person has actually run come first within their runtime.
+  return orderRouteRows(rows, recent)
 }
 
 export function RoutePicker({
@@ -85,6 +94,7 @@ export function RoutePicker({
   models,
   resolvedModels,
   active,
+  recentRoutes,
   onSelect,
   onClose,
   notice
@@ -93,6 +103,8 @@ export function RoutePicker({
   readonly models: readonly PublicModel[]
   /** What each route's model resolved to last time, keyed `runtime:model`. */
   readonly resolvedModels: ReadonlyMap<string, string>
+  /** Routes this person has run, newest first, as `runtime:model`. */
+  readonly recentRoutes: readonly string[]
   readonly active: RouteChoice
   readonly onSelect: (choice: RouteChoice) => void
   readonly onClose: () => void
@@ -111,8 +123,8 @@ export function RoutePicker({
   }, [])
 
   const rows = useMemo(
-    () => buildRows(runtimes, models, active, resolvedModels),
-    [runtimes, models, active, resolvedModels]
+    () => buildRows(runtimes, models, active, resolvedModels, recentRoutes),
+    [runtimes, models, active, resolvedModels, recentRoutes]
   )
   const needle = query.trim().toLowerCase()
   const matched = useMemo(

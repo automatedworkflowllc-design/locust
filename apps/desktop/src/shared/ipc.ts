@@ -254,6 +254,13 @@ export type MissionMode = 'ask' | 'accept-edits' | 'approve-each'
  */
 export interface PublicModel {
   readonly id: string
+  /**
+   * The concrete model id for each effort, when a runtime encodes effort in
+   * the id rather than taking a flag. Cursor lists `cursor-grok-4.6-high` and
+   * `cursor-grok-4.6-low` as separate models; they are one model here, and
+   * this says which id each effort means.
+   */
+  readonly variants?: Readonly<Record<string, string>>
   /** The runtime this model belongs to; a model is never offered under another. */
   readonly runtime: MissionRuntimeId
   readonly displayName: string

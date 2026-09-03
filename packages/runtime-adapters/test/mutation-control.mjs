@@ -27,6 +27,34 @@ const CURSOR_EVENTS = join(ROOT, 'src', 'cursor-events.ts')
 
 const MUTATIONS = [
   {
+    file: CURSOR_EVENTS,
+    name: 'a truncated final message takes back text already delivered',
+    from: '      if (bounded.length < alreadyDelivered) return [];',
+    to: '      void alreadyDelivered;',
+    expect: 'never takes back text the fragments already delivered'
+  },
+  {
+    file: CURSOR_EVENTS,
+    name: 'a turn opens and never closes',
+    from: '          emit("step.completed", { stepKind: "turn", evidence }),\n',
+    to: '',
+    expect: 'also closes, so nothing is left looking unfinished'
+  },
+  {
+    file: DISCOVERY,
+    name: 'a model list is read from stdout alone',
+    from: '        `${modelsOutcome.result.stdout}\\n${modelsOutcome.result.stderr}`,',
+    to: '        modelsOutcome.result.stdout,',
+    expect: 'reads a model list the CLI printed on stderr, and says so when it cannot read one'
+  },
+  {
+    file: DISCOVERY,
+    name: 'a model list nobody could read is passed off as no models',
+    from: '      if (modelHints === undefined) {',
+    to: '      if (false) {',
+    expect: 'says a model list it cannot read is unreadable, rather than leaving the picker silently empty'
+  },
+  {
     file: COMMANDS,
     name: 'a Codex resume is given flags that subcommand rejects',
     from: '        "-c",\n        `sandbox_mode=${sandboxArgument(options.sandbox)}`,',

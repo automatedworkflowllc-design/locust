@@ -33,11 +33,32 @@ function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: 
 const FILTERS = ['All', 'Running', 'Interrupted', 'Completed'] as const
 type Filter = (typeof FILTERS)[number]
 
-function matchesFilter(mission: PublicRecoveredMission, filter: Filter): boolean {
+/**
+ * A mission's phase for this screen, which has to account for the ones the
+ * host is running RIGHT NOW.
+ *
+ * The ledger's own phase cannot say "running": a mission with no terminal
+ * receipt reads as `interrupted`, which is the correct reading of a file but
+ * the wrong word for a run that is still going. The shell knows which ids are
+ * live, so it answers that here.
+ */
+export function missionRowPhase(
+  mission: PublicRecoveredMission,
+  runningMissionIds: ReadonlySet<string>
+): PublicRecoveredMission['phase'] | 'running' {
+  return runningMissionIds.has(mission.missionId) ? 'running' : mission.phase
+}
+
+export function matchesFilter(
+  mission: PublicRecoveredMission,
+  filter: Filter,
+  runningMissionIds: ReadonlySet<string>
+): boolean {
   if (filter === 'All') return true
-  if (filter === 'Running') return false
-  if (filter === 'Interrupted') return mission.phase === 'interrupted'
-  return mission.phase === 'completed'
+  const phase = missionRowPhase(mission, runningMissionIds)
+  if (filter === 'Running') return phase === 'running'
+  if (filter === 'Interrupted') return phase === 'interrupted'
+  return phase === 'completed'
 }
 
 /**
@@ -51,15 +72,26 @@ export function MissionsScreen({
   missions,
   teammates,
   missionOwners,
+  runningMissionIds,
+  titleOf,
   onOpen
 }: {
   readonly missions: readonly PublicRecoveredMission[]
   readonly teammates: readonly PublicTeammate[]
   readonly missionOwners: Readonly<Record<string, string>>
+  /** The missions the host is running now; the ledger cannot know this. */
+  readonly runningMissionIds: ReadonlySet<string>
+  /**
+   * What to call a mission. A continuation's own prompt can be the host's
+   * briefing, and the sidebar already names such a row by the words a person
+   * typed; this screen used to print the briefing in the same column as every
+   * real instruction.
+   */
+  readonly titleOf: (mission: PublicRecoveredMission) => string
   readonly onOpen: (missionId: string) => void
 }): ReactElement {
   const [filter, setFilter] = useState<Filter>('All')
-  const shown = missions.filter((mission) => matchesFilter(mission, filter))
+  const shown = missions.filter((mission) => matchesFilter(mission, filter, runningMissionIds))
   const withIssues = missions.filter((mission) => mission.integrityIssueCount > 0).length
 
   return (
@@ -109,7 +141,7 @@ export function MissionsScreen({
                   onClick={() => onOpen(mission.missionId)}
                 >
                   <span className={`lc-rail__dot lc-tone-${view.tone}`} />
-                  <span className="lc-missionrow__title">{mission.prompt}</span>
+                  <span className="lc-missionrow__title">{titleOf(mission)}</span>
                   <span className="lc-missionrow__owner">{owner?.name ?? '—'}</span>
                   <span className="lc-missionrow__route lc-mono">
                     {mission.runtime} / {mission.model}

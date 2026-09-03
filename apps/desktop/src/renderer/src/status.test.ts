@@ -11,6 +11,9 @@ import {
   ledgerVerificationLabel,
   missionPhaseView,
   capRouteRows,
+  modeRunsOn,
+  modeUnavailableReason,
+  orderRouteRows,
   integrationOf,
   RUNTIME_INTEGRATION,
   formatBytes,
@@ -403,5 +406,51 @@ describe('a teammate with no work of their own', () => {
       roleLabel: 'Code & Migrations'
     })
     expect(view.status).toBe('working')
+  })
+})
+
+describe('which modes a route can actually run', () => {
+  it('keeps per-action approvals to the runtime that can stop and ask', () => {
+    expect(modeRunsOn('approve-each', 'codex')).toBe(true)
+    expect(modeRunsOn('approve-each', 'cursor')).toBe(false)
+    expect(modeRunsOn('approve-each', 'claude')).toBe(false)
+  })
+
+  it('lets every runtime read and edit', () => {
+    for (const runtime of ['codex', 'claude', 'cursor'] as const) {
+      expect(modeRunsOn('ask', runtime)).toBe(true)
+      expect(modeRunsOn('accept-edits', runtime)).toBe(true)
+    }
+  })
+
+  it('names the runtime when it says no, so the menu can explain itself', () => {
+    expect(modeUnavailableReason('approve-each', 'cursor')).toContain('Cursor Agent')
+    expect(modeUnavailableReason('ask', 'cursor')).toBeUndefined()
+  })
+})
+
+describe('the order rows are offered in', () => {
+  const row = (key: string, group: string) => ({ key, group })
+
+  it('puts what this person has run first, newest first, inside its own runtime', () => {
+    const rows = [
+      row('cursor:a', 'CURSOR'),
+      row('cursor:b', 'CURSOR'),
+      row('cursor:c', 'CURSOR')
+    ]
+    const ordered = orderRouteRows(rows, ['cursor:c', 'cursor:b'])
+    expect(ordered.map((entry) => entry.key)).toEqual(['cursor:c', 'cursor:b', 'cursor:a'])
+  })
+
+  it('never moves a row out of its runtime', () => {
+    const rows = [row('codex:a', 'CODEX'), row('cursor:b', 'CURSOR'), row('codex:c', 'CODEX')]
+    const ordered = orderRouteRows(rows, ['cursor:b', 'codex:c'])
+    expect(ordered.map((entry) => entry.group)).toEqual(['CODEX', 'CODEX', 'CURSOR'])
+    expect(ordered.map((entry) => entry.key)).toEqual(['codex:c', 'codex:a', 'cursor:b'])
+  })
+
+  it('leaves the runtime order alone when nothing has been run', () => {
+    const rows = [row('codex:a', 'CODEX'), row('cursor:b', 'CURSOR')]
+    expect(orderRouteRows(rows, []).map((entry) => entry.key)).toEqual(['codex:a', 'cursor:b'])
   })
 })

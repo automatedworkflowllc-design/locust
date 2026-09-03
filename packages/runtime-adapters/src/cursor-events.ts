@@ -184,6 +184,8 @@ export function createCursorEventNormalizer(
   /** Which message the next fragment belongs to; closed by a complete message. */
   let messageIndex = 0;
   let thinking = false;
+  /** How much of each message the fragments have already put in the ledger. */
+  const deliveredLength = new Map<string, number>();
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -240,7 +242,12 @@ export function createCursorEventNormalizer(
 
     if (type === "system") {
       if (stringValue(parsed.subtype) !== "init") {
-        return [emit("step.started", { stepKind: "turn", evidence })];
+        // Opened AND closed. A step that only ever starts leaves the thread
+        // showing work in progress that nothing ever finishes.
+        return [
+          emit("step.started", { stepKind: "turn", evidence }),
+          emit("step.completed", { stepKind: "turn", evidence }),
+        ];
       }
       runtimeThreadId = identityValue(parsed.session_id);
       return [
@@ -261,6 +268,7 @@ export function createCursorEventNormalizer(
       if (text.length === 0) return [];
       const itemId = `msg_${String(messageIndex)}`;
       if (isCursorMessageFragment(parsed)) {
+        deliveredLength.set(itemId, (deliveredLength.get(itemId) ?? 0) + text.length);
         return [
           emit("message.delta", {
             itemId,
@@ -275,11 +283,20 @@ export function createCursorEventNormalizer(
       // when partial output is on, so it REPLACES the item -- and closes it,
       // so the next message does not overwrite this one.
       messageIndex += 1;
+      const bounded = boundedMessageText(text);
+      // A REPLACE that is shorter than what the fragments already delivered
+      // would take text back out of the ledger. Each fragment is bounded on
+      // its own and so is never truncated, but the whole message can be: a
+      // long answer ended up SHORTER on disk than it had been a moment
+      // earlier. When that happens the fragments stand, and the item is
+      // closed without rewriting it.
+      const alreadyDelivered = deliveredLength.get(itemId) ?? 0;
+      if (bounded.length < alreadyDelivered) return [];
       return [
         emit("message.delta", {
           itemId,
           operation: "replace",
-          text: boundedMessageText(text),
+          text: bounded,
           final: true,
           evidence,
         }),

@@ -1,4 +1,5 @@
-import type { PublicRecoveredMission, PublicRuntimeStatus } from '../../shared/ipc.js'
+import type { MissionMode, PublicRecoveredMission, PublicRuntimeStatus } from '../../shared/ipc.js'
+import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
 /**
  * Every status word the shell shows, derived from discovery and mission state
@@ -397,4 +398,61 @@ export function prunePreviewSummary(preview: {
   }
   if (preview.keptAsRunning.length > 0) kept.push(`${missions(preview.keptAsRunning.length)} kept because they are running`)
   return `Delete ${missions(preview.deleted.length)} for good${kept.length === 0 ? '' : `, with ${kept.join(' and ')}`}.`
+}
+
+/**
+ * Whether a permission mode can actually run on a runtime.
+ *
+ * Per-action approvals need a runtime that can stop and ask, which today is
+ * the Codex app-server alone. Offering the mode anyway meant a person could
+ * sit in it with another route selected and have every message refused before
+ * it started -- which is exactly what happened to the first person to try it.
+ * A control that cannot do its job says so instead.
+ */
+export function modeRunsOn(mode: MissionMode, runtime: MissionRuntimeId): boolean {
+  return mode !== 'approve-each' || runtime === 'codex'
+}
+
+/** Why a mode is unavailable here, for the menu to say out loud. */
+export function modeUnavailableReason(
+  mode: MissionMode,
+  runtime: MissionRuntimeId
+): string | undefined {
+  if (modeRunsOn(mode, runtime)) return undefined
+  return `Codex CLI only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
+}
+
+function runtimeLabel(runtime: MissionRuntimeId): string {
+  if (runtime === 'claude') return 'Claude Code'
+  if (runtime === 'cursor') return 'Cursor Agent'
+  if (runtime === 'gemini') return 'Gemini CLI'
+  return 'Codex CLI'
+}
+
+/**
+ * Order the picker's rows: the ones this person has run, newest first, then
+ * everything else in the order the runtime listed them.
+ *
+ * With one runtime listing dozens of models, the row someone wants is almost
+ * always one they have used before. Ordering by that is honest -- it comes
+ * from their own ledger -- and it costs nothing when the history is empty.
+ */
+export function orderRouteRows<TRow extends { readonly key: string; readonly group: string }>(
+  rows: readonly TRow[],
+  recent: readonly string[]
+): readonly TRow[] {
+  const rank = new Map(recent.map((key, index) => [key, index]))
+  const groups: string[] = []
+  for (const row of rows) if (!groups.includes(row.group)) groups.push(row.group)
+  return [...rows].sort((left, right) => {
+    // Groups keep the order discovery gave them; only rows move.
+    const byGroup = groups.indexOf(left.group) - groups.indexOf(right.group)
+    if (byGroup !== 0) return byGroup
+    const leftRank = rank.get(left.key)
+    const rightRank = rank.get(right.key)
+    if (leftRank !== undefined && rightRank !== undefined) return leftRank - rightRank
+    if (leftRank !== undefined) return -1
+    if (rightRank !== undefined) return 1
+    return 0
+  })
 }

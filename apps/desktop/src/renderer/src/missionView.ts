@@ -702,3 +702,27 @@ export function typedPrompt(
   }
   return current.prompt
 }
+
+/**
+ * The routes this person has actually run, newest first, as `runtime:model`.
+ *
+ * The picker puts these at the top. It is a claim the app can back -- these
+ * missions are in the ledger -- where "popular" or "recommended" would be a
+ * judgement nothing here measured. A model whose id encodes an effort is
+ * counted under the id that ran, which is the one they would pick again.
+ */
+export function recentlyUsedRoutes(
+  missions: readonly PublicRecoveredMission[]
+): readonly string[] {
+  const seen = new Map<string, number>()
+  for (const mission of missions) {
+    const key = `${mission.runtime}:${mission.model}`
+    const at = Date.parse(mission.lastUpdatedAt)
+    const stamp = Number.isFinite(at) ? at : 0
+    const held = seen.get(key)
+    if (held === undefined || stamp > held) seen.set(key, stamp)
+  }
+  return [...seen.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([key]) => key)
+}

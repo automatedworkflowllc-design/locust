@@ -91,21 +91,84 @@ export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   }))
 }
 
+/** The effort suffixes Cursor encodes in a model id, longest first. */
+const CURSOR_EFFORTS = [
+  'xhigh-fast',
+  'high-fast',
+  'medium-fast',
+  'low-fast',
+  'xhigh',
+  'high',
+  'medium',
+  'low',
+  'fast'
+] as const
+
 /**
- * Cursor Agent's models, from what `--list-models` printed at discovery. The
- * ids carry the effort (`cursor-grok-4.6-high`), so no effort list is offered
- * and the builder refuses one; the name beside each id is Cursor's own.
+ * Split `cursor-grok-4.6-high-fast` into the model and the effort.
+ *
+ * Cursor lists every effort of every model as its own entry -- 217 of them on
+ * a real account -- which turned the picker into a wall nobody could read.
+ * They are one model with an effort each, which is what the picker already
+ * knows how to show, and what the effort control exists for.
+ */
+export function splitCursorModelId(id: string): { readonly family: string; readonly effort?: string } {
+  for (const effort of CURSOR_EFFORTS) {
+    const suffix = `-${effort}`
+    if (id.endsWith(suffix) && id.length > suffix.length) {
+      return { family: id.slice(0, -suffix.length), effort }
+    }
+  }
+  return { family: id }
+}
+
+/**
+ * Cursor Agent's models, grouped. Each row is one model; its efforts are the
+ * variants Cursor actually listed, and `variants` says which concrete id each
+ * one means, because the effort travels inside the id rather than as a flag.
  */
 export function cursorModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonly PublicModel[] {
   const cursor = runtimes.find((entry) => entry.id === 'cursor')
-  const models = cursor?.modelHints?.models
-  if (cursor?.readiness !== 'ready' || models === undefined) return []
-  return models.map((model) => ({
-    id: model.id,
-    runtime: 'cursor',
-    displayName: model.displayName,
+  const listed = cursor?.modelHints?.models
+  if (cursor?.readiness !== 'ready' || listed === undefined) return []
+
+  const families = new Map<string, {
+    displayName: string
+    defaultId: string
+    readonly variants: Record<string, string>
+    readonly efforts: string[]
+  }>()
+  for (const model of listed) {
+    const { family, effort } = splitCursorModelId(model.id)
+    const held = families.get(family) ?? {
+      // Until a plain variant turns up, the first one seen stands in, so a
+      // family that only ever appears with an effort is still selectable.
+      displayName: model.displayName,
+      defaultId: model.id,
+      variants: {},
+      efforts: []
+    }
+    if (effort === undefined) {
+      held.displayName = model.displayName
+      held.defaultId = model.id
+    } else {
+      held.variants[effort] = model.id
+      if (!held.efforts.includes(effort)) held.efforts.push(effort)
+    }
+    families.set(family, held)
+  }
+
+  return [...families.entries()].map(([family, held]) => ({
+    id: held.defaultId,
+    runtime: 'cursor' as const,
+    // A family known only through its variants has no name of its own; the
+    // id is then the honest label rather than one variant's name.
+    displayName: held.efforts.length > 0 && held.defaultId !== family
+      ? family
+      : held.displayName,
     description: 'Listed by cursor-agent --list-models',
-    supportedEfforts: []
+    supportedEfforts: held.efforts,
+    ...(Object.keys(held.variants).length === 0 ? {} : { variants: held.variants })
   }))
 }
 

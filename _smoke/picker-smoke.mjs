@@ -157,7 +157,14 @@ try {
   const cursor = groups.find((group) => /cursor/i.test(group.group))
   const hidden = Number(/(\d+) more/.exec(cursor?.more ?? '')?.[1] ?? NaN)
   check('the long group says how many it holds back', cursor !== undefined && / more models · type to search them$/.test(cursor.more ?? ''), cursor?.more ?? '(no cursor group)')
-  check('shown plus withheld is the whole list', Number.isFinite(hidden) && hidden + (cursor?.rows.length ?? 0) > 200, `${hidden} + ${cursor?.rows.length ?? 0}`)
+  // Not a fixed total: the runtime's list changes, and the models it lists as
+  // separate efforts are now collapsed into one row each. What must hold is
+  // that the group shows exactly the cap and accounts for the rest.
+  check(
+    'shown plus withheld is the whole group',
+    Number.isFinite(hidden) && hidden > 0 && (cursor?.rows.length ?? 0) === LIMIT,
+    `${hidden} withheld, ${cursor?.rows.length ?? 0} shown`
+  )
   check('a group with nothing withheld says nothing', groups.filter((g) => g.more !== null).every((g) => g.rows.length === LIMIT))
 
   say('3. a runtime listed after the long one is still on screen')
@@ -184,7 +191,7 @@ try {
   const searched = await cdp.eval(`(async () => {
     const input = document.querySelector('.lc-picker__input')
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    setter.call(input, 'grok')
+    setter.call(input, 'a')
     input.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 400))
     const list = document.querySelector('.lc-picker__list')
@@ -194,7 +201,7 @@ try {
     })
   })()`)
   const searchState = JSON.parse(searched)
-  say(`       "grok": ${searchState.rows} rows, ${searchState.more} cap lines`)
+  say(`       "a": ${searchState.rows} rows, ${searchState.more} cap lines`)
   check('a search shows more than the cap', searchState.rows > LIMIT, searched)
   check('and states no cap of its own', searchState.more === 0, searched)
 } finally {

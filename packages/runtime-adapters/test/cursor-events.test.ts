@@ -237,3 +237,139 @@ describe("how a Cursor run ends", () => {
     expect(events[0]).toMatchObject({ type: "adapter.diagnostic", payload: { code: "cursor.malformed_record" } });
   });
 });
+
+describe("a message longer than the ledger's bound", () => {
+  const init = JSON.stringify({ type: "system", subtype: "init", session_id: "s1", model: "Auto" });
+  const long = "x".repeat(20_000);
+
+  it("never takes back text the fragments already delivered", () => {
+    // Each fragment is bounded on its own, so fragments are never truncated;
+    // the complete message can be. Replacing with the truncated copy left the
+    // ledger holding LESS than it held a moment earlier.
+    const cursor = normalizer();
+    const events: NormalizedRuntimeEvent[] = [];
+    let sequence = 0;
+    const accept = (value: unknown) => {
+      sequence += 1;
+      events.push(...cursor.accept({ sequence, raw: JSON.stringify(value) }));
+    };
+    accept(JSON.parse(init));
+    for (const piece of [long.slice(0, 10_000), long.slice(10_000)]) {
+      accept({
+        type: "assistant",
+        timestamp_ms: sequence,
+        message: { role: "assistant", content: [{ type: "text", text: piece }] }
+      });
+    }
+    accept({
+      type: "assistant",
+      model_call_id: "m1",
+      message: { role: "assistant", content: [{ type: "text", text: long }] }
+    });
+
+    const built = [...messages(events).values()];
+    expect(built[0]?.length).toBe(20_000);
+  });
+
+  it("still replaces when the complete message is no shorter", () => {
+    const cursor = normalizer();
+    const events: NormalizedRuntimeEvent[] = [];
+    events.push(...cursor.accept({ sequence: 1, raw: init }));
+    events.push(...cursor.accept({
+      sequence: 2,
+      raw: JSON.stringify({
+        type: "assistant",
+        timestamp_ms: 2,
+        message: { role: "assistant", content: [{ type: "text", text: "Peb" }] }
+      })
+    }));
+    events.push(...cursor.accept({
+      sequence: 3,
+      raw: JSON.stringify({
+        type: "assistant",
+        model_call_id: "m1",
+        message: { role: "assistant", content: [{ type: "text", text: "Pebble is a timer." }] }
+      })
+    }));
+    expect([...messages(events).values()]).toEqual(["Pebble is a timer."]);
+  });
+});
+
+describe("a turn that opens", () => {
+  it("also closes, so nothing is left looking unfinished", () => {
+    const cursor = normalizer();
+    const events = cursor.accept({
+      sequence: 1,
+      raw: JSON.stringify({ type: "system", subtype: "compact" })
+    });
+    expect(events.map((event) => event.type)).toEqual(["step.started", "step.completed"]);
+  });
+});
+
+describe("a message longer than the ledger's bound", () => {
+  const init = JSON.stringify({ type: "system", subtype: "init", session_id: "s1", model: "Auto" });
+  const long = "x".repeat(20_000);
+
+  it("never takes back text the fragments already delivered", () => {
+    // Each fragment is bounded on its own, so fragments are never truncated;
+    // the complete message can be. Replacing with the truncated copy left the
+    // ledger holding LESS than it held a moment earlier.
+    const cursor = normalizer();
+    const events: NormalizedRuntimeEvent[] = [];
+    let sequence = 0;
+    const accept = (value: unknown) => {
+      sequence += 1;
+      events.push(...cursor.accept({ sequence, raw: JSON.stringify(value) }));
+    };
+    accept(JSON.parse(init));
+    for (const piece of [long.slice(0, 10_000), long.slice(10_000)]) {
+      accept({
+        type: "assistant",
+        timestamp_ms: sequence,
+        message: { role: "assistant", content: [{ type: "text", text: piece }] }
+      });
+    }
+    accept({
+      type: "assistant",
+      model_call_id: "m1",
+      message: { role: "assistant", content: [{ type: "text", text: long }] }
+    });
+
+    const built = [...messages(events).values()];
+    expect(built[0]?.length).toBe(20_000);
+  });
+
+  it("still replaces when the complete message is no shorter", () => {
+    const cursor = normalizer();
+    const events: NormalizedRuntimeEvent[] = [];
+    events.push(...cursor.accept({ sequence: 1, raw: init }));
+    events.push(...cursor.accept({
+      sequence: 2,
+      raw: JSON.stringify({
+        type: "assistant",
+        timestamp_ms: 2,
+        message: { role: "assistant", content: [{ type: "text", text: "Peb" }] }
+      })
+    }));
+    events.push(...cursor.accept({
+      sequence: 3,
+      raw: JSON.stringify({
+        type: "assistant",
+        model_call_id: "m1",
+        message: { role: "assistant", content: [{ type: "text", text: "Pebble is a timer." }] }
+      })
+    }));
+    expect([...messages(events).values()]).toEqual(["Pebble is a timer."]);
+  });
+});
+
+describe("a turn that opens", () => {
+  it("also closes, so nothing is left looking unfinished", () => {
+    const cursor = normalizer();
+    const events = cursor.accept({
+      sequence: 1,
+      raw: JSON.stringify({ type: "system", subtype: "compact" })
+    });
+    expect(events.map((event) => event.type)).toEqual(["step.started", "step.completed"]);
+  });
+});

@@ -196,6 +196,40 @@ describe("installed runtime discovery", () => {
     expect(cursor?.modelHints?.efforts).toEqual([]);
   });
 
+  it("reads a model list the CLI printed on stderr, and says so when it cannot read one", async () => {
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "version") return { exitCode: 0, stdout: "2026.08.31-4057e58", stderr: "" };
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: CURSOR_HELP, stderr: "" };
+        // The one model listing this repo has captured arrived on stderr.
+        if (command.purpose === "models") return { exitCode: 0, stdout: "", stderr: CURSOR_MODELS };
+        return { exitCode: 0, stdout: "Logged in as someone@example.com", stderr: "" };
+      },
+    };
+    const [cursor] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("cursor-agent") }))
+      .filter((entry) => entry.id === "cursor");
+    expect(cursor?.modelHints?.models?.map((model) => model.id)).toEqual([
+      "auto",
+      "cursor-grok-4.6-high",
+      "composer-2.5",
+    ]);
+  });
+
+  it("says a model list it cannot read is unreadable, rather than leaving the picker silently empty", async () => {
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "version") return { exitCode: 0, stdout: "2026.08.31-4057e58", stderr: "" };
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: CURSOR_HELP, stderr: "" };
+        if (command.purpose === "models") return { exitCode: 0, stdout: "a completely different layout", stderr: "" };
+        return { exitCode: 0, stdout: "Logged in as someone@example.com", stderr: "" };
+      },
+    };
+    const [cursor] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("cursor-agent") }))
+      .filter((entry) => entry.id === "cursor");
+    expect(cursor?.modelHints).toBeUndefined();
+    expect(cursor?.diagnostics.some((issue) => /does not recognise/.test(issue.message))).toBe(true);
+  });
+
   it("reads no models from a Cursor that is signed out, and none from a list it cannot read", async () => {
     expect(parseCursorModelList("Error: Authentication required.")).toBeUndefined();
     expect(parseCursorModelList("")).toBeUndefined();

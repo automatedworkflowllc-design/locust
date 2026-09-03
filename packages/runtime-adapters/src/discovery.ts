@@ -297,7 +297,26 @@ async function discoverOne(
   // signed-out command prints an error instead of a list.
   if (definition.modelsArgs !== undefined && readiness === "ready") {
     const modelsOutcome = await runProbe(runner, executable, "models", definition.modelsArgs);
-    if (succeeded(modelsOutcome)) modelHints = parseCursorModelList(modelsOutcome.result.stdout);
+    if (succeeded(modelsOutcome)) {
+      // Both streams, like every other probe in this file: the one model
+      // listing this repo has actually captured arrived on stderr.
+      modelHints = parseCursorModelList(
+        `${modelsOutcome.result.stdout}\n${modelsOutcome.result.stderr}`,
+      );
+      if (modelHints === undefined) {
+        // A list that could not be read is not an empty list. Saying nothing
+        // here would leave the picker offering one runtime no models with no
+        // hint that anything went wrong.
+        diagnostics.push(
+          diagnostic({
+            code: "capability-probe-failed",
+            severity: "warning",
+            message: `${definition.displayName} listed its models in a form this build does not recognise.`,
+            resolution: "Its account default is still offered; update Locust if the list stays empty.",
+          }),
+        );
+      }
+    }
   }
 
   const base: RuntimeDiscovery = {

@@ -43,13 +43,14 @@ import { AgentAvatar } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
 import {
   conversationTurns,
+  recentlyUsedRoutes,
   resolvedModelNames,
   resumableSessionOf,
   rootMission,
   stitchedHandoff,
   typedPrompt
 } from './missionView.js'
-import { shortMissionId } from './status.js'
+import { modeRunsOn, shortMissionId } from './status.js'
 
 /**
  * The Locust shell.
@@ -258,6 +259,26 @@ export function swarmEffortFor(
     models.find((model) => model.id === modelId && (runtime === undefined || model.runtime === runtime))
       ?.supportedEfforts ?? []
   return supported[supported.length - 1]
+}
+
+/**
+ * Which model a mission actually starts on.
+ *
+ * Some runtimes take an effort as a flag; Cursor encodes it in the model id
+ * instead, and lists every combination as its own model. The picker shows one
+ * row per model and lets the effort control choose among them, so the effort
+ * has to be turned back into the id it names -- sending the family's default
+ * with an effort beside it would quietly run a different model than the one
+ * on screen.
+ */
+export function chosenModelId(
+  models: readonly PublicModel[],
+  modelId: string,
+  effort: string | undefined
+): string {
+  if (effort === undefined) return modelId
+  const variants = models.find((model) => model.id === modelId)?.variants
+  return variants?.[effort] ?? modelId
 }
 
 function missionTitle(prompt: string): string {
@@ -606,9 +627,15 @@ export default function App(): ReactElement {
     try {
       const response = await bridge.startCodexMission({
         prompt,
-        mode,
+        // The mode the composer SHOWS, which is not always the mode last
+        // chosen: a mode the route cannot run is not one a mission can start
+        // in, and sending it anyway is how every message came back refused.
+        mode: modeRunsOn(mode, route.runtime) ? mode : 'ask',
         runtime: route.runtime,
-        model: route.model,
+        // The concrete model. When a runtime encodes effort in the id, the
+        // chosen effort names a different model, and sending the family's
+        // default with an effort beside it would run the wrong one.
+        model: chosenModelId(models, route.model, swarmEffortFor(models, route.model, swarm, effort, route.runtime)),
         ...(teammateId === undefined ? {} : { teammateId }),
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
         // Only sent when the chosen model advertised it; the composer cannot
@@ -841,6 +868,7 @@ export default function App(): ReactElement {
   )
   // What each route's model turned out to be, from missions that already ran.
   const resolvedModels = useMemo(() => resolvedModelNames(history), [history])
+  const recentRoutes = useMemo(() => recentlyUsedRoutes(history), [history])
 
   // Re-read history whenever ANY run settles, so a finished mission stays in
   // the sidebar after the next one starts instead of vanishing until restart.
@@ -1009,6 +1037,14 @@ export default function App(): ReactElement {
           {screen === 'missions' ? (
             <MissionsScreen
               missions={history}
+              runningMissionIds={
+                new Set(
+                  [...runs.values()]
+                    .filter((run) => liveRunIsActive(run) && run.data !== undefined)
+                    .map((run) => run.data!.missionId)
+                )
+              }
+              titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
               teammates={teammates}
               missionOwners={missionOwners}
               onOpen={(missionId) => {
@@ -1193,6 +1229,7 @@ export default function App(): ReactElement {
             }}
             models={models}
             resolvedModels={resolvedModels}
+            recentRoutes={recentRoutes}
             effort={effort}
             onEffortChange={setEffort}
             swarm={swarm}

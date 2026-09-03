@@ -30,8 +30,44 @@ const HISTORY = join(ROOT, 'src', 'main', 'mission-history.ts')
 const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 const ROSTER = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const UPDATES = join(ROOT, 'src', 'main', 'updates.ts')
+const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: STATUS,
+    name: 'a mode the route cannot run is still offered',
+    from: "  return mode !== 'approve-each' || runtime === 'codex'",
+    to: '  return true',
+    expect: 'keeps per-action approvals to the runtime that can stop and ask'
+  },
+  {
+    file: STATUS,
+    name: 'the picker forgets what this person has actually run',
+    from: '    if (leftRank !== undefined) return -1',
+    to: '    if (leftRank !== undefined) return 0',
+    expect: 'puts what this person has run first, newest first, inside its own runtime'
+  },
+  {
+    file: STATUS,
+    name: 'ordering moves rows out of their own runtime',
+    from: '    const byGroup = groups.indexOf(left.group) - groups.indexOf(right.group)',
+    to: '    const byGroup = 0',
+    expect: 'never moves a row out of its runtime'
+  },
+  {
+    file: CATALOG_MODELS,
+    name: 'every effort Cursor lists is offered as its own model again',
+    from: '    if (effort === undefined) {',
+    to: '    if (true) {',
+    expect: 'collapses the efforts Cursor lists as separate models into one model with efforts'
+  },
+  {
+    file: CATALOG_MODELS,
+    name: 'an id is split on the shortest effort suffix, losing the rest',
+    from: "  'xhigh-fast',\n  'high-fast',\n  'medium-fast',\n  'low-fast',\n",
+    to: '',
+    expect: 'splits an id into the model and the effort, longest suffix first'
+  },
   {
     file: UPDATES,
     name: 'an update installs itself while a mission is running',
@@ -680,7 +716,8 @@ const originals = new Map([
   [HISTORY, readFileSync(HISTORY, 'utf8')],
   [RUNTIMES, readFileSync(RUNTIMES, 'utf8')],
   [ROSTER, readFileSync(ROSTER, 'utf8')],
-  [UPDATES, readFileSync(UPDATES, 'utf8')]
+  [UPDATES, readFileSync(UPDATES, 'utf8')],
+  [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')]
 ])
 let problems = 0
 
