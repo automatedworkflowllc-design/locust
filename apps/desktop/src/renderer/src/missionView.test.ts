@@ -641,3 +641,35 @@ describe('which words a turn shows', () => {
     expect(typedPrompt(orphan, index([orphan]))).toBe('You are continuing a mission…')
   })
 })
+
+describe('the routes this person has actually run', () => {
+  const ran = (missionId: string, runtime: string, model: string, lastUpdatedAt: string) => ({
+    missionId,
+    runId: `run_${missionId}`,
+    prompt: 'x',
+    runtime,
+    model,
+    resolvedRouteId: `${runtime}-account:default`,
+    cliVersion: null,
+    sandbox: 'read-only',
+    phase: 'completed',
+    createdAt: lastUpdatedAt,
+    lastUpdatedAt,
+    integrityIssueCount: 0,
+    events: [],
+    peerMessages: []
+  } as unknown as PublicRecoveredMission)
+
+  it('lists each route once, newest first', () => {
+    const routes = recentlyUsedRoutes([
+      ran('m1', 'codex', 'gpt-5', '2026-09-01T00:00:00.000Z'),
+      ran('m2', 'cursor', 'composer-2.5', '2026-09-02T00:00:00.000Z'),
+      ran('m3', 'codex', 'gpt-5', '2026-09-03T00:00:00.000Z')
+    ])
+    expect(routes).toEqual(['codex:gpt-5', 'cursor:composer-2.5'])
+  })
+
+  it('says nothing when nothing has been run', () => {
+    expect(recentlyUsedRoutes([])).toEqual([])
+  })
+})

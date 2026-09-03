@@ -430,29 +430,62 @@ function runtimeLabel(runtime: MissionRuntimeId): string {
 }
 
 /**
- * Order the picker's rows: the ones this person has run, newest first, then
- * everything else in the order the runtime listed them.
+ * The model families worth surfacing first when nothing else distinguishes
+ * them.
  *
- * With one runtime listing dozens of models, the row someone wants is almost
- * always one they have used before. Ordering by that is honest -- it comes
- * from their own ledger -- and it costs nothing when the history is empty.
+ * This is a CURATED JUDGEMENT, not a measurement: nothing in this app counts
+ * how often a model is used anywhere but on this machine. It exists because a
+ * runtime that lists seventy models alphabetically buries the ones most
+ * people came for. It only ever affects ORDER -- no row is hidden, nothing is
+ * labelled "best", and a model absent from this list is offered exactly as
+ * readily as one on it.
  */
-export function orderRouteRows<TRow extends { readonly key: string; readonly group: string }>(
+const FLAGSHIP_MODELS: readonly RegExp[] = [
+  /^auto$/i,
+  /grok-4\.6/i,
+  /composer-2/i,
+  /opus-5/i,
+  /fable/i,
+  /sonnet-5/i,
+  /gpt-5\.3-codex/i,
+  /gemini-3/i,
+  /gpt-5\.6/i
+]
+
+/** Where a model sits in the curated list, or nowhere. */
+export function flagshipRank(modelId: string): number | undefined {
+  const index = FLAGSHIP_MODELS.findIndex((pattern) => pattern.test(modelId))
+  return index === -1 ? undefined : index
+}
+
+/**
+ * Order the picker's rows within each runtime: what this person has actually
+ * run, newest first; then the flagship families; then everything else, in the
+ * order the runtime listed them.
+ *
+ * The first rule comes from their own ledger and is a claim the app can back.
+ * The second is a judgement, and is second for that reason.
+ */
+export function orderRouteRows<TRow extends { readonly key: string; readonly group: string; readonly model?: string }>(
   rows: readonly TRow[],
   recent: readonly string[]
 ): readonly TRow[] {
   const rank = new Map(recent.map((key, index) => [key, index]))
   const groups: string[] = []
   for (const row of rows) if (!groups.includes(row.group)) groups.push(row.group)
+  const score = (row: TRow): number => {
+    const used = rank.get(row.key)
+    if (used !== undefined) return used
+    const flagship = flagshipRank(row.model ?? row.key)
+    // Everything used sorts above everything merely notable, which sorts
+    // above the rest; the offsets keep those three bands apart whatever the
+    // counts are.
+    return flagship === undefined ? 2_000_000 : 1_000_000 + flagship
+  }
   return [...rows].sort((left, right) => {
     // Groups keep the order discovery gave them; only rows move.
     const byGroup = groups.indexOf(left.group) - groups.indexOf(right.group)
     if (byGroup !== 0) return byGroup
-    const leftRank = rank.get(left.key)
-    const rightRank = rank.get(right.key)
-    if (leftRank !== undefined && rightRank !== undefined) return leftRank - rightRank
-    if (leftRank !== undefined) return -1
-    if (rightRank !== undefined) return 1
-    return 0
+    return score(left) - score(right)
   })
 }

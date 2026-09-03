@@ -85,7 +85,8 @@ function buildRows(
       })
     }
   }
-  // The rows this person has actually run come first within their runtime.
+  // Within each runtime: what this person has run, then the flagship
+  // families, then the rest as the runtime listed them.
   return orderRouteRows(rows, recent)
 }
 

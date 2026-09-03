@@ -13,6 +13,7 @@ import {
   capRouteRows,
   modeRunsOn,
   modeUnavailableReason,
+  flagshipRank,
   orderRouteRows,
   integrationOf,
   RUNTIME_INTEGRATION,
@@ -452,5 +453,38 @@ describe('the order rows are offered in', () => {
   it('leaves the runtime order alone when nothing has been run', () => {
     const rows = [row('codex:a', 'CODEX'), row('cursor:b', 'CURSOR')]
     expect(orderRouteRows(rows, []).map((entry) => entry.key)).toEqual(['codex:a', 'cursor:b'])
+  })
+})
+
+describe('the curated shortlist', () => {
+  it('puts the flagship families above the rest when nothing has been run', () => {
+    const rows = [
+      { key: 'cursor:aardvark-1', group: 'CURSOR', model: 'aardvark-1' },
+      { key: 'cursor:cursor-grok-4.6', group: 'CURSOR', model: 'cursor-grok-4.6' },
+      { key: 'cursor:zebra-9', group: 'CURSOR', model: 'zebra-9' }
+    ]
+    expect(orderRouteRows(rows, []).map((row) => row.model)).toEqual([
+      'cursor-grok-4.6',
+      'aardvark-1',
+      'zebra-9'
+    ])
+  })
+
+  it('still puts what this person ran above the curated list', () => {
+    // Their own ledger outranks my judgement about what people want.
+    const rows = [
+      { key: 'cursor:cursor-grok-4.6', group: 'CURSOR', model: 'cursor-grok-4.6' },
+      { key: 'cursor:zebra-9', group: 'CURSOR', model: 'zebra-9' }
+    ]
+    expect(orderRouteRows(rows, ['cursor:zebra-9']).map((row) => row.model)).toEqual([
+      'zebra-9',
+      'cursor-grok-4.6'
+    ])
+  })
+
+  it('hides nothing: a model on no list is still offered', () => {
+    const rows = [{ key: 'cursor:obscure', group: 'CURSOR', model: 'obscure' }]
+    expect(orderRouteRows(rows, [])).toHaveLength(1)
+    expect(flagshipRank('obscure')).toBeUndefined()
   })
 })

@@ -35,6 +35,27 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const MUTATIONS = [
   {
     file: STATUS,
+    name: 'the curated shortlist outranks what this person actually ran',
+    from: '    if (used !== undefined) return used',
+    to: '    if (used !== undefined) return 3_000_000 + used',
+    expect: 'still puts what this person ran above the curated list'
+  },
+  {
+    file: STATUS,
+    name: 'the curated shortlist does nothing at all',
+    from: '    return flagship === undefined ? 2_000_000 : 1_000_000 + flagship',
+    to: '    void flagship; return 2_000_000',
+    expect: 'puts the flagship families above the rest when nothing has been run'
+  },
+  {
+    file: VIEW,
+    name: 'the picker forgets the order routes were last run in',
+    from: '    .sort((left, right) => right[1] - left[1])',
+    to: '    .sort((left, right) => left[1] - right[1])',
+    expect: 'lists each route once, newest first'
+  },
+  {
+    file: STATUS,
     name: 'a mode the route cannot run is still offered',
     from: "  return mode !== 'approve-each' || runtime === 'codex'",
     to: '  return true',
@@ -43,8 +64,8 @@ const MUTATIONS = [
   {
     file: STATUS,
     name: 'the picker forgets what this person has actually run',
-    from: '    if (leftRank !== undefined) return -1',
-    to: '    if (leftRank !== undefined) return 0',
+    from: '    const used = rank.get(row.key)',
+    to: '    const used = undefined',
     expect: 'puts what this person has run first, newest first, inside its own runtime'
   },
   {
