@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.14.0 — 2026-09-03
+
+- **What a run cost.** The receipt, the inspector and a new column on Missions
+  say what each run cost in the runtime's own unit: dollars for Claude Code,
+  premium requests for Copilot, tokens in and out for the rest, with a total
+  across priced runs. A runtime that reports nothing is shown as exactly that,
+  never as free.
+- **Approvals find you.** If a teammate needs an approval while Locust is
+  behind another window, you get a notification naming the teammate and the
+  action; clicking it brings Locust forward. Nothing else notifies.
+- **Custom roles mean something.** Pick Custom and say what the teammate does.
+  Those words show beside their name and are what their runtime is told.
+
 ## 0.13.0 — 2026-09-03
 
 - **Antigravity, as an experimental route.** If Google's Antigravity is open
