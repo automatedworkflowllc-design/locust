@@ -380,12 +380,12 @@ describe("Cursor Agent and Gemini CLI commands", () => {
   });
 
   it("prefers a shim on PATH over an executable in a guessed install directory", async () => {
-    // MEASURED 2026-09-03. Codex CLI was updated from npm to a working
-    // 0.153.0 -- which installs as `codex.cmd` and `codex.ps1`, never an
-    // `.exe` -- while a stale 0.151.0-alpha sat under %LOCALAPPDATA%\OpenAI
-    // whose backend endpoint had been retired. The locator swept every
-    // directory for an `.exe` before it swept any for a `.ps1`, so it kept
-    // running the stale one and fixing the runtime did not fix the app.
+    // MEASURED 2026-09-03 against the locator itself. Codex CLI installed
+    // from npm lands as `codex.cmd` and `codex.ps1`, never an `.exe`, while
+    // an older copy sat under %LOCALAPPDATA%\OpenAI with a real `.exe`. The
+    // locator swept every directory for an `.exe` before it swept any for a
+    // `.ps1`, so the older copy won and installing a newer runtime changed
+    // nothing about what actually ran.
     const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
     const LOCAL = "C:\\Users\\x\\AppData\\Local";
     const powershell = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";

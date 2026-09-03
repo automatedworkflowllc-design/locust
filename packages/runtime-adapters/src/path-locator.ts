@@ -204,12 +204,12 @@ export function createPathExecutableLocator(
       // the `.exe` sweep ran over the guessed directories before the `.ps1`
       // sweep ran over PATH, and a runtime installed from npm -- which lands
       // as `codex.cmd` plus `codex.ps1`, never a `.exe` -- lost to whatever
-      // sat in the guessed location. Concretely: Codex CLI was updated to a
-      // working 0.153.0 from npm while Locust kept running the stale
-      // 0.151.0-alpha it found under %LOCALAPPDATA%\OpenAI\Codex, whose
-      // backend endpoint had been retired and answered every mission with a
-      // 404. Fixing the runtime did not fix the app, which is the worst shape
-      // a bug like this can take.
+      // sat in the guessed location. Concretely: with a working Codex 0.153.0
+      // installed from npm and on PATH, this returned the older
+      // 0.151.0-alpha under %LOCALAPPDATA%\OpenAI\Codex instead -- measured
+      // against this function directly, not inferred. So installing or
+      // updating a runtime could have no effect on what the app actually ran,
+      // with nothing on screen naming which copy it chose.
       //
       // So each location set is resolved COMPLETELY before the next is tried.
       const resolveWithin = async (
