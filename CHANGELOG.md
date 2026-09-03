@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.5 — 2026-09-03
+
+- **Claude Code can edit now, like it does in its own app.** It was launched
+  `--permission-mode plan` with a three-tool reading list on every mission,
+  whatever the composer asked, so it could only ever read. Accept edits now
+  sends `--permission-mode acceptEdits` with the editing tools and Bash named,
+  and a Claude mission can change files and run the tests it just changed.
+  Read-only keeps exactly what it had. Both stay `--restricted`, so your own
+  Claude settings never leak into a mission and the tool list is explicit
+  either way.
+  (0.15.4 had "fixed" the composer-says-one-thing-header-says-another problem
+  by removing Accept edits from Claude Code. That was the wrong repair for the
+  right complaint: the mode now decides the arguments.)
+- **The sidebar footer stopped wrapping.** Adding the Missions and Teammates
+  buttons squeezed the connection count until "6" sat above "connected".
+
 ## 0.15.4 — 2026-09-03
 
 The rest of what using the app turned up. Notes in

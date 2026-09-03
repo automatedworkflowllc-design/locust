@@ -413,6 +413,22 @@ export function createClaudePrintCommand(
   executable: ExecutableLaunch,
   options: RuntimeCommandOptions,
 ): RuntimeCommandSpec {
+  // Claude Code CAN edit; this used to be hard-coded so it never did.
+  //
+  // MEASURED 2026-09-03 off `claude --help`: `--permission-mode` takes
+  // `acceptEdits` among others, and `--restricted` does NOT block editing --
+  // it removes the command-running tools and WebFetch *unless --tools names
+  // them*, and ignores user/project settings files. So `--restricted` is
+  // worth keeping in both modes (the tool list stays explicit and auditable,
+  // and none of the person's own Claude settings leak into a mission); what
+  // held every Claude run read-only was `--permission-mode plan` with a
+  // three-tool list, sent whatever the composer asked for. The composer said
+  // "Accept edits" and the header said "read-only" on the same screen.
+  //
+  // Now the mode decides. Read-only keeps exactly what it had. Accept edits
+  // names the file-editing tools and Bash, so a Claude mission can do the
+  // same work a Codex one can -- edit, then run the tests it just changed.
+  const editing = sandboxArgument(options.sandbox) !== "read-only";
   const args = [
     "--restricted",
     "--print",
@@ -421,9 +437,9 @@ export function createClaudePrintCommand(
     "--verbose",
     "--include-partial-messages",
     "--permission-mode",
-    "plan",
+    editing ? "acceptEdits" : "plan",
     "--tools",
-    "Read,Glob,Grep",
+    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash" : "Read,Glob,Grep",
     "--disallowedTools",
     "mcp__*",
   ];

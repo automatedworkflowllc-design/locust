@@ -151,10 +151,13 @@ export function Composer({
       : selectedReady
         ? mode === 'approve-each' && route.runtime === 'codex'
           ? 'Describe a mission. You will be asked before each action…'
-          : mode === 'accept-edits' && route.runtime !== 'claude'
+          : mode === 'accept-edits'
           ? 'Describe a mission. It may edit files in this workspace…'
-          : route.runtime === 'claude'
-            ? 'Describe a mission. Claude Code runs read-only for now…'
+          : // Claude Code used to be read-only whatever the mode said, and
+            // this line said so. It can edit now, so the mode -- not the
+            // runtime -- decides what the box promises.
+            route.runtime === 'claude'
+            ? 'Describe a mission. Claude Code will read, not write, in this mode…'
             : teammateName !== undefined
               ? `Message ${teammateName}, or describe a mission…`
               : 'Describe a mission for this workspace…'

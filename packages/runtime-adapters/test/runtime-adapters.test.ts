@@ -71,6 +71,35 @@ describe("runtime command specifications", () => {
     expect(claude.args).not.toContain("--dangerously-skip-permissions");
   });
 
+  it("holds a read-only Claude mission in plan mode with a reading tool list", () => {
+    const claude = createClaudePrintCommand(
+      { ...nativeExecutable, commandName: "claude" },
+      { workspacePath: "C:\\workspace", sandbox:"read-only" },
+    );
+    expect(claude.args).toContain("--restricted");
+    expect(claude.args.join(" ")).toContain("--permission-mode plan");
+    expect(claude.args.join(" ")).toContain("--tools Read,Glob,Grep ");
+    expect(claude.args.join(" ")).not.toContain("Edit");
+  });
+
+  it("lets a Claude mission that may edit actually edit, and run what it changed", () => {
+    // MEASURED 2026-09-03 off `claude --help`: --permission-mode takes
+    // acceptEdits, and --restricted removes the command-running tools only
+    // when --tools does not name them. Before this, every Claude run was sent
+    // `--permission-mode plan` whatever the composer asked, so "Accept edits"
+    // in the composer sat beside "read-only" in the mission header.
+    const claude = createClaudePrintCommand(
+      { ...nativeExecutable, commandName: "claude" },
+      { workspacePath: "C:\\workspace", sandbox:"workspace-write" },
+    );
+    expect(claude.args.join(" ")).toContain("--permission-mode acceptEdits");
+    expect(claude.args.join(" ")).toContain("Edit,Write,NotebookEdit,Bash");
+    // Still restricted: the person's own Claude settings stay out of a
+    // mission, and the tool list is explicit either way.
+    expect(claude.args).toContain("--restricted");
+    expect(claude.args.join(" ")).toContain("--disallowedTools mcp__*");
+  });
+
   it("rejects permission bypass arguments", () => {
     expect(() => assertSafeRuntimeCommand({
       runtime: "codex",

@@ -452,10 +452,7 @@ describe('a route whose read-only mode is not real here', () => {
 
   it('leaves the other runtimes alone on every platform', () => {
     expect(modesFor('codex', 'win32')).toEqual(['ask', 'accept-edits', 'approve-each'])
-    // Claude Code launches --restricted with a read-only tool list every
-    // time, so Ask is the only mode it can honour. Offering Accept edits put
-    // "Accept edits" in the composer and "read-only" in the header at once.
-    expect(modesFor('claude', 'win32')).toEqual(['ask'])
+    expect(modesFor('claude', 'win32')).toEqual(['ask', 'accept-edits'])
   })
 
   it('says why, in the words a person needs to act on', () => {
@@ -470,15 +467,13 @@ describe('which modes a route can actually run', () => {
     expect(modeRunsOn('approve-each', 'claude')).toBe(false)
   })
 
-  it('lets a runtime read, and edit only where it really can', () => {
+  it('lets every runtime read and edit', () => {
     for (const runtime of ['codex', 'claude', 'cursor'] as const) {
       expect(modeRunsOn('ask', runtime)).toBe(true)
+      // Claude Code included: `--permission-mode acceptEdits` with the editing
+      // tools named is a real edit mode, and the argv follows the mode.
+      expect(modeRunsOn('accept-edits', runtime)).toBe(true)
     }
-    expect(modeRunsOn('accept-edits', 'codex')).toBe(true)
-    expect(modeRunsOn('accept-edits', 'cursor')).toBe(true)
-    // Measured from the argv: Claude Code is always --restricted with
-    // Read,Glob,Grep, so an edit mode would be a promise the host breaks.
-    expect(modeRunsOn('accept-edits', 'claude')).toBe(false)
   })
 
   it('names the runtime when it says no, so the menu can explain itself', () => {
