@@ -39,6 +39,13 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'a target that only arrives with the completion never reaches the row',
+    from: "              ...(event.payload.command === undefined || open.name !== open.tool",
+    to: "              ...(true || event.payload.command === undefined || open.name !== open.tool",
+    expect: 'takes the target from the completion when the start had none'
+  },
+  {
     file: AGENT_TEXT,
     name: 'an unterminated fence is dropped instead of drawn as code still arriving',
     from: '  if (open !== undefined) {',
@@ -223,7 +230,7 @@ const MUTATIONS = [
   {
     file: VIEW,
     name: 'the completion patch never reaches the activity row',
-    from: '              ...(patch === undefined ? {} : { patch, kind: \'edit\' })\n',
+    from: '              ...(patch === undefined ? {} : { patch, kind: \'edit\' }),\n',
     to: '',
     expect: 'attaches a completion patch to the tool that opened, and names the runtime that reported it'
   },

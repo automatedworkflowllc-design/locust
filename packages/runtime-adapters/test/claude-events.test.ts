@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createClaudeEventNormalizer,
+  claudeToolTarget,
   limitKindFor,
   resetsAtIso,
   summarizeInit,
@@ -155,6 +156,50 @@ describe("trap 1: the answer arrives twice", () => {
     );
     expect(complete?.type === "message.delta" && complete.payload.itemId).toBe("block_1");
     expect(complete?.type === "message.delta" && complete.payload.operation).toBe("replace");
+  });
+});
+
+describe("an activity row can say what a tool touched", () => {
+  it("carries the file a tool acted on, which only arrives once the block is complete", () => {
+    // MEASURED 2026-09-03 by reading the card: every Claude row said
+    // `Read done` / `Write failed` and nothing else, because a tool's input
+    // streams in as JSON deltas after the call opens.
+    const claude = normalizer();
+    claude.accept(record(INIT));
+    claude.accept(
+      record({
+        type: "stream_event",
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: { type: "tool_use", id: "toolu_1", name: "Read" },
+        },
+      }),
+    );
+    claude.accept(
+      record({
+        type: "assistant",
+        message: {
+          content: [{ type: "tool_use", id: "toolu_1", name: "Read", input: { file_path: "C:/w/src/cli.js" } }],
+        },
+      }),
+    );
+    const [done] = claude.accept(
+      record({
+        type: "user",
+        message: { content: [{ type: "tool_result", tool_use_id: "toolu_1", content: "ok" }] },
+      }),
+    );
+    expect(done?.type === "tool.completed" && done.payload.name).toBe("Read");
+    expect(done?.type === "tool.completed" && done.payload.command).toBe("C:/w/src/cli.js");
+  });
+
+  it("reads each tool's own idea of a target", () => {
+    expect(claudeToolTarget("Bash", { command: "npm test" })).toBe("npm test");
+    expect(claudeToolTarget("Glob", { pattern: "src/**/*.js" })).toBe("src/**/*.js");
+    expect(claudeToolTarget("Write", { file_path: "src/format.js" })).toBe("src/format.js");
+    expect(claudeToolTarget("Read", {})).toBeUndefined();
+    expect(claudeToolTarget("Read", undefined)).toBeUndefined();
   });
 });
 

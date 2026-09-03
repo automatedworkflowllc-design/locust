@@ -74,6 +74,7 @@ export function Sidebar({
   recentlyReceived,
   onSelectTeammate,
   onNewTeammate,
+  composerShown,
   onOpenSettings,
   onOpenMissions,
   onOpenTeammates
@@ -97,6 +98,8 @@ export function Sidebar({
   readonly recentlyReceived: readonly string[]
   readonly onSelectTeammate: (teammateId: string) => void
   readonly onNewTeammate: () => void
+  /** Whether the composer is on screen; the empty state says "below" only then. */
+  readonly composerShown: boolean
   readonly onOpenSettings: () => void
   readonly onOpenMissions: () => void
   readonly onOpenTeammates: () => void
@@ -282,9 +285,16 @@ export function Sidebar({
           <>
             <div className="lc-sectionlabel">Missions</div>
             <p className="lc-sidebar__empty lc-row__meta">
-              {teammates.length === 0
-                ? 'No missions yet. Describe one below and it is recorded locally as it runs.'
-                : `No missions yet. Describe one below and ${teammates[0]!.name} picks it up.`}
+              {/*
+                * "below" means the composer, which only the workroom has. On
+                * Teammates and Settings this pointed at a box that was not on
+                * the screen -- spotted while touring the screens, 2026-09-03.
+                */}
+              {!composerShown
+                ? 'No missions yet. They are recorded here as they run.'
+                : teammates.length === 0
+                  ? 'No missions yet. Describe one below and it is recorded locally as it runs.'
+                  : `No missions yet. Describe one below and ${teammates[0]!.name} picks it up.`}
             </p>
           </>
         )}

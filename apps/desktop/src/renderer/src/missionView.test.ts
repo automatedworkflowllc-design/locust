@@ -128,6 +128,35 @@ describe('how a path is written in a row', () => {
   })
 })
 
+describe('a row a runtime names only when the tool finishes', () => {
+  it('takes the target from the completion when the start had none', () => {
+    // Claude streams a tool's input after the call opens, so the row read
+    // `Read` with no file until this arrived.
+    const thread = buildThread(
+      [
+        event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'Read', phase: 'started' }),
+        event('tool.completed', { itemId: 't1', toolKind: 'tool_use', name: 'Read', command: 'src/cli.js', phase: 'completed' })
+      ],
+      { running: false }
+    )
+    const activity = thread.find((item) => item.type === 'activity')
+    expect(activity?.type === 'activity' && activity.details[0]?.name).toBe('src/cli.js')
+    expect(activity?.type === 'activity' && activity.details[0]?.tool).toBe('Read')
+  })
+
+  it('leaves a row the start already named alone', () => {
+    const thread = buildThread(
+      [
+        event('tool.started', { itemId: 't1', toolKind: 'command_execution', name: 'shell', command: 'npm test', phase: 'started' }),
+        event('tool.completed', { itemId: 't1', toolKind: 'command_execution', name: 'shell', command: 'something else', phase: 'completed' })
+      ],
+      { running: false }
+    )
+    const activity = thread.find((item) => item.type === 'activity')
+    expect(activity?.type === 'activity' && activity.details[0]?.name).toBe('npm test')
+  })
+})
+
 describe('the command a shell row shows', () => {
   const PS = String.raw`"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"`
 

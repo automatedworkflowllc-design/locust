@@ -1299,6 +1299,7 @@ export default function App(): ReactElement {
             setTeammateError(undefined)
             setNewTeammateOpen(true)
           }}
+          composerShown={screen === 'workroom'}
           onOpenSettings={() => setScreen(screen === 'settings' ? 'workroom' : 'settings')}
           onOpenMissions={() => setScreen(screen === 'missions' ? 'workroom' : 'missions')}
           onOpenTeammates={() => setScreen(screen === 'teammates' ? 'workroom' : 'teammates')}

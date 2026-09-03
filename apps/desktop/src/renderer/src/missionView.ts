@@ -474,7 +474,14 @@ export function buildThread(
               ...(event.payload.exitCode === undefined ? {} : { exitCode: event.payload.exitCode }),
               // A completion that carries a patch also names what it touched:
               // the row's kind follows the evidence, not the tool's name.
-              ...(patch === undefined ? {} : { patch, kind: 'edit' })
+              ...(patch === undefined ? {} : { patch, kind: 'edit' }),
+              // Some runtimes only know what a tool acted on once it is done:
+              // Claude streams a tool's input as JSON deltas AFTER the call
+              // opens, so its rows read `Read done` with no file until the
+              // target arrives here. A start that already named one keeps it.
+              ...(event.payload.command === undefined || open.name !== open.tool
+                ? {}
+                : { name: event.payload.command })
             }
           }
           openTools.delete(event.payload.itemId)

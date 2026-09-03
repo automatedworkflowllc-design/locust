@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.7 — 2026-09-03
+
+- **Claude's activity rows say what they touched.** They read `Read done`,
+  `Glob done`, `Write failed` -- the tool and nothing else, so the card could
+  not tell you which file was read or written. A Claude tool's input arrives
+  after the call opens, streamed as JSON, and nothing had picked it up from
+  the finished block. Rows now read `src/format.js Read`, `src/cli.js Read`,
+  `src/format.js Edit`.
+- **The sidebar stopped pointing at a box that is not there.** Its empty state
+  said "Describe one below" on the Teammates and Settings screens, which have
+  no composer.
+
 ## 0.15.6 — 2026-09-03
 
 - **Claude Code really can edit now.** 0.15.5 said it could and it could not:

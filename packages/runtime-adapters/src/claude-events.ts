@@ -101,6 +101,42 @@ export function summarizeInit(value: unknown): JsonObject {
  * a run that was never in trouble. `allowed_warning` is the approaching-limit
  * warning, and anything else (a rejection) is the real thing.
  */
+/**
+ * What a Claude tool acted on, for the activity row to name.
+ *
+ * MEASURED 2026-09-03 by reading the card after a real run: every row said
+ * `Read done`, `Glob done`, `Write failed` -- the tool and nothing else, so
+ * the card could not tell anyone WHICH file was read or written. Codex rows
+ * name their file or command; these had no target at all because a tool's
+ * input arrives after `content_block_start`, streamed as JSON deltas, and
+ * nothing picked it up from the completed block.
+ */
+export function claudeToolTarget(name: string, input: unknown): string | undefined {
+  if (!isObject(input)) return undefined;
+  const first = (...keys: readonly string[]): string | undefined => {
+    for (const key of keys) {
+      const value = stringValue(input[key]);
+      if (value !== undefined && value.length > 0) return value;
+    }
+    return undefined;
+  };
+  switch (name) {
+    case "Bash":
+      return first("command");
+    case "Glob":
+    case "Grep":
+      return first("pattern", "path");
+    case "Task":
+      return first("description");
+    case "WebFetch":
+    case "WebSearch":
+      return first("url", "query");
+    default:
+      // Read, Edit, Write, NotebookEdit and anything else that names a file.
+      return first("file_path", "path", "notebook_path", "command", "pattern");
+  }
+}
+
 export function limitKindFor(status: unknown): "quota-exhausted" | "temporary-rate-limit" | undefined {
   const text = typeof status === "string" ? status.toLowerCase() : "";
   if (text === "allowed") return undefined;
@@ -128,7 +164,7 @@ export function createClaudeEventNormalizer(
   const now = context.now ?? (() => new Date());
 
   /** Text buffers per content block index, so a replace can be recognised. */
-  const openTools = new Map<string, { name: string }>();
+  const openTools = new Map<string, { name: string; target?: string }>();
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
   let finalized = false;
@@ -282,6 +318,17 @@ export function createClaudeEventNormalizer(
       // the buffer exactly this way, so the bug would reach the resume summary.
       const message = isObject(parsed.message) ? parsed.message : {};
       const content = Array.isArray(message.content) ? message.content : [];
+      // The same record carries every tool_use block with its input filled
+      // in, which is the first point the target is knowable.
+      for (const block of content) {
+        if (!isObject(block) || stringValue(block.type) !== "tool_use") continue;
+        const itemId = identityValue(block.id);
+        if (itemId === undefined) continue;
+        const open = openTools.get(itemId);
+        if (open === undefined) continue;
+        const target = claudeToolTarget(open.name, block.input);
+        if (target !== undefined) openTools.set(itemId, { ...open, target });
+      }
       const text = content
         .map((block) => (isObject(block) ? stringValue(block.text) : undefined))
         .filter((value): value is string => value !== undefined)
@@ -315,6 +362,8 @@ export function createClaudeEventNormalizer(
             itemId,
             toolKind: "tool_use",
             name: open?.name ?? "tool",
+            // What it acted on, so the row can say more than the tool's name.
+            ...(open?.target === undefined ? {} : { command: open.target }),
             phase: "completed",
             ...(failed ? { status: "error" } : {}),
             evidence,
