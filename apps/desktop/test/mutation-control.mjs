@@ -30,9 +30,38 @@ const HISTORY = join(ROOT, 'src', 'main', 'mission-history.ts')
 const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 const ROSTER = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const UPDATES = join(ROOT, 'src', 'main', 'updates.ts')
+const RELAY = join(ROOT, 'src', 'main', 'relay.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: RELAY,
+    name: 'teammates reply on their own even when the setting is off',
+    from: "  if (!input.enabled) {\n    return { start: false, reason: 'Teammate replies are off in Settings; the message waits for their next run.' }\n  }\n",
+    to: '',
+    expect: 'starts nothing when off, and stays quiet about it'
+  },
+  {
+    file: RELAY,
+    name: 'the hop cap lets one extra hop through',
+    from: '  if (input.hop >= MAX_RELAY_HOPS) {',
+    to: '  if (input.hop > MAX_RELAY_HOPS) {',
+    expect: 'stops after the cap and says so in the thread that shared'
+  },
+  {
+    file: RELAY,
+    name: 'the reply back starts a stranger instead of the next turn of the thread that asked',
+    from: '        const followUpOf = origin.hop >= MAX_RELAY_HOPS ? origin.originMissionId : undefined',
+    to: '        const followUpOf = undefined',
+    expect: 'the reply back follows up the mission that asked, so it lands in that thread'
+  },
+  {
+    file: RELAY,
+    name: 'a relayed run runs with write access whatever the sender had',
+    from: "            mode: mission.sandbox === 'workspace-write' ? 'accept-edits' : 'ask',",
+    to: "            mode: 'accept-edits',",
+    expect: 'a read-only sender gets a read-only reply'
+  },
   {
     file: VIEW,
     name: 'the activity total is taken from the runtime header instead of the rows',
@@ -794,6 +823,7 @@ const originals = new Map([
   [RUNTIMES, readFileSync(RUNTIMES, 'utf8')],
   [ROSTER, readFileSync(ROSTER, 'utf8')],
   [UPDATES, readFileSync(UPDATES, 'utf8')],
+  [RELAY, readFileSync(RELAY, 'utf8')],
   [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')]
 ])
 let problems = 0

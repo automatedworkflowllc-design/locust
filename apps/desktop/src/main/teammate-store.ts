@@ -73,7 +73,7 @@ interface StoredFile {
   readonly settings: WorkspaceSettings
 }
 
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: false }
 
 function isHue(value: unknown): value is TeammateHue {
   return typeof value === 'string' && (TEAMMATE_HUES as readonly string[]).includes(value)
@@ -168,6 +168,9 @@ function parsedFile(text: string): StoredFile {
   const settings: WorkspaceSettings = {
     swarm: typeof rawSettings === 'object' && rawSettings !== null
       ? (rawSettings as Record<string, unknown>).swarm === true
+      : false,
+    relay: typeof rawSettings === 'object' && rawSettings !== null
+      ? (rawSettings as Record<string, unknown>).relay === true
       : false
   }
 
@@ -338,6 +341,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         const next: WorkspaceSettings = {
           swarm: typeof settings === 'object' && settings !== null
             ? (settings as Record<string, unknown>).swarm === true
+            : false,
+          relay: typeof settings === 'object' && settings !== null
+            ? (settings as Record<string, unknown>).relay === true
             : false
         }
         const file = await read()

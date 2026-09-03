@@ -47,12 +47,13 @@ export interface PeerExchange {
   recordReceived(missionId: string, delivered: readonly WorkroomMessage[], occurredAt: string): Promise<void>
   /** Never throws: a delivery that cannot be marked is shown again next time, which is the safe direction. */
   markDelivered(missionId: string, delivered: readonly WorkroomMessage[]): Promise<void>
+  /** Resolves to the messages actually posted, so a relay can act on them. */
   share(input: {
     readonly runId: string
     readonly missionId: string
     readonly peer: MissionPeerContext
     readonly text: string
-  }, report: (update: CodexMissionUpdate) => void): Promise<void>
+  }, report: (update: CodexMissionUpdate) => void): Promise<readonly WorkroomMessage[]>
 }
 
 export function publicPeerMessage(message: WorkroomMessage, direction: 'received' | 'posted'): PublicPeerMessage {
@@ -148,6 +149,7 @@ export function createPeerExchange(options: {
       const failed = (message: string): void => {
         report({ kind: 'peer-share-failed', runId: input.runId, missionId: input.missionId, message })
       }
+      const posted: WorkroomMessage[] = []
       const blocks = parseShareBlocks(input.text)
       if (blocks.length > MAX_SHARES_PER_MISSION) {
         failed(
@@ -195,7 +197,9 @@ export function createPeerExchange(options: {
           missionId: input.missionId,
           message: publicPeerMessage(message, 'posted')
         })
+        posted.push(message)
       }
+      return posted
     }
   }
 }

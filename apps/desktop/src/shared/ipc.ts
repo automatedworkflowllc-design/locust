@@ -285,6 +285,13 @@ export type ModelCatalogResponse =
  */
 export interface WorkspaceSettings {
   readonly swarm: boolean
+  /**
+   * Teammates reply to each other on their own: a share to a teammate starts
+   * a run for them, and their answer starts the sender's next turn. Off by
+   * default because every hop is a real run on a real account; capped at
+   * two hops so two agents cannot thank each other until the quota is gone.
+   */
+  readonly relay: boolean
 }
 
 /** What the runtime is asking permission to do. */
@@ -473,6 +480,28 @@ export type CodexMissionUpdate =
   /** The mission asked to share something and the host could not honour it. */
   | {
       readonly kind: 'peer-share-failed'
+      readonly runId: string
+      readonly missionId: string
+      readonly message: string
+    }
+  /**
+   * The host started a run this renderer did not ask for: a teammate
+   * replying on their own. Carries everything a start response would, so
+   * the renderer adopts it exactly as it adopts its own.
+   */
+  | {
+      readonly kind: 'mission-started'
+      readonly runId: string
+      readonly missionId: string
+      readonly teammateId: string
+      readonly prompt: string
+      readonly data: CodexMissionStartData
+      /** Which automatic hop of the exchange this is. */
+      readonly hop: number
+    }
+  /** Why a teammate did NOT reply on their own, said in the thread that shared. */
+  | {
+      readonly kind: 'relay-notice'
       readonly runId: string
       readonly missionId: string
       readonly message: string

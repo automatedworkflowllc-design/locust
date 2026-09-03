@@ -152,9 +152,11 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'peer-message') {
     return { ...live, peerMessages: [...(live.peerMessages ?? []), update.message] }
   }
-  if (update.kind === 'peer-share-failed') {
+  if (update.kind === 'peer-share-failed' || update.kind === 'relay-notice') {
     return { ...live, peerNotices: [...(live.peerNotices ?? []), update.message] }
   }
+  // A host-started run is adopted by the listener, never applied to a run.
+  if (update.kind === 'mission-started') return live
 
   const events = [...live.events, update.event].slice(-500)
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
@@ -163,6 +165,36 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
     return { ...live, events, phase: 'failed', error: update.event.payload.message }
   }
   return { ...live, events, phase: live.phase === 'starting' ? 'running' : live.phase }
+}
+
+/**
+ * The turns before a host-started reply, so it renders as the next turn of
+ * the conversation it continues. Read from the live run when the renderer
+ * still holds it, else from history; empty when neither knows the mission,
+ * in which case the thread shows this turn alone rather than nothing.
+ */
+function earlierTurnsOf(
+  missionId: string,
+  runs: RunMap,
+  byId: ReadonlyMap<string, PublicRecoveredMission>
+): LiveRunState['earlierTurns'] {
+  const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
+  if (live !== undefined) {
+    return [
+      ...(live.earlierTurns ?? []),
+      { missionId, prompt: live.prompt, events: live.events }
+    ]
+  }
+  const held = byId.get(missionId)
+  if (held === undefined) return []
+  return conversationTurns(held, byId).map((turn) => {
+    const record = byId.get(turn.missionId)
+    return {
+      missionId: turn.missionId,
+      prompt: record === undefined ? turn.prompt : typedPrompt(record, byId),
+      events: turn.events
+    }
+  })
 }
 
 function reopenedRun(
@@ -412,6 +444,9 @@ export default function App(): ReactElement {
   const [models, setModels] = useState<readonly PublicModel[]>([])
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
+  const [relay, setRelay] = useState(false)
+  // Read inside the update listener, which is bound once.
+  const historyByIdRef = useRef<ReadonlyMap<string, PublicRecoveredMission>>(new Map())
   const [teammateError, setTeammateError] = useState<string>()
   const [handingOff, setHandingOff] = useState(false)
   /**
@@ -480,6 +515,40 @@ export default function App(): ReactElement {
     })
 
     const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
+      if (update.kind === 'mission-started') {
+        // A teammate replying on their own. The host started it; the renderer
+        // adopts it exactly as it adopts a run it asked for, so the sidebar
+        // shows them working from this moment rather than after a refresh.
+        setMissionOwners((current) => ({ ...current, [update.missionId]: update.teammateId }))
+        const queued = pendingUpdatesRef.current.get(update.runId) ?? []
+        pendingUpdatesRef.current.delete(update.runId)
+        setRuns((current) => {
+          if (current.has(update.runId)) return current
+          let next: LiveRunState = {
+            prompt: update.prompt,
+            data: update.data,
+            phase: 'running',
+            events: [],
+            teammateId: update.teammateId,
+            peerMessages: update.data.peerMessages,
+            ...(update.data.followsUp === undefined
+              ? {}
+              : {
+                  earlierTurns: earlierTurnsOf(update.data.followsUp.missionId, current, historyByIdRef.current)
+                })
+          }
+          for (const held of queued) next = applyMissionUpdate(next, held)
+          return withNewRun(current, update.runId, next)
+        })
+        // The answer lands in the thread that asked: if that thread is the
+        // one on screen, follow it to its new turn, as a person's own reply
+        // would be followed. Another conversation on screen is left alone.
+        const shown = liveRunRef.current
+        if (update.data.followsUp !== undefined && shown?.data?.missionId === update.data.followsUp.missionId) {
+          setShownKey(update.runId)
+        }
+        return
+      }
       setRuns((current) => {
         if (current.has(update.runId)) {
           return withRun(current, update.runId, (run) => applyMissionUpdate(run, update))
@@ -523,7 +592,10 @@ export default function App(): ReactElement {
     void bridge
       .readWorkspaceSettings()
       .then((settings) => {
-        if (active) setSwarm(settings.swarm === true)
+        if (active) {
+          setSwarm(settings.swarm === true)
+          setRelay(settings.relay === true)
+        }
       })
       .catch(() => undefined)
 
@@ -1068,6 +1140,7 @@ export default function App(): ReactElement {
   // The right-click menu is built outside render and names the row it was
   // opened on, so it reads the rows through this.
   sidebarMissionsRef.current = sidebarMissions
+  historyByIdRef.current = historyById
 
   const noRuntimeReady =
     runtimeState.phase !== 'ready' || !runtimes.some((runtime) => runtime.ready && runtime.status === 'ready')
@@ -1161,7 +1234,15 @@ export default function App(): ReactElement {
               update={update}
               onCheckUpdate={checkUpdate}
               onInstallUpdate={installUpdate}
-              onPreviewPrune={previewPrune}
+              relay={relay}
+            onRelayChange={(next) => {
+              setRelay(next)
+              void window.desktop
+                ?.writeWorkspaceSettings({ swarm, relay: next })
+                .then((settings) => setRelay(settings.relay === true))
+                .catch(() => setRelay(!next))
+            }}
+            onPreviewPrune={previewPrune}
               onPrune={prune}
             />
           ) : liveRun === undefined ? (
@@ -1329,7 +1410,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next })
+                ?.writeWorkspaceSettings({ swarm: next, relay })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}

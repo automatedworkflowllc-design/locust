@@ -24,6 +24,8 @@ import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
+import { createRelay } from './relay.js'
+import type { Relay } from './relay.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
@@ -230,16 +232,27 @@ if (!ownsSingleInstanceLock) {
     const workroom = createFileWorkroom({
       rootDirectory: join(app.getPath('userData'), 'workroom')
     })
+    // Bound late: the relay starts runs through the service that calls it.
+    let relay: Relay | undefined
     const codexMissions = createCodexMissionService({
       workspacePath: process.cwd(),
       discover: discoverForWork,
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,
-      workroom
+      workroom,
+      onShared: async (mission, posted) => {
+        await relay?.onShared(mission, posted)
+      }
     })
     // The approval transport. It only runs for the mode that asked for it, so
     // an experimental protocol failing cannot take the ordinary paths with it.
     let approvalWindow: BrowserWindow | undefined
+    const sendToWindow = (update: CodexMissionUpdate): void => {
+      const target = approvalWindow
+      if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+        target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
+      }
+    }
 
     // One definition of how an app-server process is started and stopped, used
     // by both the mission transport and the model probe. Killing the TREE
@@ -352,6 +365,28 @@ if (!ownsSingleInstanceLock) {
       await teammates.assignMission(teammateId, missionId).catch(() => undefined)
     }
 
+    // Teammates replying to each other. Off unless the workspace switched it
+    // on; every hop is a run the service starts like any other, under the
+    // recipient's name, on the sender's route.
+    relay = createRelay({
+      enabled: async () => (await teammates.readSettings()).relay === true,
+      peerContextFor,
+      start: (input) =>
+        codexMissions.start(
+          input.prompt,
+          input.runtime,
+          input.mode,
+          input.model === undefined ? {} : { model: input.model },
+          sendToWindow,
+          undefined,
+          input.peer,
+          input.followUpOf,
+          input.relay
+        ),
+      assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
+      notify: sendToWindow
+    })
+
     ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
@@ -383,21 +418,21 @@ if (!ownsSingleInstanceLock) {
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
 
     ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return { swarm: false } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: false } as const
       try {
         return await teammates.readSettings()
       } catch {
         // An unreadable switch reads as off. That is the safe direction.
-        return { swarm: false } as const
+        return { swarm: false, relay: false } as const
       }
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
-      if (!fromOwnWindow(event)) return { swarm: false } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: false } as const
       try {
         return await teammates.writeSettings(settings)
       } catch {
-        return { swarm: false } as const
+        return { swarm: false, relay: false } as const
       }
     })
 

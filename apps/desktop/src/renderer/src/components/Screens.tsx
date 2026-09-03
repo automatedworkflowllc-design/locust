@@ -425,6 +425,8 @@ export function SettingsScreen({
   update,
   onCheckUpdate,
   onInstallUpdate,
+  relay,
+  onRelayChange,
   onPreviewPrune,
   onPrune
 }: {
@@ -438,6 +440,9 @@ export function SettingsScreen({
   readonly update: AppUpdateState | undefined
   readonly onCheckUpdate: () => Promise<AppUpdateResponse>
   readonly onInstallUpdate: () => Promise<AppUpdateResponse>
+  /** Whether teammates start runs to answer each other. */
+  readonly relay: boolean
+  readonly onRelayChange: (relay: boolean) => void
   readonly onPreviewPrune: (days: number) => Promise<MissionPruneResponse>
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
@@ -502,6 +507,32 @@ export function SettingsScreen({
             record without a receipt.
           </p>
           <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Teammates</h2>
+          <p className="lc-settings__lede">
+            When a teammate writes to another, the other can answer on their own: Locust starts a run
+            for them with the message as its brief, and their answer starts the sender's next turn, so
+            it lands in the thread that asked. Two hops, then it stops and waits for you. Every hop is
+            a real run on the sender's route, so this is off until you turn it on.
+          </p>
+          <div className="lc-retention">
+            <div className="lc-retention__row">
+              <span className="lc-settings__note">
+                {relay ? 'Teammates reply to each other, up to two hops per exchange.' : 'Messages wait for the recipient\'s next run.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-button${relay ? ' is-active' : ''}`}
+                role="switch"
+                aria-checked={relay}
+                onClick={() => onRelayChange(!relay)}
+              >
+                {relay ? 'On' : 'Off'}
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="lc-settings__section">

@@ -210,21 +210,30 @@ describe('teammate record parsing', () => {
 })
 
 describe('workspace settings', () => {
+  it('keeps teammate replies off until switched on, and persists the switch', async () => {
+    // Every relay hop is a run on a real account, so the safe reading of an
+    // absent or malformed flag is off.
+    const { root, store: teammates } = await store()
+    expect((await teammates.readSettings()).relay).toBe(false)
+    await teammates.writeSettings({ swarm: false, relay: true })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: true })
+  })
+
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: false })
   })
 
   it('only a literal true turns it on', async () => {
     // A malformed message must not be able to enable a workspace-wide setting.
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
-      await teammates.writeSettings({ swarm: value })
-      expect(await teammates.readSettings()).toEqual({ swarm: false })
+      await teammates.writeSettings({ swarm: value, relay: value })
+      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false })
     }
   })
 
@@ -237,7 +246,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: false })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 

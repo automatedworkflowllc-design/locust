@@ -1669,3 +1669,121 @@ describe('continuing a conversation', () => {
     expect(createMission.mock.calls[0]?.[0]?.continuesFrom).toBeUndefined()
   })
 })
+
+describe('what a completed share hands to the relay', () => {
+  const WREN = { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }
+  const ATLAS = { teammateId: 'tm_atlas', name: 'Atlas', role: 'Research & Briefs' }
+  const PEER: MissionPeerContext = { self: WREN, others: [ATLAS] }
+
+  it('calls onShared once with the run and exactly the messages it posted, after they are recorded', async () => {
+    let nextId = 0
+    const workroom: Workroom = {
+      post: async (input) => ({
+        messageId: `wm_out_${String(++nextId)}`,
+        sequence: nextId,
+        from: input.from,
+        to: input.to,
+        text: input.text,
+        postedAt: NOW
+      }),
+      unread: async () => ({ messages: [], remaining: 0 }),
+      markDelivered: async () => undefined,
+      read: async () => ({ messages: [], deliveries: [], issues: [] }),
+      flush: async () => undefined
+    }
+    const scheduled: Array<() => void> = []
+    const shared: { mission: unknown; posted: readonly WorkroomMessage[] }[] = []
+    let ids = 0
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: {
+        start: () => ({
+          records: records([
+            { type: 'thread.started', thread_id: 'thread-live' },
+            { type: 'turn.started' },
+            {
+              type: 'item.completed',
+              item: {
+                id: 'answer',
+                type: 'agent_message',
+                text: 'Found it.\n<locust-share to="Atlas">The build runs with pnpm check.</locust-share>'
+              }
+            },
+            { type: 'turn.completed', usage: { output_tokens: 2 } }
+          ]),
+          completion: Promise.resolve(completion())
+        })
+      },
+      ledger: fakeLedger(),
+      workroom,
+      createId: () => String(++ids),
+      now: () => new Date(NOW),
+      schedule: (task) => scheduled.push(task),
+      onShared: async (mission, posted) => {
+        shared.push({ mission, posted })
+      }
+    })
+
+    const response = await service.start('Where do the checks run?', 'codex', 'ask', { model: 'gpt-5-codex' }, () => undefined, undefined, PEER)
+    expect(response.ok).toBe(true)
+    while (scheduled.length > 0) scheduled.shift()!()
+    for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
+
+    expect(shared).toHaveLength(1)
+    expect(shared[0]?.mission).toMatchObject({
+      runtime: 'codex',
+      sandbox: 'read-only',
+      model: 'gpt-5-codex',
+      peer: PEER,
+      relay: undefined
+    })
+    expect(shared[0]?.posted.map((message) => [message.to.name, message.text])).toEqual([
+      ['Atlas', 'The build runs with pnpm check.']
+    ])
+  })
+
+  it('a relayed run carries its hop through to what it shares', async () => {
+    const scheduled: Array<() => void> = []
+    const shared: { mission: { relay?: unknown } }[] = []
+    let ids = 0
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: {
+        start: () => ({
+          records: records([
+            { type: 'thread.started', thread_id: 'thread-live' },
+            { type: 'turn.started' },
+            {
+              type: 'item.completed',
+              item: { id: 'answer', type: 'agent_message', text: '<locust-share to="Wren">Yes.</locust-share>' }
+            },
+            { type: 'turn.completed', usage: { output_tokens: 1 } }
+          ]),
+          completion: Promise.resolve(completion())
+        })
+      },
+      ledger: fakeLedger(),
+      workroom: {
+        post: async (input) => ({ messageId: 'wm_1', sequence: 1, from: input.from, to: input.to, text: input.text, postedAt: NOW }),
+        unread: async () => ({ messages: [], remaining: 0 }),
+        markDelivered: async () => undefined,
+        read: async () => ({ messages: [], deliveries: [], issues: [] }),
+        flush: async () => undefined
+      },
+      createId: () => String(++ids),
+      now: () => new Date(NOW),
+      schedule: (task) => scheduled.push(task),
+      onShared: async (mission) => {
+        shared.push({ mission })
+      }
+    })
+    const origin = { hop: 1, originMissionId: 'mission_origin' }
+    const response = await service.start('Reply to Wren.', 'codex', 'ask', {}, () => undefined, undefined, { self: ATLAS, others: [WREN] }, undefined, origin)
+    expect(response.ok).toBe(true)
+    while (scheduled.length > 0) scheduled.shift()!()
+    for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
+    expect(shared[0]?.mission.relay).toEqual(origin)
+  })
+})

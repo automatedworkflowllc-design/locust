@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.10.0 — 2026-09-03
+
+- **Teammates can reply to each other.** Turn it on under Settings → Teammates.
+  When one teammate writes to another, Locust starts a run for the recipient
+  with the message as its brief, and their answer starts the sender's next
+  turn, so it lands in the thread that asked. If that thread is on screen, the
+  view follows it to the new turn. Two hops, then it stops and waits for you.
+- It is off by default because every hop is a real run on a real account. Each
+  hop runs on the sender's runtime, model and mode, is owned by the teammate
+  who replied, and is recorded like any other mission. When a reply could not
+  start, the thread that shared says why.
+- **Auto-update is live.** Installed copies now find new versions on their
+  own and install them when you quit. No more installers by hand.
+
 ## 0.9.1 — 2026-09-03
 
 - **One conversation, one sidebar row.** Every reply used to appear in the

@@ -30,6 +30,7 @@ import { composeHandoffPrompt } from './handoff.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
+import type { RelayOrigin, SharingMission } from './relay.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -61,6 +62,11 @@ interface ActiveCodexMission {
   readonly peer: MissionPeerContext | undefined
   /** Assistant text as the transcript rebuilt it, read for share blocks at the end. */
   readonly transcript: TranscriptTracker
+  /** What this run may touch and which model it runs, so a relayed reply inherits both. */
+  readonly sandbox: MissionSandbox
+  readonly model: string | undefined
+  /** Set when the host started this run for a teammate replying on their own. */
+  readonly relay: RelayOrigin | undefined
 }
 
 export interface CodexMissionService {
@@ -83,7 +89,9 @@ export interface CodexMissionService {
      */
     peer?: MissionPeerContext,
     /** The mission whose conversation this one continues, if any. */
-    followUpOf?: string
+    followUpOf?: string,
+    /** Set by the host when a teammate is replying on their own. */
+    relay?: RelayOrigin
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   handOff(
@@ -110,6 +118,12 @@ interface CodexMissionServiceOptions {
   readonly ledger: MissionLedger
   /** The teammate channel. Optional: a service without one runs missions that belong to nobody. */
   readonly workroom?: Workroom
+  /**
+   * Called after a completed run posted messages to teammates, with what it
+   * posted. Whatever this does -- a relay starting the recipient's run --
+   * happens after the share is recorded and must not fail the run.
+   */
+  readonly onShared?: (mission: SharingMission, posted: readonly WorkroomMessage[]) => Promise<void>
   readonly createId?: () => string
   readonly now?: () => Date
   readonly schedule?: (task: () => void) => void
@@ -338,10 +352,29 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     if (mission.transcript.completed && mission.peer !== undefined && peerExchange !== undefined) {
       const text = mission.transcript.latestFinal
       if (text !== undefined) {
-        await peerExchange.share(
+        const posted = await peerExchange.share(
           { runId: mission.runId, missionId: mission.missionId, peer: mission.peer, text },
           (update) => safelyEmit(mission, update)
         )
+        if (posted.length > 0 && options.onShared !== undefined) {
+          try {
+            await options.onShared(
+              {
+                runId: mission.runId,
+                missionId: mission.missionId,
+                runtime: mission.runtime,
+                sandbox: mission.sandbox,
+                model: mission.model,
+                peer: mission.peer,
+                relay: mission.relay
+              },
+              posted
+            )
+          } catch {
+            // The share stands and is recorded; a relay that could not start
+            // is the relay's own notice to give, not a failure of this run.
+          }
+        }
       }
     }
     clearActive(mission)
@@ -372,7 +405,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       emit: (update: CodexMissionUpdate) => void,
       continuation?: MissionContinuation,
       peer?: MissionPeerContext,
-      followUpOf?: string
+      followUpOf?: string,
+      relay?: RelayOrigin
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -683,7 +717,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           prompt,
           runtime,
           peer,
-          transcript: createTranscriptTracker()
+          transcript: createTranscriptTracker(),
+          sandbox: effectiveSandbox,
+          model: chosenModel,
+          relay
         }
         active.set(runId, mission)
         scheduleConsume(mission)
