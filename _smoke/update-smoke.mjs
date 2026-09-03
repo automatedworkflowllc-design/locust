@@ -178,9 +178,21 @@ try {
         // process we launched to exit, then for the installed version to move.
         for (let i = 0; i < 120 && child.exitCode === null; i += 1) await sleep(1000)
         check('the app quit to install', child.exitCode !== null, `exit ${String(child.exitCode)}`)
+        // Read the binary directly rather than shelling out: a PowerShell
+        // path in a template literal lost its backslashes once already and
+        // reported "installed " against a copy that had in fact updated
+        // correctly, which is a false alarm on the one check this smoke
+        // exists for. EXE is the same path this smoke launched.
         const { execFileSync } = await import('node:child_process')
+        // Single quotes: PowerShell takes backslashes literally inside them,
+        // so the path arrives intact. Doubling any quote is the escape.
+        const quoted = `'${EXE.replace(/'/g, "''")}'`
         const versionOf = () =>
-          execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `(Get-Item (Join-Path $env:LOCALAPPDATA 'Programs\Locust\Locust.exe')).VersionInfo.FileVersion`], { encoding: 'utf8' }).trim()
+          execFileSync(
+            'powershell.exe',
+            ['-NoProfile', '-NonInteractive', '-Command', `(Get-Item -LiteralPath ${quoted}).VersionInfo.FileVersion`],
+            { encoding: 'utf8' }
+          ).trim()
         let after = state.version
         for (let i = 0; i < 90; i += 1) {
           await sleep(2000)
