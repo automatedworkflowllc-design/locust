@@ -379,6 +379,36 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     });
   });
 
+  it("prefers a shim on PATH over an executable in a guessed install directory", async () => {
+    // MEASURED 2026-09-03. Codex CLI was updated from npm to a working
+    // 0.153.0 -- which installs as `codex.cmd` and `codex.ps1`, never an
+    // `.exe` -- while a stale 0.151.0-alpha sat under %LOCALAPPDATA%\OpenAI
+    // whose backend endpoint had been retired. The locator swept every
+    // directory for an `.exe` before it swept any for a `.ps1`, so it kept
+    // running the stale one and fixing the runtime did not fix the app.
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const LOCAL = "C:\\Users\\x\\AppData\\Local";
+    const powershell = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const onPath = `${ROAMING}\\npm\\codex.ps1`;
+    const guessed = `${LOCAL}\\OpenAI\\Codex\\bin\\abc123\\codex.exe`;
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: {
+        PATH: `${ROAMING}\\npm`,
+        APPDATA: ROAMING,
+        LOCALAPPDATA: LOCAL,
+        SystemRoot: "C:\\Windows",
+      },
+      isExecutableFile: async (candidate) =>
+        candidate === onPath || candidate === guessed || candidate === powershell,
+      readDirectory: async (directory) =>
+        directory === `${LOCAL}\\OpenAI\\Codex\\bin` ? ["abc123"] : [],
+    }).find("codex");
+
+    expect(found?.discoveredPath).toBe(onPath);
+    expect(found?.kind).toBe("powershell-shim");
+  });
+
   it("finds Copilot CLI where it unpacks itself, when npm's bin directory is not there either", async () => {
     const LOCAL = "C:\\Users\\x\\AppData\\Local";
     const launcher = `${LOCAL}\\copilot\\copilot.exe`;

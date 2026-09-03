@@ -197,12 +197,24 @@ export function createPathExecutableLocator(
     async find(commandName): Promise<ExecutableLaunch | undefined> {
       if (!SAFE_COMMAND_NAME.test(commandName)) return undefined;
 
-      // PATH first: what a terminal would run wins over anything inferred.
-      const directories = [
-        ...pathOnly,
-        ...(await installDirectories(commandName, environment, platform, readDirectory)),
-      ];
-
+      // PATH first, and that has to mean the WHOLE search -- shims included.
+      //
+      // MEASURED 2026-09-03: this used to concatenate PATH with the inferred
+      // install roots and hand the single list to each strategy in turn. So
+      // the `.exe` sweep ran over the guessed directories before the `.ps1`
+      // sweep ran over PATH, and a runtime installed from npm -- which lands
+      // as `codex.cmd` plus `codex.ps1`, never a `.exe` -- lost to whatever
+      // sat in the guessed location. Concretely: Codex CLI was updated to a
+      // working 0.153.0 from npm while Locust kept running the stale
+      // 0.151.0-alpha it found under %LOCALAPPDATA%\OpenAI\Codex, whose
+      // backend endpoint had been retired and answered every mission with a
+      // 404. Fixing the runtime did not fix the app, which is the worst shape
+      // a bug like this can take.
+      //
+      // So each location set is resolved COMPLETELY before the next is tried.
+      const resolveWithin = async (
+        directories: readonly string[],
+      ): Promise<ExecutableLaunch | undefined> => {
       if (platform !== "win32") {
         for (const directory of directories) {
           const candidate = posix.join(directory, commandName);
@@ -261,7 +273,15 @@ export function createPathExecutableLocator(
         };
       }
 
-      return undefined;
+        return undefined;
+      };
+
+      return (
+        (await resolveWithin(pathOnly))
+        ?? (await resolveWithin(
+          await installDirectories(commandName, environment, platform, readDirectory),
+        ))
+      );
     },
   };
 }

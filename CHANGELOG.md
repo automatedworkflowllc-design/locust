@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.1 — 2026-09-03
+
+- **Locust now runs the runtime you installed, not an older copy it found
+  somewhere else.** It searched every likely install directory for a `.exe`
+  before it looked on PATH for a shim -- and a tool installed from npm lands
+  as a `.cmd` and a `.ps1`, never a `.exe`. So updating Codex CLI to a working
+  version changed nothing: Locust kept running a stale build whose backend had
+  been retired, and answered every mission with a 404 it had no way to explain.
+  What a terminal would run now genuinely wins.
+
 ## 0.15.0 — 2026-09-03
 
 - **Updates now actually install.** "Install and restart" quit the app and

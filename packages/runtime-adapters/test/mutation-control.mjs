@@ -33,6 +33,13 @@ const ANTIGRAVITY_EVENTS = join(ROOT, 'src', 'antigravity-events.ts')
 
 const MUTATIONS = [
   {
+    file: LOCATOR,
+    name: 'the guessed install directories are searched alongside PATH again, so a shim on PATH loses to a stale exe',
+    from: '        (await resolveWithin(pathOnly))',
+    to: '        (await resolveWithin([...pathOnly, ...(await installDirectories(commandName, environment, platform, readDirectory))]))',
+    expect: 'prefers a shim on PATH over an executable in a guessed install directory'
+  },
+  {
     file: CLAUDE_EVENTS,
     name: "the cost Claude Code reported never reaches the receipt",
     from: '          ...(completedUsage === undefined ? {} : { usage: completedUsage }),\n',
@@ -378,7 +385,7 @@ const MUTATIONS = [
   {
     file: LOCATOR,
     name: 'a CLI that is not on PATH is reported as missing',
-    from: '        ...(await installDirectories(commandName, environment, platform, readDirectory)),',
+    from: '        ?? (await resolveWithin(\n          await installDirectories(commandName, environment, platform, readDirectory),\n        ))',
     to: '',
     expect: 'finds Codex in its versioned install root when PATH knows nothing'
   },
