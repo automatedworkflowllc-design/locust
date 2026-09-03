@@ -245,6 +245,9 @@ if (!ownsSingleInstanceLock) {
       workroom,
       onShared: async (mission, posted) => {
         await relay?.onShared(mission, posted)
+      },
+      onRunEnded: async (mission) => {
+        await relay?.onRunEnded(mission)
       }
     })
     // The approval transport. It only runs for the mode that asked for it, so

@@ -36,6 +36,20 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: RELAY,
+    name: "the asker's turn starts on the first reply instead of waiting for everyone",
+    from: '          if (meeting.awaiting.size > 0) {\n            notify(',
+    to: '          if (false) {\n            notify(',
+    expect: "holds the first reply, and starts the asker's turn once after the last, briefed with everyone"
+  },
+  {
+    file: RELAY,
+    name: 'a single recipient opens a meeting',
+    from: '      if (started.length >= 2) {',
+    to: '      if (started.length >= 1) {',
+    expect: 'one recipient is an ordinary exchange, not a meeting'
+  },
+  {
     file: FACES,
     name: 'an idle face moves',
     from: "  idle: {}\n}",

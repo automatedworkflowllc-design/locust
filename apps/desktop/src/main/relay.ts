@@ -131,11 +131,145 @@ export interface RelayOptions {
   readonly notify: (update: CodexMissionUpdate) => void
 }
 
+/** A run the relay may care about ending: who it belonged to and what exchange it was in. */
+export interface EndedMission {
+  readonly missionId: string
+  readonly peer: MissionPeerContext | undefined
+  readonly relay: RelayOrigin | undefined
+}
+
 export interface Relay {
   onShared(mission: SharingMission, posted: readonly WorkroomMessage[]): Promise<void>
+  /** Any run ending, however it ended. A meeting counts a recipient who left without answering. */
+  onRunEnded(mission: EndedMission): Promise<void>
+}
+
+/**
+ * A meeting: one teammate wrote to several at once, and their next turn
+ * waits until every one of them has answered or given up, then starts ONCE
+ * with all the replies quoted -- the minutes -- instead of once per reply,
+ * which a teammate who runs one mission at a time could not take anyway.
+ */
+interface Meeting {
+  readonly askerId: string
+  readonly askerName: string
+  readonly askerRunId: string
+  readonly askerMissionId: string
+  /** The exchange the reply-back hop belongs to. */
+  readonly origin: RelayOrigin
+  readonly awaiting: Map<string, string>
+  readonly answered: string[]
+  /** Those who finished without a word to the asker; named in the minutes. */
+  readonly silent: string[]
+}
+
+/**
+ * The brief for the turn after a meeting. Every reply is quoted by the
+ * ordinary inbound section; this only says what the person's teammate is
+ * looking at.
+ */
+export function meetingPrompt(input: { readonly repliers: readonly string[]; readonly silent: readonly string[] }): string {
+  const who = input.repliers.length === 1 ? input.repliers[0] : `${input.repliers.slice(0, -1).join(', ')} and ${input.repliers[input.repliers.length - 1]}`
+  return [
+    `${who} replied to your message; the replies are quoted below.`,
+    ...(input.silent.length === 0 ? [] : [`${input.silent.join(', ')} finished without replying.`]),
+    'Take them together. Write back to anyone only if that helps finish the work: one <locust-share to="Name"> block per teammate.',
+    'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
+    'Do not start unrelated work.'
+  ].join(' ')
 }
 
 export function createRelay(options: RelayOptions): Relay {
+  /** Open meetings by the asker's mission id. */
+  const meetings = new Map<string, Meeting>()
+  /** Which meeting a relayed run is answering, by that run's mission id. */
+  const answering = new Map<string, Meeting>()
+
+  const notify = (runId: string, missionId: string, message: string): void => {
+    options.notify({ kind: 'relay-notice', runId, missionId, message })
+  }
+
+  const startFor = async (input: {
+    readonly recipient: MissionPeerContext
+    readonly prompt: string
+    readonly from: SharingMission
+    readonly origin: RelayOrigin
+    readonly notice: (message: string) => void
+  }): Promise<{ readonly missionId: string } | undefined> => {
+    const { recipient, from } = input
+    const followUpOf = input.origin.lastMissionOf[recipient.self.teammateId]
+    // Their own route, so each teammate stays the model a person made
+    // them. Only a teammate who has never run borrows the sender's.
+    const own = recipient.self.route
+    const route = own ?? {
+      runtime: from.runtime,
+      model: from.model ?? 'account-default',
+      mode: from.sandbox === 'workspace-write' ? ('accept-edits' as const) : ('ask' as const)
+    }
+    if (own === undefined) {
+      input.notice(
+        `${recipient.self.name} has not run on a route of their own yet, so this reply runs on ${from.peer.self.name}'s ${runtimeDisplayName(route.runtime)} / ${route.model}. Message ${recipient.self.name} once on the route they should keep.`
+      )
+    }
+    let response: CodexMissionStartResponse
+    try {
+      response = await options.start({
+        prompt: input.prompt,
+        runtime: route.runtime,
+        mode: route.mode,
+        model: route.model === 'account-default' ? undefined : route.model,
+        peer: recipient,
+        followUpOf,
+        relay: input.origin
+      })
+    } catch {
+      input.notice(`${recipient.self.name} could not reply on their own: the run could not be started.`)
+      return undefined
+    }
+    if (!response.ok) {
+      input.notice(`${recipient.self.name} could not reply on their own: ${response.error.message} The message waits for their next run.`)
+      return undefined
+    }
+    await options.assignOwner(recipient.self.teammateId, response.data.missionId).catch(() => undefined)
+    options.notify({
+      kind: 'mission-started',
+      runId: response.data.runId,
+      missionId: response.data.missionId,
+      teammateId: recipient.self.teammateId,
+      prompt: input.prompt,
+      data: response.data,
+      hop: input.origin.hop
+    })
+    return { missionId: response.data.missionId }
+  }
+
+  /** The asker's next turn, once, briefed with everyone's reply. */
+  const closeMeeting = async (meeting: Meeting, from: SharingMission): Promise<void> => {
+    meetings.delete(meeting.askerMissionId)
+    const asker = await options.peerContextFor(meeting.askerId)
+    if (asker === undefined) return
+    if (meeting.answered.length === 0) {
+      notify(meeting.askerRunId, meeting.askerMissionId, 'Nobody replied. Your message waits with them for their next run.')
+      return
+    }
+    const silent = [...meeting.silent, ...meeting.awaiting.values()]
+    const origin: RelayOrigin = {
+      hop: meeting.origin.hop + 1,
+      lastMissionOf: { ...meeting.origin.lastMissionOf, [from.peer.self.teammateId]: from.missionId }
+    }
+    if (origin.hop > MAX_RELAY_HOPS) {
+      notify(meeting.askerRunId, meeting.askerMissionId, `Stopped after ${String(MAX_RELAY_HOPS)} automatic replies. The replies wait for your next run.`)
+      return
+    }
+    await startFor({
+      recipient: asker,
+      prompt: meetingPrompt({ repliers: meeting.answered, silent }),
+      from,
+      origin,
+      notice: (message) => notify(meeting.askerRunId, meeting.askerMissionId, message)
+    })
+  }
+
   return {
     async onShared(mission, posted) {
       if (posted.length === 0) return
@@ -146,15 +280,37 @@ export function createRelay(options: RelayOptions): Relay {
         enabled = false
       }
       const hop = mission.relay?.hop ?? 0
-      const notice = (message: string): void => {
-        options.notify({ kind: 'relay-notice', runId: mission.runId, missionId: mission.missionId, message })
+      const notice = (message: string): void => notify(mission.runId, mission.missionId, message)
+
+      // A reply into an open meeting is held, not relayed: the asker's turn
+      // starts once everyone has spoken. The message itself is already in
+      // the workroom, so nothing is lost by waiting.
+      const meeting = answering.get(mission.missionId)
+      const held = new Set<string>()
+      if (meeting !== undefined && meeting.awaiting.has(mission.peer.self.teammateId)) {
+        if (posted.some((message) => message.to.teammateId === meeting.askerId)) {
+          meeting.awaiting.delete(mission.peer.self.teammateId)
+          meeting.answered.push(mission.peer.self.name)
+          held.add(meeting.askerId)
+          if (meeting.awaiting.size > 0) {
+            notify(
+              meeting.askerRunId,
+              meeting.askerMissionId,
+              `${mission.peer.self.name} replied. Still waiting on ${[...meeting.awaiting.values()].join(', ')}.`
+            )
+          } else {
+            await closeMeeting(meeting, mission)
+          }
+        }
       }
+
       // One automatic run per recipient per share, whatever was posted: a
       // run that wrote to the same teammate twice gets one reply, not two.
       const seen = new Set<string>()
+      const started: { readonly teammateId: string; readonly name: string; readonly missionId: string }[] = []
       for (const message of posted) {
         const recipientId = message.to.teammateId
-        if (seen.has(recipientId)) continue
+        if (seen.has(recipientId) || held.has(recipientId)) continue
         seen.add(recipientId)
 
         const decision = decideRelay({ enabled, hop, recipientName: message.to.name })
@@ -174,55 +330,62 @@ export function createRelay(options: RelayOptions): Relay {
           hop: decision.hop,
           lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
         }
-        // Each hop is the next turn of ITS teammate's conversation in this
-        // exchange, so both sides read as one thread. A recipient who has
-        // not spoken in it yet starts fresh: they were not in a conversation
-        // about this.
-        const followUpOf = origin.lastMissionOf[recipientId]
-        const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop })
-        // Their own route, so each teammate stays the model a person made
-        // them. Only a teammate who has never run borrows the sender's.
-        const own = recipient.self.route
-        const route = own ?? {
-          runtime: mission.runtime,
-          model: mission.model ?? 'account-default',
-          mode: mission.sandbox === 'workspace-write' ? ('accept-edits' as const) : ('ask' as const)
-        }
-        if (own === undefined) {
-          notice(
-            `${recipient.self.name} has not run on a route of their own yet, so this reply runs on ${mission.peer.self.name}'s ${runtimeDisplayName(route.runtime)} / ${route.model}. Message ${recipient.self.name} once on the route they should keep.`
-          )
-        }
-        let response: CodexMissionStartResponse
-        try {
-          response = await options.start({
-            prompt,
-            runtime: route.runtime,
-            mode: route.mode,
-            model: route.model === 'account-default' ? undefined : route.model,
-            peer: recipient,
-            followUpOf,
-            relay: origin
-          })
-        } catch {
-          notice(`${recipient.self.name} could not reply on their own: the run could not be started.`)
-          continue
-        }
-        if (!response.ok) {
-          notice(`${recipient.self.name} could not reply on their own: ${response.error.message} The message waits for their next run.`)
-          continue
-        }
-        await options.assignOwner(recipient.self.teammateId, response.data.missionId).catch(() => undefined)
-        options.notify({
-          kind: 'mission-started',
-          runId: response.data.runId,
-          missionId: response.data.missionId,
-          teammateId: recipient.self.teammateId,
-          prompt,
-          data: response.data,
-          hop: origin.hop
+        const result = await startFor({
+          recipient,
+          prompt: relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop }),
+          from: mission,
+          origin,
+          notice
         })
+        if (result !== undefined) started.push({ teammateId: recipientId, name: recipient.self.name, missionId: result.missionId })
       }
+
+      // Writing to several teammates at once opens a meeting: their answers
+      // are collected, and the asker's next turn starts once, with all of
+      // them. One recipient is an ordinary exchange and needs no minutes.
+      if (started.length >= 2) {
+        const opened: Meeting = {
+          askerId: mission.peer.self.teammateId,
+          askerName: mission.peer.self.name,
+          askerRunId: mission.runId,
+          askerMissionId: mission.missionId,
+          origin: { hop, lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId } },
+          awaiting: new Map(started.map((entry) => [entry.teammateId, entry.name])),
+          answered: [],
+          silent: []
+        }
+        meetings.set(mission.missionId, opened)
+        for (const entry of started) answering.set(entry.missionId, opened)
+        notice(`Waiting on ${started.map((entry) => entry.name).join(', ')} to reply before your next turn.`)
+      }
+    },
+
+    async onRunEnded(mission) {
+      const meeting = answering.get(mission.missionId)
+      answering.delete(mission.missionId)
+      if (meeting === undefined || mission.peer === undefined) return
+      const teammateId = mission.peer.self.teammateId
+      if (!meeting.awaiting.has(teammateId)) return
+      // Ended without a word to the asker: counted, not waited for forever.
+      meeting.awaiting.delete(teammateId)
+      meeting.silent.push(mission.peer.self.name)
+      if (meeting.awaiting.size > 0) {
+        notify(
+          meeting.askerRunId,
+          meeting.askerMissionId,
+          `${mission.peer.self.name} finished without replying. Still waiting on ${[...meeting.awaiting.values()].join(', ')}.`
+        )
+        return
+      }
+      await closeMeeting(meeting, {
+          runId: '',
+          missionId: mission.missionId,
+          runtime: 'codex',
+          sandbox: 'read-only',
+          model: undefined,
+          peer: mission.peer,
+          relay: mission.relay
+        })
     }
   }
 }

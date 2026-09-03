@@ -30,7 +30,7 @@ import { composeHandoffPrompt } from './handoff.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
-import type { RelayOrigin, SharingMission } from './relay.js'
+import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -124,6 +124,8 @@ interface CodexMissionServiceOptions {
    * happens after the share is recorded and must not fail the run.
    */
   readonly onShared?: (mission: SharingMission, posted: readonly WorkroomMessage[]) => Promise<void>
+  /** Called once a run is over, however it ended, after any share it made. */
+  readonly onRunEnded?: (mission: EndedMission) => Promise<void>
   readonly createId?: () => string
   readonly now?: () => Date
   readonly schedule?: (task: () => void) => void
@@ -270,6 +272,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
   const clearActive = (candidate: ActiveCodexMission): void => {
     if (active.get(candidate.runId) === candidate) active.delete(candidate.runId)
+    // Whatever ended this run, anyone waiting on it is told. Fire and forget:
+    // a meeting's bookkeeping must never hold a slot open.
+    if (options.onRunEnded !== undefined) {
+      void options
+        .onRunEnded({ missionId: candidate.missionId, peer: candidate.peer, relay: candidate.relay })
+        .catch(() => undefined)
+    }
   }
 
   const consume = async (mission: ActiveCodexMission): Promise<void> => {

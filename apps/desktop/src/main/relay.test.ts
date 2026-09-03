@@ -2,7 +2,7 @@ import type { WorkroomMessage } from '@teammate/mission-store'
 import { describe, expect, it } from 'vitest'
 
 import type { CodexMissionStartResponse, CodexMissionUpdate } from '../shared/ipc.js'
-import { MAX_RELAY_HOPS, createRelay, decideRelay, relayPrompt } from './relay.js'
+import { MAX_RELAY_HOPS, createRelay, decideRelay, meetingPrompt, relayPrompt } from './relay.js'
 import type { RelayOptions, SharingMission } from './relay.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
@@ -247,5 +247,102 @@ describe('relaying a share', () => {
     })
     await relay.onShared(sharing(), [message(BOOTY)])
     expect(starts).toHaveLength(0)
+  })
+})
+
+describe('a meeting: one asks several, and the next turn waits for all of them', () => {
+  const ATLAS = { teammateId: 'tm_atlas', name: 'Atlas', role: 'Research & Briefs' }
+  const ATLAS_ROUTE = { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
+  const three = (self: { teammateId: string; name: string; role: string; route?: unknown }): MissionPeerContext => ({
+    self: self as MissionPeerContext['self'],
+    others: [WREN, BOOTY, ATLAS].filter((entry) => entry.teammateId !== self.teammateId)
+  })
+  function meetingHarness() {
+    const starts: Parameters<RelayOptions['start']>[0][] = []
+    const notices: string[] = []
+    let count = 0
+    const relay = createRelay({
+      enabled: async () => true,
+      peerContextFor: async (id) =>
+        id === WREN.teammateId ? three(WREN) : id === BOOTY.teammateId ? three({ ...BOOTY, route: BOOTY_ROUTE }) : id === ATLAS.teammateId ? three({ ...ATLAS, route: ATLAS_ROUTE }) : undefined,
+      start: async (input) => {
+        starts.push(input)
+        count += 1
+        return {
+          ok: true,
+          data: {
+            runId: `run_${String(count)}`,
+            missionId: `mission_${input.peer.self.name.toLowerCase()}_${String(count)}`,
+            runtime: input.runtime,
+            model: input.model ?? 'account-default',
+            resolvedRouteId: 'x',
+            cliVersion: null,
+            sandbox: 'read-only',
+            peerMessages: [],
+            peerDeliveryFailed: false
+          }
+        }
+      },
+      assignOwner: async () => undefined,
+      notify: (update) => {
+        if (update.kind === 'relay-notice') notices.push(update.message)
+      }
+    })
+    return { relay, starts, notices }
+  }
+  const wrenAsks = (): SharingMission => ({ ...sharing(), peer: three(WREN) })
+  const toBoth = (): WorkroomMessage[] => [message(BOOTY, 'Booty, check the tests.'), message(ATLAS, 'Atlas, check the docs.')]
+
+  it('starts a run for each, and says the next turn is waiting on them', async () => {
+    const { relay, starts, notices } = meetingHarness()
+    await relay.onShared(wrenAsks(), toBoth())
+    expect(starts.map((s) => s.peer.self.name)).toEqual(['Booty', 'Atlas'])
+    expect(notices.at(-1)).toBe('Waiting on Booty, Atlas to reply before your next turn.')
+  })
+
+  it("holds the first reply, and starts the asker's turn once after the last, briefed with everyone", async () => {
+    const { relay, starts, notices } = meetingHarness()
+    await relay.onShared(wrenAsks(), toBoth())
+    const bootyRun: SharingMission = { ...sharing(), runId: 'run_1', missionId: 'mission_booty_1', peer: three({ ...BOOTY, route: BOOTY_ROUTE }), relay: starts[0]!.relay }
+    await relay.onShared(bootyRun, [{ ...message(WREN, 'Tests pass.'), from: { ...BOOTY, missionId: 'mission_booty_1' } } as WorkroomMessage])
+    expect(starts).toHaveLength(2)
+    expect(notices.at(-1)).toBe('Booty replied. Still waiting on Atlas.')
+    const atlasRun: SharingMission = { ...sharing(), runId: 'run_2', missionId: 'mission_atlas_2', peer: three({ ...ATLAS, route: ATLAS_ROUTE }), relay: starts[1]!.relay }
+    await relay.onShared(atlasRun, [{ ...message(WREN, 'Docs are stale.'), from: { ...ATLAS, missionId: 'mission_atlas_2' } } as WorkroomMessage])
+    expect(starts).toHaveLength(3)
+    expect(starts[2]).toMatchObject({ peer: three(WREN), followUpOf: 'mission_wren1' })
+    expect(starts[2]?.prompt).toContain('Booty and Atlas replied to your message')
+  })
+
+  it('counts a teammate who finishes without replying, and still convenes the rest', async () => {
+    const { relay, starts, notices } = meetingHarness()
+    await relay.onShared(wrenAsks(), toBoth())
+    await relay.onRunEnded({ missionId: 'mission_booty_1', peer: three(BOOTY), relay: starts[0]!.relay })
+    expect(notices.at(-1)).toBe('Booty finished without replying. Still waiting on Atlas.')
+    const atlasRun: SharingMission = { ...sharing(), runId: 'run_2', missionId: 'mission_atlas_2', peer: three({ ...ATLAS, route: ATLAS_ROUTE }), relay: starts[1]!.relay }
+    await relay.onShared(atlasRun, [{ ...message(WREN, 'Docs are stale.'), from: { ...ATLAS, missionId: 'mission_atlas_2' } } as WorkroomMessage])
+    expect(starts).toHaveLength(3)
+    expect(starts[2]?.prompt).toContain('Atlas replied to your message')
+    expect(starts[2]?.prompt).toContain('Booty finished without replying')
+  })
+
+  it('says so when nobody replied, and starts nothing', async () => {
+    const { relay, starts, notices } = meetingHarness()
+    await relay.onShared(wrenAsks(), toBoth())
+    await relay.onRunEnded({ missionId: 'mission_booty_1', peer: three(BOOTY), relay: starts[0]!.relay })
+    await relay.onRunEnded({ missionId: 'mission_atlas_2', peer: three(ATLAS), relay: starts[1]!.relay })
+    expect(starts).toHaveLength(2)
+    expect(notices.at(-1)).toBe('Nobody replied. Your message waits with them for their next run.')
+  })
+
+  it('one recipient is an ordinary exchange, not a meeting', async () => {
+    const { relay, notices } = meetingHarness()
+    await relay.onShared(wrenAsks(), [message(BOOTY)])
+    expect(notices.some((n) => n.startsWith('Waiting on'))).toBe(false)
+  })
+
+  it('names everyone in the minutes', () => {
+    expect(meetingPrompt({ repliers: ['Booty', 'Atlas', 'Juno'], silent: [] })).toContain('Booty, Atlas and Juno replied')
+    expect(meetingPrompt({ repliers: ['Booty'], silent: ['Atlas'] })).toContain('Atlas finished without replying')
   })
 })

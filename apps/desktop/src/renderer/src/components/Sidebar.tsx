@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 
 import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
 import {
@@ -185,6 +186,14 @@ export function Sidebar({
                   <span className={`lc-row__meta lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
                     {status.label}
                   </span>
+                  {teammate.route !== undefined && (
+                    // Which model this teammate IS. People pit models against
+                    // each other on purpose, and that only reads if each row
+                    // says who is who without opening a thread.
+                    <span className="lc-row__route lc-mono" title="The route this teammate last ran on; replies on their own run here">
+                      {runtimeDisplayName(teammate.route.runtime)} / {teammate.route.model}
+                    </span>
+                  )}
                 </span>
               </button>
               {shownOwned.length > 0 && (

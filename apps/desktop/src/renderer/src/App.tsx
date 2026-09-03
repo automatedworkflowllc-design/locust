@@ -30,7 +30,7 @@ import { CommandPalette } from './components/CommandPalette.js'
 import type { PaletteAction } from './components/CommandPalette.js'
 import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
-import { MissionsScreen, SettingsScreen, TeammatesScreen } from './components/Screens.js'
+import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
 import type { RouteChoice } from './components/RoutePicker.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
@@ -54,7 +54,7 @@ import {
 } from './missionView.js'
 import { collapseConversations, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
-import type { LiveActivity } from './faceState.js'
+import type { FaceActivity, LiveActivity } from './faceState.js'
 
 /**
  * The Locust shell.
@@ -1203,6 +1203,25 @@ export default function App(): ReactElement {
     const owner = run === undefined ? undefined : ownerOf(run)
     if (owner !== undefined) pendingApprovalsByOwner.set(owner, (pendingApprovalsByOwner.get(owner) ?? 0) + 1)
   }
+  // And each teammate's face, decided once here with the same inputs the
+  // sidebar uses, for the surfaces that do not compute their own status.
+  const activityByTeammate: Record<string, FaceActivity> = {}
+  for (const teammate of teammates) {
+    const owned = sidebarMissions.filter(
+      (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
+    )
+    const theirRuntime = owned.find((mission) => mission.phase === 'running')?.runtime ?? owned.at(0)?.runtime
+    activityByTeammate[teammate.teammateId] = teammateStatusView({
+      runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
+      anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+      hasRunningMission: owned.some((mission) => mission.phase === 'running'),
+      pendingApprovals: pendingApprovalsByOwner.get(teammate.teammateId) ?? 0,
+      roleLabel: teammate.role,
+      ...(liveActivityByOwner[teammate.teammateId] === undefined ? {} : { liveActivity: liveActivityByOwner[teammate.teammateId] }),
+      recentlyDone: recentlyDone.includes(teammate.teammateId),
+      recentlyReceived: recentlyReceived.includes(teammate.teammateId)
+    }).activity
+  }
 
   return (
     <div className="lc-shell">
@@ -1262,6 +1281,7 @@ export default function App(): ReactElement {
             <TeammatesScreen
               teammates={teammates}
               missionOwners={missionOwners}
+              activityByTeammate={activityByTeammate}
               onNewTeammate={() => {
                 setTeammateError(undefined)
                 setNewTeammateOpen(true)
@@ -1442,6 +1462,7 @@ export default function App(): ReactElement {
               />
             </>
           )}
+          {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer
             runtimes={runtimes}

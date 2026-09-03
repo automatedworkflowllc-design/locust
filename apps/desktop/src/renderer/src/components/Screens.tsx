@@ -18,6 +18,8 @@ import {
   routeRowStatus
 } from '../status.js'
 import { PixelFace } from './PixelFace.js'
+import type { FaceActivity } from '../faceState.js'
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
 
@@ -163,12 +165,15 @@ export function MissionsScreen({
 export function TeammatesScreen({
   teammates,
   missionOwners,
+  activityByTeammate,
   onNewTeammate,
   onEdit,
   onRemove
 }: {
   readonly teammates: readonly PublicTeammate[]
   readonly missionOwners: Readonly<Record<string, string>>
+  /** Each teammate's face state, decided once in the shell so the roster agrees with the sidebar. */
+  readonly activityByTeammate: Readonly<Record<string, FaceActivity>>
   readonly onNewTeammate: () => void
   readonly onEdit: (teammate: PublicTeammate) => void
   readonly onRemove: (teammateId: string) => void
@@ -186,7 +191,13 @@ export function TeammatesScreen({
             return (
               <div className="lc-rostercard" key={teammate.teammateId}>
                 <div className="lc-rostercard__head">
-                  <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={36} />
+                  <PixelFace
+                    hue={teammate.hue}
+                    avatar={teammate.avatar}
+                    size={36}
+                    activity={activityByTeammate[teammate.teammateId] ?? 'idle'}
+                    teammateId={teammate.teammateId}
+                  />
                   <div className="lc-rostercard__id">
                     <div className="lc-rostercard__name">{teammate.name}</div>
                     <div className="lc-rostercard__role">{teammate.role}</div>
@@ -194,7 +205,11 @@ export function TeammatesScreen({
                 </div>
                 <dl className="lc-rostercard__facts">
                   <dt>Route</dt>
-                  <dd className="lc-mono">whichever is active at start</dd>
+                  <dd className="lc-mono">
+                    {teammate.route === undefined
+                      ? 'not run yet · set by their first mission'
+                      : `${runtimeDisplayName(teammate.route.runtime)} / ${teammate.route.model}`}
+                  </dd>
                   <dt>Missions</dt>
                   <dd className="lc-mono">{owned}</dd>
                   <dt>Mode</dt>
@@ -580,6 +595,49 @@ export function SettingsScreen({
           <RetentionControl report={storage} onPreview={onPreviewPrune} onPrune={onPrune} />
         </section>
       </div>
+    </div>
+  )
+}
+
+
+/**
+ * The one line that says a new version is here. Settings knew; the person
+ * did not, because nobody opens Settings to find out. It sits above the
+ * composer, offers the install, and never installs on its own -- a running
+ * mission must not be cut off mid-run, and the host refuses if one is.
+ */
+export function UpdateBanner({
+  update,
+  onInstall
+}: {
+  readonly update: AppUpdateState | undefined
+  readonly onInstall: () => Promise<AppUpdateResponse>
+}): ReactElement | null {
+  const [busy, setBusy] = useState(false)
+  const [refusal, setRefusal] = useState<string>()
+  if (update === undefined || update.phase !== 'ready') return null
+  return (
+    <div className="lc-updatebanner" role="status">
+      <span className="lc-updatebanner__text">
+        Locust {update.availableVersion ?? ''} is downloaded and ready. It installs when you restart.
+        {refusal !== undefined && <span className="lc-tone-amber"> {refusal}</span>}
+      </span>
+      <button
+        type="button"
+        className="lc-button"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true)
+          setRefusal(undefined)
+          void onInstall()
+            .then((response) => {
+              if (!response.ok) setRefusal(response.error.message)
+            })
+            .finally(() => setBusy(false))
+        }}
+      >
+        Restart and install
+      </button>
     </div>
   )
 }
