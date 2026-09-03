@@ -449,16 +449,36 @@ describe("continuing a conversation", () => {
     expect(spec.args[spec.args.indexOf("--resume") + 1]).toBe("sess-42");
   });
 
-  it("resumes a Codex session through its subcommand, keeping the sandbox", () => {
+  it("resumes a Codex session with only the arguments that subcommand accepts", () => {
+    // MEASURED against codex-cli 0.151.0: `codex exec resume` takes neither
+    // `--sandbox` nor `-C`, and exits 2 with "unexpected argument" if given
+    // either. This test used to assert the argv I had written rather than the
+    // argv the CLI accepts, so every Codex reply failed and the suite stayed
+    // green. The sandbox travels as the config override the subcommand does
+    // support, and the working directory needs no flag: the process is
+    // spawned in it.
     const spec = createCodexExecCommand(executable, {
       workspacePath,
       resumeThreadId: "thread-42",
       sandbox: "read-only",
     });
     expect(spec.args.slice(0, 3)).toEqual(["exec", "resume", "thread-42"]);
-    expect(spec.args[spec.args.indexOf("--sandbox") + 1]).toBe("read-only");
+    expect(spec.args).not.toContain("--sandbox");
+    expect(spec.args).not.toContain("-C");
+    expect(spec.args).not.toContain(workspacePath);
+    expect(spec.args).toEqual(expect.arrayContaining(["-c", "sandbox_mode=read-only"]));
     // The prompt still arrives on stdin, so the trailing `-` must survive.
     expect(spec.args.at(-1)).toBe("-");
+  });
+
+  it("carries a write-capable resume as the same override, not as a flag", () => {
+    const spec = createCodexExecCommand(executable, {
+      workspacePath,
+      resumeThreadId: "thread-42",
+      sandbox: "workspace-write",
+    });
+    expect(spec.args).toEqual(expect.arrayContaining(["-c", "sandbox_mode=workspace-write"]));
+    expect(spec.args).not.toContain("--sandbox");
   });
 
   it("starts a fresh conversation when no session is given", () => {

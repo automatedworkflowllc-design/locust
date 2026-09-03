@@ -25,15 +25,20 @@ const PORT = 9223
 const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
 const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
 const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
-// Which route to prove it on. Cursor is the default because it is the
-// cheapest here; the same check belongs on Codex and Claude Code, and runs
-// there with `--route=codex --model="GPT-5"` when there is quota to spend.
+// Which route to prove it on.
+//
+// The default is the composer's own default route, with no model picked, so
+// this runs read-only on Codex. It used to default to Cursor because that is
+// the cheapest here -- but a read-only Cursor mission is refused on Windows
+// (its sandbox needs macOS or Linux, and plan mode alone does not stop it
+// editing files), so the cheap route cannot prove a read-only claim here.
+// Pass `--route=cursor --model="Composer 2.5"` on a platform where it can.
 const arg = (name, fallback) => {
   const found = process.argv.slice(2).find((value) => value.startsWith(`--${name}=`))
   return found === undefined ? fallback : found.slice(name.length + 3)
 }
-const ROUTE = arg('route', 'cursor')
-const MODEL = arg('model', 'Composer 2.5')
+const ROUTE = arg('route', undefined)
+const MODEL = arg('model', undefined)
 // A word the model cannot get right by guessing, so a "remembered" answer in
 // the second turn can only have come from the first.
 const CODE = 'marmalade-quokka-71'
@@ -115,6 +120,12 @@ const runTurn = (prompt) => `(async () => {
     await new Promise(r => setTimeout(r, 1000))
     const stop = document.querySelector('button[aria-label^="Stop the running"]')
     if (stop) sawRunning = true
+    // A mission the host REFUSES never runs, so waiting for a run to end
+    // would wait out the whole timeout and report nothing useful.
+    const refused = document.querySelector('.lc-card.is-red')
+    if (!sawRunning && refused) {
+      return JSON.stringify({ started: true, done: false, refused: refused.innerText.replace(/\\s+/g, ' ').trim() })
+    }
     const marker = document.querySelector('.lc-thread__marker')
     if (sawRunning && !stop && marker) {
       return JSON.stringify({
@@ -122,6 +133,10 @@ const runTurn = (prompt) => `(async () => {
         done: true,
         header: (document.querySelector('.lc-workroom__mission') || { innerText: '' }).innerText.replace(/\\s+/g, ' ').trim(),
         thread: document.querySelector('.lc-thread').innerText.replace(/\\s+/g, ' ').trim(),
+        // What the MODEL said, separately from the thread as a whole. The
+        // passphrase is visible in the prompt bubble, so grepping the whole
+        // thread would pass with no model in the loop at all.
+        answers: [...document.querySelectorAll('.lc-agentline')].map(n => n.innerText.replace(/\\s+/g, ' ').trim()),
         error: (document.querySelector('.lc-card.is-red') || { innerText: '' }).innerText.trim()
       })
     }
@@ -172,8 +187,12 @@ try {
     return false
   })()`)
 
-  say(`2. pick the route under test (${ROUTE} / ${MODEL})`)
-  const picked = await cdp.eval(`(async () => {
+  say(ROUTE === undefined ? '2. keep the default route' : `2. pick the route under test (${ROUTE} / ${MODEL})`)
+  if (ROUTE !== undefined && MODEL === undefined) {
+    say('       --route needs --model')
+    process.exit(1)
+  }
+  const picked = ROUTE === undefined ? '{"picked":true,"controls":[]}' : await cdp.eval(`(async () => {
     for (let attempt = 0; attempt < 160; attempt += 1) {
       const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
       if (!document.querySelector('.lc-picker')) control.click()
@@ -203,11 +222,25 @@ try {
   // The picker shows a display name ("Composer 2.5") and the composer shows
   // the model id ("composer-2.5"); compare on letters and digits alone.
   const plain = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, '')
-  check('the route under test is selected', pickedState.picked === true && (pickedState.controls ?? []).some((t) => plain(t).includes(plain(MODEL))), picked)
+  check(
+    'the route under test is selected',
+    pickedState.picked === true
+      && (MODEL === undefined || (pickedState.controls ?? []).some((t) => plain(t).includes(plain(MODEL)))),
+    picked
+  )
 
   say('3. first turn: give it something only this conversation knows')
   const first = JSON.parse(await cdp.eval(runTurn(FIRST)))
-  check('the first mission ran to a terminal state', first.started === true && first.done === true, JSON.stringify(first).slice(0, 200))
+  check(
+    'the first mission ran to a terminal state',
+    first.started === true && first.done === true,
+    first.refused ?? JSON.stringify(first).slice(0, 200)
+  )
+  if (first.refused) {
+    say(`       refused: ${first.refused.slice(0, 200)}`)
+    say('\n1 FAILED')
+    process.exit(1)
+  }
   check('the first mission completed', /completed/.test(first.header ?? '') && !first.error, first.error || first.header)
 
   say('4. second turn: a plain reply, with nothing re-selected')
@@ -215,7 +248,9 @@ try {
   check('the reply ran to a terminal state', second.started === true && second.done === true, JSON.stringify(second).slice(0, 200))
   check('the reply completed', /completed/.test(second.header ?? '') && !second.error, second.error || second.header)
   say(`       thread now: ${(second.thread ?? '').slice(-220)}`)
-  check('the model remembered the passphrase', new RegExp(CODE, 'i').test(second.thread ?? ''), (second.thread ?? '').slice(-200))
+  const answered = (second.answers ?? []).at(-1) ?? ''
+  say(`       last answer: ${answered.slice(0, 120)}`)
+  check('the model remembered the passphrase', new RegExp(CODE, 'i').test(answered), answered.slice(0, 200))
   check('and the earlier turn is still on screen', (second.thread ?? '').includes('passphrase exactly'), (second.thread ?? '').slice(0, 200))
 
   say('5. the ledger records it as a continuation, not a stranger')

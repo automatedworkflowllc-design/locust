@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
-import { capRouteRows, integrationOf, ROUTE_GROUP_LIMIT, routeRowStatus } from '../status.js'
+import { capRouteRows, integrationOf, ROUTE_GROUP_LIMIT, routeRowStatus, routeRowTag } from '../status.js'
 import type { RouteTag } from '../status.js'
 
 export interface RouteChoice {
@@ -72,7 +72,7 @@ function buildRows(
         model: entry.model,
         label: entry.label,
         detail: entry.detail,
-        tag: isActive ? 'ACTIVE' : status.tag,
+        tag: routeRowTag(status, isActive),
         selectable: status.selectable
       })
     }

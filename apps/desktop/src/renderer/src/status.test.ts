@@ -17,6 +17,7 @@ import {
   prunePreviewSummary,
   ROUTE_GROUP_LIMIT,
   routeRowStatus,
+  routeRowTag,
   runtimeIsUsable,
   shortMissionId,
   teammateStatusView
@@ -327,5 +328,80 @@ describe('how far each integration goes', () => {
 
   it('treats a runtime it has never heard of as planned, not as live', () => {
     expect(integrationOf('something-new')).toBe('planned')
+  })
+})
+
+describe('the tag on the route you are set to', () => {
+  const runtime = (overrides: Partial<PublicRuntimeStatus> = {}): PublicRuntimeStatus => ({
+    id: 'codex',
+    displayName: 'Codex CLI',
+    installed: true,
+    version: '0.151.0',
+    auth: 'authenticated',
+    ready: true,
+    status: 'ready',
+    ...overrides
+  })
+
+  it('says ACTIVE only on a row that could actually run', () => {
+    expect(routeRowTag(routeRowStatus(runtime(), 'live', true), true)).toBe('ACTIVE')
+  })
+
+  it('does not put ACTIVE on a runtime that is not there', () => {
+    // A fresh install points the composer at Codex before discovery has
+    // found anything. The row used to read lime ACTIVE directly above the
+    // sentence "Codex CLI was not found on this machine."
+    const missing = routeRowStatus(runtime({ installed: false, ready: false, status: 'not-installed' }), 'live', true)
+    expect(routeRowTag(missing, true)).toBe('UNAVAILABLE')
+    const signedOut = routeRowStatus(runtime({ ready: false, status: 'auth-required', auth: 'unauthenticated' }), 'live', true)
+    expect(routeRowTag(signedOut, true)).toBe('SIGN IN')
+  })
+})
+
+describe('a teammate with no work of their own', () => {
+  const ready: PublicRuntimeStatus = {
+    id: 'claude',
+    displayName: 'Claude Code',
+    installed: true,
+    version: '2.1.0',
+    auth: 'authenticated',
+    ready: true,
+    status: 'ready'
+  }
+
+  it('is idle, not blocked, when something could run', () => {
+    const view = teammateStatusView({
+      runtime: undefined,
+      anyRuntimeUsable: true,
+      hasRunningMission: false,
+      pendingApprovals: 0,
+      roleLabel: 'Docs & QA'
+    })
+    expect(view.status).toBe('idle')
+  })
+
+  it('is blocked when nothing is signed in at all', () => {
+    const view = teammateStatusView({
+      runtime: undefined,
+      anyRuntimeUsable: false,
+      hasRunningMission: false,
+      pendingApprovals: 0,
+      roleLabel: 'Docs & QA'
+    })
+    expect(view.status).toBe('blocked')
+  })
+
+  it('is judged against the runtime its own mission is on', () => {
+    // Claude is signed in and running this teammate's work. Asking about a
+    // different runtime told the person she needed to sign in while her
+    // output was streaming on screen.
+    const view = teammateStatusView({
+      runtime: ready,
+      anyRuntimeUsable: true,
+      hasRunningMission: true,
+      pendingApprovals: 0,
+      roleLabel: 'Code & Migrations'
+    })
+    expect(view.status).toBe('working')
   })
 })

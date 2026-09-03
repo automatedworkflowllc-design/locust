@@ -8,6 +8,7 @@ import {
   faceActivityFor,
   facePresenceFor,
   missionPhaseView,
+  runtimeIsUsable,
   shortMissionId,
   teammateStatusView
 } from '../status.js'
@@ -23,6 +24,8 @@ export interface SidebarMission {
   readonly missionId: string
   readonly title: string
   readonly phase: PublicRecoveredMission['phase'] | 'running'
+  /** Which runtime this mission is on, when it is known. */
+  readonly runtime?: PublicRecoveredMission['runtime']
   readonly integrityIssueCount: number
 }
 
@@ -92,8 +95,19 @@ export function Sidebar({
           const owned = missions.filter(
             (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
           )
+          // The runtime this teammate's own work is on. Asking about Codex
+          // for everyone told a person their teammate needed a sign-in while
+          // she was visibly working on Claude Code.
+          const theirRuntime = owned.find((mission) => mission.phase === 'running')?.runtime
+            ?? owned.at(0)?.runtime
           const status = teammateStatusView({
-            runtime: runtimes.find((entry) => entry.id === 'codex'),
+            // A teammate with no work of their own is judged by nothing in
+            // particular, so the roster says idle rather than borrowing some
+            // other runtime's sign-in state.
+            runtime: theirRuntime === undefined
+              ? undefined
+              : runtimes.find((entry) => entry.id === theirRuntime),
+            anyRuntimeUsable: runtimes.some(runtimeIsUsable),
             hasRunningMission: owned.some((mission) => mission.phase === 'running'),
             pendingApprovals: pendingApprovals[teammate.teammateId] ?? 0,
             roleLabel: teammate.role

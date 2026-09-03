@@ -74,6 +74,19 @@ export function runtimeIsUsable(runtime: PublicRuntimeStatus): boolean {
   return runtime.ready && runtime.status === 'ready'
 }
 
+/**
+ * The tag a route row wears, given what discovery proved and whether this is
+ * the row the composer is set to.
+ *
+ * ACTIVE is drawn in the same lime as READY and reads as a stronger claim, so
+ * it may only sit on a row that could actually run. A fresh install defaults
+ * the route to Codex; before this, that row wore a lime ACTIVE tag directly
+ * above the sentence "Codex CLI was not found on this machine."
+ */
+export function routeRowTag(status: RouteRowStatus, isActive: boolean): RouteTag {
+  return isActive && status.selectable ? 'ACTIVE' : status.tag
+}
+
 export function routeRowStatus(
   runtime: PublicRuntimeStatus,
   integration: IntegrationLevel,
@@ -145,14 +158,28 @@ export interface TeammateStatusView {
 }
 
 export function teammateStatusView(input: {
+  /**
+   * The runtime this teammate's own work is on, when they have any. A
+   * teammate with no missions has no runtime of their own, and judging every
+   * teammate against one hard-coded runtime told people their teammate needed
+   * a sign-in while she was visibly working on another one.
+   */
   readonly runtime: PublicRuntimeStatus | undefined
+  /** Whether ANY runtime could take work right now. */
+  readonly anyRuntimeUsable?: boolean
   readonly hasRunningMission: boolean
   readonly pendingApprovals: number
   readonly roleLabel: string
 }): TeammateStatusView {
-  // A teammate whose runtime cannot run is blocked, even if a mission looks
-  // active in the renderer -- the sign-in wall outranks optimistic local state.
-  if (input.runtime === undefined || !runtimeIsUsable(input.runtime)) {
+  // Nobody can work when nothing is signed in, whatever this teammate has
+  // done before.
+  if (input.anyRuntimeUsable === false) {
+    return { status: 'blocked', label: 'Runtime sign-in required', tone: 'red', pulse: false }
+  }
+  // A teammate whose OWN runtime cannot run is blocked, even if a mission
+  // looks active in the renderer -- the sign-in wall outranks optimistic
+  // local state. One with no runtime of their own is simply idle.
+  if (input.runtime !== undefined && !runtimeIsUsable(input.runtime)) {
     return {
       status: 'blocked',
       label: 'Runtime sign-in required',

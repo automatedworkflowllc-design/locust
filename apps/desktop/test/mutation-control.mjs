@@ -32,6 +32,41 @@ const ROSTER = join(ROOT, 'src', 'main', 'teammate-store.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'a reply is shown the opening line instead of the words typed for it',
+    from: "    if (current.continuesFrom?.reason !== 'route-switch') return current.prompt",
+    to: '    if (current.continuesFrom === undefined) return current.prompt',
+    expect: 'shows a reply the words that were typed for it, not the opening line'
+  },
+  {
+    file: VIEW,
+    name: 'a handed-over mission shows its briefing as typed words',
+    from: '    const prior = byId.get(current.continuesFrom.missionId)',
+    to: '    const prior = undefined',
+    expect: 'shows a handed-over mission the words a person typed, not the briefing written for it'
+  },
+  {
+    file: STATUS,
+    name: 'the active tag is drawn on a runtime that is not there',
+    from: "  return isActive && status.selectable ? 'ACTIVE' : status.tag",
+    to: "  return isActive ? 'ACTIVE' : status.tag",
+    expect: 'does not put ACTIVE on a runtime that is not there'
+  },
+  {
+    file: STATUS,
+    name: 'a teammate with no work of their own reads as blocked',
+    from: '  if (input.runtime !== undefined && !runtimeIsUsable(input.runtime)) {',
+    to: '  if (input.runtime === undefined || !runtimeIsUsable(input.runtime)) {',
+    expect: 'is idle, not blocked, when something could run'
+  },
+  {
+    file: STATUS,
+    name: 'a roster with nothing signed in still says everyone is idle',
+    from: '  if (input.anyRuntimeUsable === false) {',
+    to: '  if (false) {',
+    expect: 'is blocked when nothing is signed in at all'
+  },
+  {
     file: ROSTER,
     name: 'mission assignments grow without bound, until the file empties itself',
     from: '        if (\n          file.missionOwners[missionId] === undefined\n          && Object.keys(file.missionOwners).length >= MAX_MISSION_OWNERS\n        ) {\n          throw new Error(\'Too many mission assignments\')\n        }\n',
@@ -419,7 +454,7 @@ const MUTATIONS = [
   {
     file: STATUS,
     name: 'a blocked runtime is hidden behind an optimistic running mission',
-    from: '  if (input.runtime === undefined || !runtimeIsUsable(input.runtime)) {',
+    from: '  if (input.runtime !== undefined && !runtimeIsUsable(input.runtime)) {',
     to: '  if (false) {',
     expect: 'reports a blocked runtime even while a mission looks like it is running'
   },

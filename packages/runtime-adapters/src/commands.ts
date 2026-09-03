@@ -282,6 +282,15 @@ export function createCodexExecCommand(
   // The host chooses that directory; the renderer only ever chooses the mode.
   // `codex exec resume <SESSION_ID>` is a subcommand, not a flag, so the verb
   // itself changes when a conversation is being continued.
+  //
+  // MEASURED 2026-09-02: `codex exec resume` takes NEITHER `--sandbox` NOR
+  // `-C`. Passing them made the CLI exit 2 with "unexpected argument", so
+  // every Codex reply failed with "Codex invocation did not complete
+  // successfully" -- the unit tests asserted the argv I had written rather
+  // than the argv the CLI accepts, and no live run had exercised it. The
+  // sandbox goes through the config override the subcommand does support,
+  // and the working directory needs no flag because the process is spawned
+  // in it.
   const args = options.resumeThreadId === undefined
     ? ["exec", "--json", "--sandbox", sandboxArgument(options.sandbox), "-C", options.workspacePath]
     : [
@@ -289,10 +298,8 @@ export function createCodexExecCommand(
         "resume",
         requireText(options.resumeThreadId, "Session id"),
         "--json",
-        "--sandbox",
-        sandboxArgument(options.sandbox),
-        "-C",
-        options.workspacePath,
+        "-c",
+        `sandbox_mode=${sandboxArgument(options.sandbox)}`,
       ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));

@@ -44,7 +44,8 @@ import {
   resolvedModelNames,
   resumableSessionOf,
   rootMission,
-  stitchedHandoff
+  stitchedHandoff,
+  typedPrompt
 } from './missionView.js'
 import { shortMissionId } from './status.js'
 
@@ -157,6 +158,35 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
     return { ...live, events, phase: 'failed', error: update.event.payload.message }
   }
   return { ...live, events, phase: live.phase === 'starting' ? 'running' : live.phase }
+}
+
+function reopenedRun(
+  mission: PublicRecoveredMission,
+  byId: ReadonlyMap<string, PublicRecoveredMission>
+): LiveRunState {
+  const restored = restoredLiveRun(mission)
+  const handoff = stitchedHandoff(mission, byId)
+  const earlier = conversationTurns(mission, byId).slice(0, -1)
+  return {
+    ...restored,
+    // The words a PERSON typed for this turn: a route switch's own prompt is
+    // the host's briefing, a follow-up's is what was just typed.
+    prompt: typedPrompt(mission, byId),
+    ...(earlier.length === 0
+      ? {}
+      : {
+          earlierTurns: earlier.map((turn) => {
+            const held = byId.get(turn.missionId)
+            return {
+              missionId: turn.missionId,
+              prompt: held === undefined ? turn.prompt : typedPrompt(held, byId),
+              events: turn.events,
+              peerMessages: turn.peerMessages
+            }
+          })
+        }),
+    ...(handoff === undefined ? {} : { handoff })
+  }
 }
 
 function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
@@ -436,7 +466,12 @@ export default function App(): ReactElement {
           if (current.size > 0) return current
           const queued = pendingUpdatesRef.current.get(latest.runId) ?? []
           pendingUpdatesRef.current.delete(latest.runId)
-          return withNewRun(current, latest.runId, queued.reduce(applyMissionUpdate, restoredLiveRun(latest)))
+          const byId = new Map(response.data.missions.map((mission) => [mission.missionId, mission]))
+          return withNewRun(
+            current,
+            latest.runId,
+            queued.reduce(applyMissionUpdate, reopenedRun(latest, byId))
+          )
         })
         setShownKey((current) => current ?? latest.runId)
       })
@@ -822,28 +857,7 @@ export default function App(): ReactElement {
     }
     const mission = historyById.get(missionId)
     if (mission === undefined) return
-    const restored = restoredLiveRun(mission)
-    const handoff = stitchedHandoff(mission, historyById)
-    // Every earlier turn of this conversation, rebuilt from the ledger, so a
-    // reopened exchange reads the way it did when it happened.
-    const turns = conversationTurns(mission, historyById)
-    const earlier = turns.slice(0, -1)
-    setRuns((current) =>
-      withNewRun(current, mission.runId, {
-        ...restored,
-        prompt: rootMission(mission, historyById).prompt,
-        ...(earlier.length === 0
-          ? {}
-          : {
-              earlierTurns: earlier.map((turn) => ({
-                missionId: turn.missionId,
-                prompt: turn.prompt,
-                events: turn.events
-              }))
-            }),
-        ...(handoff === undefined ? {} : { handoff })
-      })
-    )
+    setRuns((current) => withNewRun(current, mission.runId, reopenedRun(mission, historyById)))
     setShownKey(mission.runId)
   }
 
@@ -891,7 +905,10 @@ export default function App(): ReactElement {
     setSelectedTeammateId(teammateId)
     setScreen('workroom')
     const theirs = [...runs.entries()].filter(([, run]) => ownerOf(run) === teammateId)
-    const live = theirs.find(([, run]) => liveRunIsActive(run)) ?? theirs.at(-1)
+    const startedAt = (run: LiveRunState): number =>
+      Date.parse(run.restoredMission?.lastUpdatedAt ?? run.events[0]?.occurredAt ?? '') || 0
+    const newest = [...theirs].sort(([, left], [, right]) => startedAt(right) - startedAt(left))[0]
+    const live = theirs.find(([, run]) => liveRunIsActive(run)) ?? newest
     setShownKey(live?.[0])
   }
 
@@ -909,6 +926,7 @@ export default function App(): ReactElement {
         // A run's thread already shows the root's words for a continuation.
         title: missionTitle(run.prompt),
         phase: liveRunIsActive(run) ? 'running' : isTerminal(run.phase) ? (run.phase as 'completed' | 'failed' | 'cancelled') : 'interrupted',
+        ...(run.data?.runtime === undefined ? {} : { runtime: run.data.runtime }),
         integrityIssueCount: run.restoredMission?.integrityIssueCount ?? 0
       })
     }
@@ -920,6 +938,7 @@ export default function App(): ReactElement {
         // the person typed at the start of the chain.
         title: missionTitle(rootMission(mission, historyById).prompt),
         phase: mission.phase,
+        runtime: mission.runtime,
         integrityIssueCount: mission.integrityIssueCount
       })
     }
@@ -1045,7 +1064,12 @@ export default function App(): ReactElement {
                     </div>
                     <div className="lc-workroom__mission">
                       {liveRun.data === undefined
-                        ? 'Starting…'
+                        ? isTerminal(liveRun.phase)
+                          // A start that failed has no mission id and never
+                          // will. Leaving "Starting…" over a red error card
+                          // said the opposite of what happened.
+                          ? `Mission · not started · ${liveRun.phase}`
+                          : 'Starting…'
                         : `Mission · ${shortMissionId(liveRun.data.missionId)} · ${
                             running
                               ? 'running'
@@ -1157,7 +1181,11 @@ export default function App(): ReactElement {
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}
-            error={noRuntimeReady && runtimeState.phase === 'ready' ? undefined : undefined}
+            error={
+              noRuntimeReady && runtimeState.phase === 'ready'
+                ? 'No runtime is signed in. Locust runs on the CLIs already on this machine; sign in to one and it appears here.'
+                : undefined
+            }
             onStart={startMission}
             onCancel={cancelMission}
             onOpenRoutePicker={() => undefined}

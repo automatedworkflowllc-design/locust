@@ -15,6 +15,7 @@ import {
   rootMission,
   stitchedHandoff,
   resumableSessionOf,
+  typedPrompt,
   railLabel
 } from './missionView.js'
 
@@ -581,5 +582,61 @@ describe('whether a finished run can be replied to', () => {
 
   it('ignores an empty session id rather than treating it as one', () => {
     expect(resumableSessionOf([startedEvent()])).toBeUndefined()
+  })
+})
+
+describe('which words a turn shows', () => {
+  const mission = (
+    missionId: string,
+    prompt: string,
+    continuesFrom?: { readonly missionId: string; readonly reason: 'route-switch' | 'follow-up' }
+  ): PublicRecoveredMission => ({
+    missionId,
+    runId: `run_${missionId}`,
+    prompt,
+    runtime: 'codex',
+    model: 'account-default',
+    resolvedRouteId: 'codex-account:default',
+    cliVersion: null,
+    sandbox: 'read-only',
+    phase: 'completed',
+    createdAt: NOW,
+    lastUpdatedAt: NOW,
+    integrityIssueCount: 0,
+    events: [],
+    peerMessages: [],
+    ...(continuesFrom === undefined
+      ? {}
+      : { continuesFrom: { ...continuesFrom, checkpointEpoch: 1 } })
+  } as unknown as PublicRecoveredMission)
+
+  const index = (missions: readonly PublicRecoveredMission[]) =>
+    new Map(missions.map((held) => [held.missionId, held]))
+
+  it('shows a reply the words that were typed for it, not the opening line', () => {
+    const first = mission('m1', 'Audit the config')
+    const reply = mission('m2', 'Now fix the two you found', { missionId: 'm1', reason: 'follow-up' })
+    expect(typedPrompt(reply, index([first, reply]))).toBe('Now fix the two you found')
+  })
+
+  it('shows a handed-over mission the words a person typed, not the briefing written for it', () => {
+    const first = mission('m1', 'Audit the config')
+    const handed = mission('m2', 'You are continuing a mission…', { missionId: 'm1', reason: 'route-switch' })
+    expect(typedPrompt(handed, index([first, handed]))).toBe('Audit the config')
+  })
+
+  it('reaches back through a handoff but stops at the reply above it', () => {
+    // A → handed over → B → replied to → C. C's own words are C's.
+    const a = mission('m1', 'Audit the config')
+    const b = mission('m2', 'You are continuing a mission…', { missionId: 'm1', reason: 'route-switch' })
+    const c = mission('m3', 'Now fix the two you found', { missionId: 'm2', reason: 'follow-up' })
+    const byId = index([a, b, c])
+    expect(typedPrompt(c, byId)).toBe('Now fix the two you found')
+    expect(typedPrompt(b, byId)).toBe('Audit the config')
+  })
+
+  it('keeps the mission own words when the one it continues is gone', () => {
+    const orphan = mission('m2', 'You are continuing a mission…', { missionId: 'm_missing', reason: 'route-switch' })
+    expect(typedPrompt(orphan, index([orphan]))).toBe('You are continuing a mission…')
   })
 })

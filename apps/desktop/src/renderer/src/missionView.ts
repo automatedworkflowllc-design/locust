@@ -675,3 +675,30 @@ export function resumableSessionOf(
   }
   return undefined
 }
+
+/**
+ * The words a PERSON typed for this turn.
+ *
+ * A mission's own prompt is not always something anybody wrote. A route
+ * switch starts a new mission whose prompt is the host's briefing, so for
+ * that one the typed words are the previous mission's. A follow-up is the
+ * opposite: its prompt IS what the person just typed, and reaching past it to
+ * the start of the conversation shows them the wrong sentence -- the reply
+ * they actually sent appears nowhere, and the opening line appears twice.
+ *
+ * So this walks back through route switches only, and stops at the first
+ * mission whose prompt was written by a person.
+ */
+export function typedPrompt(
+  mission: PublicRecoveredMission,
+  byId: ReadonlyMap<string, PublicRecoveredMission>
+): string {
+  let current = mission
+  for (let hops = 0; hops < 32; hops += 1) {
+    if (current.continuesFrom?.reason !== 'route-switch') return current.prompt
+    const prior = byId.get(current.continuesFrom.missionId)
+    if (prior === undefined) return current.prompt
+    current = prior
+  }
+  return current.prompt
+}

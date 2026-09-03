@@ -27,6 +27,13 @@ const CURSOR_EVENTS = join(ROOT, 'src', 'cursor-events.ts')
 
 const MUTATIONS = [
   {
+    file: COMMANDS,
+    name: 'a Codex resume is given flags that subcommand rejects',
+    from: '        "-c",\n        `sandbox_mode=${sandboxArgument(options.sandbox)}`,',
+    to: '        "--sandbox",\n        sandboxArgument(options.sandbox),\n        "-C",\n        options.workspacePath,',
+    expect: 'resumes a Codex session with only the arguments that subcommand accepts'
+  },
+  {
     file: CURSOR_EVENTS,
     name: 'a command that ran and failed is recorded as a completed tool',
     from: '  if (exitCode !== undefined && exitCode !== 0) {',
@@ -164,7 +171,7 @@ const MUTATIONS = [
     name: 'a Codex follow-up silently starts a new conversation',
     from: '  const args = options.resumeThreadId === undefined',
     to: '  const args = true',
-    expect: 'resumes a Codex session through its subcommand, keeping the sandbox'
+    expect: 'resumes a Codex session with only the arguments that subcommand accepts'
   },
   {
     file: CLAUDE_EVENTS,
