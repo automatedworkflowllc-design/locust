@@ -305,7 +305,7 @@ function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function redactText(value: string): string {
+export function redactText(value: string): string {
   // NUL is unpersistable: the mission ledger's reader rejects any string
   // containing it, and a rejected record stops recovery at that point. Strip
   // it here, where every persisted string already passes through.

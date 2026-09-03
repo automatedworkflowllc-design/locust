@@ -25,6 +25,8 @@ import type { CodexMissionService } from './codex-mission.js'
 import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createRelay } from './relay.js'
+import { createAntigravityHostProbe } from './antigravity-host.js'
+import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
 import {
@@ -57,6 +59,7 @@ import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { createUpdateService } from './updates.js'
 import type {
   CodexMissionCancelRequest,
+  CodexMissionStartData,
   CodexMissionStartRequest,
   CodexMissionUpdate,
   MissionMode,
@@ -66,11 +69,16 @@ import type {
 
 const probeRunner = createNodeProbeRunner()
 const executableLocator = createPathExecutableLocator()
-const discoverRuntimes = () => discoverInstalledRuntimes({
-  runner: probeRunner,
-  locator: executableLocator,
-  includeOmniRoute: true
-})
+// Antigravity has no CLI probe: its readiness is whether the app is open,
+// which the host checks itself and merges into the same sweep.
+const antigravityProbe = createAntigravityHostProbe()
+const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
+  const [found, antigravity] = await Promise.all([
+    discoverInstalledRuntimes({ runner: probeRunner, locator: executableLocator, includeOmniRoute: true }),
+    antigravityProbe.discoveryRecord().catch(() => undefined)
+  ])
+  return antigravity === undefined ? found : [...found, antigravity]
+}
 /**
  * One probe sweep, shared.
  *
@@ -253,6 +261,28 @@ if (!ownsSingleInstanceLock) {
     // The approval transport. It only runs for the mode that asked for it, so
     // an experimental protocol failing cannot take the ordinary paths with it.
     let approvalWindow: BrowserWindow | undefined
+    // Antigravity, experimental: driven through the running app, watched
+    // through its transcript. Its own service, so its heuristics cannot leak
+    // into the transports that read a process.
+    const antigravityMissions = createAntigravityMissionService({
+      workspacePath: process.cwd(),
+      ledger: missionLedger,
+      workroom,
+      probe: () => antigravityProbe.probe(),
+      emitEvent: (runId, missionId, event) => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, { kind: 'event', runId, missionId, event })
+        }
+      },
+      emitUpdate: (update) => sendToWindow(update),
+      onShared: async (mission, posted) => {
+        await relay?.onShared(mission, posted)
+      },
+      onRunEnded: async (mission) => {
+        await relay?.onRunEnded(mission)
+      }
+    })
     const sendToWindow = (update: CodexMissionUpdate): void => {
       const target = approvalWindow
       if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
@@ -367,6 +397,27 @@ if (!ownsSingleInstanceLock) {
       }
     }
 
+    const antigravityStartData = (mission: {
+      readonly runId: string
+      readonly missionId: string
+      readonly model: string
+      readonly cliVersion: string | null
+      readonly peerMessages: CodexMissionStartData['peerMessages']
+      readonly peerDeliveryFailed: boolean
+      readonly followsUp?: { readonly missionId: string; readonly runtimeThreadId: string }
+    }): CodexMissionStartData => ({
+      runId: mission.runId,
+      missionId: mission.missionId,
+      runtime: 'antigravity',
+      model: mission.model,
+      resolvedRouteId: 'antigravity:hub',
+      cliVersion: mission.cliVersion,
+      sandbox: 'workspace-write',
+      peerMessages: mission.peerMessages,
+      peerDeliveryFailed: mission.peerDeliveryFailed,
+      ...(mission.followsUp === undefined ? {} : { followsUp: mission.followsUp })
+    })
+
     // Ownership is recorded by the host, once, after a start succeeded -- so
     // the roster and the ledger cannot disagree about who a mission belongs
     // to because a renderer forgot to say.
@@ -391,8 +442,23 @@ if (!ownsSingleInstanceLock) {
     relay = createRelay({
       enabled: async () => (await teammates.readSettings()).relay === true,
       peerContextFor,
-      start: (input) =>
-        codexMissions.start(
+      start: async (input) => {
+        if (input.runtime === 'antigravity') {
+          try {
+            const mission = await antigravityMissions.start(input.prompt, input.peer, {
+              ...(input.model === undefined ? {} : { model: input.model }),
+              ...(input.followUpOf === undefined ? {} : { followUpOf: input.followUpOf }),
+              relay: input.relay
+            })
+            return { ok: true, data: antigravityStartData(mission) } as const
+          } catch (error) {
+            return {
+              ok: false,
+              error: { code: 'RUNTIME_START_FAILED', message: error instanceof Error ? error.message : 'Antigravity could not start the mission.' }
+            } as const
+          }
+        }
+        return codexMissions.start(
           input.prompt,
           input.runtime,
           input.mode,
@@ -402,7 +468,8 @@ if (!ownsSingleInstanceLock) {
           input.peer,
           input.followUpOf,
           input.relay
-        ),
+        )
+      },
       assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
       notify: sendToWindow
     })
@@ -544,7 +611,7 @@ if (!ownsSingleInstanceLock) {
       currentVersion: app.getVersion(),
       supported: app.isPackaged,
       liveMissionCount: () =>
-        codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length,
+        codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       onStateChange: (state) => {
         for (const target of BrowserWindow.getAllWindows()) {
           if (!target.isDestroyed()) target.webContents.send(APP_UPDATE_STATE_CHANNEL, state)
@@ -588,7 +655,7 @@ if (!ownsSingleInstanceLock) {
       const response = await pruneMissionRecords(
         missionLedger,
         request,
-        () => [...codexMissions.liveMissionIds(), ...appServerMissions.liveMissionIds()],
+        () => [...codexMissions.liveMissionIds(), ...appServerMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()],
         () => new Date()
       )
       // Ownership follows the records out, exactly as it does for a single
@@ -608,7 +675,7 @@ if (!ownsSingleInstanceLock) {
       const response = await deleteMissionRecord(
         missionLedger,
         missionId,
-        (id) => codexMissions.hasMission(id) || appServerMissions.hasMission(id)
+        (id) => codexMissions.hasMission(id) || appServerMissions.hasMission(id) || antigravityMissions.hasMission(id)
       )
       // Ownership follows the record out, so the roster never lists a
       // mission that no longer exists.
@@ -643,6 +710,43 @@ if (!ownsSingleInstanceLock) {
       // ask, so it is the only one routed to the experimental transport --
       // which is Codex's app-server. Another runtime asked for it would have
       // been started on Codex without a word; it is refused instead.
+      if (runtime === 'antigravity') {
+        if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+          return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const
+        }
+        if (mode !== 'accept-edits') {
+          return {
+            ok: false,
+            error: {
+              code: 'RUNTIME_START_FAILED',
+              message: "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only. Choose Accept edits, or another route."
+            }
+          } as const
+        }
+        const peer = await peerContextFor(payload.teammateId)
+        const model = typeof payload.model === 'string' ? payload.model : undefined
+        const followUpOf = typeof payload.followUpOf === 'string' ? payload.followUpOf : undefined
+        try {
+          const mission = await antigravityMissions.start(prompt, peer, {
+            ...(model === undefined ? {} : { model }),
+            ...(followUpOf === undefined ? {} : { followUpOf })
+          })
+          await assignOwner(peer?.self.teammateId, mission.missionId)
+          await rememberRoute(peer?.self.teammateId, { runtime: 'antigravity', model: mission.model, mode })
+          return { ok: true, data: antigravityStartData(mission) } as const
+        } catch (error) {
+          if (error instanceof PeerRecordError) {
+            return { ok: false, error: { code: 'PERSISTENCE_FAILED', message: error.message } } as const
+          }
+          return {
+            ok: false,
+            error: {
+              code: error instanceof AntigravityStartError ? 'RUNTIME_START_FAILED' : 'INTERNAL_ERROR',
+              message: error instanceof Error ? error.message : 'Antigravity could not start the mission.'
+            }
+          } as const
+        }
+      }
       if (mode === 'approve-each' && runtime !== 'codex') {
         return {
           ok: false,
@@ -748,7 +852,7 @@ if (!ownsSingleInstanceLock) {
       // Not an exec run: the approval transport owns its own runs, and a stop
       // control that only knew one transport reported "no longer active" at a
       // run that was very much still going.
-      if (appServerMissions.cancel(runId)) {
+      if (appServerMissions.cancel(runId) || antigravityMissions.cancel(runId)) {
         return { ok: true, data: { runId, state: 'cancellation-requested' } } as const
       }
       return viaExec

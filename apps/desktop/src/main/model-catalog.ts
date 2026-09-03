@@ -212,6 +212,23 @@ export function copilotModelsFrom(runtimes: readonly RuntimeDiscovery[]): readon
   ]
 }
 
+/**
+ * Antigravity's three model tiers, exactly as its agent API names them. The
+ * names are the host's, from the measured `--model=<flash_lite|flash|pro>`.
+ */
+export function antigravityModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonly PublicModel[] {
+  const antigravity = runtimes.find((entry) => entry.id === 'antigravity')
+  const listed = antigravity?.modelHints?.models
+  if (antigravity?.readiness !== 'ready' || listed === undefined) return []
+  return listed.map((model) => ({
+    id: model.id,
+    runtime: 'antigravity' as const,
+    displayName: model.displayName,
+    description: model.description ?? 'Antigravity model tier',
+    supportedEfforts: []
+  }))
+}
+
 export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
   const now = options.now ?? (() => Date.now())
   let cached: { readonly at: number; readonly response: ModelCatalogResponse } | undefined
@@ -226,7 +243,8 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       ...claudeModelsFrom(runtimes),
       ...cursorModelsFrom(runtimes),
       ...opencodeModelsFrom(runtimes),
-      ...copilotModelsFrom(runtimes)
+      ...copilotModelsFrom(runtimes),
+      ...antigravityModelsFrom(runtimes)
     ]
     const codex = runtimes.find((entry) => entry.id === 'codex')
     if (codex?.readiness !== 'ready' || codex.executable === undefined) {

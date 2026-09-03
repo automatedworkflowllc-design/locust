@@ -28,6 +28,7 @@ export type RouteTag =
   | 'API'
   | 'LOCAL'
   | 'PLANNED'
+  | 'EXPERIMENTAL'
 
 /** How far a runtime's integration actually goes in this build. */
 export type IntegrationLevel =
@@ -35,6 +36,12 @@ export type IntegrationLevel =
   | 'live'
   /** Discovered and selectable, but the adapter is not finished. */
   | 'preview'
+  /**
+   * Runs a mission end to end, but through a reverse-engineered surface
+   * that its vendor did not publish and may change without notice. Said on
+   * the row, so nobody mistakes it for a supported route.
+   */
+  | 'experimental'
   /** Drawn in the design, not implemented at all. */
   | 'planned'
 
@@ -54,6 +61,7 @@ export const RUNTIME_INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
   cursor: 'live',
   opencode: 'live',
   copilot: 'live',
+  antigravity: 'experimental',
   gemini: 'planned',
   omniroute: 'planned'
 }
@@ -129,6 +137,14 @@ export function routeRowStatus(
       tag: 'UNAVAILABLE',
       selectable: false,
       detail: `${runtime.displayName} ${reason}.`
+    }
+  }
+  // Ready, and real, but on a surface nobody promised: selectable, and said.
+  if (integration === 'experimental') {
+    return {
+      tag: 'EXPERIMENTAL',
+      selectable: true,
+      detail: `${runtime.displayName} is driven through an unpublished interface of the running app. It works today and may break with an update.`
     }
   }
   // Ready, and the adapter is only partly built: selectable, never called live.
@@ -430,6 +446,10 @@ export function modeRunsOn(
   platform?: string
 ): boolean {
   if (mode === 'approve-each') return runtime === 'codex'
+  // Antigravity's agent runs its own tools under its own policy; the host
+  // has no handle that holds it read-only, so only the mode that says so is
+  // offered.
+  if (mode === 'ask' && runtime === 'antigravity') return false
   // Cursor's read-only mode is only real where its sandbox can run. On
   // Windows the host refuses such a mission rather than record a containment
   // it cannot keep -- so offering the mode here would be offering a refusal,
@@ -453,6 +473,7 @@ export function modeUnavailableReason(
 ): string | undefined {
   if (modeRunsOn(mode, runtime, platform)) return undefined
   if (mode === 'approve-each') return `Codex CLI only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
+  if (runtime === 'antigravity') return "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only."
   return 'Cursor Agent cannot be held read-only on Windows: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files.'
 }
 
@@ -461,6 +482,7 @@ function runtimeLabel(runtime: MissionRuntimeId): string {
   if (runtime === 'cursor') return 'Cursor Agent'
   if (runtime === 'opencode') return 'OpenCode'
   if (runtime === 'copilot') return 'Copilot CLI'
+  if (runtime === 'antigravity') return 'Antigravity'
   if (runtime === 'gemini') return 'Gemini CLI'
   return 'Codex CLI'
 }

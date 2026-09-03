@@ -65,7 +65,7 @@ export function FirstLaunch({
                         ? ' is-lime'
                         : status.tag === 'SIGN IN'
                           ? ' is-red'
-                          : status.tag === 'PREVIEW'
+                          : status.tag === 'PREVIEW' || status.tag === 'EXPERIMENTAL'
                             ? ' is-amber'
                             : ''
                     }`}

@@ -176,6 +176,13 @@ export function detectSupportedFeatures(
       add("tool-allowlist", scan(helpText, "--allow-all-tools"));
       add("tool-denylist", scan(helpText, "--deny-tool"));
     }
+  } else if (runtime === "antigravity") {
+    // Nothing. Antigravity's `agentapi` prints no help text this repo has ever
+    // captured, and it cannot even open a conversation without a project id
+    // from its own state file -- so no feature is claimed for it. Falling
+    // through to the gateway branch below would have it claim a health check
+    // off a help page that does not exist.
+    void helpText;
   } else {
     add("json-health-check", scan(helpText, "--json"));
   }

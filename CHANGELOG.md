@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.13.0 — 2026-09-03
+
+- **Antigravity, as an experimental route.** If Google's Antigravity is open
+  with your folder, Locust can hand its agent a mission on the Flash, Pro or
+  Flash Lite tier, watch the work land in the thread (tool calls, the final
+  answer), keep the receipt, and continue the conversation on a reply. It is
+  tagged EXPERIMENTAL in the picker because it drives an interface Antigravity
+  never published; it may break with an Antigravity update. Two limits are
+  built in and said out loud: it only works while Antigravity is open with
+  that folder, and it cannot be held read-only, so only Accept edits is
+  offered. Stopping a mission stops the watch; Antigravity's agent may keep
+  going inside Antigravity.
+
 ## 0.12.0 — 2026-09-03
 
 - **Two new routes.** OpenCode, which ships free models that need no sign-in

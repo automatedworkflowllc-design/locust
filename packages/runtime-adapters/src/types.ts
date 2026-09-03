@@ -11,6 +11,14 @@ export type RuntimeIntegrationId =
   | "gemini"
   | "opencode"
   | "copilot"
+  /**
+   * EXPERIMENTAL. Antigravity is a mission runtime, but it is not DISCOVERED
+   * like the others: its `agentapi` refuses to start a conversation without a
+   * project id that only its own protobuf state file holds, so no probe this
+   * package could run would say anything true about it. The host owns finding
+   * it; this package only normalizes the transcript it leaves behind.
+   */
+  | "antigravity"
   | "omniroute";
 
 /**

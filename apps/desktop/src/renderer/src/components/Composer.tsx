@@ -7,7 +7,7 @@ import type {
   PublicModel,
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
-import { hostReadsEventsOf, runtimeDisplayName } from '../../../shared/runtimes.js'
+import { hostCanRunMission, runtimeDisplayName } from '../../../shared/runtimes.js'
 import {
   handoffAvailability,
   handoffTitle,
@@ -141,7 +141,7 @@ export function Composer({
   // A runtime can own a mission once the host can read its events. Readiness
   // still comes from discovery, so a route that is installed but signed out
   // cannot be started.
-  const routeCanRun = hostReadsEventsOf(route.runtime)
+  const routeCanRun = hostCanRunMission(route.runtime)
   const canStart = selectedReady && routeCanRun && busyWith === undefined && value.trim().length > 0
 
   const placeholder = busyWith !== undefined

@@ -12,7 +12,8 @@ const DISPLAY_NAMES: Readonly<Record<MissionRuntimeId, string>> = {
   cursor: 'Cursor Agent',
   gemini: 'Gemini CLI',
   opencode: 'OpenCode',
-  copilot: 'Copilot CLI'
+  copilot: 'Copilot CLI',
+  antigravity: 'Antigravity'
 }
 
 export function isMissionRuntime(value: unknown): value is MissionRuntimeId {
@@ -33,4 +34,15 @@ export function runtimeDisplayName(runtime: MissionRuntimeId): string {
  */
 export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' | 'cursor' | 'opencode' | 'copilot' {
   return runtime === 'codex' || runtime === 'claude' || runtime === 'cursor' || runtime === 'opencode' || runtime === 'copilot'
+}
+
+/**
+ * Whether the host can own a mission under this runtime at all. Five stream
+ * their events through a process the host reads; Antigravity is driven
+ * through its own running app and watched through a transcript file, which
+ * is a different transport with the same receipts -- so it can run a mission
+ * without being one the process runner reads.
+ */
+export function hostCanRunMission(runtime: MissionRuntimeId): boolean {
+  return hostReadsEventsOf(runtime) || runtime === 'antigravity'
 }

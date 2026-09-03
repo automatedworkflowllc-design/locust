@@ -149,3 +149,18 @@ export type {
 export { killProcessTree } from "./process-runner.js";
 export { toolPatchFrom } from "./codex-events.js";
 export type { ToolPatch } from "./codex-events.js";
+export {
+  antigravityToolArg,
+  antigravityToolCommand,
+  antigravityWritePatch,
+  createAntigravityEventNormalizer,
+} from "./antigravity-events.js";
+export type {
+  AntigravityEventNormalizer,
+  AntigravityInvocationContext,
+} from "./antigravity-events.js";
+export {
+  normalizeAntigravityWorkspace,
+  parseAntigravityProjects,
+  projectIdForWorkspace,
+} from "./antigravity-projects.js";

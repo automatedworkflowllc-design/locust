@@ -185,7 +185,7 @@ export function RoutePicker({
                       ? 'lc-tone-lime'
                       : row.tag === 'READY'
                         ? 'lc-tone-green'
-                        : row.tag === 'PREVIEW'
+                        : row.tag === 'PREVIEW' || row.tag === 'EXPERIMENTAL'
                           ? 'lc-tone-amber'
                           : 'lc-tone-muted'
                   }`}
@@ -198,7 +198,7 @@ export function RoutePicker({
                   className={`lc-picker__tag lc-mono ${
                     row.tag === 'ACTIVE'
                       ? 'lc-tone-lime'
-                      : row.tag === 'PREVIEW'
+                      : row.tag === 'PREVIEW' || row.tag === 'EXPERIMENTAL'
                         ? 'lc-tone-amber'
                         : row.tag === 'SIGN IN'
                           ? 'lc-tone-red'

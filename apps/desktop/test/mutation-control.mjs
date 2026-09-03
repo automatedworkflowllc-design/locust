@@ -32,9 +32,38 @@ const ROSTER = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const UPDATES = join(ROOT, 'src', 'main', 'updates.ts')
 const RELAY = join(ROOT, 'src', 'main', 'relay.ts')
 const FACES = join(ROOT, 'src', 'renderer', 'src', 'faceState.ts')
+const ANTIGRAVITY = join(ROOT, 'src', 'main', 'antigravity-mission.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: ANTIGRAVITY,
+    name: "the agent's final answer never ends the watch",
+    from: '      if (run.normalizer.latestFinal) {',
+    to: '      if (false) {',
+    expect: 'opens the conversation with the project id, records the mission, and follows the transcript to the final answer'
+  },
+  {
+    file: ANTIGRAVITY,
+    name: "a follow-up replays the earlier turns as its own work",
+    from: "          fed = existing === undefined ? 0 : existing.split('\\n').filter((line) => line.trim().length > 0).length",
+    to: '          fed = 0',
+    expect: 'a follow-up sends into the same conversation and reads only the lines after the earlier turns'
+  },
+  {
+    file: ANTIGRAVITY,
+    name: 'a folder Antigravity has not opened is started anyway',
+    from: '        if (projectId === undefined) {',
+    to: '        if (false) {',
+    expect: 'refuses, naming the folder, when Antigravity has not opened the workspace'
+  },
+  {
+    file: ANTIGRAVITY,
+    name: 'a mission starts with Antigravity closed',
+    from: '        if (host === undefined) {\n          throw new AntigravityStartError',
+    to: '        if (false) {\n          throw new AntigravityStartError',
+    expect: 'refuses, recording nothing, when Antigravity is not open'
+  },
   {
     file: RELAY,
     name: "the asker's turn starts on the first reply instead of waiting for everyone",
@@ -868,6 +897,7 @@ const originals = new Map([
   [UPDATES, readFileSync(UPDATES, 'utf8')],
   [RELAY, readFileSync(RELAY, 'utf8')],
   [FACES, readFileSync(FACES, 'utf8')],
+  [ANTIGRAVITY, readFileSync(ANTIGRAVITY, 'utf8')],
   [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')]
 ])
 let problems = 0

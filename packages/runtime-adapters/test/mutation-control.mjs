@@ -29,8 +29,51 @@ const CODEX_EVENTS = join(ROOT, 'src', 'codex-events.ts')
 const OPENCODE_EVENTS = join(ROOT, 'src', 'opencode-events.ts')
 const COPILOT_EVENTS = join(ROOT, 'src', 'copilot-events.ts')
 const PROCESS_RUNNER = join(ROOT, 'src', 'process-runner.ts')
+const ANTIGRAVITY_EVENTS = join(ROOT, 'src', 'antigravity-events.ts')
 
 const MUTATIONS = [
+  {
+    file: ANTIGRAVITY_EVENTS,
+    name: "the model's reasoning rides along in the evidence",
+    from: '  const { thinking: _reasoning, ...rest } = parsed;',
+    to: '  const rest = parsed;',
+    expect: 'never stores the model\'s reasoning, and does not even record that a thinking field was there'
+  },
+  {
+    file: ANTIGRAVITY_EVENTS,
+    name: "Antigravity's checkpoint summary is written into the ledger",
+    from: '    if (SILENT_TYPES.has(type)) {',
+    to: '    if (false) {',
+    expect: "never lets Antigravity's checkpoint summary into the ledger"
+  },
+  {
+    file: ANTIGRAVITY_EVENTS,
+    name: 'an Antigravity overwrite is reported with a diff nobody produced',
+    from: '  const overwrite = antigravityToolArg(args, "Overwrite") === true;',
+    to: '  const overwrite = false;',
+    expect: 'records an overwrite as a path and no diff, because there is no before-text to diff against'
+  },
+  {
+    file: ANTIGRAVITY_EVENTS,
+    name: 'a step Antigravity has not finished writing is normalized anyway',
+    from: '    if (stringValue(parsed.status) !== "DONE") return [];',
+    to: '    void parsed.status;',
+    expect: 'holds it: nothing is emitted, and nothing claims the turn is over'
+  },
+  {
+    file: ANTIGRAVITY_EVENTS,
+    name: 'every poll of the transcript replays the whole conversation',
+    from: '    if (seen.has(stepIndex)) return [];',
+    to: '    void seen.has(stepIndex);',
+    expect: 'emits each step exactly once, however many times the file is polled'
+  },
+  {
+    file: ANTIGRAVITY_EVENTS,
+    name: 'a finished Antigravity turn is never recognised as finished',
+    from: '      latestFinal = true;',
+    to: '      latestFinal = false;',
+    expect: 'reports the run complete when the last line was a planner answer with no tool calls'
+  },
   {
     file: OPENCODE_EVENTS,
     name: "an edit's reported diff is ignored",
@@ -515,6 +558,7 @@ const originals = new Map([
   [LOCATOR, readFileSync(LOCATOR, 'utf8')],
   [DISCOVERY, readFileSync(DISCOVERY, 'utf8')],
   [OPENCODE_EVENTS, readFileSync(OPENCODE_EVENTS, 'utf8')],
+  [ANTIGRAVITY_EVENTS, readFileSync(ANTIGRAVITY_EVENTS, 'utf8')],
   [COPILOT_EVENTS, readFileSync(COPILOT_EVENTS, 'utf8')],
   [PROCESS_RUNNER, readFileSync(PROCESS_RUNNER, 'utf8')],
   [CURSOR_EVENTS, readFileSync(CURSOR_EVENTS, 'utf8')],
