@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, session } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, Notification, session } from 'electron'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -25,6 +25,7 @@ import type { CodexMissionService } from './codex-mission.js'
 import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createRelay } from './relay.js'
+import { createAttention } from './attention.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
@@ -55,6 +56,7 @@ import {
 } from '../shared/ipc.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
+import { roleLabelOf } from '../shared/ipc.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { createUpdateService } from './updates.js'
 import type {
@@ -219,6 +221,8 @@ if (!ownsSingleInstanceLock) {
 
   void app.whenReady().then(() => {
     nativeTheme.themeSource = 'dark'
+    // Windows shows a notification only for an app it can name.
+    if (process.platform === 'win32') app.setAppUserModelId('com.automatedworkflow.locust')
 
     // The renderer is untrusted: it gets no device or web-platform permissions,
     // and packaged builds get no network egress at all (the dev server needs
@@ -261,6 +265,25 @@ if (!ownsSingleInstanceLock) {
     // The approval transport. It only runs for the mode that asked for it, so
     // an experimental protocol failing cannot take the ordinary paths with it.
     let approvalWindow: BrowserWindow | undefined
+    const attention = createAttention({
+      focused: () => {
+        const target = approvalWindow
+        return target !== undefined && !target.isDestroyed() && target.isFocused() && !target.isMinimized()
+      },
+      supported: () => Notification.isSupported(),
+      notify: ({ title, body, onClick }) => {
+        const toast = new Notification({ title, body })
+        toast.on('click', onClick)
+        toast.show()
+      },
+      focusWindow: () => {
+        const target = approvalWindow
+        if (target === undefined || target.isDestroyed()) return
+        if (target.isMinimized()) target.restore()
+        target.show()
+        target.focus()
+      }
+    })
     // Antigravity, experimental: driven through the running app, watched
     // through its transcript. Its own service, so its heuristics cannot leak
     // into the transports that read a process.
@@ -329,6 +352,16 @@ if (!ownsSingleInstanceLock) {
         if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
           target.webContents.send(MISSION_APPROVAL_CHANNEL, request)
         }
+        // A run stopped waiting on a person who is looking elsewhere is told
+        // through the OS, by name, and the click brings the window back.
+        void teammates
+          .missionOwners()
+          .then(async (owners) => {
+            const ownerId = owners[request.missionId]
+            const roster = ownerId === undefined ? [] : await teammates.list()
+            attention.approvalArrived(request, roster.find((entry) => entry.teammateId === ownerId)?.name)
+          })
+          .catch(() => attention.approvalArrived(request, undefined))
       },
       emitEvent: (runId, missionId, event) => {
         const target = approvalWindow
@@ -388,7 +421,10 @@ if (!ownsSingleInstanceLock) {
       const entry = (teammate: PublicTeammate) => ({
         teammateId: teammate.teammateId,
         name: teammate.name,
-        role: teammate.role,
+        // What the runtime is told this teammate does: a Custom teammate's
+        // own words, so the brief says "Wren (release manager)" rather than
+        // "Wren (Custom)".
+        role: roleLabelOf(teammate),
         ...(teammate.route === undefined ? {} : { route: teammate.route })
       })
       return {

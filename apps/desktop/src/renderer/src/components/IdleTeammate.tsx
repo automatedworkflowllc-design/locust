@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 
 import type { PublicTeammate, TeammateRole } from '../../../shared/ipc.js'
+import { roleLabelOf } from '../../../shared/ipc.js'
 import { PixelFace } from './PixelFace.js'
 
 /**
@@ -65,7 +66,7 @@ export function IdleTeammate({
         <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={56} />
         <h1>{teammate.name}</h1>
         <p>
-          {teammate.role} · reads this workspace and explains what it finds. Nothing is changed
+          {roleLabelOf(teammate)} · reads this workspace and explains what it finds. Nothing is changed
           unless you pick a mode that allows it.
         </p>
 

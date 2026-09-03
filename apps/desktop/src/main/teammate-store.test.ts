@@ -231,6 +231,30 @@ describe("a teammate's own route", () => {
   })
 })
 
+describe("a Custom teammate's own words for their role", () => {
+  it('keeps a title on a Custom role, trimmed and bounded, and drops one on a built-in role', async () => {
+    const { root, store: teammates } = await store()
+    const custom = await teammates.create({ name: 'Sable', hue: 'clay', role: 'Custom', roleTitle: '  Release manager  ' })
+    expect(custom.roleTitle).toBe('Release manager')
+    const builtIn = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Docs & QA', roleTitle: 'ignored' })
+    expect(builtIn.roleTitle).toBeUndefined()
+    // Survives a reopen, and an edit that keeps the role.
+    const reopened = createTeammateStore({ rootDirectory: root })
+    expect((await reopened.list()).find((entry) => entry.name === 'Sable')?.roleTitle).toBe('Release manager')
+    const edited = await reopened.update({ ...custom, name: 'Sable', roleTitle: 'Reviews every PR for security' })
+    expect(edited.roleTitle).toBe('Reviews every PR for security')
+  })
+
+  it('a title that is too long, empty, or not text is dropped rather than rejected', async () => {
+    const { store: teammates } = await store()
+    for (const bad of ['x'.repeat(61), '   ', 42, { title: 'x' }, 'line' + String.fromCharCode(10) + 'break']) {
+      const made = await teammates.create({ name: 'T', hue: 'lime', role: 'Custom', roleTitle: bad })
+      expect(made.roleTitle).toBeUndefined()
+      await teammates.remove(made.teammateId)
+    }
+  })
+})
+
 describe('workspace settings', () => {
   it('has teammate replies on by default, and only a literal false turns them off', async () => {
     // Talking to each other is the point of having teammates; the hop cap

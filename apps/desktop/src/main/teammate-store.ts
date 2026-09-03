@@ -54,10 +54,10 @@ export const TEAMMATE_ROLES: readonly TeammateRole[] = [
 
 export interface TeammateStore {
   list(): Promise<readonly PublicTeammate[]>
-  create(input: { name: unknown; hue: unknown; role: unknown; avatar?: unknown }): Promise<PublicTeammate>
+  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; avatar?: unknown }): Promise<PublicTeammate>
   remove(teammateId: unknown): Promise<void>
   /** Change what a person may change; the id and the missions filed under it stay. */
-  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; avatar: unknown }): Promise<PublicTeammate>
+  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; avatar: unknown }): Promise<PublicTeammate>
   /** Record the route a person just started this teammate on. Unknown teammate or bad route: nothing changes. */
   rememberRoute(teammateId: unknown, route: unknown): Promise<void>
   /** Remember which teammate a mission belongs to. */
@@ -105,6 +105,25 @@ function isRole(value: unknown): value is TeammateRole {
  * refused rather than stripped: a name is shown back to the user, and silently
  * rewriting what they typed is worse than telling them it is invalid.
  */
+/**
+ * A Custom role's title: the person's own words, one line, no control
+ * characters, short enough to sit beside a name. It is briefed to every
+ * runtime on the roster, so it is bounded like a name is.
+ */
+export const MAX_ROLE_TITLE_LENGTH = 60
+
+export function validRoleTitle(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const trimmed = value.trim()
+  return trimmed.length > 0 && trimmed.length <= MAX_ROLE_TITLE_LENGTH && !/[\u0000-\u001f\u007f]/.test(trimmed)
+}
+
+/** Only a Custom role keeps a title, and only a valid one. Anything else is dropped, never rejected. */
+function roleTitleFor(role: TeammateRole, value: unknown): string | undefined {
+  if (role !== 'Custom' || !validRoleTitle(value)) return undefined
+  return value.trim()
+}
+
 export function validName(value: unknown): value is string {
   if (typeof value !== 'string') return false
   const trimmed = value.trim()
@@ -133,6 +152,7 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     name: (record.name as string).trim(),
     hue: record.hue,
     role: record.role,
+    ...(roleTitleFor(record.role, record.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(record.role, record.roleTitle) }),
     // A record from before faces were persisted gets the face its id seeds --
     // the same face every reader would derive, so nothing changes on upgrade.
     avatar: isAvatarSpec(record.avatar) ? record.avatar : seedAvatar(record.teammateId),
@@ -262,6 +282,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           name: input.name.trim(),
           hue: input.hue,
           role: input.role,
+          ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
           avatar: input.avatar ?? seedAvatar(teammateId),
           createdAt: new Date().toISOString()
         }
@@ -287,6 +308,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           name: input.name.trim(),
           hue: input.hue,
           role: input.role,
+          ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
           avatar: input.avatar,
           createdAt: existing.createdAt,
           ...(existing.route === undefined ? {} : { route: existing.route })

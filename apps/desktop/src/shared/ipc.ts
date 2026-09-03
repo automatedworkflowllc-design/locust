@@ -128,6 +128,13 @@ export interface PublicTeammate {
   readonly hue: TeammateHue
   readonly role: TeammateRole
   /**
+   * What a Custom teammate actually does, in the person's own words: the
+   * title shown beside their name and the role their runtime is told. The
+   * built-in roles carry their own name and need none; a Custom teammate
+   * with no title is shown as, and briefed as, "Custom".
+   */
+  readonly roleTitle?: string
+  /**
    * The face, persisted with the record. Seeded from the immutable id when a
    * teammate is created without one, so a rename never changes it.
    */
@@ -170,6 +177,7 @@ export interface TeammateCreateRequest {
   readonly name: string
   readonly hue: TeammateHue
   readonly role: TeammateRole
+  readonly roleTitle?: string
   /** The look chosen in the dialog; omitted, the store seeds one from the new id. */
   readonly avatar?: AvatarSpec
 }
@@ -183,6 +191,7 @@ export interface TeammateUpdateRequest {
   readonly name: string
   readonly hue: TeammateHue
   readonly role: TeammateRole
+  readonly roleTitle?: string
   readonly avatar: AvatarSpec
 }
 
@@ -635,4 +644,10 @@ export interface DesktopApi {
   cancelCodexMission(request: CodexMissionCancelRequest): Promise<CodexMissionCancelResponse>
   handOffMission(request: MissionHandoffRequest): Promise<MissionHandoffResponse>
   onCodexMissionUpdate(listener: (update: CodexMissionUpdate) => void): () => void
+}
+
+/** The words for what a teammate does: their own for a Custom role, the role's name otherwise. */
+export function roleLabelOf(teammate: Pick<PublicTeammate, 'role' | 'roleTitle'>): string {
+  const title = teammate.roleTitle?.trim() ?? ''
+  return teammate.role === 'Custom' && title.length > 0 ? title : teammate.role
 }

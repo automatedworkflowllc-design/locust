@@ -36,7 +36,7 @@ export function NewTeammateDialog({
   initial
 }: {
   readonly onCancel: () => void
-  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; avatar: AvatarSpec }) => void
+  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; avatar: AvatarSpec }) => void
   readonly error: string | undefined
   /** Set to edit an existing teammate: the same dialog, filled in, saving instead of creating. */
   readonly initial?: PublicTeammate
@@ -48,6 +48,7 @@ export function NewTeammateDialog({
     () => initial?.avatar ?? seedAvatar(`draft_${Date.now()}_${Math.random()}`)
   )
   const [role, setRole] = useState<TeammateRole>(initial?.role ?? 'Code & Migrations')
+  const [roleTitle, setRoleTitle] = useState(initial?.roleTitle ?? '')
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -135,6 +136,22 @@ export function NewTeammateDialog({
                 </button>
               ))}
             </div>
+            {role === 'Custom' && (
+              // The words that stand in for a role name everywhere: beside the
+              // name in the sidebar, and in the brief every runtime on the
+              // roster is given. Short, because it sits in both places.
+              <label className="lc-field lc-field--roletitle">
+                <span className="lc-fieldlabel lc-mono">What they do</span>
+                <input
+                  type="text"
+                  value={roleTitle}
+                  maxLength={60}
+                  placeholder="e.g. Release manager, or Reviews every PR for security"
+                  onChange={(event) => setRoleTitle(event.target.value)}
+                />
+                <span className="lc-field__hint">Shown beside their name, and told to their runtime as their role.</span>
+              </label>
+            )}
           </div>
 
           {/*
@@ -170,7 +187,15 @@ export function NewTeammateDialog({
             type="button"
             className="lc-primarybutton"
             disabled={!canCreate}
-            onClick={() => onCreate({ name: trimmed, hue, role, avatar })}
+            onClick={() =>
+              onCreate({
+                name: trimmed,
+                hue,
+                role,
+                ...(role === 'Custom' && roleTitle.trim().length > 0 ? { roleTitle: roleTitle.trim() } : {}),
+                avatar
+              })
+            }
           >
             {editing ? 'Save changes' : 'Create teammate'}
           </button>

@@ -23,6 +23,7 @@ import type {
   TeammateHue,
   TeammateRole
 } from '../../shared/ipc.js'
+import { roleLabelOf } from '../../shared/ipc.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { Composer } from './components/Composer.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
@@ -956,7 +957,7 @@ export default function App(): ReactElement {
       })
   }
 
-  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; avatar: AvatarSpec }): void => {
+  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; avatar: AvatarSpec }): void => {
     const bridge = window.desktop
     if (!bridge) return
     void bridge
@@ -979,7 +980,7 @@ export default function App(): ReactElement {
 
   const updateTeammate = (
     teammateId: string,
-    input: { name: string; hue: TeammateHue; role: TeammateRole; avatar: AvatarSpec }
+    input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; avatar: AvatarSpec }
   ): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -1216,7 +1217,7 @@ export default function App(): ReactElement {
       anyRuntimeUsable: runtimes.some(runtimeIsUsable),
       hasRunningMission: owned.some((mission) => mission.phase === 'running'),
       pendingApprovals: pendingApprovalsByOwner.get(teammate.teammateId) ?? 0,
-      roleLabel: teammate.role,
+      roleLabel: roleLabelOf(teammate),
       ...(liveActivityByOwner[teammate.teammateId] === undefined ? {} : { liveActivity: liveActivityByOwner[teammate.teammateId] }),
       recentlyDone: recentlyDone.includes(teammate.teammateId),
       recentlyReceived: recentlyReceived.includes(teammate.teammateId)

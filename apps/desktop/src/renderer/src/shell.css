@@ -3061,3 +3061,26 @@ textarea {
   color: var(--lc-red-text, #f5d9d4);
   background: var(--lc-red-tint, rgba(228, 104, 93, 0.1));
 }
+
+/* The Custom role's own words, under the role grid. */
+.lc-field--roletitle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-5);
+}
+
+.lc-field--roletitle input {
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font: inherit;
+  font-size: var(--lc-text-control);
+}
+
+.lc-field__hint {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}

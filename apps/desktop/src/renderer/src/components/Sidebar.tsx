@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
+import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import mark from '../assets/locust-mark.svg'
@@ -155,7 +156,7 @@ export function Sidebar({
             anyRuntimeUsable: runtimes.some(runtimeIsUsable),
             hasRunningMission: owned.some((mission) => mission.phase === 'running'),
             pendingApprovals: pendingApprovals[teammate.teammateId] ?? 0,
-            roleLabel: teammate.role,
+            roleLabel: roleLabelOf(teammate),
             ...(liveActivity[teammate.teammateId] === undefined ? {} : { liveActivity: liveActivity[teammate.teammateId] }),
             recentlyDone: recentlyDone.includes(teammate.teammateId),
             recentlyReceived: recentlyReceived.includes(teammate.teammateId)

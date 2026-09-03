@@ -623,3 +623,13 @@ describe('searching routes the way names are said', () => {
     expect(routeSearchText('OpenCode muse-spark-1.3').includes(routeSearchText('muse spark 1.3'))).toBe(true)
   })
 })
+
+describe("the words for what a teammate does", () => {
+  it("uses a Custom teammate's own title, and the role name for everyone else", async () => {
+    const { roleLabelOf } = await import('../../shared/ipc.js')
+    expect(roleLabelOf({ role: 'Custom', roleTitle: 'Release manager' })).toBe('Release manager')
+    expect(roleLabelOf({ role: 'Custom' })).toBe('Custom')
+    expect(roleLabelOf({ role: 'Custom', roleTitle: '   ' })).toBe('Custom')
+    expect(roleLabelOf({ role: 'Docs & QA', roleTitle: 'ignored' })).toBe('Docs & QA')
+  })
+})

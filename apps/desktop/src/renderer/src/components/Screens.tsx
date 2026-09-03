@@ -10,6 +10,7 @@ import type {
   PublicStorageReport,
   PublicTeammate
 } from '../../../shared/ipc.js'
+import { roleLabelOf } from '../../../shared/ipc.js'
 import {
   formatBytes,
   integrationOf,
@@ -210,7 +211,7 @@ export function TeammatesScreen({
                   />
                   <div className="lc-rostercard__id">
                     <div className="lc-rostercard__name">{teammate.name}</div>
-                    <div className="lc-rostercard__role">{teammate.role}</div>
+                    <div className="lc-rostercard__role">{roleLabelOf(teammate)}</div>
                   </div>
                 </div>
                 <dl className="lc-rostercard__facts">
