@@ -51,6 +51,34 @@ export const GEMINI_REQUIRED_FEATURES = [
   "plan-permission-mode",
 ] as const satisfies readonly RuntimeFeature[];
 
+/**
+ * OpenCode's `run` subcommand: a non-interactive turn that prints one JSON
+ * object per line.
+ *
+ * Nothing about a read-only mode is required of it, and that is deliberate.
+ * OpenCode has no read-only FLAG -- measured 2026-09-03, containment comes
+ * from a permission config passed in the environment, which no help text
+ * names and no probe can see. Requiring a feature that cannot be detected
+ * would report every install unsupported; the enforcement lives in the
+ * command builder instead, where it is applied rather than merely checked.
+ */
+export const OPENCODE_REQUIRED_FEATURES = [
+  "non-interactive",
+  "jsonl-events",
+] as const satisfies readonly RuntimeFeature[];
+
+/**
+ * GitHub Copilot CLI in its `-p` mode. Both tool lists matter: without
+ * `--allow-all-tools` the CLI stops for approval nobody can give, and
+ * `--deny-tool` is the only thing measured to actually refuse a write.
+ */
+export const COPILOT_REQUIRED_FEATURES = [
+  "non-interactive",
+  "jsonl-events",
+  "tool-allowlist",
+  "tool-denylist",
+] as const satisfies readonly RuntimeFeature[];
+
 export const OMNIROUTE_REQUIRED_FEATURES = [
   "json-health-check",
 ] as const satisfies readonly RuntimeFeature[];
@@ -68,6 +96,19 @@ const FORBIDDEN_ARGUMENTS = new Set([
   "-f",
   // Gemini CLI: "-y" is the short form of its yolo mode.
   "-y",
+  // OpenCode: publishes the session to opencode.ai and prints a public link.
+  // A mission's transcript is the customer's, and sharing it is irreversible.
+  "--share",
+  // GitHub Copilot CLI: each of these widens a run past the workspace the host
+  // chose, or moves it onto GitHub's servers where this process cannot see it.
+  // `--allow-all-tools` is NOT among them: it is what makes the run
+  // non-interactive at all, and the denylist is what holds it back.
+  "--allow-all-paths",
+  "--allow-all-urls",
+  "--allow-all",
+  "--remote",
+  "--remote-export",
+  "--enable-memory",
 ]);
 
 function requireText(value: string, label: string): string {
@@ -118,6 +159,23 @@ export function detectSupportedFeatures(
     add("jsonl-events", scan(helpText, "--output-format") && scan(helpText, "stream-json"));
     add("stdin-prompt", scan(helpText, "stdin"));
     add("plan-permission-mode", scan(helpText, "--approval-mode") && scan(helpText, "plan"));
+  } else if (runtime === "opencode" || runtime === "copilot") {
+    // These two were measured by RUNNING them, not by reading a help page:
+    // this repo has never captured `opencode run --help` or `copilot --help`,
+    // so nothing below is claimed on the strength of their wording. What is
+    // scanned for is the exact flags the builders in this file pass. A CLI
+    // that stops naming one is reported unsupported, which is the direction
+    // that costs a route rather than the direction that runs an argv the
+    // CLI may reject halfway through a mission.
+    if (runtime === "opencode") {
+      add("non-interactive", scan(helpText, "run"));
+      add("jsonl-events", scan(helpText, "--format") && scan(helpText, "json"));
+    } else {
+      add("non-interactive", scan(helpText, "--prompt") || scan(helpText, "-p"));
+      add("jsonl-events", scan(helpText, "--output-format") && scan(helpText, "json"));
+      add("tool-allowlist", scan(helpText, "--allow-all-tools"));
+      add("tool-denylist", scan(helpText, "--deny-tool"));
+    }
   } else {
     add("json-health-check", scan(helpText, "--json"));
   }
@@ -167,19 +225,27 @@ export function assertSafeRuntimeCommand(spec: RuntimeCommandSpec): void {
   }
 }
 
+interface SpecTransport {
+  /** Omitted means the prompt goes on stdin, which is what most CLIs read. */
+  readonly stdin?: "prompt" | "none";
+  readonly env?: Readonly<Record<string, string>>;
+}
+
 function baseSpec(
   runtime: MissionRuntimeId,
   executable: ExecutableLaunch,
   cwd: string,
   args: readonly string[],
+  transport: SpecTransport = {},
 ): RuntimeCommandSpec {
   const spec: RuntimeCommandSpec = {
     runtime,
     executablePath: requireText(executable.executablePath, "Executable path"),
     args: [...executable.prefixArgs, ...args],
     cwd: requireText(cwd, "Workspace path"),
-    stdin: "prompt",
+    stdin: transport.stdin ?? "prompt",
     stdout: "jsonl",
+    ...(transport.env === undefined ? {} : { env: transport.env }),
   };
   assertSafeRuntimeCommand(spec);
   return spec;
@@ -209,6 +275,20 @@ export interface RuntimeCommandOptions {
    * turn a reply rather than a stranger.
    */
   readonly resumeThreadId?: string;
+  /**
+   * The mission's prompt, for the runtimes that take it as a positional
+   * argument instead of on stdin. Every other builder ignores it: the runner
+   * still owns delivery there, and a prompt in two places is a prompt that
+   * can disagree with itself.
+   */
+  readonly prompt?: string;
+  /**
+   * The session id the HOST minted for a first Copilot run. Copilot prints its
+   * session id only in the terminal `result` record, so a run that dies before
+   * that record would leave nothing to resume from; the host generating the id
+   * up front is what makes a follow-up possible at all.
+   */
+  readonly sessionId?: string;
 }
 
 const EFFORT = /^[a-z]{1,16}$/;
@@ -426,4 +506,149 @@ export function createGeminiPrintCommand(
     args.push("--resume", requireText(options.resumeThreadId, "Session id"));
   }
   return baseSpec("gemini", executable, options.workspacePath, args);
+}
+
+/**
+ * Read `opencode models` as it prints: one `provider/model` id per line and
+ * nothing else. Measured 2026-09-03 on opencode-ai 1.18.27.
+ *
+ * The display name is the half after the first slash, because a picker that
+ * shows `opencode/` in front of every row is showing the same word ten times.
+ * A `-free` suffix is the runtime's own claim about its billing, so it is
+ * repeated as a description rather than interpreted; nothing else is added.
+ */
+export function parseOpenCodeModelList(text: string): RuntimeModelHints | undefined {
+  const models: RuntimeModelName[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^([a-z0-9][a-z0-9._-]{0,60})\/([A-Za-z0-9][A-Za-z0-9._-]{0,80})$/.exec(line.trim());
+    if (match === null) continue;
+    const id = `${match[1]!}/${match[2]!}`;
+    if (models.some((model) => model.id === id)) continue;
+    const displayName = match[2]!;
+    models.push(
+      displayName.endsWith("-free")
+        ? { id, displayName, description: "free" }
+        : { id, displayName },
+    );
+  }
+  if (models.length === 0) return undefined;
+  return { aliases: models.map((model) => model.id), efforts: [], models };
+}
+
+/**
+ * What Copilot CLI offers before a run has been paid for.
+ *
+ * There is no `copilot models` command, and the only place model names appear
+ * is inside a run, in `session.auto_mode_resolved.data.availableModels` --
+ * account-specific, and unreadable without spending a premium request. So the
+ * single route offered is the CLI choosing for itself, which is exactly what
+ * omitting `--model` does. No model id this build has not been handed is ever
+ * named here.
+ */
+export const COPILOT_MODEL_HINTS: RuntimeModelHints = {
+  aliases: ["auto"],
+  efforts: [],
+  models: [{ id: "auto", displayName: "Auto", description: "Copilot picks the model" }],
+};
+
+/**
+ * OpenCode's permission config, as an environment value.
+ *
+ * MEASURED 2026-09-03, and it is the only containment this runtime has. With
+ * this set, the write tool is not offered to the model at all: the read-only
+ * capture shows the run answering "no write tool is available" and listing the
+ * eight tools it did get. Without it, `run` edits files with no flag asked
+ * for -- the default `build` agent allows everything, so `--auto` buys
+ * nothing and is not passed.
+ *
+ * `--agent plan` is NOT this. Measured in the same session, plan mode is an
+ * instruction the model narrates ("In PLAN MODE -- read-only") and not a rule
+ * anything upholds, so it is never what a read-only mission rests on.
+ */
+export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
+  permission: { edit: "deny", write: "deny", bash: "deny", patch: "deny" },
+});
+
+/**
+ * OpenCode in its non-interactive `run` mode.
+ *
+ * The prompt goes in ARGV, not on stdin. Measured: the positional prompt is
+ * what the CLI documents and what was seen working; nothing in this repo has
+ * ever seen `opencode run` read a prompt from stdin, and a prompt delivered
+ * down a channel that was never tried is a mission that hangs. So the spec
+ * says `stdin: "none"` and the runner closes the pipe.
+ *
+ * The working directory is the workspace and there is no flag for it: OpenCode
+ * takes the directory it is spawned in.
+ */
+export function createOpenCodeRunCommand(
+  executable: ExecutableLaunch,
+  options: RuntimeCommandOptions,
+): RuntimeCommandSpec {
+  const args = ["run", "--format", "json"];
+  if (options.model !== undefined) {
+    args.push("-m", requireText(options.model, "Model"));
+  }
+  if (options.effort !== undefined) {
+    // Its `run` names no effort flag. Dropping one silently would leave a
+    // caller believing a setting they were shown had been applied.
+    throw new Error("OpenCode takes no effort level");
+  }
+  if (options.resumeThreadId !== undefined) {
+    args.push("-s", requireText(options.resumeThreadId, "Session id"));
+  }
+  args.push(requireText(options.prompt ?? "", "Prompt"));
+  return baseSpec("opencode", executable, options.workspacePath, args, {
+    stdin: "none",
+    ...(sandboxArgument(options.sandbox) === "read-only"
+      ? { env: { OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG } }
+      : {}),
+  });
+}
+
+/**
+ * GitHub Copilot CLI, non-interactive.
+ *
+ * `--allow-all-tools` is not a bypass here, it is the only way to run without
+ * a terminal: without it the CLI waits for an approval no host can give. What
+ * holds the run back is `--deny-tool=write,shell`, measured refusing
+ * `apply_patch` with "Permission to run this tool was denied due to the
+ * following rules: `write`" and PowerShell with "rules: `shell`", leaving no
+ * file behind.
+ *
+ * The session id is the host's, passed in on the first run. Copilot prints one
+ * of its own in the terminal `result` record, but only there -- a run that
+ * fails earlier would print none, and a mission that cannot be continued after
+ * a failure is the one case where continuing matters most.
+ */
+export function createCopilotPromptCommand(
+  executable: ExecutableLaunch,
+  options: RuntimeCommandOptions,
+): RuntimeCommandSpec {
+  const args = [
+    "-p",
+    requireText(options.prompt ?? "", "Prompt"),
+    "--output-format",
+    "json",
+    "--allow-all-tools",
+    // Colour codes would land in the JSON strings this adapter parses.
+    "--no-color",
+  ];
+  if (sandboxArgument(options.sandbox) === "read-only") {
+    args.push("--deny-tool=write,shell");
+  }
+  if (options.model !== undefined) {
+    args.push("--model", requireText(options.model, "Model"));
+  }
+  if (options.effort !== undefined) {
+    throw new Error("Copilot CLI takes no effort level");
+  }
+  if (options.resumeThreadId !== undefined) {
+    // Measured: the resume flag takes its value with `=`, and the run recalled
+    // what the first turn had been told.
+    args.push(`--resume=${requireText(options.resumeThreadId, "Session id")}`);
+  } else if (options.sessionId !== undefined) {
+    args.push("--session-id", requireText(options.sessionId, "Session id"));
+  }
+  return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "none" });
 }

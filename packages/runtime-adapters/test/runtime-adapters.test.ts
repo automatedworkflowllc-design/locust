@@ -3,13 +3,19 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   assertSafeRuntimeCommand,
+  COPILOT_REQUIRED_FEATURES,
   createClaudePrintCommand,
   createCodexExecCommand,
+  createCopilotPromptCommand,
   createCursorPrintCommand,
   createGeminiPrintCommand,
+  createOpenCodeRunCommand,
   CURSOR_REQUIRED_FEATURES,
+  OPENCODE_READ_ONLY_CONFIG,
+  OPENCODE_REQUIRED_FEATURES,
   parseClaudeModelHints,
   parseCursorModelList,
+  parseOpenCodeModelList,
   createNodeProbeRunner,
   createPathExecutableLocator,
   discoverInstalledRuntimes,
@@ -79,6 +85,11 @@ describe("runtime version and executable discovery", () => {
       "0.151.0-alpha.7.2",
     );
     expect(parseRuntimeVersion("2.1.251 (Claude Code)")?.version).toBe("2.1.251");
+    // Copilot CLI ends its version line with a full stop. Read as a sentence
+    // terminator, not as part of the number -- otherwise the CLI reports a
+    // version and this build says it has none.
+    expect(parseRuntimeVersion("GitHub Copilot CLI 1.0.82.")?.version).toBe("1.0.82");
+    expect(parseRuntimeVersion("1.18.27")?.version).toBe("1.18.27");
   });
 
   it("prefers native Windows executables and safely wraps PowerShell shims", async () => {
@@ -136,6 +147,8 @@ describe("installed runtime discovery", () => {
       { id: "claude", availability: "available", readiness: "ready" },
       { id: "cursor", availability: "unavailable", readiness: "unknown" },
       { id: "gemini", availability: "unavailable", readiness: "unknown" },
+      { id: "opencode", availability: "unavailable", readiness: "unknown" },
+      { id: "copilot", availability: "unavailable", readiness: "unknown" },
       { id: "omniroute", availability: "unavailable", readiness: "unknown" },
     ]);
   });
@@ -306,12 +319,73 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     expect(writing.args.slice(-4)).toEqual(["--model", "gemini-3-flash", "--resume", "s1"]);
   });
 
+  it("refuses OpenCode's session sharing and Copilot's ways out of the workspace", () => {
+    // `--share` publishes the transcript to opencode.ai and prints a public
+    // link; the Copilot flags each widen a run past the directory the host
+    // chose, or move it onto GitHub's servers.
+    for (const argument of [
+      "--share",
+      "--allow-all-paths",
+      "--allow-all-urls",
+      "--allow-all",
+      "--remote",
+      "--remote-export",
+      "--enable-memory",
+    ]) {
+      expect(() =>
+        assertSafeRuntimeCommand({ runtime: "opencode", executablePath: "C:\\x.exe", args: [argument], cwd: workspacePath, stdin: "none", stdout: "jsonl" }),
+      ).toThrow(/Forbidden/);
+    }
+    // `--allow-all-tools` is NOT one of them: it is what makes a headless run
+    // possible at all, and the denylist is what holds it back.
+    expect(() =>
+      assertSafeRuntimeCommand({ runtime: "copilot", executablePath: "C:\\x.exe", args: ["--allow-all-tools"], cwd: workspacePath, stdin: "none", stdout: "jsonl" }),
+    ).not.toThrow();
+  });
+
   it("refuses Gemini's yolo mode and Cursor's force flag in any spelling", () => {
     for (const args of [["--approval-mode", "yolo"], ["--approval-mode=yolo"], ["-y"], ["--force"], ["-f"], ["--yolo"]]) {
       expect(() =>
         assertSafeRuntimeCommand({ runtime: "gemini", executablePath: "C:\\x.exe", args, cwd: workspacePath, stdin: "prompt", stdout: "jsonl" }),
       ).toThrow(/Forbidden/);
     }
+  });
+
+  it("finds OpenCode's and Copilot's launchers in the npm bin directory without PATH", async () => {
+    // Both install from npm, which puts its global launchers here and does
+    // not always put that directory on a packaged app's PATH.
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const powershell = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const locator = createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: "", APPDATA: ROAMING, LOCALAPPDATA: "C:\\Users\\x\\AppData\\Local", SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) =>
+        candidate === `${ROAMING}\\npm\\opencode.ps1`
+        || candidate === `${ROAMING}\\npm\\copilot.ps1`
+        || candidate === powershell,
+      readDirectory: async () => [],
+    });
+    await expect(locator.find("opencode")).resolves.toMatchObject({
+      discoveredPath: `${ROAMING}\\npm\\opencode.ps1`,
+      kind: "powershell-shim",
+    });
+    await expect(locator.find("copilot")).resolves.toMatchObject({
+      discoveredPath: `${ROAMING}\\npm\\copilot.ps1`,
+      kind: "powershell-shim",
+    });
+  });
+
+  it("finds Copilot CLI where it unpacks itself, when npm's bin directory is not there either", async () => {
+    const LOCAL = "C:\\Users\\x\\AppData\\Local";
+    const launcher = `${LOCAL}\\copilot\\copilot.exe`;
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: "", LOCALAPPDATA: LOCAL, APPDATA: "C:\\Users\\x\\AppData\\Roaming", SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) => candidate === launcher,
+      readDirectory: async () => [],
+    }).find("copilot");
+    expect(found?.kind).toBe("native");
+    expect(found?.executablePath).toBe(launcher);
   });
 
   it("finds Cursor's launcher in its own install directory without PATH", async () => {
@@ -328,6 +402,209 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     }).find("cursor-agent");
     expect(found?.kind).toBe("powershell-shim");
     expect(found?.discoveredPath).toBe(launcher);
+  });
+});
+
+describe("OpenCode and Copilot CLI commands", () => {
+  const workspacePath = "C:\\work\\repo";
+  const PROMPT = "Summarize the README in one sentence.";
+  const openCode: ExecutableLaunch = { ...nativeExecutable, commandName: "opencode", discoveredPath: "C:\\tools\\opencode.exe", executablePath: "C:\\tools\\opencode.exe" };
+  const copilot: ExecutableLaunch = { ...nativeExecutable, commandName: "copilot", discoveredPath: "C:\\tools\\copilot.exe", executablePath: "C:\\tools\\copilot.exe" };
+
+  it("holds a read-only OpenCode mission with the permission config that actually enforces it", () => {
+    const spec = createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT });
+    expect(spec.runtime).toBe("opencode");
+    // The prompt is a positional argument, so the runner has nothing to send
+    // and closes stdin instead.
+    expect(spec.stdin).toBe("none");
+    expect(spec.args).toEqual(["run", "--format", "json", PROMPT]);
+    // There is no read-only FLAG. Measured, this environment value is the
+    // only thing that stops a run editing files -- with it, the write tool is
+    // not offered at all.
+    expect(spec.env).toEqual({ OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG });
+    expect(JSON.parse(OPENCODE_READ_ONLY_CONFIG)).toEqual({
+      permission: { edit: "deny", write: "deny", bash: "deny", patch: "deny" },
+    });
+  });
+
+  it("lets a workspace-write OpenCode mission edit, and carries no permission config at all", () => {
+    const spec = createOpenCodeRunCommand(openCode, {
+      workspacePath,
+      sandbox: "workspace-write",
+      model: "opencode/big-pickle",
+      resumeThreadId: "ses_1",
+      prompt: PROMPT,
+    });
+    expect(spec.env).toBeUndefined();
+    expect(spec.args).toEqual(["run", "--format", "json", "-m", "opencode/big-pickle", "-s", "ses_1", PROMPT]);
+    // `--auto` buys nothing: measured, `run` edits files without it.
+    expect(spec.args).not.toContain("--auto");
+    // Plan mode is narration, not enforcement, so it is never the read-only
+    // mechanism here.
+    expect(spec.args).not.toContain("--agent");
+  });
+
+  it("holds a read-only Copilot mission with the tool denylist that was measured refusing writes", () => {
+    const spec = createCopilotPromptCommand(copilot, { workspacePath, prompt: PROMPT, sessionId: "uuid-1" });
+    expect(spec.runtime).toBe("copilot");
+    expect(spec.stdin).toBe("none");
+    expect(spec.args).toEqual([
+      "-p", PROMPT, "--output-format", "json", "--allow-all-tools", "--no-color",
+      "--deny-tool=write,shell", "--session-id", "uuid-1",
+    ]);
+  });
+
+  it("lets a workspace-write Copilot mission edit, and resumes by the id the host minted", () => {
+    const spec = createCopilotPromptCommand(copilot, {
+      workspacePath,
+      sandbox: "workspace-write",
+      model: "gpt-5.6-luna",
+      resumeThreadId: "uuid-1",
+      prompt: PROMPT,
+    });
+    expect(spec.args).not.toContain("--deny-tool=write,shell");
+    // Measured: the resume flag takes its value with `=`.
+    expect(spec.args.slice(-3)).toEqual(["--model", "gpt-5.6-luna", "--resume=uuid-1"]);
+    expect(spec.args).not.toContain("--session-id");
+  });
+
+  it("refuses an effort for two runtimes that have no effort flag", () => {
+    expect(() => createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, effort: "high" })).toThrow(/effort/);
+    expect(() => createCopilotPromptCommand(copilot, { workspacePath, prompt: PROMPT, effort: "high" })).toThrow(/effort/);
+  });
+
+  it("refuses to build a command with no prompt, because the prompt IS the argv here", () => {
+    // For these two there is no stdin fallback: an empty positional would
+    // launch a CLI that sits there with nothing to do.
+    expect(() => createOpenCodeRunCommand(openCode, { workspacePath })).toThrow(/Prompt/);
+    expect(() => createCopilotPromptCommand(copilot, { workspacePath })).toThrow(/Prompt/);
+  });
+
+  it("reads OpenCode's model list as it prints it, and marks the free models free", () => {
+    // The real list, as printed 2026-09-03: one `provider/model` per line.
+    const hints = parseOpenCodeModelList(
+      "opencode/muse-spark-1.3-contributor-free\nopencode/nemotron-3.5-lightning-free\nopencode/big-pickle\n",
+    );
+    expect(hints?.models).toEqual([
+      { id: "opencode/muse-spark-1.3-contributor-free", displayName: "muse-spark-1.3-contributor-free", description: "free" },
+      { id: "opencode/nemotron-3.5-lightning-free", displayName: "nemotron-3.5-lightning-free", description: "free" },
+      { id: "opencode/big-pickle", displayName: "big-pickle" },
+    ]);
+    expect(hints?.efforts).toEqual([]);
+  });
+
+  it("reads no models from output that is not a model list", () => {
+    expect(parseOpenCodeModelList("")).toBeUndefined();
+    expect(parseOpenCodeModelList("Error: something went wrong")).toBeUndefined();
+    // A duplicated id is listed once; a line with no slash is not a model.
+    expect(parseOpenCodeModelList("a/b\na/b\njust words")?.models).toEqual([{ id: "a/b", displayName: "b" }]);
+  });
+});
+
+describe("OpenCode and Copilot CLI discovery", () => {
+  const OPENCODE_HELP = "opencode run [message..]  --format <format>  text | json  -m, --model  -s, --session";
+  const COPILOT_HELP = "-p, --prompt <prompt>  --output-format <format> text | json  --allow-all-tools  --deny-tool <tools>  --session-id  --resume";
+  const OPENCODE_MODELS = "opencode/muse-spark-1.3-contributor-free\nopencode/big-pickle\n";
+
+  function newcomerLocator(name: string): ExecutableLocator {
+    return {
+      find: async (command) =>
+        command === name
+          ? { ...nativeExecutable, commandName: name, discoveredPath: `C:\\tools\\${name}.exe`, executablePath: `C:\\tools\\${name}.exe` }
+          : undefined,
+    };
+  }
+
+  it("reports OpenCode ready with no sign-in at all, and reads the models it ships", async () => {
+    // MEASURED: OpenCode has no auth command and needs none -- it ships free
+    // models. Listing them is the cheapest true statement available, so it is
+    // both the readiness check and the model probe.
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "version") return { exitCode: 0, stdout: "1.18.27", stderr: "" };
+        if (command.purpose === "capabilities") {
+          expect(command.args).toEqual(["run", "--help"]);
+          return { exitCode: 0, stdout: OPENCODE_HELP, stderr: "" };
+        }
+        expect(command.args).toEqual(["models"]);
+        return { exitCode: 0, stdout: OPENCODE_MODELS, stderr: "" };
+      },
+    };
+    const [opencode] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("opencode") }))
+      .filter((entry) => entry.id === "opencode");
+    expect(opencode?.availability).toBe("available");
+    expect(opencode?.readiness).toBe("ready");
+    expect(opencode?.version?.version).toBe("1.18.27");
+    expect(opencode?.supportedFeatures).toEqual(expect.arrayContaining([...OPENCODE_REQUIRED_FEATURES]));
+    expect(opencode?.modelHints?.models?.map((model) => model.id))
+      .toEqual(["opencode/muse-spark-1.3-contributor-free", "opencode/big-pickle"]);
+  });
+
+  it("does not report an OpenCode that cannot list a single model as ready to run one", async () => {
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "version") return { exitCode: 0, stdout: "1.18.27", stderr: "" };
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: OPENCODE_HELP, stderr: "" };
+        return { exitCode: 0, stdout: "Error: could not reach the model registry", stderr: "" };
+      },
+    };
+    const [opencode] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("opencode") }))
+      .filter((entry) => entry.id === "opencode");
+    expect(opencode?.readiness).toBe("authentication-required");
+  });
+
+  it("reports Copilot CLI ready on its version alone, and says on the record why that is a guess", async () => {
+    // Copilot has NO free readiness check: whether the account's plan
+    // includes the CLI is only learned by starting a run, and a run costs a
+    // premium request. Discovery will not spend the user's quota to fill in a
+    // status field, so the caveat rides along with the ready verdict.
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: COPILOT_HELP, stderr: "" };
+        expect(command.args).toEqual(["--version"]);
+        // Note the trailing period, which is how the CLI prints it.
+        return { exitCode: 0, stdout: "GitHub Copilot CLI 1.0.82.", stderr: "" };
+      },
+    };
+    const [copilot] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("copilot") }))
+      .filter((entry) => entry.id === "copilot");
+    expect(copilot?.readiness).toBe("ready");
+    expect(copilot?.version?.version).toBe("1.0.82");
+    expect(copilot?.supportedFeatures).toEqual(expect.arrayContaining([...COPILOT_REQUIRED_FEATURES]));
+    const caveat = copilot?.diagnostics.find((issue) => issue.code === "readiness-unverifiable");
+    expect(caveat?.severity).toBe("info");
+    expect(caveat?.resolution).toContain("https://github.com/settings/copilot");
+  });
+
+  it("offers Copilot only the route where the CLI picks, because it names no models before a run", async () => {
+    // The only place model names appear is inside a paid run. Naming one here
+    // would be inventing it.
+    const runner: CommandRunner = {
+      run: async (command) => ({
+        exitCode: 0,
+        stdout: command.purpose === "capabilities" ? COPILOT_HELP : "GitHub Copilot CLI 1.0.82.",
+        stderr: "",
+      }),
+    };
+    const [copilot] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("copilot") }))
+      .filter((entry) => entry.id === "copilot");
+    expect(copilot?.modelHints?.models).toEqual([
+      { id: "auto", displayName: "Auto", description: "Copilot picks the model" },
+    ]);
+  });
+
+  it("reports a Copilot whose version command says something else as not ready", async () => {
+    const runner: CommandRunner = {
+      run: async (command) => ({
+        exitCode: 0,
+        stdout: command.purpose === "capabilities" ? COPILOT_HELP : "command not recognized",
+        stderr: "",
+      }),
+    };
+    const [copilot] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("copilot") }))
+      .filter((entry) => entry.id === "copilot");
+    expect(copilot?.readiness).toBe("authentication-required");
+    expect(copilot?.modelHints).toBeUndefined();
   });
 });
 

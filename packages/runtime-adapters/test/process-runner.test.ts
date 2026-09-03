@@ -397,4 +397,61 @@ describe("controlled runtime JSONL process runner", () => {
     });
     expect(child.signals).toEqual(["SIGINT", "SIGKILL"]);
   });
+
+  it("writes nothing to stdin for a runtime whose prompt is already in its argv", async () => {
+    // OpenCode and Copilot CLI take the prompt as a positional. Writing it a
+    // second time would put it where the CLI is not reading, and some CLIs
+    // treat anything on stdin as further input.
+    const child = fakeChild();
+    const runner = createNodeRuntimeProcessRunner({
+      environment: { PATH: "C:\\tools" },
+      spawnProcess: () => child.process,
+    });
+
+    const run = runner.start(
+      { ...spec, runtime: "opencode", args: ["run", "--format", "json", prompt], stdin: "none" },
+      prompt,
+    );
+    child.close(0);
+    await run.completion;
+
+    expect(child.stdin.writes).toEqual([]);
+    expect(child.stdin.ended).toBe(true);
+  });
+
+  it("puts a spec's own variables on top of the allowlist, where nothing on the machine can undo them", async () => {
+    // OpenCode's read-only permission config arrives this way and is the only
+    // thing holding that runtime back. Two things have to hold: a machine that
+    // exported the same name does not get a say (it is not on the allowlist,
+    // so it never reaches the child), and where a name IS on the allowlist the
+    // spec's value still wins.
+    const child = fakeChild();
+    let launched: RuntimeSpawnOptions | undefined;
+    const runner = createNodeRuntimeProcessRunner({
+      environment: { PATH: "C:\\tools", NO_COLOR: "0", OPENCODE_CONFIG_CONTENT: "{}" },
+      spawnProcess: (_executablePath, _args, options) => {
+        launched = options;
+        return child.process;
+      },
+    });
+
+    const run = runner.start(
+      {
+        ...spec,
+        runtime: "opencode",
+        args: ["run", "--format", "json", prompt],
+        stdin: "none",
+        env: { OPENCODE_CONFIG_CONTENT: '{"permission":{"write":"deny"}}', NO_COLOR: "1" },
+      },
+      prompt,
+    );
+    child.close(0);
+    await run.completion;
+
+    expect(launched?.env).toMatchObject({
+      PATH: "C:\\tools",
+      NO_COLOR: "1",
+      OPENCODE_CONFIG_CONTENT: '{"permission":{"write":"deny"}}',
+    });
+  });
 });

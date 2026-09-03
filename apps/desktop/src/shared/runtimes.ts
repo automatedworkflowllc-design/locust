@@ -10,7 +10,9 @@ const DISPLAY_NAMES: Readonly<Record<MissionRuntimeId, string>> = {
   codex: 'Codex CLI',
   claude: 'Claude Code',
   cursor: 'Cursor Agent',
-  gemini: 'Gemini CLI'
+  gemini: 'Gemini CLI',
+  opencode: 'OpenCode',
+  copilot: 'Copilot CLI'
 }
 
 export function isMissionRuntime(value: unknown): value is MissionRuntimeId {
@@ -29,6 +31,6 @@ export function runtimeDisplayName(runtime: MissionRuntimeId): string {
  * process whose output nobody can read -- and it is refused, by name, before
  * anything is recorded.
  */
-export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' | 'cursor' {
-  return runtime === 'codex' || runtime === 'claude' || runtime === 'cursor'
+export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' | 'cursor' | 'opencode' | 'copilot' {
+  return runtime === 'codex' || runtime === 'claude' || runtime === 'cursor' || runtime === 'opencode' || runtime === 'copilot'
 }

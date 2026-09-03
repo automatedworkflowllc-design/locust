@@ -1,12 +1,16 @@
 import {
   CLAUDE_REQUIRED_FEATURES,
   CODEX_REQUIRED_FEATURES,
+  COPILOT_MODEL_HINTS,
+  COPILOT_REQUIRED_FEATURES,
   CURSOR_REQUIRED_FEATURES,
   detectSupportedFeatures,
   GEMINI_REQUIRED_FEATURES,
   OMNIROUTE_REQUIRED_FEATURES,
+  OPENCODE_REQUIRED_FEATURES,
   parseClaudeModelHints,
   parseCursorModelList,
+  parseOpenCodeModelList,
 } from "./commands.js";
 import type {
   CommandResult,
@@ -19,6 +23,7 @@ import type {
   RuntimeFeature,
   RuntimeIntegrationId,
   RuntimeIntegrationKind,
+  RuntimeModelHints,
   RuntimeReadiness,
 } from "./types.js";
 import { parseRuntimeVersion } from "./version.js";
@@ -42,6 +47,19 @@ interface IntegrationDefinition {
   readonly readyWhen?: (result: CommandResult) => boolean;
   /** A command that prints the runtime's model list, run only once it is ready. */
   readonly modelsArgs?: readonly string[];
+  /** How that list is read. Each CLI prints its own shape; none is guessed. */
+  readonly parseModels?: (text: string) => RuntimeModelHints | undefined;
+  /**
+   * Routes a runtime offers without any list command to ask. Only for a CLI
+   * that has none: the alternative is naming models nobody printed.
+   */
+  readonly fixedModelHints?: RuntimeModelHints;
+  /**
+   * A note attached to a runtime reported ready on weaker evidence than the
+   * others. It rides alongside `ready`, so the route is offered and the reason
+   * it is a best guess stays visible.
+   */
+  readonly readinessCaveat?: RuntimeDiagnostic;
 }
 
 const DEFINITIONS: readonly IntegrationDefinition[] = [
@@ -79,6 +97,7 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
     capabilityArgs: ["--help"],
     readinessArgs: ["status"],
     modelsArgs: ["--list-models"],
+    parseModels: parseCursorModelList,
     requiredFeatures: CURSOR_REQUIRED_FEATURES,
     // Measured: `cursor-agent status` prints "Not logged in" and exits 0.
     readyWhen: (result) => !/not logged in/i.test(`${result.stdout}\n${result.stderr}`),
@@ -100,6 +119,58 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
     // prints "Error authenticating: IneligibleTierError ..." and exits 0. So
     // the exit code is not the whole answer here either.
     readyWhen: (result) => !/error authenticating|please set an auth method/i.test(`${result.stdout}\n${result.stderr}`),
+  },
+  {
+    id: "opencode",
+    kind: "agent-runtime",
+    displayName: "OpenCode",
+    commandName: "opencode",
+    optional: true,
+    versionArgs: ["--version"],
+    capabilityArgs: ["run", "--help"],
+    // MEASURED 2026-09-03: OpenCode is READY WITH NO SIGN-IN. It ships free
+    // models, so there is no auth command to run and nothing that would tell
+    // us anything if there were. `models` is the cheapest true statement
+    // available -- it is local, it costs nothing, and a CLI that can list the
+    // models it will run is a CLI that can run one.
+    readinessArgs: ["models"],
+    modelsArgs: ["models"],
+    parseModels: parseOpenCodeModelList,
+    requiredFeatures: OPENCODE_REQUIRED_FEATURES,
+    readyWhen: (result) =>
+      parseOpenCodeModelList(`${result.stdout}\n${result.stderr}`) !== undefined,
+  },
+  {
+    id: "copilot",
+    kind: "agent-runtime",
+    displayName: "Copilot CLI",
+    commandName: "copilot",
+    optional: true,
+    versionArgs: ["--version"],
+    capabilityArgs: ["--help"],
+    // MEASURED 2026-09-03, and this one is a judgement call worth spelling
+    // out. Copilot CLI has NO free readiness check: whether the signed-in
+    // account's plan includes the CLI is only discovered by starting a run,
+    // and a run costs a premium request. Discovery will not spend the user's
+    // quota to fill in a status field, so a version that prints is taken as
+    // ready and the caveat below rides along. The refusal, when it comes, is
+    // unmistakable and lands where the user can act on it: the run fails with
+    // "Copilot plan required" and the settings URL. Reporting
+    // `authentication-required` instead would hide a working route from every
+    // user whose plan is fine.
+    readinessArgs: ["--version"],
+    requiredFeatures: COPILOT_REQUIRED_FEATURES,
+    readyWhen: (result) => /copilot cli/i.test(`${result.stdout}\n${result.stderr}`),
+    fixedModelHints: COPILOT_MODEL_HINTS,
+    readinessCaveat: {
+      code: "readiness-unverifiable",
+      severity: "info",
+      message:
+        "Copilot CLI is installed and signed in as far as its version command can tell; "
+        + "whether this account's plan includes the CLI cannot be checked without spending a premium request.",
+      resolution:
+        "If a run fails with a policy denial, confirm the plan at https://github.com/settings/copilot",
+    },
   },
   {
     id: "omniroute",
@@ -267,6 +338,9 @@ async function discoverOne(
     );
     if (succeeded(readinessOutcome) && (definition.readyWhen?.(readinessOutcome.result) ?? true)) {
       readiness = "ready";
+      if (definition.readinessCaveat !== undefined) {
+        diagnostics.push(diagnostic(definition.readinessCaveat));
+      }
     } else if (
       definition.id !== "omniroute" &&
       readinessOutcome.result !== undefined &&
@@ -300,7 +374,7 @@ async function discoverOne(
     if (succeeded(modelsOutcome)) {
       // Both streams, like every other probe in this file: the one model
       // listing this repo has actually captured arrived on stderr.
-      modelHints = parseCursorModelList(
+      modelHints = definition.parseModels?.(
         `${modelsOutcome.result.stdout}\n${modelsOutcome.result.stderr}`,
       );
       if (modelHints === undefined) {
@@ -317,6 +391,12 @@ async function discoverOne(
         );
       }
     }
+  }
+
+  // A runtime with no list command to ask offers what it can honestly offer:
+  // the route where the CLI chooses the model for itself.
+  if (definition.fixedModelHints !== undefined && readiness === "ready") {
+    modelHints = definition.fixedModelHints;
   }
 
   const base: RuntimeDiscovery = {

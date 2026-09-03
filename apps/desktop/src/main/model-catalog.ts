@@ -172,6 +172,46 @@ export function cursorModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   }))
 }
 
+/**
+ * OpenCode's models, from `opencode models` at discovery: one `provider/model`
+ * id per line. The ones ending in `-free` cost nothing and need no sign-in,
+ * which is the whole reason this runtime is here; they are named as free.
+ */
+export function opencodeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonly PublicModel[] {
+  const opencode = runtimes.find((entry) => entry.id === 'opencode')
+  const listed = opencode?.modelHints?.models
+  if (opencode?.readiness !== 'ready' || listed === undefined) return []
+  return listed.map((model) => {
+    const free = model.id.endsWith('-free')
+    return {
+      id: model.id,
+      runtime: 'opencode' as const,
+      displayName: model.displayName,
+      description: free ? 'Free · no sign-in · listed by opencode models' : 'Listed by opencode models',
+      supportedEfforts: []
+    }
+  })
+}
+
+/**
+ * Copilot has no cheap way to list models: the ones an account may use are
+ * only reported inside a run. So the catalog offers `auto`, which is real --
+ * Copilot picks -- and never a name this build guessed.
+ */
+export function copilotModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonly PublicModel[] {
+  const copilot = runtimes.find((entry) => entry.id === 'copilot')
+  if (copilot?.readiness !== 'ready') return []
+  return [
+    {
+      id: 'auto',
+      runtime: 'copilot' as const,
+      displayName: 'Auto',
+      description: 'Copilot picks the model your plan allows',
+      supportedEfforts: []
+    }
+  ]
+}
+
 export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
   const now = options.now ?? (() => Date.now())
   let cached: { readonly at: number; readonly response: ModelCatalogResponse } | undefined
@@ -182,7 +222,12 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
     // Each runtime's models come from its own source and fail on their own:
     // Claude's and Cursor's from what their CLIs advertised at discovery,
     // Codex's from a live server read.
-    const advertisedModels = [...claudeModelsFrom(runtimes), ...cursorModelsFrom(runtimes)]
+    const advertisedModels = [
+      ...claudeModelsFrom(runtimes),
+      ...cursorModelsFrom(runtimes),
+      ...opencodeModelsFrom(runtimes),
+      ...copilotModelsFrom(runtimes)
+    ]
     const codex = runtimes.find((entry) => entry.id === 'codex')
     if (codex?.readiness !== 'ready' || codex.executable === undefined) {
       return advertisedModels.length > 0

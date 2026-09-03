@@ -1,7 +1,11 @@
 import type { ParsedRuntimeVersion } from "./types.js";
 
+// The trailing `\.(?![0-9])` is there because GitHub Copilot CLI ends its
+// version line with a full stop -- "GitHub Copilot CLI 1.0.82." -- and without
+// it that sentence read as no version at all. A period followed by a digit is
+// still part of a longer number and still does not match.
 const SEMVER_PATTERN =
-  /(?:^|[^0-9A-Za-z])v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?=$|[^0-9A-Za-z.+-])/;
+  /(?:^|[^0-9A-Za-z])v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?=$|\.(?![0-9])|[^0-9A-Za-z.+-])/;
 
 export function parseRuntimeVersion(output: string): ParsedRuntimeVersion | undefined {
   const normalized = output.trim();

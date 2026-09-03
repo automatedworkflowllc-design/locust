@@ -43,6 +43,15 @@ const WINDOWS_INSTALL_ROOTS: readonly InstallRoot[] = [
   // from the shell does not see until the next sign-in.
   { command: "cursor-agent", base: "LOCALAPPDATA", segments: ["cursor-agent"], versioned: false },
   { command: "gemini", base: "APPDATA", segments: ["npm"], versioned: false },
+  // OpenCode and Copilot CLI both install from npm, so the global npm bin
+  // directory is where their launchers land.
+  { command: "opencode", base: "APPDATA", segments: ["npm"], versioned: false },
+  { command: "copilot", base: "APPDATA", segments: ["npm"], versioned: false },
+  // Copilot CLI also unpacks itself under %LOCALAPPDATA%\copilot -- its own
+  // records name that directory (`...\AppData\Local\copilot\pkg\win32-x64\
+  // <version>\builtin\...`), so a launcher there is worth looking for when
+  // npm's bin directory is not on PATH.
+  { command: "copilot", base: "LOCALAPPDATA", segments: ["copilot"], versioned: false },
   // Windows PowerShell's own home. Claude Code installs as a `.ps1` shim, and
   // running it needs a host; on a PATH that does not name one, the shim was
   // found and then discarded for want of an interpreter that is always there.

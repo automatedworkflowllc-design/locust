@@ -1,8 +1,9 @@
-// Mutation control for the app-server client and its event normalizer.
+// Mutation control for this package's runtime adapters.
 //
-// This client sits on an experimental protocol and handles the approval
-// channel, so its bounds and its request/response correlation are the parts
-// that must not quietly rot. A green suite over them is not evidence; each
+// Everything here sits between a provider's own CLI and the mission ledger:
+// the app-server client's request correlation and bounds, each normalizer's
+// account of what a tool did, and the containment each command builder is
+// responsible for applying. A green suite over them is not evidence; each
 // invariant has to be shown to fail when broken.
 //
 //   node test/mutation-control.mjs
@@ -25,8 +26,116 @@ const LOCATOR = join(ROOT, 'src', 'path-locator.ts')
 const DISCOVERY = join(ROOT, 'src', 'discovery.ts')
 const CURSOR_EVENTS = join(ROOT, 'src', 'cursor-events.ts')
 const CODEX_EVENTS = join(ROOT, 'src', 'codex-events.ts')
+const OPENCODE_EVENTS = join(ROOT, 'src', 'opencode-events.ts')
+const COPILOT_EVENTS = join(ROOT, 'src', 'copilot-events.ts')
+const PROCESS_RUNNER = join(ROOT, 'src', 'process-runner.ts')
 
 const MUTATIONS = [
+  {
+    file: OPENCODE_EVENTS,
+    name: "an edit's reported diff is ignored",
+    from: '      const patch = reportedDiff !== undefined\n        ? toolPatchFrom(reportedDiff)\n        : kind === "write"',
+    to: '      const patch = false\n        ? undefined\n        : kind === "write"',
+    expect: 'attaches the unified diff OpenCode reported for an edit, with counts from it'
+  },
+  {
+    file: COPILOT_EVENTS,
+    name: "a view's diff-shaped listing becomes a change",
+    from: '      const patch = built !== undefined && built.added + built.removed > 0 ? built : undefined;',
+    to: '      const patch = built;',
+    expect: "attaches a patch to the edit alone; the view's diff-shaped listing carries none"
+  },
+  {
+    file: COMMANDS,
+    name: 'a read-only OpenCode mission runs with no permission config at all',
+    from: '    ...(sandboxArgument(options.sandbox) === "read-only"\n      ? { env: { OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG } }\n      : {}),',
+    to: '',
+    expect: 'holds a read-only OpenCode mission with the permission config that actually enforces it'
+  },
+  {
+    file: COMMANDS,
+    name: 'a read-only Copilot mission runs with every tool allowed',
+    from: '    args.push("--deny-tool=write,shell");',
+    to: '    void args;',
+    expect: 'holds a read-only Copilot mission with the tool denylist that was measured refusing writes'
+  },
+  {
+    file: COPILOT_EVENTS,
+    name: 'a denied Copilot tool call is recorded as one that completed',
+    from: '      const failed = data.success !== true;',
+    to: '      const failed = data.success === false && false;',
+    expect: 'is a failure unless the CLI said success in so many words'
+  },
+  {
+    file: COPILOT_EVENTS,
+    name: "the CLI's whole system prompt is written into the ledger",
+    from: '    if (IGNORED_TYPES.has(type)) return [];\n',
+    to: '',
+    expect: 'never lets the CLI\'s system prompt into the ledger'
+  },
+  {
+    file: COPILOT_EVENTS,
+    name: "the model's opaque reasoning blobs ride along in the evidence",
+    from: '    const scrubbed = scrubCopilotRecord(parsed);',
+    to: '    const scrubbed = parsed;',
+    expect: "never carries the model's opaque reasoning or the account's request handles"
+  },
+  {
+    file: COPILOT_EVENTS,
+    name: 'a policy refusal is reported as nothing more than a non-zero exit',
+    from: '      if (refusal !== undefined) {',
+    to: '      if (false) {',
+    expect: "fails with a reason a person can act on, not just 'the process exited 1'"
+  },
+  {
+    file: COPILOT_EVENTS,
+    name: "the session id the CLI printed is ignored in favour of the host's",
+    from: '      runtimeThreadId = identityValue(parsed.sessionId) ?? runtimeThreadId;',
+    to: '      void parsed.sessionId;',
+    expect: 'prefers the session id the CLI printed over the one the host passed in'
+  },
+  {
+    file: OPENCODE_EVENTS,
+    name: 'an OpenCode overwrite is reported with a diff nobody produced',
+    from: '  if (existed !== false) return undefined;',
+    to: '  void existed;',
+    expect: 'becomes a patch only when the runtime said the file did not exist'
+  },
+  {
+    file: OPENCODE_EVENTS,
+    name: 'an OpenCode tool status this build has never seen is treated as success',
+    from: '  if (status === "completed") return { failed: false };\n  return { failed: true, status: status ?? "unknown" };',
+    to: '  if (status === "error") return { failed: true, status };\n  return { failed: false };',
+    expect: 'treats anything but `completed` as a failure, including nothing at all'
+  },
+  {
+    file: OPENCODE_EVENTS,
+    name: 'only the last OpenCode step is counted, so a run looks cheaper than it was',
+    from: '        inputTokens += tokens.input;',
+    to: '        inputTokens = tokens.input;',
+    expect: 'adds up what every step cost, rather than reporting the last step as the total'
+  },
+  {
+    file: OPENCODE_EVENTS,
+    name: 'a run that stopped mid-tool-call is reported as completed',
+    from: '      if (!sawStop || completion.exitCode !== 0) {',
+    to: '      if (completion.exitCode !== 0) {',
+    expect: 'is a failure when the stream stops mid-tool-call, however cleanly the process exited'
+  },
+  {
+    file: PROCESS_RUNNER,
+    name: 'a prompt already in argv is written to stdin as well',
+    from: '      if (terminationRequested || spec.stdin === "none") {',
+    to: '      if (terminationRequested) {',
+    expect: 'writes nothing to stdin for a runtime whose prompt is already in its argv'
+  },
+  {
+    file: PROCESS_RUNNER,
+    name: "a spec's own environment is dropped before the child ever sees it",
+    from: '          env: { ...environment, ...(spec.env ?? {}) },',
+    to: '          env: { ...environment },',
+    expect: "puts a spec's own variables on top of the allowlist, where nothing on the machine can undo them"
+  },
   {
     file: CURSOR_EVENTS,
     name: 'an edit is recorded without the change it made',
@@ -128,9 +237,30 @@ const MUTATIONS = [
   {
     file: DISCOVERY,
     name: "Cursor's model list is never read",
-    from: '      modelHints = parseCursorModelList(',
-    to: '      modelHints = undefined; void parseCursorModelList(',
+    from: '      modelHints = definition.parseModels?.(',
+    to: '      modelHints = undefined; void String(',
     expect: 'reports a signed-in Cursor Agent ready and reads its models off --list-models'
+  },
+  {
+    file: DISCOVERY,
+    name: 'an OpenCode that can list no models is reported ready to run one',
+    from: '    readyWhen: (result) =>\n      parseOpenCodeModelList(`${result.stdout}\\n${result.stderr}`) !== undefined,',
+    to: '    readyWhen: () => true,',
+    expect: 'does not report an OpenCode that cannot list a single model as ready to run one'
+  },
+  {
+    file: DISCOVERY,
+    name: 'Copilot is reported ready with no note that readiness could not be checked',
+    from: '      if (definition.readinessCaveat !== undefined) {\n        diagnostics.push(diagnostic(definition.readinessCaveat));\n      }\n',
+    to: '',
+    expect: 'reports Copilot CLI ready on its version alone, and says on the record why that is a guess'
+  },
+  {
+    file: DISCOVERY,
+    name: 'Copilot is offered a model list it has no way to have read',
+    from: '  if (definition.fixedModelHints !== undefined && readiness === "ready") {\n    modelHints = definition.fixedModelHints;\n  }\n',
+    to: '',
+    expect: 'offers Copilot only the route where the CLI picks, because it names no models before a run'
   },
   {
     file: CURSOR_EVENTS,
@@ -384,6 +514,9 @@ function runSuite() {
 const originals = new Map([
   [LOCATOR, readFileSync(LOCATOR, 'utf8')],
   [DISCOVERY, readFileSync(DISCOVERY, 'utf8')],
+  [OPENCODE_EVENTS, readFileSync(OPENCODE_EVENTS, 'utf8')],
+  [COPILOT_EVENTS, readFileSync(COPILOT_EVENTS, 'utf8')],
+  [PROCESS_RUNNER, readFileSync(PROCESS_RUNNER, 'utf8')],
   [CURSOR_EVENTS, readFileSync(CURSOR_EVENTS, 'utf8')],
   [CODEX_EVENTS, readFileSync(CODEX_EVENTS, 'utf8')],
   [CLAUDE_EVENTS, readFileSync(CLAUDE_EVENTS, 'utf8')],

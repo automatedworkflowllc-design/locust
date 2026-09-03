@@ -52,6 +52,8 @@ export const RUNTIME_INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
   codex: 'live',
   claude: 'live',
   cursor: 'live',
+  opencode: 'live',
+  copilot: 'live',
   gemini: 'planned',
   omniroute: 'planned'
 }
@@ -457,6 +459,8 @@ export function modeUnavailableReason(
 function runtimeLabel(runtime: MissionRuntimeId): string {
   if (runtime === 'claude') return 'Claude Code'
   if (runtime === 'cursor') return 'Cursor Agent'
+  if (runtime === 'opencode') return 'OpenCode'
+  if (runtime === 'copilot') return 'Copilot CLI'
   if (runtime === 'gemini') return 'Gemini CLI'
   return 'Codex CLI'
 }
@@ -565,6 +569,16 @@ export interface ConversationRowExtras {
   readonly memberIds: readonly string[]
   /** How many turns it holds. 1 means an ordinary single-run mission. */
   readonly turns: number
+}
+
+/**
+ * What a route row is searched by. Model ids arrive as `muse-spark-1.3` and
+ * `gpt-5.6-luna`; a person types "muse spark" or "gpt 5". Punctuation is
+ * folded to spaces on both sides so the search matches how names are said,
+ * not how a CLI happened to spell them.
+ */
+export function routeSearchText(text: string): string {
+  return text.toLowerCase().replace(/[-_/.:]+/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 export function collapseConversations<

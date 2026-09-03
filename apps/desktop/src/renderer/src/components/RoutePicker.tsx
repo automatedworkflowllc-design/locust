@@ -3,14 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
-import {
-  capRouteRows,
-  integrationOf,
-  orderRouteRows,
-  ROUTE_GROUP_LIMIT,
-  routeRowStatus,
-  routeRowTag
-} from '../status.js'
+import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, orderRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
 
 export interface RouteChoice {
@@ -127,12 +120,12 @@ export function RoutePicker({
     () => buildRows(runtimes, models, active, resolvedModels, recentRoutes),
     [runtimes, models, active, resolvedModels, recentRoutes]
   )
-  const needle = query.trim().toLowerCase()
+  const needle = routeSearchText(query)
   const matched = useMemo(
     () =>
       needle.length === 0
         ? rows
-        : rows.filter((row) => `${row.group} ${row.label}`.toLowerCase().includes(needle)),
+        : rows.filter((row) => routeSearchText(`${row.group} ${row.label}`).includes(needle)),
     [rows, needle]
   )
   // One runtime can list hundreds of models. Every group is capped until the

@@ -115,6 +115,37 @@ export type { CursorEventNormalizer, CursorInvocationContext } from "./cursor-ev
 export { parseCursorModelList } from "./commands.js";
 export type { RuntimeModelName } from "./types.js";
 export { cursorCanEnforceReadOnly } from "./commands.js";
+export {
+  COPILOT_MODEL_HINTS,
+  COPILOT_REQUIRED_FEATURES,
+  createCopilotPromptCommand,
+  createOpenCodeRunCommand,
+  OPENCODE_READ_ONLY_CONFIG,
+  OPENCODE_REQUIRED_FEATURES,
+  parseOpenCodeModelList,
+} from "./commands.js";
+export {
+  addedFilePatch,
+  createOpenCodeEventNormalizer,
+  openCodeToolOutcome,
+  openCodeToolTarget,
+} from "./opencode-events.js";
+export type {
+  OpenCodeEventNormalizer,
+  OpenCodeInvocationContext,
+} from "./opencode-events.js";
+export {
+  copilotFailureFrom,
+  copilotToolCommand,
+  copilotUsage,
+  createCopilotEventNormalizer,
+  scrubCopilotRecord,
+  summarizeCopilotAutoMode,
+} from "./copilot-events.js";
+export type {
+  CopilotEventNormalizer,
+  CopilotInvocationContext,
+} from "./copilot-events.js";
 export { killProcessTree } from "./process-runner.js";
 export { toolPatchFrom } from "./codex-events.js";
 export type { ToolPatch } from "./codex-events.js";

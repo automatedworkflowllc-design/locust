@@ -351,7 +351,7 @@ export function createNodeRuntimeProcessRunner(
       if (!isAbsolute(spec.cwd)) {
         throw safeTransportError("Runtime workspace path must be absolute");
       }
-      if (spec.stdin !== "prompt" || spec.stdout !== "jsonl") {
+      if ((spec.stdin !== "prompt" && spec.stdin !== "none") || spec.stdout !== "jsonl") {
         throw safeTransportError("Runtime command does not satisfy the JSONL transport contract");
       }
       if (spec.args.some((argument) => argument.includes("\0"))) {
@@ -390,7 +390,11 @@ export function createNodeRuntimeProcessRunner(
       try {
         child = spawnProcess(spec.executablePath, spec.args, {
           cwd: spec.cwd,
-          env: { ...environment },
+          // The spec's own variables sit ON TOP of the allowlist, not beside
+          // it: OpenCode's read-only permission config is the only thing
+          // holding that runtime back, and a machine that happened to export
+          // the same name must not be able to loosen it.
+          env: { ...environment, ...(spec.env ?? {}) },
           shell: false,
           windowsHide: true,
           stdio: ["pipe", "pipe", "pipe"],
@@ -540,7 +544,10 @@ export function createNodeRuntimeProcessRunner(
         if (startOptions.signal.aborted) requestTermination(true);
       }
 
-      if (terminationRequested) {
+      // A spec whose prompt is already in argv gets an empty, closed stdin.
+      // Writing the prompt a second time would put it where the CLI is not
+      // reading, and some CLIs treat anything on stdin as extra input.
+      if (terminationRequested || spec.stdin === "none") {
         child.stdin.end();
       } else {
         try {

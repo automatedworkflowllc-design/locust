@@ -3,8 +3,12 @@ import {
   createClaudePrintCommand,
   createCodexEventNormalizer,
   createCodexExecCommand,
+  createCopilotEventNormalizer,
+  createCopilotPromptCommand,
   createCursorEventNormalizer,
   createCursorPrintCommand,
+  createOpenCodeEventNormalizer,
+  createOpenCodeRunCommand,
   cursorCanEnforceReadOnly
 } from '@teammate/runtime-adapters'
 import type {
@@ -535,7 +539,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const missionId = `mission_${createId()}`
         const controller = new AbortController()
         const createdAt = now().toISOString()
-        const routeId = runtime === 'claude' ? 'claude' : 'codex'
+        const routeId = runtime === 'claude' ? 'claude' : runtime === 'opencode' ? 'opencode' : runtime === 'copilot' ? 'copilot' : 'codex'
         // ONE definition of what this run may touch, computed before anything
         // records it. Codex and Cursor take a sandbox; Claude Code does not, so a Claude run is
         // restricted whatever the composer asked for -- and the durable header
@@ -566,11 +570,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           ...(chosen.version?.version === undefined ? {} : { cliVersion: chosen.version.version }),
           now
         }
+        // Copilot resumes by a session id the HOST chooses on a first run, so
+        // the host mints it here and hands the same id to the normalizer; the
+        // receipt then names a session that can really be resumed even if the
+        // stream never echoes it back.
+        const copilotSessionId = runtime === 'copilot' ? (resumeThreadId ?? randomUUID()) : undefined
         const normalizer = runtime === 'claude'
           ? createClaudeEventNormalizer(normalizerContext)
           : runtime === 'cursor'
             ? createCursorEventNormalizer(normalizerContext)
-            : createCodexEventNormalizer(normalizerContext)
+            : runtime === 'opencode'
+              ? createOpenCodeEventNormalizer(normalizerContext)
+              : runtime === 'copilot'
+                ? createCopilotEventNormalizer({ ...normalizerContext, sessionId: copilotSessionId! })
+                : createCodexEventNormalizer(normalizerContext)
 
         // The argv, decided BEFORE anything durable is written. The builders
         // refuse what they cannot honour -- an effort for a runtime that has
@@ -578,27 +591,53 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // there used to leave a mission file and a failure record behind for
         // a run that never existed. Nothing created today can be pruned
         // today, so those files were permanent.
+        // Narrowed above; captured so the closure below keeps the narrowing.
+        const executable = chosen.executable
         let command: RuntimeCommandSpec
-        try {
+        // OpenCode and Copilot take the prompt as an argument, not on stdin,
+        // so their argv is built once now with the person's own words -- so a
+        // builder's refusal still lands before anything durable -- and again
+        // below with the prompt the runtime is actually sent.
+        const buildCommand = (promptText: string): RuntimeCommandSpec => {
           const chosenEffort = route.effort
           const choice = {
             ...(chosenModel === undefined ? {} : { model: chosenModel }),
             ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
             ...(resumeThreadId === undefined ? {} : { resumeThreadId })
           }
-          command = runtime === 'claude'
-            ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath, ...choice })
+          if (runtime === 'opencode') {
+            return createOpenCodeRunCommand(executable, {
+              workspacePath: options.workspacePath,
+              sandbox: effectiveSandbox,
+              prompt: promptText,
+              ...choice
+            })
+          }
+          if (runtime === 'copilot') {
+            return createCopilotPromptCommand(executable, {
+              workspacePath: options.workspacePath,
+              sandbox: effectiveSandbox,
+              prompt: promptText,
+              ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel }),
+              ...(resumeThreadId === undefined ? { sessionId: copilotSessionId } : { resumeThreadId })
+            })
+          }
+          return runtime === 'claude'
+            ? createClaudePrintCommand(executable, { workspacePath: options.workspacePath, ...choice })
             : runtime === 'cursor'
-              ? createCursorPrintCommand(chosen.executable, {
+              ? createCursorPrintCommand(executable, {
                   workspacePath: options.workspacePath,
                   sandbox: effectiveSandbox,
                   ...choice
                 })
-              : createCodexExecCommand(chosen.executable, {
+              : createCodexExecCommand(executable, {
                   workspacePath: options.workspacePath,
                   sandbox: effectiveSandbox,
                   ...choice
                 })
+        }
+        try {
+          command = buildCommand(prompt)
         } catch {
           return error(
             'RUNTIME_START_FAILED',
@@ -696,6 +735,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
         let process: RuntimeProcessRun
         try {
+          // The prompt the runtime is sent is the person's words plus their
+          // teammates' messages; a runtime that takes it on the argv gets the
+          // same text there. Options were validated above, so this cannot refuse.
+          if (command.stdin === 'none') command = buildCommand(runtimePrompt)
           process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
         } catch {
           try {

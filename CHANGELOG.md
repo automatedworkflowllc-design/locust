@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.12.0 — 2026-09-03
+
+- **Two new routes.** OpenCode, which ships free models that need no sign-in
+  at all (Muse Spark, Nemotron, and more), so a fresh install can run a
+  mission for nothing the minute it opens; and GitHub Copilot CLI, for anyone
+  on a Copilot plan that includes the CLI, offered as Auto so Copilot picks
+  the model your plan allows. Both keep the same guarantees as the other
+  routes: read-only really is read-only (OpenCode is held by its own
+  permission config, Copilot by denying its write and shell tools), a reply
+  resumes the same session, and every run is recorded like any other.
+- **Meetings.** Write to two or more teammates at once and each gets their
+  own run, but your teammate's next turn waits until all of them have
+  answered or finished, then starts once with every reply quoted. The thread
+  says who it is waiting on and who left without a word.
+- Each teammate row now says which runtime and model they are. The roster
+  draws the same faces as the sidebar. A banner above the composer says when
+  a new version is downloaded and offers the restart.
+- The route search folds hyphens and dots, so "muse spark" finds
+  `muse-spark-1.3` and "gpt 5" finds `gpt-5.6`.
+
 ## 0.11.0 — 2026-09-03
 
 - **Faces that say what a teammate is doing.** Eight states, each with its own

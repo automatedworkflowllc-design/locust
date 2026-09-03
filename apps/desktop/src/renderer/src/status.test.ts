@@ -4,6 +4,7 @@ import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import {
   checkpointLabel,
   collapseConversations,
+  routeSearchText,
   facePresenceFor,
   connectedRuntimeCount,
   handoffAvailability,
@@ -612,5 +613,13 @@ describe('the sidebar lists conversations, not turns', () => {
     ])
     expect(rows).toHaveLength(1)
     expect(rows[0]?.turns).toBe(2)
+  })
+})
+
+describe('searching routes the way names are said', () => {
+  it('folds the punctuation a CLI spells a model with', () => {
+    expect(routeSearchText('opencode/muse-spark-1.3-contributor-free')).toBe('opencode muse spark 1 3 contributor free')
+    expect(routeSearchText('  Muse   Spark ')).toBe('muse spark')
+    expect(routeSearchText('OpenCode muse-spark-1.3').includes(routeSearchText('muse spark 1.3'))).toBe(true)
   })
 })

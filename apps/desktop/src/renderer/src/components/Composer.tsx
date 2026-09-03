@@ -7,7 +7,7 @@ import type {
   PublicModel,
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
-import { runtimeDisplayName } from '../../../shared/runtimes.js'
+import { hostReadsEventsOf, runtimeDisplayName } from '../../../shared/runtimes.js'
 import {
   handoffAvailability,
   handoffTitle,
@@ -138,9 +138,10 @@ export function Composer({
     : modesFor(route.runtime, platform)[0] ?? 'accept-edits'
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   const selectedReady = selected !== undefined && runtimeIsUsable(selected)
-  // Three runtimes can own a mission. Readiness still comes from discovery,
-  // so a route that is installed but signed out cannot be started.
-  const routeCanRun = route.runtime === 'codex' || route.runtime === 'claude' || route.runtime === 'cursor'
+  // A runtime can own a mission once the host can read its events. Readiness
+  // still comes from discovery, so a route that is installed but signed out
+  // cannot be started.
+  const routeCanRun = hostReadsEventsOf(route.runtime)
   const canStart = selectedReady && routeCanRun && busyWith === undefined && value.trim().length > 0
 
   const placeholder = busyWith !== undefined

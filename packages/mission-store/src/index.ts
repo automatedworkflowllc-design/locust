@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 7 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 8 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -59,13 +59,13 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 7 as const
  * whole mission unreadable, so the number moves for the same reason it moved
  * from 1 to 2.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -408,8 +408,11 @@ function requireTimestamp(value: string, label: string): string {
   return value
 }
 
-/** Every runtime a mission may record. Widening this is a schema version. */
-const MISSION_RUNTIMES: readonly string[] = ['codex', 'claude', 'cursor', 'gemini']
+/**
+ * Every runtime a mission may record. Widening this is a schema version:
+ * v8 added opencode and copilot, so a v7 reader refusing a v8 file says why.
+ */
+const MISSION_RUNTIMES: readonly string[] = ['codex', 'claude', 'cursor', 'gemini', 'opencode', 'copilot']
 
 function isMissionRuntime(value: unknown): value is MissionRuntimeId {
   return typeof value === 'string' && MISSION_RUNTIMES.includes(value)
