@@ -7,6 +7,7 @@ import {
   processEvidence,
   requireContextText,
   stringValue,
+  toolPatchFrom,
 } from "./codex-events.js";
 import type {
   CodexEventEvidence,
@@ -342,6 +343,12 @@ export function createCursorEventNormalizer(
         const open = openTools.get(itemId);
         openTools.delete(itemId);
         const verdict = toolOutcome(outcome);
+        // Measured: an edit's success carries the unified diff as
+        // `diffString`. It is the change itself, so it travels as its own
+        // field -- evidence strings are bounded far too tightly to hold one.
+        const success = isObject(outcome.success) ? outcome.success : {};
+        const diff = stringValue(success.diffString);
+        const patch = diff === undefined ? undefined : toolPatchFrom(diff);
         return [
           emit(verdict.failed ? "tool.failed" : "tool.completed", {
             itemId,
@@ -350,6 +357,7 @@ export function createCursorEventNormalizer(
             ...(target === undefined ? {} : { command: boundedMessageText(target) }),
             ...(verdict.status === undefined ? {} : { status: verdict.status }),
             ...(verdict.exitCode === undefined ? {} : { exitCode: verdict.exitCode }),
+            ...(patch === undefined ? {} : { patch }),
             phase: "completed",
             evidence,
           }),

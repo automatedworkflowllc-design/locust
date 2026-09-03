@@ -88,7 +88,26 @@ interface StepPayload {
   readonly evidence: CodexEventEvidence;
 }
 
-interface ToolPayload {
+/**
+ * The exact change a tool made, as the runtime reported it.
+ *
+ * The app used to record every edit and show a filename and a line count.
+ * This is the difference between trusting a receipt and reading it. The
+ * counts are DERIVED from the full patch text before any bounding, so a
+ * header can never claim +61 over two rendered lines, and `truncated` says
+ * when the text on disk is shorter than the change was -- so a reader is
+ * told what they are not seeing rather than left to assume it was all.
+ */
+export interface ToolPatch {
+  /** Unified diff text, bounded; see `truncated`. */
+  readonly text: string;
+  readonly added: number;
+  readonly removed: number;
+  /** Whether `text` is shorter than the change the runtime reported. */
+  readonly truncated: boolean;
+}
+
+export interface ToolPayload {
   readonly itemId: string;
   readonly toolKind: string;
   readonly name: string;
@@ -96,6 +115,7 @@ interface ToolPayload {
   readonly output?: RedactedJsonValue;
   readonly exitCode?: number;
   readonly status?: string;
+  readonly patch?: ToolPatch;
   readonly phase: "started" | "updated" | "completed";
   readonly evidence: CodexEventEvidence;
 }
@@ -431,6 +451,36 @@ export function processEvidence(completion: RuntimeProcessCompletion): ProcessEv
     terminationUnconfirmed: completion.terminationUnconfirmed,
     startedAt: completion.startedAt,
     finishedAt: completion.finishedAt,
+  };
+}
+
+/**
+ * A patch is larger than a message but not unbounded: 64 KiB holds any
+ * change a person would review inline, and a ledger record stays a record.
+ */
+const MAX_PATCH_TEXT_LENGTH = 64 * 1024;
+
+/**
+ * Turn a runtime's unified diff into the ledger's patch record. The counts
+ * come from the WHOLE text, then the text is bounded, in that order, so the
+ * numbers describe the change and not the excerpt.
+ */
+export function toolPatchFrom(unified: string): ToolPatch | undefined {
+  if (unified.length === 0) return undefined;
+  let added = 0;
+  let removed = 0;
+  for (const line of unified.split("\n")) {
+    if (line.startsWith("+++") || line.startsWith("---")) continue;
+    if (line.startsWith("+")) added += 1;
+    else if (line.startsWith("-")) removed += 1;
+  }
+  const clean = unified.replaceAll("\0", "");
+  const truncated = clean.length > MAX_PATCH_TEXT_LENGTH;
+  return {
+    text: truncated ? clean.slice(0, MAX_PATCH_TEXT_LENGTH) : clean,
+    added,
+    removed,
+    truncated,
   };
 }
 

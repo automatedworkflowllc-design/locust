@@ -8,6 +8,7 @@ import {
   summarizeCursorInit,
   toolOutcome,
 } from "../src/cursor-events.js";
+import { toolPatchFrom } from "../src/codex-events.js";
 import type { NormalizedRuntimeEvent } from "../src/codex-events.js";
 import type { RuntimeProcessCompletion } from "../src/process-runner.js";
 
@@ -371,5 +372,37 @@ describe("a turn that opens", () => {
       raw: JSON.stringify({ type: "system", subtype: "compact" })
     });
     expect(events.map((event) => event.type)).toEqual(["step.started", "step.completed"]);
+  });
+});
+
+describe("the change itself", () => {
+  const { events } = run(fixture("write-mode-shell-rejected.jsonl"));
+
+  it("carries the edit's unified diff as its own field, with counts derived from it", () => {
+    const edit = events.find(
+      (event) => event.type === "tool.completed" && (event.payload as { toolKind: string }).toolKind === "edit",
+    );
+    const patch = (edit?.payload as { patch?: { text: string; added: number; removed: number; truncated: boolean } }).patch;
+    expect(patch?.text).toContain("+hello");
+    expect(patch?.text).toContain("@@ -1,0 +1 @@");
+    expect(patch).toMatchObject({ added: 1, removed: 0, truncated: false });
+  });
+
+  it("counts the whole change before bounding the text, and says when it bounded", () => {
+    const lines = Array.from({ length: 3_000 }, (_, i) => `+line ${String(i)} ${"x".repeat(40)}`);
+    const unified = `--- a/big.ts\n+++ b/big.ts\n@@ -1,0 +1,3000 @@\n${lines.join("\n")}\n`;
+    const patch = toolPatchFrom(unified);
+    expect(patch?.added).toBe(3_000);
+    expect(patch?.removed).toBe(0);
+    expect(patch?.truncated).toBe(true);
+    expect((patch?.text.length ?? 0) < unified.length).toBe(true);
+  });
+
+  it("does not count the file headers as changed lines", () => {
+    expect(toolPatchFrom("--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n")).toMatchObject({ added: 1, removed: 1 });
+  });
+
+  it("records no patch for an edit that reported none", () => {
+    expect(toolPatchFrom("")).toBeUndefined();
   });
 });

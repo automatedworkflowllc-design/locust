@@ -24,8 +24,30 @@ const CLAUDE_EVENTS = join(ROOT, 'src', 'claude-events.ts')
 const LOCATOR = join(ROOT, 'src', 'path-locator.ts')
 const DISCOVERY = join(ROOT, 'src', 'discovery.ts')
 const CURSOR_EVENTS = join(ROOT, 'src', 'cursor-events.ts')
+const CODEX_EVENTS = join(ROOT, 'src', 'codex-events.ts')
 
 const MUTATIONS = [
+  {
+    file: CURSOR_EVENTS,
+    name: 'an edit is recorded without the change it made',
+    from: '            ...(patch === undefined ? {} : { patch }),\n',
+    to: '',
+    expect: "carries the edit's unified diff as its own field, with counts derived from it"
+  },
+  {
+    file: CODEX_EVENTS,
+    name: 'patch counts are taken from the excerpt rather than the whole change',
+    from: '  const clean = unified.replaceAll("\\0", "");\n  const truncated = clean.length > MAX_PATCH_TEXT_LENGTH;',
+    to: '  const clean = unified.replaceAll("\\0", "").slice(0, MAX_PATCH_TEXT_LENGTH);\n  const truncated = false; added = Math.min(added, 2000);',
+    expect: 'counts the whole change before bounding the text, and says when it bounded'
+  },
+  {
+    file: CODEX_EVENTS,
+    name: 'file headers are counted as changed lines',
+    from: '    if (line.startsWith("+++") || line.startsWith("---")) continue;\n',
+    to: '',
+    expect: 'does not count the file headers as changed lines'
+  },
   {
     file: CURSOR_EVENTS,
     name: 'a truncated final message takes back text already delivered',
@@ -106,15 +128,15 @@ const MUTATIONS = [
   {
     file: DISCOVERY,
     name: "Cursor's model list is never read",
-    from: '    if (succeeded(modelsOutcome)) modelHints = parseCursorModelList(modelsOutcome.result.stdout);\n',
-    to: '',
+    from: '      modelHints = parseCursorModelList(',
+    to: '      modelHints = undefined; void parseCursorModelList(',
     expect: 'reports a signed-in Cursor Agent ready and reads its models off --list-models'
   },
   {
     file: CURSOR_EVENTS,
     name: "a complete Cursor message appends to its fragments instead of replacing them",
-    from: '          operation: "replace",\n          text: boundedMessageText(text),\n          final: true,',
-    to: '          operation: "append",\n          text: boundedMessageText(text),\n          final: true,',
+    from: '          operation: "replace",\n          text: bounded,\n          final: true,',
+    to: '          operation: "append",\n          text: bounded,\n          final: true,',
     expect: 'rebuilds each message from its fragments and lets the complete message replace, not double, them'
   },
   {
@@ -363,6 +385,7 @@ const originals = new Map([
   [LOCATOR, readFileSync(LOCATOR, 'utf8')],
   [DISCOVERY, readFileSync(DISCOVERY, 'utf8')],
   [CURSOR_EVENTS, readFileSync(CURSOR_EVENTS, 'utf8')],
+  [CODEX_EVENTS, readFileSync(CODEX_EVENTS, 'utf8')],
   [CLAUDE_EVENTS, readFileSync(CLAUDE_EVENTS, 'utf8')],
   [COMMANDS, readFileSync(COMMANDS, 'utf8')],
   [CLIENT, readFileSync(CLIENT, 'utf8')],
