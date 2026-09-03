@@ -38,6 +38,13 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: STATUS,
+    name: 'a refused send is filed in the mission list as though it were a mission',
+    from: '  return run.missionId !== undefined || run.active',
+    to: '  return true',
+    expect: 'drops a refused send, which settled without ever being given a mission id'
+  },
+  {
     file: VIEW,
     name: 'a failure card drops the runtime own-stderr line and shows only the host sentence',
     from: '  if (said === undefined) return payload.message',

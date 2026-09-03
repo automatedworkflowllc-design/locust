@@ -317,7 +317,17 @@ try {
   const postedLinks = (atlasLedger?.records ?? []).filter((r) => r.recordType === 'mission.peer' && r.link.direction === 'posted')
   check('Atlas\u2019s ledger links the posted message', shared !== undefined && postedLinks.some((r) => r.link.messageId === shared.messageId),
     JSON.stringify(postedLinks))
-  check('the ledger header is schema v5', atlasLedger?.records[0]?.schemaVersion === 5, String(atlasLedger?.records[0]?.schemaVersion))
+  // Read from the source of truth rather than repeating the number here: this
+  // assertion sat at v5 while the app correctly wrote v9, so it failed for
+  // three schema bumps in a row and said nothing true about any of them
+  // (found by Codex's QA pass, 2026-08-31).
+  const schemaSource = await readFile(new URL('../packages/mission-store/src/index.ts', import.meta.url), 'utf8')
+  const expectedSchema = Number((schemaSource.match(/MISSION_LEDGER_SCHEMA_VERSION = (\d+)/) ?? [])[1])
+  check(
+    `the ledger header is schema v${String(expectedSchema)}, the version the store defines`,
+    Number.isInteger(expectedSchema) && atlasLedger?.records[0]?.schemaVersion === expectedSchema,
+    `header ${String(atlasLedger?.records[0]?.schemaVersion)}, store ${String(expectedSchema)}`
+  )
   const roster1 = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8'))
   check('the mission is recorded as Atlas\u2019s', atlasLedger !== undefined && roster1.missionOwners[atlasLedger.missionId] === 'tm_atlas',
     JSON.stringify(roster1.missionOwners))

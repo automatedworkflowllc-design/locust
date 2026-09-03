@@ -54,7 +54,7 @@ import {
   stitchedHandoff,
   typedPrompt
 } from './missionView.js'
-import { collapseConversations, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView } from './status.js'
+import { collapseConversations, listedAsMission, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -1160,6 +1160,15 @@ export default function App(): ReactElement {
   const sidebarMissions = useMemo<readonly SidebarMission[]>(() => {
     const rows: SidebarMission[] = []
     for (const [key, run] of runs.entries()) {
+      // A send the host REFUSED never became a mission. It was assigned no
+      // id and it has already settled, so listing it here files a permanent
+      // row under a key like `pending:3` -- a thing that looks like a mission,
+      // answers "Copy mission id" with a lie, and can never be reopened.
+      // Codex's QA pass on 0.14 caught this as a prompt that "appeared
+      // submitted" but "was never recorded as a mission". The refusal still
+      // shows in the thread, which is where a person is looking when it
+      // happens; what it must not do is accumulate.
+      if (!listedAsMission({ missionId: run.data?.missionId, active: liveRunIsActive(run) })) continue
       // A run that is still starting has no missionId yet; it is listed under
       // its pending key so the teammate reads as working from the first
       // moment, not from the first receipt.

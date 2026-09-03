@@ -603,6 +603,24 @@ export function routeSearchText(text: string): string {
   return text.toLowerCase().replace(/[-_/.:]+/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Whether a run belongs in the mission list at all.
+ *
+ * A send the host refused never became a mission: no id was ever assigned to
+ * it and it has already settled. Listing one files a permanent row under an
+ * internal key, which looks like a mission, answers "Copy mission id" with
+ * that key, and can never be reopened -- Codex's QA pass on 0.14 caught it as
+ * a prompt that "appeared submitted" but "was never recorded as a mission".
+ * A run that is still starting has no id yet either, and that one DOES belong:
+ * it is how a teammate reads as working before the first receipt.
+ */
+export function listedAsMission(run: {
+  readonly missionId: string | undefined
+  readonly active: boolean
+}): boolean {
+  return run.missionId !== undefined || run.active
+}
+
 export function collapseConversations<
   TRow extends {
     readonly missionId: string

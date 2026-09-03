@@ -1625,8 +1625,8 @@ describe('continuing a conversation', () => {
     const created: Record<string, unknown>[] = []
     const { service } = scheduledService({ start }, fakeLedger({
       getMission: async () => ({ ...(finished() as never as Record<string, unknown>), events: [] }) as never,
-      createMission: async (metadata: Record<string, unknown>) => {
-        created.push(metadata)
+      createMission: async (metadata) => {
+        created.push(metadata as unknown as Record<string, unknown>)
       }
     }))
 

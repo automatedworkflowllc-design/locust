@@ -4,6 +4,7 @@ import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import {
   checkpointLabel,
   collapseConversations,
+  listedAsMission,
   routeSearchText,
   facePresenceFor,
   connectedRuntimeCount,
@@ -43,6 +44,23 @@ function runtime(overrides: Partial<PublicRuntimeStatus> = {}): PublicRuntimeSta
     ...overrides
   }
 }
+
+describe('what belongs in the mission list', () => {
+  it('keeps a run that has a mission id, settled or not', () => {
+    expect(listedAsMission({ missionId: 'mission_1', active: false })).toBe(true)
+    expect(listedAsMission({ missionId: 'mission_1', active: true })).toBe(true)
+  })
+
+  it('keeps a run that is still starting, because that is how a teammate reads as working', () => {
+    expect(listedAsMission({ missionId: undefined, active: true })).toBe(true)
+  })
+
+  it('drops a refused send, which settled without ever being given a mission id', () => {
+    // Otherwise it sits in the list forever under an internal key, and
+    // "Copy mission id" hands back that key.
+    expect(listedAsMission({ missionId: undefined, active: false })).toBe(false)
+  })
+})
 
 describe('nothing is live unless discovery proved it', () => {
   // This is the invariant the product's trust claim rests on. If it can be
