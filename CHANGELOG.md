@@ -6,6 +6,29 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.4 — 2026-09-03
+
+The rest of what using the app turned up. Notes in
+`docs/USING-IT-2026-09-03.md`.
+
+- **Asking a teammate to talk to another teammate now reaches them.** Asked to
+  review some tests and ask a colleague whether they agreed, a teammate wrote
+  the colleague's name into its reply and stopped -- and the colleague never
+  ran. Nothing had told it that naming someone in prose does not reach them,
+  and the briefing opened with wording that discouraged a hand-off exactly when
+  you had just asked for one. Both are now said plainly.
+- **Claude Code offers Ask only, because that is all it can do.** The composer
+  said `Accept edits` while the mission header said `read-only` on the same
+  screen: Claude Code is always launched restricted to reading. The composer
+  now never shows a mode the chosen route cannot honour.
+- **Lists and links render.** Bullets and numbered lists were collapsing into
+  the sentence around them, and `[label](target)` showed its raw brackets with
+  a full absolute path in the middle of a line.
+- **Paths read the way you write them.** An activity row showed a long temp
+  path with the filename cut off; inside the workspace it is now
+  `src/streak.js`. Outside it the full path stays, because there the location
+  is the information.
+
 ## 0.15.3 — 2026-09-03
 
 Found by using the app on a real project rather than testing it. Notes in
