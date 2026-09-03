@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import {
   checkpointLabel,
+  collapseConversations,
   faceActivityFor,
   facePresenceFor,
   connectedRuntimeCount,
@@ -538,5 +539,76 @@ describe('searching missions', () => {
 
   it('shows nothing when nothing matches, rather than everything', () => {
     expect(missionsMatching(rows, 'nonsense')).toEqual([])
+  })
+})
+
+describe('the sidebar lists conversations, not turns', () => {
+  const turn = (id: string, title: string, phase: string, rootId?: string, parentId?: string) => ({
+    missionId: id,
+    title,
+    phase,
+    integrityIssueCount: 0,
+    ...(rootId === undefined ? {} : { rootId }),
+    ...(parentId === undefined ? {} : { parentId })
+  })
+
+  it('collapses a three-turn exchange into one row', () => {
+    const rows = collapseConversations([
+      turn('m1', 'test', 'completed'),
+      turn('m2', 'test', 'completed', 'm1', 'm1'),
+      turn('m3', 'test', 'completed', 'm1', 'm2')
+    ])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ missionId: 'm3', turns: 3 })
+    expect(rows[0]?.memberIds).toEqual(['m1', 'm2', 'm3'])
+  })
+
+  it('names the row for what the person typed first, and opens its newest turn', () => {
+    const rows = collapseConversations([
+      turn('m1', 'set up the parser', 'completed'),
+      turn('m2', 'now add tests', 'completed', 'm1', 'm1')
+    ])
+    expect(rows[0]?.title).toBe('set up the parser')
+    expect(rows[0]?.missionId).toBe('m2')
+  })
+
+  it('reads as running while any turn of it is running', () => {
+    const rows = collapseConversations([
+      turn('m1', 'x', 'completed'),
+      turn('m2', 'x', 'running', 'm1', 'm1')
+    ])
+    expect(rows[0]?.phase).toBe('running')
+  })
+
+  it('surfaces an integrity issue from any turn, not just the last', () => {
+    const rows = collapseConversations([
+      { ...turn('m1', 'x', 'completed'), integrityIssueCount: 2 },
+      turn('m2', 'x', 'completed', 'm1', 'm1')
+    ])
+    expect(rows[0]?.integrityIssueCount).toBe(2)
+  })
+
+  it('leaves an ordinary single-run mission exactly as it was', () => {
+    const rows = collapseConversations([turn('m1', 'one off', 'completed')])
+    expect(rows[0]).toMatchObject({ missionId: 'm1', title: 'one off', turns: 1 })
+  })
+
+  it('keeps separate conversations separate, in the order they were read', () => {
+    const rows = collapseConversations([
+      turn('a1', 'first', 'completed'),
+      turn('b1', 'second', 'completed'),
+      turn('a2', 'first', 'completed', 'a1', 'a1')
+    ])
+    expect(rows.map((row) => row.title)).toEqual(['first', 'second'])
+  })
+
+  it('still returns a row when a hand-edited chain has no leaf', () => {
+    // Both turns claim to continue the other. Nothing is dropped.
+    const rows = collapseConversations([
+      turn('m1', 'x', 'completed', 'm1', 'm2'),
+      turn('m2', 'x', 'completed', 'm1', 'm1')
+    ])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.turns).toBe(2)
   })
 })

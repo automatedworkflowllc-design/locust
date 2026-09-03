@@ -1842,6 +1842,13 @@ textarea {
   width: 100%;
 }
 
+/* How many turns the conversation holds. A count, so it is muted. */
+.lc-teammate__turns {
+  margin-left: auto;
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+}
+
 .lc-teammate__mission.is-active {
   background: var(--lc-lime-tint);
   color: var(--lc-lime-text);

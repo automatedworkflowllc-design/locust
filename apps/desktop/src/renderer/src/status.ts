@@ -530,3 +530,67 @@ export function missionsMatching<TRow extends { readonly title: string; readonly
     row.title.toLowerCase().includes(needle) || row.missionId.toLowerCase().includes(needle)
   )
 }
+
+/**
+ * One row per CONVERSATION, not one per turn.
+ *
+ * A mission is one run: one process, one receipt, one durable record, and a
+ * reply is a second run because it is a second process. That is right for the
+ * ledger and wrong for the sidebar, which was listing every reply as its own
+ * entry while the thread beside it showed them as the single exchange they
+ * were. So the chain is collapsed here, for display only -- nothing about how
+ * missions are recorded changes.
+ *
+ * The row a person clicks is the LEAF of the chain: the turn nothing else
+ * continues from, which is where the conversation actually is. Its name comes
+ * from the ROOT, because that is what they typed to start it. The phase is
+ * live if any turn is live, so a conversation whose newest turn is running
+ * reads as running.
+ */
+export interface ConversationRowExtras {
+  /** Every mission in the chain, so selecting any turn lights this row. */
+  readonly memberIds: readonly string[]
+  /** How many turns it holds. 1 means an ordinary single-run mission. */
+  readonly turns: number
+}
+
+export function collapseConversations<
+  TRow extends {
+    readonly missionId: string
+    readonly title: string
+    readonly phase: string
+    readonly integrityIssueCount: number
+    readonly rootId?: string
+    readonly parentId?: string
+  }
+>(rows: readonly TRow[]): readonly (TRow & ConversationRowExtras)[] {
+  const order: string[] = []
+  const groups = new Map<string, TRow[]>()
+  for (const row of rows) {
+    const key = row.rootId ?? row.missionId
+    const held = groups.get(key)
+    if (held === undefined) {
+      order.push(key)
+      groups.set(key, [row])
+    } else {
+      held.push(row)
+    }
+  }
+  return order.map((key) => {
+    const members = groups.get(key) ?? []
+    const continued = new Set(members.map((row) => row.parentId).filter((id): id is string => id !== undefined))
+    // The leaf is the turn nothing continues from. A hand-edited ledger could
+    // leave none, so the last row read is the fallback rather than a crash.
+    const leaf = members.find((row) => !continued.has(row.missionId)) ?? members[members.length - 1]!
+    const root = members.find((row) => row.missionId === key) ?? leaf
+    const running = members.find((row) => row.phase === 'running')
+    return {
+      ...leaf,
+      title: root.title,
+      phase: running === undefined ? leaf.phase : running.phase,
+      integrityIssueCount: Math.max(...members.map((row) => row.integrityIssueCount)),
+      memberIds: members.map((row) => row.missionId),
+      turns: members.length
+    }
+  })
+}

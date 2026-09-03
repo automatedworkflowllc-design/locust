@@ -52,7 +52,7 @@ import {
   stitchedHandoff,
   typedPrompt
 } from './missionView.js'
-import { modeRunsOn, modesFor, shortMissionId } from './status.js'
+import { collapseConversations, modeRunsOn, modesFor, shortMissionId } from './status.js'
 
 /**
  * The Locust shell.
@@ -1032,8 +1032,13 @@ export default function App(): ReactElement {
       // moment, not from the first receipt.
       const missionId = run.data?.missionId ?? key
       if (rows.some((row) => row.missionId === missionId)) continue
+      // A live reply already holds the turns before it, so its chain is
+      // known without waiting for the ledger to be re-read.
+      const earlier = run.earlierTurns ?? []
       rows.push({
         missionId,
+        ...(earlier[0] === undefined ? {} : { rootId: earlier[0].missionId }),
+        ...(earlier.at(-1) === undefined ? {} : { parentId: earlier.at(-1)!.missionId }),
         ...(run.teammateId === undefined ? {} : { ownerId: run.teammateId }),
         // A run's thread already shows the root's words for a continuation.
         title: missionTitle(run.prompt),
@@ -1049,12 +1054,16 @@ export default function App(): ReactElement {
         // A continuation's own prompt is the briefing; name it by the words
         // the person typed at the start of the chain.
         title: missionTitle(rootMission(mission, historyById).prompt),
+        rootId: rootMission(mission, historyById).missionId,
+        ...(mission.continuesFrom === undefined ? {} : { parentId: mission.continuesFrom.missionId }),
         phase: mission.phase,
         runtime: mission.runtime,
         integrityIssueCount: mission.integrityIssueCount
       })
     }
-    return rows
+    // One row per conversation. The ledger still holds one mission per run;
+    // this is only how the exchange is listed.
+    return collapseConversations(rows)
   }, [history, historyById, runs])
   // The right-click menu is built outside render and names the row it was
   // opened on, so it reads the rows through this.

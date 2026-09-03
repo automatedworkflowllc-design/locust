@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.9.1 — 2026-09-03
+
+- **One conversation, one sidebar row.** Every reply used to appear in the
+  sidebar as its own entry, even though the thread showed the exchange as one.
+  The sidebar now lists a conversation once, named for what you typed to start
+  it, with a small count of how many turns it holds. Clicking it opens the
+  newest turn. Nothing changed underneath: each turn is still its own recorded
+  run with its own receipt.
+- Tool rows in the activity card say what the tool was (`read`, `glob`), so a
+  file the teammate read and then edited no longer appears as the same path
+  twice with nothing to tell the rows apart.
+
 ## 0.9.0 — 2026-09-02
 
 - **See the actual diff.** The activity card used to say a teammate edited a

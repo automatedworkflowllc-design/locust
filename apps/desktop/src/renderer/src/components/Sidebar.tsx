@@ -29,6 +29,24 @@ export interface SidebarMission {
   /** Which runtime this mission is on, when it is known. */
   readonly runtime?: PublicRecoveredMission['runtime']
   readonly integrityIssueCount: number
+  /**
+   * The mission that began this conversation, and the turn immediately
+   * before this one. A reply is its own mission -- one run, one receipt --
+   * so without these the sidebar lists an exchange as several entries while
+   * the thread beside it shows it as one.
+   */
+  readonly rootId?: string
+  readonly parentId?: string
+  /** Every turn this row stands for, so selecting any of them lights it. */
+  readonly memberIds?: readonly string[]
+  /** Turns in the conversation; 1 is an ordinary single-run mission. */
+  readonly turns?: number
+}
+
+/** Whether a row is the conversation the workroom is showing. */
+function isShown(mission: SidebarMission, selectedMissionId: string | undefined): boolean {
+  if (selectedMissionId === undefined) return false
+  return (mission.memberIds ?? [mission.missionId]).includes(selectedMissionId)
 }
 
 /**
@@ -163,9 +181,7 @@ export function Sidebar({
                     <button
                       type="button"
                       key={mission.missionId}
-                      className={`lc-teammate__mission${
-                        mission.missionId === selectedMissionId ? ' is-active' : ''
-                      }`}
+                      className={`lc-teammate__mission${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
                       onContextMenu={(event) => {
                         event.preventDefault()
                         onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
@@ -176,6 +192,9 @@ export function Sidebar({
                         className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}`}
                       />
                       <span>{mission.title}</span>
+                      {(mission.turns ?? 1) > 1 && (
+                        <span className="lc-teammate__turns lc-mono">{mission.turns}</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -194,7 +213,7 @@ export function Sidebar({
                   type="button"
                   key={mission.missionId}
                   className="lc-row"
-                  aria-current={mission.missionId === selectedMissionId}
+                  aria-current={isShown(mission, selectedMissionId)}
                   onClick={() => onSelectMission(mission.missionId)}
                   onContextMenu={(event) => {
                     event.preventDefault()
@@ -207,7 +226,9 @@ export function Sidebar({
                   <span className="lc-row__text">
                     <span className="lc-row__name">{mission.title}</span>
                     <span className="lc-row__meta">
-                      {view.label} · <span className="lc-mono">{shortMissionId(mission.missionId)}</span>
+                      {view.label}
+                      {(mission.turns ?? 1) > 1 && ` · ${String(mission.turns)} turns`} ·{' '}
+                      <span className="lc-mono">{shortMissionId(mission.missionId)}</span>
                     </span>
                   </span>
                 </button>

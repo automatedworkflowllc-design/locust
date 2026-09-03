@@ -201,7 +201,8 @@ try {
       if (!picker) continue
       const input = picker.querySelector('.lc-picker__input')
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-      setter.call(input, ${JSON.stringify(MODEL.toLowerCase())})
+      // The picker shows display names ('Composer 2.5'); the id has a hyphen.
+      setter.call(input, ${JSON.stringify(MODEL.toLowerCase().replace(/-/g, ' '))})
       input.dispatchEvent(new Event('input', { bubbles: true }))
       await new Promise(r => setTimeout(r, 400))
       let group = ''
@@ -209,7 +210,7 @@ try {
         const header = node.querySelector('.lc-picker__group')
         if (header) group = header.innerText
         const row = node.querySelector('.lc-picker__row')
-        if (row && !row.disabled && new RegExp(${JSON.stringify(ROUTE)}, 'i').test(group) && row.innerText.trim().toLowerCase().startsWith(${JSON.stringify(MODEL.toLowerCase())})) {
+        if (row && !row.disabled && new RegExp(${JSON.stringify(ROUTE)}, 'i').test(group) && row.innerText.toLowerCase().replace(/[^a-z0-9]/g, '').startsWith(${JSON.stringify(MODEL.toLowerCase().replace(/[^a-z0-9]/g, ''))})) {
           row.click()
           await new Promise(r => setTimeout(r, 300))
           return JSON.stringify({ picked: true, controls: [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()) })
@@ -252,6 +253,22 @@ try {
   say(`       last answer: ${answered.slice(0, 120)}`)
   check('the model remembered the passphrase', new RegExp(CODE, 'i').test(answered), answered.slice(0, 200))
   check('and the earlier turn is still on screen', (second.thread ?? '').includes('passphrase exactly'), (second.thread ?? '').slice(0, 200))
+
+  // The reply is its own mission -- one run, one receipt -- but a person did
+  // not start a second thing, and the sidebar used to say they had.
+  const listed = await cdp.eval(`(async () => {
+    const rows = [...document.querySelectorAll('.lc-teammate__mission, .lc-row__name')]
+      .map(node => node.innerText.trim())
+      .filter(text => text.length > 0)
+    return JSON.stringify(rows)
+  })()`)
+  const sidebar = JSON.parse(listed)
+  say(`       sidebar rows: ${listed}`)
+  check(
+    'the sidebar lists the exchange once, not once per turn',
+    sidebar.filter((row) => row.includes('passphrase')).length === 1,
+    listed
+  )
 
   say('5. the ledger records it as a continuation, not a stranger')
   const names = (await readdir(LEDGER_DIR).catch(() => [])).filter((name) => name.endsWith('.jsonl'))
