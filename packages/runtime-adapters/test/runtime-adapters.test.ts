@@ -409,6 +409,37 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     expect(found?.kind).toBe("powershell-shim");
   });
 
+  it("runs a .cmd shim through cmd.exe, and prefers it to the .ps1 npm writes beside it", async () => {
+    // MEASURED 2026-09-03. npm writes `codex.cmd` and `codex.ps1` together.
+    // The `.ps1` cannot take Codex's arguments: a bare `-` for
+    // prompt-on-stdin makes PowerShell's parameter binder reject the call
+    // outright, so preferring it broke every Codex mission for anyone whose
+    // Codex came from npm. `.cmd` under cmd.exe is what a terminal runs.
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const cmdShim = `${ROAMING}\\npm\\codex.cmd`;
+    const psShim = `${ROAMING}\\npm\\codex.ps1`;
+    const shell = "C:\\Windows\\System32\\cmd.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: {
+        PATH: `${ROAMING}\\npm`,
+        APPDATA: ROAMING,
+        LOCALAPPDATA: "C:\\Users\\x\\AppData\\Local",
+        SystemRoot: "C:\\Windows",
+      },
+      isExecutableFile: async (candidate) =>
+        candidate === cmdShim || candidate === psShim || candidate === shell,
+      readDirectory: async () => [],
+    }).find("codex");
+
+    expect(found).toMatchObject({
+      discoveredPath: cmdShim,
+      executablePath: shell,
+      prefixArgs: ["/d", "/s", "/c", cmdShim],
+      kind: "cmd-shim",
+    });
+  });
+
   it("finds Copilot CLI where it unpacks itself, when npm's bin directory is not there either", async () => {
     const LOCAL = "C:\\Users\\x\\AppData\\Local";
     const launcher = `${LOCAL}\\copilot\\copilot.exe`;

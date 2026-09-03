@@ -6,6 +6,29 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.2 — 2026-09-03
+
+- **Fixes a Codex regression 0.15.1 introduced.** Making PATH win meant
+  reaching npm's `codex.ps1`, and that shim cannot take Codex's own arguments
+  -- the bare `-` that sends the prompt on stdin makes PowerShell reject the
+  whole call -- so every Codex mission failed for anyone whose Codex came from
+  npm. Windows itself runs the `.cmd`, and now so does Locust. **If you are on
+  0.15.1 and Codex stopped working, this is why; install this one.**
+- **Replies render as written.** Fenced code blocks are code blocks and
+  `inline code` is inline code, instead of one flat paragraph with the
+  backticks still in it. This mattered most exactly where it was worst: a
+  read-only run cannot edit the workspace, so it pastes the patch into its
+  answer, and a diff with every newline collapsed is the one reply nobody can
+  read. Long lines scroll inside the block rather than stretching the thread.
+- **A new teammate starts on Accept edits.** Under Ask, "add a discount
+  function" was refused by the sandbox and the model pasted its patch into the
+  reply instead, with nothing saying the mode was why. Ask is still one click
+  away, and a teammate you have run keeps whatever they last ran on.
+- **A read-only run that answers with code offers to run again with edits
+  allowed** -- one click, instead of changing the mode and retyping. It
+  appears only when the reply actually carries code, and it is an offer, not
+  an error: the run did exactly what its mode permits.
+
 ## 0.15.1 — 2026-09-03
 
 - **Locust now runs the runtime you installed, not an older copy it found

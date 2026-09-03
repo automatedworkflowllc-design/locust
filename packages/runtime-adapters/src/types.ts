@@ -88,15 +88,16 @@ export interface ParsedRuntimeVersion {
 }
 
 /**
- * A shell-free process target. PowerShell shims are represented as a native
- * PowerShell executable plus fixed prefix arguments rather than `shell: true`.
+ * A shell-free process target. A shim is represented as its real interpreter
+ * plus fixed prefix arguments rather than `shell: true`, so nothing is ever
+ * handed to a shell to re-parse.
  */
 export interface ExecutableLaunch {
   readonly commandName: string;
   readonly discoveredPath: string;
   readonly executablePath: string;
   readonly prefixArgs: readonly string[];
-  readonly kind: "native" | "powershell-shim";
+  readonly kind: "native" | "powershell-shim" | "cmd-shim";
 }
 
 export interface ProbeCommand {

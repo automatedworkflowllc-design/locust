@@ -34,9 +34,24 @@ const RELAY = join(ROOT, 'src', 'main', 'relay.ts')
 const FACES = join(ROOT, 'src', 'renderer', 'src', 'faceState.ts')
 const ANTIGRAVITY = join(ROOT, 'src', 'main', 'antigravity-mission.ts')
 const COST = join(ROOT, 'src', 'renderer', 'src', 'cost.ts')
+const AGENT_TEXT = join(ROOT, 'src', 'renderer', 'src', 'agentText.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: AGENT_TEXT,
+    name: 'an unterminated fence is dropped instead of drawn as code still arriving',
+    from: '  if (open !== undefined) {',
+    to: '  if (false) {',
+    expect: 'treats an unclosed fence as code still being written, not as prose'
+  },
+  {
+    file: AGENT_TEXT,
+    name: 'a closing fence is accepted even when it carries a language, swallowing the block after it',
+    from: "    if (fence !== null && fence[2]!.trim().length === 0 && fence[1]!.length >= open.ticks.length) {",
+    to: '    if (fence !== null) {',
+    expect: 'keeps a longer fence inside a shorter one as code'
+  },
   {
     file: STATUS,
     name: 'a refused send is filed in the mission list as though it were a mission',
@@ -942,7 +957,8 @@ const originals = new Map([
   [FACES, readFileSync(FACES, 'utf8')],
   [ANTIGRAVITY, readFileSync(ANTIGRAVITY, 'utf8')],
   [COST, readFileSync(COST, 'utf8')],
-  [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')]
+  [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')],
+  [AGENT_TEXT, readFileSync(AGENT_TEXT, 'utf8')]
 ])
 let problems = 0
 
@@ -957,6 +973,14 @@ try {
   for (const mutation of MUTATIONS) {
     const target = mutation.file
     const original = originals.get(target)
+    if (original === undefined) {
+      // Every mutated file must be registered above so it can be restored.
+      // Without this the sweep died on `undefined.includes` and named neither
+      // the file nor the mutation.
+      console.error(`  [SKIP] ${mutation.name} -- ${target} is not in the originals map`)
+      problems += 1
+      continue
+    }
     if (!original.includes(mutation.from)) {
       console.error(`  [SKIP] ${mutation.name} -- anchor not found`)
       problems += 1

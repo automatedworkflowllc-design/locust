@@ -534,6 +534,87 @@ textarea {
   text-wrap: pretty;
 }
 
+/*
+ * A reply is prose and code interleaved, so the line holds a column rather
+ * than a single paragraph. The gap is what used to be blank lines in the
+ * model's Markdown -- spacing is drawn here, not carried in the text.
+ */
+.lc-agentline__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+}
+
+/*
+ * Fenced code. It scrolls inside its own box: a long line of a diff must not
+ * be able to stretch the thread, which is the one thing that makes every
+ * other message on screen harder to read.
+ */
+.lc-code {
+  position: relative;
+  margin: 0;
+  padding: var(--lc-space-5);
+  background: var(--lc-diff-surface);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  overflow-x: auto;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-provenance);
+  line-height: 1.55;
+  color: var(--lc-text-secondary);
+}
+
+.lc-code code {
+  display: block;
+  white-space: pre;
+  font: inherit;
+  color: inherit;
+}
+
+/* The model's own word for what the block is, kept out of the code itself. */
+.lc-code__lang {
+  display: block;
+  margin-bottom: var(--lc-space-3);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+/*
+ * The read-only follow-through. Quiet on purpose: the run succeeded, so this
+ * is an offer, not a warning, and it must not wear the colour that means a
+ * mission stopped.
+ */
+.lc-rerun {
+  display: flex;
+  gap: var(--lc-space-5);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--lc-space-5);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-secondary-size);
+}
+
+.lc-rerun span {
+  flex: 1;
+  min-width: 0;
+}
+
+.lc-code--inline {
+  padding: 1px 5px;
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-diff-surface);
+  border: 1px solid var(--lc-border-hairline);
+  font-family: var(--lc-font-mono);
+  font-size: 0.92em;
+  color: var(--lc-text-primary);
+}
+
 .lc-caret {
   display: inline-block;
   width: 7px;
@@ -1560,7 +1641,7 @@ textarea {
   }
 }
 
-.lc-agentline p {
+.lc-agentline__body {
   flex: 1;
   min-width: 0;
 }

@@ -34,6 +34,13 @@ const ANTIGRAVITY_EVENTS = join(ROOT, 'src', 'antigravity-events.ts')
 const MUTATIONS = [
   {
     file: LOCATOR,
+    name: 'the .cmd shim is skipped so the .ps1 npm writes beside it is used, which cannot take the arguments',
+    from: '        const script = win32.join(directory, `${commandName}.cmd`);',
+    to: '        const script = win32.join(directory, `${commandName}.cmd.missing`);',
+    expect: 'runs a .cmd shim through cmd.exe, and prefers it to the .ps1 npm writes beside it'
+  },
+  {
+    file: LOCATOR,
     name: 'the guessed install directories are searched alongside PATH again, so a shim on PATH loses to a stale exe',
     from: '        (await resolveWithin(pathOnly))',
     to: '        (await resolveWithin([...pathOnly, ...(await installDirectories(commandName, environment, platform, readDirectory))]))',

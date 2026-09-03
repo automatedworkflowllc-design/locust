@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { seedAvatar } from '../../../shared/avatar.js'
+import { parseAgentText, splitInlineCode } from '../agentText.js'
 import type { PlanStep } from '../missionView.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
@@ -31,6 +32,65 @@ export function AgentAvatar({
 
 type PixelFaceHueLike = Parameters<typeof PixelFace>[0]['hue']
 type AvatarSpecLike = Parameters<typeof PixelFace>[0]['avatar']
+
+/**
+ * A model's reply, drawn the way it was written.
+ *
+ * Models answer in Markdown whether or not anyone asked, and this used to be
+ * one flat paragraph -- worst exactly where it mattered most, because a
+ * read-only run pastes its patch into the answer and a unified diff with
+ * every newline collapsed is unreadable. Fenced blocks are code; a matched
+ * pair of backticks is inline code; everything else is prose, unchanged.
+ *
+ * React escapes every value here, so nothing a model writes can become
+ * markup. Wide code scrolls inside its own box rather than stretching the
+ * thread.
+ */
+export function AgentText({
+  text,
+  streaming
+}: {
+  readonly text: string
+  readonly streaming: boolean
+}): ReactElement {
+  const blocks = parseAgentText(text)
+  return (
+    <>
+      {blocks.map((block, index) => {
+        const last = index === blocks.length - 1
+        if (block.kind === 'code') {
+          return (
+            <pre className="lc-code" key={`b${String(index)}`}>
+              {block.language !== undefined && <span className="lc-code__lang lc-mono">{block.language}</span>}
+              <code>{block.code}</code>
+              {streaming && last && <span className="lc-caret" />}
+            </pre>
+          )
+        }
+        return (
+          <p key={`b${String(index)}`}>
+            {splitInlineCode(block.text).map((span, spanIndex) =>
+              span.kind === 'code' ? (
+                <code className="lc-code--inline" key={`s${String(spanIndex)}`}>
+                  {span.text}
+                </code>
+              ) : (
+                <span key={`s${String(spanIndex)}`}>{span.text}</span>
+              )
+            )}
+            {streaming && last && <span className="lc-caret" />}
+          </p>
+        )
+      })}
+      {/* A reply that has arrived with nothing in it yet still shows it is coming. */}
+      {blocks.length === 0 && streaming && (
+        <p>
+          <span className="lc-caret" />
+        </p>
+      )}
+    </>
+  )
+}
 
 export function PlanCard({
   steps,

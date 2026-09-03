@@ -449,7 +449,13 @@ export default function App(): ReactElement {
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [screen, setScreen] = useState<Screen>('workroom')
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [mode, setMode] = useState<MissionMode>('ask')
+  // Accept edits, not Ask. A person who opens a workroom and says "add a
+  // discount function" means it; under Ask the sandbox refuses the write and
+  // the model pastes its patch into the reply instead, with nothing on screen
+  // saying the MODE is why. That was the first run of the app, measured
+  // 2026-09-03. Ask stays one click away and a teammate who has run keeps
+  // whatever they last ran on.
+  const [mode, setMode] = useState<MissionMode>('accept-edits')
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
@@ -745,7 +751,7 @@ export default function App(): ReactElement {
   const ownerOf = (run: LiveRunState): string | undefined =>
     run.teammateId ?? (run.data === undefined ? undefined : missionOwners[run.data.missionId])
 
-  const startMission = async (prompt: string): Promise<boolean> => {
+  const startMission = async (prompt: string, modeOverride?: MissionMode): Promise<boolean> => {
     const bridge = window.desktop
     const teammateId = selectedTeammate?.teammateId
     const key = `pending:${++pendingKeyCounter.current}`
@@ -802,8 +808,8 @@ export default function App(): ReactElement {
         // The mode the composer SHOWS, which is not always the mode last
         // chosen: a mode the route cannot run is not one a mission can start
         // in, and sending it anyway is how every message came back refused.
-        mode: modeRunsOn(mode, route.runtime, build?.platform)
-          ? mode
+        mode: modeRunsOn(modeOverride ?? mode, route.runtime, build?.platform)
+          ? modeOverride ?? mode
           : modesFor(route.runtime, build?.platform)[0] ?? 'accept-edits',
         runtime: route.runtime,
         // The concrete model. When a runtime encodes effort in the id, the
@@ -836,7 +842,7 @@ export default function App(): ReactElement {
         // The host recorded this route as the teammate's own; mirror it so a
         // reply they make on their own, and the composer next time they are
         // picked, use it at once.
-        const kept = { runtime: response.data.runtime, model: response.data.model, mode }
+        const kept = { runtime: response.data.runtime, model: response.data.model, mode: modeOverride ?? mode }
         setTeammates((current) =>
           current.map((teammate) => (teammate.teammateId === teammateId ? { ...teammate, route: kept } : teammate))
         )
@@ -1471,6 +1477,23 @@ export default function App(): ReactElement {
                 prompt={liveRun.prompt}
                 earlierTurns={liveRun.earlierTurns ?? []}
                 coldStart={liveRun.coldStart ?? false}
+                onRunWithEdits={
+                  // Offered only where it is genuinely the next thing a
+                  // person wants: a finished READ-ONLY run whose reply
+                  // carries code the runtime was not allowed to apply. Not
+                  // an error -- the run did what its mode permits -- just the
+                  // one click that would otherwise be a mode change and a
+                  // retyped prompt. Thread decides whether code is present.
+                  !running
+                  && liveRun.data?.sandbox === 'read-only'
+                  && liveRun.prompt.trim().length > 0
+                  && modeRunsOn('accept-edits', liveRun.data.runtime, build?.platform)
+                    ? () => {
+                        setMode('accept-edits')
+                        void startMission(liveRun.prompt, 'accept-edits')
+                      }
+                    : undefined
+                }
                 events={liveRun.events}
                 running={running}
                 missionId={liveRun.data?.missionId}

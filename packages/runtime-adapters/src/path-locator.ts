@@ -56,6 +56,9 @@ const WINDOWS_INSTALL_ROOTS: readonly InstallRoot[] = [
   // running it needs a host; on a PATH that does not name one, the shim was
   // found and then discarded for want of an interpreter that is always there.
   { command: "powershell", base: "SystemRoot", segments: ["System32", "WindowsPowerShell", "v1.0"], versioned: false },
+  // Same reason as PowerShell above: a `.cmd` shim needs a host, and the host
+  // must be the one Windows ships rather than whatever PATH offers first.
+  { command: "cmd", base: "SystemRoot", segments: ["System32"], versioned: false },
 ];
 
 const SAFE_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -243,6 +246,39 @@ export function createPathExecutableLocator(
           executablePath: native,
           prefixArgs: [],
           kind: "native",
+        };
+      }
+
+      // `.cmd` BEFORE `.ps1`, because that is the order Windows itself uses
+      // and npm writes both. MEASURED 2026-09-03, and it matters: npm's
+      // `codex.ps1` cannot take Codex's own arguments -- a bare `-` for
+      // prompt-on-stdin makes PowerShell's parameter binder reject the whole
+      // call ("the value of argument name is not valid") -- while
+      // `codex.cmd` under cmd.exe takes them exactly as a terminal does.
+      // Reaching the `.ps1` first broke every Codex mission for anyone whose
+      // Codex came from npm.
+      for (const directory of directories) {
+        const script = win32.join(directory, `${commandName}.cmd`);
+        if (!(await isExecutableFile(script, "win32"))) continue;
+
+        // cmd.exe comes from where Windows keeps it first, for the same
+        // reason the PowerShell host below does: one planted earlier on PATH
+        // would run the shim with this process's environment.
+        const shellDirectories = [
+          ...(await installDirectories("cmd", environment, platform, readDirectory)),
+          ...directories,
+        ];
+        const shell = await locateNativeWindowsCommand("cmd", shellDirectories, isExecutableFile);
+        if (!shell) continue;
+
+        return {
+          commandName,
+          discoveredPath: script,
+          executablePath: shell,
+          // /d skips AutoRun, /s settles how the quoted path is parsed,
+          // /c runs it and exits.
+          prefixArgs: ["/d", "/s", "/c", script],
+          kind: "cmd-shim",
         };
       }
 

@@ -11,6 +11,7 @@ import type {
   PublicTeammate
 } from '../../../shared/ipc.js'
 import { buildThread, cancellationSummary, peerGroups, readPlan, threadMarkers } from '../missionView.js'
+import { parseAgentText } from '../agentText.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
 import { costLine, runCostOf } from '../cost.js'
@@ -20,7 +21,7 @@ import { ActivityCard } from './ActivityCard.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
-import { AgentAvatar, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
+import { AgentAvatar, AgentText, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
 import { HandoffDivider } from './HandoffDivider.js'
 import { TimeMarker } from './TimeMarker.js'
 import { PeerThread } from './PeerThread.js'
@@ -48,10 +49,9 @@ function ThreadItems({
           return (
             <div className="lc-agentline" key={item.key}>
               <AgentAvatar teammate={owner} />
-              <p>
-                {item.text}
-                {item.streaming && <span className="lc-caret" />}
-              </p>
+              <div className="lc-agentline__body">
+                <AgentText text={item.text} streaming={item.streaming === true} />
+              </div>
             </div>
           )
         }
@@ -170,6 +170,8 @@ export interface ThreadProps {
    * turn so the exchange reads as one, which is what it was.
    */
   readonly coldStart?: boolean
+  /** Present only when re-running with edits allowed is possible; see App. */
+  readonly onRunWithEdits?: () => void
   readonly earlierTurns: readonly {
     readonly missionId: string
     readonly prompt: string
@@ -222,6 +224,7 @@ export function Thread({
   prompt,
   earlierTurns,
   coldStart = false,
+  onRunWithEdits,
   events,
   running,
   missionId,
@@ -237,6 +240,13 @@ export function Thread({
   peers
 }: ThreadProps): ReactElement {
   const items = buildThread(events, { running })
+  // A read-only run whose answer carries code is the one case where "run it
+  // again, with edits allowed" is certainly what a person wants: the runtime
+  // wrote the change and was not permitted to apply it. Asked of the parsed
+  // reply rather than of the prose, so a stray backtick cannot fake it.
+  const answeredWithCode = items.some(
+    (item) => item.type === 'agent-message' && parseAgentText(item.text).some((block) => block.kind === 'code')
+  )
   // The current turn is the last in the sequence, so its own marker is the
   // one whose index is past every earlier turn.
   const markers = threadMarkers([...earlierTurns.map((turn) => turn.events), events])
@@ -344,6 +354,18 @@ export function Thread({
           // runtime's memory of it is not.
           <div className="lc-thread__marker lc-mono">
             Started without the earlier messages — the turn before this one left no session to resume
+          </div>
+        )}
+
+        {onRunWithEdits !== undefined && answeredWithCode && (
+          // Deliberately not an error: the run did exactly what its mode
+          // allows. This is the one click that would otherwise be a mode
+          // change and a retyped prompt.
+          <div className="lc-rerun">
+            <span>This run could not write to the workspace, so the change is only in the reply.</span>
+            <button type="button" className="lc-button" onClick={onRunWithEdits}>
+              <Icon name="diff" size={13} /> Run again with edits allowed
+            </button>
           </div>
         )}
 
