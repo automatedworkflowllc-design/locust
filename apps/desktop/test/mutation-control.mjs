@@ -73,8 +73,8 @@ const MUTATIONS = [
   {
     file: RELAY,
     name: "a teammate replies on the sender's route instead of their own",
-    from: '        const own = recipient.self.route',
-    to: '        const own = undefined',
+    from: '    const own = recipient.self.route',
+    to: '    const own = undefined',
     expect: "starts the recipient's run on the recipient's OWN route, owned by the recipient"
   },
   {
@@ -94,15 +94,15 @@ const MUTATIONS = [
   {
     file: RELAY,
     name: 'the reply back starts a stranger instead of the next turn of the thread that asked',
-    from: '        const followUpOf = origin.lastMissionOf[recipientId]',
-    to: '        const followUpOf = undefined',
+    from: '    const followUpOf = input.origin.lastMissionOf[recipient.self.teammateId]',
+    to: '    const followUpOf = undefined',
     expect: 'the reply back follows up the mission that asked, so it lands in that thread'
   },
   {
     file: RELAY,
     name: 'a relayed run runs with write access whatever the sender had',
-    from: "          mode: mission.sandbox === 'workspace-write' ? ('accept-edits' as const) : ('ask' as const)",
-    to: "          mode: 'accept-edits' as const",
+    from: "      mode: from.sandbox === 'workspace-write' ? ('accept-edits' as const) : ('ask' as const)",
+    to: "      mode: 'accept-edits' as const",
     expect: 'a read-only sender gets a read-only reply when the recipient has no route'
   },
   {
@@ -353,7 +353,7 @@ const MUTATIONS = [
   {
     file: MISSIONS,
     name: 'a Cursor mission is launched as a Codex command',
-    from: "            : runtime === 'cursor'\n              ? createCursorPrintCommand(chosen.executable, {\n                  workspacePath: options.workspacePath,\n                  sandbox: effectiveSandbox,\n                  ...choice\n                })\n",
+    from: "            : runtime === 'cursor'\n              ? createCursorPrintCommand(executable, {\n                  workspacePath: options.workspacePath,\n                  sandbox: effectiveSandbox,\n                  ...choice\n                })\n",
     to: '',
     expect: 'runs a Cursor mission under its own command and its own normalizer'
   },
@@ -367,7 +367,7 @@ const MUTATIONS = [
   {
     file: RUNTIMES,
     name: 'a runtime whose events the host cannot read is started anyway',
-    from: "  return runtime === 'codex' || runtime === 'claude' || runtime === 'cursor'\n",
+    from: "  return runtime === 'codex' || runtime === 'claude' || runtime === 'cursor' || runtime === 'opencode' || runtime === 'copilot'\n",
     to: '  return true\n',
     expect: 'refuses a runtime whose event stream it cannot read yet, by name, recording nothing'
   },
