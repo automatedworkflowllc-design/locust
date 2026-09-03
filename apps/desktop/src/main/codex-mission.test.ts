@@ -797,6 +797,30 @@ describe('runtime selection', () => {
     expect(spec?.args).not.toContain('--force')
   })
 
+  it('records nothing when the chosen options cannot be turned into a command', async () => {
+    // Cursor takes no effort level, so the builder refuses this argv. The
+    // mission file used to be written first, leaving a permanent record of a
+    // run that never existed -- and nothing created today can be pruned
+    // today, so it could not be cleared either.
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const appendHostFailure = vi.fn<MissionLedger['appendHostFailure']>(async () => undefined)
+    const start = vi.fn() satisfies RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      platform: 'darwin',
+      discover: async () => [{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }],
+      runner: { start },
+      ledger: fakeLedger({ createMission, appendHostFailure })
+    })
+
+    await expect(
+      service.start('Do work.', 'cursor', 'ask', { effort: 'high' }, () => undefined)
+    ).resolves.toMatchObject({ ok: false, error: { code: 'RUNTIME_START_FAILED' } })
+    expect(start).not.toHaveBeenCalled()
+    expect(createMission).not.toHaveBeenCalled()
+    expect(appendHostFailure).not.toHaveBeenCalled()
+  })
+
   it('refuses a read-only Cursor mission where its sandbox cannot run, rather than mislabelling it', async () => {
     // Measured 2026-09-02 on Windows: `--mode plan` did not stop a Cursor run
     // from creating files, and `--sandbox enabled` is refused outright there.

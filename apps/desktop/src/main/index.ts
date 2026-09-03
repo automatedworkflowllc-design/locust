@@ -8,6 +8,7 @@ import {
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
+import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -58,8 +59,41 @@ const discoverRuntimes = () => discoverInstalledRuntimes({
   locator: executableLocator,
   includeOmniRoute: true
 })
+/**
+ * One probe sweep, shared.
+ *
+ * Discovery spawns a version probe and a capability probe per runtime -- ten
+ * or more child processes. The cached service below was wired to the UI
+ * channel alone, so every mission start, every model-catalog read and every
+ * app-server start re-ran the whole sweep, BEFORE any of the checks that
+ * might refuse the request. A window could drive that in a loop with a
+ * runtime the host was always going to turn down.
+ *
+ * Ten seconds is the same window the UI already accepts, and a runtime that
+ * is installed or signed into mid-session appears on the next read.
+ */
+const DISCOVERY_TTL_MS = 10_000
+let discoveryCache: { readonly at: number; readonly value: readonly RuntimeDiscovery[] } | undefined
+let discoveryInFlight: Promise<readonly RuntimeDiscovery[]> | undefined
+
+const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
+  const held = discoveryCache
+  if (held !== undefined && Date.now() - held.at < DISCOVERY_TTL_MS) return Promise.resolve(held.value)
+  if (discoveryInFlight !== undefined) return discoveryInFlight
+  const running = discoverRuntimes()
+    .then((value) => {
+      discoveryCache = { at: Date.now(), value }
+      return value
+    })
+    .finally(() => {
+      discoveryInFlight = undefined
+    })
+  discoveryInFlight = running
+  return running
+}
+
 const runtimeDiscovery = createRuntimeDiscoveryService({
-  probe: discoverRuntimes
+  probe: discoverForWork
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
@@ -191,7 +225,7 @@ if (!ownsSingleInstanceLock) {
     })
     const codexMissions = createCodexMissionService({
       workspacePath: process.cwd(),
-      discover: discoverRuntimes,
+      discover: discoverForWork,
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,
       workroom
@@ -225,14 +259,14 @@ if (!ownsSingleInstanceLock) {
     }
 
     const modelCatalog = createModelCatalog({
-      discover: discoverRuntimes,
+      discover: discoverForWork,
       spawn: spawnAppServer
     })
 
     const appServerMissions = createAppServerMissionService({
       workspacePath: process.cwd(),
       ledger: missionLedger,
-      discover: discoverRuntimes,
+      discover: discoverForWork,
       spawn: spawnAppServer,
       emitApproval: (request) => {
         const target = approvalWindow

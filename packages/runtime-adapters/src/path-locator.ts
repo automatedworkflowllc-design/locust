@@ -229,9 +229,14 @@ export function createPathExecutableLocator(
         const script = win32.join(directory, `${commandName}.ps1`);
         if (!(await isExecutableFile(script, "win32"))) continue;
 
+        // The interpreter comes from where Windows keeps it FIRST, and only
+        // then from PATH. `pwsh` is not a component Windows ships, so a
+        // planted one earlier on PATH would face no competitor -- and it
+        // would run the shim with this process's environment and the
+        // mission's workspace as its working directory.
         const hostDirectories = [
-          ...directories,
           ...(await installDirectories("powershell", environment, platform, readDirectory)),
+          ...directories,
         ];
         const powershell =
           (await locateNativeWindowsCommand("pwsh", hostDirectories, isExecutableFile)) ??

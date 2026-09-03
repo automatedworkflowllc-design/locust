@@ -32,6 +32,13 @@ const ROSTER = join(ROOT, 'src', 'main', 'teammate-store.ts')
 
 const MUTATIONS = [
   {
+    file: MISSIONS,
+    name: 'a command that cannot be built still writes a mission file first',
+    from: '        } catch {\n          return error(\n            \'RUNTIME_START_FAILED\',',
+    to: '        } catch {\n          command = createCodexExecCommand(chosen.executable, { workspacePath: options.workspacePath })\n        }\n        if (false) {\n          return error(\n            \'RUNTIME_START_FAILED\',',
+    expect: 'records nothing when the chosen options cannot be turned into a command'
+  },
+  {
     file: VIEW,
     name: 'a reply is shown the opening line instead of the words typed for it',
     from: "    if (current.continuesFrom?.reason !== 'route-switch') return current.prompt",

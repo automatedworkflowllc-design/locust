@@ -16,7 +16,7 @@ import type {
   RuntimeProcessRunner
 } from '@teammate/runtime-adapters'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
-import type { MissionSandbox } from '@teammate/runtime-adapters'
+import type { MissionSandbox, RuntimeCommandSpec } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
 import type {
@@ -529,6 +529,40 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ? createCursorEventNormalizer(normalizerContext)
             : createCodexEventNormalizer(normalizerContext)
 
+        // The argv, decided BEFORE anything durable is written. The builders
+        // refuse what they cannot honour -- an effort for a runtime that has
+        // no effort flag, a model that is not plain text -- and a refusal
+        // there used to leave a mission file and a failure record behind for
+        // a run that never existed. Nothing created today can be pruned
+        // today, so those files were permanent.
+        let command: RuntimeCommandSpec
+        try {
+          const chosenEffort = route.effort
+          const choice = {
+            ...(chosenModel === undefined ? {} : { model: chosenModel }),
+            ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
+            ...(resumeThreadId === undefined ? {} : { resumeThreadId })
+          }
+          command = runtime === 'claude'
+            ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath, ...choice })
+            : runtime === 'cursor'
+              ? createCursorPrintCommand(chosen.executable, {
+                  workspacePath: options.workspacePath,
+                  sandbox: effectiveSandbox,
+                  ...choice
+                })
+              : createCodexExecCommand(chosen.executable, {
+                  workspacePath: options.workspacePath,
+                  sandbox: effectiveSandbox,
+                  ...choice
+                })
+        } catch {
+          return error(
+            'RUNTIME_START_FAILED',
+            'That runtime cannot be started with the options chosen. Nothing was recorded.'
+          ) as CodexMissionStartResponse
+        }
+
         // What the runtime is SENT is the person's words plus their teammates'
         // waiting messages and the share form. The ledger keeps the person's
         // words as the prompt and the delivered messages by id; the rest is
@@ -619,31 +653,6 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
         let process: RuntimeProcessRun
         try {
-          // Claude's print command carries its own restricted argv; only Codex
-          // takes a sandbox flag, so write mode is a Codex capability today and
-          // a Claude mission stays read-only whatever the composer said.
-          // Model and effort go to whichever runtime runs. Effort is only ever
-          // one the catalog reported for that model; the builder refuses
-          // anything but a plain word regardless.
-          const chosenEffort = route.effort
-          const choice = {
-            ...(chosenModel === undefined ? {} : { model: chosenModel }),
-            ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
-            ...(resumeThreadId === undefined ? {} : { resumeThreadId })
-          }
-          const command = runtime === 'claude'
-            ? createClaudePrintCommand(chosen.executable, { workspacePath: options.workspacePath, ...choice })
-            : runtime === 'cursor'
-              ? createCursorPrintCommand(chosen.executable, {
-                  workspacePath: options.workspacePath,
-                  sandbox: effectiveSandbox,
-                  ...choice
-                })
-              : createCodexExecCommand(chosen.executable, {
-                  workspacePath: options.workspacePath,
-                  sandbox: effectiveSandbox,
-                  ...choice
-                })
           process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
         } catch {
           try {
