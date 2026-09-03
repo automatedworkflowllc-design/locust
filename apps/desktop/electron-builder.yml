@@ -9,6 +9,18 @@ appId: com.automatedworkflow.locust
 productName: Locust
 copyright: Copyright © 2026 Automated Workflow
 
+# Where installed copies look for a newer version.
+#
+# A PUBLIC repository holding only installers, deliberately separate from the
+# source. Publishing to the private source repo would mean shipping a token
+# that can read it inside every installed copy, which is not a thing to hand
+# out; and this way the source can stay private while updates still work.
+publish:
+  provider: github
+  owner: automatedworkflowllc-design
+  repo: locust-releases
+  releaseType: release
+
 directories:
   output: release
   buildResources: resources

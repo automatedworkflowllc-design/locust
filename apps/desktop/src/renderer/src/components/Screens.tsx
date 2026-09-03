@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type {
+  AppUpdateResponse,
+  AppUpdateState,
   MissionPruneResponse,
   PublicRecoveredMission,
   PublicRuntimeStatus,
@@ -301,11 +303,96 @@ function RetentionControl({
   )
 }
 
+/**
+ * The update control.
+ *
+ * The app checks on its own and downloads on its own; it never installs on
+ * its own, because a restart under a running mission would cut the run and
+ * leave its record without a terminal receipt. So the last step is a button,
+ * and it refuses while anything is running.
+ */
+function UpdateControl({
+  update,
+  onCheck,
+  onInstall
+}: {
+  readonly update: AppUpdateState | undefined
+  readonly onCheck: () => Promise<AppUpdateResponse>
+  readonly onInstall: () => Promise<AppUpdateResponse>
+}): ReactElement {
+  const [busy, setBusy] = useState(false)
+  const [refusal, setRefusal] = useState<string>()
+
+  const phase = update?.phase ?? 'idle'
+  const line =
+    phase === 'unsupported'
+      ? 'This build cannot update itself. Installed copies check on their own.'
+      : phase === 'checking'
+        ? 'Checking…'
+        : phase === 'current'
+          ? 'Up to date.'
+          : phase === 'available'
+            ? `Version ${update?.availableVersion ?? ''} is available. Downloading it now.`
+            : phase === 'downloading'
+              ? `Downloading ${update?.availableVersion ?? ''}${update?.percent === undefined ? '' : ` · ${String(update.percent)}%`}`
+              : phase === 'ready'
+                ? `Version ${update?.availableVersion ?? ''} is downloaded and ready to install.`
+                : phase === 'failed'
+                  ? update?.message ?? 'The update check could not complete.'
+                  : 'Not checked yet.'
+
+  return (
+    <div className="lc-retention">
+      <div className="lc-retention__row">
+        <span className={`lc-settings__note${phase === 'failed' ? ' lc-tone-red' : ''}`}>{line}</span>
+        <button
+          type="button"
+          className="lc-button"
+          disabled={busy || phase === 'unsupported' || phase === 'checking'}
+          onClick={() => {
+            setBusy(true)
+            setRefusal(undefined)
+            void onCheck().finally(() => {
+              setBusy(false)
+            })
+          }}
+        >
+          Check now
+        </button>
+        {phase === 'ready' && (
+          <button
+            type="button"
+            className="lc-button"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true)
+              setRefusal(undefined)
+              void onInstall()
+                .then((response) => {
+                  if (!response.ok) setRefusal(response.error.message)
+                })
+                .finally(() => {
+                  setBusy(false)
+                })
+            }}
+          >
+            Install and restart
+          </button>
+        )}
+      </div>
+      {refusal !== undefined && <span className="lc-settings__note lc-tone-red">{refusal}</span>}
+    </div>
+  )
+}
+
 export function SettingsScreen({
   runtimes,
   ledgerPath,
   build,
   storage,
+  update,
+  onCheckUpdate,
+  onInstallUpdate,
   onPreviewPrune,
   onPrune
 }: {
@@ -315,6 +402,10 @@ export function SettingsScreen({
   readonly build: { readonly version: string; readonly packaged: boolean } | undefined
   /** What the local history costs; undefined until the host has answered. */
   readonly storage: PublicStorageReport | undefined
+  /** Where an update stands; undefined until the host has said anything. */
+  readonly update: AppUpdateState | undefined
+  readonly onCheckUpdate: () => Promise<AppUpdateResponse>
+  readonly onInstallUpdate: () => Promise<AppUpdateResponse>
   readonly onPreviewPrune: (days: number) => Promise<MissionPruneResponse>
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
@@ -369,6 +460,16 @@ export function SettingsScreen({
               )
             })}
           </div>
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Updates</h2>
+          <p className="lc-settings__lede">
+            Locust checks for a new version on its own and downloads it quietly. It never installs
+            one while a mission is running — restarting then would cut the run off and leave its
+            record without a receipt.
+          </p>
+          <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
         </section>
 
         <section className="lc-settings__section">

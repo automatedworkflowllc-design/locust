@@ -12,6 +12,8 @@ import type {
   PublicRuntimeStatus,
   PublicStorageReport,
   MissionPruneResponse,
+  AppUpdateResponse,
+  AppUpdateState,
   MissionApprovalDecision,
   MissionApprovalRequest,
   MissionMode,
@@ -267,6 +269,21 @@ export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
   const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean }>()
   const [storage, setStorage] = useState<PublicStorageReport>()
+  const [update, setUpdate] = useState<AppUpdateState>()
+
+  const checkUpdate = async (): Promise<AppUpdateResponse> => {
+    const bridge = window.desktop
+    if (!bridge) return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The host is not available.' } }
+    const response = await bridge.checkForUpdate()
+    if (response.ok) setUpdate(response.data)
+    return response
+  }
+
+  const installUpdate = async (): Promise<AppUpdateResponse> => {
+    const bridge = window.desktop
+    if (!bridge) return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The host is not available.' } }
+    return bridge.installUpdate()
+  }
 
   /** Ask the host what a prune would do. Nothing is deleted by this. */
   const previewPrune = async (days: number): Promise<MissionPruneResponse> => {
@@ -400,6 +417,10 @@ export default function App(): ReactElement {
       })
     })
 
+    const stopUpdates = bridge.onUpdateState((state) => {
+      if (active) setUpdate(state)
+    })
+
     void bridge
       .readStorageReport()
       .then((response) => {
@@ -483,6 +504,7 @@ export default function App(): ReactElement {
       active = false
       removeMissionListener()
       removeApprovalListener()
+      stopUpdates()
     }
   }, [])
 
@@ -1014,6 +1036,9 @@ export default function App(): ReactElement {
               ledgerPath={undefined}
               build={build}
               storage={storage}
+              update={update}
+              onCheckUpdate={checkUpdate}
+              onInstallUpdate={installUpdate}
               onPreviewPrune={previewPrune}
               onPrune={prune}
             />

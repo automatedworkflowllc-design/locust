@@ -7,6 +7,9 @@ import {
   MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HANDOFF_CHANNEL,
   APP_INFO_CHANNEL,
+  APP_UPDATE_CHECK_CHANNEL,
+  APP_UPDATE_INSTALL_CHANNEL,
+  APP_UPDATE_STATE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
   MISSION_STORAGE_CHANNEL,
   MISSION_DELETE_CHANNEL,
@@ -33,6 +36,8 @@ import type {
   MissionHandoffRequest,
   MissionHandoffResponse,
   AppInfo,
+  AppUpdateResponse,
+  AppUpdateState,
   MissionPruneRequest,
   MissionPruneResponse,
   StorageReportResponse,
@@ -83,6 +88,17 @@ const desktopApi: DesktopApi = {
   close: () => ipcRenderer.send('window:close'),
   getAppInfo: () => ipcRenderer.invoke(APP_INFO_CHANNEL) as Promise<AppInfo>,
   readStorageReport: () => ipcRenderer.invoke(MISSION_STORAGE_CHANNEL) as Promise<StorageReportResponse>,
+  checkForUpdate: () => ipcRenderer.invoke(APP_UPDATE_CHECK_CHANNEL) as Promise<AppUpdateResponse>,
+  installUpdate: () => ipcRenderer.invoke(APP_UPDATE_INSTALL_CHANNEL) as Promise<AppUpdateResponse>,
+  onUpdateState: (listener: (state: AppUpdateState) => void) => {
+    const handler = (_event: unknown, state: AppUpdateState): void => {
+      listener(state)
+    }
+    ipcRenderer.on(APP_UPDATE_STATE_CHANNEL, handler)
+    return () => {
+      ipcRenderer.removeListener(APP_UPDATE_STATE_CHANNEL, handler)
+    }
+  },
   pruneMissions: (request: MissionPruneRequest) =>
     ipcRenderer.invoke(MISSION_PRUNE_CHANNEL, request) as Promise<MissionPruneResponse>,
   getLocalRuntimes: () => ipcRenderer.invoke(RUNTIME_DISCOVERY_CHANNEL) as Promise<RuntimeDiscoveryResponse>,

@@ -29,8 +29,37 @@ const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const HISTORY = join(ROOT, 'src', 'main', 'mission-history.ts')
 const RUNTIMES = join(ROOT, 'src', 'shared', 'runtimes.ts')
 const ROSTER = join(ROOT, 'src', 'main', 'teammate-store.ts')
+const UPDATES = join(ROOT, 'src', 'main', 'updates.ts')
 
 const MUTATIONS = [
+  {
+    file: UPDATES,
+    name: 'an update installs itself while a mission is running',
+    from: '      if (options.liveMissionCount() > 0) {',
+    to: '      if (false) {',
+    expect: 'refuses to install while a mission is running, and says why'
+  },
+  {
+    file: UPDATES,
+    name: 'the app installs a new version on its own at quit',
+    from: '    options.updater.autoInstallOnAppQuit = false',
+    to: '    options.updater.autoInstallOnAppQuit = true',
+    expect: 'downloads on its own, and never installs on its own'
+  },
+  {
+    file: UPDATES,
+    name: 'a check that could not run reports the app as up to date',
+    from: "            phase: 'failed',\n            currentVersion: options.currentVersion,\n            message: 'The update check could not complete.'",
+    to: "            phase: 'current',\n            currentVersion: options.currentVersion",
+    expect: 'says up to date only after a check that finished'
+  },
+  {
+    file: UPDATES,
+    name: 'a build that cannot update itself reports itself up to date',
+    from: '      if (!options.supported) {',
+    to: '      if (false) {',
+    expect: 'says a build that cannot update itself cannot, rather than that it is current'
+  },
   {
     file: MISSIONS,
     name: 'a command that cannot be built still writes a mission file first',
@@ -650,7 +679,8 @@ const originals = new Map([
   [CATALOG, readFileSync(CATALOG, 'utf8')],
   [HISTORY, readFileSync(HISTORY, 'utf8')],
   [RUNTIMES, readFileSync(RUNTIMES, 'utf8')],
-  [ROSTER, readFileSync(ROSTER, 'utf8')]
+  [ROSTER, readFileSync(ROSTER, 'utf8')],
+  [UPDATES, readFileSync(UPDATES, 'utf8')]
 ])
 let problems = 0
 

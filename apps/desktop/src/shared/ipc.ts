@@ -11,6 +11,40 @@ export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 export const MISSION_DELETE_CHANNEL = 'mission:delete'
 export const APP_INFO_CHANNEL = 'app:info'
 export const MISSION_STORAGE_CHANNEL = 'mission:storage'
+export const APP_UPDATE_CHECK_CHANNEL = 'app:update-check'
+export const APP_UPDATE_INSTALL_CHANNEL = 'app:update-install'
+export const APP_UPDATE_STATE_CHANNEL = 'app:update-state'
+
+/**
+ * Where an update stands. `unsupported` is a real answer: a development build
+ * or one installed outside its installer cannot replace itself, and saying
+ * "up to date" there would be a claim nothing checked.
+ */
+export type AppUpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'current'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'failed'
+  | 'unsupported'
+
+export interface AppUpdateState {
+  readonly phase: AppUpdatePhase
+  readonly currentVersion: string
+  readonly availableVersion?: string
+  readonly percent?: number
+  /** Set only when the phase is `failed`; never the provider's own text. */
+  readonly message?: string
+}
+
+export type AppUpdateResponse =
+  | { readonly ok: true; readonly data: AppUpdateState }
+  | {
+      readonly ok: false
+      readonly error: { readonly code: 'UPDATE_NOT_READY' | 'UPDATE_BUSY' | 'INTERNAL_ERROR'; readonly message: string }
+    }
 export const MISSION_PRUNE_CHANNEL = 'mission:prune'
 
 /** What the local mission history costs on this machine. */
@@ -520,6 +554,9 @@ export interface DesktopApi {
   close(): void
   getAppInfo(): Promise<AppInfo>
   readStorageReport(): Promise<StorageReportResponse>
+  checkForUpdate(): Promise<AppUpdateResponse>
+  installUpdate(): Promise<AppUpdateResponse>
+  onUpdateState(listener: (state: AppUpdateState) => void): () => void
   pruneMissions(request: MissionPruneRequest): Promise<MissionPruneResponse>
   getLocalRuntimes(): Promise<RuntimeDiscoveryResponse>
   getMissionHistory(): Promise<MissionHistoryResponse>

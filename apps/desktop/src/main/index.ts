@@ -1,4 +1,7 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, session } from 'electron'
+import electronUpdater from 'electron-updater'
+
+const { autoUpdater } = electronUpdater
 import {
   createNodeProbeRunner,
   killProcessTree,
@@ -30,6 +33,9 @@ import {
   MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HANDOFF_CHANNEL,
   APP_INFO_CHANNEL,
+  APP_UPDATE_CHECK_CHANNEL,
+  APP_UPDATE_INSTALL_CHANNEL,
+  APP_UPDATE_STATE_CHANNEL,
   MISSION_DELETE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
   MISSION_STORAGE_CHANNEL,
@@ -45,6 +51,7 @@ import {
 } from '../shared/ipc.js'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
+import { createUpdateService } from './updates.js'
 import type {
   CodexMissionCancelRequest,
   CodexMissionStartRequest,
@@ -473,6 +480,40 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged } as const
       // The version electron-builder stamped, which is the one on the installer.
       return { name: 'Locust', version: app.getVersion(), packaged: app.isPackaged } as const
+    })
+
+    // Updates. A packaged build can replace itself; a development build
+    // cannot, and says so rather than reporting itself up to date.
+    const updates = createUpdateService({
+      updater: autoUpdater,
+      currentVersion: app.getVersion(),
+      supported: app.isPackaged,
+      liveMissionCount: () =>
+        codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length,
+      onStateChange: (state) => {
+        for (const target of BrowserWindow.getAllWindows()) {
+          if (!target.isDestroyed()) target.webContents.send(APP_UPDATE_STATE_CHANNEL, state)
+        }
+      }
+    })
+    // One check a few seconds after launch, so a person is told a new version
+    // exists without ever being asked to go looking.
+    setTimeout(() => {
+      void updates.check()
+    }, 8_000)
+
+    ipcMain.handle(APP_UPDATE_CHECK_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The request was rejected.' } } as const
+      }
+      return updates.check()
+    })
+
+    ipcMain.handle(APP_UPDATE_INSTALL_CHANNEL, (event) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The request was rejected.' } } as const
+      }
+      return updates.install()
     })
 
     ipcMain.handle(MISSION_STORAGE_CHANNEL, async (event) => {
