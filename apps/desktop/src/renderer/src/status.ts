@@ -409,17 +409,36 @@ export function prunePreviewSummary(preview: {
  * it started -- which is exactly what happened to the first person to try it.
  * A control that cannot do its job says so instead.
  */
-export function modeRunsOn(mode: MissionMode, runtime: MissionRuntimeId): boolean {
-  return mode !== 'approve-each' || runtime === 'codex'
+export function modeRunsOn(
+  mode: MissionMode,
+  runtime: MissionRuntimeId,
+  platform?: string
+): boolean {
+  if (mode === 'approve-each') return runtime === 'codex'
+  // Cursor's read-only mode is only real where its sandbox can run. On
+  // Windows the host refuses such a mission rather than record a containment
+  // it cannot keep -- so offering the mode here would be offering a refusal,
+  // and every message sent under it came back as an error.
+  if (mode === 'ask' && runtime === 'cursor' && platform === 'win32') return false
+  return true
+}
+
+/** The modes a route can actually run, in the order they are offered. */
+export function modesFor(runtime: MissionRuntimeId, platform?: string): readonly MissionMode[] {
+  return (['ask', 'accept-edits', 'approve-each'] as const).filter((mode) =>
+    modeRunsOn(mode, runtime, platform)
+  )
 }
 
 /** Why a mode is unavailable here, for the menu to say out loud. */
 export function modeUnavailableReason(
   mode: MissionMode,
-  runtime: MissionRuntimeId
+  runtime: MissionRuntimeId,
+  platform?: string
 ): string | undefined {
-  if (modeRunsOn(mode, runtime)) return undefined
-  return `Codex CLI only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
+  if (modeRunsOn(mode, runtime, platform)) return undefined
+  if (mode === 'approve-each') return `Codex CLI only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
+  return 'Cursor Agent cannot be held read-only on Windows: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files.'
 }
 
 function runtimeLabel(runtime: MissionRuntimeId): string {
@@ -488,4 +507,26 @@ export function orderRouteRows<TRow extends { readonly key: string; readonly gro
     if (byGroup !== 0) return byGroup
     return score(left) - score(right)
   })
+}
+
+/**
+ * Which missions a search shows.
+ *
+ * The sidebar's search field was drawn, labelled and completely inert: it
+ * held no state and filtered nothing, which is the exact shape this codebase
+ * refuses elsewhere -- a control that cannot do its job should say so rather
+ * than appear and fail.
+ *
+ * Matching is on the words a person can see: a mission's title, and its short
+ * id, so the id in a receipt can be pasted straight in.
+ */
+export function missionsMatching<TRow extends { readonly title: string; readonly missionId: string }>(
+  rows: readonly TRow[],
+  query: string
+): readonly TRow[] {
+  const needle = query.trim().toLowerCase()
+  if (needle.length === 0) return rows
+  return rows.filter((row) =>
+    row.title.toLowerCase().includes(needle) || row.missionId.toLowerCase().includes(needle)
+  )
 }

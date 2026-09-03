@@ -477,9 +477,9 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(APP_INFO_CHANNEL, (event) => {
-      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged } as const
+      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged, platform: process.platform } as const
       // The version electron-builder stamped, which is the one on the installer.
-      return { name: 'Locust', version: app.getVersion(), packaged: app.isPackaged } as const
+      return { name: 'Locust', version: app.getVersion(), packaged: app.isPackaged, platform: process.platform } as const
     })
 
     // Updates. A packaged build can replace itself; a development build

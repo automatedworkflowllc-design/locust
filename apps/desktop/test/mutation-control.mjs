@@ -35,6 +35,34 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const MUTATIONS = [
   {
     file: STATUS,
+    name: 'a read-only Cursor mode is offered where nothing can enforce it',
+    from: "  if (mode === 'ask' && runtime === 'cursor' && platform === 'win32') return false",
+    to: '  void platform',
+    expect: 'does not offer Cursor a read-only mode on Windows, where nothing enforces it'
+  },
+  {
+    file: STATUS,
+    name: 'a read-only Cursor mode is refused even where the sandbox is real',
+    from: "  if (mode === 'ask' && runtime === 'cursor' && platform === 'win32') return false",
+    to: "  if (mode === 'ask' && runtime === 'cursor') return false",
+    expect: 'offers it where the sandbox exists'
+  },
+  {
+    file: STATUS,
+    name: 'the search field filters nothing, as it did when it was inert',
+    from: '  if (needle.length === 0) return rows',
+    to: '  return rows; if (needle.length === 0) return rows',
+    expect: 'matches the words a person can see, whatever the case'
+  },
+  {
+    file: STATUS,
+    name: 'a search that matches nothing shows everything',
+    from: '  return rows.filter((row) =>',
+    to: '  return rows.length > 0 ? rows : rows.filter((row) =>',
+    expect: 'shows nothing when nothing matches, rather than everything'
+  },
+  {
+    file: STATUS,
     name: 'the curated shortlist outranks what this person actually ran',
     from: '    if (used !== undefined) return used',
     to: '    if (used !== undefined) return 3_000_000 + used',
@@ -57,8 +85,8 @@ const MUTATIONS = [
   {
     file: STATUS,
     name: 'a mode the route cannot run is still offered',
-    from: "  return mode !== 'approve-each' || runtime === 'codex'",
-    to: '  return true',
+    from: "  if (mode === 'approve-each') return runtime === 'codex'",
+    to: "  if (mode === 'approve-each') return true",
     expect: 'keeps per-action approvals to the runtime that can stop and ask'
   },
   {

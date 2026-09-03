@@ -12,6 +12,7 @@ import {
   handoffAvailability,
   handoffTitle,
   modeRunsOn,
+  modesFor,
   modeUnavailableReason,
   runtimeIsUsable
 } from '../status.js'
@@ -58,6 +59,8 @@ export interface ComposerProps {
   readonly resolvedModels: ReadonlyMap<string, string>
   /** Routes this person has run, newest first, as `runtime:model`. */
   readonly recentRoutes: readonly string[]
+  /** Where this build is running; some containment is platform specific. */
+  readonly platform: string | undefined
   readonly effort: string | undefined
   readonly onEffortChange: (effort: string | undefined) => void
   readonly swarm: boolean
@@ -108,6 +111,7 @@ export function Composer({
   models,
   resolvedModels,
   recentRoutes,
+  platform,
   effort,
   onEffortChange,
   swarm,
@@ -129,7 +133,9 @@ export function Composer({
   // in, so it is not the mode the control shows either. Switching route used
   // to leave "Approve each action" selected against a runtime that refuses
   // it, and every message was then rejected before it began.
-  const effectiveMode: MissionMode = modeRunsOn(mode, route.runtime) ? mode : 'ask'
+  const effectiveMode: MissionMode = modeRunsOn(mode, route.runtime, platform)
+    ? mode
+    : modesFor(route.runtime, platform)[0] ?? 'accept-edits'
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   const selectedReady = selected !== undefined && runtimeIsUsable(selected)
   // Three runtimes can own a mission. Readiness still comes from discovery,
@@ -251,7 +257,7 @@ export function Composer({
                 {modeOpen && (
                   <div className="lc-menu" role="menu" aria-label="Permission mode">
                     {MODES.map((option) => {
-                      const unavailable = modeUnavailableReason(option.mode, route.runtime)
+                      const unavailable = modeUnavailableReason(option.mode, route.runtime, platform)
                       return (
                         <button
                           key={option.mode}

@@ -87,6 +87,12 @@ export interface AppInfo {
   readonly name: string
   readonly version: string
   readonly packaged: boolean
+  /**
+   * The platform this build is running on. Some containment is platform
+   * specific -- Cursor's sandbox exists on macOS and Linux only -- and the
+   * window has to know, or it offers modes the host will refuse.
+   */
+  readonly platform: string
 }
 export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'

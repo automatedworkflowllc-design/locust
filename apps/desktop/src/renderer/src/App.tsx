@@ -50,7 +50,7 @@ import {
   stitchedHandoff,
   typedPrompt
 } from './missionView.js'
-import { modeRunsOn, shortMissionId } from './status.js'
+import { modeRunsOn, modesFor, shortMissionId } from './status.js'
 
 /**
  * The Locust shell.
@@ -288,7 +288,7 @@ function missionTitle(prompt: string): string {
 
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
-  const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean }>()
+  const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean; readonly platform: string }>()
   const [storage, setStorage] = useState<PublicStorageReport>()
   const [update, setUpdate] = useState<AppUpdateState>()
 
@@ -452,7 +452,7 @@ export default function App(): ReactElement {
     void bridge
       .getAppInfo()
       .then((info) => {
-        if (active) setBuild({ version: info.version, packaged: info.packaged })
+        if (active) setBuild({ version: info.version, packaged: info.packaged, platform: info.platform })
       })
       .catch(() => undefined)
 
@@ -630,7 +630,9 @@ export default function App(): ReactElement {
         // The mode the composer SHOWS, which is not always the mode last
         // chosen: a mode the route cannot run is not one a mission can start
         // in, and sending it anyway is how every message came back refused.
-        mode: modeRunsOn(mode, route.runtime) ? mode : 'ask',
+        mode: modeRunsOn(mode, route.runtime, build?.platform)
+          ? mode
+          : modesFor(route.runtime, build?.platform)[0] ?? 'accept-edits',
         runtime: route.runtime,
         // The concrete model. When a runtime encodes effort in the id, the
         // chosen effort names a different model, and sending the family's
@@ -1230,6 +1232,7 @@ export default function App(): ReactElement {
             models={models}
             resolvedModels={resolvedModels}
             recentRoutes={recentRoutes}
+            platform={build?.platform}
             effort={effort}
             onEffortChange={setEffort}
             swarm={swarm}

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
@@ -8,6 +9,7 @@ import {
   faceActivityFor,
   facePresenceFor,
   missionPhaseView,
+  missionsMatching,
   runtimeIsUsable,
   shortMissionId,
   teammateStatusView
@@ -64,8 +66,10 @@ export function Sidebar({
   readonly onNewTeammate: () => void
   readonly onOpenSettings: () => void
 }): ReactElement {
+  const [query, setQuery] = useState('')
   const connected = connectedRuntimeCount(runtimes)
   const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
+  const shownUnowned = missionsMatching(unowned, query)
   return (
     <nav className="lc-sidebar" aria-label="Workspace">
       <div className="lc-sidebar__brand">
@@ -86,7 +90,14 @@ export function Sidebar({
 
       <div className="lc-search">
         <Icon name="search" size={13} />
-        <input type="text" placeholder="Search missions" aria-label="Search missions" />
+        <input
+          type="text"
+          placeholder="Search missions"
+          aria-label="Search missions"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          autoComplete="off"
+        />
       </div>
 
       <div className="lc-sidebar__scroll">
@@ -95,6 +106,10 @@ export function Sidebar({
           const owned = missions.filter(
             (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
           )
+          // What this teammate's rows show while a search is running. Their
+          // status still comes from ALL their work: a teammate does not stop
+          // working because someone typed in a box.
+          const shownOwned = missionsMatching(owned, query)
           // The runtime this teammate's own work is on. Asking about Codex
           // for everyone told a person their teammate needed a sign-in while
           // she was visibly working on Claude Code.
@@ -139,9 +154,9 @@ export function Sidebar({
                   </span>
                 </span>
               </button>
-              {owned.length > 0 && (
+              {shownOwned.length > 0 && (
                 <div className="lc-teammate__missions">
-                  {owned.map((mission) => (
+                  {shownOwned.map((mission) => (
                     <button
                       type="button"
                       key={mission.missionId}
@@ -162,10 +177,10 @@ export function Sidebar({
           )
         })}
 
-        {unowned.length > 0 && (
+        {shownUnowned.length > 0 && (
           <>
             <div className="lc-sectionlabel">{teammates.length > 0 ? 'Other missions' : 'Missions'}</div>
-            {unowned.map((mission) => {
+            {shownUnowned.map((mission) => {
               const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
               return (
                 <button
@@ -196,6 +211,15 @@ export function Sidebar({
           above, so an "other missions" section with a note in it would be a
           heading for nothing.
         */}
+        {/*
+          A search that matches nothing says so. Without this the sidebar
+          simply empties, which reads as "you have no missions" rather than
+          "none of them match".
+        */}
+        {query.trim().length > 0 && missionsMatching(missions, query).length === 0 && (
+          <p className="lc-sidebar__empty lc-row__meta">No missions match that.</p>
+        )}
+
         {missions.length === 0 && (
           <>
             <div className="lc-sectionlabel">Missions</div>

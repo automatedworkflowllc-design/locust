@@ -12,8 +12,10 @@ import {
   missionPhaseView,
   capRouteRows,
   modeRunsOn,
+  modesFor,
   modeUnavailableReason,
   flagshipRank,
+  missionsMatching,
   orderRouteRows,
   integrationOf,
   RUNTIME_INTEGRATION,
@@ -410,6 +412,32 @@ describe('a teammate with no work of their own', () => {
   })
 })
 
+describe('a route whose read-only mode is not real here', () => {
+  it('does not offer Cursor a read-only mode on Windows, where nothing enforces it', () => {
+    // Measured: Cursor's sandbox needs macOS or Linux, and plan mode alone
+    // did not stop a run editing files. The host refuses such a mission, so
+    // offering the mode meant every message came back an error -- and a run
+    // that never started leaves no conversation to reply to, which read as
+    // "it starts a new chat every time".
+    expect(modeRunsOn('ask', 'cursor', 'win32')).toBe(false)
+    expect(modesFor('cursor', 'win32')).toEqual(['accept-edits'])
+  })
+
+  it('offers it where the sandbox exists', () => {
+    expect(modeRunsOn('ask', 'cursor', 'darwin')).toBe(true)
+    expect(modesFor('cursor', 'darwin')).toEqual(['ask', 'accept-edits'])
+  })
+
+  it('leaves the other runtimes alone on every platform', () => {
+    expect(modesFor('codex', 'win32')).toEqual(['ask', 'accept-edits', 'approve-each'])
+    expect(modesFor('claude', 'win32')).toEqual(['ask', 'accept-edits'])
+  })
+
+  it('says why, in the words a person needs to act on', () => {
+    expect(modeUnavailableReason('ask', 'cursor', 'win32')).toContain('macOS or Linux')
+  })
+})
+
 describe('which modes a route can actually run', () => {
   it('keeps per-action approvals to the runtime that can stop and ask', () => {
     expect(modeRunsOn('approve-each', 'codex')).toBe(true)
@@ -486,5 +514,29 @@ describe('the curated shortlist', () => {
     const rows = [{ key: 'cursor:obscure', group: 'CURSOR', model: 'obscure' }]
     expect(orderRouteRows(rows, [])).toHaveLength(1)
     expect(flagshipRank('obscure')).toBeUndefined()
+  })
+})
+
+describe('searching missions', () => {
+  const rows = [
+    { title: 'Audit the config', missionId: 'mission_abc12345' },
+    { title: 'Rewrite the README', missionId: 'mission_def67890' }
+  ]
+
+  it('matches the words a person can see, whatever the case', () => {
+    expect(missionsMatching(rows, 'audit').map((row) => row.missionId)).toEqual(['mission_abc12345'])
+    expect(missionsMatching(rows, 'README').map((row) => row.missionId)).toEqual(['mission_def67890'])
+  })
+
+  it('matches an id, so one pasted from a receipt finds its mission', () => {
+    expect(missionsMatching(rows, 'def678').map((row) => row.title)).toEqual(['Rewrite the README'])
+  })
+
+  it('shows everything when nothing was typed', () => {
+    expect(missionsMatching(rows, '   ')).toHaveLength(2)
+  })
+
+  it('shows nothing when nothing matches, rather than everything', () => {
+    expect(missionsMatching(rows, 'nonsense')).toEqual([])
   })
 })
