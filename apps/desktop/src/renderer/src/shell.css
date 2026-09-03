@@ -2550,6 +2550,58 @@ textarea {
 }
 
 /* Armed for something that cannot be undone: the button itself says so. */
+/* The right-click menu on a mission row. */
+.lc-context {
+  position: fixed;
+  z-index: 60;
+  min-width: 188px;
+  padding: var(--lc-space-2);
+  border: 1px solid var(--lc-border-strong);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised-2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  outline: none;
+}
+
+.lc-context__title {
+  padding: var(--lc-space-2) var(--lc-space-3);
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+  color: var(--lc-text-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+.lc-context__item {
+  display: block;
+  width: 100%;
+  padding: var(--lc-space-3);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-context__item:hover:not(:disabled) {
+  background: var(--lc-bg-selected);
+}
+
+.lc-context__item:disabled {
+  color: var(--lc-text-muted);
+  cursor: default;
+}
+
+.lc-context__item.is-danger {
+  color: var(--lc-red-text);
+}
+
 /* Retention: the two-step prune in Settings. */
 .lc-retention {
   display: flex;

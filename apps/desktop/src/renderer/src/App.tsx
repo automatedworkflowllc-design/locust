@@ -38,6 +38,8 @@ import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import { PixelFace } from './components/PixelFace.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
+import { ContextMenu } from './components/ContextMenu.js'
+import type { ContextMenuState } from './components/ContextMenu.js'
 import { Thread } from './components/Thread.js'
 import { AgentAvatar } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
@@ -291,6 +293,43 @@ export default function App(): ReactElement {
   const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean; readonly platform: string }>()
   const [storage, setStorage] = useState<PublicStorageReport>()
   const [update, setUpdate] = useState<AppUpdateState>()
+  const [rowMenu, setRowMenu] = useState<ContextMenuState>()
+  const [rowMenuArmed, setRowMenuArmed] = useState<string>()
+
+  /**
+   * The right-click menu for a mission row. Reaching an action faster is not
+   * the same as skipping the question it asks, so Delete still confirms in
+   * place, and a running mission cannot be deleted at all -- the host would
+   * refuse it anyway, and saying so here beats an error card afterwards.
+   */
+  const openMissionMenu = (missionId: string, at: { readonly x: number; readonly y: number }): void => {
+    const live = [...runsRef.current.values()].some(
+      (run) => liveRunIsActive(run) && run.data?.missionId === missionId
+    )
+    const title = sidebarMissionsRef.current.find((row) => row.missionId === missionId)?.title ?? 'Mission'
+    setRowMenuArmed(undefined)
+    setRowMenu({
+      x: at.x,
+      y: at.y,
+      title,
+      items: [
+        { label: 'Open', onSelect: () => openMission(missionId) },
+        {
+          label: 'Copy mission id',
+          onSelect: () => {
+            void navigator.clipboard.writeText(missionId).catch(() => undefined)
+          }
+        },
+        {
+          label: 'Delete',
+          confirmLabel: 'Delete for good?',
+          danger: true,
+          ...(live ? { disabledReason: 'This mission is still running. Stop it first.' } : {}),
+          onSelect: () => deleteMissionById(missionId)
+        }
+      ]
+    })
+  }
 
   const checkUpdate = async (): Promise<AppUpdateResponse> => {
     const bridge = window.desktop
@@ -395,6 +434,21 @@ export default function App(): ReactElement {
   liveRunRef.current = liveRun
   const runsRef = useRef<ReadonlyMap<string, LiveRunState>>(runs)
   runsRef.current = runs
+
+  /**
+   * Re-read what the local history costs. Deleting a mission changes it, and
+   * Settings used to keep the number it read at launch until a restart.
+   */
+  const refreshStorage = (): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .readStorageReport()
+      .then((response) => {
+        if (response.ok) setStorage(response.data)
+      })
+      .catch(() => undefined)
+  }
 
   const refreshHistory = (): void => {
     const bridge = window.desktop
@@ -921,10 +975,9 @@ export default function App(): ReactElement {
    */
   const [deleteArmed, setDeleteArmed] = useState(false)
   const [deleteError, setDeleteError] = useState<string>()
-  const deleteShownMission = (): void => {
+  const deleteMissionById = (missionId: string): void => {
     const bridge = window.desktop
-    const missionId = liveRun?.data?.missionId
-    if (!bridge || missionId === undefined) return
+    if (!bridge) return
     void bridge
       .deleteMission(missionId)
       .then((response) => {
@@ -944,7 +997,13 @@ export default function App(): ReactElement {
           const { [missionId]: _gone, ...rest } = current
           return rest
         })
-        setShownKey(undefined)
+        setShownKey((current) => {
+          const shown = current === undefined ? undefined : runsRef.current.get(current)
+          // Only the thread that was deleted closes. Deleting a row from the
+          // sidebar must not take the workroom with it.
+          return shown?.data?.missionId === missionId ? undefined : current
+        })
+        void refreshStorage()
       })
       .catch(() => {
         setDeleteArmed(false)
@@ -964,6 +1023,7 @@ export default function App(): ReactElement {
     setShownKey(live?.[0])
   }
 
+  const sidebarMissionsRef = useRef<readonly SidebarMission[]>([])
   const sidebarMissions = useMemo<readonly SidebarMission[]>(() => {
     const rows: SidebarMission[] = []
     for (const [key, run] of runs.entries()) {
@@ -996,6 +1056,9 @@ export default function App(): ReactElement {
     }
     return rows
   }, [history, historyById, runs])
+  // The right-click menu is built outside render and names the row it was
+  // opened on, so it reads the rows through this.
+  sidebarMissionsRef.current = sidebarMissions
 
   const noRuntimeReady =
     runtimeState.phase !== 'ready' || !runtimes.some((runtime) => runtime.ready && runtime.status === 'ready')
@@ -1019,6 +1082,17 @@ export default function App(): ReactElement {
     <div className="lc-shell">
       <TitleBar workspaceName="Local workspace" runningCount={runningCount} swarm={swarm} />
       <div className="lc-body">
+        {rowMenu !== undefined && (
+          <ContextMenu
+            state={rowMenu}
+            armedLabel={rowMenuArmed}
+            onArm={setRowMenuArmed}
+            onClose={() => {
+              setRowMenu(undefined)
+              setRowMenuArmed(undefined)
+            }}
+          />
+        )}
         <Sidebar
           runtimes={runtimes}
           missions={sidebarMissions}
@@ -1027,6 +1101,7 @@ export default function App(): ReactElement {
           selectedMissionId={liveRun?.data?.missionId ?? shownKey}
           selectedTeammateId={selectedTeammate?.teammateId}
           onSelectMission={openMission}
+          onMissionMenu={openMissionMenu}
           pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
           onSelectTeammate={selectTeammate}
           onNewTeammate={() => {
@@ -1155,7 +1230,10 @@ export default function App(): ReactElement {
                       className={`lc-button${deleteArmed ? ' lc-button--danger' : ''}`}
                       title={deleteArmed ? 'This removes the record for good' : 'Delete this mission'}
                       onClick={() => {
-                        if (deleteArmed) deleteShownMission()
+                        if (deleteArmed) {
+                          const shownId = liveRun?.data?.missionId
+                          if (shownId !== undefined) deleteMissionById(shownId)
+                        }
                         else {
                           setDeleteError(undefined)
                           setDeleteArmed(true)

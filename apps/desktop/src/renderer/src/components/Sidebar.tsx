@@ -47,6 +47,7 @@ export function Sidebar({
   selectedMissionId,
   selectedTeammateId,
   onSelectMission,
+  onMissionMenu,
   pendingApprovals,
   onSelectTeammate,
   onNewTeammate,
@@ -60,6 +61,8 @@ export function Sidebar({
   /** Who the composer is addressing. Selecting a teammate makes them the next mission's owner. */
   readonly selectedTeammateId: string | undefined
   readonly onSelectMission: (missionId: string) => void
+  /** Right-click on a mission row, so it can be acted on without opening it. */
+  readonly onMissionMenu: (missionId: string, at: { readonly x: number; readonly y: number }) => void
   /** Approvals waiting on each teammate's live run, by teammate id. */
   readonly pendingApprovals: Readonly<Record<string, number>>
   readonly onSelectTeammate: (teammateId: string) => void
@@ -163,6 +166,10 @@ export function Sidebar({
                       className={`lc-teammate__mission${
                         mission.missionId === selectedMissionId ? ' is-active' : ''
                       }`}
+                      onContextMenu={(event) => {
+                        event.preventDefault()
+                        onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
+                      }}
                       onClick={() => onSelectMission(mission.missionId)}
                     >
                       <span
@@ -189,6 +196,10 @@ export function Sidebar({
                   className="lc-row"
                   aria-current={mission.missionId === selectedMissionId}
                   onClick={() => onSelectMission(mission.missionId)}
+                  onContextMenu={(event) => {
+                    event.preventDefault()
+                    onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
+                  }}
                 >
                   <span
                     className={`lc-dot lc-tone-${view.tone}${mission.phase === 'running' ? ' is-pulsing' : ''}`}
