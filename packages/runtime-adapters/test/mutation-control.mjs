@@ -33,6 +33,13 @@ const ANTIGRAVITY_EVENTS = join(ROOT, 'src', 'antigravity-events.ts')
 
 const MUTATIONS = [
   {
+    file: CLAUDE_EVENTS,
+    name: 'the completing assistant record replaces an assumed block_0, so an answer streamed elsewhere renders twice',
+    from: '          itemId: textBlockId ?? "block_0",',
+    to: '          itemId: "block_0",',
+    expect: 'replaces the block the text actually streamed into, not an assumed block_0'
+  },
+  {
     file: LOCATOR,
     name: 'the .cmd shim is skipped so the .ps1 npm writes beside it is used, which cannot take the arguments',
     from: '        const script = win32.join(directory, `${commandName}.cmd`);',

@@ -83,7 +83,7 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
       entries.push({
         kind: 'shell',
         key: `shell_${String(index)}`,
-        command: detail.name,
+        command: shellCommandText(detail.name),
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode
@@ -96,8 +96,15 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
       // An edit whose runtime named its files but sent no diff (Codex's
       // file_change) is one row PER FILE, each saying the change was not
       // reported -- never one row named after the tool with no path at all.
-      const named = detail.kind === 'edit' && detail.tool === detail.name && detail.name.includes('\n')
-        ? detail.name.split('\n').filter((path) => path.length > 0)
+      // MEASURED 2026-09-03 in a real run, correcting a first attempt: for a
+      // Codex `file_change` the detail's NAME is the joined paths (they
+      // arrive as the tool's command) while its TOOL is the literal string
+      // `file_change`. Requiring name and tool to be equal -- which they
+      // never are -- meant the card kept drawing ONE row with both paths run
+      // together, labelled `file_change`, saying the change was not reported.
+      // Any edit naming more than one path splits, whatever the tool is called.
+      const named = detail.kind === 'edit' && detail.name.includes('\n')
+        ? detail.name.split('\n').map((path) => path.trim()).filter((path) => path.length > 0)
         : undefined
       if (named !== undefined && named.length > 0) {
         named.forEach((path, fileIndex) => {
@@ -322,6 +329,32 @@ function pluralize(count: number, singular: string): string {
  * The collapsed activity line. Counts come from tool events only -- never from
  * a guess about what the model said it did.
  */
+/**
+ * What a person means by "the command that ran".
+ *
+ * Runtimes reach a shell through a host, and the host is not the work: a
+ * Codex run on Windows records every command as
+ * `"C:\Windows\System32\WindowsPowerShell1.0\powershell.exe" -Command "npm test"`.
+ * The row is one line wide, so the host name and its escaped backslashes
+ * filled it and the actual command was cut off -- measured 2026-09-03 by
+ * reading the card after a real run and being unable to tell what had been
+ * run. The host is unwrapped for DISPLAY only; the ledger keeps the argv it
+ * really used.
+ */
+export function shellCommandText(command: string): string {
+  const host = /^\s*"?[^"]*(?:powershell|pwsh|cmd)\.exe"?\s+(?:-NoProfile\s+|-NonInteractive\s+|\/d\s+|\/s\s+)*(?:-Command|\/c)\s+([\s\S]+)$/i
+  const match = host.exec(command)
+  if (match === null) return command
+  const inner = match[1]!.trim()
+  // The host quotes the whole command; unwrap one matched layer, and undo the
+  // doubling that quoting introduced.
+  const unquoted =
+    (inner.startsWith('"') && inner.endsWith('"')) || (inner.startsWith("'") && inner.endsWith("'"))
+      ? inner.slice(1, -1)
+      : inner
+  return unquoted.replace(/\\"/g, '"').replace(/""/g, '"').replace(/''/g, "'").trim()
+}
+
 export function activitySummary(details: readonly ActivityDetail[]): string {
   // Files, not edit calls: one Codex file_change can touch several files, and
   // "Edited 1 file" over a two-file change is the wrong number.

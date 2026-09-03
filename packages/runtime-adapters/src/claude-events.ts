@@ -139,6 +139,16 @@ export function createClaudeEventNormalizer(
   // `input_tokens` / `output_tokens`. Only the numbers travel; the record's
   // model-usage table names the account's models and stays behind.
   let completedUsage: Record<string, number> | undefined;
+  /**
+   * The block the assistant's text is actually streaming into.
+   *
+   * MEASURED 2026-09-03: Claude Code does not always put the text at index 0.
+   * When it sends another block first, the deltas arrive as `block_1` while
+   * the completing record below replaced `block_0` -- two different items, so
+   * the finished answer rendered TWICE, in full, one after the other. The
+   * replace has to land on the block the text was written to.
+   */
+  let textBlockId: string | undefined;
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -248,9 +258,10 @@ export function createClaudeEventNormalizer(
         const delta = isObject(inner.delta) ? inner.delta : {};
         const text = stringValue(delta.text);
         if (text === undefined) return [];
+        textBlockId = `block_${String(inner.index ?? 0)}`;
         return [
           emit("message.delta", {
-            itemId: `block_${String(inner.index ?? 0)}`,
+            itemId: textBlockId,
             operation: "append",
             text: boundedMessageText(text),
             final: false,
@@ -278,7 +289,8 @@ export function createClaudeEventNormalizer(
       if (text.length === 0) return [];
       return [
         emit("message.delta", {
-          itemId: "block_0",
+          // The block the text streamed into, not an assumed one.
+          itemId: textBlockId ?? "block_0",
           operation: "replace",
           text: boundedMessageText(text),
           final: true,

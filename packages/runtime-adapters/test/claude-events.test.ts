@@ -129,6 +129,33 @@ describe("trap 1: the answer arrives twice", () => {
     expect(complete?.type === "message.delta" && complete.payload.final).toBe(true);
     expect(complete?.type === "message.delta" && complete.payload.text).toBe("PROBE_OK");
   });
+
+  it("replaces the block the text actually streamed into, not an assumed block_0", () => {
+    // MEASURED 2026-09-03 by using the app: Claude Code does not always put
+    // the answer at index 0. It sent another block first, so the deltas
+    // arrived as `block_1` while the completing record replaced `block_0` --
+    // two different items, and the finished answer rendered TWICE in full.
+    // The test above never caught it because it streams at index 0, which is
+    // the one index where the assumption happens to hold.
+    const claude = normalizer();
+    claude.accept(record(INIT));
+    const [delta] = claude.accept(
+      record({
+        type: "stream_event",
+        event: { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "PROBE_OK" } },
+      }),
+    );
+    expect(delta?.type === "message.delta" && delta.payload.itemId).toBe("block_1");
+
+    const [complete] = claude.accept(
+      record({
+        type: "assistant",
+        message: { content: [{ type: "text", text: "PROBE_OK" }] },
+      }),
+    );
+    expect(complete?.type === "message.delta" && complete.payload.itemId).toBe("block_1");
+    expect(complete?.type === "message.delta" && complete.payload.operation).toBe("replace");
+  });
 });
 
 describe("trap 3: a rate-limit warning is not exhaustion", () => {

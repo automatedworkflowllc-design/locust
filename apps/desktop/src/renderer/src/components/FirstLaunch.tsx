@@ -20,16 +20,31 @@ export function FirstLaunch({
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
 }): ReactElement {
+  const anyReady =
+    discoveryPhase === 'ready'
+    && runtimes.some((runtime) => {
+      const tag = routeRowStatus(runtime, integrationOf(runtime.id), false).tag
+      return tag === 'READY' || tag === 'ACTIVE'
+    })
   return (
     <div className="lc-empty">
       <div className="lc-empty__inner">
         <div className="lc-empty__logo">
           <img src={logo} alt="Locust" />
         </div>
-        <h1>Connect a runtime to start working</h1>
+        {/*
+          * The headline has to describe the state a person is actually in.
+          * It read "Connect a runtime to start working" unconditionally, so
+          * on a machine with six runtimes already signed in and marked READY
+          * it opened by asking for the one thing that was already done --
+          * measured on a first run, 2026-09-03. When something can run, the
+          * next move is to type a mission, and that is what it says.
+          */}
+        <h1>{anyReady ? 'Ready when you are' : 'Connect a runtime to start working'}</h1>
         <p>
-          Locust runs on the accounts and models already on this machine. Nothing is pooled,
-          proxied, or sent anywhere you have not connected.
+          {anyReady
+            ? 'Describe a mission in the box below and it runs here, recorded as it goes. Locust uses the accounts and models already on this machine — nothing is pooled, proxied, or sent anywhere you have not connected.'
+            : 'Locust runs on the accounts and models already on this machine. Nothing is pooled, proxied, or sent anywhere you have not connected.'}
         </p>
 
         {discoveryPhase === 'loading' && <p className="lc-footnote">Checking local runtimes…</p>}

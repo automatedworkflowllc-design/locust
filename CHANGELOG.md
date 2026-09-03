@@ -6,6 +6,25 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.15.3 — 2026-09-03
+
+Found by using the app on a real project rather than testing it. Notes in
+`docs/USING-IT-2026-09-03.md`.
+
+- **A Claude Code answer no longer appears twice.** Claude streams its reply
+  and then sends the finished message to replace what streamed; the replace
+  targeted a fixed block while the text had arrived in a different one, so the
+  whole answer rendered a second time underneath itself.
+- **Shell rows show the command, not the thing that ran it.** Every command was
+  displayed as `"C:\Windows\...\powershell.exe" -Command "..."`, and since a
+  row is one line wide, all you could read was the same truncated path. They
+  now read `npm test`, `node --test`, `git status --short`.
+- **A Codex edit lists one row per file again**, instead of one row with every
+  path run together saying the change was not reported.
+- **The first screen stops asking for something already done.** It said
+  "Connect a runtime to start working" above six runtimes marked READY; when
+  something can run it now says so and points at the composer.
+
 ## 0.15.2 — 2026-09-03
 
 - **Fixes a Codex regression 0.15.1 introduced.** Making PATH win meant

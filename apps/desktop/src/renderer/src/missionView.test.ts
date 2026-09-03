@@ -7,6 +7,7 @@ import {
   activityCounts,
   activityEntries,
   failureMessage,
+  shellCommandText,
   activitySummary,
   assistantMessages,
   defaultOpenEntry,
@@ -99,6 +100,30 @@ describe('assistant text', () => {
   })
 })
 
+describe('the command a shell row shows', () => {
+  const PS = String.raw`"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"`
+
+  it('shows what ran, not the host that ran it', () => {
+    // The row is one line wide. With the host in front, every command read as
+    // the same truncated path and the actual work was cut off.
+    expect(shellCommandText(`${PS} -Command "npm test"`)).toBe('npm test')
+    expect(shellCommandText(`${PS} -NoProfile -NonInteractive -Command 'node --test'`)).toBe('node --test')
+  })
+
+  it('keeps a command that was never wrapped', () => {
+    expect(shellCommandText('pnpm build')).toBe('pnpm build')
+    expect(shellCommandText('git diff -- src/streak.js')).toBe('git diff -- src/streak.js')
+  })
+
+  it('unwraps a cmd.exe host too', () => {
+    expect(shellCommandText(String.raw`C:\Windows\System32\cmd.exe /d /s /c "npm run build"`)).toBe('npm run build')
+  })
+
+  it('undoes the quote doubling the host introduced', () => {
+    expect(shellCommandText(`${PS} -Command "rg -n ""streak"" src"`)).toBe('rg -n "streak" src')
+  })
+})
+
 describe('what a failure card says', () => {
   const nl = String.fromCharCode(10)
 
@@ -151,7 +176,9 @@ describe('collapsed activity', () => {
 
   it('draws one row per file a runtime named without a diff, never one row named after the tool', () => {
     const rows = activityEntries([
-      { kind: 'edit', name: 'C:/w/README.md' + String.fromCharCode(10) + 'C:/w/src/prices.ts', tool: 'C:/w/README.md' + String.fromCharCode(10) + 'C:/w/src/prices.ts', settled: true }
+      // The real shape: the paths arrive as the tool's command and become the
+      // detail's name, while the tool stays the literal 'file_change'.
+      { kind: 'edit', name: 'C:/w/README.md' + String.fromCharCode(10) + 'C:/w/src/prices.ts', tool: 'file_change', settled: true }
     ])
     expect(rows.map((row) => [row.kind, 'name' in row ? row.name : ''])).toEqual([
       ['unreported', 'C:/w/README.md'],
