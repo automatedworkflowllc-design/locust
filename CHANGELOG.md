@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.16.0 — 2026-09-03
+
+- **The Teammates screen says what a teammate has been doing.** It could tell
+  you a teammate existed, their route, and how many missions they owned --
+  which answers "who is on my team" and not "what have they been up to". Each
+  card now carries when they last ran, what their work has cost, and their
+  newest missions, and clicking one opens it. A teammate who has never run
+  reads `never`, `not reported`, `not set yet`, because a card that filled
+  those with zeroes would be claiming things nobody measured.
+
 ## 0.15.8 — 2026-09-03
 
 - **A retrying mission stops looking frozen.** Against a dead endpoint Codex

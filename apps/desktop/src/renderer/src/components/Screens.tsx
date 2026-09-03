@@ -22,6 +22,7 @@ import {
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
 import { costLine, runCostOf, sumCosts } from '../cost.js'
+import { agoLabel, teammateWork } from '../teammateWork.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
@@ -176,14 +177,22 @@ export function MissionsScreen({
 
 export function TeammatesScreen({
   teammates,
+  missions,
   missionOwners,
   activityByTeammate,
+  titleOf,
+  onOpenMission,
   onNewTeammate,
   onEdit,
   onRemove
 }: {
   readonly teammates: readonly PublicTeammate[]
+  /** Every recovered mission, so a card can say what its teammate has done. */
+  readonly missions: readonly PublicRecoveredMission[]
   readonly missionOwners: Readonly<Record<string, string>>
+  /** The words a person typed, which for a continuation is not its own prompt. */
+  readonly titleOf: (mission: PublicRecoveredMission) => string
+  readonly onOpenMission: (missionId: string) => void
   /** Each teammate's face state, decided once in the shell so the roster agrees with the sidebar. */
   readonly activityByTeammate: Readonly<Record<string, FaceActivity>>
   readonly onNewTeammate: () => void
@@ -200,6 +209,7 @@ export function TeammatesScreen({
         <div className="lc-rostergrid">
           {teammates.map((teammate) => {
             const owned = Object.values(missionOwners).filter((owner) => owner === teammate.teammateId).length
+            const work = teammateWork(teammate.teammateId, missions, missionOwners, titleOf)
             return (
               <div className="lc-rostercard" key={teammate.teammateId}>
                 <div className="lc-rostercard__head">
@@ -224,11 +234,34 @@ export function TeammatesScreen({
                   </dd>
                   <dt>Missions</dt>
                   <dd className="lc-mono">{owned}</dd>
+                  <dt>Last run</dt>
+                  <dd className="lc-mono">
+                    {work.lastRunAt === undefined ? 'never' : agoLabel(work.lastRunAt) ?? 'unknown'}
+                  </dd>
+                  <dt>Cost</dt>
+                  {/* Undefined is not zero: a runtime that reported no usage
+                    * has not said the work was free. */}
+                  <dd className="lc-mono">{costLine(work.cost) ?? 'not reported'}</dd>
                   <dt>Mode</dt>
                   {/* Their own last mode, not a constant. This printed
                     * `read-only` for every teammate regardless. */}
                   <dd className="lc-mono">{modeLabel(teammate.route?.mode)}</dd>
                 </dl>
+                {work.recent.length > 0 && (
+                  <div className="lc-rostercard__recent">
+                    {work.recent.map((entry) => (
+                      <button
+                        type="button"
+                        key={entry.missionId}
+                        className="lc-rostercard__mission"
+                        onClick={() => onOpenMission(entry.missionId)}
+                      >
+                        <span className={`lc-dot lc-tone-${missionPhaseView(entry.phase, false).tone}`} />
+                        <span className="lc-rostercard__missiontitle">{entry.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="lc-rostercard__actions">
                   <button type="button" className="lc-rostercard__edit" onClick={() => onEdit(teammate)}>
                     Edit

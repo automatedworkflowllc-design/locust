@@ -1327,8 +1327,14 @@ export default function App(): ReactElement {
           ) : screen === 'teammates' ? (
             <TeammatesScreen
               teammates={teammates}
+              missions={history}
               missionOwners={missionOwners}
               activityByTeammate={activityByTeammate}
+              titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
+              onOpenMission={(missionId) => {
+                setScreen('workroom')
+                openMission(missionId)
+              }}
               onNewTeammate={() => {
                 setTeammateError(undefined)
                 setNewTeammateOpen(true)

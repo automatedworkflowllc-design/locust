@@ -35,9 +35,24 @@ const FACES = join(ROOT, 'src', 'renderer', 'src', 'faceState.ts')
 const ANTIGRAVITY = join(ROOT, 'src', 'main', 'antigravity-mission.ts')
 const COST = join(ROOT, 'src', 'renderer', 'src', 'cost.ts')
 const AGENT_TEXT = join(ROOT, 'src', 'renderer', 'src', 'agentText.ts')
+const TEAMMATE_WORK = join(ROOT, 'src', 'renderer', 'src', 'teammateWork.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: TEAMMATE_WORK,
+    name: 'a card counts every mission, not only the ones the host says are theirs',
+    from: '    .filter((mission) => missionOwners[mission.missionId] === teammateId)',
+    to: '    .filter(() => true)',
+    expect: 'counts only the missions the host recorded as theirs'
+  },
+  {
+    file: TEAMMATE_WORK,
+    name: 'the last run is taken from the list order rather than the newest mission',
+    from: '    .sort((left, right) => Date.parse(right.lastUpdatedAt) - Date.parse(left.lastUpdatedAt))',
+    to: '',
+    expect: 'takes the last run from the newest mission, not the first in the list'
+  },
   {
     file: STATUS,
     name: 'a roster card prints read-only for every teammate again',
@@ -986,7 +1001,8 @@ const originals = new Map([
   [ANTIGRAVITY, readFileSync(ANTIGRAVITY, 'utf8')],
   [COST, readFileSync(COST, 'utf8')],
   [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')],
-  [AGENT_TEXT, readFileSync(AGENT_TEXT, 'utf8')]
+  [AGENT_TEXT, readFileSync(AGENT_TEXT, 'utf8')],
+  [TEAMMATE_WORK, readFileSync(TEAMMATE_WORK, 'utf8')]
 ])
 let problems = 0
 

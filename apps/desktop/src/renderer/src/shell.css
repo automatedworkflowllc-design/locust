@@ -3052,6 +3052,46 @@ textarea {
   }
 }
 
+/*
+ * The teammate's newest missions, on their card. The roster said a teammate
+ * existed and how many missions they owned; it could not say what any of them
+ * were, so the screen answered "who is on my team" and not "what have they
+ * been doing".
+ */
+.lc-rostercard__recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  margin-top: var(--lc-space-4);
+}
+
+.lc-rostercard__mission {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  width: 100%;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-secondary-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-rostercard__mission:hover {
+  background: var(--lc-hover-surface);
+}
+
+.lc-rostercard__missiontitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .lc-rostercard__actions {
   display: flex;
   gap: var(--lc-space-3);
