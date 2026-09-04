@@ -24,6 +24,22 @@ const say = (line) => console.error(line)
 
 const profile = await mkdtemp(join(tmpdir(), 'locust-copilot-'))
 await mkdir(profile, { recursive: true })
+// The last difference between this probe (passes) and copilot-smoke (fails):
+// the smoke seeds a teammate. A mission with a teammate is composed with the
+// workroom briefing, which is the one thing that changes what the runtime is
+// actually sent. Pass `--no-teammate` to run without it.
+if (!process.argv.includes('--no-teammate')) {
+  await writeFile(
+    join(profile, 'teammates.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: new Date().toISOString() }],
+      missionOwners: {},
+      settings: { swarm: false, relay: false }
+    }),
+    'utf8'
+  )
+}
 // A THROWAWAY workspace, not the repo. The app treats its cwd as the folder a
 // mission may edit, and this probe runs prompts that ask for writes -- the
 // first version launched from APP_DIR and left a `blocked.txt` in the source
@@ -167,6 +183,16 @@ try {
     }
   })()`)
   say(`  mode: ${String(mode)}`)
+
+  // Select the teammate so the mission is composed as theirs.
+  const chosen = await evaluate(`(async () => {
+    const button = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
+    if (!button) return 'no teammate button'
+    button.click()
+    await new Promise(r => setTimeout(r, 500))
+    return 'selected Wren'
+  })()`)
+  say(`  teammate: ${String(chosen)}`)
 
   const submitted = await evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')

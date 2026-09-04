@@ -469,6 +469,129 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     });
   });
 
+  it("resolves an npm .cmd shim past cmd.exe to the node script it wraps", async () => {
+    // MEASURED 2026-09-05. cmd.exe ends a command line at the first newline,
+    // so a runtime that takes its prompt as an argument lost every flag after
+    // a multi-line prompt -- including `--deny-tool=write,shell`. A read-only
+    // Copilot run silently had write access. Under node directly there is no
+    // shell to truncate anything.
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const cmdShim = `${ROAMING}\\npm\\copilot.cmd`;
+    const script = `${ROAMING}\\npm\\node_modules\\@github\\copilot\\npm-loader.js`;
+    const node = "C:\\Program Files\\nodejs\\node.exe";
+    const shell = "C:\\Windows\\System32\\cmd.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: {
+        PATH: `${ROAMING}\\npm;C:\\Program Files\\nodejs`,
+        APPDATA: ROAMING,
+        LOCALAPPDATA: "C:\\Users\\x\\AppData\\Local",
+        SystemRoot: "C:\\Windows",
+      },
+      isExecutableFile: async (candidate) => candidate === cmdShim || candidate === node || candidate === shell,
+      readDirectory: async () => [],
+      // The exact line npm writes, lifted from the real shim on 2026-09-05.
+      readFile: async (path) =>
+        path === cmdShim
+          ? 'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\node_modules\\@github\\copilot\\npm-loader.js" %*\r\n'
+          : undefined,
+    }).find("copilot");
+
+    expect(found).toMatchObject({
+      discoveredPath: cmdShim,
+      executablePath: node,
+      prefixArgs: [script],
+      kind: "node-shim",
+    });
+  });
+
+  it("prefers the node.exe npm keeps beside its shim, the way the shim itself does", async () => {
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const cmdShim = `${ROAMING}\\npm\\opencode.cmd`;
+    const beside = `${ROAMING}\\npm\\node.exe`;
+    const onPath = "C:\\Program Files\\nodejs\\node.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: `${ROAMING}\\npm;C:\\Program Files\\nodejs`, APPDATA: ROAMING, SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) => candidate === cmdShim || candidate === beside || candidate === onPath,
+      readDirectory: async () => [],
+      readFile: async () => '"%_prog%"  "%dp0%\\node_modules\\opencode-ai\\bin\\opencode.js" %*',
+    }).find("opencode");
+
+    expect(found?.executablePath).toBe(beside);
+    expect(found?.kind).toBe("node-shim");
+  });
+
+  it("resolves an npm .cmd shim around a native binary to the binary itself", async () => {
+    // OpenCode and Claude Code ship a real .exe and npm wraps it in a .cmd.
+    // There is nothing for node to run; cmd.exe was only ever in the way, and
+    // OpenCode takes its prompt as an argument, so it had the same truncation.
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const cmdShim = `${ROAMING}\\npm\\opencode.cmd`;
+    const binary = `${ROAMING}\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe`;
+    const shell = "C:\\Windows\\System32\\cmd.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: `${ROAMING}\\npm`, APPDATA: ROAMING, SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) => candidate === cmdShim || candidate === binary || candidate === shell,
+      readDirectory: async () => [],
+      // Lifted from the real shim on 2026-09-05.
+      readFile: async () => '"%dp0%\\node_modules\\opencode-ai\\bin\\opencode.exe"   %*\r\n',
+    }).find("opencode");
+
+    expect(found).toMatchObject({ discoveredPath: cmdShim, executablePath: binary, prefixArgs: [], kind: "native" });
+  });
+
+  it("keeps cmd.exe when the binary an npm shim names is not there", async () => {
+    // A shim whose target is gone is a broken install; the shell will say so
+    // the way it always did, rather than this locator inventing a path.
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const cmdShim = `${ROAMING}\\npm\\opencode.cmd`;
+    const shell = "C:\\Windows\\System32\\cmd.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: `${ROAMING}\\npm`, APPDATA: ROAMING, SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) => candidate === cmdShim || candidate === shell,
+      readDirectory: async () => [],
+      readFile: async () => '"%dp0%\\node_modules\\opencode-ai\\bin\\opencode.exe"   %*',
+    }).find("opencode");
+
+    expect(found?.kind).toBe("cmd-shim");
+  });
+
+  it("keeps cmd.exe for a .cmd that is not an npm shim", async () => {
+    // Somebody's own batch file. Guessing at what it does is how a locator
+    // starts running things it did not mean to, so it keeps its shell.
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const cmdShim = `${ROAMING}\\npm\\codex.cmd`;
+    const shell = "C:\\Windows\\System32\\cmd.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: `${ROAMING}\\npm`, APPDATA: ROAMING, SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) => candidate === cmdShim || candidate === shell,
+      readDirectory: async () => [],
+      readFile: async () => "@echo off\r\ncall some-other-thing.exe %*\r\n",
+    }).find("codex");
+
+    expect(found).toMatchObject({ executablePath: shell, prefixArgs: ["/d", "/s", "/c", cmdShim], kind: "cmd-shim" });
+  });
+
+  it("keeps cmd.exe for an npm shim when no node.exe can be found", async () => {
+    // A machine this cannot help is no worse off than before.
+    const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
+    const cmdShim = `${ROAMING}\\npm\\copilot.cmd`;
+    const shell = "C:\\Windows\\System32\\cmd.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: `${ROAMING}\\npm`, APPDATA: ROAMING, SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) => candidate === cmdShim || candidate === shell,
+      readDirectory: async () => [],
+      readFile: async () => '"%_prog%"  "%dp0%\\node_modules\\@github\\copilot\\npm-loader.js" %*',
+    }).find("copilot");
+
+    expect(found?.kind).toBe("cmd-shim");
+  });
+
   it("finds Copilot CLI where it unpacks itself, when npm's bin directory is not there either", async () => {
     const LOCAL = "C:\\Users\\x\\AppData\\Local";
     const launcher = `${LOCAL}\\copilot\\copilot.exe`;

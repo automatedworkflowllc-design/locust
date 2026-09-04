@@ -1019,8 +1019,8 @@ const MUTATIONS = [
   {
     file: STATUS,
     name: 'every discovered runtime counts as connected',
-    from: '  return runtimes.filter(runtimeIsUsable).length',
-    to: '  return runtimes.length',
+    from: "  return runtimes.filter((runtime) => runtimeIsUsable(runtime) && integrationOf(runtime.id) !== 'planned')",
+    to: '  return runtimes.filter(() => true)',
     expect: 'counts only usable runtimes as connected'
   },
   {

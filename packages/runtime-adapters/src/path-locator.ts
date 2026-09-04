@@ -1,5 +1,5 @@
 import { constants as fsConstants } from "node:fs";
-import { access, readdir, stat } from "node:fs/promises";
+import { access, readdir, readFile, stat } from "node:fs/promises";
 import { posix, win32 } from "node:path";
 import type { ExecutableLaunch, ExecutableLocator } from "./types.js";
 
@@ -9,6 +9,42 @@ export interface PathExecutableLocatorOptions {
   readonly isExecutableFile?: (candidate: string, platform: NodeJS.Platform) => Promise<boolean>;
   /** Test seam for the versioned-install search; defaults to reading the directory. */
   readonly readDirectory?: (directory: string) => Promise<readonly string[]>;
+  /**
+   * Test seam for reading a `.cmd` shim to see what it wraps. Resolves to
+   * undefined for anything that cannot be read, so an unreadable shim falls
+   * back to cmd.exe rather than failing discovery.
+   */
+  readonly readFile?: (path: string) => Promise<string | undefined>;
+}
+
+/**
+ * The line npm writes into every `.cmd` shim it generates: the wrapped script,
+ * relative to the shim's own directory, followed by `%*` for the arguments.
+ *
+ *   "%_prog%"  "%dp0%\node_modules\@github\copilot\npm-loader.js" %*
+ *
+ * Only this exact shape is resolved past cmd.exe. A `.cmd` that does anything
+ * else is somebody's own script and keeps its shell, because guessing at what
+ * a batch file does is how a locator starts running things it did not mean to.
+ */
+const NPM_SHIM_SCRIPT = /"%dp0%\\(node_modules\\[^"\r\n]+\.[cm]?js)"\s+%\*/;
+
+/**
+ * The other shape npm writes, for a package whose bin is a native binary:
+ *
+ *   "%dp0%\node_modules\opencode-ai\bin\opencode.exe"   %*
+ *
+ * OpenCode and Claude Code both ship this way. There is nothing for node to
+ * run; the `.exe` is the program, and cmd.exe was only ever in the way.
+ */
+const NPM_SHIM_BINARY = /"%dp0%\\(node_modules\\[^"\r\n]+\.exe)"\s+%\*/i;
+
+async function defaultReadFile(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -194,6 +230,7 @@ export function createPathExecutableLocator(
   const platform = options.platform ?? process.platform;
   const isExecutableFile = options.isExecutableFile ?? defaultIsExecutableFile;
   const readDirectory = options.readDirectory ?? defaultReadDirectory;
+  const readShim = options.readFile ?? defaultReadFile;
   const pathOnly = pathDirectories(environment, platform);
 
   return {
@@ -260,6 +297,61 @@ export function createPathExecutableLocator(
       for (const directory of directories) {
         const script = win32.join(directory, `${commandName}.cmd`);
         if (!(await isExecutableFile(script, "win32"))) continue;
+
+        // An npm shim is resolved PAST cmd.exe to the node script it wraps.
+        //
+        // MEASURED 2026-09-05. cmd.exe ends a command line at the first
+        // newline and refuses one past 8191 characters. OpenCode and Copilot
+        // take the prompt as an ARGUMENT, so any multi-line prompt -- every
+        // teammate briefing is one -- lost every flag after it: the JSON
+        // output format, and `--deny-tool=write,shell`, the flag that made a
+        // read-only run read-only. Copilot ran in its human mode with write
+        // access, exited 0, and the thread reported "ended without a terminal
+        // result record". Under node directly:
+        //
+        //   multi-line prompt, flags after it -> 16 records, result present,
+        //   `--deny-tool` honoured, the prompt arriving whole
+        //
+        // node.exe comes from beside the shim first -- that is where npm's
+        // own shim looks (`%dp0%\node.exe`) -- and then from PATH, the way the
+        // shim's `node` fallback does. If neither is found the shim keeps its
+        // shell, so a machine this cannot help is no worse off than before.
+        const shimText = await readShim(script);
+
+        // A shim around a native binary resolves to the binary itself. The
+        // shim is still what was DISCOVERED -- that is the path a person
+        // would look for -- but the program that runs is the `.exe`, with no
+        // shell between them.
+        const binary = shimText === undefined ? null : NPM_SHIM_BINARY.exec(shimText);
+        if (binary?.[1] !== undefined) {
+          const executable = win32.join(directory, binary[1]);
+          if (await isExecutableFile(executable, "win32")) {
+            return {
+              commandName,
+              discoveredPath: script,
+              executablePath: executable,
+              prefixArgs: [],
+              kind: "native",
+            };
+          }
+        }
+
+        const wrapped = shimText === undefined ? null : NPM_SHIM_SCRIPT.exec(shimText);
+        if (wrapped?.[1] !== undefined) {
+          const beside = win32.join(directory, "node.exe");
+          const node = (await isExecutableFile(beside, "win32"))
+            ? beside
+            : await locateNativeWindowsCommand("node", directories, isExecutableFile);
+          if (node) {
+            return {
+              commandName,
+              discoveredPath: script,
+              executablePath: node,
+              prefixArgs: [win32.join(directory, wrapped[1])],
+              kind: "node-shim",
+            };
+          }
+        }
 
         // cmd.exe comes from where Windows keeps it first, for the same
         // reason the PowerShell host below does: one planted earlier on PATH

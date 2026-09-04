@@ -6,6 +6,28 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.18.1 — 2026-09-05
+
+- **A read-only Copilot or OpenCode mission could silently have write access.**
+  Both take the request as a command-line argument, reached through `cmd.exe`,
+  and `cmd.exe` stops reading a command line at the first newline. Any
+  multi-line request — every teammate briefing is one — dropped every flag
+  after it: the JSON output the app reads, and the flag that made the run
+  read-only. The run then ran in Copilot's human mode, exited 0, and the thread
+  said it "ended without a terminal result record". Fixed by running what the
+  npm shim wraps directly — `node` plus the script, or the native `.exe` —
+  with no shell in between, which also removes the 8,191-character ceiling.
+- **A request too long for a Windows command line is refused with the reason**,
+  naming the limit, the actual length, and the runtimes that read from input
+  instead — rather than failing with nothing on screen to explain it.
+- **The record now says what was actually run.** Each mission's header carries
+  the executable and flags, with the request itself replaced by a marker so it
+  never rides along in a shared ledger. This is how the bug above was found.
+- The waiting line's clock counts from the start of the turn instead of
+  restarting on every event, so it climbs rather than looking like a loop.
+- Launch failures report their real reason instead of "could not be started
+  safely" for everything.
+
 ## 0.18.0 — 2026-09-05
 
 - **A mission the app stopped in the middle of can be picked back up.** The

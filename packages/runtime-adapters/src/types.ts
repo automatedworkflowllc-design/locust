@@ -97,7 +97,15 @@ export interface ExecutableLaunch {
   readonly discoveredPath: string;
   readonly executablePath: string;
   readonly prefixArgs: readonly string[];
-  readonly kind: "native" | "powershell-shim" | "cmd-shim";
+  /**
+   * `node-shim` is an npm `.cmd` shim resolved PAST cmd.exe to the node
+   * script it wraps. cmd.exe ends a command line at the first newline and
+   * refuses one past 8191 characters, so a runtime that takes its prompt as
+   * an argument lost every flag after a multi-line prompt -- including the
+   * one that made it read-only. Running the script under node directly has
+   * neither limit. See the locator for the measurement.
+   */
+  readonly kind: "native" | "powershell-shim" | "cmd-shim" | "node-shim";
 }
 
 export interface ProbeCommand {
