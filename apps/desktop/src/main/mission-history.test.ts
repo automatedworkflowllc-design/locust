@@ -49,6 +49,22 @@ function recovered(overrides: Partial<RecoveredMission> = {}): RecoveredMission 
   }
 }
 
+import { workspaceIdFor } from './workspace.js'
+
+describe('which folder a mission belongs to', () => {
+  it('gives the same folder the same id every time, so a mission can be matched back to it', () => {
+    expect(workspaceIdFor('C:/w/streaks')).toBe(workspaceIdFor('C:/w/streaks'))
+    expect(workspaceIdFor('C:/w/streaks')).not.toBe(workspaceIdFor('C:/w/other'))
+  })
+
+  it('does not put the path itself in the ledger', () => {
+    // The ledger is a durable local record and a path can name a person, a
+    // client, or an unreleased project.
+    expect(workspaceIdFor('C:/clients/acme-secret')).not.toContain('acme')
+    expect(workspaceIdFor('C:/clients/acme-secret')).toMatch(/^ws_[0-9a-f]{32}$/)
+  })
+})
+
 describe('mission history mapping', () => {
   it('passes small missions through untruncated with truthful counts', () => {
     const mission = recovered({ events: Array.from({ length: 500 }, (_, index) => event(index + 1)) })

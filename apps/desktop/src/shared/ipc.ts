@@ -559,6 +559,8 @@ export interface PublicMissionCheckpoint {
 export interface PublicRecoveredMission {
   readonly missionId: string
   readonly runId: string
+  /** The folder the mission ran in, as a stable id derived from its path. */
+  readonly workspaceId: string
   readonly prompt: string
   // History spans every runtime a mission could have run under, so this is the
   // union even while Codex is the only one that can be started today. Pinning
@@ -600,6 +602,8 @@ export type MissionHistoryResponse =
       readonly ok: true
       readonly data: {
         readonly missions: readonly PublicRecoveredMission[]
+        /** The folder this window is working in; missions elsewhere are not its own. */
+        readonly currentWorkspaceId: string
         readonly issueCount: number
       }
     }

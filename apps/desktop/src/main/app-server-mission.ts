@@ -1,3 +1,4 @@
+import { workspaceIdFor } from './workspace.js'
 import { randomUUID } from 'node:crypto'
 
 import { createAppServerClient, createAppServerEventNormalizer } from '@teammate/runtime-adapters'
@@ -310,7 +311,9 @@ export function createAppServerMissionService(
           requestedRouteId: 'codex',
           resolvedRouteId: 'codex-app-server:default',
           cliVersion: codex.version?.version ?? null,
-          workspaceId: `ws_${createId()}`.slice(0, 40),
+          // The FOLDER, not a fresh id: a random one can never be matched
+          // back to where the mission ran.
+          workspaceId: workspaceIdFor(options.workspacePath),
           // Approvals only mean something when the agent could otherwise act,
           // so this mode runs write-capable and stops to ask.
           sandbox: 'workspace-write',

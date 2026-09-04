@@ -469,6 +469,8 @@ export default function App(): ReactElement {
   const [workspaceName, setWorkspaceName] = useState('Local workspace')
   /** The folder itself, so activity rows can show paths the way a person writes them. */
   const [workspacePath, setWorkspacePath] = useState<string | undefined>(undefined)
+  /** The folder id the host reports with history, so the sidebar can keep to it. */
+  const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined)
   // Faces that just finished or just heard something: a hop and a glance, each
   // for a moment, then still. Keyed by teammate; cleared by their own timers.
   const [recentlyDone, setRecentlyDone] = useState<readonly string[]>([])
@@ -673,9 +675,16 @@ export default function App(): ReactElement {
       .then((response) => {
         if (!active || !response.ok) return
         setHistory(response.data.missions)
-        const latest = response.data.missions[0]
+        setWorkspaceId(response.data.currentWorkspaceId)
+        // The most recent mission IN THIS FOLDER opens on launch. It used to be
+        // the most recent mission anywhere, so opening Locust in a new project
+        // greeted you with a conversation from a different one -- measured
+        // 2026-09-03. History still lists every mission; what changes is which
+        // one this window opens on, and a folder with no missions opens empty.
+        const latest = response.data.missions.find(
+          (mission) => mission.workspaceId === response.data.currentWorkspaceId
+        )
         if (latest === undefined) return
-        // The most recent mission opens on launch, restored from the ledger.
         // Any update addressed to it (a run the host still owns) makes it live.
         setRuns((current) => {
           if (current.size > 0) return current
@@ -1201,6 +1210,11 @@ export default function App(): ReactElement {
     }
     for (const mission of history) {
       if (rows.some((row) => row.missionId === mission.missionId)) continue
+      // The sidebar is this folder's work. Missions from other folders stay in
+      // the ledger and on the Missions screen, which is the whole archive --
+      // listing them here put another project's conversations in the sidebar
+      // of this one. Measured 2026-09-03 by opening a second project.
+      if (workspaceId !== undefined && mission.workspaceId !== workspaceId) continue
       rows.push({
         missionId: mission.missionId,
         // A continuation's own prompt is the briefing; name it by the words
@@ -1216,7 +1230,7 @@ export default function App(): ReactElement {
     // One row per conversation. The ledger still holds one mission per run;
     // this is only how the exchange is listed.
     return collapseConversations(rows)
-  }, [history, historyById, runs])
+  }, [history, historyById, runs, workspaceId])
   // The right-click menu is built outside render and names the row it was
   // opened on, so it reads the rows through this.
   sidebarMissionsRef.current = sidebarMissions

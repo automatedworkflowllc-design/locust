@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.16.1 — 2026-09-03
+
+- **Opening Locust in a project shows that project's work.** It opened on the
+  most recent mission anywhere, so starting it in a new folder greeted you with
+  a conversation from a different one, and the sidebar listed that folder's
+  missions too. The workroom now keeps to the folder it was launched in; the
+  Missions screen is still the whole archive, which is what it is for.
+- **Two runtimes were recording a random id for the folder they ran in.**
+  Codex missions hashed the workspace path, so they could be matched back to a
+  folder; the app-server and Antigravity paths minted a fresh id each time,
+  which looks identical in a receipt and means the opposite. All three now use
+  the same derivation, and the path itself never enters the ledger.
+
 ## 0.16.0 — 2026-09-03
 
 - **The Teammates screen says what a teammate has been doing.** It could tell

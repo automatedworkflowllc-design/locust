@@ -479,6 +479,7 @@ describe('reopening a handed-off mission', () => {
     return {
       missionId: 'mission_1',
       runId: 'run_1',
+      workspaceId: 'ws_test',
       prompt: 'Inspect the workspace.',
       runtime: 'codex',
       model: 'account-default',
@@ -635,6 +636,7 @@ describe('what a model alias resolved to', () => {
     return {
       missionId,
       runId: `run_${missionId}`,
+      workspaceId: 'ws_test',
       prompt: 'x',
       runtime: 'claude' as const,
       model,
@@ -648,6 +650,7 @@ describe('what a model alias resolved to', () => {
         {
           id: `e_${missionId}`,
           runId: `run_${missionId}`,
+      workspaceId: 'ws_test',
           missionId,
           sequence: 1,
           type: 'run.started',
@@ -701,6 +704,7 @@ describe('a conversation across turns', () => {
     return {
       missionId,
       runId: `run_${missionId}`,
+      workspaceId: 'ws_test',
       prompt,
       runtime: 'claude',
       model: 'sonnet',
@@ -787,6 +791,7 @@ describe('which words a turn shows', () => {
   ): PublicRecoveredMission => ({
     missionId,
     runId: `run_${missionId}`,
+      workspaceId: 'ws_test',
     prompt,
     runtime: 'codex',
     model: 'account-default',
@@ -839,6 +844,7 @@ describe('the routes this person has actually run', () => {
   const ran = (missionId: string, runtime: string, model: string, lastUpdatedAt: string) => ({
     missionId,
     runId: `run_${missionId}`,
+      workspaceId: 'ws_test',
     prompt: 'x',
     runtime,
     model,

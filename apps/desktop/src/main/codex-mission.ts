@@ -19,6 +19,7 @@ import type {
   RuntimeProcessRun,
   RuntimeProcessRunner
 } from '@teammate/runtime-adapters'
+import { workspaceIdFor } from './workspace.js'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionSandbox, RuntimeCommandSpec } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
@@ -252,7 +253,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   }
 
   const createId = options.createId ?? randomUUID
-  const workspaceId = `ws_${createHash('sha256').update(options.workspacePath, 'utf8').digest('hex').slice(0, 32)}`
+  const workspaceId = workspaceIdFor(options.workspacePath)
   const now = options.now ?? (() => new Date())
   const schedule = options.schedule ?? ((task: () => void) => {
     setImmediate(task)

@@ -1,3 +1,4 @@
+import { workspaceIdFor } from './workspace.js'
 import type { MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type {
   MissionDeleteResponse,
@@ -64,6 +65,9 @@ export function publicRecoveredMission(
   return {
     missionId: mission.metadata.missionId,
     runId: mission.metadata.runId,
+    // Which folder it ran in, so the shell can open the conversation that
+    // belongs to the folder it was launched in.
+    workspaceId: mission.metadata.workspaceId,
     prompt: mission.metadata.prompt,
     runtime: mission.metadata.runtime,
     model: mission.metadata.model,
@@ -127,7 +131,9 @@ export function withinByteBudget(
 
 export async function readMissionHistory(
   ledger: MissionLedger,
-  workroom?: Workroom
+  workroom?: Workroom,
+  /** The folder this window works in; defaults to the process's own. */
+  workspacePath: string = process.cwd()
 ): Promise<MissionHistoryResponse> {
   try {
     const snapshot = await ledger.listMissions({ limit: MAX_HISTORY_MISSIONS })
@@ -152,6 +158,7 @@ export async function readMissionHistory(
             .slice(0, MAX_HISTORY_MISSIONS)
             .map((mission) => publicRecoveredMission(mission, workroomMessages))
         ),
+        currentWorkspaceId: workspaceIdFor(workspacePath),
         issueCount: snapshot.issues.length
       }
     }

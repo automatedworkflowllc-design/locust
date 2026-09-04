@@ -1,3 +1,4 @@
+import { workspaceIdFor } from './workspace.js'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -320,7 +321,9 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           requestedRouteId: 'antigravity',
           resolvedRouteId: 'antigravity:hub',
           cliVersion: host.version ?? null,
-          workspaceId: `ws_${createId()}`.slice(0, 40),
+          // The FOLDER, not a fresh id: a random one can never be matched
+          // back to where the mission ran.
+          workspaceId: workspaceIdFor(options.workspacePath),
           sandbox: 'workspace-write',
           executionPolicyVersion: 1,
           createdAt,

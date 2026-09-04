@@ -631,7 +631,8 @@ if (!ownsSingleInstanceLock) {
           }
         } as const
       }
-      return readMissionHistory(missionLedger, workroom)
+      // The window's own folder decides which conversation it opens on.
+      return readMissionHistory(missionLedger, workroom, process.cwd())
     })
 
     ipcMain.handle(APP_INFO_CHANNEL, (event) => {
