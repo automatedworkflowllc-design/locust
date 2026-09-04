@@ -413,7 +413,15 @@ try {
 } finally {
   child.kill()
   await sleep(500)
-  await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+  // `--keep` leaves the profile so a run where the reply never came can be
+  // read afterwards: Booty's ledger says whether the run completed, whether
+  // it posted a share, and what it actually wrote. Without it the evidence is
+  // deleted the moment the smoke reports the failure.
+  if (process.argv.includes('--keep')) {
+    say(`profile kept at ${profile}`)
+  } else {
+    await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+  }
   await rm(workspace, { recursive: true, force: true }).catch(() => undefined)
 }
 
