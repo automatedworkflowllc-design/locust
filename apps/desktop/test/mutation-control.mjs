@@ -23,6 +23,7 @@ const MISSIONS = join(ROOT, 'src', 'main', 'codex-mission.ts')
 const PEERS = join(ROOT, 'src', 'main', 'peer-exchange.ts')
 const BRIEFING = join(ROOT, 'src', 'main', 'workroom-briefing.ts')
 const SHARE = join(ROOT, 'src', 'shared', 'peer-share.ts')
+const DECISION = join(ROOT, 'src', 'shared', 'decision.ts')
 const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
@@ -39,6 +40,48 @@ const TEAMMATE_WORK = join(ROOT, 'src', 'renderer', 'src', 'teammateWork.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: DECISION,
+    name: 'one option is offered as a decision, which is an approval in disguise',
+    from: '  if (options.length < MIN_OPTIONS || options.length > MAX_OPTIONS) return undefined',
+    to: '  if (options.length > MAX_OPTIONS) return undefined',
+    expect: 'refuses a single option, which is an announcement rather than a decision'
+  },
+  {
+    file: DECISION,
+    name: 'the same option twice is offered as two choices',
+    from: '  if (seen.size !== options.length) return undefined',
+    to: '  if (false) return undefined',
+    expect: 'refuses two options that say the same thing'
+  },
+  {
+    file: DECISION,
+    name: 'prose after the options is folded into the question',
+    from: '      if (options.length === 0) questionLines.push(trimmed)',
+    to: '      questionLines.push(trimmed)',
+    expect: 'ignores prose that arrives after the options'
+  },
+  {
+    file: DECISION,
+    name: 'a raw ask tag is left in the reply bubble',
+    from: "  return text.replace(BLOCK, '').replace(/\\n{3,}/gu, '\\n\\n').trimEnd()",
+    to: '  return text.trimEnd()',
+    expect: 'is taken out, because the card asks it answerably'
+  },
+  {
+    file: VIEW,
+    name: 'an already-answered question is offered again on an earlier turn',
+    from: '  if (!options.running && options.latestTurn === true) {',
+    to: '  if (!options.running) {',
+    expect: 'is not offered on an earlier turn, where the answer already exists'
+  },
+  {
+    file: VIEW,
+    name: 'the card claims nothing changed for a run that could write',
+    from: "  if (input.sandbox === 'read-only') return 'stopped here · nothing was changed'",
+    to: "  if (true) return 'stopped here · nothing was changed'",
+    expect: 'never claims nothing changed for a run that was allowed to write'
+  },
   {
     file: VIEW,
     name: 'a relayed run is named by the briefing the host wrote to a runtime',
@@ -847,8 +890,8 @@ const MUTATIONS = [
   {
     file: VIEW,
     name: 'the agent bubble shows the share block too',
-    from: '    const text = stripShareBlocks(message.text)',
-    to: '    const text = message.text',
+    from: '    const text = stripDecisionBlocks(stripShareBlocks(message.text))',
+    to: '    const text = stripDecisionBlocks(message.text)',
     expect: 'hides a share block from the agent bubble, keeping the prose'
   },
   {
@@ -1080,6 +1123,7 @@ const originals = new Map([
   [PEERS, readFileSync(PEERS, 'utf8')],
   [BRIEFING, readFileSync(BRIEFING, 'utf8')],
   [SHARE, readFileSync(SHARE, 'utf8')],
+  [DECISION, readFileSync(DECISION, 'utf8')],
   [VIEW, readFileSync(VIEW, 'utf8')],
   [TEAMMATES, readFileSync(TEAMMATES, 'utf8')],
   [CATALOG, readFileSync(CATALOG, 'utf8')],

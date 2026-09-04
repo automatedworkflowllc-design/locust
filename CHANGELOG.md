@@ -6,6 +6,33 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.17.0 — 2026-09-05
+
+- **A teammate can ask you which way to go, instead of guessing.** When a run
+  reaches a real fork — two defensible ways to do what you asked, where picking
+  wrong means undoing work — it can stop and put the question to you as a card
+  with the options as buttons, each labelled with what the runtime says it
+  costs. Your answer starts the next turn.
+
+  This is deliberately **not** the approval card. An approval asks *may I do
+  this thing I am about to do*; the agent has already decided. This asks
+  *which of these should I do*, before anything is done. Until now an agent at
+  a fork had exactly one move — pick, and carry on — and you found out
+  afterwards from a diff.
+
+  No option is marked as recommended: the card exists because the model
+  reached a decision it should not make alone, and quietly nominating a
+  favourite would make it anyway. The card also says plainly that you can
+  ignore the buttons and just reply.
+- **The card never claims more than it knows.** The design's line was "paused,
+  nothing changed" — but a run permitted to edit may well have changed files
+  before it asked. So it says *nothing was changed* only when the mode made
+  writing impossible; otherwise it says work is kept, or that the run could
+  edit, and claims nothing.
+- Every mission now tells its runtime how to ask, and — as importantly — when
+  not to: not for anything it can settle by reading the workspace, and never
+  as a way to ask permission to continue.
+
 ## 0.16.6 — 2026-09-04
 
 - **A teammate's automatic reply is no longer named after machine

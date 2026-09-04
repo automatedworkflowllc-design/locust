@@ -1,0 +1,145 @@
+/**
+ * The ask block: how a runtime says "I need you to choose" instead of guessing.
+ *
+ * This is NOT the approval card, and the difference is the whole point. An
+ * approval asks *may I do this thing I am about to do* -- the agent has
+ * decided, and wants permission. This asks *which of these should I do*, with
+ * what each choice costs, before anything is done. Today an agent that reaches
+ * a fork has exactly one option: pick one and carry on. The person finds out
+ * afterwards, from a diff.
+ *
+ * Same transport problem as the share block, same answer. `codex exec` and
+ * `claude -p` are one prompt in, one transcript out, with no side channel, so
+ * the question travels in the transcript in a form the host can find without
+ * guessing.
+ *
+ * The form is line-based rather than nested tags because a model has to
+ * produce it reliably from a one-paragraph instruction, and every runtime here
+ * writes lists correctly far more often than it writes nested XML.
+ *
+ *   <locust-ask>
+ *   The v2 handler has two callers outside billing. Keep them on v2 behind the
+ *   flag, or migrate them in this mission?
+ *   - Keep them on v2 :: Smaller change, flag stays until you flip it
+ *   - Migrate all callers now :: Touches 4 more files, adds ~10 min
+ *   </locust-ask>
+ *
+ * Shared between main and renderer so the parser that builds the card and the
+ * one that hides the block from the reply bubble are the same function.
+ */
+
+export const ASK_TAG = 'locust-ask'
+
+/** A question long enough to need scrolling is not a question, it is a memo. */
+export const MAX_QUESTION_LENGTH = 600
+export const MAX_OPTION_LABEL_LENGTH = 90
+export const MAX_OPTION_NOTE_LENGTH = 160
+
+/**
+ * One option is not a decision, it is an announcement -- and the card would
+ * offer a button whose only effect is to agree, which is the approval card
+ * wearing the wrong clothes. More than four is a menu nobody reads; a runtime
+ * with five paths has not thought hard enough yet.
+ */
+export const MIN_OPTIONS = 2
+export const MAX_OPTIONS = 4
+
+const BLOCK = /<locust-ask\s*>([\s\S]*?)<\/locust-ask>/g
+/** `- Label :: what it costs`, where the cost half is optional. */
+const OPTION_LINE = /^[-*]\s+(.+)$/
+
+export interface DecisionOption {
+  readonly label: string
+  /** What this choice costs or implies, in the runtime's own words. */
+  readonly note: string | undefined
+}
+
+export interface DecisionRequest {
+  readonly question: string
+  readonly options: readonly DecisionOption[]
+}
+
+const clean = (value: string): string =>
+  value
+    // Control characters other than the whitespace collapsed below: a
+    // stray byte from a transcript must not refuse a whole question.
+    // Written as escapes -- typing them literally put real NUL bytes in
+    // this file and git classed it binary.
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+
+const bounded = (value: string, limit: number): string =>
+  value.length <= limit ? value : `${value.slice(0, limit - 1).trimEnd()}…`
+
+/**
+ * The first well-formed question in a transcript, or undefined.
+ *
+ * Only the first: a run that asks twice has produced two forks it never
+ * resolved, and answering the second would be answering out of order. The
+ * rest stay visible in the reply, which is where a reader can see them.
+ */
+export function parseDecision(text: string): DecisionRequest | undefined {
+  for (const match of text.matchAll(BLOCK)) {
+    const parsed = readBlock(match[1] ?? '')
+    if (parsed !== undefined) return parsed
+  }
+  return undefined
+}
+
+function readBlock(body: string): DecisionRequest | undefined {
+  const lines = body.split(/\r?\n/)
+  const questionLines: string[] = []
+  const options: DecisionOption[] = []
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.length === 0) continue
+    const option = OPTION_LINE.exec(trimmed)
+    if (option === null) {
+      // Prose AFTER the options began is not part of the question -- it is a
+      // model still talking, and folding it in would put a stray sentence in
+      // the middle of a decision.
+      if (options.length === 0) questionLines.push(trimmed)
+      continue
+    }
+    const [label, ...rest] = (option[1] ?? '').split('::')
+    const text = clean(label ?? '')
+    if (text.length === 0) continue
+    const note = clean(rest.join('::'))
+    options.push({
+      label: bounded(text, MAX_OPTION_LABEL_LENGTH),
+      note: note.length === 0 ? undefined : bounded(note, MAX_OPTION_NOTE_LENGTH)
+    })
+  }
+
+  const question = bounded(clean(questionLines.join(' ')), MAX_QUESTION_LENGTH)
+  if (question.length === 0) return undefined
+  if (options.length < MIN_OPTIONS || options.length > MAX_OPTIONS) return undefined
+  // Two options that read the same are one option twice, and a person cannot
+  // choose between them. Compared case-insensitively because that is how they
+  // would be read aloud.
+  const seen = new Set(options.map((option) => option.label.toLowerCase()))
+  if (seen.size !== options.length) return undefined
+  return { question, options }
+}
+
+/**
+ * The transcript without its ask blocks. The question is shown as a card,
+ * attributed and answerable; leaving it in the bubble too would ask the same
+ * thing twice, once in a form that cannot be answered.
+ */
+export function stripDecisionBlocks(text: string): string {
+  return text.replace(BLOCK, '').replace(/\n{3,}/gu, '\n\n').trimEnd()
+}
+
+/**
+ * What the next turn is sent when a person picks. Written as the person's own
+ * words because it IS their answer -- the thread shows it as the turn they
+ * took, and a briefing voice there would read as the host deciding for them.
+ */
+export function decisionReply(option: DecisionOption): string {
+  return option.note === undefined
+    ? `${option.label}. Continue with that.`
+    : `${option.label} (${option.note}). Continue with that.`
+}

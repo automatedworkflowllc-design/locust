@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, readPlan, threadMarkers, threadPeerCards } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, readPlan, threadMarkers, threadPeerCards } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
@@ -22,10 +22,12 @@ import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
 import { AgentAvatar, AgentText, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
+import { DecisionCard } from './DecisionCard.js'
 import { HandoffDivider } from './HandoffDivider.js'
 import { TimeMarker } from './TimeMarker.js'
 import { PeerThread } from './PeerThread.js'
 import type { ThreadItem, ThreadPeerCard } from '../missionView.js'
+import type { DecisionOption } from '../../../shared/decision.js'
 
 /**
  * One transcript's worth of items. Extracted so a handed-off mission can render
@@ -36,13 +38,18 @@ function ThreadItems({
   items,
   owner,
   activity,
-  workspacePath
+  workspacePath,
+  decision
 }: {
   readonly items: readonly ThreadItem[]
   readonly owner: PublicTeammate | undefined
   /** What the live run is doing; only the working line draws it. */
   readonly activity: FaceActivity
   readonly workspacePath: string | undefined
+  /** How to answer a question the run ended on. Absent on earlier turns. */
+  readonly decision:
+    | { readonly onChoose: (option: DecisionOption) => void; readonly busy: boolean; readonly standing: string }
+    | undefined
 }): ReactElement {
   return (
     <>
@@ -101,6 +108,22 @@ function ThreadItems({
               </div>
               <div className="lc-card__body">{item.message}</div>
             </div>
+          )
+        }
+        if (item.type === 'decision') {
+          // Only where an answer can actually be given. buildThread already
+          // withholds the item on earlier turns; this is the second half of
+          // the same rule, so a card can never appear with no way to answer.
+          if (decision === undefined) return null
+          return (
+            <DecisionCard
+              key={item.key}
+              request={item.request}
+              teammateName={owner?.name}
+              standing={decision.standing}
+              busy={decision.busy}
+              onChoose={decision.onChoose}
+            />
           )
         }
         return <DiagnosticLine key={item.key} level={item.level} message={item.message} />
@@ -178,6 +201,20 @@ export interface ThreadProps {
   readonly workspacePath?: string
   /** Present only when re-running with edits allowed is possible; see App. */
   readonly onRunWithEdits?: () => void
+  /**
+   * How a person answers a question the run ended on. Absent when this thread
+   * cannot take a next turn at all, which is what keeps a card from appearing
+   * with no way to answer it.
+   */
+  readonly onAnswer?: (option: DecisionOption) => void
+  /**
+   * What THIS run was permitted to do. Taken from the live run rather than
+   * from `restoredMission`, which is set only for a mission recovered from
+   * the ledger -- so reading it there made every live read-only run say it
+   * could edit files, which is the one claim on the card that must not be
+   * loose. Caught on screen 2026-09-05, not by a test.
+   */
+  readonly sandbox?: 'read-only' | 'workspace-write'
   readonly earlierTurns: readonly {
     readonly missionId: string
     readonly prompt: string
@@ -235,6 +272,8 @@ export function Thread({
   earlierTurns,
   coldStart = false,
   onRunWithEdits,
+  onAnswer,
+  sandbox,
   workspacePath,
   events,
   running,
@@ -253,6 +292,7 @@ export function Thread({
 }: ThreadProps): ReactElement {
   const items = buildThread(events, {
     running,
+    latestTurn: true,
     awaitingDecision: approvals.length > 0,
     ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso })
   })
@@ -320,7 +360,7 @@ export function Thread({
               )}
               <div className="lc-bubble">{turn.prompt}</div>
               {cardsFor(index, 'before-work').map(peerCard)}
-              <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} />
+              <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
               {cardsFor(index, 'after-work').map(peerCard)}
             </Fragment>
           )
@@ -333,7 +373,7 @@ export function Thread({
 
         {handoff !== undefined && (
           <>
-            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} />
+            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
             <HandoffDivider
               from={handoff.from}
               to={handoff.to}
@@ -350,7 +390,17 @@ export function Thread({
         */}
         {cardsFor(earlierTurns.length, 'before-work').map(peerCard)}
 
-        <ThreadItems items={items} owner={peers.self} activity={liveActivityOf(events, running)} workspacePath={workspacePath} />
+        <ThreadItems
+          items={items}
+          owner={peers.self}
+          activity={liveActivityOf(events, running)}
+          workspacePath={workspacePath}
+          decision={
+            onAnswer === undefined
+              ? undefined
+              : { onChoose: onAnswer, busy: running, standing: decisionStanding({ sandbox: sandbox ?? restoredMission?.sandbox, events }) }
+          }
+        />
 
         {cardsFor(earlierTurns.length, 'after-work').map(peerCard)}
         {peers.notices.map((notice, index) => (

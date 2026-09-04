@@ -43,8 +43,12 @@ describe('the runtime prompt a teammate is sent', () => {
     expect(withOthers.prompt).toContain('<locust-share to="Atlas">')
     expect(withOthers.prompt).toContain('never secrets, credentials or tokens')
 
+    // Alone, the roster trailer is absent -- but the ask form is not, because
+    // it is not about teammates at all.
     const alone = composeRuntimePrompt({ prompt: 'Look around.', peer: { self: WREN, others: [] }, inbound: [], remaining: 0 })
-    expect(alone.prompt).toBe('Look around.')
+    expect(alone.prompt).not.toContain('locust-share')
+    expect(alone.prompt).not.toContain('besides you')
+    expect(alone.prompt.startsWith('Look around.')).toBe(true)
   })
 
   it('defangs a share tag inside a received message so it cannot be echoed as a share', () => {

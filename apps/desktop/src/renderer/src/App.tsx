@@ -57,6 +57,7 @@ import {
   typedPrompt
 } from './missionView.js'
 import { conversationCost, costLine } from './cost.js'
+import { decisionReply } from '../../shared/decision.js'
 import { collapseConversations, listedAsMission, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
@@ -1568,6 +1569,18 @@ export default function App(): ReactElement {
                       }
                     : undefined
                 }
+                onAnswer={
+                  // Answering IS the next turn of the conversation, so it goes
+                  // through the same path a typed reply does -- same continuity,
+                  // same route, same record. A run still going has not asked
+                  // anything yet, and one with no prompt cannot be continued.
+                  !running && liveRun.prompt.trim().length > 0
+                    ? (option) => {
+                        void startMission(decisionReply(option))
+                      }
+                    : undefined
+                }
+                {...(liveRun.data?.sandbox === undefined ? {} : { sandbox: liveRun.data.sandbox })}
                 events={liveRun.events}
                 running={running}
                 missionId={liveRun.data?.missionId}

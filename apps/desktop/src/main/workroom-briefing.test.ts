@@ -40,8 +40,31 @@ describe('what a teammate is told about reaching another', () => {
   })
 
   it('says nothing about sharing when there is nobody to share with', () => {
+    // Asserted on the SHARE form rather than on the whole prompt: every
+    // mission also carries the ask form, which has nothing to do with
+    // teammates -- a person working with one agent hits forks too.
     const text = brief('Review the tests.', [])
-    expect(text).toBe('Review the tests.')
+    expect(text).not.toContain('locust-share')
+    expect(text).not.toContain('besides you')
+    expect(text.startsWith('Review the tests.')).toBe(true)
+  })
+
+  it('tells every mission how to ask, teammates or not', () => {
+    // The whole point of the card: an agent working alone hits forks just as
+    // often, and this is its only way to stop and ask rather than pick.
+    for (const others of [[], undefined]) {
+      const text = brief('Review the tests.', others)
+      expect(text).toContain('<locust-ask>')
+      expect(text).toContain(':: what it costs or implies')
+    }
+  })
+
+  it('tells it when NOT to ask, so it does not ask about everything', () => {
+    // An agent that asks about everything is worse than one that asks about
+    // nothing: the person makes every decision AND reads the questions.
+    const text = brief('Review the tests.', [])
+    expect(text).toContain('Do NOT ask about anything you can settle by reading the workspace')
+    expect(text).toContain('do not ask permission to continue')
   })
 
   it('keeps the person’s words first and unaltered', () => {

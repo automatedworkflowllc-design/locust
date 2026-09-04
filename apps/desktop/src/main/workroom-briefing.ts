@@ -3,6 +3,7 @@ import type { WorkroomMessage } from '@teammate/mission-store'
 import type { TeammateRoute } from '../shared/ipc.js'
 
 import { sanitizeInbound, SHARE_TAG } from '../shared/peer-share.js'
+import { ASK_TAG } from '../shared/decision.js'
 
 /**
  * What a teammate's runtime is told about its colleagues.
@@ -93,6 +94,33 @@ function rosterSection(peer: MissionPeerContext): string {
 }
 
 /**
+ * How to ask the person instead of guessing.
+ *
+ * Goes on EVERY mission, unlike the roster trailer -- a person working with
+ * one agent and no teammates hits forks just as often, and this is the only
+ * way an agent has to stop and ask rather than pick.
+ *
+ * Worded against the failure it exists for: a model told it "may" ask will
+ * not, because carrying on always looks more helpful than pausing. So it
+ * names the case where asking BEATS finishing, and bounds it -- an agent that
+ * asks about everything is worse than one that asks about nothing, since the
+ * person then has to make every decision AND read the questions.
+ */
+function askSection(): string {
+  return [
+    'If you reach a real fork -- two defensible ways to do what was asked, where picking wrong means work has to be undone -- stop and ask instead of choosing. Asking there is better than finishing.',
+    'Do NOT ask about anything you can settle by reading the workspace, and do not ask permission to continue: that is not a fork.',
+    'To ask, end your reply with exactly this block and nothing after it:',
+    `<${ASK_TAG}>`,
+    'The question, in one or two sentences.',
+    '- The first option :: what it costs or implies',
+    '- The second option :: what it costs or implies',
+    `</${ASK_TAG}>`,
+    'Two to four options, each one you would actually be willing to do. The person sees them as buttons and their answer starts your next turn.'
+  ].join('\n')
+}
+
+/**
  * Compose what the runtime is sent. Inbound messages that do not fit are left
  * out from the newest end and are NOT reported as delivered, so they wait for
  * the next mission rather than vanishing; the notice line then counts them.
@@ -107,6 +135,7 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
     const sections = [input.prompt]
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))
     if (trailer !== undefined) sections.push(trailer)
+    sections.push(askSection())
     return sections.join('\n\n')
   }
 

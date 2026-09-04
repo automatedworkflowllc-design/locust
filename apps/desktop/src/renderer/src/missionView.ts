@@ -7,6 +7,8 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
 import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
+import { parseDecision, stripDecisionBlocks } from '../../shared/decision.js'
+import type { DecisionRequest } from '../../shared/decision.js'
 
 /**
  * Turns the normalized event stream into the thread the workroom renders.
@@ -300,6 +302,12 @@ export type ThreadItem =
     }
   | {
       readonly key: string
+      readonly type: 'decision'
+      /** What the runtime asked, and what it says each choice costs. */
+      readonly request: DecisionRequest
+    }
+  | {
+      readonly key: string
       readonly type: 'plan'
       readonly steps: readonly PlanStep[]
       readonly doneCount: number
@@ -474,6 +482,13 @@ export interface MissionThreadOptions {
    * what is happening, so nothing is added above it.
    */
   readonly awaitingDecision?: boolean
+  /**
+   * True for the turn at the END of the conversation. A question a runtime
+   * asked is only answerable there: on an earlier turn the answer already
+   * exists -- it is the next turn's prompt, visible a few lines below -- and
+   * offering the buttons again would invite answering it twice.
+   */
+  readonly latestTurn?: boolean
 }
 
 export function buildThread(
@@ -620,7 +635,7 @@ export function buildThread(
   for (const message of assistantMessages(events)) {
     // A share block is shown in the peer card, attributed and labelled; left
     // in the bubble it would present the same claim twice, once unlabelled.
-    const text = stripShareBlocks(message.text)
+    const text = stripDecisionBlocks(stripShareBlocks(message.text))
     if (text.length === 0) continue
     items.push({
       key: `msg_${message.itemId}`,
@@ -668,6 +683,18 @@ export function buildThread(
           waiting: true
         })
       }
+    }
+  }
+
+  // A run that ended by asking. Read from the LAST message the provider marked
+  // final, because that is where a runtime puts the question it stopped on --
+  // and only once the run is over, since a block still streaming may not have
+  // its closing tag yet and would parse as nothing or as half a question.
+  if (!options.running && options.latestTurn === true) {
+    const answer = assistantMessages(events).filter((message) => message.final).at(-1)
+    const request = answer === undefined ? undefined : parseDecision(answer.text)
+    if (request !== undefined) {
+      items.push({ key: `decision_${answer!.itemId}`, type: 'decision', request })
     }
   }
 
@@ -919,6 +946,35 @@ export function peerSnippet(text: string | null, limit = 72): string | undefined
   const flat = text.replace(/\s+/gu, ' ').trim()
   if (flat.length === 0) return undefined
   return flat.length <= limit ? flat : `${flat.slice(0, limit - 1).trimEnd()}…`
+}
+
+/**
+ * What the decision card may honestly say about the workspace.
+ *
+ * The design's line is "paused, nothing changed". That is a CLAIM, and in a
+ * mode that permits edits it is often false -- a run can rewrite four files
+ * and then reach the fork it should have asked about first. Saying "nothing
+ * changed" there would be a comforting lie in the one place the product is
+ * asking to be trusted, so the sentence is derived rather than written:
+ *
+ *   read-only        the sandbox could not write. A guarantee, not an
+ *                    observation, so it is the only case that says "nothing".
+ *   edits + evidence a patch came back, so work exists and is kept.
+ *   edits + none     nothing was OBSERVED, which is not the same as nothing
+ *                    happening -- a runtime need not report every write. So
+ *                    it states the permission and claims nothing.
+ */
+export function decisionStanding(input: {
+  readonly sandbox: 'read-only' | 'workspace-write' | undefined
+  readonly events: readonly NormalizedRuntimeEvent[]
+}): string {
+  if (input.sandbox === 'read-only') return 'stopped here · nothing was changed'
+  const wrote = input.events.some(
+    (event) =>
+      (event.type === 'tool.completed' || event.type === 'tool.failed')
+      && (event.payload as { readonly patch?: unknown }).patch !== undefined
+  )
+  return wrote ? 'stopped here · work already done is kept' : 'stopped here · this run could edit files'
 }
 
 export interface ThreadPeerCard {

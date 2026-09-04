@@ -12,6 +12,7 @@ import {
   buildThread,
   cancellationSummary,
   conversationTurns,
+  decisionStanding,
   defaultOpenEntry,
   failureMessage,
   peerExchangeStartsOpen,
@@ -1208,5 +1209,81 @@ describe('a run the host started for a teammate', () => {
     const title = typedPrompt(relayed(), new Map())
     expect(title).toBe('Wren asked: Please reply with the passphrase PEBBLE-9993.')
     expect(title).not.toContain('locust-share')
+  })
+})
+
+describe('a question the run ended on', () => {
+  const ASK = [
+    'Here is what I found.',
+    '',
+    '<locust-ask>',
+    'Keep the two callers on v2, or migrate them now?',
+    '- Keep them on v2 :: Smaller change',
+    '- Migrate all callers now :: Touches 4 more files',
+    '</locust-ask>'
+  ].join('\n')
+
+  const finished = (text: string): readonly NormalizedRuntimeEvent[] => [delta('a', text, 'append', true)]
+
+  it('becomes a card on the turn a person can answer', () => {
+    const items = buildThread(finished(ASK), { running: false, latestTurn: true })
+    const card = items.find((item) => item.type === 'decision')
+    expect(card?.type === 'decision' && card.request.options).toHaveLength(2)
+  })
+
+  it('is not offered on an earlier turn, where the answer already exists', () => {
+    // On an earlier turn the answer IS the next turn's prompt, a few lines
+    // below. Offering buttons there invites answering the same fork twice.
+    expect(buildThread(finished(ASK), { running: false }).some((i) => i.type === 'decision')).toBe(false)
+  })
+
+  it('is not offered while the run is still going', () => {
+    // A block still streaming may not have its closing tag yet, and a run that
+    // has not stopped has not asked.
+    expect(buildThread(finished(ASK), { running: true, latestTurn: true }).some((i) => i.type === 'decision')).toBe(false)
+  })
+
+  it('is taken out of the reply bubble, so it is never asked twice', () => {
+    const items = buildThread(finished(ASK), { running: false, latestTurn: true })
+    const message = items.find((item) => item.type === 'agent-message')
+    expect(message?.type === 'agent-message' && message.text).toBe('Here is what I found.')
+  })
+
+  it('leaves an ordinary finished run with no card', () => {
+    expect(buildThread(finished('Done, two files changed.'), { running: false, latestTurn: true })
+      .some((i) => i.type === 'decision')).toBe(false)
+  })
+
+  it('reads the LAST final message, not an earlier one', () => {
+    // A run can answer, then ask. The question it stopped on is the last one.
+    const items = buildThread(
+      [delta('a', 'First pass done.', 'append', true), delta('b', ASK, 'append', true)],
+      { running: false, latestTurn: true }
+    )
+    expect(items.some((i) => i.type === 'decision')).toBe(true)
+  })
+})
+
+describe('what the decision card may say about the workspace', () => {
+  it('claims nothing changed only when the run could not write', () => {
+    // A guarantee from the sandbox, not an observation.
+    expect(decisionStanding({ sandbox: 'read-only', events: [] })).toContain('nothing was changed')
+  })
+
+  it('says work is kept when a patch actually came back', () => {
+    const wrote = [event('tool.completed', { itemId: 't1', toolKind: 'edit', name: 'apply', phase: 'completed', patch: 'diff' })]
+    expect(decisionStanding({ sandbox: 'workspace-write', events: wrote })).toContain('work already done is kept')
+  })
+
+  it('never claims nothing changed for a run that was allowed to write', () => {
+    // Nothing was OBSERVED, which is not the same as nothing happening: a
+    // runtime need not report every write. So it states the permission.
+    const said = decisionStanding({ sandbox: 'workspace-write', events: [] })
+    expect(said).not.toContain('nothing was changed')
+    expect(said).toContain('could edit files')
+  })
+
+  it('does not claim nothing changed when the mode is unknown', () => {
+    expect(decisionStanding({ sandbox: undefined, events: [] })).not.toContain('nothing was changed')
   })
 })
