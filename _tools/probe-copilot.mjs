@@ -95,7 +95,7 @@ try {
         const header = node.querySelector('.lc-picker__group')
         if (header) { group = header.innerText; sawGroups += group + ' / ' }
         const row = node.querySelector('.lc-picker__row')
-        if (row && !row.disabled && /copilot/i.test(group)) { target = row; break }
+        if (row && !row.disabled && /copilot/i.test(group) && /auto/i.test(row.innerText)) { target = row; break }
       }
       if (target === null) await new Promise(r => setTimeout(r, 500))
     }
@@ -110,10 +110,26 @@ try {
   // runs the wrong runtime and prints its outcome is worse than no probe.
   if (!String(picked).startsWith('picked:')) throw new Error(`could not select Copilot: ${String(picked)}`)
 
+  // Ask mode: the smoke's failing read-only run.
+  const mode = await evaluate(`(async () => {
+    const control = [...document.querySelectorAll('.lc-control')].find(c => /Accept edits|Ask|Approve/i.test(c.innerText))
+    if (!control) return 'no mode control'
+    control.click()
+    await new Promise(r => setTimeout(r, 500))
+    const item = [...document.querySelectorAll('.lc-menu[role="menu"] .lc-menu__item')]
+      .find(b => ((b.querySelector('.lc-menu__name') || {}).innerText || '').trim() === 'Ask')
+    if (!item) return 'no Ask item'
+    item.click()
+    await new Promise(r => setTimeout(r, 400))
+    return [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/
++/g,' ')).join(' | ')
+  })()`)
+  say(`  mode: ${String(mode)}`)
+
   const submitted = await evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    setter.call(field, 'Reply with only the word ok.')
+    setter.call(field, 'Create a file named blocked.txt containing hi if you can. Then, whatever happened, reply with one line that starts with MODEL: followed by the model you are.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     for (let i = 0; i < 120; i += 1) {
       await new Promise(r => setTimeout(r, 250))

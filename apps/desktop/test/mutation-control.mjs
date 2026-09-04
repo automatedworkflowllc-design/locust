@@ -42,6 +42,13 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'the waiting clock restarts on every event, reading as a stuck loop',
+    from: '      const since = options.startedAt ?? events[0]?.occurredAt ?? events.at(-1)?.occurredAt',
+    to: '      const since = events.at(-1)?.occurredAt ?? options.startedAt',
+    expect: 'counts from the start of the turn, so it climbs instead of looping'
+  },
+  {
     file: FACES,
     name: 'a live run with nothing open is called working, so a bobbing face wears the dots',
     from: "  return 'thinking'\n}",

@@ -669,9 +669,16 @@ export function buildThread(
       //
       // A live run is always doing something, so a line always shows. What it
       // SAYS stays honest: no step has been reported, so it names the wait
-      // rather than inventing a step, and the elapsed clock runs from the
-      // last thing that actually happened.
-      const since = events.at(-1)?.occurredAt ?? options.startedAt
+      // rather than inventing a step.
+      //
+      // The clock runs from the START OF THE TURN, not from the last event.
+      // It used to run from the last event, on the reasoning that "waiting 3s"
+      // is more useful than "running 4m" -- but a runtime that reports
+      // something every few seconds then resets the clock every few seconds,
+      // and Colin watched one count to 10 and start over, repeatedly, which
+      // reads as a stuck loop rather than a run making progress. A number that
+      // only ever climbs cannot be mistaken for one.
+      const since = options.startedAt ?? events[0]?.occurredAt ?? events.at(-1)?.occurredAt
       if (since !== undefined) {
         items.push({
           key: 'live-step',

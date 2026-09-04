@@ -1287,3 +1287,29 @@ describe('what the decision card may say about the workspace', () => {
     expect(decisionStanding({ sandbox: undefined, events: [] })).not.toContain('nothing was changed')
   })
 })
+
+describe('the waiting line’s clock', () => {
+  it('counts from the start of the turn, so it climbs instead of looping', () => {
+    // Colin watched one count to 10 and start over, repeatedly, which reads as
+    // a stuck loop rather than a run making progress. Clocking from the last
+    // event did that: a runtime reporting every few seconds reset it every few
+    // seconds.
+    const items = buildThread(
+      [
+        event('run.started', {}),
+        event('adapter.diagnostic', { level: 'info', message: 'something later' })
+      ],
+      { running: true, latestTurn: true, startedAt: '2026-09-05T10:00:00.000Z' }
+    )
+    const line = items.find((item) => item.type === 'live-step')
+    expect(line?.type === 'live-step' && line.startedAt).toBe('2026-09-05T10:00:00.000Z')
+  })
+
+  it('falls back to the first event when the turn start is unknown', () => {
+    // A restored mission has no send time in hand; the first event is still
+    // the earliest moment the app can honestly count from.
+    const items = buildThread([event('run.started', {})], { running: true, latestTurn: true })
+    const line = items.find((item) => item.type === 'live-step')
+    expect(line?.type === 'live-step' && line.startedAt).toBe(NOW)
+  })
+})
