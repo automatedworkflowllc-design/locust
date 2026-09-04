@@ -301,21 +301,33 @@ export function Sidebar({
       </div>
 
       <div className="lc-sidebar__footer">
-        <button type="button" onClick={onOpenMissions} title="All missions (Ctrl 1)">
-          <Icon name="inbox" size={15} />
-          <span>Missions</span>
-        </button>
-        <button type="button" onClick={onOpenTeammates} title="Teammates (Ctrl 2)">
-          <Icon name="users" size={15} />
-          <span>Teammates</span>
-        </button>
-        <button type="button" onClick={onOpenSettings} title="Settings (Ctrl 3)">
-          <Icon name="settings" size={15} />
-          <span>Settings</span>
-        </button>
-        <span className="lc-connected">
-          {connected} connected
-        </span>
+        {/*
+          * An equal-thirds grid with min-width: 0. The row is a fixed 266px
+          * and three labelled buttons laid out by content came to 371px of it
+          * -- so the count was pushed off the edge entirely rather than
+          * merely squeezed. Cells that share the width cannot overflow
+          * whatever the labels ever say.
+          */}
+        <div className="lc-sidebar__nav">
+          <button type="button" onClick={onOpenMissions} title="All missions (Ctrl 1)">
+            <Icon name="inbox" size={14} />
+            <span>Missions</span>
+          </button>
+          <button type="button" onClick={onOpenTeammates} title="Teammates (Ctrl 2)">
+            <Icon name="users" size={14} />
+            <span>Teammates</span>
+          </button>
+          <button type="button" onClick={onOpenSettings} title="Settings (Ctrl 3)">
+            <Icon name="settings" size={14} />
+            <span>Settings</span>
+          </button>
+        </div>
+        <div className="lc-connected">
+          <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
+          <span>
+            {connected} runtime{connected === 1 ? '' : 's'} connected
+          </span>
+        </div>
       </div>
     </nav>
   )

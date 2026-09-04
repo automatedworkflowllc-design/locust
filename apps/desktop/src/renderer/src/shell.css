@@ -3694,3 +3694,245 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
+
+
+/* ======================================================================
+ * Touch-up, 2026-09-04 (design agent).
+ *
+ * Answers the 0.16.2 screenshot. Supersedes my own footer rules above: their
+ * equal-thirds grid with `min-width: 0` cannot overflow whatever the labels
+ * ever say, where mine fitted 251px of buttons into 255px and would break the
+ * moment a label or font changed.
+ *
+ * Their measurement (371px in 266px) describes 0.16.2, before the footer fix
+ * landed; the count is visible in 0.16.3. The grid is adopted anyway because
+ * it is the more durable answer to the same problem.
+ * ====================================================================== */
+
+/*
+ * PASS-2026-09-04.css -- sidebar overflow + dead space, from the 0.16.2
+ * screenshot. Drop-in delta for shell.css. Tokens only; no `color:` takes
+ * --lc-text-faint; one selector per block for token-gate.mjs.
+ *
+ * Where a rule REPLACES an existing one, the original is named so it can be
+ * deleted rather than overridden.
+ */
+
+/* --- 1. Sidebar footer: the bottom-left bleed --------------------------
+ * Replaces .lc-sidebar__footer and .lc-sidebar__footer button.
+ *
+ * Three labelled buttons plus the count want ~295px of intrinsic width in a
+ * 268px sidebar, and they were `flex: 0 0 auto; white-space: nowrap` under
+ * `space-between` -- so the row spilled into the workroom and pushed the
+ * count off screen entirely. Equal thirds with `min-width: 0` cannot
+ * overflow whatever the labels ever say, and the count gets its own line
+ * where it is actually visible.
+ */
+.lc-sidebar__footer {
+  margin-top: auto;
+  border-top: 1px solid var(--lc-border-hairline);
+  padding: var(--lc-space-3) var(--lc-space-4) var(--lc-space-4);
+  display: block;
+}
+
+.lc-sidebar__nav {
+  display: grid;
+  /*
+   * Content-sized, not equal thirds -- but still shrinkable, so the row can
+   * never overflow the rail. Equal thirds gave every cell 82px, which starved
+   * "Teammates" (needs 63px of label, got 55 and ellipsised to "Teamma…")
+   * while "Missions" and "Settings" sat on room they did not need. Measured
+   * on screen: the three together want ~246px of the 251 available, so each
+   * label fits in full and the screen's real name survives in the nav that
+   * opens it.
+   */
+  grid-template-columns: repeat(3, minmax(0, auto));
+  justify-content: space-between;
+  gap: var(--lc-space-1);
+}
+
+.lc-sidebar__footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px var(--lc-space-2);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-sidebar__footer button:hover {
+  background: var(--lc-hover-surface);
+}
+
+.lc-sidebar__footer button > svg {
+  flex: none;
+}
+
+/* The label may shorten but never wraps or pushes the grid open. */
+.lc-sidebar__footer button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Replaces .lc-connected. Its own line, with a settled dot -- green owns
+   "connected", which is a standing fact rather than something happening. */
+.lc-connected {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: var(--lc-space-3) var(--lc-space-4) 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  min-width: 0;
+}
+
+.lc-connected__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--lc-green);
+}
+
+.lc-connected__dot.is-none {
+  background: var(--lc-neutral);
+}
+
+.lc-connected > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Belt and braces: the sidebar is a fixed width, so nothing inside it may
+   paint outside it even if a future row miscalculates. */
+.lc-sidebar {
+  overflow: hidden;
+}
+
+/* --- 2. Short threads sit on the composer -----------------------------
+ * Adds to .lc-thread. A conversation grows upward out of the box you type
+ * in; top-aligning it left a ~70px void between the last card and the
+ * composer, so the receipt hung in mid-air. Long threads are unaffected --
+ * the column already overflows and scrolls.
+ */
+.lc-thread {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* The column must not stretch to fill the flex line, or its own 22px gaps
+   turn into whatever is left over. */
+.lc-thread__column {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+/* --- 3. Workroom header: put the provenance on the band ---------------
+ * Route, mode, cost and ledger state are already computed -- they sit at the
+ * bottom of the receipt card, ~700px below the header. On the band they
+ * answer "what is this running on" without a scroll, which is the claim the
+ * product is built on, and they fill the ~600px that was empty.
+ *
+ * Markup change in App.tsx -- see PASS-2026-09-04.md §3.
+ */
+.lc-workroom__provenance {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  margin-left: auto;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+}
+
+.lc-workroom__route {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  min-width: 0;
+  color: var(--lc-text-secondary);
+}
+
+.lc-workroom__route > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The one place the faint token is legitimate: a separator glyph, same as
+   .lc-separator in the composer. Nothing readable is painted. */
+.lc-workroom__provenance .lc-separator {
+  color: var(--lc-text-faint);
+}
+
+/* Below the inspector breakpoint the band cannot hold the strip and the
+   identity block at once. Identity wins; the receipt still has the facts. */
+@media (max-width: 1279px) {
+  .lc-workroom__provenance {
+    display: none;
+  }
+}
+
+/* --- 4. Destructive action out of the primary row ---------------------
+ * Delete sat one pixel-perfect click from Activity. It moves into an
+ * overflow menu; the button itself is the existing .lc-iconbutton.
+ */
+.lc-workroom__more {
+  flex: none;
+  position: relative;
+}
+
+.lc-menu {
+  position: absolute;
+  top: calc(100% + var(--lc-space-3));
+  right: 0;
+  min-width: 190px;
+  padding: var(--lc-space-3);
+  border: 1px solid var(--lc-border-strong);
+  border-radius: var(--lc-radius-popover);
+  background: var(--lc-bg-raised-2);
+  box-shadow: var(--lc-shadow-menu);
+  z-index: 18;
+}
+
+.lc-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-control);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-menu button:hover {
+  background: var(--lc-hover-surface);
+  color: var(--lc-text-primary);
+}
+
+.lc-menu button.is-danger:hover {
+  background: var(--lc-red-tint);
+  color: var(--lc-red-text);
+}

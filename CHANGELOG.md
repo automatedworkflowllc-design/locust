@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.16.3 — 2026-09-04
+
+- **A short conversation sits on the composer** instead of hanging in mid-air
+  above 70px of nothing. It grows upward out of the box you type in, the way
+  every chat does.
+- **The sidebar footer cannot bleed past the rail.** Its buttons are a grid
+  that can shrink rather than a row laid out by content, and the connection
+  count has its own line: `6 runtimes connected`, with a settled dot.
+- **The window icon uses the 512, not the 256 beside it.** Windows scales from
+  whatever it is handed, so it was downsampling a downsample.
+- The visual pass from 2026-09-03 is applied throughout: code blocks, lists,
+  link labels, the read-only rerun note, and the roster card.
+
 ## 0.16.2 — 2026-09-03
 
 - **The routes you move between sit at the top of the picker.** Recency

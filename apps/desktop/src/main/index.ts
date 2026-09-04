@@ -157,7 +157,10 @@ const createWindow = (
     // the build output, which sits two levels below the app directory both in
     // dev and in the unpackaged build; a packaged build will carry its own
     // `.ico` when packaging exists.
-    icon: join(__dirname, '../../resources/icon.png'),
+    // The 512, not the 256 beside it. Windows scales the window and taskbar
+    // icon from whatever it is handed, so handing it the smaller file made it
+    // downsample from a downsample. Found by the design pass, 2026-09-04.
+    icon: join(__dirname, '../../resources/icon-512.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       sandbox: true,

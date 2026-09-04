@@ -39,7 +39,11 @@ const FORBIDDEN_IN_APP = ['#616666', '#4e5353']
  */
 const FAINT_COLOR_EXCEPTIONS = new Map([
   ['.lc-windowcontrols button', 'minimize/maximize/close: SVG strokes through currentColor, labelled by aria-label, no text inside'],
-  ['.lc-separator', 'the `/` glyph between route names, which the spec names explicitly']
+  ['.lc-separator', 'the `/` glyph between route names, which the spec names explicitly'],
+  [
+    '.lc-workroom__provenance .lc-separator',
+    'the `·` between facts on the header strip: punctuation between values, carrying nothing a reader needs to make out'
+  ]
 ])
 
 const FAINT = ['var(--lc-text-faint)', '#7a807f']

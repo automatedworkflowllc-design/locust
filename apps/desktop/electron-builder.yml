@@ -54,11 +54,13 @@ nsis:
   artifactName: Locust-${version}-setup.${ext}
 
 linux:
-  icon: resources/icon.png
+  # The 512, for the same reason the window uses it: a packager scales down
+  # from what it is given, and the 256 was a downsample already.
+  icon: resources/icon-512.png
   category: Development
   target:
     - AppImage
 
 mac:
-  icon: resources/icon.png
+  icon: resources/icon-512.png
   category: public.app-category.developer-tools
