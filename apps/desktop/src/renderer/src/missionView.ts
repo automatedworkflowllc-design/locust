@@ -465,6 +465,15 @@ export interface MissionThreadOptions {
    * held back -- which is the lag it exists to remove.
    */
   readonly startedAt?: string
+  /**
+   * True when the run is stopped on an approval. A run awaiting a decision is
+   * still `running`, so the waiting line would sit directly above the card
+   * asking the question and say "Working" while the header says "waiting on
+   * you" -- two surfaces describing one teammate differently, which is the
+   * exact defect `faceState.ts` exists to prevent. The card is already saying
+   * what is happening, so nothing is added above it.
+   */
+  readonly awaitingDecision?: boolean
 }
 
 export function buildThread(
@@ -635,7 +644,7 @@ export function buildThread(
         kind: runningStep.kind,
         ...(runningStep.kind === 'reasoning' ? { waiting: true } : {})
       })
-    } else if (!streaming) {
+    } else if (!streaming && options.awaitingDecision !== true) {
       // Nothing has begun, or the last step closed and the next has not
       // opened. The thread used to draw NOTHING here, so pressing Enter left
       // an empty page until the runtime's first event -- seconds, for a CLI

@@ -6,6 +6,35 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.16.5 — 2026-09-04
+
+- **You can see both halves of a conversation between two teammates.** Ask one
+  of them to message another and the thread showed the reply and never the
+  question -- so it read as though the second teammate had answered *you*. The
+  message asking is written on an earlier turn than the answer, and the thread
+  only ever drew the newest turn's. Every turn's now shows, filed against the
+  turn it happened on.
+- **A short exchange opens where it sits.** Two messages is something you read
+  in place, not a toggle to find. Longer ones stay folded and now show their
+  first line instead of only counting themselves.
+- **Pressing send does something immediately.** The working line appeared only
+  once the runtime reported its first step, so for a CLI that has to launch a
+  process the thread sat blank for seconds and the bounce looked late. It was
+  not late -- there was no line for it to be on. A live run always shows one
+  now, and it says what is true: with no step reported it names the wait rather
+  than inventing a step.
+- **The `...` shows up where you are actually waiting.** It used to mean "a
+  reasoning step is open", which most runtimes never report, so it almost never
+  appeared. It now means waiting on the model with nothing to show yet.
+- **The composer lets go of what you sent.** A start the host refused left your
+  text on screen twice -- as a failed turn and still in the box -- which read as
+  though nothing had been sent. If the bridge is missing the text stays, because
+  then the box is the only copy of it.
+- **The window remembers its size and position.** It also refuses to reopen onto
+  a monitor that is no longer plugged in, which would put it where you cannot
+  see or drag it.
+- The app icon drops the black tile and keeps the ink.
+
 ## 0.16.4 — 2026-09-04
 
 - **A new app icon.** The mark is a fine engraving, and downsampled to the

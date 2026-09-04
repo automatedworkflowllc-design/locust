@@ -41,6 +41,13 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const MUTATIONS = [
   {
     file: VIEW,
+    name: 'a waiting line says Working above the approval it is stopped on',
+    from: "    } else if (!streaming && options.awaitingDecision !== true) {",
+    to: '    } else if (!streaming) {',
+    expect: 'says nothing above an approval the run is stopped on'
+  },
+  {
+    file: VIEW,
     name: 'a freshly sent mission shows nothing until its first event',
     from: '    } else if (!streaming) {',
     to: '    } else if (false) {',
@@ -1099,7 +1106,18 @@ try {
       continue
     }
     if (!original.includes(mutation.from)) {
-      console.error(`  [SKIP] ${mutation.name} -- anchor not found`)
+      // Name the usual cause instead of leaving it as a mystery. On Windows
+      // with `core.autocrlf=true` a plain `git checkout -- <file>` rewrites
+      // the file CRLF, and every anchor here that spans a newline stops
+      // matching -- so an invariant silently stops being checked while the
+      // sweep says something that sounds like a stale mutation. Three files
+      // were in that state on 2026-09-04. `.gitattributes` pins LF now; this
+      // says so out loud if it ever happens again.
+      const crlf = original.includes(String.fromCharCode(13, 10))
+      console.error(
+        `  [SKIP] ${mutation.name} -- anchor not found` +
+          (crlf ? ` (${target} has CRLF line endings; anchors here are LF -- normalise the file)` : '')
+      )
       problems += 1
       continue
     }

@@ -251,7 +251,11 @@ export function Thread({
   handoff,
   peers
 }: ThreadProps): ReactElement {
-  const items = buildThread(events, { running, ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso }) })
+  const items = buildThread(events, {
+    running,
+    awaitingDecision: approvals.length > 0,
+    ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso })
+  })
   // A read-only run whose answer carries code is the one case where "run it
   // again, with edits allowed" is certainly what a person wants: the runtime
   // wrote the change and was not permitted to apply it. Asked of the parsed

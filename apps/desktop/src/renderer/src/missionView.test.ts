@@ -337,6 +337,18 @@ describe('thread composition', () => {
     })
   })
 
+  it('says nothing above an approval the run is stopped on', () => {
+    // A run awaiting a decision is still `running`. A "Working" line directly
+    // above the card asking the question would contradict the header, which
+    // resolves the same teammate to "waiting on you".
+    const items = buildThread([], {
+      running: true,
+      startedAt: '2026-09-04T21:47:00.000Z',
+      awaitingDecision: true
+    })
+    expect(items.some((i) => i.type === 'live-step')).toBe(false)
+  })
+
   it('draws no live line once the run is over', () => {
     expect(buildThread([], { running: false, startedAt: '2026-09-04T21:47:00.000Z' })).toEqual([])
   })

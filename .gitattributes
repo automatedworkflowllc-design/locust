@@ -1,0 +1,22 @@
+# Line endings are load-bearing here, so they are pinned rather than left to
+# each machine's `core.autocrlf`.
+#
+# `apps/desktop/test/mutation-control.mjs` finds the code it mutates by exact
+# string match, and many of those anchors span a newline. On a Windows box
+# with `core.autocrlf=true` a plain `git checkout -- <file>` rewrites that
+# file CRLF, every multi-line anchor in it stops matching, and the sweep
+# reports `[SKIP] ... anchor not found`. That reads like a stale mutation and
+# is actually an invariant that has quietly stopped being checked. It happened
+# on 2026-09-04 to three files at once.
+#
+# Text is LF in the repository and LF in the working tree, on every platform.
+* text=auto eol=lf
+
+# Binaries git must never touch.
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.gif binary
+*.woff binary
+*.woff2 binary
