@@ -40,6 +40,41 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'a freshly sent mission shows nothing until its first event',
+    from: '    } else if (!streaming) {',
+    to: '    } else if (false) {',
+    expect: 'shows a line the moment a run starts, before any event arrives'
+  },
+  {
+    file: VIEW,
+    name: 'a live line lingers after the run is over',
+    from: '  if (options.running) {',
+    to: '  if (true) {',
+    expect: 'draws no live line once the run is over'
+  },
+  {
+    file: VIEW,
+    name: 'only the newest turn of a teammate exchange is drawn',
+    from: '  turns.forEach((messages, turnIndex) => {',
+    to: '  turns.slice(-1).forEach((messages, turnIndex) => {',
+    expect: 'keeps every turn of a long conversation, not just the last two'
+  },
+  {
+    file: VIEW,
+    name: 'the message a teammate SENT is dropped from the thread',
+    from: "        placement: group.received ? 'before-work' : 'after-work',",
+    to: "        placement: 'before-work',",
+    expect: 'puts what a turn sent after its work and what it was handed before it'
+  },
+  {
+    file: VIEW,
+    name: 'a two-message exchange stays collapsed and goes unread',
+    from: '  return messageCount > 0 && messageCount <= PEER_EXCHANGE_OPEN_LIMIT',
+    to: '  return false',
+    expect: 'opens a short exchange in place'
+  },
+  {
     file: COST,
     name: 'the running turn is left out of what the conversation has cost',
     from: '  return sumCosts([...earlierTurns.map((turn) => runCostOf(turn.events)), runCostOf(events)])',
@@ -1027,6 +1062,23 @@ const originals = new Map([
 ])
 let problems = 0
 
+// An optional substring filter, so one new invariant can be checked in
+// seconds instead of re-running the whole sweep. The full sweep is what CI
+// runs; this is for the person writing a mutation. Added after a filtered
+// run turned out to be impossible and two timed-out full runs each left a
+// mutated file behind in the working tree -- one of which briefly looked
+// like a real defect.
+const filter = process.argv[2]
+const selected =
+  filter === undefined
+    ? MUTATIONS
+    : MUTATIONS.filter((mutation) => mutation.name.toLowerCase().includes(filter.toLowerCase()))
+if (selected.length === 0) {
+  console.error(`no mutation name contains "${filter}"`)
+  process.exit(1)
+}
+if (filter !== undefined) console.error(`filtered to ${selected.length} of ${MUTATIONS.length} mutations`)
+
 try {
   const baseline = runSuite()
   if (baseline.failed.length > 0) {
@@ -1035,7 +1087,7 @@ try {
   }
   console.error(`baseline green (${baseline.total} tests)\n`)
 
-  for (const mutation of MUTATIONS) {
+  for (const mutation of selected) {
     const target = mutation.file
     const original = originals.get(target)
     if (original === undefined) {

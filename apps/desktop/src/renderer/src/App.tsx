@@ -110,6 +110,8 @@ interface LiveRunState {
     readonly missionId: string
     readonly prompt: string
     readonly events: readonly NormalizedRuntimeEvent[]
+    /** That turn's own workroom exchange, so the thread can draw it in place. */
+    readonly peerMessages?: readonly PublicPeerMessage[]
   }[]
   /**
    * What this run continues, when it was started by a route switch. Held in
@@ -124,6 +126,12 @@ interface LiveRunState {
     readonly omittedBriefing: readonly string[]
     readonly priorEvents: readonly NormalizedRuntimeEvent[]
   }
+  /**
+   * When the person pressed send, ISO. The thread's waiting line clocks the
+   * launch from here -- before the first event there is nothing else to time,
+   * and no clock meant no line at all.
+   */
+  readonly startedAtIso?: string
   /** Workroom messages this run received or posted, as the host reported them. */
   readonly peerMessages?: readonly PublicPeerMessage[]
   /** Shares the host could not honour, in the host's words. */
@@ -797,12 +805,23 @@ export default function App(): ReactElement {
       ? []
       : [
           ...(continuing.earlierTurns ?? []),
-          { missionId: continuing.data!.missionId, prompt: continuing.prompt, events: continuing.events }
+          {
+            missionId: continuing.data!.missionId,
+            prompt: continuing.prompt,
+            events: continuing.events,
+            // What that turn exchanged with peers, carried forward with it.
+            // Dropping it here is what hid the outgoing half of a teammate
+            // exchange even after the thread learned to draw earlier turns:
+            // the message Booty sent Wren lived on the turn BEFORE the reply,
+            // and this is where that turn was rebuilt without it.
+            ...(continuing.peerMessages === undefined ? {} : { peerMessages: continuing.peerMessages })
+          }
         ]
     const starting: LiveRunState = {
       prompt,
       phase: 'starting',
       events: [],
+      startedAtIso: new Date().toISOString(),
       ...(teammateId === undefined ? {} : { teammateId }),
       ...(earlierTurns.length === 0 ? {} : { earlierTurns }),
       ...(coldStart ? { coldStart: true } : {})
@@ -844,7 +863,13 @@ export default function App(): ReactElement {
         setRuns((current) =>
           withRun(current, key, (run) => ({ ...run, phase: 'failed', error: response.error.message }))
         )
-        return false
+        // The turn IS on screen -- prompt bubble and failure card -- so the
+        // composer must let go of it. Holding on left the same sentence in
+        // two places and read as though nothing had been sent (Colin,
+        // 2026-09-04: "sometimes text stays in box after sending"). The
+        // bridge-missing case above still keeps it, because there the turn
+        // was never recorded anywhere and the box is the only copy.
+        return true
       }
 
       const runId = response.data.runId
@@ -1553,6 +1578,10 @@ export default function App(): ReactElement {
                     ? undefined
                     : startedLabel(liveRun.restoredMission.createdAt)
                 }
+                {...(() => {
+                  const iso = liveRun.startedAtIso ?? liveRun.restoredMission?.createdAt
+                  return iso === undefined ? {} : { startedAtIso: iso }
+                })()}
               />
             </>
           )}

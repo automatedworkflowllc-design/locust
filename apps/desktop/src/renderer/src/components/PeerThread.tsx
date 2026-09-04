@@ -4,6 +4,7 @@ import type { ReactElement } from 'react'
 import { seedAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { PublicPeerMessage, PublicTeammate, TeammateHue } from '../../../shared/ipc.js'
+import { peerExchangeStartsOpen, peerSnippet } from '../missionView.js'
 import { PixelFace } from './PixelFace.js'
 
 /**
@@ -30,7 +31,11 @@ export function PeerThread({
   readonly messages: readonly PublicPeerMessage[]
   readonly teammates: readonly PublicTeammate[]
 }): ReactElement {
-  const [open, setOpen] = useState(false)
+  // A short exchange opens itself. The collapse exists so a long aside does
+  // not read as the mission's own work; an ask-and-answer pair is not that,
+  // and hiding it is how a whole conversation between two teammates went
+  // unseen (Colin, 2026-09-04).
+  const [open, setOpen] = useState(() => peerExchangeStartsOpen(messages.length))
   const peerProfile = teammates.find((teammate) => teammate.teammateId === peer.teammateId)
   // A peer who has since left the roster keeps their name (it travels with
   // the message) and gets a neutral face: inventing a hue for someone who is
@@ -42,6 +47,9 @@ export function PeerThread({
     profile?.avatar ?? seedAvatar(teammateId.length > 0 ? teammateId : 'unknown')
   const count = messages.length
   const label = `${count} message${count === 1 ? '' : 's'} with`
+  // What the exchange was about, for the times it stays collapsed. A count
+  // alone says one happened and nothing about what it said.
+  const snippet = open ? undefined : peerSnippet(messages[0]?.text ?? null)
 
   const hueFor = (teammateId: string): TeammateHue =>
     teammateId === self?.teammateId
@@ -61,13 +69,15 @@ export function PeerThread({
         <span>{label}</span>
         <PixelFace hue={peerHue} avatar={faceOf(peer.teammateId, peerProfile)} size={16} />
         <span className={`lc-peer__name is-${peerHue}`}>{peer.name}</span>
-        {open && (
+        {open ? (
           <>
             <span className="lc-peer__dot" aria-hidden="true">
               ·
             </span>
             <span className="lc-peer__tag lc-mono">UNTRUSTED</span>
           </>
+        ) : (
+          snippet !== undefined && <span className="lc-peer__snippet">{snippet}</span>
         )}
       </button>
       {open && (

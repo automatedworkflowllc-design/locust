@@ -290,6 +290,13 @@ export type ThreadItem =
        * staggered dots. Never a bar or a synthetic percentage.
        */
       readonly kind: 'turn' | 'reasoning' | 'item'
+      /**
+       * True when the teammate is waiting on the model rather than doing
+       * something nameable -- the launch before the first event, and the gaps
+       * between steps. Draws the dots, which is the only honest thing to show
+       * for a wait: there is no step to name and no progress to claim.
+       */
+      readonly waiting?: boolean
     }
   | {
       readonly key: string
@@ -452,6 +459,12 @@ export function assistantMessages(
 export interface MissionThreadOptions {
   /** While a run is live the last message shows a streaming caret. */
   readonly running: boolean
+  /**
+   * When the run was started, so the waiting line can time the launch itself.
+   * Without it a run with no events yet has no clock to show, and the line is
+   * held back -- which is the lag it exists to remove.
+   */
+  readonly startedAt?: string
 }
 
 export function buildThread(
@@ -610,15 +623,43 @@ export function buildThread(
     })
   }
 
-  if (options.running && runningStep !== undefined) {
-    items.push({
-      key: 'live-step',
-      type: 'live-step',
-      label: runningStep.label,
-      detail: runningStep.detail,
-      startedAt: runningStep.startedAt,
-      kind: runningStep.kind
-    })
+  if (options.running) {
+    const streaming = items.some((item) => item.type === 'agent-message' && item.streaming)
+    if (runningStep !== undefined) {
+      items.push({
+        key: 'live-step',
+        type: 'live-step',
+        label: runningStep.label,
+        detail: runningStep.detail,
+        startedAt: runningStep.startedAt,
+        kind: runningStep.kind,
+        ...(runningStep.kind === 'reasoning' ? { waiting: true } : {})
+      })
+    } else if (!streaming) {
+      // Nothing has begun, or the last step closed and the next has not
+      // opened. The thread used to draw NOTHING here, so pressing Enter left
+      // an empty page until the runtime's first event -- seconds, for a CLI
+      // that has to launch a process. Colin reported it twice as the working
+      // bounce lagging the send (2026-09-03, 2026-09-04); the bounce was not
+      // late, there was no line for it to be on.
+      //
+      // A live run is always doing something, so a line always shows. What it
+      // SAYS stays honest: no step has been reported, so it names the wait
+      // rather than inventing a step, and the elapsed clock runs from the
+      // last thing that actually happened.
+      const since = events.at(-1)?.occurredAt ?? options.startedAt
+      if (since !== undefined) {
+        items.push({
+          key: 'live-step',
+          type: 'live-step',
+          label: events.length === 0 ? 'Starting' : 'Working',
+          detail: undefined,
+          startedAt: since,
+          kind: 'turn',
+          waiting: true
+        })
+      }
+    }
   }
 
   return items
@@ -840,6 +881,79 @@ export function peerGroups(messages: readonly PublicPeerMessage[]): readonly Pee
     messages: [...group.messages].sort((left, right) => Date.parse(left.at) - Date.parse(right.at)),
     received: group.received
   }))
+}
+
+/**
+ * How many messages an exchange may hold and still be drawn open.
+ *
+ * The card collapses so a colleague's aside does not read as the mission's
+ * own work, which is right for a long back-and-forth and wrong for the
+ * common case: one teammate asks, one answers. Colin's report on 2026-09-04
+ * -- *"lets try and keep the whole convo between the bots"* -- was about an
+ * exchange of exactly two messages, both hidden behind a toggle he had to
+ * find. Two is an exchange you read in place; more is a thread you open.
+ */
+export const PEER_EXCHANGE_OPEN_LIMIT = 2
+
+/** Whether an exchange is short enough to read in place. */
+export function peerExchangeStartsOpen(messageCount: number): boolean {
+  return messageCount > 0 && messageCount <= PEER_EXCHANGE_OPEN_LIMIT
+}
+
+/**
+ * The first line of an exchange, for the collapsed card to preview. A count
+ * alone ("2 messages with Wren") says an exchange happened and nothing about
+ * what it was, which is the whole reason it went unread.
+ */
+export function peerSnippet(text: string | null, limit = 72): string | undefined {
+  if (text === null) return undefined
+  const flat = text.replace(/\s+/gu, ' ').trim()
+  if (flat.length === 0) return undefined
+  return flat.length <= limit ? flat : `${flat.slice(0, limit - 1).trimEnd()}…`
+}
+
+export interface ThreadPeerCard {
+  readonly key: string
+  /** Which turn of the conversation the exchange happened in. */
+  readonly turnIndex: number
+  /** Received messages sit before that turn's work; posted ones after it. */
+  readonly placement: 'before-work' | 'after-work'
+  readonly group: PeerGroup
+}
+
+/**
+ * Every peer card the thread draws, for every turn -- not just the last one.
+ *
+ * The thread rendered the CURRENT turn's exchange and silently dropped every
+ * earlier turn's. That is invisible in the ordinary case and wrong in the one
+ * that matters: a teammate who messages a peer usually does it on the turn a
+ * person asked them to, and the peer's answer arrives on the NEXT turn. So
+ * the message asking was always in an earlier turn and was never drawn. Colin
+ * watched Booty ask Wren for a soliloquy on 2026-09-04 and saw only Wren's
+ * reply -- the thread read as though Wren had answered HIM.
+ *
+ * Taking every turn is what makes both halves of an exchange visible. The
+ * placement rule is unchanged: what a turn was handed sits above its work,
+ * what it sent sits below.
+ */
+export function threadPeerCards(
+  turns: readonly (readonly PublicPeerMessage[])[]
+): readonly ThreadPeerCard[] {
+  const cards: ThreadPeerCard[] = []
+  turns.forEach((messages, turnIndex) => {
+    for (const group of peerGroups(messages)) {
+      const name = group.peer.teammateId.length > 0 ? group.peer.teammateId : group.peer.name
+      cards.push({
+        // Turn-scoped: the same peer appears on more than one turn of a
+        // conversation, and two cards keyed alike would collapse into one.
+        key: `peer_${String(turnIndex)}_${name}`,
+        turnIndex,
+        placement: group.received ? 'before-work' : 'after-work',
+        group
+      })
+    }
+  })
+  return cards
 }
 
 /**

@@ -1,4 +1,6 @@
-import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, openingSize } from './window-size.js'
+import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from './window-size.js'
+import { openingPlacement, readSavedWindow } from './window-bounds.js'
+import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, ipcMain, nativeTheme, Notification, screen, session } from 'electron'
 import electronUpdater from 'electron-updater'
 
@@ -14,6 +16,7 @@ import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-s
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -141,17 +144,76 @@ let workroomForShutdown: Workroom | undefined
  */
 
 
+/**
+ * Where the remembered window goes. Its own file rather than a key in the
+ * roster: losing it costs a window position, and it must never be able to
+ * take the roster down with it.
+ */
+const windowFile = (): string => join(app.getPath('userData'), 'window.json')
+
+const readWindowFile = (): SavedWindow | undefined => {
+  try {
+    return readSavedWindow(JSON.parse(readFileSync(windowFile(), 'utf8')))
+  } catch {
+    // No file on first launch, and a corrupt one is the same answer: open
+    // where a first launch would. Nothing here is worth a startup failure.
+    return undefined
+  }
+}
+
+/**
+ * Save the window's shape as the person changes it.
+ *
+ * Written on a timer rather than per event -- a drag emits `move` for every
+ * frame, and writing the file that often would beat the disk for no gain. The
+ * final write on close is what makes the last position stick.
+ */
+const rememberWindow = (window: BrowserWindow): void => {
+  let pending: NodeJS.Timeout | undefined
+
+  const save = (): void => {
+    if (window.isDestroyed()) return
+    // `getNormalBounds` is the un-maximized shape, which is what a maximized
+    // window needs to remember: restoring maximized is a flag, and the size
+    // underneath it is what un-maximizing goes back to.
+    const bounds = window.getNormalBounds()
+    const record: SavedWindow = { ...bounds, maximized: window.isMaximized() }
+    void writeFile(windowFile(), JSON.stringify(record), 'utf8').catch(() => {
+      // A window position is not worth surfacing an error over.
+    })
+  }
+
+  const later = (): void => {
+    if (pending) clearTimeout(pending)
+    pending = setTimeout(save, 500)
+  }
+
+  window.on('resize', later)
+  window.on('move', later)
+  window.on('maximize', later)
+  window.on('unmaximize', later)
+  window.on('close', () => {
+    if (pending) clearTimeout(pending)
+    save()
+  })
+}
+
 const createWindow = (
   codexMissions: CodexMissionService,
   onWindow: (window: BrowserWindow) => void
 ): void => {
-  const opening = openingSize(screen.getPrimaryDisplay().workAreaSize)
+  const opening = openingPlacement(
+    readWindowFile(),
+    screen.getAllDisplays().map((display) => display.workArea),
+    screen.getPrimaryDisplay().workAreaSize
+  )
   const window = new BrowserWindow({
     width: opening.width,
     height: opening.height,
+    ...(opening.x === undefined || opening.y === undefined ? {} : { x: opening.x, y: opening.y }),
     minWidth: MIN_WINDOW_WIDTH,
     minHeight: MIN_WINDOW_HEIGHT,
-    center: true,
+    center: opening.x === undefined,
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
@@ -176,6 +238,8 @@ const createWindow = (
   onWindow(window)
 
   window.once('ready-to-show', () => {
+    // Maximize before showing: maximizing a visible window is a visible jump.
+    if (opening.maximized) window.maximize()
     window.show()
 
     const capturePath = app.isPackaged ? undefined : process.env.TEAMMATE_CAPTURE_PATH
@@ -191,6 +255,8 @@ const createWindow = (
       })
     }
   })
+
+  rememberWindow(window)
 
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 

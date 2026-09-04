@@ -2860,6 +2860,20 @@ textarea {
   background: rgba(255, 255, 255, 0.07);
 }
 
+/*
+  What the exchange said, on the collapsed line. Bounded and single-line: the
+  card is a marker in the thread, and a preview that wrapped would make it a
+  paragraph in the mission's own voice, which is the thing the card avoids.
+*/
+.lc-peer__snippet {
+  max-width: 42ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lc-text-muted);
+  opacity: 0.85;
+}
+
 .lc-peer__dot {
   color: var(--lc-text-muted);
 }

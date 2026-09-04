@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, peerGroups, readPlan, threadMarkers } from '../missionView.js'
+import { buildThread, cancellationSummary, readPlan, threadMarkers, threadPeerCards } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
@@ -25,7 +25,7 @@ import { AgentAvatar, AgentText, DiagnosticLine, LiveStepCard, PlanCard } from '
 import { HandoffDivider } from './HandoffDivider.js'
 import { TimeMarker } from './TimeMarker.js'
 import { PeerThread } from './PeerThread.js'
-import type { PeerGroup, ThreadItem } from '../missionView.js'
+import type { ThreadItem, ThreadPeerCard } from '../missionView.js'
 
 /**
  * One transcript's worth of items. Extracted so a handed-off mission can render
@@ -79,6 +79,7 @@ function ThreadItems({
               detail={item.detail}
               startedAt={item.startedAt}
               kind={item.kind}
+              waiting={item.waiting ?? false}
               owner={owner}
               activity={activity}
             />
@@ -181,6 +182,8 @@ export interface ThreadProps {
     readonly missionId: string
     readonly prompt: string
     readonly events: readonly NormalizedRuntimeEvent[]
+    /** What that turn exchanged with peers. Drawn with the turn, not with the last one. */
+    readonly peerMessages?: readonly PublicPeerMessage[]
   }[]
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean
@@ -190,6 +193,8 @@ export interface ThreadProps {
   readonly errorIsPersistence: boolean
   /** Local wall-clock label for when the mission began. */
   readonly startedAt: string | undefined
+  /** The same moment as an ISO string, for the waiting line's clock. */
+  readonly startedAtIso?: string
   /** Approvals waiting on the user, oldest first. */
   readonly approvals: readonly MissionApprovalRequest[]
   readonly onDecide: (approvalId: string, decision: MissionApprovalDecision) => void
@@ -238,6 +243,7 @@ export function Thread({
   error,
   errorIsPersistence,
   startedAt,
+  startedAtIso,
   approvals,
   onDecide,
   decidingIds,
@@ -245,7 +251,7 @@ export function Thread({
   handoff,
   peers
 }: ThreadProps): ReactElement {
-  const items = buildThread(events, { running })
+  const items = buildThread(events, { running, ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso }) })
   // A read-only run whose answer carries code is the one case where "run it
   // again, with edits allowed" is certainly what a person wants: the runtime
   // wrote the change and was not permitted to apply it. Asked of the parsed
@@ -257,16 +263,21 @@ export function Thread({
   // one whose index is past every earlier turn.
   const markers = threadMarkers([...earlierTurns.map((turn) => turn.events), events])
   const currentMarker = markers.find((marker) => marker.beforeTurn === earlierTurns.length)
-  const exchanges = peerGroups(peers.messages)
-  const peerCard = (group: PeerGroup): ReactElement => (
+  // Every turn's exchange, not only the last one: the message a teammate SENT
+  // was written on an earlier turn than the reply it drew, so a thread that
+  // only drew the current turn showed the answer and never the question.
+  const exchanges = threadPeerCards([...earlierTurns.map((turn) => turn.peerMessages ?? []), peers.messages])
+  const peerCard = (card: ThreadPeerCard): ReactElement => (
     <PeerThread
-      key={`peer_${group.peer.teammateId || group.peer.name}`}
+      key={card.key}
       self={peers.self}
-      peer={group.peer}
-      messages={group.messages}
+      peer={card.group.peer}
+      messages={card.group.messages}
       teammates={peers.teammates}
     />
   )
+  const cardsFor = (turnIndex: number, placement: ThreadPeerCard['placement']): readonly ThreadPeerCard[] =>
+    exchanges.filter((card) => card.turnIndex === turnIndex && card.placement === placement)
   // Planned-step count comes from the last plan the provider sent, so
   // "never started" is measured against what it said it would do.
   const plannedSteps = events
@@ -304,7 +315,9 @@ export function Thread({
                 <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
               )}
               <div className="lc-bubble">{turn.prompt}</div>
+              {cardsFor(index, 'before-work').map(peerCard)}
               <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} />
+              {cardsFor(index, 'after-work').map(peerCard)}
             </Fragment>
           )
         })}
@@ -331,11 +344,11 @@ export function Thread({
           Exchanges that were delivered to this run sit where they were in
           time: before the work. Ones this run only sent follow the work.
         */}
-        {exchanges.filter((group) => group.received).map(peerCard)}
+        {cardsFor(earlierTurns.length, 'before-work').map(peerCard)}
 
         <ThreadItems items={items} owner={peers.self} activity={liveActivityOf(events, running)} workspacePath={workspacePath} />
 
-        {exchanges.filter((group) => !group.received).map(peerCard)}
+        {cardsFor(earlierTurns.length, 'after-work').map(peerCard)}
         {peers.notices.map((notice, index) => (
           <DiagnosticLine key={`peer_notice_${index}`} level="warning" message={notice} />
         ))}

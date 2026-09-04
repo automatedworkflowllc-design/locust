@@ -177,6 +177,7 @@ export function LiveStepCard({
   detail,
   startedAt,
   kind,
+  waiting = false,
   owner,
   activity
 }: {
@@ -184,6 +185,8 @@ export function LiveStepCard({
   readonly detail: string | undefined
   readonly startedAt: string
   readonly kind: 'turn' | 'reasoning' | 'item'
+  /** Waiting on the model with no step to name; draws the dots. */
+  readonly waiting?: boolean
   readonly owner: { readonly teammateId?: string; readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike } | undefined
   /** Decided once from the events, the same way the sidebar and header decide it. */
   readonly activity: FaceActivity
@@ -194,7 +197,13 @@ export function LiveStepCard({
     return () => clearInterval(timer)
   }, [])
   const elapsed = elapsedLabel(startedAt, now)
-  const thinking = activity === 'thinking'
+  // The dots meant "a reasoning step is open", which most runtimes never
+  // report -- so the nicest signal in the app almost never appeared (Colin,
+  // 2026-09-04: "I feel like i never see the '...'"). They now mean the
+  // honest thing: the teammate is waiting on the model and has nothing to
+  // show yet. That covers the reasoning step AND the launch and the gaps
+  // between steps, which is most of the time a person spends waiting.
+  const thinking = activity === 'thinking' || waiting
   const face = owner ?? { hue: 'lime' as const, avatar: RUNTIME_FACE }
   return (
     <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind}>

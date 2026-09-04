@@ -1,31 +1,34 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
-import type { PublicRecoveredMission } from '../../shared/ipc.js'
+import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
 import { describe, expect, it } from 'vitest'
 
 import {
   activityCounts,
   activityEntries,
-  failureMessage,
-  relativePath,
-  startedLabel,
-  shellCommandText,
   activitySummary,
   assistantMessages,
-  defaultOpenEntry,
-  threadMarkers,
   buildSignalRail,
   buildThread,
   cancellationSummary,
   conversationTurns,
+  defaultOpenEntry,
+  failureMessage,
+  peerExchangeStartsOpen,
   peerGroups,
-  resolvedModelNames,
-  rootMission,
-  stitchedHandoff,
+  peerSnippet,
+  railLabel,
   recentlyUsedRoutes,
+  relativePath,
+  resolvedModelNames,
   resumableSessionOf,
-  typedPrompt,
-  railLabel
+  rootMission,
+  shellCommandText,
+  startedLabel,
+  stitchedHandoff,
+  threadMarkers,
+  threadPeerCards,
+  typedPrompt
 } from './missionView.js'
 
 const NOW = '2026-08-31T16:00:00.000Z'
@@ -313,8 +316,36 @@ describe('thread composition', () => {
       ],
       { running: true }
     )
-    expect(running.some((i) => i.type === 'live-step')).toBe(true)
-    expect(done.some((i) => i.type === 'live-step')).toBe(false)
+    expect(running.find((i) => i.type === 'live-step')).toMatchObject({ label: 'Running the billing suite' })
+    // The NAMED step goes the moment it completes -- a finished step must
+    // never sit there looking live. What replaces it is a generic waiting
+    // line, because the run is still up: `liveActivityOf` calls that state
+    // "working", and the thread has to say the same thing the face does.
+    expect(done.find((i) => i.type === 'live-step')).toMatchObject({ label: 'Working', waiting: true })
+  })
+
+  it('shows a line the moment a run starts, before any event arrives', () => {
+    // The gap this closes: pressing Enter drew nothing at all until the
+    // runtime's first event, which for a CLI that has to launch a process is
+    // seconds of blank page (Colin, twice: "the input to working/thinking lag
+    // still feels clunky").
+    const justSent = buildThread([], { running: true, startedAt: '2026-09-04T21:47:00.000Z' })
+    expect(justSent.find((i) => i.type === 'live-step')).toMatchObject({
+      label: 'Starting',
+      waiting: true,
+      startedAt: '2026-09-04T21:47:00.000Z'
+    })
+  })
+
+  it('draws no live line once the run is over', () => {
+    expect(buildThread([], { running: false, startedAt: '2026-09-04T21:47:00.000Z' })).toEqual([])
+  })
+
+  it('does not put a waiting line under a message that is still streaming', () => {
+    // Text arriving IS the teammate doing something visible; a "Working" line
+    // under it would say the opposite of what the reader can see.
+    const items = buildThread([delta('a', 'half a sen', 'append')], { running: true, startedAt: '2026-09-04T21:47:00.000Z' })
+    expect(items.some((i) => i.type === 'live-step')).toBe(false)
   })
 
   it('never shows a live step for a run that is not running', () => {
@@ -1000,5 +1031,100 @@ describe('marking time in a long conversation', () => {
   it('measures elapsed time from the mission first event, not the previous turn', () => {
     const markers = threadMarkers([turn(0), turn(10), turn(30)])
     expect(markers.map((marker) => marker.minutesIn)).toEqual([10, 30])
+  })
+})
+
+describe('both halves of a teammate exchange are drawn', () => {
+  const message = (
+    direction: 'received' | 'posted',
+    who: string,
+    text: string,
+    at: string
+  ): PublicPeerMessage => ({
+    messageId: `m_${text.slice(0, 6)}_${direction}`,
+    direction,
+    from: direction === 'posted' ? { teammateId: 'booty', name: 'Booty' } : { teammateId: 'wren', name: 'Wren' },
+    to: direction === 'posted' ? { teammateId: 'wren', name: who } : { teammateId: 'booty', name: 'Booty' },
+    text,
+    at
+  })
+
+  // Turn 1: Booty asks Wren. Turn 2: Wren's answer comes back.
+  const turns = [
+    [message('posted', 'Wren', 'Write me a soliloquy.', '2026-09-04T21:47:00.000Z')],
+    [message('received', 'Booty', 'O silent hall of half-built code...', '2026-09-04T21:48:00.000Z')]
+  ]
+
+  it('draws the message an earlier turn SENT, not only the reply', () => {
+    // The bug Colin caught: the thread showed Wren's soliloquy and never
+    // showed Booty asking for it, so it read as though Wren answered him.
+    const cards = threadPeerCards(turns)
+    const sent = cards.flatMap((card) => card.group.messages).filter((held) => held.direction === 'posted')
+    expect(sent.map((held) => held.text)).toEqual(['Write me a soliloquy.'])
+  })
+
+  it('keeps every turn of a long conversation, not just the last two', () => {
+    // Guards the shape of the fix: a version that kept only the newest turns
+    // would pass the test above and still lose the start of the exchange.
+    const many = Array.from({ length: 6 }, (_unused, index) =>
+      [message('posted', 'Wren', `ask ${String(index)}`, `2026-09-04T21:${String(40 + index)}:00.000Z`)]
+    )
+    const texts = threadPeerCards(many).flatMap((card) => card.group.messages).map((held) => held.text)
+    expect(texts).toEqual(['ask 0', 'ask 1', 'ask 2', 'ask 3', 'ask 4', 'ask 5'])
+  })
+
+  it('files each card against the turn it happened on', () => {
+    const cards = threadPeerCards(turns)
+    expect(cards.map((card) => card.turnIndex)).toEqual([0, 1])
+  })
+
+  it('puts what a turn sent after its work and what it was handed before it', () => {
+    const cards = threadPeerCards(turns)
+    expect(cards[0]?.placement).toBe('after-work')
+    expect(cards[1]?.placement).toBe('before-work')
+  })
+
+  it('gives the same peer a distinct key on each turn', () => {
+    // One key per peer would collapse two turns of an exchange into one card.
+    const keys = threadPeerCards(turns).map((card) => card.key)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+})
+
+describe('reading an exchange without hunting for it', () => {
+  it('opens a short exchange in place', () => {
+    // An ask and an answer is the common case and the one that went unread.
+    expect(peerExchangeStartsOpen(1)).toBe(true)
+    expect(peerExchangeStartsOpen(2)).toBe(true)
+  })
+
+  it('leaves a long back-and-forth collapsed', () => {
+    // The reason the card collapses at all: a colleague's long aside must not
+    // read as the mission's own work.
+    expect(peerExchangeStartsOpen(3)).toBe(false)
+    expect(peerExchangeStartsOpen(9)).toBe(false)
+  })
+
+  it('has nothing to open when there are no messages', () => {
+    expect(peerExchangeStartsOpen(0)).toBe(false)
+  })
+
+  it('previews what a collapsed exchange said', () => {
+    expect(peerSnippet('Write me a soliloquy.')).toBe('Write me a soliloquy.')
+  })
+
+  it('flattens a multi-line message to one line', () => {
+    expect(peerSnippet('first line\n\n  second line')).toBe('first line second line')
+  })
+
+  it('cuts a long message rather than letting the card wrap', () => {
+    const snippet = peerSnippet('x'.repeat(200), 20)
+    expect(snippet).toHaveLength(20)
+    expect(snippet?.endsWith('…')).toBe(true)
+  })
+
+  it('previews nothing for a message the workroom no longer holds', () => {
+    expect(peerSnippet(null)).toBeUndefined()
+    expect(peerSnippet('   ')).toBeUndefined()
   })
 })
