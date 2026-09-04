@@ -40,6 +40,20 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: STATUS,
+    name: 'the Recent group resurrects a route the runtime no longer offers',
+    from: '    if (row === undefined) continue',
+    to: "    if (row === undefined) { picked.push({ key, group: 'Recent' }); continue }",
+    expect: 'never resurrects a route the runtime has stopped offering'
+  },
+  {
+    file: STATUS,
+    name: 'a single recent route is offered as a shortcut to where you already are',
+    from: '  return picked.length < 2 ? [] : picked',
+    to: '  return picked',
+    expect: 'withholds the group for a single recent route, which is the one you are on'
+  },
+  {
     file: TEAMMATE_WORK,
     name: 'a card counts every mission, not only the ones the host says are theirs',
     from: '    .filter((mission) => missionOwners[mission.missionId] === teammateId)',

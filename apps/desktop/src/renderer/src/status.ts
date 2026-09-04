@@ -545,6 +545,39 @@ export function flagshipRank(modelId: string): number | undefined {
  * The first rule comes from their own ledger and is a claim the app can back.
  * The second is a judgement, and is second for that reason.
  */
+/** How many routes the Recent group offers before it is a list of its own. */
+export const RECENT_ROUTE_LIMIT = 4
+
+/**
+ * The routes this person actually moves between, lifted to the top.
+ *
+ * Recency already sorts rows WITHIN a runtime, which helps when you stay on
+ * one. It does nothing for the move this product exists for -- putting two
+ * models on the same work -- because the other runtime's group sits below
+ * six rows of the one you are on, and the list shows less than half its
+ * height at a time. MEASURED 2026-09-03: 27 rows across 7 groups, scrolling
+ * at 330px of 751.
+ *
+ * Only routes that are still offered appear, so a model a runtime has stopped
+ * advertising cannot be resurrected here. Fewer than two is not a shortcut --
+ * one recent route is the one you are already on -- so the group is withheld.
+ */
+export function recentRouteRows<TRow extends { readonly key: string; readonly group: string }>(
+  rows: readonly TRow[],
+  recent: readonly string[],
+  limit: number = RECENT_ROUTE_LIMIT
+): readonly TRow[] {
+  const byKey = new Map(rows.map((row) => [row.key, row]))
+  const picked: TRow[] = []
+  for (const key of recent) {
+    const row = byKey.get(key)
+    if (row === undefined) continue
+    picked.push({ ...row, group: 'Recent', key: `recent:${key}` })
+    if (picked.length >= limit) break
+  }
+  return picked.length < 2 ? [] : picked
+}
+
 export function orderRouteRows<TRow extends { readonly key: string; readonly group: string; readonly model?: string }>(
   rows: readonly TRow[],
   recent: readonly string[]

@@ -6,6 +6,7 @@ import {
   collapseConversations,
   listedAsMission,
   modeLabel,
+  recentRouteRows,
   routeSearchText,
   facePresenceFor,
   connectedRuntimeCount,
@@ -45,6 +46,35 @@ function runtime(overrides: Partial<PublicRuntimeStatus> = {}): PublicRuntimeSta
     ...overrides
   }
 }
+
+describe('the routes a person moves between', () => {
+  const rows = [
+    { key: 'codex:gpt-5.6-sol', group: 'Codex CLI · your account' },
+    { key: 'claude:sonnet', group: 'Claude Code · your account' },
+    { key: 'cursor:composer-2.5', group: 'Cursor Agent · your account' }
+  ]
+
+  it('lifts the recently used routes into a group of their own, newest first', () => {
+    const recent = recentRouteRows(rows, ['claude:sonnet', 'codex:gpt-5.6-sol'])
+    expect(recent.map((row) => row.group)).toEqual(['Recent', 'Recent'])
+    expect(recent.map((row) => row.key)).toEqual(['recent:claude:sonnet', 'recent:codex:gpt-5.6-sol'])
+  })
+
+  it('withholds the group for a single recent route, which is the one you are on', () => {
+    expect(recentRouteRows(rows, ['claude:sonnet'])).toEqual([])
+    expect(recentRouteRows(rows, [])).toEqual([])
+  })
+
+  it('never resurrects a route the runtime has stopped offering', () => {
+    const recent = recentRouteRows(rows, ['codex:retired-model', 'claude:sonnet', 'cursor:composer-2.5'])
+    expect(recent.map((row) => row.key)).toEqual(['recent:claude:sonnet', 'recent:cursor:composer-2.5'])
+  })
+
+  it('stops at the limit rather than repeating the whole list', () => {
+    const many = ['codex:gpt-5.6-sol', 'claude:sonnet', 'cursor:composer-2.5']
+    expect(recentRouteRows(rows, many, 2)).toHaveLength(2)
+  })
+})
 
 describe('the mode a roster card shows', () => {
   it('names the mode the teammate actually last ran in', () => {

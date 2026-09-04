@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
-import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, orderRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
+import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
 
 export interface RouteChoice {
@@ -79,8 +79,11 @@ function buildRows(
     }
   }
   // Within each runtime: what this person has run, then the flagship
-  // families, then the rest as the runtime listed them.
-  return orderRouteRows(rows, recent)
+  // families, then the rest as the runtime listed them. The routes they move
+  // between are then lifted to a group of their own at the top, because the
+  // move this product exists for is between runtimes, not within one.
+  const ordered = orderRouteRows(rows, recent)
+  return [...recentRouteRows(ordered, recent), ...ordered]
 }
 
 export function RoutePicker({

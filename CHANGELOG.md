@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.16.2 — 2026-09-03
+
+- **The routes you move between sit at the top of the picker.** Recency
+  already ordered models within a runtime, which helps when you stay on one
+  and does nothing for the move this app exists for -- putting two models on
+  the same work. The other runtime's group sat below six rows of the one you
+  were on, in a list showing less than half its height. A Recent group now
+  carries the routes actually used, across runtimes. It appears only once
+  there are two of them (a single recent is the route you are already on) and
+  never lists a model its runtime has stopped offering.
+
 ## 0.16.1 — 2026-09-03
 
 - **Opening Locust in a project shows that project's work.** It opened on the
