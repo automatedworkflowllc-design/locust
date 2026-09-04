@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 11 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 12 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -72,6 +72,14 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 11 as const
  * a later host-started run has somewhere truthful to say so. An older reader
  * would drop the field and be wrong in exactly the way the app was.
  *
+ * v11 -> v12 adds `command`: the executable and arguments the host actually
+ * ran, with the prompt replaced by a marker. Everything else in this file
+ * describes what a runtime SAID; this is the one record of what it was ASKED,
+ * and its absence cost eight experiments on 2026-09-05 reconstructing a
+ * command by reading the builder and hoping the reconstruction matched. For a
+ * beta it matters more: a tester's machine cannot be borrowed, and a failure
+ * report without the argv is a question nobody can answer remotely.
+ *
  * v10 -> v11 takes that extension point up: `startedBy.kind` gains `resume`, a
  * run the host started to pick a mission back up from its last checkpoint
  * after the app stopped mid-work. Same reason as v10 -- its prompt is a
@@ -79,13 +87,13 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 11 as const
  * v10 reader would refuse the record outright, since `relay` was the only kind
  * it knew.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11 || value === 12
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -149,6 +157,17 @@ export interface MissionLedgerMetadata {
    * written before v10 and most written after it.
    */
   readonly startedBy?: MissionStarter
+  /**
+   * The command the host ran. The prompt is NEVER here -- it is recorded once,
+   * above, and a copy in the argv would both duplicate it and put it wherever
+   * a "send me your ledger" request travels.
+   */
+  readonly command?: MissionCommand
+}
+
+export interface MissionCommand {
+  readonly executablePath: string
+  readonly args: readonly string[]
 }
 
 /**
@@ -496,6 +515,17 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
       requireText(metadata.continuesFrom.runtimeThreadId, 'continuesFrom.runtimeThreadId', 2_048)
     }
   }
+  if (metadata.command !== undefined) {
+    requireText(metadata.command.executablePath, 'command.executablePath', 1_024)
+    if (!Array.isArray(metadata.command.args) || metadata.command.args.length > 128) {
+      throw new Error('Mission command is invalid')
+    }
+    for (const argument of metadata.command.args) {
+      // Every argument is checked, not just the shape: an unbounded or
+      // control-carrying value here would ride into every reader of the file.
+      requireText(argument, 'command.args entry', 1_024)
+    }
+  }
   if (metadata.startedBy !== undefined) {
     const starter = metadata.startedBy
     const counter = starter.kind === 'relay' ? starter.hop : starter.kind === 'resume' ? starter.epoch : undefined
@@ -598,6 +628,10 @@ function parsedMetadata(
   // And no writer before v10 could say a run was started by anything but a
   // person, so a file claiming otherwise was hand-edited.
   if (schemaVersion < 10 && candidate.startedBy !== undefined) {
+    return undefined
+  }
+  // And no writer before v12 recorded the command it ran.
+  if (schemaVersion < 12 && candidate.command !== undefined) {
     return undefined
   }
   // And no writer before v11 knew any starter but the relay.

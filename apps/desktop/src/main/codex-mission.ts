@@ -37,6 +37,7 @@ import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionStarter } from '@teammate/mission-store'
+import { recordableCommand } from './command-record.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -747,7 +748,18 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               ? { startedBy: { kind: 'relay' as const, hop: relay.hop } }
               : startedBy === undefined
                 ? {}
-                : { startedBy })
+                : { startedBy }),
+            // What was actually run, so a failure can be diagnosed from the
+            // record instead of by reconstructing the command from the builder
+            // and hoping the reconstruction matched -- which is how eight
+            // experiments went on 2026-09-05.
+            //
+            // The command built HERE, not the one rebuilt below for runtimes
+            // that take the prompt as an argument. They differ only in the
+            // prompt text, and the prompt is replaced by a marker either way,
+            // so the recorded value is identical -- and taking this one keeps
+            // the briefing, which is longer and quotes teammates, out of it.
+            command: recordableCommand(command, prompt)
           })
         } catch {
           return error(

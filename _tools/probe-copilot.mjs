@@ -112,17 +112,29 @@ try {
 
   // Ask mode: the smoke's failing read-only run.
   const mode = await evaluate(`(async () => {
-    const control = [...document.querySelectorAll('.lc-control')].find(c => /Accept edits|Ask|Approve/i.test(c.innerText))
-    if (!control) return 'no mode control'
-    control.click()
-    await new Promise(r => setTimeout(r, 500))
-    const item = [...document.querySelectorAll('.lc-menu[role="menu"] .lc-menu__item')]
-      .find(b => ((b.querySelector('.lc-menu__name') || {}).innerText || '').trim() === 'Ask')
-    if (!item) return 'no Ask item'
-    item.click()
-    await new Promise(r => setTimeout(r, 400))
-    return [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/
-+/g,' ')).join(' | ')
+    try {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const control = [...document.querySelectorAll('.lc-control')]
+          .find(c => /Accept edits|^\s*Ask|Approve/i.test(c.innerText || ''))
+        if (!control) { await new Promise(r => setTimeout(r, 400)); continue }
+        if (/^\s*Ask/i.test(control.innerText || '')) return 'already Ask'
+        control.click()
+        await new Promise(r => setTimeout(r, 600))
+        const items = [...document.querySelectorAll('.lc-menu[role="menu"] .lc-menu__item')]
+        const item = items.find(b => {
+          const name = b.querySelector('.lc-menu__name')
+          return name !== null && name.innerText.trim() === 'Ask'
+        })
+        if (!item) { await new Promise(r => setTimeout(r, 400)); continue }
+        if (item.disabled) return 'Ask is disabled'
+        item.click()
+        await new Promise(r => setTimeout(r, 600))
+        return [...document.querySelectorAll('.lc-control')].map(c => (c.innerText || '').replace(/\n+/g,' ')).join(' | ')
+      }
+      return 'gave up finding the mode control'
+    } catch (error) {
+      return 'threw: ' + String(error)
+    }
   })()`)
   say(`  mode: ${String(mode)}`)
 
@@ -159,6 +171,8 @@ try {
     const header = JSON.parse(lines[0]).metadata ?? {}
     say(`\n=== ${file} (${String(lines.length)} records) ===`)
     say(`  runtime: ${String(header.runtime)} · model: ${String(header.model)} · sandbox: ${String(header.sandbox)}`)
+    say(`  command: ${String(header.command?.executablePath ?? '(not recorded)')}`)
+    say(`  args:    ${JSON.stringify(header.command?.args ?? null)}`)
     for (const line of lines.slice(-6)) {
       const record = JSON.parse(line)
       const event = record.event ?? {}

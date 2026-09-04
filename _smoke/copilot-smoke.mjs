@@ -252,7 +252,16 @@ try {
 } finally {
   child.kill()
   await sleep(500)
-  await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+  // `--keep` leaves the profile behind so a FAILING run can be read after the
+  // fact: its ledger holds the argv the host ran, the process evidence and the
+  // events that arrived. Diagnosing the 2026-09-05 Copilot failure meant
+  // reconstructing all three by hand, because the evidence was deleted the
+  // moment the smoke finished.
+  if (process.argv.includes('--keep')) {
+    say(`profile kept at ${profile}`)
+  } else {
+    await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+  }
   await rm(workspace, { recursive: true, force: true }).catch(() => undefined)
 }
 

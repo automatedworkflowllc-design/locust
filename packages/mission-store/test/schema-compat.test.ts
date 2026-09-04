@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(11)
-    expect(header.schemaVersion).toBe(11)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(12)
+    expect(header.schemaVersion).toBe(12)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -498,6 +498,62 @@ describe('ledger schema versions', () => {
     expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
   })
 
+  it('round-trips the command the host ran', async () => {
+    const root = await temporaryRoot()
+    await createFileMissionLedger({ rootDirectory: root }).createMission(
+      v1Metadata({
+        command: { executablePath: 'C:\cmd.exe', args: ['-p', '<prompt>', '--no-color'] }
+      }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.command?.args).toEqual(['-p', '<prompt>', '--no-color'])
+  })
+
+  it('refuses a command in a file written before version 12', async () => {
+    const root = await temporaryRoot()
+    const metadata = v1Metadata({ command: { executablePath: 'C:\cmd.exe', args: [] } })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 11,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}
+`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
+  it('refuses a command carrying an argument it cannot vouch for', async () => {
+    const root = await temporaryRoot()
+    // A NUL in an argument is the kind of byte that rides into every reader of
+    // the file. Refused outright rather than cleaned, like every other record.
+    const metadata = v1Metadata({
+      command: { executablePath: 'C:\cmd.exe', args: [`--flag${String.fromCharCode(0)}`] }
+    })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 12,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}
+`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
   it('round-trips a Cursor Agent mission at the current version', async () => {
     const root = await temporaryRoot()
     const ledger = createFileMissionLedger({ rootDirectory: root })
@@ -528,7 +584,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 12,
+        schemaVersion: 13,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,
