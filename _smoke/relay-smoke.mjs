@@ -366,8 +366,41 @@ try {
     `ledgers: ${names.length} (${relayed} relayed, cap ${MAX_RELAY_HOPS})`
   )
 
+  // Nothing on screen may be NAMED by the briefing the host wrote to a
+  // runtime. That sentence was appearing as a mission title beside the
+  // person's own conversations (Colin, 2026-09-04).
+  const titles = await cdp.eval(`(() => {
+    const seen = []
+    for (const node of document.querySelectorAll('.lc-teammate__mission, .lc-rostercard__mission')) {
+      seen.push((node.innerText || '').replace(/[ \\t\\r\\n]+/g, ' ').trim())
+    }
+    return JSON.stringify(seen)
+  })()`)
+  const shown = JSON.parse(titles)
+  say(`       titles on screen: ${shown.map((title) => JSON.stringify(title.slice(0, 70))).join(', ')}`)
+  const briefing = shown.filter((title) => /locust-share|sent you a message|replied to you/i.test(title))
+  check('no mission on screen is named by the host briefing', briefing.length === 0, briefing.join(' | ').slice(0, 200))
+
   const headers = await Promise.all(names.map(async (name) => JSON.parse((await readFile(join(LEDGER_DIR, name), 'utf8')).split('\n')[0]).metadata))
   headers.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
+  // Exactly two runs in this scenario were started by a person -- Booty's
+  // seeding run and Wren's -- and they are the two oldest. Everything after
+  // them is the host answering on a teammate's behalf. Written as a partition
+  // rather than by index, because indexing the wrong header is how the first
+  // version of this check failed against correct data.
+  const starters = headers.map((header) => header.startedBy)
+  check(
+    'exactly the two runs a person started carry no starter',
+    starters.filter((starter) => starter === undefined).length === 2
+      && starters[0] === undefined
+      && starters[1] === undefined,
+    JSON.stringify(starters.map((starter) => starter ?? 'person'))
+  )
+  check(
+    'every run the host started is recorded as a relay, hop counting up from 1',
+    starters.slice(2).every((starter, index) => starter?.kind === 'relay' && starter.hop === index + 1),
+    JSON.stringify(starters.map((starter) => starter ?? 'person'))
+  )
   // headers[0] is Booty's first, person-started run.
   const [, first, second, third] = headers
   const owners = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8')).missionOwners ?? {}
