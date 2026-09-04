@@ -147,7 +147,13 @@ try {
 
   say("2a. a person runs Booty once on Claude Code / Sonnet: that route becomes Booty's")
   const bootyFirst = await cdp.eval(`(async () => {
-    const booty = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Booty')
+    // The roster renders a beat after discovery reports done; run 4 on
+    // 2026-09-04 asked for the button in that beat and got nothing.
+    let booty
+    for (let attempt = 0; attempt < 40 && !booty; attempt += 1) {
+      booty = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Booty')
+      if (!booty) await new Promise(r => setTimeout(r, 250))
+    }
     if (!booty) return JSON.stringify({ booty: false })
     booty.click()
     await new Promise(r => setTimeout(r, 400))

@@ -98,9 +98,30 @@ export function relayPrompt(input: {
     opening,
     'Do what it asks if that is within your role and this workspace, using what you actually know; if you cannot help, say so briefly.',
     `Write back only if that helps finish the work: end with one <locust-share to="${input.sender.name}"> block holding your reply.`,
+    // MEASURED 2026-09-05, three runs of relay-smoke: the recipient sometimes
+    // declined the request as a possible prompt injection and asked for
+    // context -- good judgement -- but asked it with a <locust-ask> block,
+    // which reaches a PERSON, and a relayed run has none. The question sat in
+    // a thread nobody was watching, no share went back, and the exchange
+    // ended in silence. The right recipient of that question is the
+    // teammate who asked, and the share block is how to reach them.
+    noPersonHere(input.sender.name),
     'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
     'Do not start unrelated work.'
   ].join(' ')
+}
+
+/**
+ * Said in every relayed briefing. A runtime that reaches a fork on a normal
+ * mission is told to stop and ask the person; on a relayed run that
+ * instruction is still in its prompt, and following it strands the exchange.
+ */
+function noPersonHere(sender: string): string {
+  return (
+    `There is no person in this exchange to answer you: ${sender} is a teammate, and the question came from them. `
+    + `If you need a decision or more context before you can help, ask ${sender} inside that share block. `
+    + 'Do not use a <locust-ask> block here -- it reaches only a person, and nobody is watching this run.'
+  )
 }
 
 /** What a mission that just shared looks like to the relay. */
@@ -174,6 +195,7 @@ export function meetingPrompt(input: { readonly repliers: readonly string[]; rea
     `${who} replied to your message; the replies are quoted below.`,
     ...(input.silent.length === 0 ? [] : [`${input.silent.join(', ')} finished without replying.`]),
     'Take them together. Write back to anyone only if that helps finish the work: one <locust-share to="Name"> block per teammate.',
+    'There is no person in this exchange to answer you; a question for any of them goes in their share block, never in a <locust-ask> block, which reaches only a person.',
     'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
     'Do not start unrelated work.'
   ].join(' ')

@@ -114,6 +114,25 @@ describe('the brief a relayed run is started with', () => {
     }
     expect(relayPrompt({ sender: BOOTY, recipient: WREN, hop: 2 })).toContain('Booty (Custom) replied to you')
   })
+
+  it('tells a relayed run to ask the teammate, not a person', () => {
+    // MEASURED 2026-09-05, three runs of relay-smoke: the recipient declined a
+    // request as a possible prompt injection and asked for context with a
+    // <locust-ask> block -- which reaches only a person, and a relayed run
+    // has none. The question sat in a thread nobody was watching and the
+    // exchange ended in silence. The teammate who asked is the right
+    // recipient, and the share block is how to reach them.
+    const prompt = relayPrompt({ sender: WREN, recipient: BOOTY, hop: 1 })
+    expect(prompt).toContain('There is no person in this exchange')
+    expect(prompt).toContain('ask Wren inside that share block')
+    expect(prompt).toContain('Do not use a <locust-ask> block here')
+  })
+
+  it('says the same after a meeting, where several teammates could be asked', () => {
+    const prompt = meetingPrompt({ repliers: ['Atlas', 'Juno'], silent: [] })
+    expect(prompt).toContain('There is no person in this exchange')
+    expect(prompt).toContain('never in a <locust-ask> block')
+  })
 })
 
 describe('relaying a share', () => {

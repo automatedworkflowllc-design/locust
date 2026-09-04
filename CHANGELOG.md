@@ -6,6 +6,25 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.18.2 — 2026-09-05
+
+- **A teammate answering a teammate no longer asks a person who isn't there.**
+  Since 0.17.0 a run that reaches a fork stops and asks you with a decision
+  card. A relayed run — one teammate replying to another — still had that
+  instruction in its prompt, and one in three test exchanges used it: the
+  recipient (rightly) wanted context before acting on a message it could not
+  verify, asked for it with a card, and the card sat in a thread nobody was
+  watching. No reply went back, and the exchange ended in silence. The relayed
+  brief now says there is no person in the exchange and that any question
+  goes in the share block to the teammate who asked. Meetings get the same
+  line.
+- **When a teammate's reply arrives, the thread still shows what was sent.**
+  A reply that comes back on its own opens the next turn of the thread that
+  asked, and that turn was rebuilt without the message it had sent — so the
+  thread showed the answer and not the question, and read as though the
+  teammate had answered you. The person-typed follow-up had the same fix on
+  2026-09-04; this is the other path.
+
 ## 0.18.1 — 2026-09-05
 
 - **A read-only Copilot or OpenCode mission could silently have write access.**

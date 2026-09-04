@@ -451,6 +451,13 @@ const MUTATIONS = [
   },
   {
     file: RELAY,
+    name: 'a relayed run is left free to ask a person who is not there',
+    from: '    noPersonHere(input.sender.name),\n',
+    to: '',
+    expect: 'tells a relayed run to ask the teammate, not a person'
+  },
+  {
+    file: RELAY,
     name: 'the reply back starts a stranger instead of the next turn of the thread that asked',
     from: '    const followUpOf = input.origin.lastMissionOf[recipient.self.teammateId]',
     to: '    const followUpOf = undefined',

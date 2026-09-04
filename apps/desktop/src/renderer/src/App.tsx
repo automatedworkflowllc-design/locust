@@ -212,7 +212,16 @@ function earlierTurnsOf(
   if (live !== undefined) {
     return [
       ...(live.earlierTurns ?? []),
-      { missionId, prompt: live.prompt, events: live.events }
+      // With what that turn exchanged: the message this reply answers was
+      // SENT on it. Rebuilt without it (as this was until 0.18.2) the thread
+      // drew the answer and never the question, the same omission the
+      // person-typed follow-up path fixed on 2026-09-04. relay-smoke run 5.
+      {
+        missionId,
+        prompt: live.prompt,
+        events: live.events,
+        ...(live.peerMessages === undefined ? {} : { peerMessages: live.peerMessages })
+      }
     ]
   }
   const held = byId.get(missionId)
@@ -222,7 +231,8 @@ function earlierTurnsOf(
     return {
       missionId: turn.missionId,
       prompt: record === undefined ? turn.prompt : typedPrompt(record, byId),
-      events: turn.events
+      events: turn.events,
+      peerMessages: turn.peerMessages
     }
   })
 }
