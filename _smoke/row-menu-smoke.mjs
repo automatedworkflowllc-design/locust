@@ -10,7 +10,8 @@
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { createHash } from 'node:crypto'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
@@ -61,6 +62,21 @@ class Cdp {
   }
 }
 
+// The sidebar shows THIS folder's missions, and a mission records its folder
+// as a hash of the path. A seeded literal (`ws_smoke`) therefore stopped
+// matching the moment workspace scoping landed on 2026-09-03: the rows were
+// filtered out, no row meant no right-click, and this smoke reported the
+// context menu as broken. It was not -- it had simply been seeding missions
+// into a folder the app was not looking at, and nobody knew for two days,
+// because the smokes are run by hand.
+//
+// Derived the way the app derives it, from the same cwd the app is launched
+// with, so this cannot drift again without the app's own function changing.
+// `resolve` because the app hashes `process.cwd()`, which on Windows is
+// backslashed with no trailing separator -- APP_DIR is a URL pathname and is
+// neither, and hashing it would produce a different id that matches nothing.
+const WORKSPACE_ID = `ws_${createHash('sha256').update(resolve(APP_DIR), 'utf8').digest('hex').slice(0, 32)}`
+
 const profile = await mkdtemp(join(tmpdir(), 'locust-rowmenu-'))
 const LEDGER_DIR = join(profile, 'mission-ledger')
 await mkdir(LEDGER_DIR, { recursive: true })
@@ -82,7 +98,7 @@ for (const [missionId, prompt] of [
     requestedRouteId: 'codex',
     resolvedRouteId: 'codex-account:default',
     cliVersion: '0.151.0',
-    workspaceId: 'ws_smoke',
+    workspaceId: WORKSPACE_ID,
     sandbox: 'read-only',
     executionPolicyVersion: 1,
     createdAt

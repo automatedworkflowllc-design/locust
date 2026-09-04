@@ -130,9 +130,26 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
   if (streaming) return 'responding'
   if (reasoning) return 'thinking'
   if (openTools > 0) return 'working'
-  // A run that is live but between steps is still working: the process is
-  // up and nothing has come back yet. Never idle -- idle means nobody home.
-  return turnOpen || events.length === 0 ? 'working' : 'working'
+  // An open TURN step is the runtime naming something it is doing, and the
+  // thread draws that as a named live line with no dots. It has to resolve to
+  // `working` for the same reason the gap below resolves to `thinking`: the
+  // face and the dots must agree, and here there are no dots.
+  if (turnOpen) return 'working'
+  // Live, but with nothing open: no tool running, no message arriving, no
+  // reasoning step reported. The run is waiting on the model.
+  //
+  // This used to answer `working`, chosen against `idle` -- the process IS up,
+  // and idle means nobody home. But the app has no evidence of WORK here, only
+  // of waiting, and the difference became visible when the waiting line
+  // started showing the dots on 2026-09-05: a bobbing "working" face beside
+  // staggered "still thinking" dots, which the avatar spec forbids for a good
+  // reason. They say opposite things.
+  //
+  // `thinking` is the same fact under a truer name, and it is already the
+  // vocabulary for "waiting on thought, nothing to show". It keeps every chip
+  // agreeing -- sidebar, header and the working line all resolve here -- and
+  // it is what a person is actually waiting on.
+  return 'thinking'
 }
 
 /**

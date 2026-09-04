@@ -76,12 +76,45 @@ describe('what a live run is doing', () => {
   it('replies while a message is still streaming, and stops when it is final', () => {
     const streaming = [event('message.delta', { itemId: 'm', operation: 'append', text: 'Hel', final: false })]
     expect(liveActivityOf(streaming, true)).toBe('responding')
+    // Once the message is final the run is live with nothing open, which is
+    // waiting rather than replying. It answered `working` until 2026-09-05;
+    // see below for why that changed.
     const done = [...streaming, event('message.delta', { itemId: 'm', operation: 'append', text: 'lo', final: true })]
-    expect(liveActivityOf(done, true)).toBe('working')
+    expect(liveActivityOf(done, true)).toBe('thinking')
   })
 
   it('is never idle while the run is live, even between steps', () => {
     expect(liveActivityOf([], true)).not.toBe('idle')
+  })
+
+  it('calls a live run with nothing open thinking, not working', () => {
+    // The app has no evidence of WORK between steps -- no tool, no message,
+    // no reported reasoning -- only evidence of waiting. Calling it `working`
+    // put a bobbing face beside the staggered dots the waiting line now
+    // shows, which the avatar spec forbids because they say opposite things.
+    // Caught by `_smoke/avatar-smoke.mjs`, which is why that smoke exists.
+    expect(liveActivityOf([], true)).toBe('thinking')
+    const settled = [
+      event('step.started', { stepKind: 'turn', message: 'Working' }),
+      event('step.completed', { stepKind: 'turn' })
+    ]
+    expect(liveActivityOf(settled, true)).toBe('thinking')
+  })
+
+  it('calls a named turn step working, because its line shows no dots', () => {
+    // The other half of the same rule: the face and the dots must agree in
+    // BOTH directions. A named step draws a line without dots, so a thinking
+    // face there would contradict it just as a working face contradicts the
+    // waiting line's dots.
+    const named = [event('step.started', { stepKind: 'turn', message: 'Running the billing suite' })]
+    expect(liveActivityOf(named, true)).toBe('working')
+  })
+
+  it('still calls an open tool working', () => {
+    // The change above must not swallow the state that means something IS
+    // happening: a tool running is work, and its face bobs.
+    const open = [event('tool.started', { itemId: 't', toolKind: 'x', name: 'x', phase: 'started' })]
+    expect(liveActivityOf(open, true)).toBe('working')
   })
 })
 

@@ -42,6 +42,20 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: FACES,
+    name: 'a live run with nothing open is called working, so a bobbing face wears the dots',
+    from: "  return 'thinking'\n}",
+    to: "  return 'working'\n}",
+    expect: 'calls a live run with nothing open thinking, not working'
+  },
+  {
+    file: FACES,
+    name: 'a named turn step is called thinking, so its dotless line wears a thinking face',
+    from: "  if (turnOpen) return 'working'",
+    to: "  if (false) return 'working'",
+    expect: 'calls a named turn step working, because its line shows no dots'
+  },
+  {
     file: STATUS,
     name: 'the footer counts a runtime this build cannot run',
     from: "  return runtimes.filter((runtime) => runtimeIsUsable(runtime) && integrationOf(runtime.id) !== 'planned')",
