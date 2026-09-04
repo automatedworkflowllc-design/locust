@@ -312,8 +312,25 @@ try {
         const body = (m.querySelector('.lc-peer__bubble') || { innerText: '' }).innerText
         return author === 'Booty' && body.includes(${JSON.stringify(CODE)})
       })
+      // The OTHER half: what Wren actually sent Booty. It is written on an
+      // earlier turn than the reply, and the thread used to draw only the
+      // newest turn's exchange -- so this was invisible and the thread read
+      // as though Booty had answered the person (Colin, 2026-09-04).
+      const fromWren = [...document.querySelectorAll('.lc-peer__message')].find(m => {
+        const author = (m.querySelector('.lc-peer__author') || { innerText: '' }).innerText.trim()
+        return author === 'Wren'
+      })
       if (!stop && fromBooty) {
-        return JSON.stringify({ found: true, excerpt: fromBooty.innerText.slice(0, 300) })
+        return JSON.stringify({
+          found: true,
+          outgoingShown: fromWren !== undefined,
+          // Double-escaped on purpose: this whole function is inside a JS
+          // template literal before it reaches the page, and a lone \s there
+          // collapses to a bare s -- which quietly turned this into /s+/g and
+          // deleted every letter s from the reported text.
+          outgoing: fromWren ? fromWren.innerText.replace(/\\s+/g, ' ').slice(0, 200) : null,
+          excerpt: fromBooty.innerText.slice(0, 300)
+        })
       }
     }
     return JSON.stringify({ found: false, excerpt: (document.querySelector('.lc-thread') || { innerText: '' }).innerText.slice(-400) })
@@ -321,6 +338,8 @@ try {
   const seen = JSON.parse(thread)
   say(`       thread tail: ${(seen.excerpt ?? '').replace(/\s+/g, ' ').slice(-300)}`)
   check("Wren's thread carries Booty's answer with the passphrase", seen.found === true)
+  say(`       what Wren sent: ${seen.outgoing ?? '(nothing drawn)'}`)
+  check("Wren's thread also shows the message Wren SENT, not only the reply", seen.outgoingShown === true)
 
   say('6. it ends on its own')
   // The exchange ends when a reply has nothing more to say. Wren's follow-up
@@ -332,7 +351,20 @@ try {
     const now = await ledgers()
     if (now.length !== names.length) { names = now; i = 0 }
   }
-  check('the exchange ended on its own: four missions, or one courtesy more', names.length === 4 || names.length === 5, `ledgers: ${names.length}`)
+  // What matters is that it stopped BECAUSE a reply had nothing more to say,
+  // not because the cap fired. A fixed count of four is too tight: on
+  // 2026-09-04 Booty (Claude/sonnet) declined to echo an arbitrary token
+  // without knowing why, Wren explained, and the exchange finished correctly
+  // in one more round trip. A model that asks before complying is behaving
+  // well, and a smoke test that calls that a failure teaches the wrong thing.
+  // One seeded run precedes the exchange, so the relayed runs are the rest.
+  const MAX_RELAY_HOPS = 6
+  const relayed = names.length - 1
+  check(
+    'the exchange ended on its own rather than running into the hop cap',
+    relayed >= 3 && relayed < MAX_RELAY_HOPS,
+    `ledgers: ${names.length} (${relayed} relayed, cap ${MAX_RELAY_HOPS})`
+  )
 
   const headers = await Promise.all(names.map(async (name) => JSON.parse((await readFile(join(LEDGER_DIR, name), 'utf8')).split('\n')[0]).metadata))
   headers.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
