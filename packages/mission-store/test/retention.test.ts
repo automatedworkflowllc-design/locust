@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createFileMissionLedger } from '../src/index.js'
+import { createFileMissionLedger, MISSION_LEDGER_SCHEMA_VERSION } from '../src/index.js'
 import type { MissionLedgerMetadata } from '../src/index.js'
 
 /**
@@ -178,8 +178,15 @@ describe('pruning old missions', () => {
     // ledger takes after the app is rolled back one release. The strict
     // reader refuses the whole file; its first line still names the
     // conversation it belongs to.
+    //
+    // The number has to be one this reader genuinely does NOT accept, and it
+    // was 8, which every build since v8 reads perfectly well. So the file was
+    // never refused, the hint path this test exists for was never taken, and
+    // the test passed on the ordinary reader instead -- proven on 2026-09-04
+    // by deleting the hint entirely and watching it stay green. Keep it ahead
+    // of MISSION_LEDGER_SCHEMA_VERSION, never behind.
     const header = {
-      schemaVersion: 8,
+      schemaVersion: MISSION_LEDGER_SCHEMA_VERSION + 1,
       recordType: 'mission.created',
       ledgerSequence: 1,
       occurredAt: at(1),

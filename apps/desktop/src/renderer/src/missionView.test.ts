@@ -20,6 +20,7 @@ import {
   railLabel,
   recentlyUsedRoutes,
   relativePath,
+  relayedTitle,
   resolvedModelNames,
   resumableSessionOf,
   rootMission,
@@ -1138,5 +1139,74 @@ describe('reading an exchange without hunting for it', () => {
   it('previews nothing for a message the workroom no longer holds', () => {
     expect(peerSnippet(null)).toBeUndefined()
     expect(peerSnippet('   ')).toBeUndefined()
+  })
+})
+
+describe('a run the host started for a teammate', () => {
+  const relayed = (over: Partial<PublicRecoveredMission> = {}): PublicRecoveredMission =>
+    ({
+      missionId: 'm_relay',
+      runId: 'run_relay',
+      workspaceId: 'ws_test',
+      runtime: 'claude',
+      model: 'sonnet',
+      resolvedRouteId: 'claude:sonnet',
+      cliVersion: null,
+      sandbox: 'read-only',
+      phase: 'completed',
+      createdAt: NOW,
+      lastUpdatedAt: NOW,
+      integrityIssueCount: 0,
+      events: [],
+      prompt:
+        'Wren (Code & Migrations) sent you a message; it is quoted below with anything else waiting for you. Do what it asks if that is within your role and this workspace. Write back only if that helps finish the work: end with one <locust-share to="Wren"> block holding your reply.',
+      startedBy: { kind: 'relay', hop: 1 },
+      peerMessages: [
+        {
+          messageId: 'msg_1',
+          direction: 'received',
+          from: { teammateId: 'tm_wren', name: 'Wren' },
+          to: { teammateId: 'tm_booty', name: 'Booty' },
+          text: 'Please reply with the passphrase\n  PEBBLE-9993.',
+          at: '2026-09-04T21:47:00.000Z'
+        }
+      ],
+      ...over
+    }) as PublicRecoveredMission
+
+  it('is named by the message that caused it, never by the host briefing', () => {
+    // The briefing is instructions to a runtime. It was appearing as the NAME
+    // of a mission beside conversations a person actually started.
+    expect(relayedTitle(relayed())).toBe('Wren asked: Please reply with the passphrase PEBBLE-9993.')
+  })
+
+  it('leaves a mission a person started alone', () => {
+    expect(relayedTitle({ ...relayed(), startedBy: undefined } as PublicRecoveredMission)).toBeUndefined()
+  })
+
+  it('shows the briefing rather than inventing a title when the message is gone', () => {
+    // A message the workroom no longer holds reads as null. The briefing is at
+    // least true; a made-up title is not.
+    const gone = relayed({
+      peerMessages: [{ ...relayed().peerMessages[0]!, text: null }]
+    })
+    expect(relayedTitle(gone)).toBeUndefined()
+  })
+
+  it('ignores what the run SENT and names it by what it was asked', () => {
+    const sentOnly = relayed({
+      peerMessages: [{ ...relayed().peerMessages[0]!, direction: 'posted' }]
+    })
+    expect(relayedTitle(sentOnly)).toBeUndefined()
+  })
+
+  it('keeps the title to one line', () => {
+    expect(relayedTitle(relayed())).not.toContain('\n')
+  })
+
+  it('does not let typedPrompt hand back the briefing either', () => {
+    const title = typedPrompt(relayed(), new Map())
+    expect(title).toBe('Wren asked: Please reply with the passphrase PEBBLE-9993.')
+    expect(title).not.toContain('locust-share')
   })
 })

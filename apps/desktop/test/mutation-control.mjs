@@ -41,6 +41,34 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const MUTATIONS = [
   {
     file: VIEW,
+    name: 'a relayed run is named by the briefing the host wrote to a runtime',
+    from: "  if (mission.startedBy?.kind !== 'relay') return undefined",
+    to: '  if (false) return undefined',
+    expect: 'leaves a mission a person started alone'
+  },
+  {
+    file: VIEW,
+    name: 'a title is invented for a message the workroom no longer holds',
+    from: '  if (asked === undefined || asked.text === null) return undefined',
+    to: '  if (asked === undefined) return undefined',
+    expect: 'shows the briefing rather than inventing a title when the message is gone'
+  },
+  {
+    file: VIEW,
+    name: 'a relayed run is named by what it SENT rather than what it was asked',
+    from: "  const asked = mission.peerMessages.find((message) => message.direction === 'received')",
+    to: '  const asked = mission.peerMessages[0]',
+    expect: 'ignores what the run SENT and names it by what it was asked'
+  },
+  {
+    file: VIEW,
+    name: 'typedPrompt hands back the host briefing for a relayed run',
+    from: '    const relayed = relayedTitle(current)\n    if (relayed !== undefined) return relayed\n',
+    to: '',
+    expect: 'does not let typedPrompt hand back the briefing either'
+  },
+  {
+    file: VIEW,
     name: 'a waiting line says Working above the approval it is stopped on',
     from: "    } else if (!streaming && options.awaitingDecision !== true) {",
     to: '    } else if (!streaming) {',
@@ -49,7 +77,7 @@ const MUTATIONS = [
   {
     file: VIEW,
     name: 'a freshly sent mission shows nothing until its first event',
-    from: '    } else if (!streaming) {',
+    from: "    } else if (!streaming && options.awaitingDecision !== true) {",
     to: '    } else if (false) {',
     expect: 'shows a line the moment a run starts, before any event arrives'
   },

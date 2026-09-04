@@ -104,7 +104,10 @@ export function publicRecoveredMission(
             checkpointEpoch: mission.metadata.continuesFrom.checkpointEpoch,
             reason: mission.metadata.continuesFrom.reason
           }
-        })
+        }),
+    ...(mission.metadata.startedBy === undefined
+      ? {}
+      : { startedBy: { kind: mission.metadata.startedBy.kind, hop: mission.metadata.startedBy.hop } })
   }
 }
 

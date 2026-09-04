@@ -595,6 +595,17 @@ export interface PublicRecoveredMission {
     /** `route-switch` is a handoff; `follow-up` is the next turn of one conversation. */
     readonly reason: 'route-switch' | 'follow-up'
   }
+  /**
+   * Set when the HOST started this run rather than a person -- today, one
+   * teammate answering another. Its `prompt` is then instructions the host
+   * wrote to a runtime, not a sentence anybody would recognise as their own,
+   * which is why the renderer must never title a mission with it.
+   */
+  readonly startedBy?: {
+    readonly kind: 'relay'
+    /** Which automatic turn of the exchange this is, counting from 1. */
+    readonly hop: number
+  }
 }
 
 export type MissionHistoryResponse =

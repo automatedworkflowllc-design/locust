@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 9 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 10 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -58,14 +58,27 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 9 as const
  * handed a Gemini mission would refuse its header as invalid and report the
  * whole mission unreadable, so the number moves for the same reason it moved
  * from 1 to 2.
+ *
+ * v9 -> v10 adds `startedBy`. Until now every mission in the file looked like
+ * something a person asked for, because every mission WAS. The relay broke
+ * that: when one teammate writes to another, the host starts the recipient's
+ * run by itself, with a prompt the host wrote. Nothing on the record said so,
+ * so the app could only present that run as a mission the person began -- a
+ * new conversation in their list, titled with machine instructions. Colin, on
+ * 2026-09-04: *"this pops up as its own mission, 'missions' are like projects
+ * or whole new conversations."*
+ *
+ * It is deliberately about WHO STARTED THE RUN rather than about the relay, so
+ * a later host-started run has somewhere truthful to say so. An older reader
+ * would drop the field and be wrong in exactly the way the app was.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -124,6 +137,24 @@ export interface MissionLedgerMetadata {
    * without pretending they were one run.
    */
   readonly continuesFrom?: MissionContinuation
+  /**
+   * Who started this run. Absent means a person did, which is every mission
+   * written before v10 and most written after it.
+   */
+  readonly startedBy?: MissionStarter
+}
+
+/**
+ * A run nobody typed a prompt for.
+ *
+ * `relay` is one teammate answering another without a person in the loop: the
+ * host wrote the prompt, so the words in `prompt` are instructions to a
+ * runtime rather than anything a reader should be shown as a mission title.
+ * `hop` is which automatic turn of the exchange this is, counting from 1.
+ */
+export interface MissionStarter {
+  readonly kind: 'relay'
+  readonly hop: number
 }
 
 /**
@@ -451,6 +482,15 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
       requireText(metadata.continuesFrom.runtimeThreadId, 'continuesFrom.runtimeThreadId', 2_048)
     }
   }
+  if (metadata.startedBy !== undefined) {
+    if (
+      metadata.startedBy.kind !== 'relay'
+      || !Number.isSafeInteger(metadata.startedBy.hop)
+      || metadata.startedBy.hop < 1
+    ) {
+      throw new Error('Mission starter is invalid')
+    }
+  }
   return metadata
 }
 
@@ -536,6 +576,11 @@ function parsedMetadata(
   }
   // And no writer before v6 could call one a follow-up.
   if (schemaVersion < 6 && candidate.continuesFrom?.reason === 'follow-up') {
+    return undefined
+  }
+  // And no writer before v10 could say a run was started by anything but a
+  // person, so a file claiming otherwise was hand-edited.
+  if (schemaVersion < 10 && candidate.startedBy !== undefined) {
     return undefined
   }
   // And no writer before v7 knew Cursor Agent or Gemini CLI.

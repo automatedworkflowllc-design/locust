@@ -714,7 +714,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                       ...(resumeThreadId === undefined ? {} : { runtimeThreadId: resumeThreadId })
                     }
                   }
-              : { continuesFrom: continuation })
+              : { continuesFrom: continuation }),
+            // Who started this run. The relay starts a teammate's reply with a
+            // prompt the HOST wrote, and until this was recorded the file said
+            // only what every other mission says -- so the app had no way to
+            // tell a conversation a person began from one it began itself, and
+            // presented both the same way.
+            ...(relay === undefined ? {} : { startedBy: { kind: 'relay' as const, hop: relay.hop } })
           })
         } catch {
           return error(

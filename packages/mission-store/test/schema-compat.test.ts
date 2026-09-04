@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(9)
-    expect(header.schemaVersion).toBe(9)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(10)
+    expect(header.schemaVersion).toBe(10)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -388,6 +388,64 @@ describe('ledger schema versions', () => {
     expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
   })
 
+  it('round-trips who started a run at the current version', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission(
+      v1Metadata({ startedBy: { kind: 'relay', hop: 2 } }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.startedBy).toEqual({ kind: 'relay', hop: 2 })
+  })
+
+  it('refuses a host-started run in a file written before version 10', async () => {
+    const root = await temporaryRoot()
+    // A v9 file, deliberately: every other rule accepts it, so only the v10
+    // rule can refuse it. No writer before v10 could say a run was started by
+    // anything but a person, so this one was hand-edited -- and believing it
+    // would let a file rename a mission using text it supplied.
+    const metadata = v1Metadata({ startedBy: { kind: 'relay', hop: 1 } })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 9,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}
+`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
+  it('refuses a starter it cannot read rather than dropping the field', async () => {
+    const root = await temporaryRoot()
+    // hop 0 is not a hop. A record whose starter is malformed must be refused
+    // outright: quietly ignoring it would present a host-started run as one a
+    // person began, which is the exact confusion the field exists to end.
+    const metadata = v1Metadata({ startedBy: { kind: 'relay', hop: 0 } })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 10,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}
+`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
   it('round-trips a Cursor Agent mission at the current version', async () => {
     const root = await temporaryRoot()
     const ledger = createFileMissionLedger({ rootDirectory: root })
@@ -418,7 +476,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 10,
+        schemaVersion: 11,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

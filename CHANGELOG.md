@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.16.6 — 2026-09-04
+
+- **A teammate's automatic reply is no longer named after machine
+  instructions.** When one teammate writes to another, the host starts the
+  recipient's run with a prompt the host wrote — *"Wren (Code & Migrations)
+  sent you a message... end with one `<locust-share>` block"* — and that
+  sentence was appearing as the NAME of a mission, beside conversations you
+  actually started. It is now named by the message that caused it: *"Wren
+  asked: Please reply with the passphrase."* If the workroom no longer holds
+  that message the briefing still shows, because an invented title is worse
+  than an ugly true one.
+- **The ledger records who started a run.** Until now every mission in the file
+  looked like something a person asked for, because every mission was. Nothing
+  said otherwise when the app started one itself, so it could only present its
+  own work as yours.
+- A waiting line no longer says **Working** directly above an approval it is
+  stopped on, while the header says *waiting on you*.
+
 ## 0.16.5 — 2026-09-04
 
 - **You can see both halves of a conversation between two teammates.** Ask one

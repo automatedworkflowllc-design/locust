@@ -1197,12 +1197,41 @@ export function typedPrompt(
 ): string {
   let current = mission
   for (let hops = 0; hops < 32; hops += 1) {
+    const relayed = relayedTitle(current)
+    if (relayed !== undefined) return relayed
     if (current.continuesFrom?.reason !== 'route-switch') return current.prompt
     const prior = byId.get(current.continuesFrom.missionId)
     if (prior === undefined) return current.prompt
     current = prior
   }
   return current.prompt
+}
+
+/**
+ * What to call a run the host started for one teammate to answer another.
+ *
+ * Its `prompt` is a briefing written to a runtime -- *"Wren (Code & Migrations)
+ * sent you a message; it is quoted below... end with one <locust-share>
+ * block"* -- and that sentence was appearing as the NAME of a mission in the
+ * list, beside conversations a person had actually started. Colin, 2026-09-04:
+ * *"missions are like projects or whole new conversations."*
+ *
+ * The message that caused the run is the readable thing, and the ledger holds
+ * it, so the title says who wrote and what they said. Undefined when a person
+ * started the run, and undefined when the host started one but the workroom no
+ * longer holds the message -- because inventing a title is worse than showing
+ * the briefing, which is at least true.
+ */
+export function relayedTitle(mission: {
+  readonly startedBy?: PublicRecoveredMission['startedBy']
+  readonly peerMessages: PublicRecoveredMission['peerMessages']
+}): string | undefined {
+  if (mission.startedBy?.kind !== 'relay') return undefined
+  const asked = mission.peerMessages.find((message) => message.direction === 'received')
+  if (asked === undefined || asked.text === null) return undefined
+  const said = asked.text.replace(/\s+/gu, ' ').trim()
+  if (said.length === 0) return undefined
+  return `${asked.from.name} asked: ${said}`
 }
 
 /**

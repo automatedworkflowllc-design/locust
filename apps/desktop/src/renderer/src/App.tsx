@@ -50,6 +50,7 @@ import {
   recentlyUsedRoutes,
   resolvedModelNames,
   resumableSessionOf,
+  relayedTitle,
   rootMission,
   startedLabel,
   stitchedHandoff,
@@ -126,6 +127,12 @@ interface LiveRunState {
     readonly omittedBriefing: readonly string[]
     readonly priorEvents: readonly NormalizedRuntimeEvent[]
   }
+  /**
+   * Set when the HOST started this run -- the relay, answering for a teammate.
+   * Its prompt is a briefing written to a runtime, so nothing may show it as a
+   * mission title while this is set.
+   */
+  readonly startedBy?: PublicRecoveredMission['startedBy']
   /**
    * When the person pressed send, ISO. The thread's waiting line clocks the
    * launch from here -- before the first event there is nothing else to time,
@@ -585,6 +592,7 @@ export default function App(): ReactElement {
             events: [],
             teammateId: update.teammateId,
             peerMessages: update.data.peerMessages,
+            startedBy: { kind: 'relay' as const, hop: update.hop },
             ...(update.data.followsUp === undefined
               ? {}
               : {
@@ -1233,7 +1241,9 @@ export default function App(): ReactElement {
         ...(earlier.at(-1) === undefined ? {} : { parentId: earlier.at(-1)!.missionId }),
         ...(run.teammateId === undefined ? {} : { ownerId: run.teammateId }),
         // A run's thread already shows the root's words for a continuation.
-        title: missionTitle(run.prompt),
+        // A relayed run's prompt is the host's briefing to a runtime, never a
+        // sentence to name a conversation with.
+        title: missionTitle(relayedTitle({ ...run, peerMessages: run.peerMessages ?? [] }) ?? run.prompt),
         phase: liveRunIsActive(run) ? 'running' : isTerminal(run.phase) ? (run.phase as 'completed' | 'failed' | 'cancelled') : 'interrupted',
         ...(run.data?.runtime === undefined ? {} : { runtime: run.data.runtime }),
         integrityIssueCount: run.restoredMission?.integrityIssueCount ?? 0
@@ -1250,7 +1260,9 @@ export default function App(): ReactElement {
         missionId: mission.missionId,
         // A continuation's own prompt is the briefing; name it by the words
         // the person typed at the start of the chain.
-        title: missionTitle(rootMission(mission, historyById).prompt),
+        title: missionTitle(
+          relayedTitle(rootMission(mission, historyById)) ?? rootMission(mission, historyById).prompt
+        ),
         rootId: rootMission(mission, historyById).missionId,
         ...(mission.continuesFrom === undefined ? {} : { parentId: mission.continuesFrom.missionId }),
         phase: mission.phase,
