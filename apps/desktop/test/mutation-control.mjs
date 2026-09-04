@@ -42,6 +42,13 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: STATUS,
+    name: 'the footer counts a runtime this build cannot run',
+    from: "  return runtimes.filter((runtime) => runtimeIsUsable(runtime) && integrationOf(runtime.id) !== 'planned')",
+    to: '  return runtimes.filter((runtime) => runtimeIsUsable(runtime))',
+    expect: 'does not count a runtime this build cannot actually run'
+  },
+  {
     file: RESUME,
     name: 'a resume is offered from a record the app cannot vouch for',
     from: "  if (point.resumeSafety === 'unsafe' || mission.integrityIssueCount > 0) {",

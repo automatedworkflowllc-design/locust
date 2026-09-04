@@ -162,9 +162,32 @@ export function routeRowStatus(
   }
 }
 
-/** Count for the sidebar's "N connected" line. Only usable runtimes count. */
+/**
+ * Count for the sidebar's "N connected" line.
+ *
+ * TWO truths have to agree before a runtime may be counted. `runtimeIsUsable`
+ * says discovery found the CLI installed and signed in. `integrationOf` says
+ * how far THIS build's support for it goes. A runtime can satisfy the first
+ * and not the second -- Gemini CLI probes at 0.58.0 and reports itself signed
+ * in, while the same screen says "Not built yet. Shown so the roadmap is
+ * visible, not because it works."
+ *
+ * **This is a guard, not a repair, and the difference is worth recording.** It
+ * was written on 2026-09-05 while chasing what looked like a miscount -- the
+ * footer said 6 where a probe counted 5 -- and the app turned out to be right:
+ * the sixth was Antigravity, whose adapter is EXPERIMENTAL and does complete
+ * missions, and the probe had been counting the literal word READY. No
+ * miscount has ever been observed. What remains true is that nothing here
+ * previously stopped a discovered-but-unbuilt runtime from being counted, and
+ * `integrationOf` is the one place that knows the difference.
+ *
+ * Counted through `integrationOf` rather than a second list, for the reason
+ * that map exists: a runtime this build does not know is `planned`, so a new
+ * one cannot start being counted before anybody has written its adapter.
+ */
 export function connectedRuntimeCount(runtimes: readonly PublicRuntimeStatus[]): number {
-  return runtimes.filter(runtimeIsUsable).length
+  return runtimes.filter((runtime) => runtimeIsUsable(runtime) && integrationOf(runtime.id) !== 'planned')
+    .length
 }
 
 /** Sidebar / roster status vocabulary from the design. */

@@ -199,6 +199,22 @@ describe('nothing is live unless discovery proved it', () => {
       ])
     ).toBe(1)
   })
+
+  it('does not count a runtime this build cannot actually run', () => {
+    // A guard rather than a repair: no live miscount has been observed, and
+    // the one that looked like it on 2026-09-05 was the probe counting the
+    // word READY while the sixth runtime was EXPERIMENTAL and genuinely
+    // runnable. What this pins is that a runtime discovery calls ready but
+    // this build cannot run -- Gemini probes and reports signed in -- is not
+    // counted as connected.
+    expect(connectedRuntimeCount([runtime(), runtime({ id: 'gemini' })])).toBe(1)
+  })
+
+  it('counts a runtime whose adapter is finished but unofficial', () => {
+    // Experimental is a caveat about the SURFACE, not about whether it runs --
+    // Antigravity completes missions today. Excluding it would understate.
+    expect(connectedRuntimeCount([runtime({ id: 'antigravity' })])).toBe(1)
+  })
 })
 
 describe('teammate status', () => {
