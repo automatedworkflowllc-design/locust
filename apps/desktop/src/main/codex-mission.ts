@@ -38,6 +38,7 @@ import type { MissionPeerContext } from './workroom-briefing.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionStarter } from '@teammate/mission-store'
 import { recordableCommand } from './command-record.js'
+import { commandTooLong } from './command-length.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -811,12 +812,24 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // teammates' messages; a runtime that takes it on the argv gets the
           // same text there. Options were validated above, so this cannot refuse.
           if (command.stdin === 'none') command = buildCommand(runtimePrompt)
+          // Refused HERE rather than by cmd.exe, which answers a too-long
+          // command line with exit 1, no output, and one line on stderr --
+          // reported to the person as the runtime failing for no stated
+          // reason. This is the last point at which the real length is known,
+          // because the workroom briefing has just been folded in.
+          const tooLong = commandTooLong(command)
+          if (tooLong !== undefined) throw new Error(tooLong)
           process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
-        } catch {
+        } catch (startError) {
+          // A refusal this file raised knows WHY; anything else does not, and
+          // must not borrow a specific-sounding reason it cannot back.
+          const why = startError instanceof Error && startError.message.length > 0
+            ? startError.message
+            : 'The Codex process could not be started safely.'
           try {
             await options.ledger.appendHostFailure(missionId, {
               code: 'runtime-start-failed',
-              message: 'The Codex process could not be started safely.',
+              message: why,
               occurredAt: now().toISOString()
             })
           } catch {
@@ -827,7 +840,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
           return error(
             'RUNTIME_START_FAILED',
-            'The Codex process could not be started safely.'
+            why
           ) as CodexMissionStartResponse
         }
 

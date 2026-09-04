@@ -25,6 +25,8 @@ const BRIEFING = join(ROOT, 'src', 'main', 'workroom-briefing.ts')
 const SHARE = join(ROOT, 'src', 'shared', 'peer-share.ts')
 const DECISION = join(ROOT, 'src', 'shared', 'decision.ts')
 const RESUME = join(ROOT, 'src', 'renderer', 'src', 'resume.ts')
+const CMDLEN = join(ROOT, 'src', 'main', 'command-length.ts')
+const CMDREC = join(ROOT, 'src', 'main', 'command-record.ts')
 const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
@@ -41,6 +43,27 @@ const TEAMMATE_WORK = join(ROOT, 'src', 'renderer', 'src', 'teammateWork.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: CMDLEN,
+    name: 'a command that cannot fit is launched anyway, to fail as cmd.exe sees fit',
+    from: '  if (length + QUOTING_RESERVE <= WINDOWS_COMMAND_LINE_LIMIT) return undefined',
+    to: '  if (true) return undefined',
+    expect: 'refuses one that would hit the limit'
+  },
+  {
+    file: CMDLEN,
+    name: 'a stdin runtime is limited by a ceiling that does not apply to it',
+    from: "  if (spec.stdin !== 'none') return undefined",
+    to: '  if (false) return undefined',
+    expect: 'never limits a runtime that reads the prompt from input'
+  },
+  {
+    file: CMDREC,
+    name: 'the prompt is recorded into the command, where a shared ledger carries it',
+    from: "    if (trimmed.length > 0 && argument.trim() === trimmed) {",
+    to: '    if (false) {',
+    expect: 'never records the prompt, whatever flag introduced it'
+  },
   {
     file: VIEW,
     name: 'the waiting clock restarts on every event, reading as a stuck loop',
@@ -1189,6 +1212,8 @@ const originals = new Map([
   [SHARE, readFileSync(SHARE, 'utf8')],
   [DECISION, readFileSync(DECISION, 'utf8')],
   [RESUME, readFileSync(RESUME, 'utf8')],
+  [CMDLEN, readFileSync(CMDLEN, 'utf8')],
+  [CMDREC, readFileSync(CMDREC, 'utf8')],
   [VIEW, readFileSync(VIEW, 'utf8')],
   [TEAMMATES, readFileSync(TEAMMATES, 'utf8')],
   [CATALOG, readFileSync(CATALOG, 'utf8')],

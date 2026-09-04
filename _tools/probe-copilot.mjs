@@ -30,6 +30,16 @@ await mkdir(profile, { recursive: true })
 // tree, twice, because the agent did what it was asked. Electron takes the app
 // directory as an argument, so the cwd is free to be somewhere disposable.
 const workspace = await mkdtemp(join(tmpdir(), 'locust-copilot-ws-'))
+// Seeded the way copilot-smoke seeds its workspace. Bisecting toward the
+// smoke one difference at a time: identical argv, identical launch, identical
+// prompt and mode all pass here while the smoke fails, so the difference is
+// something the smoke DOES, and its workspace having a file in it is the next
+// candidate.
+await writeFile(
+  join(workspace, 'status.ts'),
+  ['export const status = "draft";', '', 'export function describe(): string {', '  return status;', '}', ''].join('\n'),
+  'utf8'
+)
 const child = spawn(ELECTRON, [APP_DIR, '--remote-debugging-port=9295', `--user-data-dir=${profile}`], {
   cwd: workspace,
   env: { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}` },
@@ -65,7 +75,17 @@ try {
   const evaluate = (expression) =>
     new Promise((resolve) => {
       const next = ++id
-      pending.set(next, (message) => resolve(message.result?.result?.value))
+      pending.set(next, (message) => {
+        // Surface a thrown expression instead of resolving undefined. The mode
+        // switch here returned undefined three times and was read as "it did
+        // not take", when the expression had failed to parse -- a silent
+        // failure in the instrument, again.
+        const thrown = message.result?.exceptionDetails
+        if (thrown !== undefined) {
+          say(`  eval threw: ${thrown.exception?.description ?? JSON.stringify(thrown).slice(0, 200)}`)
+        }
+        resolve(message.result?.result?.value)
+      })
       socket.send(JSON.stringify({
         id: next,
         method: 'Runtime.evaluate',
@@ -117,25 +137,29 @@ try {
   if (!String(picked).startsWith('picked:')) throw new Error(`could not select Copilot: ${String(picked)}`)
 
   // Ask mode: the smoke's failing read-only run.
+  // No regex here on purpose. The first version built one through two layers
+  // of escaping and produced `Invalid regular expression: missing /`, which
+  // resolved as undefined and read as "the mode did not change" for three
+  // runs. Plain string comparison cannot be mangled that way.
   const mode = await evaluate(`(async () => {
     try {
+      const modeWords = ['Accept edits', 'Ask', 'Approve each action']
       for (let attempt = 0; attempt < 20; attempt += 1) {
         const control = [...document.querySelectorAll('.lc-control')]
-          .find(c => /Accept edits|^\s*Ask|Approve/i.test(c.innerText || ''))
+          .find(c => modeWords.some(word => (c.innerText || '').trim().startsWith(word)))
         if (!control) { await new Promise(r => setTimeout(r, 400)); continue }
-        if (/^\s*Ask/i.test(control.innerText || '')) return 'already Ask'
+        if ((control.innerText || '').trim().startsWith('Ask')) return 'already Ask'
         control.click()
         await new Promise(r => setTimeout(r, 600))
-        const items = [...document.querySelectorAll('.lc-menu[role="menu"] .lc-menu__item')]
-        const item = items.find(b => {
+        const item = [...document.querySelectorAll('.lc-menu__item')].find(b => {
           const name = b.querySelector('.lc-menu__name')
           return name !== null && name.innerText.trim() === 'Ask'
         })
         if (!item) { await new Promise(r => setTimeout(r, 400)); continue }
-        if (item.disabled) return 'Ask is disabled'
+        if (item.disabled) return 'Ask is disabled here'
         item.click()
         await new Promise(r => setTimeout(r, 600))
-        return [...document.querySelectorAll('.lc-control')].map(c => (c.innerText || '').replace(/\n+/g,' ')).join(' | ')
+        return 'now: ' + [...document.querySelectorAll('.lc-control')].map(c => (c.innerText || '').trim()).join(' | ')
       }
       return 'gave up finding the mode control'
     } catch (error) {
