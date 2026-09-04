@@ -3738,16 +3738,12 @@ textarea {
 .lc-sidebar__nav {
   display: grid;
   /*
-   * Content-sized, not equal thirds -- but still shrinkable, so the row can
-   * never overflow the rail. Equal thirds gave every cell 82px, which starved
-   * "Teammates" (needs 63px of label, got 55 and ellipsised to "Teamma…")
-   * while "Missions" and "Settings" sat on room they did not need. Measured
-   * on screen: the three together want ~246px of the 251 available, so each
-   * label fits in full and the screen's real name survives in the nav that
-   * opens it.
+   * Even thirds, as delivered. This was briefly content-sized so the full
+   * word "Teammates" could fit -- equal cells starved it to "Teamma…" -- but
+   * the shorter label is the better answer and the even row is the tidier
+   * one. Cells that share the width cannot overflow whatever the labels say.
    */
-  grid-template-columns: repeat(3, minmax(0, auto));
-  justify-content: space-between;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--lc-space-1);
 }
 

@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, Notification, session } from 'electron'
+import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, openingSize } from './window-size.js'
+import { app, BrowserWindow, ipcMain, nativeTheme, Notification, screen, session } from 'electron'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -139,15 +140,18 @@ let workroomForShutdown: Workroom | undefined
  * accept one from the window.
  */
 
+
 const createWindow = (
   codexMissions: CodexMissionService,
   onWindow: (window: BrowserWindow) => void
 ): void => {
+  const opening = openingSize(screen.getPrimaryDisplay().workAreaSize)
   const window = new BrowserWindow({
-    width: 1480,
-    height: 940,
-    minWidth: 1120,
-    minHeight: 720,
+    width: opening.width,
+    height: opening.height,
+    minWidth: MIN_WINDOW_WIDTH,
+    minHeight: MIN_WINDOW_HEIGHT,
+    center: true,
     show: false,
     frame: false,
     titleBarStyle: 'hidden',

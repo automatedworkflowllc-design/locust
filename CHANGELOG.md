@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.16.4 — 2026-09-04
+
+- **A new app icon.** The mark is a fine engraving, and downsampled to the
+  sizes a taskbar actually uses it averaged to grey -- under 2% of the tile
+  carried solid ink at 32px, so it stopped reading as a locust. The new one is
+  the same artwork, thickened and zoomed so the wings reach the edges: 43% at
+  32px, and the `.ico` now carries every size Windows picks from rather than
+  making it scale one.
+- **The window opens at a sensible size.** It was a flat 1480x940 — most of a
+  laptop screen. It now takes a fraction of your display and caps there.
+- The sidebar's second button reads **Team**.
+
 ## 0.16.3 — 2026-09-04
 
 - **A short conversation sits on the composer** instead of hanging in mid-air

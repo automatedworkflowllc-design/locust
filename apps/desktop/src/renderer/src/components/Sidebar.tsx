@@ -315,7 +315,11 @@ export function Sidebar({
           </button>
           <button type="button" onClick={onOpenTeammates} title="Teammates (Ctrl 2)">
             <Icon name="users" size={14} />
-            <span>Teammates</span>
+            {/* "Team", not "Teammates": Colin's call, and the design agent's
+              * original. The full name needed 63px of a cell and rendered as
+              * "Teamma…"; the screen it opens is still titled Teammates, and
+              * the tooltip says so. */}
+            <span>Team</span>
           </button>
           <button type="button" onClick={onOpenSettings} title="Settings (Ctrl 3)">
             <Icon name="settings" size={14} />
