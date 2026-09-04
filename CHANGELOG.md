@@ -6,6 +6,27 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.18.0 — 2026-09-05
+
+- **A mission the app stopped in the middle of can be picked back up.** The
+  ledger has written checkpoints since the beginning and the receipt has
+  reported them; what never existed was the way to act on one, so an
+  interrupted mission was a record you could read and nothing else. It now
+  offers to resume from its last checkpoint, and the new run is told what had
+  finished, what had not, and what to verify before building on it.
+- **It says which of three things is true, rather than showing a button that
+  might not work.** If every recorded action reported an outcome, it offers a
+  plain resume. If something started and never reported back, it offers the
+  resume *and names those actions*, so you can go and look before saying go.
+  And if the ledger itself came back incomplete, it refuses and says why —
+  continuing from a record the app cannot vouch for would build on work it
+  cannot describe.
+- **Closing the app mid-run is what this is for; pressing Stop is not.** A run
+  you stopped on purpose is not offered a resume, because undoing your own
+  decision is not the app's to suggest.
+- A teammate's question can no longer be a yes/no. That is a permission
+  request, and there is already a card for those.
+
 ## 0.17.0 — 2026-09-05
 
 - **A teammate can ask you which way to go, instead of guessing.** When a run

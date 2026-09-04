@@ -24,6 +24,7 @@ const PEERS = join(ROOT, 'src', 'main', 'peer-exchange.ts')
 const BRIEFING = join(ROOT, 'src', 'main', 'workroom-briefing.ts')
 const SHARE = join(ROOT, 'src', 'shared', 'peer-share.ts')
 const DECISION = join(ROOT, 'src', 'shared', 'decision.ts')
+const RESUME = join(ROOT, 'src', 'renderer', 'src', 'resume.ts')
 const VIEW = join(ROOT, 'src', 'renderer', 'src', 'missionView.ts')
 const TEAMMATES = join(ROOT, 'src', 'main', 'teammate-store.ts')
 const CATALOG = join(ROOT, 'src', 'main', 'model-catalog.ts')
@@ -40,6 +41,41 @@ const TEAMMATE_WORK = join(ROOT, 'src', 'renderer', 'src', 'teammateWork.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
+  {
+    file: RESUME,
+    name: 'a resume is offered from a record the app cannot vouch for',
+    from: "  if (point.resumeSafety === 'unsafe' || mission.integrityIssueCount > 0) {",
+    to: "  if (point.resumeSafety === 'unsafe' && false) {",
+    expect: 'refuses when recovery reported an issue, whatever the checkpoint concluded'
+  },
+  {
+    file: RESUME,
+    name: 'an unknown outcome is folded into an ordinary resume',
+    from: "  if (point.resumeSafety === 'approval-required') {",
+    to: '  if (false) {',
+    expect: 'offers it WITH the doubt named when an action never reported back'
+  },
+  {
+    file: RESUME,
+    name: 'a resume starts from the first checkpoint rather than the newest',
+    from: '    if (newest === undefined || checkpoint.epoch > newest.epoch) newest = checkpoint',
+    to: '    if (newest === undefined) newest = checkpoint',
+    expect: 'takes the newest, not the first'
+  },
+  {
+    file: RESUME,
+    name: 'a person who pressed Stop is offered a resume, arguing with their decision',
+    from: "  const stoppedByShutdown = mission.phase === 'cancelled' && point?.reason === 'shutdown'",
+    to: "  const stoppedByShutdown = mission.phase === 'cancelled'",
+    expect: 'offers nothing to someone who pressed Stop'
+  },
+  {
+    file: RESUME,
+    name: 'a run the app closed underneath is not offered a resume at all',
+    from: "  if (mission.phase !== 'interrupted' && !stoppedByShutdown) return undefined",
+    to: "  if (mission.phase !== 'interrupted') return undefined",
+    expect: 'offers a resume for a run the app closed underneath'
+  },
   {
     file: DECISION,
     name: 'one option is offered as a decision, which is an approval in disguise',
@@ -1124,6 +1160,7 @@ const originals = new Map([
   [BRIEFING, readFileSync(BRIEFING, 'utf8')],
   [SHARE, readFileSync(SHARE, 'utf8')],
   [DECISION, readFileSync(DECISION, 'utf8')],
+  [RESUME, readFileSync(RESUME, 'utf8')],
   [VIEW, readFileSync(VIEW, 'utf8')],
   [TEAMMATES, readFileSync(TEAMMATES, 'utf8')],
   [CATALOG, readFileSync(CATALOG, 'utf8')],

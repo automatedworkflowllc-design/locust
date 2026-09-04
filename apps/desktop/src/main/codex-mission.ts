@@ -36,6 +36,7 @@ import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from '
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
+import type { MissionStarter } from '@teammate/mission-store'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -96,9 +97,30 @@ export interface CodexMissionService {
     /** The mission whose conversation this one continues, if any. */
     followUpOf?: string,
     /** Set by the host when a teammate is replying on their own. */
-    relay?: RelayOrigin
+    relay?: RelayOrigin,
+    /**
+     * Who started this run, when it was not a person and not the relay. Only
+     * `resume` supplies it; the relay derives its own from `relay` above.
+     */
+    startedBy?: MissionStarter
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
+  /**
+   * Pick a stopped mission back up from its last checkpoint.
+   *
+   * Unlike `handOff` this works on a mission that is NOT active -- that is the
+   * whole case, since the usual way to end up here is the app closing
+   * mid-run. So it reconciles from the ledger rather than from a live run,
+   * and refuses on the same terms a handoff does when the record cannot be
+   * trusted to say what happened.
+   */
+  resume(
+    missionId: unknown,
+    runtime: MissionRuntimeId,
+    mode: MissionMode,
+    route: { readonly model?: string; readonly effort?: string },
+    emit: (update: CodexMissionUpdate) => void
+  ): Promise<MissionHandoffResponse>
   handOff(
     runId: unknown,
     runtime: MissionRuntimeId,
@@ -420,7 +442,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       continuation?: MissionContinuation,
       peer?: MissionPeerContext,
       followUpOf?: string,
-      relay?: RelayOrigin
+      relay?: RelayOrigin,
+      startedBy?: MissionStarter
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -720,7 +743,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             // only what every other mission says -- so the app had no way to
             // tell a conversation a person began from one it began itself, and
             // presented both the same way.
-            ...(relay === undefined ? {} : { startedBy: { kind: 'relay' as const, hop: relay.hop } })
+            ...(relay !== undefined
+              ? { startedBy: { kind: 'relay' as const, hop: relay.hop } }
+              : startedBy === undefined
+                ? {}
+                : { startedBy })
           })
         } catch {
           return error(
@@ -951,6 +978,111 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         data: {
           ...started.data,
           continuesFrom: { missionId: fromMissionId, checkpointEpoch: checkpoint.epoch },
+          resumeSafety: checkpoint.resumeSafety,
+          omittedBriefing: briefing.omitted,
+          unsettledCount: checkpoint.unsettledActions.length
+        }
+      }
+    },
+
+    async resume(
+      missionId: unknown,
+      runtime: MissionRuntimeId,
+      mode: MissionMode,
+      route: { readonly model?: string; readonly effort?: string },
+      emit: (update: CodexMissionUpdate) => void
+    ): Promise<MissionHandoffResponse> {
+      if (!validRunId(missionId)) {
+        return error('RUN_NOT_ACTIVE', 'That mission id is not one this app wrote.') as MissionHandoffResponse
+      }
+      // A mission still running has nothing to resume, and starting a second
+      // run against the same work would have two processes writing the same
+      // tree. Cancel it or let it finish first.
+      if ([...active.values()].some((mission) => mission.missionId === missionId)) {
+        return error(
+          'HANDOFF_REFUSED',
+          'That mission is still running, so there is nothing to resume.'
+        ) as MissionHandoffResponse
+      }
+
+      let recovered
+      try {
+        recovered = await options.ledger.getMission(missionId)
+      } catch {
+        recovered = undefined
+      }
+      if (recovered === undefined) {
+        return error(
+          'HANDOFF_REFUSED',
+          'That mission could not be read back from the local ledger, so there is nothing to continue from.'
+        ) as MissionHandoffResponse
+      }
+
+      let checkpoint
+      try {
+        checkpoint = await options.ledger.createCheckpoint(missionId, 'manual')
+      } catch {
+        return error(
+          'HANDOFF_REFUSED',
+          'The mission could not be reconciled, so nothing was resumed.'
+        ) as MissionHandoffResponse
+      }
+
+      // Same rule as a handoff, and for the same reason: `unsafe` means the
+      // ledger itself is damaged, and a briefing built from a record that
+      // cannot be trusted would carry that damage into a fresh run under a
+      // confident heading. The renderer already declines to offer this, so
+      // reaching here means the offer and the record disagreed -- which is
+      // exactly when the host must not take the renderer's word for it.
+      if (checkpoint.resumeSafety === 'unsafe') {
+        return error(
+          'HANDOFF_REFUSED',
+          `This mission cannot be resumed: ${checkpoint.safetyReason}`
+        ) as MissionHandoffResponse
+      }
+
+      const briefing = composeHandoffPrompt(
+        recovered.metadata.prompt,
+        checkpoint,
+        runtimeDisplayName(recovered.metadata.runtime)
+      )
+      if (briefing === undefined) {
+        return error(
+          'HANDOFF_REFUSED',
+          'The original request is too long to carry into a resumed run.'
+        ) as MissionHandoffResponse
+      }
+
+      const started = await service.start(
+        briefing.prompt,
+        runtime,
+        mode,
+        route,
+        emit,
+        // A resume continues the same conversation on the same runtime, so it
+        // is a follow-up rather than a route switch -- drawing a handoff
+        // divider here would claim a change of runtime that did not happen.
+        { missionId, checkpointEpoch: checkpoint.epoch, reason: 'follow-up' },
+        undefined,
+        undefined,
+        undefined,
+        { kind: 'resume', epoch: checkpoint.epoch }
+      )
+      if (!started.ok) {
+        return {
+          ok: false,
+          error: {
+            code: started.error.code,
+            message: `The mission could not be resumed. ${started.error.message}`
+          }
+        }
+      }
+
+      return {
+        ok: true,
+        data: {
+          ...started.data,
+          continuesFrom: { missionId, checkpointEpoch: checkpoint.epoch },
           resumeSafety: checkpoint.resumeSafety,
           omittedBriefing: briefing.omitted,
           unsettledCount: checkpoint.unsettledActions.length

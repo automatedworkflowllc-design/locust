@@ -6,6 +6,7 @@ export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
 export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
 export const CODEX_MISSION_CANCEL_CHANNEL = 'codex-mission:cancel'
 export const MISSION_HANDOFF_CHANNEL = 'mission:hand-off'
+export const MISSION_RESUME_CHANNEL = 'mission:resume'
 export const CODEX_MISSION_UPDATE_CHANNEL = 'codex-mission:update'
 export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 export const MISSION_DELETE_CHANNEL = 'mission:delete'
@@ -441,6 +442,18 @@ export interface MissionHandoffRequest {
   readonly effort?: string
 }
 
+/**
+ * Picking a stopped mission back up. Named by MISSION rather than by run,
+ * because the run it continues is over -- that is the whole case.
+ */
+export interface MissionResumeRequest {
+  readonly missionId: string
+  readonly runtime: MissionRuntimeId
+  readonly mode: MissionMode
+  readonly model?: string
+  readonly effort?: string
+}
+
 export interface MissionHandoffData extends CodexMissionStartData {
   /** The mission this one continues, and the checkpoint it resumed from. */
   readonly continuesFrom: {
@@ -601,11 +614,17 @@ export interface PublicRecoveredMission {
    * wrote to a runtime, not a sentence anybody would recognise as their own,
    * which is why the renderer must never title a mission with it.
    */
-  readonly startedBy?: {
-    readonly kind: 'relay'
-    /** Which automatic turn of the exchange this is, counting from 1. */
-    readonly hop: number
-  }
+  readonly startedBy?:
+    | {
+        readonly kind: 'relay'
+        /** Which automatic turn of the exchange this is, counting from 1. */
+        readonly hop: number
+      }
+    | {
+        /** Picking a mission back up from a checkpoint after an interruption. */
+        readonly kind: 'resume'
+        readonly epoch: number
+      }
 }
 
 export type MissionHistoryResponse =
@@ -666,6 +685,7 @@ export interface DesktopApi {
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>
   cancelCodexMission(request: CodexMissionCancelRequest): Promise<CodexMissionCancelResponse>
   handOffMission(request: MissionHandoffRequest): Promise<MissionHandoffResponse>
+  resumeMission(request: MissionResumeRequest): Promise<MissionHandoffResponse>
   onCodexMissionUpdate(listener: (update: CodexMissionUpdate) => void): () => void
 }
 

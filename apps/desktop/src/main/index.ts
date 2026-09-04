@@ -41,6 +41,7 @@ import {
   MISSION_APPROVAL_CHANNEL,
   MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HANDOFF_CHANNEL,
+  MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
@@ -70,7 +71,8 @@ import type {
   CodexMissionUpdate,
   MissionMode,
   PublicTeammate,
-  MissionHandoffRequest
+  MissionHandoffRequest,
+  MissionResumeRequest
 } from '../shared/ipc.js'
 
 const probeRunner = createNodeProbeRunner()
@@ -974,6 +976,42 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: { runId, state: 'cancellation-requested' } } as const
       }
       return viaExec
+    })
+
+    ipcMain.handle(MISSION_RESUME_CHANNEL, async (event, request: unknown) => {
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
+        return {
+          ok: false,
+          error: { code: 'INTERNAL_ERROR', message: 'The resume request was rejected.' }
+        } as const
+      }
+      const payload = (typeof request === 'object' && request !== null ? request : {}) as Partial<MissionResumeRequest>
+      // Same widening as a start and a handoff: an unrecognized mode is
+      // read-only and an unrecognized runtime is Codex, so a malformed
+      // request cannot buy itself write access by being wrong.
+      const mode = payload.mode === 'accept-edits' ? 'accept-edits' : 'ask'
+      const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
+      const model = typeof payload.model === 'string' ? payload.model : undefined
+      const effort = typeof payload.effort === 'string' ? payload.effort : undefined
+      try {
+        return await codexMissions.resume(
+          payload.missionId,
+          runtime,
+          mode,
+          { ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) },
+          (update: CodexMissionUpdate) => {
+            if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
+              owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
+            }
+          }
+        )
+      } catch {
+        return {
+          ok: false,
+          error: { code: 'INTERNAL_ERROR', message: 'The mission could not be resumed.' }
+        } as const
+      }
     })
 
     ipcMain.handle(MISSION_HANDOFF_CHANNEL, async (event, request: unknown) => {

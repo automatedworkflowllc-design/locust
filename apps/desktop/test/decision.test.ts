@@ -135,3 +135,40 @@ describe('what the next turn is sent when a person picks', () => {
       .toBe('Wait for review. Continue with that.')
   })
 })
+
+describe('a permission request wearing the decision card', () => {
+  it('refuses a yes/no question, because that is an approval', () => {
+    // The exact over-asking the card was designed against, arriving through
+    // the front door. The product already has a card for "may I".
+    expect(parseDecision(block('Shall I proceed with the migration?\n- Yes\n- No'))).toBeUndefined()
+  })
+
+  it.each([
+    ['proceed / cancel', '- Proceed\n- Cancel'],
+    ['go ahead / stop', '- Go ahead\n- Stop'],
+    ['confirm / abort', '- Confirm\n- Abort'],
+    ['punctuated', '- Yes.\n- No!'],
+    ['mixed case', '- YES\n- no'],
+    ['one bare among substantive', '- Migrate all callers now\n- No']
+  ])('refuses %s', (_label, options) => {
+    expect(parseDecision(block(`Should I?\n${options}`))).toBeUndefined()
+  })
+
+  it('keeps a real fork whose option merely BEGINS with an assent word', () => {
+    // A rule that swallowed this would suppress a genuine choice -- and a
+    // suppressed question is worse than an ugly one, because the agent then
+    // guesses, which is the failure this card exists to end.
+    const asked = parseDecision(
+      block('How far should the migration go?\n- Yes, and migrate the callers too :: touches 4 files\n- Keep them on v2 :: smaller change')
+    )
+    expect(asked?.options.map((option) => option.label)).toEqual([
+      'Yes, and migrate the callers too',
+      'Keep them on v2'
+    ])
+  })
+
+  it('keeps options that name what to do, even when one sounds decisive', () => {
+    const asked = parseDecision(block('Which?\n- Stop the retry after one minute\n- Continue retrying three times'))
+    expect(asked?.options).toHaveLength(2)
+  })
+})

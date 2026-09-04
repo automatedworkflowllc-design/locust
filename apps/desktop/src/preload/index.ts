@@ -6,6 +6,7 @@ import {
   MISSION_APPROVAL_CHANNEL,
   MISSION_APPROVAL_DECIDE_CHANNEL,
   MISSION_HANDOFF_CHANNEL,
+  MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
@@ -34,6 +35,7 @@ import type {
   MissionApprovalAnswer,
   MissionApprovalRequest,
   MissionHandoffRequest,
+  MissionResumeRequest,
   MissionHandoffResponse,
   AppInfo,
   AppUpdateResponse,
@@ -120,6 +122,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(CODEX_MISSION_CANCEL_CHANNEL, request) as Promise<CodexMissionCancelResponse>,
   handOffMission: (request: MissionHandoffRequest) =>
     ipcRenderer.invoke(MISSION_HANDOFF_CHANNEL, request) as Promise<MissionHandoffResponse>,
+  resumeMission: (request: MissionResumeRequest) =>
+    ipcRenderer.invoke(MISSION_RESUME_CHANNEL, request) as Promise<MissionHandoffResponse>,
   listModels: () => ipcRenderer.invoke(MODEL_CATALOG_CHANNEL) as Promise<ModelCatalogResponse>,
   readWorkspaceSettings: () =>
     ipcRenderer.invoke(WORKSPACE_SETTINGS_READ_CHANNEL) as Promise<WorkspaceSettings>,

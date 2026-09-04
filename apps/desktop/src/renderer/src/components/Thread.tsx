@@ -23,6 +23,8 @@ import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
 import { AgentAvatar, AgentText, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
 import { DecisionCard } from './DecisionCard.js'
+import { ResumeCard } from './ResumeCard.js'
+import { resumeOffer } from '../resume.js'
 import { HandoffDivider } from './HandoffDivider.js'
 import { TimeMarker } from './TimeMarker.js'
 import { PeerThread } from './PeerThread.js'
@@ -208,6 +210,12 @@ export interface ThreadProps {
    */
   readonly onAnswer?: (option: DecisionOption) => void
   /**
+   * Pick up an interrupted mission from its last checkpoint. Absent when this
+   * thread cannot start a run at all, so the offer can never appear without a
+   * way to accept it.
+   */
+  readonly onResume?: (epoch: number) => void
+  /**
    * What THIS run was permitted to do. Taken from the live run rather than
    * from `restoredMission`, which is set only for a mission recovered from
    * the ledger -- so reading it there made every live read-only run say it
@@ -273,6 +281,7 @@ export function Thread({
   coldStart = false,
   onRunWithEdits,
   onAnswer,
+  onResume,
   sandbox,
   workspacePath,
   events,
@@ -464,6 +473,14 @@ export function Thread({
           </div>
         )}
 
+        {/*
+          An interrupted mission kept everything needed to carry on and, until
+          now, offered no way to. The offer sits ABOVE the receipt: the receipt
+          is the record, this is the thing to do about it.
+        */}
+        {restoredMission !== undefined && onResume !== undefined && (
+          <ResumeCard offer={resumeOffer(restoredMission)} onResume={onResume} busy={running} />
+        )}
         {restoredMission !== undefined && <ReceiptCard mission={restoredMission} />}
       </div>
     </div>

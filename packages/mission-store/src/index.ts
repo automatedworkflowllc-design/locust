@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 10 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 11 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -71,14 +71,21 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 10 as const
  * It is deliberately about WHO STARTED THE RUN rather than about the relay, so
  * a later host-started run has somewhere truthful to say so. An older reader
  * would drop the field and be wrong in exactly the way the app was.
+ *
+ * v10 -> v11 takes that extension point up: `startedBy.kind` gains `resume`, a
+ * run the host started to pick a mission back up from its last checkpoint
+ * after the app stopped mid-work. Same reason as v10 -- its prompt is a
+ * briefing the host wrote, so nothing may show it as a mission title -- and a
+ * v10 reader would refuse the record outright, since `relay` was the only kind
+ * it knew.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -152,10 +159,17 @@ export interface MissionLedgerMetadata {
  * runtime rather than anything a reader should be shown as a mission title.
  * `hop` is which automatic turn of the exchange this is, counting from 1.
  */
-export interface MissionStarter {
-  readonly kind: 'relay'
-  readonly hop: number
-}
+export type MissionStarter =
+  | {
+      readonly kind: 'relay'
+      readonly hop: number
+    }
+  | {
+      /** Picking a mission back up from a checkpoint after an interruption. */
+      readonly kind: 'resume'
+      /** The checkpoint epoch the new run continues from. */
+      readonly epoch: number
+    }
 
 /**
  * `route-switch` is a handoff to another runtime; `follow-up` is the next turn
@@ -483,10 +497,13 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
     }
   }
   if (metadata.startedBy !== undefined) {
+    const starter = metadata.startedBy
+    const counter = starter.kind === 'relay' ? starter.hop : starter.kind === 'resume' ? starter.epoch : undefined
     if (
-      metadata.startedBy.kind !== 'relay'
-      || !Number.isSafeInteger(metadata.startedBy.hop)
-      || metadata.startedBy.hop < 1
+      (starter.kind !== 'relay' && starter.kind !== 'resume')
+      || counter === undefined
+      || !Number.isSafeInteger(counter)
+      || counter < 1
     ) {
       throw new Error('Mission starter is invalid')
     }
@@ -581,6 +598,10 @@ function parsedMetadata(
   // And no writer before v10 could say a run was started by anything but a
   // person, so a file claiming otherwise was hand-edited.
   if (schemaVersion < 10 && candidate.startedBy !== undefined) {
+    return undefined
+  }
+  // And no writer before v11 knew any starter but the relay.
+  if (schemaVersion < 11 && candidate.startedBy !== undefined && candidate.startedBy.kind !== 'relay') {
     return undefined
   }
   // And no writer before v7 knew Cursor Agent or Gemini CLI.

@@ -48,6 +48,52 @@ const BLOCK = /<locust-ask\s*>([\s\S]*?)<\/locust-ask>/g
 /** `- Label :: what it costs`, where the cost half is optional. */
 const OPTION_LINE = /^[-*]\s+(.+)$/
 
+/**
+ * A button that only agrees, or only refuses.
+ *
+ * This is the failure this whole card was designed against, arriving through
+ * the front door: "Shall I proceed? - Yes / - No" is a PERMISSION request, not
+ * a fork, and the product already has a card for permission. Accepting it here
+ * would let an agent turn every step into a confirmation, which is the exact
+ * over-asking the briefing tells it to avoid -- and the person would face a
+ * decision card that decides nothing.
+ *
+ * A real fork's options say what to DO, so refusing bare assent costs nothing
+ * that matters. Kept deliberately narrow -- whole-label matches only, after
+ * stripping trailing punctuation -- because a rule that swallowed "Yes, and
+ * migrate the callers too" would suppress a genuine choice, and a suppressed
+ * question is worse than an ugly one: the agent then guesses, which is where
+ * this started.
+ */
+const BARE_ASSENT = new Set([
+  'yes',
+  'no',
+  'ok',
+  'okay',
+  'sure',
+  'proceed',
+  'continue',
+  'go',
+  'go ahead',
+  'do it',
+  'stop',
+  'cancel',
+  'abort',
+  'wait',
+  'approve',
+  'reject',
+  'deny',
+  'confirm',
+  'yes please',
+  'no thanks',
+  "don't",
+  'do not'
+])
+
+function isBareAssent(label: string): boolean {
+  return BARE_ASSENT.has(label.toLowerCase().replace(/[.!?,;:]+$/u, '').trim())
+}
+
 export interface DecisionOption {
   readonly label: string
   /** What this choice costs or implies, in the runtime's own words. */
@@ -121,6 +167,9 @@ function readBlock(body: string): DecisionRequest | undefined {
   // would be read aloud.
   const seen = new Set(options.map((option) => option.label.toLowerCase()))
   if (seen.size !== options.length) return undefined
+  // A permission request in a decision card's clothes. The approval card
+  // already exists for "may I"; this one is for "which".
+  if (options.some((option) => isBareAssent(option.label))) return undefined
   return { question, options }
 }
 

@@ -934,6 +934,56 @@ export default function App(): ReactElement {
    * path in the host describes a mission that is now STOPPED. Swallowing one
    * would leave a dead run looking live.
    */
+  /**
+   * Pick a stopped mission back up. It reaches the same update stream a start
+   * does, so the new run appears and follows exactly as any other; what is
+   * different is only that the host wrote its prompt from the checkpoint.
+   */
+  const resumeMission = async (missionId: string, epoch: number): Promise<void> => {
+    const bridge = window.desktop
+    if (!bridge) return
+    setHandingOff(true)
+    try {
+      const response = await bridge.resumeMission({
+        missionId,
+        runtime: route.runtime,
+        mode,
+        ...(route.model === 'account-default' ? {} : { model: route.model })
+      })
+      if (!response.ok) {
+        // Said in the thread the person is looking at, not swallowed: they
+        // pressed a button and are owed the reason it did nothing.
+        setRuns((current) =>
+          withNewRun(current, `resume-failed:${String(epoch)}:${String(++pendingKeyCounter.current)}`, {
+            prompt: 'Resume from checkpoint',
+            phase: 'failed',
+            events: [],
+            error: response.error.message
+          })
+        )
+        return
+      }
+      const ownerId = missionOwners[missionId]
+      if (ownerId !== undefined) {
+        setMissionOwners((current) => ({ ...current, [response.data.missionId]: ownerId }))
+      }
+      setRuns((current) =>
+        withNewRun(current, response.data.runId, {
+          prompt: 'Resume from checkpoint',
+          data: response.data,
+          phase: 'running',
+          events: [],
+          startedAtIso: new Date().toISOString(),
+          ...(ownerId === undefined ? {} : { teammateId: ownerId })
+        })
+      )
+      setShownKey(response.data.runId)
+      await refreshHistory()
+    } finally {
+      setHandingOff(false)
+    }
+  }
+
   const handOffMission = async (choice: RouteChoice): Promise<void> => {
     const bridge = window.desktop
     const current = liveRunRef.current
@@ -1566,6 +1616,17 @@ export default function App(): ReactElement {
                     ? () => {
                         setMode('accept-edits')
                         void startMission(liveRun.prompt, 'accept-edits')
+                      }
+                    : undefined
+                }
+                onResume={
+                  // Offered only for a mission that is not running and whose
+                  // record the app will vouch for -- ResumeCard decides that
+                  // from the checkpoint, and the host checks it again rather
+                  // than taking the renderer's word.
+                  !running && liveRun.restoredMission !== undefined
+                    ? (epoch) => {
+                        void resumeMission(liveRun.restoredMission!.missionId, epoch)
                       }
                     : undefined
                 }

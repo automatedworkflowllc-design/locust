@@ -105,9 +105,13 @@ export function publicRecoveredMission(
             reason: mission.metadata.continuesFrom.reason
           }
         }),
+    // Copied by kind rather than spread: each carries a different counter, and
+    // a spread would let a future field ride out to the renderer unreviewed.
     ...(mission.metadata.startedBy === undefined
       ? {}
-      : { startedBy: { kind: mission.metadata.startedBy.kind, hop: mission.metadata.startedBy.hop } })
+      : mission.metadata.startedBy.kind === 'relay'
+        ? { startedBy: { kind: 'relay' as const, hop: mission.metadata.startedBy.hop } }
+        : { startedBy: { kind: 'resume' as const, epoch: mission.metadata.startedBy.epoch } })
   }
 }
 
