@@ -24,8 +24,14 @@ const say = (line) => console.error(line)
 
 const profile = await mkdtemp(join(tmpdir(), 'locust-copilot-'))
 await mkdir(profile, { recursive: true })
-const child = spawn(ELECTRON, ['.', '--remote-debugging-port=9295', `--user-data-dir=${profile}`], {
-  cwd: APP_DIR,
+// A THROWAWAY workspace, not the repo. The app treats its cwd as the folder a
+// mission may edit, and this probe runs prompts that ask for writes -- the
+// first version launched from APP_DIR and left a `blocked.txt` in the source
+// tree, twice, because the agent did what it was asked. Electron takes the app
+// directory as an argument, so the cwd is free to be somewhere disposable.
+const workspace = await mkdtemp(join(tmpdir(), 'locust-copilot-ws-'))
+const child = spawn(ELECTRON, [APP_DIR, '--remote-debugging-port=9295', `--user-data-dir=${profile}`], {
+  cwd: workspace,
   env: { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}` },
   stdio: ['ignore', 'pipe', 'pipe']
 })
@@ -194,4 +200,5 @@ try {
   child.kill()
   await sleep(800)
   await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+  await rm(workspace, { recursive: true, force: true }).catch(() => undefined)
 }
