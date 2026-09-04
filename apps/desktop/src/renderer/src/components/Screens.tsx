@@ -114,6 +114,13 @@ export function MissionsScreen({
           withIssues === 0 ? 'ledger verified' : `${withIssues} with an incomplete receipt`
         }${total === undefined ? '' : ` · ${total} across ${priced} priced`}`}
       />
+      {/*
+        * Filters over an empty archive are four controls that can only ever
+        * return nothing -- the same reason the approval filter is withheld
+        * when there is nothing to approve. Raised by the design pass as a
+        * feature question rather than a styling one, which it is.
+        */}
+      {missions.length > 0 && (
       <div className="lc-filters">
         {FILTERS.map((name) => (
           <button
@@ -127,6 +134,7 @@ export function MissionsScreen({
           </button>
         ))}
       </div>
+      )}
       <div className="lc-screen__scroll">
         {shown.length === 0 ? (
           <p className="lc-inspector__empty">
@@ -224,31 +232,60 @@ export function TeammatesScreen({
                     <div className="lc-rostercard__name">{teammate.name}</div>
                     <div className="lc-rostercard__role">{roleLabelOf(teammate)}</div>
                   </div>
+                  <div className="lc-rostercard__actions">
+                    <button type="button" className="lc-rostercard__edit" onClick={() => onEdit(teammate)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="lc-rostercard__remove"
+                      onClick={() => onRemove(teammate.teammateId)}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <dl className="lc-rostercard__facts">
-                  <dt>Route</dt>
-                  <dd className="lc-mono">
-                    {teammate.route === undefined
-                      ? 'not run yet · set by their first mission'
-                      : `${runtimeDisplayName(teammate.route.runtime)} / ${teammate.route.model}`}
-                  </dd>
-                  <dt>Missions</dt>
-                  <dd className="lc-mono">{owned}</dd>
-                  <dt>Last run</dt>
-                  <dd className="lc-mono">
-                    {work.lastRunAt === undefined ? 'never' : agoLabel(work.lastRunAt) ?? 'unknown'}
-                  </dd>
+                {/*
+                  * Route and mode are identity, not status, and the model name
+                  * is the fact this product exists to keep legible -- so it
+                  * gets a full-width row and wraps rather than ever being cut.
+                  */}
+                <div className="lc-rostercard__route lc-mono">
+                  {teammate.route === undefined ? (
+                    <span>not run yet · route set by their first mission</span>
+                  ) : (
+                    <>
+                      <span className="lc-rostercard__model">
+                        {runtimeDisplayName(teammate.route.runtime)} / {teammate.route.model}
+                      </span>
+                      <span>{modeLabel(teammate.route.mode)}</span>
+                    </>
+                  )}
+                </div>
+                <dl className="lc-rostercard__stats">
+                  <div className="lc-rostercard__stat">
+                    <dt>Missions</dt>
+                    <dd className={`lc-mono${owned === 0 ? ' is-unreported' : ''}`}>{owned}</dd>
+                  </div>
+                  <div className="lc-rostercard__stat">
+                    <dt>Last run</dt>
+                    <dd className={`lc-mono${work.lastRunAt === undefined ? ' is-unreported' : ''}`}>
+                      {work.lastRunAt === undefined ? 'never' : agoLabel(work.lastRunAt) ?? 'unknown'}
+                    </dd>
+                  </div>
+                </dl>
+                {/* Undefined is not zero: a runtime that reported no usage has
+                  * not said the work was free, and `not reported` must never
+                  * be truncated into saying something else. */}
+                <dl className="lc-rostercard__cost">
                   <dt>Cost</dt>
-                  {/* Undefined is not zero: a runtime that reported no usage
-                    * has not said the work was free. */}
-                  <dd className="lc-mono">{costLine(work.cost) ?? 'not reported'}</dd>
-                  <dt>Mode</dt>
-                  {/* Their own last mode, not a constant. This printed
-                    * `read-only` for every teammate regardless. */}
-                  <dd className="lc-mono">{modeLabel(teammate.route?.mode)}</dd>
+                  <dd className={`lc-mono${work.cost === undefined ? ' is-unreported' : ''}`}>
+                    {costLine(work.cost) ?? 'not reported'}
+                  </dd>
                 </dl>
                 {work.recent.length > 0 && (
                   <div className="lc-rostercard__recent">
+                    <div className="lc-rostercard__recentlabel lc-mono">Recent</div>
                     {work.recent.map((entry) => (
                       <button
                         type="button"
@@ -258,22 +295,11 @@ export function TeammatesScreen({
                       >
                         <span className={`lc-dot lc-tone-${missionPhaseView(entry.phase, false).tone}`} />
                         <span className="lc-rostercard__missiontitle">{entry.title}</span>
+                        <span className="lc-rostercard__missionage lc-mono">{agoLabel(entry.at) ?? ''}</span>
                       </button>
                     ))}
                   </div>
                 )}
-                <div className="lc-rostercard__actions">
-                  <button type="button" className="lc-rostercard__edit" onClick={() => onEdit(teammate)}>
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="lc-rostercard__remove"
-                    onClick={() => onRemove(teammate.teammateId)}
-                  >
-                    Remove
-                  </button>
-                </div>
               </div>
             )
           })}

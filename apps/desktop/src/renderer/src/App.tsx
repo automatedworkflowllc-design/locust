@@ -55,6 +55,7 @@ import {
   stitchedHandoff,
   typedPrompt
 } from './missionView.js'
+import { conversationCost, costLine } from './cost.js'
 import { collapseConversations, listedAsMission, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
@@ -1061,6 +1062,11 @@ export default function App(): ReactElement {
 
   const runtimes = runtimeState.phase === 'ready' ? runtimeState.runtimes : []
   const running = liveRunIsActive(liveRun)
+  /** The conversation's recorded cost, shown in the header while it is going. */
+  const shownCost =
+    liveRun === undefined
+      ? undefined
+      : costLine(conversationCost(liveRun.earlierTurns ?? [], liveRun.events))
   const runningCount = [...runs.values()].filter(liveRunIsActive).length
   const historyById = useMemo(
     () => new Map(history.map((mission) => [mission.missionId, mission] as const)),
@@ -1452,7 +1458,12 @@ export default function App(): ReactElement {
                               : liveRun.restored === true
                                 ? 'restored from the local ledger'
                                 : liveRun.phase
-                          } · ${liveRun.data.sandbox === 'workspace-write' ? 'may edit the workspace' : 'read-only'}`}
+                          } · ${liveRun.data.sandbox === 'workspace-write' ? 'may edit the workspace' : 'read-only'}${
+                            // What the conversation has actually cost, while it
+                            // is still going. Silence when no turn reported a
+                            // number -- never a zero, which would read as free.
+                            shownCost === undefined ? '' : ` · ${running ? 'so far ' : ''}${shownCost}`
+                          }`}
                     </div>
                   </div>
                 </div>

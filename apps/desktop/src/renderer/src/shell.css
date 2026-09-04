@@ -362,20 +362,33 @@ textarea {
 }
 
 /*
- * Three nav buttons and the connection count share one narrow row. Before
- * this the row was `space-between` with no minimum sizes, so adding Missions
- * and Teammates squeezed "6 connected" until it wrapped onto two lines --
- * Colin spotted it in a screenshot. The buttons take the room they need and
- * the count keeps its own line to itself.
+ * Three nav buttons and the connection count, in a 267px sidebar.
+ *
+ * MEASURED 2026-09-03, twice. Adding Missions and Teammates put three
+ * labelled buttons in a footer built for one: they need 268px of the 243px
+ * this row actually has, before the count's 73px is considered. The first
+ * attempt at a fix let the buttons keep their width and gave the count
+ * `flex: 0 1 auto` -- which stopped it WRAPPING by squeezing it to zero
+ * width, so "6 connected" was in the DOM, reported by innerText, and invisible
+ * on screen. Colin caught that in a screenshot too.
+ *
+ * So the row is two rows: navigation, then the count under it. The buttons
+ * wrap among themselves if they still cannot fit, rather than pushing anything
+ * off the edge.
  */
 .lc-sidebar__footer {
   margin-top: auto;
   border-top: 1px solid var(--lc-border-hairline);
-  padding: var(--lc-space-4) var(--lc-space-5);
+  /* Measured: the three labelled buttons come to 251px, and the row has 255
+   * at this padding. Column gap is zero because `space-between` already
+   * spaces them and 8px of gap was the whole overflow; the row gap is what
+   * separates the count's line below. */
+  padding: var(--lc-space-4) var(--lc-space-3);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--lc-space-3);
+  gap: var(--lc-space-2) 0;
 }
 
 .lc-sidebar__footer button {
@@ -383,13 +396,13 @@ textarea {
   align-items: center;
   flex: 0 0 auto;
   white-space: nowrap;
-  gap: var(--lc-space-3);
+  gap: var(--lc-space-2);
   border: 0;
   background: transparent;
   color: var(--lc-text-secondary);
   font-size: var(--lc-text-control);
   cursor: pointer;
-  padding: var(--lc-space-2) var(--lc-space-3);
+  padding: var(--lc-space-2) var(--lc-space-2);
   border-radius: var(--lc-radius-control);
 }
 
@@ -401,11 +414,13 @@ textarea {
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
-  /* One line or nothing: "6" above "connected" reads as two facts. */
+  /*
+   * Its own full-width line, so it is never squeezed by the buttons and never
+   * broken mid-phrase. `flex: 0 1 auto` here is what made it disappear.
+   */
   white-space: nowrap;
-  flex: 0 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 1 0 100%;
+  padding-left: var(--lc-space-2);
 }
 
 /* --- Workroom ---------------------------------------------------------- */
@@ -3243,5 +3258,439 @@ textarea {
 
 .lc-field__hint {
   font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/* ======================================================================
+ * Visual pass, 2026-09-03 (design agent).
+ *
+ * Answer to docs/DESIGN-BRIEF-2026-09-03.md, applied verbatim. It supersedes
+ * the first-pass rules I wrote earlier the same day for the components it
+ * names; those blocks above are left where they are and overridden here by
+ * source order, so the delta stays reviewable against what was handed over.
+ *
+ * Two of its eight items were returned as scope rather than styling and were
+ * changed in the code instead: the Recent group now withholds itself when it
+ * would not shorten anything, and the Missions filters are hidden when there
+ * is nothing to filter.
+ * ====================================================================== */
+
+/*
+ * PASS-2026-09-03.css -- visual pass on the components shipped 2026-09-03.
+ *
+ * Drop-in delta for shell.css. Every value is a token; no `color:` takes
+ * --lc-text-faint. Written to pass `node apps/desktop/test/token-gate.mjs`.
+ * Rules are flat and one selector per block, which is what the gate's parser
+ * expects. Where a rule REPLACES an existing one in shell.css, the original
+ * is named in the comment so it can be deleted rather than overridden.
+ */
+
+/* --- 1. Code ------------------------------------------------------------
+ * Replaces .lc-code, .lc-code__lang, .lc-code--inline.
+ * Tighter than a card (it is content, not a container), and the language
+ * label sits in the corner so the code starts on its first line.
+ */
+.lc-code {
+  position: relative;
+  margin: var(--lc-space-1) 0;
+  padding: 10px var(--lc-space-5);
+  background: var(--lc-diff-surface);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-button);
+  overflow-x: auto;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-provenance);
+  line-height: 1.6;
+  color: var(--lc-text-secondary);
+}
+
+.lc-code code {
+  display: block;
+  white-space: pre;
+  font: inherit;
+  color: inherit;
+}
+
+.lc-code__lang {
+  position: absolute;
+  top: var(--lc-space-3);
+  right: var(--lc-space-4);
+  margin: 0;
+  padding: 1px var(--lc-space-3);
+  border-radius: 4px;
+  border: 1px solid var(--lc-border-hairline);
+  background: var(--lc-bg-raised-2);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+/* A code block that carries a label needs room for it on its first line. */
+.lc-code:has(.lc-code__lang) code {
+  padding-right: 64px;
+}
+
+/* Inline code: fill only, no border. Two outlines on a dark surface read as
+   a button; one fill reads as a literal. Secondary rather than primary so it
+   sits IN the sentence instead of above it. */
+.lc-code--inline {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--lc-diff-surface);
+  font-family: var(--lc-font-mono);
+  font-size: 0.92em;
+  color: var(--lc-text-secondary);
+}
+
+/* --- 2. Lists -----------------------------------------------------------
+ * Replaces .lc-list, .lc-list li. Markers are mono and muted so the shape of
+ * the list reads before the words; the gap is tighter than paragraph gap so
+ * the items group.
+ */
+.lc-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-list li {
+  text-wrap: pretty;
+}
+
+.lc-list li::marker {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+/* --- 3. Link labels -----------------------------------------------------
+ * Replaces .lc-linklabel. Answer to the brief's question: no, a hairline
+ * underline is the one signal every reader has learned means "click". This
+ * names a thing, so it borrows the register of a name -- mono, no fill, no
+ * underline. Inline code keeps its fill; that is what tells the two apart.
+ */
+.lc-linklabel {
+  font-family: var(--lc-font-mono);
+  font-size: 0.92em;
+  color: var(--lc-text-secondary);
+  border-bottom: 0;
+  cursor: default;
+}
+
+/* --- 4. The rerun offer -------------------------------------------------
+ * Replaces .lc-rerun, .lc-rerun span. Not a card. Same register as
+ * .lc-diagnostic (a note about the run, left-ruled), in green because the
+ * run SETTLED -- it did what its mode allows. Lime is on the one action.
+ * Indented to the reply column so it reads as a footnote to the reply.
+ */
+.lc-rerun {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-5);
+  margin-left: 36px;
+  padding: var(--lc-space-3) 0 var(--lc-space-3) 10px;
+  border: 0;
+  border-left: 2px solid var(--lc-green-border);
+  border-radius: 0;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-secondary-size);
+}
+
+.lc-rerun span {
+  flex: 1;
+  min-width: 0;
+  text-wrap: pretty;
+}
+
+.lc-rerun .lc-button {
+  height: 28px;
+  flex: none;
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+  color: var(--lc-lime-text);
+}
+
+.lc-rerun .lc-button:hover:not(:disabled) {
+  background: var(--lc-lime-tint-strong);
+  border-color: var(--lc-lime-border-strong);
+}
+
+/* --- 5. Roster card -----------------------------------------------------
+ * The card holds three kinds of fact and now says so: identity (name, role)
+ * in the head; route + mode on a full-width line of its own; the measured
+ * numbers as tiles; history as a labelled section. Edit/Remove sit in the
+ * head as quiet text.
+ *
+ * NOTHING ON THIS CARD ELLIPSIZES. The brief's words -- `not reported`,
+ * `never` -- are load-bearing, and the model name is the fact this product
+ * exists to keep legible. A 280px card cannot hold three mono tiles or a
+ * route line beside two buttons, so the layout gives each its own row and
+ * lets long values wrap instead of clipping. Measured at 300px on the
+ * reference; shell.css's grid goes to 280px.
+ *
+ * Markup change required in Screens.tsx -- see PASS-2026-09-03.md §5.
+ */
+.lc-rostercard {
+  gap: 14px;
+}
+
+.lc-rostercard__head {
+  align-items: flex-start;
+}
+
+.lc-rostercard__id {
+  flex: 1;
+  min-width: 0;
+}
+
+.lc-rostercard__actions {
+  display: flex;
+  gap: var(--lc-space-1);
+  flex: none;
+}
+
+.lc-rostercard__edit,
+.lc-rostercard__remove {
+  height: 24px;
+  padding: 0 var(--lc-space-4);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-rostercard__edit:hover {
+  background: var(--lc-hover-surface);
+  color: var(--lc-text-secondary);
+}
+
+.lc-rostercard__remove:hover {
+  background: var(--lc-red-tint);
+  color: var(--lc-red-text);
+}
+
+/* Route + mode. Identity, not status -- same voice as .lc-row__route in the
+   sidebar -- on its own row so it gets the full card width and wraps. */
+.lc-rostercard__route {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2) var(--lc-space-4);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: 0.02em;
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
+.lc-rostercard__route .lc-rostercard__model {
+  color: var(--lc-text-secondary);
+}
+
+/* Missions and Last run as tiles: a number in a tile reads as a number. Two
+   columns, not three -- three mono tiles do not fit 280px. */
+.lc-rostercard__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lc-space-3);
+  margin: 0;
+}
+
+.lc-rostercard__stat {
+  min-width: 0;
+  padding: var(--lc-space-4) 10px;
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-border-hairline);
+  background: var(--lc-bg-window);
+}
+
+.lc-rostercard__stat dt {
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-label);
+}
+
+.lc-rostercard__stat dd {
+  margin: var(--lc-space-1) 0 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* Cost on its own full-width row, label and value inline. Costs are long
+   ("$0.42 · 118k tokens") and `not reported` must never truncate. */
+.lc-rostercard__cost {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-border-hairline);
+  background: var(--lc-bg-window);
+}
+
+.lc-rostercard__cost dt {
+  flex: none;
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-label);
+}
+
+.lc-rostercard__cost dd {
+  margin: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-provenance);
+  color: var(--lc-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* `not reported`, `never`, `0`: the words stay exactly as written, but a
+   non-value is quieter than a value. */
+.lc-rostercard__stat dd.is-unreported,
+.lc-rostercard__cost dd.is-unreported {
+  color: var(--lc-text-muted);
+}
+
+/* Replaces .lc-rostercard__recent. A labelled section with a hairline, only
+   rendered when there is something in it. */
+.lc-rostercard__recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+  margin: 0;
+  padding-top: var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+.lc-rostercard__recentlabel {
+  padding: 0 var(--lc-space-4) var(--lc-space-2);
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-label);
+}
+
+.lc-rostercard__mission {
+  padding: 5px var(--lc-space-4);
+}
+
+.lc-rostercard__missionage {
+  flex: none;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+}
+
+/* --- 6. Picker: Recent --------------------------------------------------
+ * A shortcut has to look like a shortcut. The group becomes a recessed tray
+ * one surface below the list, its rows are single-line and carry a pointer
+ * to the group they live in instead of a tag -- the canonical row below owns
+ * the detail and the tag, so ACTIVE appears exactly once on screen.
+ *
+ * Needs the `is-recent` class on the row and group, and the pointer span;
+ * see PASS-2026-09-03.md §6.
+ */
+.lc-picker__tray {
+  padding: var(--lc-space-3) var(--lc-space-3) var(--lc-space-4);
+  background: var(--lc-bg-window);
+  border-bottom: 1px solid var(--lc-border-card);
+}
+
+.lc-picker__group.is-recent {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-3) var(--lc-space-4) var(--lc-space-2);
+}
+
+.lc-picker__grouphint {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--lc-text-muted);
+}
+
+.lc-picker__row.is-recent {
+  height: 30px;
+  padding: 0 9px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.lc-picker__row.is-recent:hover:not(:disabled) {
+  background: var(--lc-hover-surface);
+}
+
+/* The ACTIVE fill belongs to the canonical row only. */
+.lc-picker__row.is-recent.is-active {
+  background: transparent;
+  border-color: transparent;
+}
+
+.lc-picker__row.is-recent .lc-picker__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-picker__row.is-recent .lc-picker__detail,
+.lc-picker__row.is-recent .lc-picker__tag {
+  display: none;
+}
+
+.lc-picker__pointer {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+}
+
+.lc-picker__pointer svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* --- Empty states -------------------------------------------------------
+ * Both screens reuse .lc-empty. The Missions filter row hides when there is
+ * nothing to filter (see §7 in the .md); the Teammates grid is replaced.
+ */
+.lc-empty__glyph {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--lc-border-button);
+  border-radius: var(--lc-radius-button);
+  color: var(--lc-text-muted);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.lc-empty .lc-primarybutton {
+  margin-top: var(--lc-space-2);
+}
+
+.lc-empty__hint {
+  margin: var(--lc-space-2) 0 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }

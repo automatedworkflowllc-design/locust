@@ -169,12 +169,23 @@ export function RoutePicker({
           // The last row of a capped group carries the count it held back.
           const hidden = shown[index + 1]?.group === row.group ? 0 : hiddenByGroup.get(row.group) ?? 0
           const isActive = row.tag === 'ACTIVE'
+          const recent = row.group === 'Recent'
+          // Which runtime the canonical row below sits under, so a recent row
+          // can say why it appears twice.
+          const pointsAt = recent
+            ? rows.find((other) => other.key === row.key.replace(/^recent:/, ''))?.group.replace(/ · your account$/, '')
+            : undefined
           return (
-            <div key={row.key}>
-              {header !== undefined && <div className="lc-picker__group">{header}</div>}
+            <div key={row.key} className={recent ? 'lc-picker__tray' : undefined}>
+              {header !== undefined && (
+                <div className="lc-picker__group">
+                  {header}
+                  {recent && <span className="lc-picker__grouphint">shortcuts to rows below</span>}
+                </div>
+              )}
               <button
                 type="button"
-                className={`lc-picker__row${isActive ? ' is-active' : ''}`}
+                className={`lc-picker__row${isActive ? ' is-active' : ''}${recent ? ' is-recent' : ''}`}
                 disabled={!row.selectable}
                 aria-current={isActive}
                 onClick={() => {
@@ -195,8 +206,16 @@ export function RoutePicker({
                 />
                 <span className="lc-picker__text">
                   <span className="lc-picker__label">{row.label}</span>
-                  <span className="lc-picker__detail lc-mono">{row.detail}</span>
+                  {/* A shortcut row carries neither detail nor tag: the
+                    * canonical row below owns those, so ACTIVE appears exactly
+                    * once on screen. */}
+                  {!recent && <span className="lc-picker__detail lc-mono">{row.detail}</span>}
                 </span>
+                {recent ? (
+                  pointsAt === undefined ? null : (
+                    <span className="lc-picker__pointer lc-mono">{`↓ ${pointsAt}`}</span>
+                  )
+                ) : (
                 <span
                   className={`lc-picker__tag lc-mono ${
                     row.tag === 'ACTIVE'
@@ -210,6 +229,7 @@ export function RoutePicker({
                 >
                   {row.tag}
                 </span>
+                )}
               </button>
               {hidden > 0 && (
                 <p className="lc-picker__more lc-mono">

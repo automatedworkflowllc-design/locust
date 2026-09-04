@@ -64,6 +64,26 @@ export function costLine(cost: RunCost | undefined): string | undefined {
   return undefined
 }
 
+/**
+ * What a conversation has cost so far, across every turn that reported one.
+ *
+ * Cost only existed on a receipt, and a receipt belongs to one mission -- so a
+ * five-turn conversation kept its cost in five places and showed it in none of
+ * them while any of it was happening. MEASURED 2026-09-03: the moment a person
+ * most wants the number is while a run is going, and that was the one moment
+ * it was never on screen.
+ *
+ * Nothing here is estimated. A turn that reported no usage contributes
+ * nothing, and a conversation where no turn reported any returns undefined --
+ * which the caller must render as silence, not as zero.
+ */
+export function conversationCost(
+  earlierTurns: readonly { readonly events: readonly NormalizedRuntimeEvent[] }[],
+  events: readonly NormalizedRuntimeEvent[]
+): RunCost | undefined {
+  return sumCosts([...earlierTurns.map((turn) => runCostOf(turn.events)), runCostOf(events)])
+}
+
 /** Sum what can be summed; a mixed list keeps every unit it saw. */
 export function sumCosts(costs: readonly (RunCost | undefined)[]): RunCost | undefined {
   let total: RunCost | undefined

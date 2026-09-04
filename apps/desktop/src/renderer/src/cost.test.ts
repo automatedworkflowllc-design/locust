@@ -1,7 +1,7 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it } from 'vitest'
 
-import { costLine, runCostOf, sumCosts } from './cost.js'
+import { conversationCost, costLine, runCostOf, sumCosts } from './cost.js'
 
 function completed(usage: unknown): NormalizedRuntimeEvent {
   return {
@@ -15,6 +15,43 @@ function completed(usage: unknown): NormalizedRuntimeEvent {
     payload: { evidence: { redacted: false }, process: {}, ...(usage === undefined ? {} : { usage }) }
   } as unknown as NormalizedRuntimeEvent
 }
+
+describe('what a conversation has cost so far', () => {
+  const turn = (inputTokens: number, outputTokens: number) => ({
+    events: [
+      {
+        id: 'e',
+        runId: 'r',
+        missionId: 'm',
+        sequence: 1,
+        type: 'run.completed',
+        occurredAt: '2026-09-03T10:00:00.000Z',
+        sourceAdapter: 'codex',
+        payload: { usage: { inputTokens, outputTokens }, evidence: { redacted: true } }
+      }
+    ] as unknown as Parameters<typeof conversationCost>[1]
+  })
+
+  it('adds every turn that reported a number, including the one still running', () => {
+    // Cost lived on a receipt, and a receipt belongs to one mission -- so a
+    // five-turn conversation kept its cost in five places and showed it in
+    // none of them while any of it was happening.
+    expect(conversationCost([turn(100, 10), turn(200, 20)], turn(50, 5).events)).toEqual({
+      inputTokens: 350,
+      outputTokens: 35
+    })
+  })
+
+  it('counts the earlier turns while the current one has reported nothing yet', () => {
+    expect(conversationCost([turn(100, 10)], [])).toEqual({ inputTokens: 100, outputTokens: 10 })
+  })
+
+  it('says nothing when no turn reported anything, rather than zero', () => {
+    // A runtime that reported no usage has not said the work was free.
+    expect(conversationCost([], [])).toBeUndefined()
+    expect(conversationCost([{ events: [] }], [])).toBeUndefined()
+  })
+})
 
 describe('what a run cost, off its receipt', () => {
   it('reads token counts in either spelling', () => {

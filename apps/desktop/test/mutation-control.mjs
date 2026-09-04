@@ -40,6 +40,13 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 
 const MUTATIONS = [
   {
+    file: COST,
+    name: 'the running turn is left out of what the conversation has cost',
+    from: '  return sumCosts([...earlierTurns.map((turn) => runCostOf(turn.events)), runCostOf(events)])',
+    to: '  return sumCosts(earlierTurns.map((turn) => runCostOf(turn.events)))',
+    expect: 'adds every turn that reported a number, including the one still running'
+  },
+  {
     file: STATUS,
     name: 'the Recent group resurrects a route the runtime no longer offers',
     from: '    if (row === undefined) continue',
@@ -49,8 +56,8 @@ const MUTATIONS = [
   {
     file: STATUS,
     name: 'a single recent route is offered as a shortcut to where you already are',
-    from: '  return picked.length < 2 ? [] : picked',
-    to: '  return picked',
+    from: '  if (picked.length < 2) return []',
+    to: '  if (false) return []',
     expect: 'withholds the group for a single recent route, which is the one you are on'
   },
   {

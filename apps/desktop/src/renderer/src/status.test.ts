@@ -54,25 +54,57 @@ describe('the routes a person moves between', () => {
     { key: 'cursor:composer-2.5', group: 'Cursor Agent · your account' }
   ]
 
+  // A list long enough for a shortcut to shorten something.
+  const longList = [
+    ...rows,
+    ...Array.from({ length: 9 }, (_, index) => ({
+      key: `codex:filler-${String(index)}`,
+      group: 'Codex CLI · your account'
+    }))
+  ]
+
   it('lifts the recently used routes into a group of their own, newest first', () => {
-    const recent = recentRouteRows(rows, ['claude:sonnet', 'codex:gpt-5.6-sol'])
+    const recent = recentRouteRows(longList, ['claude:sonnet', 'codex:gpt-5.6-sol'])
     expect(recent.map((row) => row.group)).toEqual(['Recent', 'Recent'])
     expect(recent.map((row) => row.key)).toEqual(['recent:claude:sonnet', 'recent:codex:gpt-5.6-sol'])
   })
 
   it('withholds the group for a single recent route, which is the one you are on', () => {
-    expect(recentRouteRows(rows, ['claude:sonnet'])).toEqual([])
-    expect(recentRouteRows(rows, [])).toEqual([])
+    // Against the LONG list, so the short-list and half-the-list rules cannot
+    // withhold it for their own reasons -- this has to fail when the
+    // single-recent rule is the thing that breaks. The sweep caught exactly
+    // that: written against the short list, the test passed no matter what
+    // this rule did.
+    expect(recentRouteRows(longList, ['claude:sonnet'])).toEqual([])
+    expect(recentRouteRows(longList, [])).toEqual([])
+  })
+
+  it('withholds the group when the whole list is short enough to take in at once', () => {
+    // The justification for the group was 27 rows scrolling at 330px. Three
+    // rows on screen have nothing to skip past, so a shortcut shortens nothing.
+    expect(recentRouteRows(rows, ['claude:sonnet', 'codex:gpt-5.6-sol'])).toEqual([])
+  })
+
+  it('withholds the group when it would be half the list or more', () => {
+    // With two routes total the shortcut is a second copy of the picker.
+    const many = Array.from({ length: 12 }, (_, index) => ({
+      key: `codex:model-${String(index)}`,
+      group: 'Codex CLI · your account'
+    }))
+    const halfOrMore = many.slice(0, 6).map((row) => row.key)
+    expect(recentRouteRows(many, halfOrMore, 6)).toEqual([])
+    const aFew = many.slice(0, 3).map((row) => row.key)
+    expect(recentRouteRows(many, aFew)).toHaveLength(3)
   })
 
   it('never resurrects a route the runtime has stopped offering', () => {
-    const recent = recentRouteRows(rows, ['codex:retired-model', 'claude:sonnet', 'cursor:composer-2.5'])
+    const recent = recentRouteRows(longList, ['codex:retired-model', 'claude:sonnet', 'cursor:composer-2.5'])
     expect(recent.map((row) => row.key)).toEqual(['recent:claude:sonnet', 'recent:cursor:composer-2.5'])
   })
 
   it('stops at the limit rather than repeating the whole list', () => {
     const many = ['codex:gpt-5.6-sol', 'claude:sonnet', 'cursor:composer-2.5']
-    expect(recentRouteRows(rows, many, 2)).toHaveLength(2)
+    expect(recentRouteRows(longList, many, 2)).toHaveLength(2)
   })
 })
 

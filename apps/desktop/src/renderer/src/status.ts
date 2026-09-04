@@ -559,8 +559,17 @@ export const RECENT_ROUTE_LIMIT = 4
  * at 330px of 751.
  *
  * Only routes that are still offered appear, so a model a runtime has stopped
- * advertising cannot be resurrected here. Fewer than two is not a shortcut --
- * one recent route is the one you are already on -- so the group is withheld.
+ * advertising cannot be resurrected here. Three cases withhold it entirely,
+ * all of them the same rule: a shortcut has to shorten something.
+ *
+ * - Fewer than two recents. One recent route is the one you are already on.
+ * - A list short enough to see at once. The justification for the group was
+ *   27 rows scrolling at 330px; below that there is nothing to skip past.
+ * - Recents that are half the list or more. With two routes total, a Recent
+ *   group duplicates the entire picker and explains nothing.
+ *
+ * The last two came from the design pass pushing back on the feature rather
+ * than styling around it, which was the right call.
  */
 export function recentRouteRows<TRow extends { readonly key: string; readonly group: string }>(
   rows: readonly TRow[],
@@ -575,7 +584,12 @@ export function recentRouteRows<TRow extends { readonly key: string; readonly gr
     picked.push({ ...row, group: 'Recent', key: `recent:${key}` })
     if (picked.length >= limit) break
   }
-  return picked.length < 2 ? [] : picked
+  if (picked.length < 2) return []
+  // Short enough to take in at once, or so much of the list that the shortcut
+  // is a second copy of it.
+  if (rows.length <= ROUTE_GROUP_LIMIT + 2) return []
+  if (picked.length * 2 >= rows.length) return []
+  return picked
 }
 
 export function orderRouteRows<TRow extends { readonly key: string; readonly group: string; readonly model?: string }>(

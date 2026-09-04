@@ -21,6 +21,8 @@ export interface TeammateWork {
     readonly missionId: string
     readonly title: string
     readonly phase: PublicRecoveredMission['phase']
+    /** When it last changed, so a row can say how long ago it was. */
+    readonly at: string
   }[]
 }
 
@@ -51,7 +53,8 @@ export function teammateWork(
     recent: theirs.slice(0, RECENT_MISSION_LIMIT).map((mission) => ({
       missionId: mission.missionId,
       title: titleOf(mission),
-      phase: mission.phase
+      phase: mission.phase,
+      at: mission.lastUpdatedAt
     }))
   }
 }
