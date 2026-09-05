@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.23.0 — 2026-09-05
+
+- **Rooms.** Make a room out of some teammates (Ctrl 4, or the Rooms section
+  in the sidebar once you have one). Post to it and every teammate in it
+  answers in their own card, each on their own runtime and model; each card
+  opens the conversation it came from. A post starts an ordinary mission per
+  teammate, so everything you already know about missions applies.
+- **A blank window after switching the route on a finished conversation.**
+  With a teammate picked and their finished conversation open, choosing a
+  different runtime for the next message could throw during render and leave
+  nothing on screen (0.21.6 to 0.22.1). Fixed; found by the room's own smoke.
+
 ## 0.22.1 — 2026-09-05
 
 - **The sidebar no longer promises a teammate will pick up a message you
