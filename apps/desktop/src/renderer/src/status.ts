@@ -602,6 +602,12 @@ const FLAGSHIP_MODELS: readonly RegExp[] = [
   /sonnet-5/i,
   /gpt-5\.3-codex/i,
   /gemini-3/i,
+  // A newer family sits above the one it replaces. Added 2026-09-05, the day
+  // GPT-6 Astra appeared: the app READS its models from each runtime, so a
+  // new one is offered the moment the runtime reports it and needs no code
+  // at all -- this list is the single exception, and only decides where a
+  // row sits among seventy. Left out, Astra sorted below GPT-5.6.
+  /gpt-6/i,
   /gpt-5\.6/i
 ]
 

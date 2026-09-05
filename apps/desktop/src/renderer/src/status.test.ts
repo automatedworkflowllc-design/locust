@@ -658,6 +658,18 @@ describe('the curated shortlist', () => {
     ])
   })
 
+  it('puts a newer flagship family above the one it replaces', () => {
+    // The catalog itself is read from each runtime, so a new model needs no
+    // code to appear. This curated list is the one exception, and it only
+    // decides ORDER -- so the check is that GPT-6 outranks GPT-5.6 rather
+    // than that either is present.
+    const astra = flagshipRank('gpt-6-astra')
+    const sol = flagshipRank('gpt-5.6-sol')
+    expect(astra).toBeDefined()
+    expect(sol).toBeDefined()
+    expect(astra!).toBeLessThan(sol!)
+  })
+
   it('hides nothing: a model on no list is still offered', () => {
     const rows = [{ key: 'cursor:obscure', group: 'CURSOR', model: 'obscure' }]
     expect(orderRouteRows(rows, [])).toHaveLength(1)
