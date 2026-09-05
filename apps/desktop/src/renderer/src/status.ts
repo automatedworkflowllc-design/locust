@@ -222,6 +222,15 @@ function baseRouteRowStatus(
  * that map exists: a runtime this build does not know is `planned`, so a new
  * one cannot start being counted before anybody has written its adapter.
  */
+/**
+ * DECIDED 2026-09-05 (Colin: "if antigravity works it works"). An
+ * EXPERIMENTAL route counts when discovery says it can run right now --
+ * Antigravity only answers while its own app is open with this folder, so
+ * the count reflects that moment honestly and drops back when it does not.
+ * What is NOT counted is a runtime this build cannot drive at all: `planned`
+ * is filtered by name, which is why a design pass's report that Gemini was
+ * being counted did not hold.
+ */
 export function connectedRuntimeCount(runtimes: readonly PublicRuntimeStatus[]): number {
   return runtimes.filter((runtime) => runtimeIsUsable(runtime) && integrationOf(runtime.id) !== 'planned')
     .length
