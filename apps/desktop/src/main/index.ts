@@ -890,7 +890,9 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return teammateRejected('The teammate could not be created.')
       const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
       try {
-        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, avatar: input.avatar })
+        // roleTitle was dropped here since Custom teammates got titles: every
+        // one read "Custom" on the sidebar and in the brief (found 2026-09-05).
+        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, avatar: input.avatar })
         return { ok: true, data: { teammate } } as const
       } catch {
         // The store's own validation is the authority; the renderer is told
@@ -908,6 +910,7 @@ if (!ownsSingleInstanceLock) {
           name: input.name,
           hue: input.hue,
           role: input.role,
+          roleTitle: input.roleTitle,
           avatar: input.avatar
         })
         return { ok: true, data: { teammate } } as const
