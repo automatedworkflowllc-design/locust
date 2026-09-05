@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.27.1 — 2026-09-05
+
+- **Locust opens on the home screen.** Launch showed the newest finished
+  conversation instead of the home screen with the connected runtimes and
+  the folder. Now a conversation is put on screen at launch only if it is
+  still running; otherwise the home screen is what you see, and the
+  sidebar has the chats.
+
 ## 0.27.0 — 2026-09-05
 
 - **Your team remembers.** Teammates keep a shared memory per project

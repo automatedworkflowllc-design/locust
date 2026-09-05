@@ -988,6 +988,15 @@ export default function App(): ReactElement {
           (mission) => mission.workspaceId === response.data.currentWorkspaceId
         )
         if (latest === undefined) return
+        // Only a run still under way is put on screen at launch. A finished
+        // conversation is adopted (so its record is there to open) but the
+        // window opens on the home screen -- what is connected, which folder,
+        // the teammates to pick from -- which is what Colin asked launch to be
+        // (2026-09-05, twice: "it still opens to the teammates screen with all
+        // the chats").
+        // The record's phase is always a finished one; what says a run is
+        // still under way is the host addressing updates to it.
+        const stillLive = (pendingUpdatesRef.current.get(latest.runId) ?? []).length > 0
         // Any update addressed to it (a run the host still owns) makes it live.
         setRuns((current) => {
           if (current.size > 0) return current
@@ -1000,7 +1009,7 @@ export default function App(): ReactElement {
             queued.reduce(applyMissionUpdate, reopenedRun(latest, byId))
           )
         })
-        setShownKey((current) => current ?? latest.runId)
+        if (stillLive) setShownKey((current) => current ?? latest.runId)
       })
       .catch(() => {
         // History recovery is optional at startup; discovery remains usable.

@@ -135,9 +135,14 @@ try {
   const home = JSON.parse(await evaluate(`JSON.stringify({
     placeholder: document.querySelector('form.command-dock textarea').placeholder,
     sidebar: document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' '),
-    highlighted: document.querySelectorAll('.lc-teammate.is-selected').length
+    highlighted: document.querySelectorAll('.lc-teammate.is-selected').length,
+    home: !!document.querySelector('.lc-runtimepanel')
   })`))
   say(`       ${JSON.stringify(home)}`)
+  // Colin, 2026-09-05: launch opened on the newest finished conversation
+  // instead of the home screen. The seeded mission is finished, so the
+  // runtime panel must be what the window opens on.
+  check('the window opens on the home screen, not the newest finished conversation', home.home === true, String(home.home))
   check('the box invites a plain message, not a message to the first teammate', home.placeholder === 'Write a message…', home.placeholder)
   // User session, 2026-09-05: with nobody picked the first teammate was drawn
   // as chosen while the composer addressed nobody.
