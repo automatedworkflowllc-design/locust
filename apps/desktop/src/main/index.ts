@@ -64,6 +64,7 @@ import {
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
+  DEFAULT_RELAY_HOP_CAP,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
@@ -593,6 +594,7 @@ if (!ownsSingleInstanceLock) {
     // recipient's name, on the sender's route.
     relay = createRelay({
       enabled: async () => (await teammates.readSettings()).relay === true,
+      hopCap: async () => (await teammates.readSettings()).relayHopCap,
       peerContextFor,
       start: async (input) => {
         if (input.runtime === 'antigravity') {
@@ -682,12 +684,12 @@ if (!ownsSingleInstanceLock) {
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
 
     ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP } as const
       try {
         return await teammates.readSettings()
       } catch {
         // An unreadable switch reads as its default: swarm off, replies on.
-        return { swarm: false, relay: true } as const
+        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP } as const
       }
     })
 
@@ -735,11 +737,11 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP } as const
       try {
         return await teammates.writeSettings(settings)
       } catch {
-        return { swarm: false, relay: true } as const
+        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP } as const
       }
     })
 

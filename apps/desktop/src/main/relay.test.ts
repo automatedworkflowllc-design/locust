@@ -96,6 +96,17 @@ describe('deciding whether a teammate replies on their own', () => {
     // has nothing more to say and posts no share.
     expect(MAX_RELAY_HOPS).toBe(6)
   })
+
+  it('takes the person\u2019s own budget over the constant, and says the number it stopped at', () => {
+    // 0.21.2 QA, rec. 6: "six hops is a useful backstop, but it is not a
+    // user-controlled time/spend budget".
+    expect(decideRelay({ enabled: true, hop: 2, recipientName: 'Booty', cap: 2 })).toMatchObject({ start: false })
+    const stopped = decideRelay({ enabled: true, hop: 2, recipientName: 'Booty', cap: 2 })
+    expect(stopped.start ? '' : stopped.reason).toContain('Stopped after 2 automatic replies')
+    expect(decideRelay({ enabled: true, hop: 1, recipientName: 'Booty', cap: 2 })).toEqual({ start: true, hop: 2 })
+    const one = decideRelay({ enabled: true, hop: 1, recipientName: 'Booty', cap: 1 })
+    expect(one.start ? '' : one.reason).toContain('after 1 automatic reply.')
+  })
 })
 
 describe('the brief a relayed run is started with', () => {

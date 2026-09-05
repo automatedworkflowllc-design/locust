@@ -409,7 +409,18 @@ export interface WorkspaceSettings {
    * backstop that bounds the spend.
    */
   readonly relay: boolean
+  /**
+   * How many automatic replies one exchange may use before it stops and
+   * waits for a person -- the autonomy budget. Six was a constant; the
+   * 0.21.2 QA pass (rec. 6) asked for it to be the person's own number.
+   * Bounded 1..12 by the host; anything else reads as the default.
+   */
+  readonly relayHopCap: number
 }
+
+export const DEFAULT_RELAY_HOP_CAP = 6
+export const MIN_RELAY_HOP_CAP = 1
+export const MAX_RELAY_HOP_CAP = 12
 
 /** What the runtime is asking permission to do. */
 export type MissionApprovalKind = 'command' | 'file-change' | 'question'

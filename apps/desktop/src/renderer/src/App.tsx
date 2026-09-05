@@ -31,7 +31,11 @@ import { queuedVerdict } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
+import { DEFAULT_RELAY_HOP_CAP } from '../../shared/ipc.js'
 import { Composer } from './components/Composer.js'
+import { ExchangeStrip } from './components/ExchangeStrip.js'
+import { exchangeOf } from './exchange.js'
+import type { ExchangeMission } from './exchange.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
 import { CommandPalette } from './components/CommandPalette.js'
 import type { PaletteAction } from './components/CommandPalette.js'
@@ -628,6 +632,9 @@ export default function App(): ReactElement {
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
   const [relay, setRelay] = useState(true)
+  /** The autonomy budget: automatic replies one exchange may use. */
+  const [relayHopCap, setRelayHopCap] = useState(DEFAULT_RELAY_HOP_CAP)
+  const [stoppingExchange, setStoppingExchange] = useState(false)
   // Which folder this window works in. Every mission runs here; a person
   // with two projects open needs the title to say which is which.
   const [workspaceName, setWorkspaceName] = useState('Local workspace')
@@ -853,6 +860,7 @@ export default function App(): ReactElement {
         if (active) {
           setSwarm(settings.swarm === true)
           setRelay(settings.relay === true)
+          setRelayHopCap(settings.relayHopCap)
         }
       })
       .catch(() => undefined)
@@ -1008,6 +1016,70 @@ export default function App(): ReactElement {
     && ownerOf(liveRun) === pickedTeammate?.teammateId
       ? `Continues on ${runtimeNameOf(route.runtime)} from ${runtimeNameOf(shownData.runtime)}'s checkpoint -- briefed on what was done, not handed the memory.`
       : undefined
+
+  /**
+   * The exchange the shown conversation is part of, read from what the
+   * window already holds: every recovered mission plus every live run,
+   * linked by the workroom messages they posted and received. Nothing is
+   * bookkept twice -- the strip says what the records say.
+   */
+  const exchange = useMemo(() => {
+    if (shownData === undefined) return undefined
+    const byMission = new Map<string, ExchangeMission>()
+    for (const mission of history) {
+      byMission.set(mission.missionId, {
+        missionId: mission.missionId,
+        runtime: mission.runtime,
+        model: mission.model,
+        events: mission.events,
+        peerMessages: mission.peerMessages,
+        ...(mission.startedBy === undefined ? {} : { startedBy: mission.startedBy }),
+        ...(missionOwners[mission.missionId] === undefined ? {} : { teammateId: missionOwners[mission.missionId] }),
+        ...(teammates.find((entry) => entry.teammateId === missionOwners[mission.missionId])?.name === undefined
+          ? {}
+          : { teammateName: teammates.find((entry) => entry.teammateId === missionOwners[mission.missionId])!.name }),
+        live: false
+      })
+    }
+    // Live runs overlay the record: fresher events, and which are still going.
+    for (const run of runs.values()) {
+      if (run.data === undefined) continue
+      const owner = ownerOf(run)
+      const name = teammates.find((entry) => entry.teammateId === owner)?.name
+      // Merge over the record rather than replace it: a run reopened from the
+      // ledger carries its events but not always who started it, and the
+      // strip's hop count read 0 for a relayed reply until this kept the
+      // record's answer (exchange smoke, first run).
+      const recorded = byMission.get(run.data.missionId)
+      const startedBy = run.startedBy ?? recorded?.startedBy
+      byMission.set(run.data.missionId, {
+        missionId: run.data.missionId,
+        runtime: run.data.runtime,
+        model: run.data.model,
+        events: run.events.length > 0 ? run.events : recorded?.events ?? [],
+        peerMessages: run.peerMessages ?? recorded?.peerMessages ?? [],
+        ...(startedBy === undefined ? {} : { startedBy }),
+        ...(owner === undefined ? {} : { teammateId: owner }),
+        ...(name === undefined ? {} : { teammateName: name }),
+        live: liveRunIsActive(run),
+        runId: run.data.runId
+      })
+    }
+    return exchangeOf(shownData.missionId, [...byMission.values()])
+  }, [shownData, history, runs, missionOwners, teammates])
+
+  /** Stop every run in the exchange. Records stay; only the processes go. */
+  const stopExchange = (runIds: readonly string[]): void => {
+    const bridge = window.desktop
+    if (bridge === undefined || runIds.length === 0) return
+    setStoppingExchange(true)
+    void Promise.all(
+      runIds.map((runId) => {
+        setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+        return bridge.cancelCodexMission({ runId }).catch(() => undefined)
+      })
+    ).finally(() => setStoppingExchange(false))
+  }
 
   const startMission = async (prompt: string, modeOverride?: MissionMode): Promise<boolean> => {
     const bridge = window.desktop
@@ -1911,10 +1983,18 @@ export default function App(): ReactElement {
               onCheckUpdate={checkUpdate}
               onInstallUpdate={installUpdate}
               relay={relay}
+              relayHopCap={relayHopCap}
+              onRelayHopCapChange={(next) => {
+                setRelayHopCap(next)
+                void window.desktop
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next })
+                  .then((settings) => setRelayHopCap(settings.relayHopCap))
+                  .catch(() => undefined)
+              }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -2083,6 +2163,15 @@ export default function App(): ReactElement {
                   </button>
                 </div>
               </header>
+              {exchange !== undefined && (
+                <ExchangeStrip
+                  exchange={exchange}
+                  cap={relayHopCap}
+                  runtimeNameOf={runtimeNameOf}
+                  stopping={stoppingExchange}
+                  onStop={() => stopExchange(exchange.liveRunIds)}
+                />
+              )}
               <Thread
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
@@ -2238,7 +2327,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}

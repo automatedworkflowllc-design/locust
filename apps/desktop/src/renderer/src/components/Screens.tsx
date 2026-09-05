@@ -577,6 +577,8 @@ export function SettingsScreen({
   onInstallUpdate,
   relay,
   onRelayChange,
+  relayHopCap,
+  onRelayHopCapChange,
   onPreviewPrune,
   onPrune
 }: {
@@ -598,6 +600,9 @@ export function SettingsScreen({
   /** Whether teammates start runs to answer each other. */
   readonly relay: boolean
   readonly onRelayChange: (relay: boolean) => void
+  /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
+  readonly relayHopCap: number
+  readonly onRelayHopCapChange: (cap: number) => void
   readonly onPreviewPrune: (days: number) => Promise<MissionPruneResponse>
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
@@ -697,8 +702,8 @@ export function SettingsScreen({
             When a teammate writes to another, the other can answer on their own: Locust starts a run
             for them with the message as its brief, and their answer starts the sender's next turn, so
             it lands in the thread that asked. They keep going while a reply helps finish the work, and
-            stop when one has nothing more to say -- or after six automatic runs, as a backstop. Each
-            teammate answers on their own route -- their runtime, model and mode, not the sender's --
+            stop when one has nothing more to say -- or after {String(relayHopCap)} automatic {relayHopCap === 1 ? 'reply' : 'replies'}, the budget
+            below. Each teammate answers on their own route -- their runtime, model and mode, not the sender's --
             which is how two models end up on one piece of work. Switch this off to make messages wait
             for you instead.
           </p>
@@ -716,6 +721,32 @@ export function SettingsScreen({
               >
                 {relay ? 'On' : 'Off'}
               </button>
+            </div>
+            {/*
+              * The autonomy budget. Six was a constant nobody could see or
+              * change; the 0.21.2 QA pass (rec. 6) asked for a budget the
+              * person owns. Fixed steps rather than a free number: each is
+              * a real answer to "how far may they go without me".
+              */}
+            <div className="lc-retention__row">
+              <span className="lc-settings__note">
+                Automatic replies per exchange before they wait for you
+              </span>
+              <div className="lc-segmented" role="radiogroup" aria-label="Automatic replies per exchange">
+                {[1, 2, 4, 6, 8, 12].map((cap) => (
+                  <button
+                    key={cap}
+                    type="button"
+                    role="radio"
+                    aria-checked={relayHopCap === cap}
+                    className={`lc-button${relayHopCap === cap ? ' is-active' : ''}`}
+                    disabled={!relay}
+                    onClick={() => onRelayHopCapChange(cap)}
+                  >
+                    {String(cap)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </section>

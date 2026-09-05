@@ -1353,6 +1353,76 @@ textarea {
   color: var(--lc-amber-text);
 }
 
+/* The exchange strip: who is in it, on what, how far into the budget,
+   what it cost, and a stop. One line under the header, in the thread's own
+   column, so it reads as a fact about the conversation rather than chrome. */
+.lc-exchange {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3) var(--lc-space-4);
+  margin: 0 auto;
+  width: 100%;
+  max-width: var(--lc-thread-max-width);
+  padding: var(--lc-space-2) var(--lc-space-4);
+  border-bottom: 1px solid var(--lc-border-hairline);
+  font-size: var(--lc-text-secondary-size);
+  color: var(--lc-text-secondary);
+}
+
+.lc-exchange__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-exchange__who {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
+  min-width: 0;
+}
+
+.lc-exchange__part {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+}
+
+.lc-exchange__name {
+  color: var(--lc-text-primary);
+}
+
+.lc-exchange__route {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-exchange__facts {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  margin-left: auto;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-exchange__stop {
+  flex: 0 0 auto;
+}
+
+/* A row of fixed choices; one is active. */
+.lc-segmented {
+  display: inline-flex;
+  gap: var(--lc-space-1);
+}
+
 /* The line above the box when the next message crosses runtimes. */
 .lc-continuation {
   display: flex;

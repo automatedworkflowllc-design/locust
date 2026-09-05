@@ -5,6 +5,7 @@ import { isAbsolute, join } from 'node:path'
 
 import { isAvatarSpec, seedAvatar } from '../shared/avatar.js'
 import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings } from '../shared/ipc.js'
+import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
 
 /**
@@ -78,7 +79,14 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP }
+
+/** A cap from disk or from the window: an integer inside the bounds, or the default. */
+function parsedHopCap(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= MIN_RELAY_HOP_CAP && value <= MAX_RELAY_HOP_CAP
+    ? value
+    : DEFAULT_RELAY_HOP_CAP
+}
 
 export function isTeammateRoute(value: unknown): value is TeammateRoute {
   if (typeof value !== 'object' || value === null) return false
@@ -214,7 +222,10 @@ function parsedFile(text: string): StoredFile {
     // Only a literal false turns replies off; absent or malformed keeps the default.
     relay: typeof rawSettings === 'object' && rawSettings !== null
       ? (rawSettings as Record<string, unknown>).relay !== false
-      : true
+      : true,
+    relayHopCap: typeof rawSettings === 'object' && rawSettings !== null
+      ? parsedHopCap((rawSettings as Record<string, unknown>).relayHopCap)
+      : DEFAULT_RELAY_HOP_CAP
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, settings }
@@ -406,7 +417,10 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             : false,
           relay: typeof settings === 'object' && settings !== null
             ? (settings as Record<string, unknown>).relay !== false
-            : true
+            : true,
+          relayHopCap: typeof settings === 'object' && settings !== null
+            ? parsedHopCap((settings as Record<string, unknown>).relayHopCap)
+            : DEFAULT_RELAY_HOP_CAP
         }
         const file = await read()
         await write({ ...file, settings: next })

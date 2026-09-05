@@ -256,6 +256,23 @@ describe("a Custom teammate's own words for their role", () => {
 })
 
 describe('workspace settings', () => {
+  it('keeps the autonomy budget inside its bounds, and reads garbage as the default', async () => {
+    // 0.21.2 QA, rec. 6: the hop cap becomes the person's own number. It is
+    // a workspace-wide bound on spend, so a malformed value must not widen it.
+    const { root, store: teammates } = await store()
+    expect((await teammates.readSettings()).relayHopCap).toBe(6)
+    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 2 })
+    expect((await teammates.readSettings()).relayHopCap).toBe(2)
+    expect((await createTeammateStore({ rootDirectory: root }).readSettings()).relayHopCap).toBe(2)
+    for (const value of [0, 13, 2.5, '4', -1, null, undefined, Number.NaN]) {
+      await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: value })
+      expect((await teammates.readSettings()).relayHopCap).toBe(6)
+    }
+    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12 })
+    expect((await teammates.readSettings()).relayHopCap).toBe(12)
+  })
+
+
   it('has teammate replies on by default, and only a literal false turns them off', async () => {
     // Talking to each other is the point of having teammates; the hop cap
     // bounds the spend. So absent or malformed keeps them on, and only an
@@ -267,16 +284,16 @@ describe('workspace settings', () => {
       expect((await teammates.readSettings()).relay).toBe(true)
     }
     await teammates.writeSettings({ swarm: false, relay: false })
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6 })
   })
 
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6 })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 6 })
   })
 
   it('only a literal true turns it on', async () => {
@@ -284,7 +301,7 @@ describe('workspace settings', () => {
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
       await teammates.writeSettings({ swarm: value, relay: false })
-      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false })
+      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6 })
     }
   })
 
@@ -297,7 +314,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6 })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 

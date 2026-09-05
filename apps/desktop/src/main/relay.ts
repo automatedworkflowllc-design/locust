@@ -66,14 +66,17 @@ export function decideRelay(input: {
   readonly enabled: boolean
   readonly hop: number
   readonly recipientName: string
+  /** The person's own budget for one exchange; the constant is only the default. */
+  readonly cap?: number
 }): RelayDecision {
+  const cap = input.cap ?? MAX_RELAY_HOPS
   if (!input.enabled) {
     return { start: false, reason: 'Teammate replies are switched off in Settings; the message waits for their next run.' }
   }
-  if (input.hop >= MAX_RELAY_HOPS) {
+  if (input.hop >= cap) {
     return {
       start: false,
-      reason: `Stopped after ${String(MAX_RELAY_HOPS)} automatic replies. ${input.recipientName} will see this on their next run.`
+      reason: `Stopped after ${String(cap)} automatic ${cap === 1 ? 'reply' : 'replies'}. ${input.recipientName} will see this on their next run.`
     }
   }
   return { start: true, hop: input.hop + 1 }
@@ -137,6 +140,8 @@ export interface SharingMission {
 
 export interface RelayOptions {
   readonly enabled: () => Promise<boolean>
+  /** The autonomy budget for one exchange, read when a share is decided. Absent means the default. */
+  readonly hopCap?: () => Promise<number>
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
   readonly start: (input: {
     readonly prompt: string
@@ -313,6 +318,12 @@ export function createRelay(options: RelayOptions): Relay {
       } catch {
         enabled = false
       }
+      let cap = MAX_RELAY_HOPS
+      try {
+        cap = (await options.hopCap?.()) ?? MAX_RELAY_HOPS
+      } catch {
+        cap = MAX_RELAY_HOPS
+      }
       const hop = mission.relay?.hop ?? 0
       const notice = (message: string): void => notify(mission.runId, mission.missionId, message)
 
@@ -354,7 +365,7 @@ export function createRelay(options: RelayOptions): Relay {
         if (seen.has(recipientId) || held.has(recipientId)) continue
         seen.add(recipientId)
 
-        const decision = decideRelay({ enabled, hop, recipientName: message.to.name })
+        const decision = decideRelay({ enabled, hop, recipientName: message.to.name, cap })
         if (!decision.start) {
           // Off is the default and needs no announcement; a cap that fired
           // does, because the person is watching an exchange stop.
