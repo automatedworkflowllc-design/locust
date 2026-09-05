@@ -31,6 +31,7 @@ import type { RoomTasks } from './room-tasks.js'
 import { taskSection } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
+import { readRuntimeSetup } from './runtime-setup.js'
 import { createMemoryReader } from './memory-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
@@ -79,6 +80,7 @@ import {
   MEMORY_UPDATE_CHANNEL,
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
+  RUNTIME_SETUP_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
@@ -1248,6 +1250,19 @@ if (!ownsSingleInstanceLock) {
         return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The request was rejected.' } } as const
       }
       return updates.install()
+    })
+
+    // What each runtime has set up for itself -- MCP servers and hooks --
+    // read from its own files so nothing fires unseen (Colin, 2026-09-05).
+    ipcMain.handle(RUNTIME_SETUP_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'SETUP_UNAVAILABLE', message: 'The request was rejected.' } } as const
+      }
+      try {
+        return { ok: true, data: { runtimes: await readRuntimeSetup({ workspacePath: workspaceChosen ? workspacePath : undefined }) } } as const
+      } catch {
+        return { ok: false, error: { code: 'SETUP_UNAVAILABLE', message: 'The runtimes\' own configuration could not be read.' } } as const
+      }
     })
 
     ipcMain.handle(MISSION_STORAGE_CHANNEL, async (event) => {

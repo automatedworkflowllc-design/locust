@@ -1570,6 +1570,12 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+.lc-runtimerow__setup {
+  margin-top: 2px;
+  font-family: var(--lc-font-mono);
+  font-size: 11px;
+}
+
 .lc-linkbutton {
   background: none;
   border: 0;

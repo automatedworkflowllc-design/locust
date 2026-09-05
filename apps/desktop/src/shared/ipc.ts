@@ -47,6 +47,23 @@ export interface MemoryClearRequest {
   readonly scope: 'workspace' | 'all'
 }
 
+/**
+ * What a runtime has configured for itself, read from its own files and
+ * never changed: MCP server names and hook events with their counts.
+ * `sources` are the files read; `unreadable` the ones that exist but could
+ * not be read or parsed. Names only -- no commands, no arguments.
+ */
+export interface PublicRuntimeSetup {
+  readonly mcpServers: readonly string[]
+  readonly hooks: readonly string[]
+  readonly sources: readonly string[]
+  readonly unreadable: readonly string[]
+}
+
+export type RuntimeSetupResponse =
+  | { readonly ok: true; readonly data: { readonly runtimes: Readonly<Record<string, PublicRuntimeSetup>> } }
+  | { readonly ok: false; readonly error: { readonly code: 'SETUP_UNAVAILABLE'; readonly message: string } }
+
 export type MemoryListResponse =
   | {
       readonly ok: true
@@ -194,6 +211,7 @@ export const MEMORY_ADD_CHANNEL = 'memory:add'
 export const MEMORY_UPDATE_CHANNEL = 'memory:update'
 export const MEMORY_REMOVE_CHANNEL = 'memory:remove'
 export const MEMORY_CLEAR_CHANNEL = 'memory:clear'
+export const RUNTIME_SETUP_CHANNEL = 'runtime:setup'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
@@ -988,6 +1006,8 @@ export interface DesktopApi {
   postToRoom(request: RoomPostRequest): Promise<RoomPostResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   listMemories(): Promise<MemoryListResponse>
+  /** Each runtime's own MCP servers and hooks, read-only. */
+  readRuntimeSetup(): Promise<RuntimeSetupResponse>
   addMemory(request: MemoryAddRequest): Promise<MemoryListResponse>
   updateMemory(request: MemoryUpdateRequest): Promise<MemoryListResponse>
   removeMemory(memoryId: string): Promise<MemoryListResponse>

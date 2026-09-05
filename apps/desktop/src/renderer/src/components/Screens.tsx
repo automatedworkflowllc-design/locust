@@ -10,7 +10,8 @@ import type {
   PublicRuntimeStatus,
   PublicStorageReport,
   PublicTeammate,
-  MemoryMode
+  MemoryMode,
+  PublicRuntimeSetup
 } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import {
@@ -570,9 +571,29 @@ function UpdateControl({
   )
 }
 
+/**
+ * One muted line: the runtime's own MCP servers and hooks by name, with the
+ * files they were read from in the tooltip. Nothing configured says so in
+ * words, so an empty line never reads as "not checked".
+ */
+function RuntimeSetupLine({ setup }: { readonly setup: PublicRuntimeSetup }): ReactElement {
+  const parts: string[] = []
+  if (setup.mcpServers.length > 0) parts.push(`MCP: ${setup.mcpServers.join(', ')}`)
+  if (setup.hooks.length > 0) parts.push(`Hooks: ${setup.hooks.join(', ')}`)
+  if (setup.unreadable.length > 0) parts.push(`${String(setup.unreadable.length)} config file${setup.unreadable.length === 1 ? '' : 's'} could not be read`)
+  const text = parts.length === 0 ? 'No MCP servers or hooks configured' : parts.join(' · ')
+  const title = [...setup.sources.map((path) => `read: ${path}`), ...setup.unreadable.map((path) => `unreadable: ${path}`)].join('\n')
+  return (
+    <div className="lc-runtimerow__detail lc-runtimerow__setup" title={title.length === 0 ? 'No configuration files found' : title}>
+      {text}
+    </div>
+  )
+}
+
 export function SettingsScreen({
   runtimes,
   limitedRuntimes,
+  runtimeSetup,
   workspacePath,
   onChooseFolder,
   ledgerPath,
@@ -596,6 +617,8 @@ export function SettingsScreen({
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
+  /** Each runtime's own MCP servers and hooks, by runtime id; undefined until read. */
+  readonly runtimeSetup: Readonly<Record<string, PublicRuntimeSetup>> | undefined
   /** The folder every teammate works in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly onChooseFolder: () => void
@@ -666,7 +689,9 @@ export function SettingsScreen({
           <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>
           <p className="lc-settings__lede">
             Locust uses the accounts already on this machine. It never pools subscriptions or proxies
-            your requests.
+            your requests. Under each runtime is what it has set up for itself -- MCP servers and
+            hooks, read from its own files -- so a tool a teammate reaches for, or a script that runs
+            mid-mission, is never a surprise. Locust adds none of its own and changes nothing there.
           </p>
           <div className="lc-runtimelist">
             {runtimes.map((runtime) => {
@@ -684,6 +709,7 @@ export function SettingsScreen({
                       )}
                       {status.detail}
                     </div>
+                    {runtimeSetup?.[runtime.id] !== undefined && <RuntimeSetupLine setup={runtimeSetup[runtime.id]!} />}
                   </div>
                   <span
                     className={`lc-tag${

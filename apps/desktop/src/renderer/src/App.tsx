@@ -29,7 +29,8 @@ import type {
   MemoryMode,
   MemoryScope,
   MemoryUpdateRequest,
-  PublicMemory
+  PublicMemory,
+  PublicRuntimeSetup
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
@@ -626,6 +627,8 @@ export default function App(): ReactElement {
   const [memoryWorkspace, setMemoryWorkspace] = useState<{ readonly id: string; readonly name: string }>({ id: '', name: '' })
   const [memoryMode, setMemoryMode] = useState<MemoryMode>(DEFAULT_MEMORY_MODE)
   const [memoryNotice, setMemoryNotice] = useState<string>()
+  /** Each runtime's own MCP servers and hooks, read once at boot and again when Settings opens. */
+  const [runtimeSetup, setRuntimeSetup] = useState<Readonly<Record<string, PublicRuntimeSetup>>>()
   /**
    * What a person typed while a mission was running, waiting to go as the
    * next turn. Kept against the RUN it was typed at, not the teammate, so it
@@ -723,6 +726,15 @@ export default function App(): ReactElement {
    * not lost data, and the cheapest honest fix is to read it again whenever
    * the screen that shows it is opened.
    */
+  const refreshRuntimeSetup = (): void => {
+    void window.desktop
+      ?.readRuntimeSetup()
+      .then((response) => {
+        if (response.ok) setRuntimeSetup(response.data.runtimes)
+      })
+      .catch(() => undefined)
+  }
+
   const refreshStorage = (): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -1008,6 +1020,15 @@ export default function App(): ReactElement {
       })
 
     void bridge
+      .readRuntimeSetup()
+      .then((response) => {
+        if (active && response.ok) setRuntimeSetup(response.data.runtimes)
+      })
+      .catch(() => {
+        // A runtime's own configuration is shown when it can be read, never guessed.
+      })
+
+    void bridge
       .getMissionHistory()
       .then((response) => {
         seedLimitsFrom(response)
@@ -1100,7 +1121,7 @@ export default function App(): ReactElement {
       if (event.key === '2') { event.preventDefault(); setScreen('teammates') }
       // Ctrl 3 reads the storage number too, or the shortcut would be the
       // one way into Settings that still showed the launch reading.
-      if (event.key === '3') { event.preventDefault(); refreshStorage(); setScreen('settings') }
+      if (event.key === '3') { event.preventDefault(); refreshStorage(); refreshRuntimeSetup(); setScreen('settings') }
       if (event.key === '4') { event.preventDefault(); setScreen('rooms') }
       if (event.key === '5') { event.preventDefault(); setScreen('memory') }
     }
@@ -2298,6 +2319,7 @@ export default function App(): ReactElement {
               onChooseFolder={chooseWorkspace}
               runtimes={runtimes}
               limitedRuntimes={limitedRuntimes}
+              runtimeSetup={runtimeSetup}
               ledgerPath={undefined}
               build={build}
               storage={storage}

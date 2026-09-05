@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.28.0 — 2026-09-05
+
+- **Settings shows what each runtime has set up for itself.** Under every
+  runtime: its MCP servers and its hooks, by name and event, read from the
+  runtime's own configuration files (Claude Code's settings and MCP files,
+  Codex's config.toml, Cursor's, OpenCode's and Copilot's). Names only, so
+  no command line or secret reaches the screen; the tooltip names the files
+  read. Locust adds none of its own and changes nothing there. A runtime
+  with nothing configured says so in words.
+
 ## 0.27.6 — 2026-09-05
 
 - **A runtime's own helper has its own row.** When Claude Code or OpenCode
