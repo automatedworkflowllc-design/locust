@@ -396,6 +396,36 @@ export default function App(): ReactElement {
     return routineDraft(mission, historyByIdRef.current)
   }
 
+  /**
+   * Right-click on a teammate. Removing one is destructive in a way a mission
+   * is not -- their routines go with them -- so it asks in place like every
+   * other destructive item here, and says what else it takes.
+   */
+  const openTeammateMenu = (teammateId: string, at: { readonly x: number; readonly y: number }): void => {
+    const teammate = teammatesRef.current.find((entry) => entry.teammateId === teammateId)
+    if (teammate === undefined) return
+    const theirRoutines = routinesRef.current.filter((routine) => routine.teammateId === teammateId).length
+    setRowMenuArmed(undefined)
+    setRowMenu({
+      x: at.x,
+      y: at.y,
+      title: teammate.name,
+      items: [
+        { label: 'Message them', onSelect: () => selectTeammate(teammateId) },
+        { label: 'Edit', onSelect: () => setEditingTeammate(teammate) },
+        {
+          label: 'Remove teammate',
+          confirmLabel:
+            theirRoutines === 0
+              ? 'Remove for good?'
+              : `Remove, with ${String(theirRoutines)} routine${theirRoutines === 1 ? '' : 's'}?`,
+          danger: true,
+          onSelect: () => removeTeammate(teammateId)
+        }
+      ]
+    })
+  }
+
   const openMissionMenu = (missionId: string, at: { readonly x: number; readonly y: number }): void => {
     const live = [...runsRef.current.values()].some(
       (run) => liveRunIsActive(run) && run.data?.missionId === missionId
@@ -563,6 +593,9 @@ export default function App(): ReactElement {
   const [workspaceName, setWorkspaceName] = useState('Local workspace')
   /** The folder itself, so activity rows can show paths the way a person writes them. */
   const [workspacePath, setWorkspacePath] = useState<string | undefined>(undefined)
+  // A word about the folder, at shell level: a refused start, a refused
+  // choice, or the reopen that follows a successful one.
+  const [workspaceNotice, setWorkspaceNotice] = useState<string>()
   /** The folder id the host reports with history, so the sidebar can keep to it. */
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined)
   // Faces that just finished or just heard something: a hop and a glance, each
@@ -596,8 +629,14 @@ export default function App(): ReactElement {
   runsRef.current = runs
 
   /**
-   * Re-read what the local history costs. Deleting a mission changes it, and
-   * Settings used to keep the number it read at launch until a restart.
+   * Re-read what the local history costs.
+   *
+   * Deleting a mission changes it, and so does running one -- but this was
+   * called only on a delete, so Settings kept its launch reading: two
+   * missions in, and with both listed in the sidebar and two files on disk,
+   * it still said `0 missions · 0 B` (QA pass, 2026-09-05). Stale display,
+   * not lost data, and the cheapest honest fix is to read it again whenever
+   * the screen that shows it is opened.
    */
   const refreshStorage = (): void => {
     const bridge = window.desktop
@@ -869,7 +908,9 @@ export default function App(): ReactElement {
       if (!accel) return
       if (event.key === '1') { event.preventDefault(); setScreen('missions') }
       if (event.key === '2') { event.preventDefault(); setScreen('teammates') }
-      if (event.key === '3') { event.preventDefault(); setScreen('settings') }
+      // Ctrl 3 reads the storage number too, or the shortcut would be the
+      // one way into Settings that still showed the launch reading.
+      if (event.key === '3') { event.preventDefault(); refreshStorage(); setScreen('settings') }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -887,6 +928,14 @@ export default function App(): ReactElement {
   const startMission = async (prompt: string, modeOverride?: MissionMode): Promise<boolean> => {
     const bridge = window.desktop
     const teammateId = selectedTeammate?.teammateId
+    // No folder, no run. The main process refuses this too; saying it here
+    // keeps a refused start from being filed as a failed mission.
+    if (workspacePath === undefined && build !== undefined) {
+      setWorkspaceNotice(
+        'Choose the folder your teammates work in first. Locust was opened from its own install folder, and no teammate should work in there.'
+      )
+      return false
+    }
     const key = `pending:${++pendingKeyCounter.current}`
     // A reply continues the conversation on screen, when there IS one to
     // continue: the same teammate's finished mission, on the route it ran on,
@@ -1343,6 +1392,28 @@ export default function App(): ReactElement {
       ? undefined
       : costLine(conversationCost(liveRun.earlierTurns ?? [], liveRun.events))
   const runningCount = [...runs.values()].filter(liveRunIsActive).length
+
+  /**
+   * Pick the folder the teammates work in. A chosen folder reopens the app
+   * there, which stops anything running -- so with runs live it says so and
+   * does nothing, rather than taking the person's work down with the switch.
+   */
+  const chooseWorkspace = (): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    if (runningCount > 0) {
+      setWorkspaceNotice('Stop the running missions first. Changing folder reopens Locust.')
+      return
+    }
+    setWorkspaceNotice(undefined)
+    void bridge
+      .chooseWorkspace()
+      .then((response) => {
+        if (response.ok) setWorkspaceNotice(`Reopening in ${response.data.path}...`)
+        else if (response.error.code !== 'CANCELLED') setWorkspaceNotice(response.error.message)
+      })
+      .catch(() => setWorkspaceNotice('The folder could not be chosen.'))
+  }
   const historyById = useMemo(
     () => new Map(history.map((mission) => [mission.missionId, mission] as const)),
     [history]
@@ -1399,21 +1470,50 @@ export default function App(): ReactElement {
    * the divider rebuilt from the checkpoint, then this run -- because that is
    * what the durable record says happened.
    */
+  /**
+   * Point the composer at the conversation now on screen.
+   *
+   * The route is remembered per teammate, but the composer's own route starts
+   * at Codex and nothing moved it when a conversation was reopened -- so a
+   * restored Claude thread sat above a composer saying `Codex CLI /
+   * account-default`, and the next message would have gone somewhere the
+   * person never chose (QA pass, 2026-09-05). What the run actually ran on is
+   * in its own record, so it is read from there rather than guessed.
+   *
+   * Never for a run that is still going: the composer already follows a live
+   * run's own route, and moving the controls under a person mid-mission is
+   * its own surprise.
+   */
+  const followRouteOf = (run: LiveRunState | undefined): void => {
+    if (run?.data === undefined || liveRunIsActive(run)) return
+    setRoute({ runtime: run.data.runtime, model: run.data.model ?? 'account-default' })
+  }
+
   const openMission = (missionId: string): void => {
+    // Opening a conversation SHOWS it. Every caller but one used to have to
+    // remember `setScreen('workroom')` first, and the sidebar did not -- so
+    // from the Missions screen a click lit the row and left you looking at
+    // the list, with no thread and no composer (QA pass, 2026-09-05). The
+    // screen change belongs to the action, not to each caller.
+    setScreen('workroom')
     // A run that is still starting is listed under its pending key.
     if (runs.has(missionId)) {
       setShownKey(missionId)
+      followRouteOf(runs.get(missionId))
       return
     }
     const known = [...runs.entries()].find(([, run]) => run.data?.missionId === missionId)
     if (known !== undefined) {
       setShownKey(known[0])
+      followRouteOf(known[1])
       return
     }
     const mission = historyById.get(missionId)
     if (mission === undefined) return
-    setRuns((current) => withNewRun(current, mission.runId, reopenedRun(mission, historyById)))
+    const reopened = reopenedRun(mission, historyById)
+    setRuns((current) => withNewRun(current, mission.runId, reopened))
     setShownKey(mission.runId)
+    followRouteOf(reopened)
   }
 
   /**
@@ -1481,6 +1581,10 @@ export default function App(): ReactElement {
   }
 
   const sidebarMissionsRef = useRef<readonly SidebarMission[]>([])
+  // The right-click menus are built outside render, so they read the roster
+  // and the routines through refs the same way they read the rows.
+  const teammatesRef = useRef<readonly PublicTeammate[]>([])
+  const routinesRef = useRef<readonly PublicRoutine[]>([])
   const sidebarMissions = useMemo<readonly SidebarMission[]>(() => {
     const rows: SidebarMission[] = []
     for (const [key, run] of runs.entries()) {
@@ -1543,6 +1647,8 @@ export default function App(): ReactElement {
   // The right-click menu is built outside render and names the row it was
   // opened on, so it reads the rows through this.
   sidebarMissionsRef.current = sidebarMissions
+  teammatesRef.current = teammates
+  routinesRef.current = routines
   historyByIdRef.current = historyById
   missionOwnersRef.current = missionOwners
   // What each teammate's live run is doing, from its events -- the same
@@ -1608,7 +1714,11 @@ export default function App(): ReactElement {
 
   return (
     <div className="lc-shell">
-      <TitleBar workspaceName={workspaceName} runningCount={runningCount} swarm={swarm} />
+      <TitleBar
+        workspaceName={workspaceName.length === 0 ? 'No folder chosen' : workspaceName}
+        runningCount={runningCount}
+        swarm={swarm}
+      />
       <div className="lc-body">
         {rowMenu !== undefined && (
           <ContextMenu
@@ -1631,6 +1741,7 @@ export default function App(): ReactElement {
           selectedTeammateId={selectedTeammate?.teammateId}
           onSelectMission={openMission}
           onMissionMenu={openMissionMenu}
+          onTeammateMenu={openTeammateMenu}
           pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
           liveActivity={liveActivityByOwner}
           recentlyDone={recentlyDone}
@@ -1641,7 +1752,13 @@ export default function App(): ReactElement {
             setNewTeammateOpen(true)
           }}
           composerShown={screen === 'workroom'}
-          onOpenSettings={() => setScreen(screen === 'settings' ? 'workroom' : 'settings')}
+          onOpenSettings={() => {
+            const next = screen === 'settings' ? 'workroom' : 'settings'
+            // Read the number when the screen that shows it opens, so it
+            // cannot be the one from launch.
+            if (next === 'settings') refreshStorage()
+            setScreen(next)
+          }}
           onOpenMissions={() => setScreen(screen === 'missions' ? 'workroom' : 'missions')}
           onOpenTeammates={() => setScreen(screen === 'teammates' ? 'workroom' : 'teammates')}
         />
@@ -1659,10 +1776,7 @@ export default function App(): ReactElement {
               titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
               teammates={teammates}
               missionOwners={missionOwners}
-              onOpen={(missionId) => {
-                openMission(missionId)
-                setScreen('workroom')
-              }}
+              onOpen={openMission}
             />
           ) : screen === 'teammates' ? (
             <TeammatesScreen
@@ -1671,10 +1785,7 @@ export default function App(): ReactElement {
               missionOwners={missionOwners}
               activityByTeammate={activityByTeammate}
               titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
-              onOpenMission={(missionId) => {
-                setScreen('workroom')
-                openMission(missionId)
-              }}
+              onOpenMission={openMission}
               routines={routines}
               routineStepByTeammate={routineStepByTeammate}
               onRunRoutine={runRoutine}
@@ -1702,6 +1813,8 @@ export default function App(): ReactElement {
             />
           ) : screen === 'settings' ? (
             <SettingsScreen
+              workspacePath={workspacePath}
+              onChooseFolder={chooseWorkspace}
               runtimes={runtimes}
               limitedRuntimes={limitedRuntimes}
               ledgerPath={undefined}
@@ -1722,9 +1835,15 @@ export default function App(): ReactElement {
               onPrune={prune}
             />
           ) : liveRun === undefined ? (
-            // A teammate with nothing running gets their own capability-led
-            // state; with no teammates at all, the runtime story comes first.
-            teammates.length > 0 && runtimes.some((entry) => entry.ready && entry.status === 'ready') ? (
+            // A CHOSEN teammate with nothing running gets their own
+            // capability-led state. Nothing chosen -- which is how every
+            // launch begins -- shows the home screen: what is connected,
+            // which folder, and the sidebar to pick a teammate from (Colin,
+            // 2026-09-05: "have that on open so the user can see if their
+            // models are connected and then can click onto their teammates").
+            // `selectedTeammate` falls back to the first teammate so a message
+            // always has someone to go to; the SCREEN keys on the explicit pick.
+            selectedTeammateId !== undefined && selectedTeammate !== undefined && runtimes.some((entry) => entry.ready && entry.status === 'ready') ? (
               <IdleTeammate
                 teammate={selectedTeammate ?? teammates[0]!}
                 canStart={busyRun === undefined}
@@ -1734,7 +1853,14 @@ export default function App(): ReactElement {
                 }}
               />
             ) : (
-              <FirstLaunch runtimes={runtimes} limitedRuntimes={limitedRuntimes} discoveryPhase={runtimeState.phase} />
+              <FirstLaunch
+                runtimes={runtimes}
+                limitedRuntimes={limitedRuntimes}
+                discoveryPhase={runtimeState.phase}
+                workspacePath={workspacePath}
+                teammateCount={teammates.length}
+                onChooseFolder={chooseWorkspace}
+              />
             )
           ) : (
             <>
@@ -1870,12 +1996,6 @@ export default function App(): ReactElement {
                   </button>
                 </div>
               </header>
-              {deleteError !== undefined && (
-                <div className="lc-diagnostic lc-tone-red" role="alert">
-                  <Icon name="shield" size={12} />
-                  <span>{deleteError}</span>
-                </div>
-              )}
               <Thread
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
@@ -1962,9 +2082,36 @@ export default function App(): ReactElement {
               />
             </>
           )}
+          {/*
+            * A refused delete, wherever it was asked for. This used to render
+            * inside the shown conversation's header -- so a Delete refused
+            * from the SIDEBAR, on a row you were not looking at, reported
+            * nothing anywhere and read as the menu doing nothing at all
+            * (Colin, 2026-09-05, second report of "delete not working").
+            */}
+          {deleteError !== undefined && (
+            <div className="lc-diagnostic lc-tone-red" role="alert">
+              <Icon name="shield" size={12} />
+              <span>{deleteError}</span>
+            </div>
+          )}
+          {workspaceNotice !== undefined && (
+            <div className="lc-diagnostic lc-tone-amber lc-diagnostic--row" role="alert">
+              <Icon name="shield" size={12} />
+              <span>{workspaceNotice}</span>
+              {workspacePath === undefined && (
+                <button type="button" className="lc-button" onClick={chooseWorkspace}>
+                  Choose folder
+                </button>
+              )}
+            </div>
+          )}
           {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer
+            workspaceName={workspaceName.length === 0 ? undefined : workspaceName}
+            workspacePath={workspacePath}
+            onChooseFolder={chooseWorkspace}
             runtimes={runtimes}
             limitedRuntimes={limitedRuntimes}
             discoveryPhase={runtimeState.phase}
@@ -2069,7 +2216,18 @@ export default function App(): ReactElement {
                 hint: 'Ctrl 2',
                 run: () => setScreen('teammates')
               },
-              { id: 'go-settings', group: 'Go to', label: 'Settings', hint: 'Ctrl 3', run: () => setScreen('settings') },
+              {
+                id: 'go-settings',
+                group: 'Go to',
+                label: 'Settings',
+                hint: 'Ctrl 3',
+                // Same as the rail button: the storage number is read when
+                // the screen that shows it opens, by every route in.
+                run: () => {
+                  refreshStorage()
+                  setScreen('settings')
+                }
+              },
               {
                 id: 'new-teammate',
                 group: 'Teammates',
@@ -2103,6 +2261,7 @@ export default function App(): ReactElement {
       {newTeammateOpen && (
         <NewTeammateDialog
           error={teammateError}
+          mode={mode}
           onCancel={() => setNewTeammateOpen(false)}
           onCreate={createTeammate}
         />
@@ -2112,6 +2271,7 @@ export default function App(): ReactElement {
           key={editingTeammate.teammateId}
           initial={editingTeammate}
           error={teammateError}
+          mode={mode}
           onCancel={() => setEditingTeammate(undefined)}
           onCreate={(input) => updateTeammate(editingTeammate.teammateId, input)}
         />

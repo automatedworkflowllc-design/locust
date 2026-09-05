@@ -252,6 +252,35 @@ describe('what a failure card says', () => {
       'Codex CLI is not ready.'
     )
   })
+
+  it('strips the terminal colour codes a runtime writes around its own words', () => {
+    // Colin, 2026-09-05: OpenCode's refusal reached the card as three boxes
+    // before the sentence a person needs to read. ESC is built from its code
+    // so an editor eating an invisible character cannot break this quietly.
+    const esc = String.fromCharCode(27)
+    const message = failureMessage({
+      message: 'OpenCode ended without a step that reported it had stopped.',
+      process: {
+        stderr: esc + '[93m' + esc + '[1m! ' + esc + '[0mpermission requested: external_directory; auto-rejecting'
+      }
+    })
+    expect(message).toBe(
+      "OpenCode ended without a step that reported it had stopped. The runtime's own last word was: ! permission requested: external_directory; auto-rejecting"
+    )
+    expect(message).not.toContain(esc)
+    expect(message).not.toContain('[93m')
+  })
+
+  it('still finds the last SPEAKING line when the final one is only colour codes', () => {
+    const esc = String.fromCharCode(27)
+    expect(
+      failureMessage({
+        message: 'Codex stopped.',
+        process: { stderr: 'the disk is full' + String.fromCharCode(10) + esc + '[0m' + esc + '[2K' }
+      })
+    ).toBe("Codex stopped. The runtime's own last word was: the disk is full")
+  })
+
 })
 
 describe('collapsed activity', () => {

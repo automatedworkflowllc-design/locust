@@ -350,6 +350,43 @@ describe("tool pairing and terminal state", () => {
     expect(terminal?.type).toBe("run.completed");
   });
 
+  it("says what the run was refused permission to do, on an otherwise successful result", () => {
+    // MEASURED 2026-09-05 by running the app's own accept-edits argv by hand:
+    // `--permission-mode acceptEdits` auto-approves edits but NOT Bash, so
+    // `node t.mjs` came back as a permission denial WHILE the record said
+    // is_error false, subtype success, terminal_reason completed. The mission
+    // completed with the person's actual request never attempted, and nothing
+    // said so (QA pass, five identical attempts on one mission).
+    const claude = normalizer();
+    const events = claude.accept(
+      record({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        terminal_reason: "completed",
+        result: "It looks like running that command requires your approval",
+        permission_denials: [
+          { tool_name: "Bash", tool_use_id: "toolu_01", tool_input: { command: "node t.mjs", description: "Run t.mjs" } },
+        ],
+      }),
+    );
+    const said = events.find((event) => event.type === "adapter.diagnostic");
+    expect(said?.payload.level).toBe("warning");
+    expect(String(said?.payload.message)).toContain("Bash");
+    expect(String(said?.payload.message)).toContain("node t.mjs");
+    // NOT a failure: the run did what it was allowed to do.
+    const [terminal] = claude.finish(completion());
+    expect(terminal?.type).toBe("run.completed");
+  });
+
+  it("stays quiet when nothing was refused", () => {
+    const claude = normalizer();
+    const events = claude.accept(
+      record({ type: "result", subtype: "success", is_error: false, result: "ok", permission_denials: [] }),
+    );
+    expect(events.some((event) => event.type === "adapter.diagnostic")).toBe(false);
+  });
+
   it("refuses to call a clean exit a success when no result record arrived", () => {
     // Exit 0 is not the provider saying it finished. Treating it as success is
     // how a truncated run gets recorded as a completed one.

@@ -16,12 +16,19 @@ import { SIGNED_IN_DETAIL, integrationOf, routeRowStatus } from '../status.js'
 export function FirstLaunch({
   runtimes,
   limitedRuntimes,
-  discoveryPhase
+  discoveryPhase,
+  workspacePath,
+  teammateCount,
+  onChooseFolder
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
+  /** The folder the teammates work in; undefined when none is chosen. */
+  readonly workspacePath: string | undefined
+  readonly teammateCount: number
+  readonly onChooseFolder: () => void
 }): ReactElement {
   const anyReady =
     discoveryPhase === 'ready'
@@ -67,6 +74,27 @@ export function FirstLaunch({
             : 'Locust runs on the accounts and models already on this machine. Nothing is pooled, proxied, or sent anywhere you have not connected.'}
         </p>
 
+        {/*
+          * The folder card itself lives in Settings and on the composer's own
+          * chip -- this screen is about what is connected (Colin, 2026-09-05).
+          * What stays is the one case where the screen would otherwise invite
+          * a mission that cannot start: no folder chosen, which is what an
+          * installed app launched from its own install folder begins as.
+          */}
+        {workspacePath === undefined && (
+          <div className="lc-folder is-missing">
+            <div className="lc-folder__text">
+              <div className="lc-folder__label">No folder chosen</div>
+              <div className="lc-folder__path">
+                Every teammate works inside one project folder. Pick it before the first mission.
+              </div>
+            </div>
+            <button type="button" className="lc-button" onClick={onChooseFolder}>
+              Choose folder
+            </button>
+          </div>
+        )}
+
         {discoveryPhase === 'loading' && <p className="lc-footnote">Checking local runtimes…</p>}
         {discoveryPhase === 'error' && (
           <p className="lc-footnote lc-tone-red">
@@ -75,11 +103,12 @@ export function FirstLaunch({
         )}
 
         {discoveryPhase === 'ready' && (
-          // Open when nothing is ready -- then the list IS the content and
-          // the screen's job is to get a runtime connected. Closed when
-          // something can run, because then the job is to get a mission
-          // typed and the roster is a footnote.
-          <details className="lc-roster" open={!anyReady}>
+          // Open. This screen is what the app opens on now, and its job is
+          // to show what is connected before anyone picks a teammate (Colin,
+          // 2026-09-05). It used to close once something was ready, to keep
+          // the composer above the fold; the fold is kept by letting this
+          // pane scroll instead, and the first-fold check measures it open.
+          <details className="lc-roster" open>
             <summary className="lc-roster__summary lc-mono">{roster}</summary>
             {/* Said once, above the list, rather than on every signed-in row. */}
             <p className="lc-footnote">{SIGNED_IN_DETAIL}</p>
@@ -134,6 +163,9 @@ export function FirstLaunch({
           <p className="lc-footnote">
             Discovery runs locally · no model is shown as live until it answers
           </p>
+        )}
+        {anyReady && teammateCount > 0 && workspacePath !== undefined && (
+          <p className="lc-footnote">Pick a teammate in the sidebar to start, or write to whoever is free below.</p>
         )}
       </div>
     </div>

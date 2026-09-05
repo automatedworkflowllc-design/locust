@@ -11,6 +11,7 @@
 // the composer's own rectangle against the viewport at two sizes -- Colin's
 // window, and the smaller content pane the design pass measured -- and it
 // carries its own control: with the pre-0.21.2 state restored the same check
+// (re-measured 0.21.5 with the roster open by default, plus the folder card)
 // must fail. Measured 2026-09-05 at 1280x860 -- fixed: 16px above the edge;
 // old: 395px below it. The control had to be corrected once: restoring the
 // rule but leaving the roster collapsed kept the screen short and the check
@@ -117,7 +118,10 @@ try {
       } else {
         empty.style.minHeight = ''
         empty.style.overflowY = ''
-        if (roster) roster.open = false
+        // The page's own state, not a tidier one: since 0.21.5 the roster
+        // opens by default (Colin wants connections visible on launch), so
+        // the check measures it open. Closing it here would measure a
+        // screen nobody sees.
       }
       await new Promise(r => setTimeout(r, 250))
       const dock = document.querySelector('form.command-dock')

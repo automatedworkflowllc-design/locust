@@ -19,6 +19,7 @@ import {
   RUNTIME_DISCOVERY_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
+  WORKSPACE_CHOOSE_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
@@ -53,6 +54,7 @@ import type {
   ModelCatalogResponse,
   RuntimeDiscoveryResponse,
   WorkspaceSettings,
+  WorkspaceChooseResponse,
   TeammateCreateRequest,
   TeammateListResponse,
   TeammateMutationResponse,
@@ -82,6 +84,7 @@ export type {
   ModelCatalogResponse,
   PublicModel,
   WorkspaceSettings,
+  WorkspaceChooseResponse,
   PublicTeammate,
   TeammateCreateRequest,
   TeammateHue,
@@ -145,6 +148,7 @@ const desktopApi: DesktopApi = {
   listModels: () => ipcRenderer.invoke(MODEL_CATALOG_CHANNEL) as Promise<ModelCatalogResponse>,
   readWorkspaceSettings: () =>
     ipcRenderer.invoke(WORKSPACE_SETTINGS_READ_CHANNEL) as Promise<WorkspaceSettings>,
+  chooseWorkspace: () => ipcRenderer.invoke(WORKSPACE_CHOOSE_CHANNEL) as Promise<WorkspaceChooseResponse>,
   writeWorkspaceSettings: (settings: WorkspaceSettings) =>
     ipcRenderer.invoke(WORKSPACE_SETTINGS_WRITE_CHANNEL, settings) as Promise<WorkspaceSettings>,
   decideMissionApproval: (answer: MissionApprovalAnswer) =>

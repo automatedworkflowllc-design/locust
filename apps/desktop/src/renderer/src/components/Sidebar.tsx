@@ -70,6 +70,7 @@ export function Sidebar({
   selectedTeammateId,
   onSelectMission,
   onMissionMenu,
+  onTeammateMenu,
   pendingApprovals,
   liveActivity,
   recentlyDone,
@@ -93,6 +94,8 @@ export function Sidebar({
   readonly onSelectMission: (missionId: string) => void
   /** Right-click on a mission row, so it can be acted on without opening it. */
   readonly onMissionMenu: (missionId: string, at: { readonly x: number; readonly y: number }) => void
+  /** Right-click on a teammate. Same menu shape as a mission row, on the row above them. */
+  readonly onTeammateMenu: (teammateId: string, at: { readonly x: number; readonly y: number }) => void
   /** Approvals waiting on each teammate's live run, by teammate id. */
   readonly pendingApprovals: Readonly<Record<string, number>>
   /** What each teammate's live run is doing, by teammate id; absent means no live run. */
@@ -181,6 +184,10 @@ export function Sidebar({
                 aria-current={selected ? 'true' : undefined}
                 title={`Message ${teammate.name}`}
                 onClick={() => onSelectTeammate(teammate.teammateId)}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  onTeammateMenu(teammate.teammateId, { x: event.clientX, y: event.clientY })
+                }}
               >
                 <PixelFace
                   hue={teammate.hue}

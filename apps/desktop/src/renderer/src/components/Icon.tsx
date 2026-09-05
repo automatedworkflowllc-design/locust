@@ -18,6 +18,7 @@ export type IconName =
   | 'diff'
   | 'dots'
   | 'file'
+  | 'folder'
   | 'grid'
   | 'inbox'
   | 'maximize'
@@ -50,6 +51,7 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }): Re
     // Two columns and a divider: a change with a before and an after.
     diff: <><rect x="3" y="5" width="6" height="14" /><rect x="15" y="5" width="6" height="14" /><path d="M12 2v20" /></>,
     file: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v5h5" /></>,
+    folder: <path d="M3 6h6l2 3h10v10H3z" />,
     grid: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>,
     inbox: <><path d="M4 5h16v13H4z" /><path d="M4 13h4l2 3h4l2-3h4" /></>,
     maximize: <rect x="5" y="5" width="14" height="14" rx="1" />,

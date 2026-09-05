@@ -567,6 +567,8 @@ function UpdateControl({
 export function SettingsScreen({
   runtimes,
   limitedRuntimes,
+  workspacePath,
+  onChooseFolder,
   ledgerPath,
   build,
   storage,
@@ -581,6 +583,9 @@ export function SettingsScreen({
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
+  /** The folder every teammate works in; undefined when none is chosen. */
+  readonly workspacePath: string | undefined
+  readonly onChooseFolder: () => void
   readonly ledgerPath: string | undefined
   /** Which build this is; undefined until the host has answered. */
   readonly build: { readonly version: string; readonly packaged: boolean } | undefined
@@ -607,6 +612,33 @@ export function SettingsScreen({
         }
       />
       <div className="lc-screen__scroll">
+        {/*
+          * Where the teammates work. A workspace-wide fact, so it sits with
+          * the other workspace-wide settings rather than on the intro screen
+          * (Colin, 2026-09-05). The composer carries a chip for the same
+          * thing, the way Claude Code states its own folder on the bar.
+          */}
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Project folder</h2>
+          <p className="lc-settings__lede">
+            Every teammate works inside one folder, and every mission runs there. Changing it reopens
+            Locust, so stop anything running first.
+          </p>
+          <div className={`lc-folder${workspacePath === undefined ? ' is-missing' : ''}`}>
+            <div className="lc-folder__text">
+              <div className="lc-folder__label">
+                {workspacePath === undefined ? 'No folder chosen' : 'Teammates work in'}
+              </div>
+              <div className={`lc-folder__path${workspacePath === undefined ? '' : ' lc-mono'}`}>
+                {workspacePath ?? 'Pick a project folder before the first mission.'}
+              </div>
+            </div>
+            <button type="button" className="lc-button" onClick={onChooseFolder}>
+              {workspacePath === undefined ? 'Choose folder' : 'Change'}
+            </button>
+          </div>
+        </section>
+
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>
           <p className="lc-settings__lede">

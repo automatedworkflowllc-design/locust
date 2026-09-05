@@ -84,6 +84,11 @@ export interface ComposerProps {
    */
   readonly onHandOff: (route: RouteChoice) => void
   readonly handingOff: boolean
+  /** The folder the next mission runs in, by its last segment; undefined when none is chosen. */
+  readonly workspaceName: string | undefined
+  /** The whole path, for the chip's tooltip -- a name alone is ambiguous across projects. */
+  readonly workspacePath: string | undefined
+  readonly onChooseFolder: () => void
   /** Who the next mission is messaged to; the placeholder says so. */
   readonly teammateName: string | undefined
   /**
@@ -114,6 +119,9 @@ export interface ComposerProps {
  * discovery, never from a constant.
  */
 export function Composer({
+  workspaceName,
+  workspacePath,
+  onChooseFolder,
   runtimes,
   limitedRuntimes,
   discoveryPhase,
@@ -400,6 +408,27 @@ export function Composer({
                   {MODES.find((option) => option.mode === effectiveMode)?.name ?? 'Ask'}
                 </button>
               </span>
+              {/*
+                * Which folder this message runs in. Stated on the bar that
+                * says what the message will do, because it is the same kind
+                * of fact as the mode and the model -- and because an app
+                * launched from the Start menu had no folder at all and no
+                * surface said so (Colin, 2026-09-05).
+                */}
+              <button
+                type="button"
+                className={`lc-control lc-control--folder${workspacePath === undefined ? ' is-missing' : ''}`}
+                disabled={running}
+                title={
+                  workspacePath === undefined
+                    ? 'No folder chosen. Every teammate works inside one project folder.'
+                    : `Teammates work in ${workspacePath}`
+                }
+                onClick={onChooseFolder}
+              >
+                <Icon name="folder" size={13} />
+                {workspaceName ?? 'No folder'}
+              </button>
               <button type="button" className="lc-control" disabled title="Attachments and slash commands are not built yet">
                 <Icon name="plus" size={14} />
               </button>

@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
-import type { PublicTeammate, TeammateHue, TeammateRole } from '../../../shared/ipc.js'
+import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole } from '../../../shared/ipc.js'
 import { PixelFace } from './PixelFace.js'
 
 const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
@@ -29,17 +29,28 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
  * on the preview when they create is what gets persisted with the record.
  * Never derived from the name -- a rename must not change a face.
  */
+/** What the next mission may do, in the words the mode menu uses. */
+function modeSummary(mode: MissionMode): string {
+  if (mode === 'accept-edits') return 'Accept edits · may change files in this workspace'
+  if (mode === 'approve-each') return 'Approve each action · asks before every command or change'
+  if (mode === 'plan') return 'Plan · answers with the steps it would take, changes nothing'
+  return 'Ask · reads and explains, every write refused'
+}
+
 export function NewTeammateDialog({
   onCancel,
   onCreate,
   error,
-  initial
+  initial,
+  mode
 }: {
   readonly onCancel: () => void
   readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; avatar: AvatarSpec }) => void
   readonly error: string | undefined
   /** Set to edit an existing teammate: the same dialog, filled in, saving instead of creating. */
   readonly initial?: PublicTeammate
+  /** The mode the next mission would actually run in, so the card cannot promise another. */
+  readonly mode: MissionMode
 }): ReactElement {
   const editing = initial !== undefined
   const [name, setName] = useState(initial?.name ?? '')
@@ -166,8 +177,16 @@ export function NewTeammateDialog({
               <span className="lc-summarycard__text">Whichever route is active when a mission starts</span>
               <span className="lc-summarycard__label lc-mono">DEFAULT ROUTE</span>
             </div>
+            {/*
+              * The mode the next mission will ACTUALLY run in. This said
+              * "Read-only · nothing outside the workspace" as fixed copy,
+              * while the composer's default is Accept edits -- so a fresh
+              * profile promised read-only in the dialog and then wrote files
+              * (QA pass, 2026-09-05). Same defect as the idle teammate's
+              * sentence, fixed in 0.18.3; this was its second home.
+              */}
             <div className="lc-summarycard">
-              <span className="lc-summarycard__text">Read-only · nothing outside the workspace</span>
+              <span className="lc-summarycard__text">{modeSummary(mode)}</span>
               <span className="lc-summarycard__label lc-mono">APPROVALS</span>
             </div>
           </div>

@@ -1228,10 +1228,25 @@ const EXHAUSTION_PATTERNS = [
   /\bhttp\s*429\b/i
 ] as const
 
+/**
+ * Terminal colour codes, stripped.
+ *
+ * A runtime writes stderr for a terminal, so its own last word arrives
+ * wrapped in escape sequences -- and this card is not a terminal. Colin,
+ * 2026-09-05: OpenCode's refusal reached the screen as three boxes before
+ * the sentence a person needs to read, because ESC[93m ESC[1m ESC[0m have
+ * no glyphs. The codes carry no meaning here; the card has its own colour.
+ *
+ * Built from the character code rather than a literal escape, which is
+ * invisible in a diff and easy to break silently.
+ */
+const ANSI = new RegExp(String.fromCharCode(27) + '\[[0-9;?]*[ -/]*[@-~]', 'g')
+
 /** The last line of stderr that says something, or undefined. */
 function lastStderrLine(stderr: string | undefined): string | undefined {
   if (stderr === undefined) return undefined
   const lines = stderr
+    .replace(ANSI, '')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0)

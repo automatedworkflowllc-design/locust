@@ -1,7 +1,7 @@
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from './window-size.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, ipcMain, nativeTheme, Notification, screen, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, screen, session } from 'electron'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -18,7 +18,7 @@ import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
@@ -33,6 +33,7 @@ import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createRelay } from './relay.js'
 import { createAttention } from './attention.js'
+import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace } from './workspace.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
@@ -62,6 +63,7 @@ import {
   ROUTINE_RUN_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
+  WORKSPACE_CHOOSE_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
@@ -322,6 +324,34 @@ if (!ownsSingleInstanceLock) {
         }
       )
     }
+    // The folder the teammates work in. The install folder is never it: the
+    // Start menu launches the app from there, and until 0.21.5 every teammate
+    // on an installed build worked inside AppData\Local\Programs\Locust. With
+    // no folder chosen the services still need SOME absolute path to bind,
+    // so they get the launch folder -- and every way of starting a run below
+    // is refused until a folder is picked, so nothing ever runs in it.
+    // `LOCUST_INSTALL_DIR` is a test seam: a development build has no install
+    // folder, and the smoke that proves the refusal needs to name one.
+    const installDirectory = app.isPackaged
+      ? dirname(app.getPath('exe'))
+      : process.env.LOCUST_INSTALL_DIR === undefined || process.env.LOCUST_INSTALL_DIR.length === 0
+        ? undefined
+        : process.env.LOCUST_INSTALL_DIR
+    const rememberedWorkspaceFile = join(app.getPath('userData'), 'workspace.json')
+    const workspace = resolveWorkspacePath({
+      argv: process.argv,
+      cwd: process.cwd(),
+      installDirectory,
+      remembered: readRememberedWorkspace(rememberedWorkspaceFile),
+      platform: process.platform
+    })
+    const workspaceChosen = workspace.path !== undefined
+    const workspacePath = workspace.path ?? process.cwd()
+    const NO_WORKSPACE_MESSAGE =
+      'Choose the folder your teammates work in first. Locust was opened from its own install folder, and no teammate should work in there.'
+    const noWorkspaceRefusal = () =>
+      workspaceChosen ? undefined : ({ ok: false, error: { code: 'NO_WORKSPACE', message: NO_WORKSPACE_MESSAGE } } as const)
+
     const missionLedger = createFileMissionLedger({
       rootDirectory: join(app.getPath('userData'), 'mission-ledger')
     })
@@ -334,7 +364,7 @@ if (!ownsSingleInstanceLock) {
     let relay: Relay | undefined
     let routineRunner: RoutineRunner | undefined
     const codexMissions = createCodexMissionService({
-      workspacePath: process.cwd(),
+      workspacePath,
       discover: discoverForWork,
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,
@@ -373,7 +403,7 @@ if (!ownsSingleInstanceLock) {
     // through its transcript. Its own service, so its heuristics cannot leak
     // into the transports that read a process.
     const antigravityMissions = createAntigravityMissionService({
-      workspacePath: process.cwd(),
+      workspacePath,
       ledger: missionLedger,
       workroom,
       probe: () => antigravityProbe.probe(),
@@ -429,7 +459,7 @@ if (!ownsSingleInstanceLock) {
     })
 
     const appServerMissions = createAppServerMissionService({
-      workspacePath: process.cwd(),
+      workspacePath,
       ledger: missionLedger,
       discover: discoverForWork,
       spawn: spawnAppServer,
@@ -661,6 +691,49 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    ipcMain.handle(WORKSPACE_CHOOSE_CHANNEL, async (event) => {
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (owner === null || !fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The folder request was rejected.' } } as const
+      }
+      const picked = await dialog.showOpenDialog(owner, {
+        title: 'Choose the folder your teammates work in',
+        buttonLabel: 'Work here',
+        properties: ['openDirectory', 'createDirectory'],
+        defaultPath: workspaceChosen ? workspacePath : app.getPath('home')
+      })
+      const next = picked.filePaths[0]
+      if (picked.canceled || next === undefined) {
+        return { ok: false, error: { code: 'CANCELLED', message: 'No folder chosen.' } } as const
+      }
+      if (isInsideDirectory(next, installDirectory, process.platform)) {
+        return {
+          ok: false,
+          error: {
+            code: 'INSTALL_FOLDER',
+            message: 'That is where Locust itself is installed. Pick a project folder instead.'
+          }
+        } as const
+      }
+      try {
+        await writeRememberedWorkspace(rememberedWorkspaceFile, next)
+      } catch {
+        return {
+          ok: false,
+          error: { code: 'INTERNAL_ERROR', message: 'The chosen folder could not be saved.' }
+        } as const
+      }
+      // Reopen there. Every service bound its folder at start-up and the
+      // mission list is scoped by it, so the honest switch is a fresh start;
+      // before-quit still runs, so live runs are stopped and the ledger is
+      // flushed on the way out.
+      app.relaunch({
+        args: [...process.argv.slice(1).filter((entry) => !entry.startsWith(WORKSPACE_ARGUMENT)), `${WORKSPACE_ARGUMENT}${next}`]
+      })
+      setTimeout(() => app.quit(), 150)
+      return { ok: true, data: { path: next, reopening: true } } as const
+    })
+
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
       if (!fromOwnWindow(event)) return { swarm: false, relay: true } as const
       try {
@@ -785,6 +858,7 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(ROUTINE_RUN_CHANNEL, async (event, routineId: unknown) => {
       if (!fromOwnWindow(event)) return routineRejected('The routine could not be started.')
       if (typeof routineId !== 'string' || routineRunner === undefined) return routineRejected('That routine could not be started.')
+      if (!workspaceChosen) return routineRejected(NO_WORKSPACE_MESSAGE)
       return routineRunner.run(routineId)
     })
 
@@ -800,7 +874,7 @@ if (!ownsSingleInstanceLock) {
         } as const
       }
       // The window's own folder decides which conversation it opens on.
-      return readMissionHistory(missionLedger, workroom, process.cwd())
+      return readMissionHistory(missionLedger, workroom, workspacePath)
     })
 
     ipcMain.handle(APP_INFO_CHANNEL, (event) => {
@@ -811,8 +885,8 @@ if (!ownsSingleInstanceLock) {
         version: app.getVersion(),
         packaged: app.isPackaged,
         platform: process.platform,
-        workspaceName: basename(process.cwd()) || process.cwd(),
-        workspacePath: process.cwd()
+        workspaceName: workspaceChosen ? basename(workspacePath) || workspacePath : '',
+        workspacePath: workspaceChosen ? workspacePath : ''
       } as const
     })
 
@@ -910,6 +984,8 @@ if (!ownsSingleInstanceLock) {
         } as const
       }
 
+      const refused = noWorkspaceRefusal()
+      if (refused !== undefined) return refused
       const payload = (typeof request === 'object' && request !== null ? request : {}) as Partial<CodexMissionStartRequest>
       const prompt = payload.prompt
       // Anything but an explicit accept-edits is read-only. A malformed or
@@ -1079,6 +1155,8 @@ if (!ownsSingleInstanceLock) {
           error: { code: 'INTERNAL_ERROR', message: 'The resume request was rejected.' }
         } as const
       }
+      const refusedResume = noWorkspaceRefusal()
+      if (refusedResume !== undefined) return refusedResume
       const payload = (typeof request === 'object' && request !== null ? request : {}) as Partial<MissionResumeRequest>
       // Same widening as a start and a handoff: an unrecognized mode is
       // read-only and an unrecognized runtime is Codex, so a malformed
@@ -1115,6 +1193,8 @@ if (!ownsSingleInstanceLock) {
           error: { code: 'INTERNAL_ERROR', message: 'The handoff request was rejected.' }
         } as const
       }
+      const refusedHandoff = noWorkspaceRefusal()
+      if (refusedHandoff !== undefined) return refusedHandoff
       const payload = (typeof request === 'object' && request !== null ? request : {}) as Partial<MissionHandoffRequest>
       // Same widening rules as a start: an unrecognized mode is read-only and
       // an unrecognized runtime is Codex. A handoff must not become the way a

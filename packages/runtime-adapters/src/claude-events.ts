@@ -394,6 +394,41 @@ export function createClaudeEventNormalizer(
           stringValue(parsed.result) ?? `Claude Code ended with ${reason || "an error"}.`,
         );
       }
+      // What the run was NOT allowed to do.
+      //
+      // MEASURED 2026-09-05, running the app's own accept-edits argv by hand:
+      // `--permission-mode acceptEdits` auto-approves edits but NOT Bash, so
+      // asking Claude Code to run `node t.mjs` produced
+      // `permission_denials: [{tool_name: "Bash", ...}]` -- and the record
+      // still said `is_error: false`, `subtype: "success"`,
+      // `terminal_reason: "completed"`. The mission therefore completed with
+      // the thing the person asked for never attempted, and nothing on
+      // screen said so (QA pass, 2026-09-05, five identical attempts).
+      //
+      // The runtime names each refusal, so the app can too. This is not a
+      // failure of the run and is not reported as one: it is the run saying
+      // what it could not do.
+      const denials = Array.isArray(parsed.permission_denials) ? parsed.permission_denials : [];
+      const refused = denials
+        .filter(isObject)
+        .map((denial) => {
+          const tool = stringValue(denial.tool_name) ?? "a tool";
+          const input = isObject(denial.tool_input) ? denial.tool_input : {};
+          const detail = stringValue(input.command) ?? stringValue(input.file_path) ?? stringValue(input.description);
+          return detail === undefined ? tool : `${tool} \`${detail}\``;
+        });
+      if (refused.length > 0) {
+        return [
+          diagnostic(
+            "warning",
+            "claude.permission_denied",
+            refused.length === 1
+              ? `Claude Code was not permitted to run ${refused[0]}, so it did not. This route allows edits but asks for approval before running commands, and a printed run has no way to give it.`
+              : `Claude Code was not permitted to run ${String(refused.length)} actions, so it did not: ${refused.join("; ")}. This route allows edits but asks for approval before running commands, and a printed run has no way to give it.`,
+            evidence,
+          ),
+        ];
+      }
       return [];
     }
 

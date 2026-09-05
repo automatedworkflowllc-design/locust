@@ -82,7 +82,14 @@ const LEDGER_DIR = join(profile, 'mission-ledger')
 await mkdir(LEDGER_DIR, { recursive: true })
 await writeFile(
   join(profile, 'teammates.json'),
-  JSON.stringify({ schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false } })
+  JSON.stringify({
+    schemaVersion: 1,
+    teammates: [
+      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-05T00:00:00.000Z' }
+    ],
+    missionOwners: {},
+    settings: { swarm: false }
+  })
 )
 const createdAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
 for (const [missionId, prompt] of [
@@ -172,7 +179,11 @@ try {
   const menu = JSON.parse(opened)
   say(`       menu: ${menu.title} · ${JSON.stringify(menu.items)}`)
   check('the menu names the row it was opened on', /rewrite the readme/i.test(menu.title ?? ''), menu.title)
-  check('it offers open, copy and delete', JSON.stringify(menu.items) === JSON.stringify(['Open', 'Copy mission id', 'Delete']), JSON.stringify(menu.items))
+  // Named items, not an exact list: this asserted the whole array once, and
+  // adding "Save as routine" turned a working menu into a red smoke.
+  for (const item of ['Open', 'Copy mission id', 'Delete']) {
+    check(`it offers ${item}`, menu.items.includes(item), JSON.stringify(menu.items))
+  }
 
   say('3. the first press on Delete only asks')
   const armed = await cdp.eval(`(async () => {
@@ -203,6 +214,57 @@ try {
   check('and it is gone from the sidebar', !/Rewrite the README/.test(sidebar), sidebar.replace(/\s+/g, ' ').slice(0, 160))
   check('the other mission is still listed', /Audit the config/.test(sidebar))
   check('the menu closed', (await cdp.eval(`document.querySelector('.lc-context') === null`)) === true)
+
+  // Colin, 2026-09-05: "got to add an option for a right click delete teammate
+  // too id imagine". A teammate row had no context menu at all, so the gesture
+  // that works on a mission silently did nothing one row above it.
+  say('5. right-clicking a TEAMMATE offers the same menu')
+  const onTeammate = JSON.parse(await cdp.eval(`(async () => {
+    const row = document.querySelector('.lc-teammate .lc-row')
+    if (!row) return JSON.stringify({ found: false })
+    const box = row.getBoundingClientRect()
+    row.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true, clientX: Math.round(box.left + 20), clientY: Math.round(box.top + 10)
+    }))
+    await new Promise(r => setTimeout(r, 300))
+    const menu = document.querySelector('.lc-context')
+    return JSON.stringify({
+      found: true,
+      open: menu !== null,
+      title: menu ? menu.querySelector('.lc-context__title').innerText.trim() : '',
+      items: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => b.innerText.trim()) : []
+    })
+  })()`))
+  say(`       menu: ${onTeammate.title} · ${JSON.stringify(onTeammate.items)}`)
+  check('the teammate row is on screen to right-click', onTeammate.found === true)
+  check('a menu opens on it', onTeammate.open === true)
+  check('and it names the teammate', /wren/i.test(onTeammate.title ?? ''), onTeammate.title)
+  check('it offers Remove teammate', (onTeammate.items ?? []).includes('Remove teammate'), JSON.stringify(onTeammate.items))
+
+  say('6. removing a teammate also asks first')
+  const teammateArmed = JSON.parse(await cdp.eval(`(async () => {
+    const remove = [...document.querySelectorAll('.lc-context__item')].find(b => /^Remove teammate/.test(b.innerText.trim()))
+    remove.click()
+    await new Promise(r => setTimeout(r, 300))
+    const menu = document.querySelector('.lc-context')
+    return JSON.stringify({
+      open: menu !== null,
+      label: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => b.innerText.trim()).at(-1) : '',
+      roster: document.querySelector('.lc-sidebar').innerText
+    })
+  })()`))
+  check('the menu stays open', teammateArmed.open === true)
+  check('and asks before removing', /^Remove/.test(teammateArmed.label ?? '') && /\?$/.test(teammateArmed.label ?? ''), teammateArmed.label)
+  check('nobody was removed yet', /Wren/.test(teammateArmed.roster ?? ''))
+
+  say('7. the second press removes them')
+  const gone = await cdp.eval(`(async () => {
+    const remove = [...document.querySelectorAll('.lc-context__item')].find(b => /^Remove.*\?$/.test(b.innerText.trim()))
+    remove.click()
+    await new Promise(r => setTimeout(r, 1200))
+    return document.querySelector('.lc-sidebar').innerText
+  })()`)
+  check('the teammate is gone from the roster', !/Wren/.test(gone), gone.replace(/\s+/g, ' ').slice(0, 160))
 } finally {
   child.kill()
   await sleep(500)

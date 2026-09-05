@@ -1296,6 +1296,74 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/* The folder card on the home screen: where the teammates work, and the
+   one control that changes it. Left-aligned inside a centered column because
+   a path is read, not admired. */
+.lc-folder {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  text-align: left;
+}
+
+.lc-folder.is-missing {
+  border-color: var(--lc-amber-border);
+  background: var(--lc-amber-tint);
+}
+
+.lc-folder__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+}
+
+.lc-folder__label {
+  font-size: var(--lc-text-label);
+  color: var(--lc-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lc-folder__path {
+  color: var(--lc-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lc-folder > .lc-button {
+  flex: 0 0 auto;
+}
+
+/* The folder chip on the composer bar. Nothing chosen is a state worth
+   seeing without reading, so it takes the amber the folder card takes. */
+.lc-control--folder {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+}
+
+.lc-control--folder.is-missing {
+  border-color: var(--lc-amber-border);
+  color: var(--lc-amber-text);
+}
+
+/* A notice that carries its own control sits them side by side. */
+.lc-diagnostic--row {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
+.lc-diagnostic--row > span {
+  flex: 1 1 auto;
+}
+
 .lc-empty__inner {
   width: 100%;
   /* Wide enough that the roster line does not break mid-claim. At 420px
@@ -4126,52 +4194,18 @@ textarea {
 }
 
 /* --- 4. Destructive action out of the primary row ---------------------
- * Delete sat one pixel-perfect click from Activity. It moves into an
- * overflow menu; the button itself is the existing .lc-iconbutton.
+ * REMOVED 2026-09-05, and it took a live bug with it.
+ *
+ * That pass moved Delete into an overflow menu and gave the menu the class
+ * `.lc-menu`, which the COMPOSER already owned. The markup was later reverted
+ * -- nothing renders `.lc-workroom__more` any more -- but the CSS stayed, and
+ * being later in the file it won the cascade over the composer's own rule.
+ * So the permission-mode menu, whose whole job is to open UPWARD from a
+ * control sitting at the bottom of the window, was flipped to
+ * `top: calc(100% + ...)` and opened DOWNWARD off the bottom edge: Colin,
+ * 2026-09-05, "permissions box folding under". Dead CSS that could still
+ * break a live surface, so it is deleted rather than renamed.
  */
-.lc-workroom__more {
-  flex: none;
-  position: relative;
-}
-
-.lc-menu {
-  position: absolute;
-  top: calc(100% + var(--lc-space-3));
-  right: 0;
-  min-width: 190px;
-  padding: var(--lc-space-3);
-  border: 1px solid var(--lc-border-strong);
-  border-radius: var(--lc-radius-popover);
-  background: var(--lc-bg-raised-2);
-  box-shadow: var(--lc-shadow-menu);
-  z-index: 18;
-}
-
-.lc-menu button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--lc-space-4);
-  padding: var(--lc-space-3) var(--lc-space-4);
-  border: 0;
-  border-radius: var(--lc-radius-control);
-  background: transparent;
-  color: var(--lc-text-secondary);
-  font-size: var(--lc-text-control);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease);
-}
-
-.lc-menu button:hover {
-  background: var(--lc-hover-surface);
-  color: var(--lc-text-primary);
-}
-
-.lc-menu button.is-danger:hover {
-  background: var(--lc-red-tint);
-  color: var(--lc-red-text);
-}
 
 /* Agent prose keeps the line breaks the model wrote: "one per line" must
    draw one per line (user session 3, 2026-09-05). Runs of spaces still

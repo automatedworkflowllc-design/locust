@@ -94,10 +94,30 @@ export interface AppInfo {
    * window has to know, or it offers modes the host will refuse.
    */
   readonly platform: string
-  /** The folder every mission runs in: the app's working directory, by its last segment. */
+  /**
+   * The folder every mission runs in, by its last segment; empty when none
+   * is chosen. The folder is the one the app was launched from, or the one
+   * chosen last time when it was launched from its own install folder --
+   * never the install folder itself.
+   */
   readonly workspaceName: string
   readonly workspacePath: string
 }
+
+/**
+ * The answer to "choose a folder". A chosen folder makes the app reopen
+ * itself there: every service binds the folder when it starts and the
+ * mission list is scoped by it, so a running window cannot simply switch.
+ */
+export type WorkspaceChooseResponse =
+  | { readonly ok: true; readonly data: { readonly path: string; readonly reopening: true } }
+  | {
+      readonly ok: false
+      readonly error: {
+        readonly code: 'CANCELLED' | 'INSTALL_FOLDER' | 'RUNS_ACTIVE' | 'INTERNAL_ERROR'
+        readonly message: string
+      }
+    }
 export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
@@ -111,6 +131,7 @@ export const ROUTINE_RUN_CHANNEL = 'routines:run'
 export const MODEL_CATALOG_CHANNEL = 'models:list'
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
+export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
@@ -309,6 +330,13 @@ export type CodexMissionErrorCode =
    * so rather than implying the user can simply try again.
    */
   | 'HANDOFF_REFUSED'
+  /**
+   * No folder is chosen for the teammates to work in. The installed app is
+   * launched from its own install folder, which is never a workspace, so a
+   * start there is refused until a folder is picked -- it must not quietly
+   * edit the app's own files.
+   */
+  | 'NO_WORKSPACE'
 
 export interface CodexMissionError {
   readonly code: CodexMissionErrorCode
@@ -753,6 +781,8 @@ export interface DesktopApi {
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */
   listModels(): Promise<ModelCatalogResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>
+  /** Pick the folder the teammates work in. Reopens the app there on success. */
+  chooseWorkspace(): Promise<WorkspaceChooseResponse>
   writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void
