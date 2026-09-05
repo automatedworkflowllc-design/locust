@@ -1396,20 +1396,31 @@ export function peerRunFor(
   )
 }
 
+/**
+ * Who started a run, as the window knows it: the ledger's own kinds plus a
+ * person's post to a room, which the ledger does not record (a room post's
+ * missions are ordinary missions of their teammates; the room remembers
+ * which).
+ */
+export type LiveStarter =
+  | PublicRecoveredMission['startedBy']
+  | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
+
 export function turnPromptLine(turn: {
   readonly prompt: string
-  readonly startedBy?: PublicRecoveredMission['startedBy']
+  readonly startedBy?: LiveStarter
   readonly peerMessages?: readonly PublicPeerMessage[]
 }): string | undefined {
   if (turn.startedBy === undefined) return turn.prompt
   // A routine step is the person's own words, saved from a conversation they
-  // had; it is theirs to see, even though the host pressed go.
-  if (turn.startedBy.kind === 'routine') return turn.prompt
+  // had; it is theirs to see, even though the host pressed go. A room post
+  // is the person's own words too, said to several at once.
+  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room') return turn.prompt
   return relayedTitle({ startedBy: turn.startedBy, peerMessages: turn.peerMessages ?? [] })
 }
 
 export function relayedTitle(mission: {
-  readonly startedBy?: PublicRecoveredMission['startedBy']
+  readonly startedBy?: LiveStarter
   readonly peerMessages: PublicRecoveredMission['peerMessages']
 }): string | undefined {
   if (mission.startedBy?.kind !== 'relay') return undefined

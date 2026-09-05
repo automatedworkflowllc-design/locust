@@ -67,6 +67,7 @@ import {
   stitchedHandoff,
   typedPrompt
 } from './missionView.js'
+import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
 import { collapseConversations, listedAsMission, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView } from './status.js'
@@ -144,7 +145,8 @@ interface LiveRunState {
    * Its prompt is a briefing written to a runtime, so nothing may show it as a
    * mission title while this is set.
    */
-  readonly startedBy?: PublicRecoveredMission['startedBy']
+  /** Who started it. The room kind is the window's own -- a person's post, filed under a room. */
+  readonly startedBy?: LiveStarter
   /** This run was asked to PLAN rather than do, so the offer after it is the build step. */
   readonly plan?: boolean
   /**

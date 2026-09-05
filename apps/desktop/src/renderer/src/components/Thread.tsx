@@ -11,6 +11,7 @@ import type {
   PublicTeammate
 } from '../../../shared/ipc.js'
 import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnPromptLine } from '../missionView.js'
+import type { LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
@@ -194,7 +195,7 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
 export interface ThreadProps {
   readonly prompt: string
   /** Who started the current turn; a host-briefed one is not the person's words. */
-  readonly startedBy?: PublicRecoveredMission['startedBy']
+  readonly startedBy?: LiveStarter
   /** Open the run a peer message reached; undefined for one nothing received yet. */
   readonly onOpenPeerRun: (messageId: string) => (() => void) | undefined
   /**
@@ -236,7 +237,7 @@ export interface ThreadProps {
     /** What that turn exchanged with peers. Drawn with the turn, not with the last one. */
     readonly peerMessages?: readonly PublicPeerMessage[]
     /** Who started it. A host-briefed turn is not drawn as the person's words. */
-    readonly startedBy?: PublicRecoveredMission['startedBy']
+    readonly startedBy?: LiveStarter
   }[]
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean

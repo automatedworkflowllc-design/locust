@@ -132,6 +132,10 @@ export const MODEL_CATALOG_CHANNEL = 'models:list'
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
+export const ROOM_LIST_CHANNEL = 'rooms:list'
+export const ROOM_CREATE_CHANNEL = 'rooms:create'
+export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
+export const ROOM_POST_CHANNEL = 'rooms:post'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
@@ -282,6 +286,57 @@ export type RoutineListResponse =
 export type RoutineMutationResponse =
   | { readonly ok: true; readonly data: { readonly routine?: PublicRoutine } }
   | { readonly ok: false; readonly error: { readonly code: 'ROUTINE_REJECTED'; readonly message: string } }
+
+/**
+ * A room: a named set of teammates a person can write to at once, and the
+ * posts they made. A post starts one ordinary mission per teammate, on that
+ * teammate's own route; the room remembers which, and the thread a person
+ * watches is read from those missions' records.
+ */
+export interface RoomPost {
+  readonly postId: string
+  readonly text: string
+  readonly at: string
+  /** The mission each teammate answered in, by teammate id. A teammate whose run could not start is absent. */
+  readonly missions: Readonly<Record<string, string>>
+}
+
+export interface PublicRoom {
+  readonly roomId: string
+  readonly name: string
+  readonly teammateIds: readonly string[]
+  readonly createdAt: string
+  readonly posts: readonly RoomPost[]
+}
+
+export interface RoomCreateRequest {
+  readonly name: string
+  readonly teammateIds: readonly string[]
+}
+
+export interface RoomPostRequest {
+  readonly roomId: string
+  readonly text: string
+}
+
+export type RoomListResponse =
+  | { readonly ok: true; readonly data: { readonly rooms: readonly PublicRoom[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROOMS_UNAVAILABLE'; readonly message: string } }
+
+export type RoomMutationResponse =
+  | { readonly ok: true; readonly data: { readonly room?: PublicRoom } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROOM_REJECTED'; readonly message: string } }
+
+/** A post, with what it started and who it could not start, in the host's words. */
+export type RoomPostResponse =
+  | {
+      readonly ok: true
+      readonly data: {
+        readonly post: RoomPost
+        readonly refused: readonly { readonly teammateId: string; readonly name: string; readonly message: string }[]
+      }
+    }
+  | { readonly ok: false; readonly error: { readonly code: 'ROOM_REJECTED'; readonly message: string } }
 
 export type RoutineRunResponse =
   | { readonly ok: true; readonly data: { readonly missionId: string; readonly runId: string } }
@@ -641,10 +696,16 @@ export type CodexMissionUpdate =
       readonly teammateId: string
       readonly prompt: string
       readonly data: CodexMissionStartData
-      /** Who started it: a relay hop of an exchange, or one step of a routine being replayed. */
+      /**
+       * Who started it: a relay hop of an exchange, one step of a routine
+       * being replayed, or a person's post to a room. The room kind lives
+       * only in this live update and the window -- the ledger records a
+       * room post's missions as ordinary missions of their teammates.
+       */
       readonly startedBy:
         | { readonly kind: 'relay'; readonly hop: number }
         | { readonly kind: 'routine'; readonly routineId: string; readonly step: number }
+        | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
     }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */
   | {
@@ -803,6 +864,10 @@ export interface DesktopApi {
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>
+  listRooms(): Promise<RoomListResponse>
+  createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>
+  removeRoom(roomId: string): Promise<RoomMutationResponse>
+  postToRoom(request: RoomPostRequest): Promise<RoomPostResponse>
   writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void

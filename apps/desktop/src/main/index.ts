@@ -25,6 +25,7 @@ import { createAppServerMissionService, PeerRecordError } from './app-server-mis
 import { createModelCatalog } from './model-catalog.js'
 import { createTeammateStore } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
+import { createRoomStore } from './room-store.js'
 import { createRoutineRunner } from './routine-runner.js'
 import type { RoutineRunner } from './routine-runner.js'
 import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
@@ -65,6 +66,10 @@ import {
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
+  ROOM_LIST_CHANNEL,
+  ROOM_CREATE_CHANNEL,
+  ROOM_REMOVE_CHANNEL,
+  ROOM_POST_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
@@ -632,6 +637,7 @@ if (!ownsSingleInstanceLock) {
     // so a replayed step is a real mission on the teammate's own route, in
     // its own ledger, recorded as started by the routine.
     const routines = createRoutineStore({ rootDirectory: app.getPath('userData') })
+    const rooms = createRoomStore({ rootDirectory: app.getPath('userData') })
     routineRunner = createRoutineRunner({
       routines,
       peerContextFor,
@@ -809,6 +815,122 @@ if (!ownsSingleInstanceLock) {
     })
 
     const routineRejected = (message: string) => ({ ok: false, error: { code: 'ROUTINE_REJECTED', message } }) as const
+
+    // Rooms: a named set of teammates a person writes to at once. A post
+    // starts one ordinary mission per teammate on that teammate's own
+    // route, owned by them; the room remembers which. Nothing new reaches
+    // the ledger (docs/FEATURES-FROM-VISION-2026-09-05.md, #2: "a surface,
+    // not a new engine").
+    const roomRejected = (message: string) => ({ ok: false, error: { code: 'ROOM_REJECTED', message } }) as const
+
+    ipcMain.handle(ROOM_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'ROOMS_UNAVAILABLE', message: 'Rooms are unavailable.' } } as const
+      try {
+        return { ok: true, data: { rooms: await rooms.list() } } as const
+      } catch {
+        return { ok: false, error: { code: 'ROOMS_UNAVAILABLE', message: 'Rooms could not be read.' } } as const
+      }
+    })
+
+    ipcMain.handle(ROOM_CREATE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return roomRejected('The room could not be created.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        // Only teammates on the roster can be in a room.
+        const roster = await teammates.list()
+        const wanted = Array.isArray(input.teammateIds) ? input.teammateIds : []
+        const known = wanted.filter((id) => roster.some((entry) => entry.teammateId === id))
+        if (known.length !== wanted.length) return roomRejected('Every teammate in a room has to be on the roster.')
+        const room = await rooms.create({ name: input.name, teammateIds: known })
+        return { ok: true, data: { room } } as const
+      } catch (error) {
+        return roomRejected(error instanceof Error ? error.message : 'That room could not be created.')
+      }
+    })
+
+    ipcMain.handle(ROOM_REMOVE_CHANNEL, async (event, roomId: unknown) => {
+      if (!fromOwnWindow(event)) return roomRejected('The room could not be removed.')
+      if (typeof roomId !== 'string') return roomRejected('That room could not be removed.')
+      try {
+        await rooms.remove(roomId)
+        return { ok: true, data: {} } as const
+      } catch {
+        return roomRejected('That room could not be removed.')
+      }
+    })
+
+    ipcMain.handle(ROOM_POST_CHANNEL, async (event, request: unknown) => {
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (owner === null || !fromOwnWindow(event)) return roomRejected('The post could not be made.')
+      const refused = noWorkspaceRefusal()
+      if (refused !== undefined) return roomRejected(refused.error.message)
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      const roomId = typeof input.roomId === 'string' ? input.roomId : undefined
+      const text = typeof input.text === 'string' ? input.text : ''
+      if (roomId === undefined || text.trim().length === 0) return roomRejected('Write something to post.')
+      const room = await rooms.get(roomId)
+      if (room === undefined) return roomRejected('That room no longer exists.')
+
+      // One run per teammate, each on THEIR route. A teammate with no route
+      // of their own yet -- never started by a person -- runs on Codex's
+      // account default in read-only, the same as a fresh teammate would.
+      const started: Record<string, string> = {}
+      const startedData: { teammateId: string; data: CodexMissionStartData }[] = []
+      const refusals: { teammateId: string; name: string; message: string }[] = []
+      const roster = await teammates.list()
+      for (const teammateId of room.teammateIds) {
+        const teammate = roster.find((entry) => entry.teammateId === teammateId)
+        const peer = await peerContextFor(teammateId)
+        if (teammate === undefined || peer === undefined) {
+          refusals.push({ teammateId, name: teammate?.name ?? teammateId, message: 'No longer on the roster.' })
+          continue
+        }
+        const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
+        const response =
+          route.runtime === 'antigravity'
+            ? roomRejected('Antigravity cannot be posted to from a room yet.')
+            : await codexMissions.start(
+                text,
+                route.runtime,
+                route.mode,
+                route.model === 'account-default' ? {} : { model: route.model },
+                sendToWindow,
+                undefined,
+                peer,
+                undefined,
+                undefined,
+                undefined
+              )
+        if (!response.ok) {
+          refusals.push({ teammateId, name: teammate.name, message: response.error.message })
+          continue
+        }
+        started[teammateId] = response.data.missionId
+        startedData.push({ teammateId, data: response.data })
+        await assignOwner(teammateId, response.data.missionId)
+      }
+      let post
+      try {
+        post = await rooms.addPost(roomId, { text, missions: started })
+      } catch (error) {
+        return roomRejected(error instanceof Error ? error.message : 'The post could not be recorded.')
+      }
+      // Now that the post has an id, tell the window which runs it started,
+      // the way the relay and routines do, so the sidebar shows them working
+      // at once and the room can file each run under its post.
+      for (const entry of startedData) {
+        sendToWindow({
+          kind: 'mission-started',
+          runId: entry.data.runId,
+          missionId: entry.data.missionId,
+          teammateId: entry.teammateId,
+          prompt: text,
+          data: entry.data,
+          startedBy: { kind: 'room', roomId, postId: post.postId }
+        })
+      }
+      return { ok: true, data: { post, refused: refusals } } as const
+    })
 
     ipcMain.handle(ROUTINE_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { ok: false, error: { code: 'ROUTINES_UNAVAILABLE', message: 'Routines are unavailable.' } } as const
