@@ -55,10 +55,10 @@ export const TEAMMATE_ROLES: readonly TeammateRole[] = [
 
 export interface TeammateStore {
   list(): Promise<readonly PublicTeammate[]>
-  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; avatar?: unknown }): Promise<PublicTeammate>
+  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar?: unknown }): Promise<PublicTeammate>
   remove(teammateId: unknown): Promise<void>
   /** Change what a person may change; the id and the missions filed under it stay. */
-  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; avatar: unknown }): Promise<PublicTeammate>
+  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar: unknown }): Promise<PublicTeammate>
   /** Record the route a person just started this teammate on. Unknown teammate or bad route: nothing changes. */
   rememberRoute(teammateId: unknown, route: unknown): Promise<void>
   /** Remember which teammate a mission belongs to. */
@@ -169,6 +169,8 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     hue: record.hue,
     role: record.role,
     ...(roleTitleFor(record.role, record.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(record.role, record.roleTitle) }),
+    // Only a literal true: a malformed record cannot move a teammate onto a branch.
+    ...(record.worktree === true ? { worktree: true } : {}),
     // A record from before faces were persisted gets the face its id seeds --
     // the same face every reader would derive, so nothing changes on upgrade.
     avatar: isAvatarSpec(record.avatar) ? record.avatar : seedAvatar(record.teammateId),
@@ -305,6 +307,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           hue: input.hue,
           role: input.role,
           ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
+          ...(input.worktree === true ? { worktree: true } : {}),
           avatar: input.avatar ?? seedAvatar(teammateId),
           createdAt: new Date().toISOString()
         }
@@ -331,6 +334,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           hue: input.hue,
           role: input.role,
           ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
+          ...(input.worktree === true ? { worktree: true } : {}),
           avatar: input.avatar,
           createdAt: existing.createdAt,
           ...(existing.route === undefined ? {} : { route: existing.route })

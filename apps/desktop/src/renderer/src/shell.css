@@ -1593,6 +1593,18 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+.lc-field--switch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lc-space-3);
+}
+
+.lc-field--switch .lc-field__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .lc-linkbutton {
   background: none;
   border: 0;

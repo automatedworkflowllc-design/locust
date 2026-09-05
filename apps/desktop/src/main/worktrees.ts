@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process'
 import { appendFile, mkdir, readFile, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
+import { branchNameFor } from '../shared/worktree-name.js'
+
 /**
  * A worktree per teammate (docs/WORKTREES-DESIGN-2026-09-05.md).
  *
@@ -22,7 +24,7 @@ import { join, resolve } from 'node:path'
 
 const GIT_TIMEOUT_MS = 20_000
 export const WORKTREE_DIR = join('.locust', 'worktrees')
-export const BRANCH_PREFIX = 'locust/'
+export { BRANCH_PREFIX, branchNameFor } from '../shared/worktree-name.js'
 
 export interface WorktreeInfo {
   readonly teammateId: string
@@ -60,18 +62,6 @@ function defaultRunGit(args: readonly string[], cwd: string): Promise<string> {
       else resolvePromise(stdout)
     })
   })
-}
-
-/** `locust/<name>`: the name lower-cased, anything git dislikes folded to a dash. */
-export function branchNameFor(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^[-.]+|[-.]+$/g, '')
-    .replace(/\.\.+/g, '.')
-    .replace(/\.lock$/, '')
-    .slice(0, 40)
-  return `${BRANCH_PREFIX}${slug.length === 0 ? 'teammate' : slug}`
 }
 
 /** Only a plain teammate id may name a directory under the folder. */

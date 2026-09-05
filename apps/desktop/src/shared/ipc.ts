@@ -254,6 +254,12 @@ export interface PublicTeammate {
    */
   readonly roleTitle?: string
   /**
+   * Works on its own branch: missions run in this teammate's own worktree of
+   * the folder's repository (`.locust/worktrees/<id>`, branch `locust/<name>`),
+   * so two teammates editing one repository do not collide. Off by default.
+   */
+  readonly worktree?: boolean
+  /**
    * The face, persisted with the record. Seeded from the immutable id when a
    * teammate is created without one, so a rename never changes it.
    */
@@ -297,6 +303,7 @@ export interface TeammateCreateRequest {
   readonly hue: TeammateHue
   readonly role: TeammateRole
   readonly roleTitle?: string
+  readonly worktree?: boolean
   /** The look chosen in the dialog; omitted, the store seeds one from the new id. */
   readonly avatar?: AvatarSpec
 }
@@ -311,6 +318,7 @@ export interface TeammateUpdateRequest {
   readonly hue: TeammateHue
   readonly role: TeammateRole
   readonly roleTitle?: string
+  readonly worktree?: boolean
   readonly avatar: AvatarSpec
 }
 

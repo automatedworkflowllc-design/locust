@@ -37,6 +37,14 @@ export interface MissionPeerContext {
   readonly self: PeerRosterEntry
   /** Every other teammate on the roster. May be empty. */
   readonly others: readonly PeerRosterEntry[]
+  /**
+   * Where this teammate's runs happen when it is not the folder: its own
+   * worktree. Host-only, resolved when the context is built; never printed
+   * into a prompt. Absent means the folder.
+   */
+  readonly cwd?: string
+  /** Why the worktree could not be made, when the teammate asked for one. */
+  readonly worktreeRefused?: string
 }
 
 export interface RuntimePromptInput {

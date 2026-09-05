@@ -1682,7 +1682,7 @@ export default function App(): ReactElement {
       })
   }
 
-  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; avatar: AvatarSpec }): void => {
+  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }): void => {
     const bridge = window.desktop
     if (!bridge) return
     void bridge
@@ -1705,7 +1705,7 @@ export default function App(): ReactElement {
 
   const updateTeammate = (
     teammateId: string,
-    input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; avatar: AvatarSpec }
+    input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }
   ): void => {
     const bridge = window.desktop
     if (!bridge) return

@@ -5,6 +5,7 @@ import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate, Publi
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
+import { branchNameFor } from '../../../shared/worktree-name.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
 import {
@@ -269,6 +270,11 @@ export function Sidebar({
                     // says who is who without opening a thread.
                     <span className="lc-row__route lc-mono" title="The route this teammate last ran on; replies on their own run here">
                       {runtimeDisplayName(teammate.route.runtime)} / {teammate.route.model}
+                    </span>
+                  )}
+                  {teammate.worktree === true && (
+                    <span className="lc-row__route lc-mono" title="Works on its own branch, in its own worktree of the folder">
+                      on {branchNameFor(teammate.name)}
                     </span>
                   )}
                 </span>

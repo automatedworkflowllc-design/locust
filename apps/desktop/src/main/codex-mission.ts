@@ -85,6 +85,8 @@ interface ActiveCodexMission {
    * 2026-09-05). Undefined outside a repository, or for a read-only run.
    */
   readonly diskBefore: WorkspaceSnapshot | undefined
+  /** Where the run happened: the teammate's worktree, or the folder. */
+  readonly cwd: string
   /** The last event sequence persisted, so a synthetic event can follow it. */
   lastSequence: number
   /** Every event persisted, so the observation can tell reported edits from unreported ones. */
@@ -412,7 +414,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     // observation that cannot be made or stored costs the run nothing.
     if (mission.diskBefore !== undefined) {
       try {
-        const diskAfter = await (options.observeDisk ?? snapshotWorkspace)(options.workspacePath)
+        const diskAfter = await (options.observeDisk ?? snapshotWorkspace)(mission.cwd)
         if (diskAfter !== undefined) {
           const unreported = unreportedPaths(changedPaths(mission.diskBefore, diskAfter), mission.persisted)
           if (unreported.length > 0) {
@@ -733,6 +735,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // today, so those files were permanent.
         // Narrowed above; captured so the closure below keeps the narrowing.
         const executable = chosen.executable
+        // The teammate's own worktree when it has one, else the folder. The
+        // ledger's workspace id stays the FOLDER's: history is per folder.
+        const runCwd = peer?.cwd ?? options.workspacePath
         let command: RuntimeCommandSpec
         // OpenCode and Copilot take the prompt as an argument, not on stdin,
         // so their argv is built once now with the person's own words -- so a
@@ -747,7 +752,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
           if (runtime === 'opencode') {
             return createOpenCodeRunCommand(executable, {
-              workspacePath: options.workspacePath,
+              workspacePath: runCwd,
               sandbox: effectiveSandbox,
               prompt: promptText,
               ...choice
@@ -755,7 +760,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
           if (runtime === 'copilot') {
             return createCopilotPromptCommand(executable, {
-              workspacePath: options.workspacePath,
+              workspacePath: runCwd,
               sandbox: effectiveSandbox,
               prompt: promptText,
               ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel }),
@@ -764,7 +769,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
           return runtime === 'claude'
             ? createClaudePrintCommand(executable, {
-                workspacePath: options.workspacePath,
+                workspacePath: runCwd,
                 // Claude's containment IS this value: it picks the permission
                 // mode and the tool list. Leaving it out defaulted every
                 // Claude run to read-only, so a mission started in Accept
@@ -775,12 +780,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               })
             : runtime === 'cursor'
               ? createCursorPrintCommand(executable, {
-                  workspacePath: options.workspacePath,
+                  workspacePath: runCwd,
                   sandbox: effectiveSandbox,
                   ...choice
                 })
               : createCodexExecCommand(executable, {
-                  workspacePath: options.workspacePath,
+                  workspacePath: runCwd,
                   sandbox: effectiveSandbox,
                   ...choice
                 })
@@ -935,7 +940,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // Look at the tree BEFORE the runtime can touch it. Only when it may:
           // a read-only run has nothing to observe, and asking git for every
           // question would be paying for an answer nobody reads.
-          diskBefore = effectiveSandbox === 'read-only' ? undefined : await (options.observeDisk ?? snapshotWorkspace)(options.workspacePath)
+          diskBefore = effectiveSandbox === 'read-only' ? undefined : await (options.observeDisk ?? snapshotWorkspace)(runCwd)
           process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
         } catch (startError) {
           // A refusal this file raised knows WHY; anything else does not, and
@@ -976,6 +981,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           model: chosenModel,
           relay,
           diskBefore,
+          cwd: runCwd,
           lastSequence: 0,
           persisted: []
         }

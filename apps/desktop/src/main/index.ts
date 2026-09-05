@@ -31,6 +31,7 @@ import type { RoomTasks } from './room-tasks.js'
 import { taskSection } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
+import { createWorktreeManager } from './worktrees.js'
 import { readRuntimeSetup } from './runtime-setup.js'
 import { briefSection, readWorkspaceBrief } from './workspace-brief.js'
 import { createMemoryReader } from './memory-reader.js'
@@ -602,6 +603,11 @@ if (!ownsSingleInstanceLock) {
      * reads itself. The renderer only names an id; an id that is nobody yields
      * a mission that belongs to nobody, never a guessed teammate.
      */
+    // A teammate with "Own branch" on runs in its own worktree of the
+    // folder's repository. Resolved here, once per start, because every
+    // start for a teammate -- a person's message, a relay, a routine, a room
+    // post -- builds its peer context through this one function.
+    const worktrees = workspaceChosen ? createWorktreeManager({ workspacePath }) : undefined
     const peerContextFor = async (teammateId: unknown): Promise<MissionPeerContext | undefined> => {
       if (typeof teammateId !== 'string' || teammateId.length === 0) return undefined
       let roster
@@ -621,9 +627,21 @@ if (!ownsSingleInstanceLock) {
         role: roleLabelOf(teammate),
         ...(teammate.route === undefined ? {} : { route: teammate.route })
       })
+      let cwd: string | undefined
+      let worktreeRefused: string | undefined
+      // Antigravity works in the folder it has open; a worktree would be one it has not.
+      if (self.worktree === true && worktrees !== undefined && self.route?.runtime !== 'antigravity') {
+        try {
+          cwd = await worktrees.ensure(self)
+        } catch (error) {
+          worktreeRefused = `${self.name} is set to work on its own branch, but ${error instanceof Error ? error.message : 'the worktree could not be made.'}`
+        }
+      }
       return {
         self: entry(self),
-        others: roster.filter((other) => other.teammateId !== teammateId).map(entry)
+        others: roster.filter((other) => other.teammateId !== teammateId).map(entry),
+        ...(cwd === undefined ? {} : { cwd }),
+        ...(worktreeRefused === undefined ? {} : { worktreeRefused })
       }
     }
 
@@ -892,7 +910,7 @@ if (!ownsSingleInstanceLock) {
       try {
         // roleTitle was dropped here since Custom teammates got titles: every
         // one read "Custom" on the sidebar and in the brief (found 2026-09-05).
-        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, avatar: input.avatar })
+        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, worktree: input.worktree, avatar: input.avatar })
         return { ok: true, data: { teammate } } as const
       } catch {
         // The store's own validation is the authority; the renderer is told
@@ -911,6 +929,7 @@ if (!ownsSingleInstanceLock) {
           hue: input.hue,
           role: input.role,
           roleTitle: input.roleTitle,
+          worktree: input.worktree,
           avatar: input.avatar
         })
         return { ok: true, data: { teammate } } as const
@@ -1427,6 +1446,9 @@ if (!ownsSingleInstanceLock) {
           return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const
         }
         const peer = await peerContextFor(payload.teammateId)
+        if (peer?.worktreeRefused !== undefined) {
+          return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: peer.worktreeRefused } } as const
+        }
         const approveModel = typeof payload.model === 'string' ? payload.model : undefined
         const approveEffort = typeof payload.effort === 'string' ? payload.effort : undefined
         try {
@@ -1468,6 +1490,9 @@ if (!ownsSingleInstanceLock) {
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       try {
         const peer = await peerContextFor(payload.teammateId)
+        if (peer?.worktreeRefused !== undefined) {
+          return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: peer.worktreeRefused } } as const
+        }
         const followUpOf = typeof payload.followUpOf === 'string' ? payload.followUpOf : undefined
         const response = await codexMissions.start(
           prompt,

@@ -5,6 +5,7 @@ import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole } from '../../../shared/ipc.js'
 import { PixelFace } from './PixelFace.js'
+import { branchNameFor } from '../../../shared/worktree-name.js'
 
 const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
   { hue: 'lime', label: 'Lime' },
@@ -45,7 +46,7 @@ export function NewTeammateDialog({
   mode
 }: {
   readonly onCancel: () => void
-  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; avatar: AvatarSpec }) => void
+  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }) => void
   readonly error: string | undefined
   /** Set to edit an existing teammate: the same dialog, filled in, saving instead of creating. */
   readonly initial?: PublicTeammate
@@ -60,6 +61,7 @@ export function NewTeammateDialog({
   )
   const [role, setRole] = useState<TeammateRole>(initial?.role ?? 'Code & Migrations')
   const [roleTitle, setRoleTitle] = useState(initial?.roleTitle ?? '')
+  const [worktree, setWorktree] = useState(initial?.worktree === true)
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -166,6 +168,32 @@ export function NewTeammateDialog({
           </div>
 
           {/*
+            * Own branch: the teammate's missions run in its own worktree of the
+            * folder's repository, so two teammates editing one repository do
+            * not collide (parity row 64). Bringing the branch back is a git
+            * operation of the person's; Locust merges nothing.
+            */}
+          <div className="lc-field lc-field--switch">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={worktree}
+              aria-label="Own branch"
+              className={`lc-memory__switch${worktree ? ' is-on' : ''}`}
+              onClick={() => setWorktree(!worktree)}
+            >
+              <span className="lc-memory__knob" />
+            </button>
+            <span className="lc-field__text">
+              <span className="lc-fieldlabel lc-mono">Own branch</span>
+              <span className="lc-field__hint">
+                Works in its own copy of the folder, on branch {branchNameFor(name.trim().length === 0 ? 'teammate' : name)}. Needs the folder to be a git repository.
+                Merging back is yours to do.
+              </span>
+            </span>
+          </div>
+
+          {/*
             The reference shows a default route and approval mode here. Both are
             stated as what they are today rather than as settings this dialog
             can change: route selection lands with the route layer, and approval
@@ -212,6 +240,7 @@ export function NewTeammateDialog({
                 hue,
                 role,
                 ...(role === 'Custom' && roleTitle.trim().length > 0 ? { roleTitle: roleTitle.trim() } : {}),
+                ...(worktree ? { worktree: true } : {}),
                 avatar
               })
             }

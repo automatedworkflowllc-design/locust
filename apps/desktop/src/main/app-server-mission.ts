@@ -393,7 +393,7 @@ export function createAppServerMissionService(
             const requestParams = (typeof request.params === 'object' && request.params !== null ? request.params : {}) as Record<string, unknown>
             const itemId = typeof requestParams.itemId === 'string' ? requestParams.itemId : undefined
             const changes = described.kind === 'file-change' && itemId !== undefined ? changesByItem.get(itemId) : undefined
-            const patch = approvalPatchFrom(changes, options.workspacePath)
+            const patch = approvalPatchFrom(changes, peer?.cwd ?? options.workspacePath)
             return await new Promise<JsonValue>((resolve) => {
               approvals.set(approvalId, { runId, resolve })
               options.emitApproval({
@@ -425,7 +425,8 @@ export function createAppServerMissionService(
           })
           rpc.notify('initialized')
           const thread = await rpc.request('thread/start', {
-            cwd: options.workspacePath,
+            // The teammate's own worktree when it has one, else the folder.
+            cwd: peer?.cwd ?? options.workspacePath,
             sandbox: 'workspace-write',
             approvalPolicy: 'untrusted'
           })
