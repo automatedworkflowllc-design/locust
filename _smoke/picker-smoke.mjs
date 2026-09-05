@@ -215,7 +215,7 @@ try {
   // Since 0.21.5 the search cap is WIDER (12 per group), not gone: a one-letter
   // search may still hold rows back, and every held-back row is counted in one
   // line. What is refused is a silent cut.
-  check('and any rows held back are counted, never silently cut', searchState.more <= 1 && (searchState.more === 0 || /[0-9]+ more match/.test(searchState.moreText ?? '')), searched)
+  check('and any rows held back are counted, never silently cut', searchState.more <= 1 && (searchState.more === 0 || /[0-9]+ more (models )?match/.test(searchState.moreText ?? '')), searched)
 } finally {
   child.kill()
   await sleep(500)

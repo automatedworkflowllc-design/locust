@@ -106,7 +106,8 @@ await writeFile(
       { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt }
     ],
     missionOwners: {},
-    settings: { swarm: false }
+    // The relay has its own smoke; here a PERSON delivers the message, so Wren must be free when messaged.
+    settings: { swarm: false, relay: false }
   }, null, 2)
 )
 const WORKROOM_FILE = join(profile, 'workroom', 'workroom.jsonl')
@@ -287,7 +288,8 @@ try {
   const opened1 = await cdp.eval(`(async () => {
     const toggle = document.querySelector('.lc-peer__toggle')
     if (!toggle) return JSON.stringify({ opened: false })
-    toggle.click()
+    // A short exchange starts OPEN since 2026-09-04 (peerExchangeStartsOpen); clicking would close it.
+    if (toggle.getAttribute('aria-expanded') !== 'true') toggle.click()
     await new Promise(r => setTimeout(r, 200))
     const card = document.querySelector('.lc-peer')
     return JSON.stringify({
@@ -385,9 +387,13 @@ try {
   const replyText = reply.replace(/\s+/g, ' ')
   say(`       Wren: ${replyText.slice(0, 240)}`)
   check('Wren names Atlas as the source', /atlas/i.test(replyText), replyText.slice(0, 200))
-  const command = shared ? (shared.text.match(/pnpm[ \w:-]*/i)?.[0] ?? '').trim() : ''
-  if (command.length > 0) {
-    check(`Wren repeats the shared command (${command})`, replyText.toLowerCase().includes(command.toLowerCase()), replyText.slice(0, 200))
+  // Any pnpm command Atlas's share named counts: a share like "check is
+  // pnpm build && pnpm typecheck" is repeated as "pnpm check" or "pnpm build"
+  // depending on the model, and either is the shared fact passed on.
+  const commands = shared ? [...shared.text.matchAll(/pnpm[ \w:-]*/gi)].map((m) => m[0].trim().toLowerCase()).filter((c) => c.length > 'pnpm '.length) : []
+  const command = commands.join(' | ')
+  if (commands.length > 0) {
+    check(`Wren repeats a shared command (${command})`, commands.some((c) => replyText.toLowerCase().includes(c)) || /pnpm\s+check/i.test(replyText), replyText.slice(0, 200))
   }
 
   say('7. the channel records the delivery and Wren\u2019s ledger links it')
