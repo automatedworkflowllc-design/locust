@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.30.0 — 2026-09-05
+
+- **The approval card shows the change.** When Codex asks to change files
+  in "Approve each action" mode, the card now carries the diff itself --
+  each file named, added and removed lines counted, the lines drawn with
+  the same viewer the activity fold uses -- instead of a summary of what
+  it was told. Nothing changes until you approve, as before.
+
 ## 0.29.0 — 2026-09-05
 
 - **One instruction file for the whole team: LOCUST.md.** Put a LOCUST.md

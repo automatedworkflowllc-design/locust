@@ -77,7 +77,15 @@ export function ApprovalCard({
             <p className="lc-settings__note">Codex sent a change this build could not read as a diff.</p>
           ) : (
             files.map((file) => (
-              <DiffView key={file.path} file={file} truncated={request.patch!.truncated} reported={request.patch!.truncated ? { added: request.patch!.added, removed: request.patch!.removed } : fileCounts(file)} />
+              <div key={file.path} className="lc-approval__file">
+                {/* The viewer draws hunks; the file they belong to is said here. */}
+                <div className="lc-filerow is-static">
+                  <Icon name="file" size={14} />
+                  <span className="lc-filerow__path">{file.path}</span>
+                  <span className="lc-filerow__status">{file.status}</span>
+                </div>
+                <DiffView file={file} truncated={request.patch!.truncated} reported={request.patch!.truncated ? { added: request.patch!.added, removed: request.patch!.removed } : fileCounts(file)} />
+              </div>
             ))
           )}
         </div>
