@@ -2,6 +2,7 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { RecoveredMissionPhase } from '@teammate/mission-store'
 
 import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineRunResponse } from '../shared/ipc.js'
+import { isDue } from '../shared/routine-schedule.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
 /**
@@ -15,13 +16,24 @@ import type { MissionPeerContext } from './workroom-briefing.js'
  * Nothing skips ahead: a step that failed, was stopped, or was interrupted
  * ends the routine there, and the thread says which step and why. Continuing
  * past a failure would build step 3 on work step 2 never did.
+ *
+ * A routine with a schedule also starts on its own: the host ticks the
+ * runner once a minute and a routine whose next run has passed starts
+ * exactly as if the person pressed Run -- same path, same record, same
+ * "one routine per teammate at a time". A teammate in the middle of a
+ * person's run is skipped and tried on the next tick, never queued behind
+ * them; a scheduled start that FAILS is held off for an hour rather than
+ * retried every minute against a runtime that is down.
  */
 
 export interface RoutineRunnerOptions {
   readonly routines: {
     get(routineId: unknown): Promise<PublicRoutine | undefined>
     recordRun(routineId: unknown): Promise<void>
+    list(): Promise<readonly PublicRoutine[]>
   }
+  /** Whether the teammate has a live run of anyone's. A scheduled routine waits for it to end. */
+  readonly teammateBusy?: (teammateId: string) => Promise<boolean>
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
   readonly start: (input: {
     readonly prompt: string
@@ -54,7 +66,17 @@ export interface RoutineRunner {
   /** Any run ending, however it ended. Only a routine's own current step moves it. */
   onRunEnded(mission: { readonly missionId: string }): Promise<void>
   running(): readonly RoutineProgress[]
+  /**
+   * Start every scheduled routine whose next run has passed, as of `now`.
+   * Returns the ids started. Safe to call every minute: a routine that is
+   * running, or whose teammate is busy, or that failed to start within the
+   * last hour, is skipped this tick.
+   */
+  tick(now: Date): Promise<readonly string[]>
 }
+
+/** How long a scheduled routine waits after a start that failed before it is tried again. */
+export const SCHEDULE_HOLD_OFF_MS = 3_600_000
 
 /** Runtimes the routine runner can start. Antigravity is driven through another service and records no starter. */
 const ROUTINE_RUNTIMES: ReadonlySet<string> = new Set(['codex', 'claude', 'cursor', 'opencode', 'copilot'])
@@ -76,6 +98,8 @@ function phaseWords(phase: RecoveredMissionPhase | undefined): string {
 
 export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunner {
   const active = new Map<string, RoutineProgress>()
+  /** routineId -> epoch ms before which a scheduled start is not tried again. */
+  const heldOff = new Map<string, number>()
 
   const notice = (progress: RoutineProgress, message: string): void => {
     options.notify({ kind: 'relay-notice', runId: progress.runId, missionId: progress.missionId, message })
@@ -201,6 +225,28 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
 
     running() {
       return [...active.values()]
+    },
+
+    async tick(now) {
+      const started: string[] = []
+      const all = await options.routines.list().catch(() => [] as readonly PublicRoutine[])
+      for (const routine of all) {
+        if (routine.schedule === undefined) continue
+        if (!isDue(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)) continue
+        const until = heldOff.get(routine.routineId)
+        if (until !== undefined && until > now.getTime()) continue
+        heldOff.delete(routine.routineId)
+        // Busy is a wait, not a failure: tried again next tick, no hold-off.
+        if ([...active.values()].some((progress) => progress.teammateId === routine.teammateId)) continue
+        if (options.teammateBusy !== undefined && (await options.teammateBusy(routine.teammateId).catch(() => true))) continue
+        const response = await this.run(routine.routineId)
+        if (response.ok) {
+          started.push(routine.routineId)
+        } else {
+          heldOff.set(routine.routineId, now.getTime() + SCHEDULE_HOLD_OFF_MS)
+        }
+      }
+      return started
     }
   }
 }

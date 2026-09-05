@@ -30,6 +30,10 @@ import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
 import { taskSection } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
+
+/** Scheduled routines are checked once a minute; the first check waits for runtime discovery. */
+const ROUTINE_TICK_MS = 60_000
+const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
 import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
@@ -664,7 +668,29 @@ if (!ownsSingleInstanceLock) {
         ),
       assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
       phaseOf: async (missionId) => (await missionLedger.getMission(missionId))?.phase,
+      // A scheduled routine waits for any live run of the teammate's, whoever started it.
+      teammateBusy: async (teammateId) => {
+        const owners = await teammates.missionOwners()
+        const live = [...codexMissions.liveMissionIds(), ...appServerMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
+        return live.some((missionId) => owners[missionId] === teammateId)
+      },
       notify: sendToWindow
+    })
+    // Scheduled routines: one tick a minute, the first after the runtimes
+    // have had a moment to be discovered. Only with a project folder chosen
+    // -- a run needs one, and a routine started into nothing would fail and
+    // be held off an hour for a reason the person never saw.
+    const tickRoutines = (): void => {
+      if (!workspaceChosen || routineRunner === undefined) return
+      void routineRunner.tick(new Date()).catch(() => undefined)
+    }
+    const firstRoutineTick = setTimeout(tickRoutines, ROUTINE_FIRST_TICK_MS)
+    firstRoutineTick.unref()
+    const routineTicks = setInterval(tickRoutines, ROUTINE_TICK_MS)
+    routineTicks.unref()
+    app.once('before-quit', () => {
+      clearTimeout(firstRoutineTick)
+      clearInterval(routineTicks)
     })
     roomTasks = createRoomTasks({
       rooms,
@@ -1010,7 +1036,8 @@ if (!ownsSingleInstanceLock) {
           teammateId: input.teammateId,
           route: input.route,
           steps: input.steps,
-          learnedFrom: input.learnedFrom
+          learnedFrom: input.learnedFrom,
+          ...(input.schedule === undefined ? {} : { schedule: input.schedule })
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {
@@ -1022,7 +1049,12 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return routineRejected('The routine could not be changed.')
       const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
       try {
-        const routine = await routines.update({ routineId: input.routineId, name: input.name, steps: input.steps })
+        const routine = await routines.update({
+          routineId: input.routineId,
+          name: input.name,
+          steps: input.steps,
+          ...(input.schedule === undefined ? {} : { schedule: input.schedule })
+        })
         return { ok: true, data: { routine } } as const
       } catch (error) {
         return routineRejected(error instanceof Error ? error.message : 'That routine could not be changed.')

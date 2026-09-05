@@ -24,7 +24,7 @@ import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
 import { costLine, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
-import { routineRunSummary, routineStepLabel } from '../routines.js'
+import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'rooms'
@@ -333,6 +333,11 @@ export function TeammatesScreen({
                         <span className="lc-routinerow__name" title={routine.steps.join(STEP_GAP)}>
                           {routine.name}
                           <span className="lc-routinerow__meta lc-mono"> · {routineRunSummary(routine)}</span>
+                          {routineScheduleSummary(routine, new Date()) !== undefined && (
+                            <span className="lc-routinerow__meta lc-mono lc-routinerow__sched">
+                              {routineScheduleSummary(routine, new Date())}
+                            </span>
+                          )}
                         </span>
                         <button
                           type="button"

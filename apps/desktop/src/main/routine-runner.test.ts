@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { CodexMissionStartResponse, CodexMissionUpdate, PublicRoutine } from '../shared/ipc.js'
-import { createRoutineRunner } from './routine-runner.js'
+import { SCHEDULE_HOLD_OFF_MS, createRoutineRunner } from './routine-runner.js'
 import type { RoutineRunnerOptions } from './routine-runner.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
@@ -44,6 +44,7 @@ function harness(input: {
   const options: RoutineRunnerOptions = {
     routines: {
       get: async (id) => held.get(String(id)),
+      list: async () => [...held.values()],
       recordRun: async (id) => {
         runs.push(String(id))
       }
@@ -198,5 +199,102 @@ describe('running a routine', () => {
     const second = await runner.run('rt_2')
     expect(second).toMatchObject({ ok: false, error: { message: expect.stringContaining('already running') } })
     expect(h.starts).toHaveLength(1)
+  })
+})
+
+describe('a routine that runs on its own', () => {
+  const NOON = new Date('2026-09-05T12:00:00.000Z')
+
+  /** A harness whose store keeps lastRunAt, so a second tick sees the first. */
+  function scheduled(input: { readonly routines: readonly PublicRoutine[]; readonly busy?: readonly string[]; readonly startFails?: boolean }) {
+    const base = harness({ routines: input.routines, ...(input.startFails === true ? { startFails: true } : {}) })
+    const held = new Map(input.routines.map((entry) => [entry.routineId, entry]))
+    let clock = NOON
+    const options: RoutineRunnerOptions = {
+      ...base.options,
+      routines: {
+        get: async (id) => held.get(String(id)),
+        list: async () => [...held.values()],
+        recordRun: async (id) => {
+          base.runs.push(String(id))
+          const routine = held.get(String(id))
+          if (routine !== undefined) held.set(routine.routineId, { ...routine, runs: routine.runs + 1, lastRunAt: clock.toISOString() })
+        }
+      },
+      // The real peer context is the routine's own teammate; the base stub answers Wren for everyone.
+      peerContextFor: async (teammateId) => ({ self: { teammateId, name: 'Wren', role: 'Code & Migrations' }, others: [] }),
+      teammateBusy: async (teammateId) => (input.busy ?? []).includes(teammateId)
+    }
+    const runner = createRoutineRunner(options)
+    return {
+      ...base,
+      runner,
+      tick: (at: Date) => {
+        clock = at
+        return runner.tick(at)
+      }
+    }
+  }
+
+  it('a due routine starts on the tick as if Run were pressed; an undue one, and one with no schedule, do not', async () => {
+    const h = scheduled({
+      routines: [
+        routine({ routineId: 'rt_due', teammateId: 'tm_a', schedule: { kind: 'every', hours: 2 }, createdAt: '2026-09-05T09:00:00.000Z' }),
+        routine({ routineId: 'rt_soon', teammateId: 'tm_b', schedule: { kind: 'every', hours: 4 }, createdAt: '2026-09-05T09:00:00.000Z' }),
+        routine({ routineId: 'rt_manual', teammateId: 'tm_c' })
+      ]
+    })
+    expect(await h.tick(NOON)).toEqual(['rt_due'])
+    expect(h.starts.map((start) => start.startedBy)).toEqual([{ kind: 'routine', routineId: 'rt_due', step: 1 }])
+    expect(h.runs).toEqual(['rt_due'])
+    expect(h.updates.some((update) => update.kind === 'mission-started' && update.missionId === 'mission_1')).toBe(true)
+    // The next minute: it ran, so it is not due again until two hours pass.
+    expect(await h.tick(new Date('2026-09-05T12:01:00.000Z'))).toEqual([])
+    // Two hours on, rt_soon (four hours from nine) is due too, and rt_due is
+    // still replaying step 1 so it waits.
+    expect(await h.tick(new Date('2026-09-05T14:00:00.000Z'))).toEqual(['rt_soon'])
+    expect(h.starts).toHaveLength(2)
+  })
+
+  it("a teammate busy with a person's run is skipped and tried next tick, not queued and not held off", async () => {
+    const busy = ['tm_wren']
+    const h = scheduled({
+      routines: [routine({ schedule: { kind: 'every', hours: 1 }, createdAt: '2026-09-05T09:00:00.000Z' })],
+      busy
+    })
+    expect(await h.tick(NOON)).toEqual([])
+    expect(h.starts).toHaveLength(0)
+    busy.length = 0
+    expect(await h.tick(new Date('2026-09-05T12:01:00.000Z'))).toEqual(['rt_1'])
+  })
+
+  it('a scheduled start that fails is held off for an hour rather than retried every minute', async () => {
+    const h = scheduled({
+      routines: [routine({ schedule: { kind: 'every', hours: 1 }, createdAt: '2026-09-05T09:00:00.000Z' })],
+      startFails: true
+    })
+    expect(await h.tick(NOON)).toEqual([])
+    expect(h.starts).toHaveLength(1)
+    await h.tick(new Date(NOON.getTime() + 60_000))
+    await h.tick(new Date(NOON.getTime() + SCHEDULE_HOLD_OFF_MS - 1))
+    expect(h.starts).toHaveLength(1)
+    await h.tick(new Date(NOON.getTime() + SCHEDULE_HOLD_OFF_MS))
+    expect(h.starts).toHaveLength(2)
+    // Nothing was recorded as a run: the routine still says it never ran.
+    expect(h.runs).toEqual([])
+  })
+
+  it('daily at a time runs once that day, whichever minute the tick lands on', async () => {
+    const h = scheduled({
+      routines: [routine({ schedule: { kind: 'daily', at: '09:00' }, createdAt: '2026-09-01T00:00:00.000Z' })]
+    })
+    const local = (h2: number, m: number) => new Date(2026, 8, 5, h2, m, 0)
+    expect(await h.tick(local(8, 59))).toEqual([])
+    expect(await h.tick(local(9, 3))).toEqual(['rt_1'])
+    // Step 1 completes; the routine is over (one step matters not -- three
+    // steps run on, but the day's slot is spent either way).
+    for (const at of [local(9, 4), local(13, 0), local(23, 59)]) {
+      expect(await h.tick(at)).toEqual([])
+    }
   })
 })

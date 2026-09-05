@@ -4,6 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import type { PublicRoutine, TeammateRoute } from '../shared/ipc.js'
+import { validSchedule } from '../shared/routine-schedule.js'
 import { isTeammateRoute, safeId } from './teammate-store.js'
 
 /**
@@ -34,9 +35,10 @@ export interface RoutineStore {
     readonly route: unknown
     readonly steps: unknown
     readonly learnedFrom: unknown
+    readonly schedule?: unknown
   }): Promise<PublicRoutine>
-  /** Corrections: the name and the steps. The teammate, route and provenance stay. */
-  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown }): Promise<PublicRoutine>
+  /** Corrections: the name, the steps, and the schedule (`null` clears it). The teammate, route and provenance stay. */
+  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown }): Promise<PublicRoutine>
   remove(routineId: unknown): Promise<void>
   /** Count a run, and when. Unknown routine: nothing changes. */
   recordRun(routineId: unknown): Promise<void>
@@ -92,6 +94,9 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
   if (record.lastRunAt !== undefined && (typeof record.lastRunAt !== 'string' || Number.isNaN(Date.parse(record.lastRunAt)))) {
     return undefined
   }
+  // A schedule that does not read is dropped, not the routine: the steps
+  // are the person's words and outrank a malformed timer.
+  const schedule = validSchedule(record.schedule) ? record.schedule : undefined
   const route: TeammateRoute = { runtime: record.route.runtime, model: record.route.model, mode: record.route.mode }
   return {
     routineId: record.routineId,
@@ -102,7 +107,8 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     learnedFrom: [...record.learnedFrom],
     createdAt: record.createdAt,
     runs: record.runs,
-    ...(record.lastRunAt === undefined ? {} : { lastRunAt: record.lastRunAt })
+    ...(record.lastRunAt === undefined ? {} : { lastRunAt: record.lastRunAt }),
+    ...(schedule === undefined ? {} : { schedule })
   }
 }
 
@@ -195,6 +201,9 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         if (!isTeammateRoute(input.route)) throw new Error('Routine route is invalid')
         if (!validSteps(input.steps)) throw new Error(`Routine steps are invalid: 1 to ${String(MAX_STEPS)} non-empty steps`)
         if (!validLearnedFrom(input.learnedFrom)) throw new Error('Routine provenance is invalid')
+        if (input.schedule !== undefined && !validSchedule(input.schedule)) {
+          throw new Error('The schedule is not one Locust can keep: every 1 to 168 hours, or daily at HH:MM.')
+        }
         const file = await read()
         if (file.routines.length >= MAX_ROUTINES) throw new Error('Too many routines')
         const routine: PublicRoutine = {
@@ -205,7 +214,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           steps: [...input.steps],
           learnedFrom: [...input.learnedFrom],
           createdAt: new Date().toISOString(),
-          runs: 0
+          runs: 0,
+          ...(input.schedule === undefined ? {} : { schedule: input.schedule })
         }
         await write({ ...file, routines: [...file.routines, routine] })
         return routine
@@ -220,7 +230,20 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         const file = await read()
         const held = file.routines.find((routine) => routine.routineId === input.routineId)
         if (held === undefined) throw new Error('Routine not found')
-        const next: PublicRoutine = { ...held, name: input.name.trim(), steps: [...input.steps] }
+        if (input.schedule !== undefined && input.schedule !== null && !validSchedule(input.schedule)) {
+          throw new Error('The schedule is not one Locust can keep: every 1 to 168 hours, or daily at HH:MM.')
+        }
+        const { schedule: _held, ...rest } = held
+        const next: PublicRoutine = {
+          ...rest,
+          name: input.name.trim(),
+          steps: [...input.steps],
+          ...(input.schedule === null
+            ? {}
+            : input.schedule === undefined
+              ? (held.schedule === undefined ? {} : { schedule: held.schedule })
+              : { schedule: input.schedule })
+        }
         await write({
           ...file,
           routines: file.routines.map((routine) => (routine.routineId === next.routineId ? next : routine))

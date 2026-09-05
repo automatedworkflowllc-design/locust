@@ -1423,6 +1423,33 @@ textarea {
   gap: var(--lc-space-1);
 }
 
+/* A routine's schedule: the three-way choice, then the one detail the
+   choice needs (hours, or a time). The card shows the rule and the next
+   run on its own line so the name stays a name. */
+.lc-routinesched {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lc-space-2);
+}
+
+.lc-routinesched__detail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-1);
+  color: var(--lc-text-muted);
+}
+
+.lc-routinesched__pick {
+  width: auto;
+  min-width: 0;
+  padding-block: 2px;
+}
+
+.lc-routinerow__sched {
+  display: block;
+}
+
 /* Rooms. The list is a grid of cards; a room is a thread of posts, each
    with one answer card per teammate, and a post box that reads as the
    composer's plainer cousin -- it addresses everyone, so it says so. */

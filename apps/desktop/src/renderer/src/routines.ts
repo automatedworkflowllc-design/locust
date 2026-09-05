@@ -1,4 +1,5 @@
 import type { PublicRecoveredMission, PublicRoutine } from '../../shared/ipc.js'
+import { nextRunAfter, scheduleLabel } from '../../shared/routine-schedule.js'
 import { conversationTurns } from './missionView.js'
 
 /**
@@ -78,4 +79,32 @@ export function routineRunSummary(routine: Pick<PublicRoutine, 'runs' | 'steps'>
   const steps = `${String(routine.steps.length)} step${routine.steps.length === 1 ? '' : 's'}`
   if (routine.runs === 0) return `${steps} · not run yet`
   return `${steps} · run ${String(routine.runs)} time${routine.runs === 1 ? '' : 's'}`
+}
+
+const pad = (value: number): string => String(value).padStart(2, '0')
+const clock = (at: Date): string => `${pad(at.getHours())}:${pad(at.getMinutes())}`
+const sameDay = (a: Date, b: Date): boolean =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/**
+ * What a routine's card says about its schedule: the rule and the next run,
+ * in the person's own clock. Undefined for a routine that only runs when
+ * pressed, so the card says nothing rather than "never".
+ */
+export function routineScheduleSummary(
+  routine: Pick<PublicRoutine, 'schedule' | 'lastRunAt' | 'createdAt'>,
+  now: Date
+): string | undefined {
+  if (routine.schedule === undefined) return undefined
+  const next = nextRunAfter(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)
+  const when =
+    next.getTime() <= now.getTime()
+      ? 'due now'
+      : sameDay(next, now)
+        ? `next ${clock(next)}`
+        : sameDay(next, new Date(now.getTime() + 24 * 3_600_000))
+          ? `next tomorrow ${clock(next)}`
+          : `next ${WEEKDAYS[next.getDay()] ?? ''} ${clock(next)}`
+  return `${scheduleLabel(routine.schedule)} · ${when}`
 }

@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.26.0 — 2026-09-05
+
+- **Routines can run on their own.** Saving or editing a routine now offers
+  a schedule: every few hours (1 to 24, counted from its last run) or daily
+  at a time. A scheduled routine starts exactly as if you pressed Run -- on
+  its teammate's route, recorded as started by the routine -- and the Team
+  card says the rule and the next run. It runs only while Locust is open
+  and only when its teammate is free; a run missed while Locust was closed
+  happens once, when it is next open, not once per missed interval. A start
+  that fails is tried again an hour later, not every minute.
+
 ## 0.25.0 — 2026-09-05
 
 - **Rooms tell you when something happened while you were away.** A teammate

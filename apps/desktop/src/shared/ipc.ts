@@ -2,6 +2,9 @@ import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime
 
 import type { AvatarSpec } from './avatar.js'
 
+import type { RoutineSchedule } from './routine-schedule.js'
+export type { RoutineSchedule } from './routine-schedule.js'
+
 export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
 export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
 export const CODEX_MISSION_CANCEL_CHANNEL = 'codex-mission:cancel'
@@ -264,6 +267,12 @@ export interface PublicRoutine {
   readonly createdAt: string
   readonly runs: number
   readonly lastRunAt?: string
+  /**
+   * When it runs on its own: every N hours from the last run, or daily at
+   * a wall-clock time -- local, and only while the app is open. Absent
+   * means what every routine was before: it runs when a person presses Run.
+   */
+  readonly schedule?: RoutineSchedule
 }
 
 export interface RoutineCreateRequest {
@@ -272,12 +281,15 @@ export interface RoutineCreateRequest {
   readonly route: TeammateRoute
   readonly steps: readonly string[]
   readonly learnedFrom: readonly string[]
+  readonly schedule?: RoutineSchedule
 }
 
 export interface RoutineUpdateRequest {
   readonly routineId: string
   readonly name: string
   readonly steps: readonly string[]
+  /** `null` clears a schedule; absent leaves it as it was. */
+  readonly schedule?: RoutineSchedule | null
 }
 
 export type RoutineListResponse =

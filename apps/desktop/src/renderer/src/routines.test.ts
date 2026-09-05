@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PublicRecoveredMission } from '../../shared/ipc.js'
-import { MAX_ROUTINE_STEPS, draftName, routineDraft, routineRunSummary, routineStepLabel } from './routines.js'
+import { MAX_ROUTINE_STEPS, draftName, routineDraft, routineRunSummary, routineStepLabel, routineScheduleSummary } from './routines.js'
 
 function turn(
   missionId: string,
@@ -115,5 +115,28 @@ describe('how a routine reads', () => {
 
   it('says which step is running', () => {
     expect(routineStepLabel({ step: 2, of: 3 })).toBe('routine · step 2 of 3')
+  })
+})
+
+describe('what a card says about a schedule', () => {
+  const base = { createdAt: new Date(2026, 8, 4, 9, 0, 0).toISOString() }
+  const now = new Date(2026, 8, 5, 8, 0, 0)
+
+  it('says nothing for a routine that only runs when pressed', () => {
+    expect(routineScheduleSummary({ ...base, schedule: undefined }, now)).toBeUndefined()
+  })
+
+  it('names the rule and the next run in local clock words: today, tomorrow, a weekday, or due now', () => {
+    expect(routineScheduleSummary({ ...base, schedule: { kind: 'daily', at: '09:30' } }, now)).toBe('daily at 09:30 · next 09:30')
+    expect(
+      routineScheduleSummary({ ...base, schedule: { kind: 'daily', at: '07:00' }, lastRunAt: new Date(2026, 8, 5, 7, 1).toISOString() }, now)
+    ).toBe('daily at 07:00 · next tomorrow 07:00')
+    expect(
+      routineScheduleSummary({ ...base, schedule: { kind: 'every', hours: 4 }, lastRunAt: new Date(2026, 8, 5, 6, 0).toISOString() }, now)
+    ).toBe('every 4 hours · next 10:00')
+    expect(
+      routineScheduleSummary({ ...base, schedule: { kind: 'every', hours: 168 }, lastRunAt: new Date(2026, 8, 5, 6, 0).toISOString() }, now)
+    ).toBe('every 168 hours · next Sat 06:00')
+    expect(routineScheduleSummary({ ...base, schedule: { kind: 'every', hours: 1 } }, now)).toBe('every hour · due now')
   })
 })

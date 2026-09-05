@@ -23,7 +23,9 @@ import type {
   PublicTeammate,
   TeammateHue,
   TeammateRole,
-  TeammateRoute, PublicRoom, RoomTaskRequest } from '../../shared/ipc.js'
+  TeammateRoute, PublicRoom, RoomTaskRequest,
+  RoutineSchedule
+} from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
 import { queuedVerdict } from './steering.js'
@@ -622,6 +624,7 @@ export default function App(): ReactElement {
     readonly learnedFrom: readonly string[]
     readonly truncated: boolean
     readonly route?: TeammateRoute
+    readonly schedule?: RoutineSchedule
     readonly busy: boolean
     readonly error?: string
   }>()
@@ -805,6 +808,9 @@ export default function App(): ReactElement {
         // adopts it exactly as it adopts a run it asked for, so the sidebar
         // shows them working from this moment rather than after a refresh.
         setMissionOwners((current) => ({ ...current, [update.missionId]: update.teammateId }))
+        // A routine that started on its own: the Team card's run count and
+        // next run moved on disk, and nobody pressed anything to refresh them.
+        if (update.startedBy?.kind === 'routine') void reloadRoutines()
         const queued = pendingUpdatesRef.current.get(update.runId) ?? []
         pendingUpdatesRef.current.delete(update.runId)
         setRuns((current) => {
@@ -1603,7 +1609,11 @@ export default function App(): ReactElement {
     })
   }
 
-  const saveRoutine = (input: { readonly name: string; readonly steps: readonly string[] }): void => {
+  const saveRoutine = (input: {
+    readonly name: string
+    readonly steps: readonly string[]
+    readonly schedule: RoutineSchedule | undefined
+  }): void => {
     const bridge = window.desktop
     const dialog = routineDialog
     if (!bridge || dialog === undefined) return
@@ -1615,9 +1625,11 @@ export default function App(): ReactElement {
             teammateId: dialog.teammateId,
             route: dialog.route ?? { runtime: 'codex', model: 'account-default', mode: 'ask' },
             steps: input.steps,
-            learnedFrom: dialog.learnedFrom
+            learnedFrom: dialog.learnedFrom,
+            ...(input.schedule === undefined ? {} : { schedule: input.schedule })
           })
-        : bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps })
+        : // null clears a schedule the routine had; the store leaves an absent one alone.
+          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null })
     void request
       .then(async (response) => {
         if (!response.ok) {
@@ -2103,6 +2115,7 @@ export default function App(): ReactElement {
                   steps: routine.steps,
                   learnedFrom: routine.learnedFrom,
                   truncated: false,
+                  ...(routine.schedule === undefined ? {} : { schedule: routine.schedule }),
                   busy: false
                 })
               }
@@ -2626,6 +2639,7 @@ export default function App(): ReactElement {
           teammate={teammates.find((entry) => entry.teammateId === routineDialog.teammateId)}
           initialName={routineDialog.name}
           initialSteps={routineDialog.steps}
+          initialSchedule={routineDialog.schedule}
           truncated={routineDialog.truncated}
           routeLabel={
             routineDialog.route === undefined

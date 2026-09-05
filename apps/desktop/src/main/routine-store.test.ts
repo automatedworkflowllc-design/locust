@@ -131,3 +131,32 @@ describe('the routine store', () => {
     expect(await createRoutineStore({ rootDirectory: directory }).list()).toEqual([])
   })
 })
+
+describe('a routine that runs on its own', () => {
+  it('keeps a schedule, corrects it, clears it with null, and leaves it alone when unmentioned', async () => {
+    const store = createRoutineStore({ rootDirectory: await root() })
+    const made = await store.create(fresh({ schedule: { kind: 'every', hours: 4 } }))
+    expect(made.schedule).toEqual({ kind: 'every', hours: 4 })
+    const daily = await store.update({ routineId: made.routineId, name: made.name, steps: made.steps, schedule: { kind: 'daily', at: '07:30' } })
+    expect(daily.schedule).toEqual({ kind: 'daily', at: '07:30' })
+    const same = await store.update({ routineId: made.routineId, name: 'Renamed', steps: made.steps })
+    expect(same.schedule).toEqual({ kind: 'daily', at: '07:30' })
+    const cleared = await store.update({ routineId: made.routineId, name: 'Renamed', steps: made.steps, schedule: null })
+    expect(cleared.schedule).toBeUndefined()
+    expect((await store.get(made.routineId))?.schedule).toBeUndefined()
+  })
+
+  it('refuses a schedule it cannot keep, and drops a malformed one from disk without dropping the routine', async () => {
+    const directory = await root()
+    const store = createRoutineStore({ rootDirectory: directory })
+    await expect(store.create(fresh({ schedule: { kind: 'every', hours: 0 } }))).rejects.toThrow(/schedule/)
+    const made = await store.create(fresh())
+    await expect(store.update({ routineId: made.routineId, name: made.name, steps: made.steps, schedule: { kind: 'daily', at: '25:00' } })).rejects.toThrow(/schedule/)
+    const raw = JSON.parse(await readFile(join(directory, 'routines.json'), 'utf8'))
+    raw.routines[0].schedule = { kind: 'weekly' }
+    await writeFile(join(directory, 'routines.json'), JSON.stringify(raw), 'utf8')
+    const back = await createRoutineStore({ rootDirectory: directory }).get(made.routineId)
+    expect(back?.name).toBe('Nightly tidy')
+    expect(back?.schedule).toBeUndefined()
+  })
+})

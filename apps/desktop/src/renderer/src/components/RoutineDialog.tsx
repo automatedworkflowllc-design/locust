@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { PublicTeammate } from '../../../shared/ipc.js'
+import type { PublicTeammate, RoutineSchedule } from '../../../shared/ipc.js'
+import { EVERY_HOURS_CHOICES } from '../../../shared/routine-schedule.js'
 import { MAX_ROUTINE_STEPS } from '../routines.js'
 import { PixelFace } from './PixelFace.js'
 
@@ -18,6 +19,7 @@ export function RoutineDialog({
   teammate,
   initialName,
   initialSteps,
+  initialSchedule,
   truncated,
   routeLabel,
   busy,
@@ -28,18 +30,26 @@ export function RoutineDialog({
   readonly teammate: PublicTeammate | undefined
   readonly initialName: string
   readonly initialSteps: readonly string[]
+  /** When it runs on its own, if it does. Undefined: only when a person presses Run. */
+  readonly initialSchedule: RoutineSchedule | undefined
   /** The conversation had more turns than a routine may hold, and the draft was cut. */
   readonly truncated: boolean
   /** The route this will replay on, in the words the picker uses. */
   readonly routeLabel: string | undefined
   readonly busy: boolean
   readonly error: string | undefined
-  readonly onSave: (input: { readonly name: string; readonly steps: readonly string[] }) => void
+  readonly onSave: (input: {
+    readonly name: string
+    readonly steps: readonly string[]
+    readonly schedule: RoutineSchedule | undefined
+  }) => void
   readonly onCancel: () => void
 }): ReactElement {
   const editing = initialSteps.length > 0 && routeLabel === undefined
   const [name, setName] = useState(initialName)
   const [steps, setSteps] = useState<readonly string[]>(initialSteps)
+  const [schedule, setSchedule] = useState<RoutineSchedule | undefined>(initialSchedule)
+  const scheduleKind = schedule?.kind ?? 'off'
 
   const kept = steps.filter((step) => step.trim().length > 0)
   const canSave = name.trim().length > 0 && kept.length > 0 && !busy
@@ -119,6 +129,75 @@ export function RoutineDialog({
             </button>
           </div>
 
+          <div className="lc-dialog__section">
+            <span className="lc-fieldlabel lc-mono" id="routine-schedule-label">
+              Runs on its own
+            </span>
+            <div className="lc-routinesched">
+              <div className="lc-segmented" role="radiogroup" aria-labelledby="routine-schedule-label">
+                {(
+                  [
+                    ['off', 'Only when I press Run'],
+                    ['every', 'Every few hours'],
+                    ['daily', 'Daily at a time']
+                  ] as const
+                ).map(([kind, label]) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    role="radio"
+                    aria-checked={scheduleKind === kind}
+                    className={`lc-button${scheduleKind === kind ? ' is-active' : ''}`}
+                    onClick={() =>
+                      setSchedule(
+                        kind === 'off' ? undefined : kind === 'every' ? { kind: 'every', hours: 4 } : { kind: 'daily', at: '09:00' }
+                      )
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {schedule?.kind === 'every' && (
+                <label className="lc-routinesched__detail lc-mono">
+                  every
+                  <select
+                    className="lc-input lc-routinesched__pick"
+                    aria-label="Hours between runs"
+                    value={String(schedule.hours)}
+                    onChange={(event) => setSchedule({ kind: 'every', hours: Number(event.target.value) })}
+                  >
+                    {EVERY_HOURS_CHOICES.map((hours) => (
+                      <option key={hours} value={String(hours)}>
+                        {hours === 1 ? '1 hour' : `${String(hours)} hours`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {schedule?.kind === 'daily' && (
+                <label className="lc-routinesched__detail lc-mono">
+                  at
+                  <input
+                    type="time"
+                    className="lc-input lc-routinesched__pick"
+                    aria-label="Time of day"
+                    value={schedule.at}
+                    onChange={(event) => {
+                      if (/^\d\d:\d\d$/u.test(event.target.value)) setSchedule({ kind: 'daily', at: event.target.value })
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+            {schedule !== undefined && (
+              <p className="lc-dialog__note lc-mono">
+                Only while Locust is open, and only when {teammate?.name ?? 'the teammate'} is free. A run missed while
+                Locust was closed happens once, the next time it is open.
+              </p>
+            )}
+          </div>
+
           {truncated && (
             <p className="lc-dialog__note lc-mono">
               This conversation had more turns than a routine can hold, so the first {String(MAX_ROUTINE_STEPS)} are here.
@@ -138,7 +217,7 @@ export function RoutineDialog({
             type="button"
             className="lc-primarybutton"
             disabled={!canSave}
-            onClick={() => onSave({ name: name.trim(), steps: kept.map((step) => step.trim()) })}
+            onClick={() => onSave({ name: name.trim(), steps: kept.map((step) => step.trim()), schedule })}
           >
             {editing ? 'Save changes' : 'Save routine'}
           </button>
