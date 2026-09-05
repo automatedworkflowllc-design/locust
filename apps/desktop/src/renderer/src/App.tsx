@@ -426,6 +426,31 @@ export default function App(): ReactElement {
     })
   }
 
+  const assignMissionTo = (missionId: string, teammateId: string): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    void bridge
+      .assignMission(teammateId, missionId)
+      .then((response) => {
+        if (!response.ok) {
+          setDeleteError(response.error.message)
+          return
+        }
+        setMissionOwners((current) => ({ ...current, [missionId]: teammateId }))
+        // The run on screen, if it is this one, is now theirs too.
+        setRuns((current) => {
+          let next = current
+          for (const [key, run] of current) {
+            if (run.data?.missionId === missionId && run.teammateId !== teammateId) {
+              next = withRun(next, key, (entry) => ({ ...entry, teammateId }))
+            }
+          }
+          return next
+        })
+      })
+      .catch(() => setDeleteError('That mission could not be assigned.'))
+  }
+
   const openMissionMenu = (missionId: string, at: { readonly x: number; readonly y: number }): void => {
     const live = [...runsRef.current.values()].some(
       (run) => liveRunIsActive(run) && run.data?.missionId === missionId
@@ -438,6 +463,20 @@ export default function App(): ReactElement {
       title,
       items: [
         { label: 'Open', onSelect: () => openMission(missionId) },
+        // Hand a conversation to a teammate after the fact. Flat items, one
+        // per teammate, so the menu stays one press deep; a roster longer
+        // than six says where the rest are.
+        ...teammatesRef.current
+          .filter((teammate) => missionOwnersRef.current[missionId] !== teammate.teammateId)
+          .slice(0, 6)
+          .map((teammate) => ({
+            label: `Assign to ${teammate.name}`,
+            disabledReason: live ? 'Wait for the run to finish before handing it over.' : undefined,
+            onSelect: () => assignMissionTo(missionId, teammate.teammateId)
+          })),
+        ...(teammatesRef.current.length > 6
+          ? [{ label: 'More teammates in Team', onSelect: () => setScreen('teammates') }]
+          : []),
         {
           label: 'Copy mission id',
           onSelect: () => {
@@ -942,6 +981,16 @@ export default function App(): ReactElement {
   // needs a click before the first mission; removal falls back the same way.
   const selectedTeammate =
     teammates.find((teammate) => teammate.teammateId === selectedTeammateId) ?? teammates[0]
+  /**
+   * The teammate the person actually picked, or nobody. `selectedTeammate`
+   * falls back to the first teammate so surfaces that need a name have one;
+   * a MESSAGE must not inherit that fallback. From the home screen, with no
+   * one picked, a message starts a conversation of nobody's -- a plain chat
+   * on the route the bar shows -- and "Assign to ..." on its row hands it
+   * to a teammate afterwards (Colin, 2026-09-05: no Conversation tab; a
+   * mission already is one, a teammate is a saved route with a face).
+   */
+  const pickedTeammate = selectedTeammateId === undefined ? undefined : selectedTeammate
 
   /** Who a run belongs to: what it was started with, or what the host recorded. */
   const ownerOf = (run: LiveRunState): string | undefined =>
@@ -956,13 +1005,13 @@ export default function App(): ReactElement {
     && shownData !== undefined
     && !liveRunIsActive(liveRun)
     && shownData.runtime !== route.runtime
-    && ownerOf(liveRun) === selectedTeammate?.teammateId
+    && ownerOf(liveRun) === pickedTeammate?.teammateId
       ? `Continues on ${runtimeNameOf(route.runtime)} from ${runtimeNameOf(shownData.runtime)}'s checkpoint -- briefed on what was done, not handed the memory.`
       : undefined
 
   const startMission = async (prompt: string, modeOverride?: MissionMode): Promise<boolean> => {
     const bridge = window.desktop
-    const teammateId = selectedTeammate?.teammateId
+    const teammateId = pickedTeammate?.teammateId
     // No folder, no run. The main process refuses this too; saying it here
     // keeps a refused start from being filed as a failed mission.
     if (workspacePath === undefined && build !== undefined) {
@@ -1498,7 +1547,7 @@ export default function App(): ReactElement {
 
   /** The addressed teammate's live run, if they have one: they cannot be given a second. */
   const busyRun = [...runs.values()].find(
-    (run) => liveRunIsActive(run) && selectedTeammate !== undefined && ownerOf(run) === selectedTeammate.teammateId
+    (run) => liveRunIsActive(run) && pickedTeammate !== undefined && ownerOf(run) === pickedTeammate.teammateId
   )
 
   /**
@@ -1883,7 +1932,7 @@ export default function App(): ReactElement {
             // always has someone to go to; the SCREEN keys on the explicit pick.
             selectedTeammateId !== undefined && selectedTeammate !== undefined && runtimes.some((entry) => entry.ready && entry.status === 'ready') ? (
               <IdleTeammate
-                teammate={selectedTeammate ?? teammates[0]!}
+                teammate={pickedTeammate ?? selectedTeammate ?? teammates[0]!}
                 canStart={busyRun === undefined}
                 mode={mode}
                 onStarter={(prompt) => {
@@ -2203,8 +2252,8 @@ export default function App(): ReactElement {
             onOpenRoutePicker={() => undefined}
             onHandOff={(choice) => { void handOffMission(choice) }}
             handingOff={handingOff}
-            teammateName={selectedTeammate?.name}
-            busyWith={busyRun === undefined ? undefined : (selectedTeammate?.name ?? 'This teammate')}
+            teammateName={pickedTeammate?.name}
+            busyWith={busyRun === undefined ? undefined : (pickedTeammate?.name ?? 'This teammate')}
             queued={queued?.text}
             queuedNote={queuedNote}
             queuedElsewhere={queued !== undefined && shownKey !== queued.key}
