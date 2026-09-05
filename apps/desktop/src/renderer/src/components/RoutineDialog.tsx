@@ -78,7 +78,9 @@ export function RoutineDialog({
           )}
 
           <div className="lc-dialog__section">
-            <span className="lc-fieldlabel lc-mono">Steps</span>
+            <span className="lc-fieldlabel lc-mono">
+              Steps <span className="lc-queued__note">{String(steps.length)} of {String(MAX_ROUTINE_STEPS)}</span>
+            </span>
             {steps.map((step, index) => (
               <div className="lc-routinestep" key={`step_${String(index)}`}>
                 <span className="lc-routinestep__n lc-mono">{index + 1}</span>
@@ -101,11 +103,20 @@ export function RoutineDialog({
                 </button>
               </div>
             ))}
-            {steps.length < MAX_ROUTINE_STEPS && (
-              <button type="button" className="lc-ghostbutton" onClick={() => setSteps([...steps, ''])}>
-                Add a step
-              </button>
-            )}
+            {/*
+              * Kept and disabled at the cap rather than unmounted. A control
+              * that vanishes reads as a broken dialog; one that stays and
+              * says why teaches the limit (design pass, gap 4).
+              */}
+            <button
+              type="button"
+              className="lc-ghostbutton"
+              disabled={steps.length >= MAX_ROUTINE_STEPS}
+              title={steps.length >= MAX_ROUTINE_STEPS ? `A routine holds ${String(MAX_ROUTINE_STEPS)} steps at most` : undefined}
+              onClick={() => setSteps([...steps, ''])}
+            >
+              Add a step
+            </button>
           </div>
 
           {truncated && (

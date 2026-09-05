@@ -1240,6 +1240,15 @@ textarea {
   color: var(--lc-lime-text);
 }
 
+/* Green is "available"; lime is "happening right now". A first launch has
+   nothing happening on it, so its READY tags are green (design pass,
+   objection 5). Added because the class did not exist -- an undefined one
+   would have painted nothing at all and looked like a plain tag. */
+.lc-tag.is-green {
+  border-color: var(--lc-green-border);
+  color: var(--lc-green-text);
+}
+
 .lc-tag.is-amber {
   border-color: var(--lc-amber-border);
   color: var(--lc-amber-text);
@@ -4195,8 +4204,11 @@ textarea {
    thing you will say rather than about the work on screen. */
 .lc-queued {
   display: grid;
-  grid-template-columns: auto 1fr auto auto auto;
-  gap: 0.5rem;
+  /* Label, the message, then the actions -- with the reason on a second row
+     under the message, where a caption belongs, instead of competing with it
+     for the same line (design pass, 2026-09-05). */
+  grid-template-columns: auto 1fr auto;
+  gap: 0.2rem 0.5rem;
   align-items: center;
   margin-bottom: 0.4rem;
   padding: 0.4rem 0.6rem;
@@ -4217,7 +4229,15 @@ textarea {
 }
 
 .lc-queued__note {
+  grid-column: 2;
   color: var(--lc-text-muted);
+}
+
+.lc-queued__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  grid-row: span 2;
 }
 
 /* "Open the run this reached" on an exchange message. Quiet: it is a way

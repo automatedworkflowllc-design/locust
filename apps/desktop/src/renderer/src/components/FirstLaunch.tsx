@@ -79,8 +79,13 @@ export function FirstLaunch({
                   </div>
                   <span
                     className={`lc-tag${
+                      // Lime is "happening right now", and nothing on a first
+                      // launch is happening. Green is available, which is
+                      // what a signed-in runtime is here (design pass,
+                      // objection 5) -- it takes five lime elements off the
+                      // calmest screen in the app.
                       status.tag === 'READY' || status.tag === 'ACTIVE'
-                        ? ' is-lime'
+                        ? ' is-green'
                         : status.tag === 'SIGN IN'
                           ? ' is-red'
                           : status.tag === 'PREVIEW' || status.tag === 'EXPERIMENTAL' || status.tag === 'AT LIMIT'

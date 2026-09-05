@@ -271,20 +271,45 @@ export function Composer({
           <div className="lc-queued" role="status" aria-live="polite">
             <span className="lc-queued__label lc-mono">NEXT</span>
             <span className="lc-queued__text">{queued}</span>
-            <span className="lc-queued__note lc-mono">
-              {queuedNote ?? (workingNow ? 'sends when this finishes' : 'ready to send')}
-            </span>
-            {!workingNow && (
-              <button type="button" className="lc-ghostbutton" onClick={onSendQueued}>
-                {/* It always goes into the conversation ON SCREEN, so where
-                    that is not the one it was typed at, the button says so
-                    rather than reading as "send it where it was going". */}
-                {queuedElsewhere ? 'Send here' : 'Send now'}
+            <span className="lc-queued__actions">
+              {!workingNow && (
+                <button type="button" className="lc-ghostbutton" onClick={onSendQueued}>
+                  {/* It always goes into the conversation ON SCREEN, so where
+                      that is not the one it was typed at, the button says so
+                      rather than reading as "send it where it was going". */}
+                  {queuedElsewhere ? 'Send here' : 'Send now'}
+                </button>
+              )}
+              {/*
+                * Fixing one word meant discarding the sentence and retyping
+                * it from memory: while a message is queued the box is
+                * disabled, so Discard was the only way back to the text
+                * (design pass, gap 2). Edit is those same two operations in
+                * the order people want them.
+                */}
+              <button
+                type="button"
+                className="lc-ghostbutton"
+                onClick={() => {
+                  setValue(queued)
+                  onUnqueue()
+                }}
+              >
+                Edit
               </button>
-            )}
-            <button type="button" className="lc-ghostbutton" onClick={onUnqueue} aria-label="Discard the queued message">
-              Discard
-            </button>
+              <button type="button" className="lc-ghostbutton" onClick={onUnqueue} aria-label="Discard the queued message">
+                Discard
+              </button>
+            </span>
+            {/*
+              * The reason, or what will happen -- never a description of the
+              * button. "ready to send" was the one state a person could not
+              * act on intelligently (design pass, objection 1), and it is now
+              * unreachable: a queue that is ready has already gone.
+              */}
+            <span className="lc-queued__note lc-mono">
+              {queuedNote ?? `sends when ${workingName} finishes`}
+            </span>
           </div>
         )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>

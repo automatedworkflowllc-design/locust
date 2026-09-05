@@ -28,12 +28,16 @@ export function queuedVerdict(input: {
   /** Whether the conversation it belongs to is the one on screen. */
   readonly onScreen: boolean
 }): QueuedVerdict {
-  if (input.phase === undefined) return { kind: 'held', note: 'waiting: that conversation is no longer open' }
+  if (input.phase === undefined) return { kind: 'held', note: 'held — that conversation is no longer open' }
   if (input.running) return { kind: 'waiting' }
   if (input.phase !== 'completed') {
+    // The reason, not the button. A person who can see WHY it did not send
+    // can decide what to do; "ready to send" only described the control and
+    // was the one state nothing could be done about intelligently (design
+    // pass, objection 1).
     return {
       kind: 'held',
-      note: `not sent: that run ${
+      note: `held — the run ${
         input.phase === 'cancelled' ? 'was stopped' : input.phase === 'failed' ? 'failed' : 'did not finish'
       }`
     }
@@ -41,6 +45,6 @@ export function queuedVerdict(input: {
   // Completed, but the person has moved to another conversation. Sending
   // would put the message into whatever is on screen now, which is not what
   // they were replying to.
-  if (!input.onScreen) return { kind: 'held', note: 'waiting: open that conversation to send it' }
+  if (!input.onScreen) return { kind: 'held', note: 'typed in another conversation — sending puts it here instead' }
   return { kind: 'send' }
 }

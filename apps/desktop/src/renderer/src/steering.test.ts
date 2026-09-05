@@ -14,18 +14,20 @@ describe('a message queued while a teammate works', () => {
   it('is HELD when the run did not complete, and says which way it ended', () => {
     // The next instruction assumes the last turn happened. Sending it after a
     // failure builds on work that never ran -- the same rule a routine's
-    // steps follow.
+    // steps follow. Every held state names the REASON: a note that described
+    // the button instead ("ready to send") was the one state a person could
+    // not act on intelligently, and it is now unreachable.
     expect(queuedVerdict({ running: false, phase: 'failed', onScreen: true })).toEqual({
       kind: 'held',
-      note: 'not sent: that run failed'
+      note: 'held — the run failed'
     })
     expect(queuedVerdict({ running: false, phase: 'cancelled', onScreen: true })).toEqual({
       kind: 'held',
-      note: 'not sent: that run was stopped'
+      note: 'held — the run was stopped'
     })
     expect(queuedVerdict({ running: false, phase: 'interrupted', onScreen: true })).toEqual({
       kind: 'held',
-      note: 'not sent: that run did not finish'
+      note: 'held — the run did not finish'
     })
   })
 
@@ -34,14 +36,14 @@ describe('a message queued while a teammate works', () => {
     // they were replying to.
     expect(queuedVerdict({ running: false, phase: 'completed', onScreen: false })).toEqual({
       kind: 'held',
-      note: 'waiting: open that conversation to send it'
+      note: 'typed in another conversation — sending puts it here instead'
     })
   })
 
   it('is held rather than sent when the run it belonged to is gone', () => {
     expect(queuedVerdict({ running: false, phase: undefined, onScreen: true })).toEqual({
       kind: 'held',
-      note: 'waiting: that conversation is no longer open'
+      note: 'held — that conversation is no longer open'
     })
   })
 

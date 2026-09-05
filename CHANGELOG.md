@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.21.1 — 2026-09-05
+
+The rest of the design pass's objections.
+
+- **A queued message can be edited.** While one is waiting the box is
+  disabled, so fixing a single word meant discarding the sentence and
+  retyping it from memory. Edit lifts it back into the box.
+- **Every held message says why it is held**, and the reason now sits under
+  the message where a caption belongs rather than competing with it. The one
+  state that described the button instead of the reason is gone, and cannot
+  come back: a queue that is ready to send has already sent.
+- **"Add a step" stays and says why** at a routine's twelve-step limit
+  instead of disappearing, which read as a broken dialog. The Steps label
+  carries the count, so the limit is visible before you meet it.
+- **First launch is calmer.** Its READY tags are green rather than lime.
+  Lime means happening right now, and nothing on a first launch is
+  happening; five lime elements leave the quietest screen in the app.
+
 ## 0.21.0 — 2026-09-05
 
 - **You can scroll a long conversation again.** The thread used a layout rule

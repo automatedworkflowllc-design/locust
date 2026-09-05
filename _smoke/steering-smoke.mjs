@@ -224,6 +224,10 @@ try {
     return chip ? chip.innerText.replace(/\\s+/g, ' ') : 'no chip'
   })()`)
   check('it is held, and the screen says so', /BETA/.test(String(queued)) && /finishes/i.test(String(queued)), String(queued).slice(0, 140))
+  // Fixing one word must not mean retyping the sentence from memory: while a
+  // message is queued the box is disabled, so Discard was the only way back
+  // to the text (design pass, gap 2).
+  check('the queued message can be edited, not only discarded', /Edit/.test(String(queued)), String(queued).slice(0, 140))
 
   say('3. it goes on its own when the run finishes')
   check('the first run finished', (await settle(300)) === true)
@@ -245,9 +249,10 @@ try {
   check('the queued words are its own prompt', afterQueue.some((h) => /BETA/.test(String(h.prompt))), JSON.stringify(afterQueue.map((h) => String(h.prompt).slice(0, 24))))
 
   say('4. plan first, then build -- on a route that CAN be held read-only')
-  // Cursor Agent has no sandbox on Windows, so Ask is not offered there at
-  // all and Plan first is correctly refused. Claude Code can be held
-  // read-only here, so the plan half runs on it (steering smoke run 3).
+  // Cursor Agent has no sandbox on Windows, so neither Ask nor Plan is
+  // offered there -- correctly, since a plan that could edit the workspace is
+  // a promise the app cannot keep. Claude Code can be held read-only here, so
+  // the plan half runs on it (steering smoke run 3).
   const switched = await evaluate(`(async () => {
     const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
     control.click()
@@ -279,27 +284,23 @@ try {
   check('moved to Claude Code / sonnet for the plan half', /claude/i.test(String(switched)), String(switched))
 
   const planned = await evaluate(`(async () => {
-    // The mode menu's items are menuitemradio, not plain buttons -- the first
-    // version of this walk found nothing, left the mode on Accept edits, and
-    // then reported the (correct) refusal of Plan first as a product failure.
+    // Plan is the fourth PERMISSION MODE as of 0.21.0, not a switch beside
+    // one. The menu's items are menuitemradio, not plain buttons -- an
+    // earlier version of this walk queried buttons, found nothing, left the
+    // mode alone and then reported the app's correct refusal as a defect.
     const modeControl = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'menu')
     if (!modeControl) return 'no mode control'
     modeControl.click()
     await new Promise(r => setTimeout(r, 400))
-    const ask = [...document.querySelectorAll('[role=menuitemradio]')].find(b => /^Ask/.test(b.innerText.trim()))
-    if (!ask) return 'no Ask item'
-    if (ask.disabled) return 'Ask is unavailable on this route'
-    ask.click()
-    await new Promise(r => setTimeout(r, 500))
-    if (!/^Ask/.test(modeControl.innerText.trim())) return 'mode did not switch: ' + modeControl.innerText.trim()
-    const plan = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Plan first')
-    if (!plan) return 'no Plan first control'
-    if (plan.disabled) return 'Plan first disabled: ' + plan.getAttribute('title')
+    const items = [...document.querySelectorAll('[role=menuitemradio]')]
+    const plan = items.find(b => /^Plan/.test(b.innerText.trim()))
+    if (!plan) return 'no Plan item · saw: ' + items.map(b => b.innerText.trim().slice(0, 24)).join(', ')
+    if (plan.disabled) return 'Plan is unavailable on this route: ' + plan.getAttribute('title')
     plan.click()
-    await new Promise(r => setTimeout(r, 300))
-    return plan.getAttribute('aria-pressed')
+    await new Promise(r => setTimeout(r, 500))
+    return modeControl.innerText.trim()
   })()`)
-  check('Plan first turns on in a read-only mode', planned === 'true', String(planned))
+  check('Plan is chosen from the mode menu', /^Plan/.test(String(planned)), String(planned))
 
   await type('Add a second exported constant to status.ts called reviewed.')
   check('the plan mission started', (await clickSend('Start mission')) === 'clicked')
