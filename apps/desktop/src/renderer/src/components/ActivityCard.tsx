@@ -79,6 +79,18 @@ export function ActivityCard({
                   </button>
                   {isOpen(entry) && <DiffView file={entry.file} truncated={entry.truncated} reported={entry.reported} />}
                 </>
+              ) : entry.kind === 'helper' ? (
+                // A helper the runtime started for itself. What it did inside
+                // is the runtime's business and not reported; what it was
+                // asked, and whether it came back, is.
+                <div className="lc-filerow is-static is-helper">
+                  <Icon name="users" size={14} />
+                  <span className="lc-filerow__path">{entry.description}</span>
+                  <span className="lc-filerow__status">helper</span>
+                  <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : 'is-running'}`}>
+                    {!entry.settled ? 'working on it' : entry.failed ? 'failed' : 'reported back'}
+                  </span>
+                </div>
               ) : entry.kind === 'shell' ? (
                 <div className="lc-filerow is-shell is-static">
                   <Icon name="terminal" size={14} />

@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.27.6 — 2026-09-05
+
+- **A runtime's own helper has its own row.** When Claude Code or OpenCode
+  starts a sub-agent for itself, the activity fold now says "asked 1
+  helper" apart from the tool calls, and the row says what the helper was
+  asked and whether it reported back. What the helper did inside is not
+  reported by the runtime, so nothing is invented about it.
+
 ## 0.27.5 — 2026-09-05
 
 - **A runtime slow to answer reads CHECKING, not UNAVAILABLE.** Discovery

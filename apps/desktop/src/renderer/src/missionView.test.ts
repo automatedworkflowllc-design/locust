@@ -283,6 +283,32 @@ describe('what a failure card says', () => {
 
 })
 
+describe("a runtime's own helper", () => {
+  it("is its own row: what it was asked, and whether it reported back", () => {
+    const thread = buildThread(
+      [
+        event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'Task', command: 'Search the tests for flaky cases', phase: 'started' }),
+        event('tool.completed', { itemId: 't1', toolKind: 'tool_use', name: 'Task', command: 'Search the tests for flaky cases', phase: 'completed' }),
+        event('tool.started', { itemId: 't2', toolKind: 'task', name: 'task', command: 'Summarise README', phase: 'started' })
+      ],
+      { running: true }
+    )
+    const activity = thread.find((item) => item.type === 'activity')
+    expect(activity?.type === 'activity' && activity.details.map((d) => d.kind)).toEqual(['helper', 'helper'])
+    const entries = activity?.type === 'activity' ? activityEntries(activity.details) : []
+    expect(entries.map((e) => (e.kind === 'helper' ? [e.description, e.settled] : e.kind))).toEqual([
+      ['Search the tests for flaky cases', true],
+      ['Summarise README', false]
+    ])
+    expect(activity?.type === 'activity' && activity.summary).toBe('asked 2 helpers')
+  })
+
+  it('a helper the runtime never named is said to be unnamed, not drawn as a path', () => {
+    const entries = activityEntries([{ kind: 'helper', name: 'Task', tool: 'Task', settled: true }])
+    expect(entries).toEqual([{ kind: 'helper', key: 'helper_0', description: 'a helper, unnamed', settled: true, failed: false }])
+  })
+})
+
 describe('collapsed activity', () => {
   it('counts edits and commands separately from their tool events', () => {
     expect(

@@ -64,6 +64,19 @@ export type ActivityEntry =
       readonly exitCode: number | undefined
     }
   | {
+      /**
+       * A helper the runtime started for itself: Claude Code's Task tool,
+       * OpenCode's task tool. Until now one plain tool row; what the helper
+       * did inside is not reported by the runtime, so the row says what it
+       * was asked and whether it reported back (Colin, 2026-09-05).
+       */
+      readonly kind: 'helper'
+      readonly key: string
+      readonly description: string
+      readonly settled: boolean
+      readonly failed: boolean
+    }
+  | {
       readonly kind: 'unreported' | 'tool'
       readonly key: string
       readonly name: string
@@ -120,6 +133,17 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
             settled: detail.settled,
             failed
           })
+        })
+        return
+      }
+      if (detail.kind === 'helper') {
+        entries.push({
+          kind: 'helper',
+          key: `helper_${String(entries.length)}`,
+          // The target is what the helper was asked; without one, say so.
+          description: detail.tool !== undefined && detail.tool !== detail.name ? detail.name : 'a helper, unnamed',
+          settled: detail.settled,
+          failed: detail.failed === true
         })
         return
       }
@@ -426,10 +450,12 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
     .filter((detail) => detail.kind === 'edit')
     .reduce((sum, detail) => sum + Math.max(1, detail.name.split('\n').filter((line) => line.length > 0).length), 0)
   const commands = details.filter((detail) => detail.kind === 'shell').length
-  const other = details.length - edits - commands
+  const helpers = details.filter((detail) => detail.kind === 'helper').length
+  const other = details.length - edits - commands - helpers
   const parts: string[] = []
   if (edits > 0) parts.push(`Edited ${pluralize(edits, 'file')}`)
   if (commands > 0) parts.push(`ran ${pluralize(commands, 'command')}`)
+  if (helpers > 0) parts.push(`asked ${pluralize(helpers, 'helper')}`)
   if (other > 0) parts.push(`${pluralize(other, 'tool call')}`)
   return parts.length === 0 ? 'No tool activity' : parts.join(' · ')
 }
@@ -440,6 +466,8 @@ function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started
   if (name === 'shell' || event.payload.toolKind === 'command_execution') {
     return command !== undefined && EDIT_COMMANDS.test(command.trim()) ? 'edit' : 'shell'
   }
+  // A runtime's own sub-agent: Claude Code's `Task`, OpenCode's `task`.
+  if (/^(task|agent|subagent)$/i.test(name)) return 'helper'
   if (/file|patch|write|edit/i.test(name)) return 'edit'
   return 'tool'
 }
