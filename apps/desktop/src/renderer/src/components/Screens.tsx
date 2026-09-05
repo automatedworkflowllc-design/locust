@@ -697,8 +697,10 @@ export function SettingsScreen({
             When a teammate writes to another, the other can answer on their own: Locust starts a run
             for them with the message as its brief, and their answer starts the sender's next turn, so
             it lands in the thread that asked. They keep going while a reply helps finish the work, and
-            stop when one has nothing more to say -- or after six automatic runs, as a backstop. Each is a
-            real run on the sender's route; switch this off to make messages wait for you instead.
+            stop when one has nothing more to say -- or after six automatic runs, as a backstop. Each
+            teammate answers on their own route -- their runtime, model and mode, not the sender's --
+            which is how two models end up on one piece of work. Switch this off to make messages wait
+            for you instead.
           </p>
           <div className="lc-retention">
             <div className="lc-retention__row">
@@ -719,16 +721,31 @@ export function SettingsScreen({
         </section>
 
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Fallback policy</h2>
+          <h2 className="lc-settings__heading">When a route hits its limit</h2>
           <p className="lc-settings__lede">
-            What happens when the active route hits a limit mid-mission. Choosing a policy needs route
-            switching, which is not built yet — today a run pauses and waits for you.
+            A run that hits its account&rsquo;s limit stops at a durable checkpoint and waits for you.
+            Nothing switches provider on its own: you choose where the work continues, and Locust
+            carries it there with a briefing of what was done and what was left unsettled. Two ways to
+            do that exist today; the third is not built.
           </p>
           <div className="lc-policyrow">
-            <span className="lc-tag">PAUSE AND WAIT</span>
+            <span className="lc-tag">HAND OFF</span>
             <span className="lc-settings__note">
-              The mission stops at its last durable checkpoint rather than continuing somewhere you did
-              not choose.
+              Pick another runtime from the composer while a mission is running. The run is stopped,
+              reconciled, and continued there.
+            </span>
+          </div>
+          <div className="lc-policyrow">
+            <span className="lc-tag">CONTINUE ELSEWHERE</span>
+            <span className="lc-settings__note">
+              After a run has stopped, change the route and reply. The next turn starts on the new
+              runtime from the old one&rsquo;s checkpoint, with your reply as its first instruction.
+            </span>
+          </div>
+          <div className="lc-policyrow">
+            <span className="lc-tag">AUTOMATIC</span>
+            <span className="lc-settings__note">
+              Not built. Locust will not move your work to a provider you did not choose.
             </span>
           </div>
         </section>

@@ -60,13 +60,22 @@ function inline(text: string): ReactElement {
         }
         if (span.kind === 'link') {
           // Shown, not linked: a thread must not become a way to navigate the
-          // app somewhere. The target rides on the title so it is available
-          // without sitting in the middle of the sentence.
+          // app -- or the machine -- somewhere a model chose. The target
+          // rides on the title so it is available without sitting in the
+          // middle of the sentence. Deliberate, and kept after the 0.21.2 QA
+          // pass asked for "actionable links": what it asked for is what a
+          // prompt injection would ask for.
           return (
             <span className="lc-linklabel" key={`s${String(index)}`} title={span.href}>
               {span.text}
             </span>
           )
+        }
+        if (span.kind === 'strong') {
+          return <strong key={`s${String(index)}`}>{span.text}</strong>
+        }
+        if (span.kind === 'em') {
+          return <em key={`s${String(index)}`}>{span.text}</em>
         }
         return <span key={`s${String(index)}`}>{span.text}</span>
       })}
@@ -93,6 +102,17 @@ export function AgentText({
               <code>{block.code}</code>
               {streaming && last && <span className="lc-caret" />}
             </pre>
+          )
+        }
+        if (block.kind === 'heading') {
+          // One element per level so a screen reader gets the outline too;
+          // the sizes are the thread's own, a step above the prose and
+          // nowhere near the screen titles.
+          const Tag = block.level === 1 ? 'h3' : block.level === 2 ? 'h4' : 'h5'
+          return (
+            <Tag className={`lc-heading lc-heading--${String(block.level)}`} key={`b${String(index)}`}>
+              {inline(block.text)}
+            </Tag>
           )
         }
         if (block.kind === 'list') {

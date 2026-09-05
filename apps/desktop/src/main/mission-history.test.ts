@@ -1,7 +1,7 @@
 import type { MissionLedger, RecoveredMission, WorkroomMessage } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it, vi } from 'vitest'
-import { deleteMissionRecord, publicRecoveredMission, withinByteBudget, readMissionHistory } from './mission-history.js'
+import { deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, withinByteBudget, readMissionHistory } from './mission-history.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 
@@ -312,5 +312,84 @@ describe('deleting a mission', () => {
     const response = await deleteMissionRecord(ledger({ deleteMission }), '../escape', () => false)
     expect(response).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
     expect(deleteMission).not.toHaveBeenCalled()
+  })
+})
+
+describe('which runtimes the record still holds at their limit', () => {
+  // The 0.21.2 QA pass: Codex ran out of quota, Settings said AT LIMIT, a
+  // reload turned it back into READY with no successful run in between.
+  const at = (minutes: number): string => new Date(Date.parse(NOW) + minutes * 60_000).toISOString()
+  const limit = (runtime: string, minutes: number, said = 'You have hit your usage limit.'): NormalizedRuntimeEvent =>
+    ({
+      id: `limit-${runtime}-${String(minutes)}`,
+      runId: 'run_x',
+      missionId: 'mission_x',
+      sequence: 1,
+      type: 'route.limit_detected',
+      occurredAt: at(minutes),
+      sourceAdapter: runtime,
+      payload: { kind: 'quota-exhausted', message: said, evidence: { redacted: true } }
+    }) as unknown as NormalizedRuntimeEvent
+  const completed = (runtime: string, minutes: number): NormalizedRuntimeEvent =>
+    ({
+      id: `done-${runtime}-${String(minutes)}`,
+      runId: 'run_x',
+      missionId: 'mission_x',
+      sequence: 2,
+      type: 'run.completed',
+      occurredAt: at(minutes),
+      sourceAdapter: runtime,
+      payload: { process: { exitCode: 0, signal: null }, evidence: { redacted: true } }
+    }) as unknown as NormalizedRuntimeEvent
+
+  it('reports a runtime whose last word was its limit, with that word', () => {
+    expect(limitedRuntimesFrom([recovered({ events: [limit('codex', 5)] })])).toEqual({
+      codex: 'You have hit your usage limit.'
+    })
+  })
+
+  it('CONTROL: a later completed run on that runtime clears it', () => {
+    expect(
+      limitedRuntimesFrom([recovered({ events: [limit('codex', 5)] }), recovered({ events: [completed('codex', 9)] })])
+    ).toEqual({})
+  })
+
+  it('decides by time across missions, not by file order', () => {
+    // The completed run is listed first but happened earlier.
+    expect(
+      limitedRuntimesFrom([recovered({ events: [completed('codex', 1)] }), recovered({ events: [limit('codex', 3)] })])
+    ).toEqual({ codex: 'You have hit your usage limit.' })
+  })
+
+  it('keeps runtimes apart: Claude finishing says nothing about Codex', () => {
+    expect(limitedRuntimesFrom([recovered({ events: [limit('codex', 5), completed('claude', 9)] })])).toEqual({
+      codex: 'You have hit your usage limit.'
+    })
+  })
+
+  it('ignores a temporary rate limit -- that is a moment, not the account', () => {
+    const temporary = {
+      ...limit('codex', 5),
+      payload: { kind: 'temporary-rate-limit', message: 'slow down', evidence: { redacted: true } }
+    } as unknown as NormalizedRuntimeEvent
+    expect(limitedRuntimesFrom([recovered({ events: [temporary] })])).toEqual({})
+  })
+
+  it('rides on the history response', async () => {
+    const stub: MissionLedger = {
+      createMission: async () => undefined,
+      appendEvents: async () => undefined,
+      appendHostFailure: async () => undefined,
+      createCheckpoint: async () => { throw new Error('not used in this test') },
+      appendPeerLinks: async () => undefined,
+      deleteMission: async () => true,
+      storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
+      pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
+      getMission: async () => undefined,
+      listMissions: async () => ({ missions: [recovered({ events: [limit('codex', 5)] })], issues: [] }),
+      flush: async () => undefined
+    }
+    const response = await readMissionHistory(stub)
+    expect(response.ok && response.data.limitedRuntimes).toEqual({ codex: 'You have hit your usage limit.' })
   })
 })

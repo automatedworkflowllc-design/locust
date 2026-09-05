@@ -50,15 +50,23 @@ class Cdp {
   send(method, params = {}) {
     const id = ++this.id
     this.ws.send(JSON.stringify({ id, method, params }))
+    const settleTimers = new Set()
+    const clearTimers = () => { for (const t of settleTimers) clearInterval(t) }
     return Promise.race([
-      new Promise((resolve) => this.pending.set(id, { resolve })),
-      (async () => {
-        for (let i = 0; i < 400; i += 1) {
-          await sleep(1000)
-          if (child.exitCode !== null) return { error: { message: `app exited ${child.exitCode}` } }
-        }
-        return { error: { message: 'cdp timeout' } }
-      })()
+      new Promise((resolve) => this.pending.set(id, { resolve: (m) => { clearTimers(); resolve(m) } })),
+      new Promise((resolve) => {
+        // One timer, cleared when the answer wins and unref()'d: the sleep loop
+        // this replaced kept the process alive for up to 400s after the
+        // last line (six smokes 'not exiting cleanly', QA on 0.21.2).
+        let ticks = 0
+        const tick = setInterval(() => {
+          ticks += 1
+          if (child.exitCode !== null) { clearInterval(tick); resolve({ error: { message: `app exited ${child.exitCode}` } }) }
+          else if (ticks >= 400) { clearInterval(tick); resolve({ error: { message: 'cdp timeout' } }) }
+        }, 1000)
+        tick.unref()
+        settleTimers.add(tick)
+        })
     ])
   }
   async eval(expression) {

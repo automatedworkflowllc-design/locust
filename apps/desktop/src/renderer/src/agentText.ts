@@ -37,11 +37,19 @@ export type AgentBlock =
       /** Item text, marker already removed. */
       readonly items: readonly string[]
     }
+  | {
+      /** `# Title` through `### Title`. Deeper levels are drawn as the third. */
+      readonly kind: 'heading'
+      readonly level: 1 | 2 | 3
+      readonly text: string
+    }
 
 export type InlineSpan =
   | { readonly kind: 'plain'; readonly text: string }
   | { readonly kind: 'code'; readonly text: string }
   | { readonly kind: 'link'; readonly text: string; readonly href: string }
+  | { readonly kind: 'strong'; readonly text: string }
+  | { readonly kind: 'em'; readonly text: string }
 
 /** `- item`, `* item`, `+ item`. */
 const BULLET = /^[ \t]*[-*+][ \t]+(.+)$/
@@ -50,6 +58,14 @@ const NUMBERED = /^[ \t]*\d+[.)][ \t]+(.+)$/
 
 /** ```lang, or ``` on its own. Leading spaces are allowed; models indent them. */
 const FENCE = /^[ \t]*(`{3,})[ \t]*(.*)$/
+
+/**
+ * `# Title`, `## Title`, `### Title`. The QA pass on 0.21.2 read a literal
+ * `### Summary` in a Codex reply: a heading is the model saying "this part
+ * is about that", and drawing the hashes throws the structure away while
+ * keeping the punctuation.
+ */
+const HEADING = /^[ \t]{0,3}(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/
 
 /**
  * Split a reply into prose and fenced code blocks, in the order written.
@@ -88,6 +104,14 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
       items = []
     }
     for (const line of prose) {
+      const heading = HEADING.exec(line)
+      if (heading !== null) {
+        flushList()
+        flushParagraph()
+        const depth = heading[1]!.length
+        blocks.push({ kind: 'heading', level: depth === 1 ? 1 : depth === 2 ? 2 : 3, text: heading[2]!.trim() })
+        continue
+      }
       const bullet = BULLET.exec(line)
       const numbered = NUMBERED.exec(line)
       if (bullet !== null || numbered !== null) {
@@ -158,15 +182,27 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
   // sentence. The label is what the sentence needs; the target is kept on the
   // element's title so it is available without being in the way. Nothing is
   // linked: a thread must not become a way to navigate the app somewhere.
-  const pattern = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)/g
+  // Emphasis after code and links, so `**` inside a code span stays literal
+  // and a link label can itself be bold. `**bold**` and `__bold__` are
+  // strong; `*em*` and `_em_` are emphasis, but only when the marker sits at
+  // a word edge -- `snake_case_name` must not become "snake" + em("case") +
+  // "name", and `2 * 3 * 4` is arithmetic. The QA pass on 0.21.2 read a
+  // literal `**Yes, whitespace-only input is already covered.**` in a Claude
+  // reply, which is the model's own emphasis drawn as four asterisks.
+  const pattern =
+    /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)|(?:\*\*|__)(?=\S)([^\n]+?\S)(?:\*\*|__)|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]+?\S)(?:\*|_)(?![A-Za-z0-9*_])/g
   let cursor = 0
   for (const match of text.matchAll(pattern)) {
     const at = match.index
     if (at > cursor) spans.push({ kind: 'plain', text: text.slice(cursor, at) })
     if (match[1] !== undefined) {
       spans.push({ kind: 'code', text: match[1] })
+    } else if (match[2] !== undefined) {
+      spans.push({ kind: 'link', text: match[2], href: match[3]! })
+    } else if (match[4] !== undefined) {
+      spans.push({ kind: 'strong', text: match[4] })
     } else {
-      spans.push({ kind: 'link', text: match[2]!, href: match[3]! })
+      spans.push({ kind: 'em', text: match[5]! })
     }
     cursor = at + match[0].length
   }
@@ -182,7 +218,11 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
 export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]): boolean {
   const kept = blocks
     .map((block) =>
-      block.kind === 'text' ? block.text : block.kind === 'code' ? block.code : block.items.join('\n')
+      block.kind === 'text' || block.kind === 'heading'
+        ? block.text
+        : block.kind === 'code'
+          ? block.code
+          : block.items.join('\n')
     )
     .join('\n')
     .replace(/\s+/g, ' ')
@@ -194,7 +234,7 @@ export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]):
     // A list marker is punctuation the renderer redraws, not words: the
     // bullet becomes a real bullet. Everything AFTER the marker still has to
     // survive, which is what this is checking.
-    .map((line) => line.replace(BULLET, '$1').replace(NUMBERED, '$1').trim())
+    .map((line) => line.replace(HEADING, '$2').replace(BULLET, '$1').replace(NUMBERED, '$1').trim())
     .join('\n')
     .replace(/\s+/g, ' ')
     .trim()

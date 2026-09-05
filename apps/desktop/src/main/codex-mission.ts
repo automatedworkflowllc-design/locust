@@ -17,8 +17,7 @@ import type {
   MissionRuntimeId,
   RuntimeDiscovery,
   RuntimeProcessRun,
-  RuntimeProcessRunner
-} from '@teammate/runtime-adapters'
+  RuntimeProcessRunner, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { workspaceIdFor } from './workspace.js'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionSandbox, RuntimeCommandSpec } from '@teammate/runtime-adapters'
@@ -32,6 +31,8 @@ import type {
   MissionMode
 } from '../shared/ipc.js'
 import { composeHandoffPrompt } from './handoff.js'
+import { changedPaths, observedEditEvents, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
+import type { WorkspaceSnapshot } from './disk-observation.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
@@ -76,6 +77,17 @@ interface ActiveCodexMission {
   readonly model: string | undefined
   /** Set when the host started this run for a teammate replying on their own. */
   readonly relay: RelayOrigin | undefined
+  /**
+   * `git status` before the process started, for a run allowed to write.
+   * Compared with the tree after it ends, so an edit the runtime made through
+   * a sub-agent and never reported still gets a row (OpenCode's `task` tool,
+   * 2026-09-05). Undefined outside a repository, or for a read-only run.
+   */
+  readonly diskBefore: WorkspaceSnapshot | undefined
+  /** The last event sequence persisted, so a synthetic event can follow it. */
+  lastSequence: number
+  /** Every event persisted, so the observation can tell reported edits from unreported ones. */
+  readonly persisted: NormalizedRuntimeEvent[]
 }
 
 export interface CodexMissionService {
@@ -156,6 +168,8 @@ interface CodexMissionServiceOptions {
   readonly onShared?: (mission: SharingMission, posted: readonly WorkroomMessage[]) => Promise<void>
   /** Called once a run is over, however it ended, after any share it made. */
   readonly onRunEnded?: (mission: EndedMission) => Promise<void>
+  /** Test seam: how the working tree is looked at before and after a write-capable run. Defaults to `git status`. */
+  readonly observeDisk?: (workspacePath: string) => Promise<WorkspaceSnapshot | undefined>
   readonly createId?: () => string
   readonly now?: () => Date
   readonly schedule?: (task: () => void) => void
@@ -226,6 +240,10 @@ async function persistAndEmit(
   // Tracked only once durable, so what a share is read from is what the
   // ledger holds.
   active.transcript.track(events)
+  for (const event of events) {
+    if (event.sequence > active.lastSequence) active.lastSequence = event.sequence
+    active.persisted.push(event)
+  }
   for (const event of events) {
     safelyEmit(active, {
       kind: 'event',
@@ -383,6 +401,35 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       persistenceFailure(mission)
       clearActive(mission)
       return
+    }
+
+    // What the run changed that it never said. After the terminal events so
+    // the record's own account comes first and the observation reads as what
+    // it is -- the host looking at the tree afterwards. Best effort: an
+    // observation that cannot be made or stored costs the run nothing.
+    if (mission.diskBefore !== undefined) {
+      try {
+        const diskAfter = await (options.observeDisk ?? snapshotWorkspace)(options.workspacePath)
+        if (diskAfter !== undefined) {
+          const unreported = unreportedPaths(changedPaths(mission.diskBefore, diskAfter), mission.persisted)
+          if (unreported.length > 0) {
+            await persistAndEmit(
+              mission,
+              options.ledger,
+              observedEditEvents({
+                runId: mission.runId,
+                missionId: mission.missionId,
+                sourceAdapter: mission.runtime,
+                nextSequence: mission.lastSequence + 1,
+                paths: unreported,
+                at: now().toISOString()
+              }) as ReturnType<CodexEventNormalizer['accept']>
+            )
+          }
+        }
+      } catch {
+        // The receipt stands on the runtime's own events.
+      }
     }
 
     // Share only from a run that finished on its own terms, and before the
@@ -550,13 +597,62 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ) as CodexMissionStartResponse
           }
           if (prior.metadata.runtime !== runtime) {
-            // Resuming across runtimes is a handoff, and that has its own path
-            // with a checkpoint and a briefing. Silently starting blank here
-            // would look like a reply and behave like a stranger.
-            return error(
-              'RUNTIME_START_FAILED',
-              `That conversation belongs to ${runtimeDisplayName(prior.metadata.runtime)}. Switch the route back, or hand the mission over instead.`
-            ) as CodexMissionStartResponse
+            // A reply on ANOTHER runtime. This used to be refused ("switch the
+            // route back, or hand the mission over"), and the person's
+            // workaround was a fresh mission with the filenames and the task
+            // retyped -- the 0.21.2 QA pass did exactly that after a quota
+            // failure. It is a handoff without the stop: the earlier mission
+            // is reconciled, the briefing carries what was done and what was
+            // left unsettled, and the reply rides on it as the latest word.
+            let checkpoint
+            try {
+              checkpoint = await options.ledger.createCheckpoint(prior.metadata.missionId, 'route-switch')
+            } catch {
+              return error(
+                'RUNTIME_START_FAILED',
+                'That conversation could not be reconciled, so it cannot be continued on another runtime.'
+              ) as CodexMissionStartResponse
+            }
+            if (checkpoint.resumeSafety === 'unsafe') {
+              return error(
+                'RUNTIME_START_FAILED',
+                `That conversation cannot be continued safely on another runtime: ${checkpoint.safetyReason}`
+              ) as CodexMissionStartResponse
+            }
+            const briefing = composeHandoffPrompt(
+              prior.metadata.prompt,
+              checkpoint,
+              runtimeDisplayName(prior.metadata.runtime),
+              prompt
+            )
+            if (briefing === undefined) {
+              return error(
+                'RUNTIME_START_FAILED',
+                'That conversation is too long to carry to another runtime with this reply.'
+              ) as CodexMissionStartResponse
+            }
+            // Re-enter as a route-switch continuation of the prior mission:
+            // the same record the live handoff writes, so the thread draws
+            // the same divider and a reopened conversation stitches the same
+            // way. The briefing, not the bare reply, starts the new runtime.
+            // This call holds the owner's in-flight claim; the re-entry
+            // would see it and refuse itself, so it is released first.
+            if (claimed) {
+              starting.delete(owner)
+              claimed = false
+            }
+            return service.start(
+              briefing.prompt,
+              runtime,
+              mode,
+              route,
+              emit,
+              { missionId: prior.metadata.missionId, checkpointEpoch: checkpoint.epoch, reason: 'route-switch' },
+              peer,
+              undefined,
+              relay,
+              startedBy
+            )
           }
           // A prior turn that failed before its runtime started recorded no
           // session. That used to refuse the reply outright; now the turn is
@@ -819,6 +915,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           ) as CodexMissionStartResponse
         }
 
+        let diskBefore: WorkspaceSnapshot | undefined
         let process: RuntimeProcessRun
         try {
           // The prompt the runtime is sent is the person's words plus their
@@ -832,6 +929,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // because the workroom briefing has just been folded in.
           const tooLong = commandTooLong(command)
           if (tooLong !== undefined) throw new Error(tooLong)
+          // Look at the tree BEFORE the runtime can touch it. Only when it may:
+          // a read-only run has nothing to observe, and asking git for every
+          // question would be paying for an answer nobody reads.
+          diskBefore = effectiveSandbox === 'read-only' ? undefined : await (options.observeDisk ?? snapshotWorkspace)(options.workspacePath)
           process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
         } catch (startError) {
           // A refusal this file raised knows WHY; anything else does not, and
@@ -870,7 +971,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           transcript: createTranscriptTracker(),
           sandbox: effectiveSandbox,
           model: chosenModel,
-          relay
+          relay,
+          diskBefore,
+          lastSequence: 0,
+          persisted: []
         }
         active.set(runId, mission)
         scheduleConsume(mission)

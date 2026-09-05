@@ -53,6 +53,40 @@ export function publicPeerMessages(
   })
 }
 
+/**
+ * Which runtimes are still, as far as the record knows, at their limit.
+ *
+ * Per runtime, the latest event in time across all missions decides: a
+ * `route.limit_detected` of kind `quota-exhausted` puts it at its limit, a
+ * later `run.completed` on the same runtime takes it off. Same rule the
+ * window applies live, applied to the ledger at boot so a reload does not
+ * amount to a lie about the account.
+ */
+export function limitedRuntimesFrom(missions: readonly RecoveredMission[]): Record<string, string> {
+  const latest = new Map<string, { readonly at: string; readonly said: string | undefined }>()
+  for (const mission of missions) {
+    for (const event of mission.events) {
+      let said: string | undefined
+      let relevant = false
+      if (event.type === 'route.limit_detected' && event.payload.kind === 'quota-exhausted') {
+        relevant = true
+        said = event.payload.message
+      } else if (event.type === 'run.completed') {
+        relevant = true
+      }
+      if (!relevant) continue
+      const runtime = event.sourceAdapter
+      const current = latest.get(runtime)
+      if (current === undefined || event.occurredAt > current.at) latest.set(runtime, { at: event.occurredAt, said })
+    }
+  }
+  const limited: Record<string, string> = {}
+  for (const [runtime, entry] of latest) {
+    if (entry.said !== undefined) limited[runtime] = entry.said
+  }
+  return limited
+}
+
 export function publicRecoveredMission(
   mission: RecoveredMission,
   workroomMessages: ReadonlyMap<string, WorkroomMessage> = new Map()
@@ -174,7 +208,8 @@ export async function readMissionHistory(
             .map((mission) => publicRecoveredMission(mission, workroomMessages))
         ),
         currentWorkspaceId: workspaceIdFor(workspacePath),
-        issueCount: snapshot.issues.length
+        issueCount: snapshot.issues.length,
+        limitedRuntimes: limitedRuntimesFrom(snapshot.missions)
       }
     }
   } catch {

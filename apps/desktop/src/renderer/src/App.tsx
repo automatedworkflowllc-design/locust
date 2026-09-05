@@ -532,6 +532,7 @@ export default function App(): ReactElement {
       ])
       if (next.ok) setStorage(next.data)
       if (listed.ok) setHistory(listed.data.missions)
+      seedLimitsFrom(listed)
       if (roster.ok) setMissionOwners(roster.data.missionOwners)
     }
     return response
@@ -649,12 +650,32 @@ export default function App(): ReactElement {
       .catch(() => undefined)
   }
 
+  /**
+   * What the ledger knows about the accounts, before any live event arrives:
+   * a runtime that was at its limit when the window closed is still at its
+   * limit when it opens (0.21.2 QA, P2 -- a reload turned AT LIMIT back into
+   * READY with no successful run in between). Every read of history seeds
+   * from it, the boot read included; the first version of this seeded only
+   * the refresh path and the live check caught it.
+   */
+  const seedLimitsFrom = (response: Awaited<ReturnType<NonNullable<typeof window.desktop>['getMissionHistory']>>): void => {
+    if (!response.ok) return
+    const remembered = Object.entries(response.data.limitedRuntimes)
+    if (remembered.length === 0) return
+    setLimitedRuntimes((current) => {
+      const next = new Map(current)
+      for (const [runtime, said] of remembered) if (!next.has(runtime)) next.set(runtime, said)
+      return next
+    })
+  }
+
   const refreshHistory = (): void => {
     const bridge = window.desktop
     if (!bridge) return
     void bridge
       .getMissionHistory()
       .then((response) => {
+        seedLimitsFrom(response)
         if (response.ok) setHistory(response.data.missions)
       })
       .catch(() => undefined)
@@ -832,6 +853,7 @@ export default function App(): ReactElement {
     void bridge
       .getMissionHistory()
       .then((response) => {
+        seedLimitsFrom(response)
         if (!active || !response.ok) return
         setHistory(response.data.missions)
         setWorkspaceId(response.data.currentWorkspaceId)
@@ -925,6 +947,19 @@ export default function App(): ReactElement {
   const ownerOf = (run: LiveRunState): string | undefined =>
     run.teammateId ?? (run.data === undefined ? undefined : missionOwners[run.data.missionId])
 
+  // Said before the send: a reply on another runtime continues from the
+  // stopped run's checkpoint, not from its memory (0.21.2 QA, P2).
+  const shownData = liveRun?.data
+  const runtimeNameOf = (id: string): string => runtimes.find((entry) => entry.id === id)?.displayName ?? id
+  const continuationNote =
+    liveRun !== undefined
+    && shownData !== undefined
+    && !liveRunIsActive(liveRun)
+    && shownData.runtime !== route.runtime
+    && ownerOf(liveRun) === selectedTeammate?.teammateId
+      ? `Continues on ${runtimeNameOf(route.runtime)} from ${runtimeNameOf(shownData.runtime)}'s checkpoint -- briefed on what was done, not handed the memory.`
+      : undefined
+
   const startMission = async (prompt: string, modeOverride?: MissionMode): Promise<boolean> => {
     const bridge = window.desktop
     const teammateId = selectedTeammate?.teammateId
@@ -952,12 +987,15 @@ export default function App(): ReactElement {
     // going left no session to resume -- it did not stop being the turn the
     // person was replying to. So the conversation continues either way, and
     // whether the model gets the earlier messages is asked separately.
+    // The route no longer has to match: a reply on another runtime is a
+    // checkpointed continuation now (the host briefs the new runtime from the
+    // old run's record), so it is still the same conversation on screen. The
+    // 0.21.2 QA pass had to start a stranger and retype the task instead.
     const continuing =
       shown !== undefined
       && shown.data !== undefined
       && !liveRunIsActive(shown)
       && ownerOf(shown) === teammateId
-      && shown.data.runtime === route.runtime
         ? shown
         : undefined
     const coldStart = continuing !== undefined && resumableSessionOf(continuing.events) === undefined
@@ -2109,6 +2147,9 @@ export default function App(): ReactElement {
           {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer
+            // Said before the send: a reply on another runtime continues
+            // from the stopped run's checkpoint, not from its memory.
+            continuationNote={continuationNote}
             workspaceName={workspaceName.length === 0 ? undefined : workspaceName}
             workspacePath={workspacePath}
             onChooseFolder={chooseWorkspace}

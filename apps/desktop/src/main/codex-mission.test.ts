@@ -4,7 +4,8 @@ import type {
   RuntimeProcessRecordStream,
   RuntimeProcessCompletion,
   RuntimeProcessRun,
-  RuntimeProcessRunner
+  RuntimeProcessRunner,
+  NormalizedRuntimeEvent
 } from '@teammate/runtime-adapters'
 import type { MissionLedger, MissionPeerLink, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import { describe, expect, it, vi } from 'vitest'
@@ -121,7 +122,11 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
   }
 }
 
-function scheduledService(runner: RuntimeProcessRunner, ledger = fakeLedger()) {
+function scheduledService(
+  runner: RuntimeProcessRunner,
+  ledger = fakeLedger(),
+  extra: Partial<Parameters<typeof createCodexMissionService>[0]> = {}
+) {
   const scheduled: Array<() => void> = []
   let nextId = 0
   const service = createCodexMissionService({
@@ -131,7 +136,8 @@ function scheduledService(runner: RuntimeProcessRunner, ledger = fakeLedger()) {
     ledger,
     createId: () => String(++nextId),
     now: () => new Date(NOW),
-    schedule: (task) => scheduled.push(task)
+    schedule: (task) => scheduled.push(task),
+    ...extra
   })
   return { service, scheduled, ledger }
 }
@@ -1720,22 +1726,76 @@ describe('continuing a conversation', () => {
     expect(spec.args).not.toContain('resume')
   })
 
-  it('refuses to continue another runtime\u2019s conversation, and says which', async () => {
+  it('continues another runtime\u2019s conversation from a checkpoint, with the reply as the latest word', async () => {
+    // This used to be refused ("switch the route back"), and the person's
+    // workaround was a fresh mission with the task retyped -- the 0.21.2 QA
+    // pass did exactly that after a quota failure. Now it is a handoff
+    // without the stop.
+    const checkpoints: Array<[string, string]> = []
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'thread.started', thread_id: 'thread-new' }, { type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => finished({ runtime: 'claude' }),
+      createMission,
+      createCheckpoint: async (missionId, reason) => {
+        checkpoints.push([missionId, reason])
+        return {
+          missionId,
+          epoch: 2,
+          reason,
+          resumeSafety: 'safe',
+          safetyReason: 'settled',
+          createdAt: NOW,
+          unsettledActions: [],
+          settledActions: ['read README.md'],
+          assistantSummary: 'The price was 181.'
+        } as never
+      }
+    }))
+
+    const response = await service.start(
+      'now in euros', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior'
+    )
+
+    expect(response).toMatchObject({ ok: true })
+    expect(checkpoints).toEqual([['mission_prior', 'route-switch']])
+    expect(start).toHaveBeenCalledTimes(1)
+    const briefed = start.mock.calls[0]?.[1] as string
+    expect(briefed).toContain('another agent (Claude Code)')
+    expect(briefed).toContain('check the google stock price')
+    expect(briefed).toContain('The price was 181.')
+    expect(briefed.endsWith('The person now asks:\n\nnow in euros')).toBe(true)
+    // Recorded the way the live handoff records, so the thread draws the
+    // same divider and a reopened conversation stitches the same way.
+    expect(createMission.mock.calls[0]?.[0]?.continuesFrom).toEqual({
+      missionId: 'mission_prior',
+      checkpointEpoch: 2,
+      reason: 'route-switch'
+    })
+    // No `exec resume`: the other runtime's session is not this one's.
+    const spec = start.mock.calls[0]?.[0] as { args: readonly string[] }
+    expect(spec.args.includes('resume')).toBe(false)
+  })
+
+  it('refuses the cross-runtime continuation when the record cannot be trusted', async () => {
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
       records: records([]),
       completion: Promise.resolve(completion())
     })) satisfies RuntimeProcessRunner['start']
     const { service } = scheduledService({ start }, fakeLedger({
-      getMission: async () => finished({ runtime: 'claude' })
+      getMission: async () => finished({ runtime: 'claude' }),
+      createCheckpoint: async (missionId, reason) =>
+        ({ missionId, epoch: 2, reason, resumeSafety: 'unsafe', safetyReason: 'the ledger tail is damaged' }) as never
     }))
-
     const response = await service.start(
       'go on', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior'
     )
-
     expect(response).toMatchObject({
       ok: false,
-      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('Claude Code') }
+      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('the ledger tail is damaged') }
     })
     expect(start).not.toHaveBeenCalled()
   })
@@ -1871,5 +1931,82 @@ describe('what a completed share hands to the relay', () => {
     while (scheduled.length > 0) scheduled.shift()!()
     for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
     expect(shared[0]?.mission.relay).toEqual(origin)
+  })
+})
+
+describe('what a run changed on disk that it never said', () => {
+  // OpenCode, 2026-09-05: a free Muse Spark run in write mode changed
+  // notes.ts through its `task` sub-agent; the stream said `task` and `read`,
+  // the activity card said "2 tool calls", and the file on disk disagreed
+  // with the receipt. The host now looks for itself.
+  const NUL = String.fromCharCode(0)
+  const snapshots = (before: string, after: string) => {
+    let looks = 0
+    const observeDisk = vi.fn(async () => {
+      looks += 1
+      const output = looks === 1 ? before : after
+      const map = new Map<string, string>()
+      for (const entry of output.split(NUL)) if (entry.length >= 4) map.set(entry.slice(3), entry.slice(0, 2))
+      return map
+    })
+    return observeDisk
+  }
+
+  it('adds an observed edit row, after the terminal event, for a file no tool named', async () => {
+    const appended: NormalizedRuntimeEvent[] = []
+    const ledger = fakeLedger({ appendEvents: async (_id, events) => { appended.push(...events) } })
+    const observeDisk = snapshots('', ` M src/notes.ts${NUL}`)
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([
+        { type: 'thread.started', thread_id: 'thread-live' },
+        { type: 'turn.started' },
+        { type: 'item.started', item: { id: 'i1', type: 'command_execution', command: 'cat README.md' } },
+        { type: 'item.completed', item: { id: 'i1', type: 'command_execution', command: 'cat README.md', exit_code: 0 } },
+        { type: 'turn.completed', usage: { output_tokens: 2 } }
+      ]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, ledger, { observeDisk })
+    await service.start('polish the notes', 'codex', 'accept-edits', {}, () => undefined)
+    scheduled[0]?.()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(observeDisk).toHaveBeenCalledTimes(2)
+    const completedAt = appended.findIndex((event) => event.type === 'run.completed')
+    expect(completedAt).toBeGreaterThan(-1)
+    const observed = appended.slice(completedAt + 1)
+    expect(observed.map((event) => event.type)).toEqual(['tool.started', 'tool.completed'])
+    expect(observed[0]?.payload).toMatchObject({ name: 'edit', command: 'src/notes.ts', status: 'observed on disk' })
+    // Contiguous with the record it follows: the ledger refuses a gap.
+    expect(observed[0]?.sequence).toBe(appended[completedAt]!.sequence + 1)
+    expect(observed[1]?.sequence).toBe(appended[completedAt]!.sequence + 2)
+  })
+
+  it('does not repeat a file the runtime already named, and never looks on a read-only run', async () => {
+    const appended: NormalizedRuntimeEvent[] = []
+    const ledger = fakeLedger({ appendEvents: async (_id, events) => { appended.push(...events) } })
+    const observeDisk = snapshots('', ` M src/notes.ts${NUL}`)
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([
+        { type: 'thread.started', thread_id: 'thread-live' },
+        { type: 'turn.started' },
+        { type: 'item.started', item: { id: 'i1', type: 'command_execution', command: 'apply_patch src/notes.ts' } },
+        { type: 'item.completed', item: { id: 'i1', type: 'command_execution', command: 'apply_patch src/notes.ts', exit_code: 0 } },
+        { type: 'turn.completed', usage: { output_tokens: 2 } }
+      ]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, ledger, { observeDisk })
+    await service.start('polish the notes', 'codex', 'accept-edits', {}, () => undefined)
+    scheduled[0]?.()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(appended.filter((event) => event.payload && (event.payload as { status?: string }).status === 'observed on disk')).toHaveLength(0)
+
+    const readOnly = snapshots('', ` M src/notes.ts${NUL}`)
+    const again = scheduledService({ start }, fakeLedger(), { observeDisk: readOnly })
+    await again.service.start('just read', 'codex', 'ask', {}, () => undefined)
+    again.scheduled[0]?.()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(readOnly).not.toHaveBeenCalled()
   })
 })

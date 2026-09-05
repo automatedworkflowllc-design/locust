@@ -41,7 +41,8 @@ function bullets(lines: readonly string[]): string {
 function sectionsFor(
   originalPrompt: string,
   checkpoint: ReconciledCheckpoint,
-  fromRuntime: string
+  fromRuntime: string,
+  next?: string
 ): readonly { readonly name: string; readonly text: string }[] {
   const sections: { readonly name: string; readonly text: string }[] = [
     {
@@ -77,15 +78,35 @@ function sectionsFor(
     })
   }
 
+  // The person's own next instruction, when the continuation is a reply
+  // rather than a rescue. It goes LAST so it reads as the latest word, and
+  // it is never dropped: a continuation that lost the instruction it was
+  // started for would be a run pointed at the wrong task. `task` is kept for
+  // the same reason, so this is the second never-dropped section, and the
+  // budget accounts for both.
+  if (next !== undefined && next.trim().length > 0) {
+    sections.push({
+      name: 'next',
+      text: `The person now asks:\n\n${next.trim()}`
+    })
+  }
+
   return sections
 }
 
 export function composeHandoffPrompt(
   originalPrompt: string,
   checkpoint: ReconciledCheckpoint,
-  fromRuntime: string
+  fromRuntime: string,
+  /**
+   * The person's next instruction, for a continuation that is a reply on a
+   * different runtime after the earlier run stopped (0.21.2 QA, P2: a
+   * provider switch after a quota failure used to start a stranger with no
+   * memory of the files or the task).
+   */
+  next?: string
 ): HandoffBriefing | undefined {
-  const sections = sectionsFor(originalPrompt, checkpoint, fromRuntime)
+  const sections = sectionsFor(originalPrompt, checkpoint, fromRuntime, next)
   // Reserve room for the omission notice UP FRONT whenever a section could be
   // dropped. Charging for it only at the first drop is too late: by then the
   // mandatory task section has already claimed the space, and it cannot be
@@ -108,9 +129,10 @@ export function composeHandoffPrompt(
     used += cost
   }
 
-  // The task section is first and is never optional. If it alone overflows, the
+  // The task section is first and is never optional, and the person's own
+  // next instruction is never optional either. If either overflows, the
   // caller gets nothing rather than a run pointed at a truncated instruction.
-  if (!omitted.every((name) => name !== 'task')) return undefined
+  if (!omitted.every((name) => name !== 'task' && name !== 'next')) return undefined
   if (kept.length === 0) return undefined
 
   const body = omitted.length === 0

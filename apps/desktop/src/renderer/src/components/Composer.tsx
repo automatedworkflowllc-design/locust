@@ -97,6 +97,12 @@ export interface ComposerProps {
    * run being on screen does not block this one.
    */
   readonly busyWith: string | undefined
+  /**
+   * Said above the box when the next message continues a stopped run on a
+   * DIFFERENT runtime: the person is told, before sending, that the new
+   * runtime starts from the old one's checkpoint rather than its memory.
+   */
+  readonly continuationNote: string | undefined
   /** What is waiting to be sent when the running mission finishes, if anything. */
   readonly queued: string | undefined
   /** Why a queued message has not gone yet, when it is not simply still running. */
@@ -119,6 +125,7 @@ export interface ComposerProps {
  * discovery, never from a constant.
  */
 export function Composer({
+  continuationNote,
   workspaceName,
   workspacePath,
   onChooseFolder,
@@ -318,6 +325,12 @@ export function Composer({
             <span className="lc-queued__note lc-mono">
               {queuedNote ?? `sends when ${workingName} finishes`}
             </span>
+          </div>
+        )}
+        {continuationNote !== undefined && (
+          <div className="lc-continuation lc-mono" role="status">
+            <Icon name="route" size={12} />
+            <span>{continuationNote}</span>
           </div>
         )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>

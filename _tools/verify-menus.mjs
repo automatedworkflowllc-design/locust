@@ -83,7 +83,9 @@ try {
         pending.set(n, res)
         socket.send(JSON.stringify({ id: n, method, params }))
       }),
-      sleep(60_000).then(() => ({ error: { message: 'cdp timeout' } }))
+      // An unref()'d timer, so a finished smoke is not held open for a minute
+      // by a timeout that already lost its race.
+      new Promise((resolve) => { const t = setTimeout(() => resolve({ error: { message: 'cdp timeout' } }), 60_000); t.unref() })
     ])
   const evaluate = async (expression) => {
     const m = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })

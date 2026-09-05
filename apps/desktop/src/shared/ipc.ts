@@ -731,6 +731,15 @@ export type MissionHistoryResponse =
         /** The folder this window is working in; missions elsewhere are not its own. */
         readonly currentWorkspaceId: string
         readonly issueCount: number
+        /**
+         * Runtimes whose most recent word, across every mission in the
+         * ledger, was that the account is out of quota -- with that word.
+         * Derived here rather than remembered by the window, because the
+         * window forgets on reload and the ledger does not: the 0.21.2 QA
+         * pass reloaded past a Codex limit and watched AT LIMIT turn back
+         * into READY with no successful run in between.
+         */
+        readonly limitedRuntimes: Readonly<Record<string, string>>
       }
     }
   | {

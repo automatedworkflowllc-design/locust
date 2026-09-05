@@ -153,3 +153,71 @@ describe('inline code', () => {
     }
   })
 })
+
+describe('headings and emphasis', () => {
+  // The QA pass on 0.21.2 read a literal `### Summary` from Codex and a
+  // literal `**Yes, whitespace-only input is already covered.**` from
+  // Claude. Both are the model's own structure drawn as punctuation.
+  it('lifts a hash heading out of the prose, at its level', () => {
+    expect(parseAgentText(lines('### Summary', 'Two files changed.'))).toEqual([
+      { kind: 'heading', level: 3, text: 'Summary' },
+      { kind: 'text', text: 'Two files changed.' }
+    ])
+    expect(parseAgentText('# Title')).toEqual([{ kind: 'heading', level: 1, text: 'Title' }])
+    expect(parseAgentText('## Title ##')).toEqual([{ kind: 'heading', level: 2, text: 'Title' }])
+    // Deeper than three is drawn as the third: the thread has three sizes.
+    expect(parseAgentText('##### Deep')).toEqual([{ kind: 'heading', level: 3, text: 'Deep' }])
+  })
+
+  it('does not mistake a hashtag or a shell comment for a heading', () => {
+    expect(parseAgentText('#123 is the issue')).toEqual([{ kind: 'text', text: '#123 is the issue' }])
+    expect(parseAgentText('#')).toEqual([{ kind: 'text', text: '#' }])
+  })
+
+  it('a heading ends the list before it', () => {
+    expect(parseAgentText(lines('- one', '- two', '## Next', 'prose'))).toEqual([
+      { kind: 'list', ordered: false, items: ['one', 'two'] },
+      { kind: 'heading', level: 2, text: 'Next' },
+      { kind: 'text', text: 'prose' }
+    ])
+  })
+
+  it('keeps every word when headings are lifted', () => {
+    const text = lines('# A', 'para', '## B', '- x', '### C')
+    expect(segmentsCoverInput(text, parseAgentText(text))).toBe(true)
+  })
+
+  it('draws **bold** and *emphasis* as spans, and leaves the markers out', () => {
+    expect(splitInlineCode('**Yes, whitespace-only input is already covered.** Then more.')).toEqual([
+      { kind: 'strong', text: 'Yes, whitespace-only input is already covered.' },
+      { kind: 'plain', text: ' Then more.' }
+    ])
+    expect(splitInlineCode('use *care* here')).toEqual([
+      { kind: 'plain', text: 'use ' },
+      { kind: 'em', text: 'care' },
+      { kind: 'plain', text: ' here' }
+    ])
+    expect(splitInlineCode('__also bold__ and _also em_')).toEqual([
+      { kind: 'strong', text: 'also bold' },
+      { kind: 'plain', text: ' and ' },
+      { kind: 'em', text: 'also em' }
+    ])
+  })
+
+  it('does not turn identifiers or arithmetic into emphasis', () => {
+    // A marker inside a word is part of the word; a spaced star is a star.
+    expect(splitInlineCode('snake_case_name and 2 * 3 * 4')).toEqual([
+      { kind: 'plain', text: 'snake_case_name and 2 * 3 * 4' }
+    ])
+    expect(splitInlineCode('a lone * star')).toEqual([{ kind: 'plain', text: 'a lone * star' }])
+    expect(splitInlineCode('**unclosed bold')).toEqual([{ kind: 'plain', text: '**unclosed bold' }])
+  })
+
+  it('keeps markers inside code spans literal', () => {
+    expect(splitInlineCode('run `a ** b` now')).toEqual([
+      { kind: 'plain', text: 'run ' },
+      { kind: 'code', text: 'a ** b' },
+      { kind: 'plain', text: ' now' }
+    ])
+  })
+})
