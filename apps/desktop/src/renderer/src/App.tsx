@@ -2143,9 +2143,12 @@ export default function App(): ReactElement {
             setCurrentRoomId(undefined)
             setScreen('rooms')
           }}
-          memoryCount={memories.filter((memory) => memory.status === 'kept').length}
-          memoryWaiting={memories.filter((memory) => memory.status === 'proposed').length}
-          onOpenMemory={() => setScreen('memory')}
+          onHome={() => {
+            setSelectedTeammateId(undefined)
+            setShownKey(undefined)
+            setRoomNotice(undefined)
+            setScreen('workroom')
+          }}
           pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
           liveActivity={liveActivityByOwner}
           recentlyDone={recentlyDone}
@@ -2269,6 +2272,7 @@ export default function App(): ReactElement {
               memoryMode={memoryMode}
               onMemoryModeChange={changeMemoryMode}
               memoryCount={memories.filter((memory) => memory.status === 'kept').length}
+              memoryWaiting={memories.filter((memory) => memory.status === 'proposed').length}
               onOpenMemory={() => setScreen('memory')}
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
@@ -2530,15 +2534,13 @@ export default function App(): ReactElement {
                   self: missionOwner,
                   teammates,
                   messages: liveRun.peerMessages ?? [],
+                  notices: liveRun.peerNotices ?? [],
                   // What this conversation taught the team is read from the
                   // memory list, not from a notice that would be gone once
                   // the thread is drawn from the record.
-                  notices: [
-                    ...(liveRun.peerNotices ?? []),
-                    ...memories
-                      .filter((memory) => memory.missionId !== undefined && memory.missionId === liveRun.data?.missionId)
-                      .map((memory) => `${memory.by.name} ${memory.status === 'proposed' ? 'wants to remember' : 'remembered'}: "${memory.text}"`)
-                  ]
+                  memories: memories
+                    .filter((memory) => memory.missionId !== undefined && memory.missionId === liveRun.data?.missionId)
+                    .map((memory) => ({ by: memory.by.name, text: memory.text, status: memory.status }))
                 }}
                 startedAt={
                   liveRun.restoredMission === undefined

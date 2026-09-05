@@ -161,8 +161,12 @@ try {
     return false
   })()`)
   check('discovery finished', ready === true)
-  const sidebar = await evaluate(`document.querySelector('.lc-memoryrow')?.innerText.replace(/\\s+/g, ' ') ?? 'no memory row'`)
-  check('the sidebar says one memory is kept', /1 kept/.test(String(sidebar)), String(sidebar))
+  const settingsNote = `(async () => { if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /remembers/.test(h.innerText))) { document.querySelector('button[title="Settings (Ctrl 3)"]').click(); await new Promise(r => setTimeout(r, 400)) } const h = [...document.querySelectorAll('.lc-settings__heading')].find(h => /remembers/.test(h.innerText)); return h.closest('section').innerText.replace(/\\s+/g, ' ') })()`
+  const openMemory = `(async () => { if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /remembers/.test(h.innerText))) { document.querySelector('button[title="Settings (Ctrl 3)"]').click(); await new Promise(r => setTimeout(r, 400)) } [...document.querySelectorAll('button')].find(b => /Open memory/.test(b.innerText)).click(); await new Promise(r => setTimeout(r, 600)) })()`
+  const sidebar = await evaluate(settingsNote)
+  check('Settings says one memory is kept', /1 memory kept/.test(String(sidebar)), String(sidebar).slice(-120))
+  await evaluate(`(async () => { document.querySelector('.lc-brand__lockup').click(); await new Promise(r => setTimeout(r, 300)) })()`)
+  check('the logo goes home', (await evaluate(`!!document.querySelector('.lc-runtimepanel')`)) === true)
 
   const ask = async (name, text) => evaluate(`(async () => {
     const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message ${name}')
@@ -204,20 +208,19 @@ try {
   const byBooty = after.filter((m) => m.by?.teammateId === 'tm_booty')
   if (wroteBlock) {
     check('the block became a memory of Booty\'s, for this folder, from that conversation', byBooty.length >= 1 && byBooty[0].scope === 'workspace' && byBooty[0].workspaceId === WORKSPACE_ID && typeof byBooty[0].missionId === 'string' && byBooty[0].status === 'kept', JSON.stringify(byBooty[0]))
-    const thread = await evaluate(`(() => { const found = document.body.innerText.split(String.fromCharCode(10)).find(l => l.includes('Booty remembered')); return found ?? ('not said; diag lines: ' + [...document.querySelectorAll('[class*=diag], [class*=notice]')].map(n => n.innerText).join(' | ').slice(0, 300)) })()`)
-    check('the thread says Booty remembered it', /Booty remembered/.test(String(thread)), String(thread).slice(0, 200))
+    const thread = await evaluate(`(async () => { const fold = document.querySelector('.lc-memorycard .lc-activity'); if (!fold) return 'no memory fold'; const summary = fold.innerText.replace(/\\s+/g, ' '); fold.click(); await new Promise(r => setTimeout(r, 200)); const lines = [...document.querySelectorAll('.lc-memorycard__line')].map(l => l.innerText); return JSON.stringify({ summary, lines }) })()`)
+    check('the thread folds it as "Booty remembered 1 thing", with the line under it', /Booty remembered 1 thing/.test(String(thread)) && /pnpm build/.test(String(thread)), String(thread).slice(0, 200))
     const shown = await evaluate(`document.body.innerText.includes('<locust-memory>')`)
     check('the block itself is not shown', shown === false)
-    const rowAfter = await evaluate(`document.querySelector('.lc-memoryrow')?.innerText.replace(/\\s+/g, ' ')`)
-    check('the sidebar counts it', /2 kept/.test(String(rowAfter)), String(rowAfter))
+    const rowAfter = await evaluate(settingsNote)
+    check('Settings counts it', /2 memories kept/.test(String(rowAfter)), String(rowAfter).slice(-120))
   } else {
     check('no block, so nothing of Booty\'s was invented', byBooty.length === 0, JSON.stringify(byBooty))
   }
 
   say('C. the Memory screen, checked against the file')
   const screen = await evaluate(`(async () => {
-    document.querySelector('.lc-memoryrow').click()
-    await new Promise(r => setTimeout(r, 600))
+    await (async () => { if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /remembers/.test(h.innerText))) { document.querySelector('button[title="Settings (Ctrl 3)"]').click(); await new Promise(r => setTimeout(r, 400)) } [...document.querySelectorAll('button')].find(b => /Open memory/.test(b.innerText)).click(); await new Promise(r => setTimeout(r, 600)) })()
     return JSON.stringify({
       title: document.querySelector('.lc-screen__title')?.innerText,
       rows: [...document.querySelectorAll('.lc-memory')].map(r => ({ text: r.querySelector('.lc-memory__text')?.innerText, meta: r.querySelector('.lc-memory__meta')?.innerText.replace(/\\s+/g, ' '), on: r.querySelector('[role=switch]')?.getAttribute('aria-checked') })),
@@ -282,11 +285,13 @@ try {
   await writeFile(MEMORIES, JSON.stringify({ schemaVersion: 1, memories: planted }), 'utf8')
   const kept = await evaluate(`(async () => {
     // Leave and come back so the screen re-reads the file.
+    // The Memory screen re-reads the file when opened; Settings shows what the window holds, so open the screen first.
+    // Leave the Memory screen and come back so it re-reads the planted file.
     document.querySelector('button[title="Team (Ctrl 2)"]').click()
     await new Promise(r => setTimeout(r, 300))
-    document.querySelector('.lc-memoryrow').click()
-    await new Promise(r => setTimeout(r, 600))
-    const waiting = document.querySelector('.lc-memoryrow')?.innerText.replace(/\\s+/g, ' ')
+    await (async () => { if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /remembers/.test(h.innerText))) { document.querySelector('button[title="Settings (Ctrl 3)"]').click(); await new Promise(r => setTimeout(r, 400)) } [...document.querySelectorAll('button')].find(b => /Open memory/.test(b.innerText)).click(); await new Promise(r => setTimeout(r, 600)) })()
+    const waiting = await (async () => { if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /remembers/.test(h.innerText))) { document.querySelector('button[title="Settings (Ctrl 3)"]').click(); await new Promise(r => setTimeout(r, 400)) } const h = [...document.querySelectorAll('.lc-settings__heading')].find(h => /remembers/.test(h.innerText)); return h.closest('section').innerText.replace(/\\s+/g, ' ') })()
+    await (async () => { if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /remembers/.test(h.innerText))) { document.querySelector('button[title="Settings (Ctrl 3)"]').click(); await new Promise(r => setTimeout(r, 400)) } [...document.querySelectorAll('button')].find(b => /Open memory/.test(b.innerText)).click(); await new Promise(r => setTimeout(r, 600)) })()
     const row = [...document.querySelectorAll('.lc-memory.is-proposed')].find(r => /3001/.test(r.innerText))
     if (!row) return JSON.stringify({ waiting, row: null })
     ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Keep').click()
@@ -295,7 +300,7 @@ try {
   })()`)
   let k = {}
   try { k = JSON.parse(String(kept)) } catch { /* below */ }
-  check('a proposed memory is counted as waiting and Keep makes it kept on disk', /1 waiting/.test(String(k.waiting)) && k.proposedLeft === 0 && (await memoriesOnDisk()).some((m) => m.memoryId === 'mem_proposed' && m.status === 'kept'), String(kept))
+  check('a proposed memory is counted as waiting in Settings and Keep makes it kept on disk', /1 waiting for you/.test(String(k.waiting)) && k.proposedLeft === 0 && (await memoriesOnDisk()).some((m) => m.memoryId === 'mem_proposed' && m.status === 'kept'), String(kept))
 
   const removed = await evaluate(`(async () => {
     const row = [...document.querySelectorAll('.lc-memory')].find(r => /3001/.test(r.innerText))

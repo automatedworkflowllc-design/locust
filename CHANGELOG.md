@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.27.3 — 2026-09-05
+
+- **The logo takes you home.** Click the Locust mark in the sidebar to
+  return to the home screen from anywhere.
+- **Memory lives in Settings.** The sidebar row is gone; Settings has the
+  mode, the count, what is waiting for you, and Open memory (Ctrl 5).
+- **What a conversation taught the team folds like tool activity.** One
+  quiet line -- "Wren remembered 2 things" -- with the lines a click away,
+  instead of warning-coloured notices at the bottom of the thread.
+
 ## 0.27.2 — 2026-09-05
 
 - With no folder chosen, the title bar shows the build (Locust 0.27.2)

@@ -588,6 +588,7 @@ export function SettingsScreen({
   memoryMode,
   onMemoryModeChange,
   memoryCount,
+  memoryWaiting,
   onOpenMemory,
   onPreviewPrune,
   onPrune
@@ -617,6 +618,8 @@ export function SettingsScreen({
   readonly memoryMode: MemoryMode
   readonly onMemoryModeChange: (mode: MemoryMode) => void
   readonly memoryCount: number
+  /** Memories a teammate proposed that wait for a keep or a forget. */
+  readonly memoryWaiting: number
   readonly onOpenMemory: () => void
   readonly onPreviewPrune: (days: number) => Promise<MissionPruneResponse>
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
@@ -807,7 +810,8 @@ export function SettingsScreen({
               Open memory
             </button>
             <span className="lc-settings__note">
-              {memoryCount === 0 ? 'Nothing remembered yet.' : `${String(memoryCount)} ${memoryCount === 1 ? 'memory' : 'memories'} kept.`} Ctrl 5.
+              {memoryCount === 0 ? 'Nothing remembered yet.' : `${String(memoryCount)} ${memoryCount === 1 ? 'memory' : 'memories'} kept.`}
+              {memoryWaiting > 0 ? ` ${String(memoryWaiting)} waiting for you.` : ''} Ctrl 5.
             </span>
           </div>
         </section>

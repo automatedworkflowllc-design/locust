@@ -19,6 +19,8 @@ import { costLine, runCostOf } from '../cost.js'
 import type { FaceActivity } from '../faceState.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { ActivityCard } from './ActivityCard.js'
+import { MemoryCard } from './MemoryCard.js'
+import type { MemoryCardLine } from './MemoryCard.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
@@ -281,6 +283,8 @@ export interface ThreadProps {
     readonly teammates: readonly PublicTeammate[]
     readonly messages: readonly PublicPeerMessage[]
     readonly notices: readonly string[]
+    /** What this conversation taught the team, read from the memory list. */
+    readonly memories?: readonly MemoryCardLine[]
   }
 }
 
@@ -431,6 +435,7 @@ export function Thread({
         {peers.notices.map((notice, index) => (
           <DiagnosticLine key={`peer_notice_${index}`} level="warning" message={notice} />
         ))}
+        <MemoryCard lines={peers.memories ?? []} />
 
         {/*
           Approvals sit at the END of the thread, after everything that has
