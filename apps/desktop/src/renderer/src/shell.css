@@ -3045,7 +3045,12 @@ textarea {
   color: var(--lc-lime-text);
 }
 
-.lc-teammate__mission span:last-child {
+/* The title, by name: as `span:last-child` it lost the ellipsis the moment a
+   turn count sat after it, and a two-turn conversation wrapped to three
+   lines (seen driving the app, 2026-09-05). */
+.lc-teammate__mission .lc-teammate__title {
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

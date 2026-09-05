@@ -48,7 +48,7 @@ export async function scratchRepository(prefix = 'locust-drive-ws-') {
  * and the first-launch screen). `env` is merged over the process
  * environment. `keep` leaves the profile and workspace on disk afterwards.
  */
-export async function startDrive({ name, port, workspace, seed, env = {}, keep = false, profilePath, outPath, stepFrom = 0 }) {
+export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0 }) {
   try {
     const already = await fetch(`http://127.0.0.1:${String(port)}/json/list`, { signal: AbortSignal.timeout(1500) })
     if (already.ok) { say(`something is already debugging on port ${String(port)}`); process.exit(1) }
@@ -63,6 +63,12 @@ export async function startDrive({ name, port, workspace, seed, env = {}, keep =
   if (seed !== undefined && profilePath === undefined) {
     await mkdir(join(profile, 'mission-ledger'), { recursive: true })
     await writeFile(join(profile, 'teammates.json'), JSON.stringify(seed), 'utf8')
+  }
+  // Other profile files a drive wants in place BEFORE the app reads them
+  // (memories.json, rooms.json, routines.json): written before launch, so
+  // nothing the app writes at boot can race them.
+  for (const [file, content] of Object.entries(files)) {
+    await writeFile(join(profile, file), typeof content === 'string' ? content : JSON.stringify(content), 'utf8')
   }
   const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`], {
     cwd: workspace,
@@ -170,4 +176,68 @@ export async function startDrive({ name, port, workspace, seed, env = {}, keep =
   }
 
   return { evaluate, send, capture, ready, finish, profile, out, record }
+}
+
+/**
+ * Pick a route from the composer's picker the way a person does: open it,
+ * type a search, click the first enabled row under the runtime's group.
+ * Returns what the controls read afterwards, or why nothing was picked.
+ */
+export function pickRouteScript({ group, search, row }) {
+  return `(async () => {
+    const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+    if (!control) return 'no route control'
+    if (control.disabled) return 'route control disabled'
+    control.click()
+    let target
+    let notice = null
+    for (let attempt = 0; attempt < 60 && !target; attempt += 1) {
+      const picker = document.querySelector('.lc-picker')
+      if (!picker) { control.click(); await new Promise(r => setTimeout(r, 500)); continue }
+      notice = picker.querySelector('.lc-picker__notice')?.innerText ?? null
+      const box = picker.querySelector('.lc-picker__input')
+      if (box && ${JSON.stringify(search ?? '')}) {
+        const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+        setInput.call(box, ${JSON.stringify(search ?? '')})
+        box.dispatchEvent(new Event('input', { bubbles: true }))
+        await new Promise(r => setTimeout(r, 500))
+      }
+      let current = ''
+      for (const node of picker.querySelector('.lc-picker__list').children) {
+        const header = node.querySelector('.lc-picker__group')
+        if (header) current = header.innerText
+        const candidate = node.querySelector('.lc-picker__row')
+        if (candidate && !candidate.disabled && ${group}.test(current) && ${row ?? '/./'}.test(candidate.innerText)) { target = candidate; break }
+      }
+      if (!target) await new Promise(r => setTimeout(r, 500))
+    }
+    if (!target) return 'no matching route; rows: ' + [...document.querySelectorAll('.lc-picker__row')].map(r => r.innerText.replace(/\\s+/g, ' ')).slice(0, 6).join(' | ')
+    target.click()
+    await new Promise(r => setTimeout(r, 500))
+    return (notice ? 'picker said: ' + notice + ' || ' : '') + [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' · ')
+  })()`
+}
+
+/** Type a message, press send, and wait for the run to end (or not, within the bound). */
+export function sendAndWaitScript(text, { waitSeconds = 360, settle = true } = {}) {
+  return `(async () => {
+    const field = document.querySelector('form.command-dock textarea')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(field, ${JSON.stringify(text)})
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    let sent = false
+    for (let i = 0; i < 120 && !sent; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      const button = document.querySelector('button[aria-label="Start mission"]')
+      if (button && !button.disabled) { button.click(); sent = true }
+    }
+    if (!sent) return 'no send'
+    if (!${settle ? 'true' : 'false'}) return 'sent'
+    for (let i = 0; i < ${String(waitSeconds * 2)}; i += 1) {
+      await new Promise(r => setTimeout(r, 500))
+      if (i > 4 && !document.querySelector('button[aria-label^="Stop the running"]')) break
+    }
+    await new Promise(r => setTimeout(r, 800))
+    return 'finished: ' + (document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-300) ?? '')
+  })()`
 }

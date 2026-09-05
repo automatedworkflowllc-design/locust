@@ -1699,7 +1699,12 @@ if (!ownsSingleInstanceLock) {
         if (response.ok) {
           // The continuation belongs to whoever the stopped mission did.
           const owners = await teammates.missionOwners().catch(() => ({}) as Readonly<Record<string, string>>)
-          await assignOwner(owners[response.data.continuesFrom.missionId], response.data.missionId)
+          const ownerId = owners[response.data.continuesFrom.missionId]
+          await assignOwner(ownerId, response.data.missionId)
+          // A person picked this route for this teammate, mid-run; that is
+          // as much a choice as starting them on it. The sidebar read the old
+          // route while the composer read the new one (seen driving, 2026-09-05).
+          await rememberRoute(ownerId, { runtime, model: model ?? 'account-default', mode })
         }
         return response
       } catch {

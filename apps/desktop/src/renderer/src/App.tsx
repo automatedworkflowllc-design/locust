@@ -1660,6 +1660,11 @@ export default function App(): ReactElement {
       if (ownerId !== undefined) {
         const missionId = response.data.missionId
         setMissionOwners((owners) => ({ ...owners, [missionId]: ownerId }))
+        // The host now remembers a handed-off route as the teammate's own;
+        // mirror it, as a start does, so the sidebar and the composer agree
+        // (the sidebar read the old route after a handoff, 2026-09-05).
+        const kept = { runtime: response.data.runtime, model: response.data.model, mode }
+        setTeammates((all) => all.map((teammate) => (teammate.teammateId === ownerId ? { ...teammate, route: kept } : teammate)))
       }
       const queued = pendingUpdatesRef.current.get(newRunId) ?? []
       pendingUpdatesRef.current.delete(newRunId)
@@ -1922,6 +1927,11 @@ export default function App(): ReactElement {
   useEffect(() => {
     if (settledSignature.length === 0) return
     refreshHistory()
+    // A tree that was "In use" is free once its run settles. Settings read
+    // the list when it opened and kept saying In use until the NEXT run
+    // (seen driving the app, 2026-09-05); re-read once the list has ever
+    // been asked for, so a person sitting on Settings sees Remove appear.
+    if (worktrees !== undefined) refreshWorktrees()
   }, [settledSignature])
 
   // A queued message goes as the next turn the moment its run COMPLETES, and
@@ -2095,10 +2105,20 @@ export default function App(): ReactElement {
       // A live reply already holds the turns before it, so its chain is
       // known without waiting for the ledger to be re-read.
       const earlier = run.earlierTurns ?? []
+      // A handoff's continuation knows the mission it continues from its
+      // start data, before the ledger is re-read. Without it the pair sat
+      // in the sidebar as two rows with one title (seen driving the app,
+      // 2026-09-05); the root is resolved through history when it is there.
+      const handoffFrom = (run.data as { continuesFrom?: { missionId: string } } | undefined)?.continuesFrom?.missionId
+      const handoffRoot = handoffFrom === undefined
+        ? undefined
+        : historyById.get(handoffFrom) === undefined ? handoffFrom : rootMission(historyById.get(handoffFrom)!, historyById).missionId
+      const rootId = earlier[0]?.missionId ?? handoffRoot
+      const parentId = earlier.at(-1)?.missionId ?? handoffFrom
       rows.push({
         missionId,
-        ...(earlier[0] === undefined ? {} : { rootId: earlier[0].missionId }),
-        ...(earlier.at(-1) === undefined ? {} : { parentId: earlier.at(-1)!.missionId }),
+        ...(rootId === undefined ? {} : { rootId }),
+        ...(parentId === undefined ? {} : { parentId }),
         ...(run.teammateId === undefined ? {} : { ownerId: run.teammateId }),
         // A run's thread already shows the root's words for a continuation.
         // A relayed run's prompt is the host's briefing to a runtime, never a

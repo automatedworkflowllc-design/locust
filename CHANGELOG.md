@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.32.2 — 2026-09-05
+
+- **Claude Code teammates can use subagents.** The tool list Locust hands
+  Claude Code never included its subagent launcher, so no helper could be
+  spawned. It can now, in both modes; a helper inherits the run's tools,
+  so a read-only run's helpers read only. The activity fold names what
+  each helper was asked and whether it reported back.
+- **Read-only on Claude Code no longer runs in plan mode.** Plan mode wrote
+  a plan file of its own under your home folder, which the fold counted as
+  an edit, and called a tool that fails without a person to answer it. The
+  reading-only tool list is what keeps the run read-only.
+- **A handed-off mission is one conversation in the sidebar,** not two rows
+  with one title, and the teammate keeps the route you handed it to.
+- **Settings' Own branches list updates when a run ends,** so "In use"
+  becomes "Remove" without leaving the screen.
+
 ## 0.32.1 — 2026-09-05
 
 - **A teammate's message that goes nowhere is always said.** When replies

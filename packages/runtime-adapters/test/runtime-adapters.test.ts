@@ -67,18 +67,18 @@ describe("runtime command specifications", () => {
     );
     expect(claude.args).toContain("--restricted");
     expect(claude.args).toContain("stream-json");
-    expect(claude.args).toContain("plan");
+    expect(claude.args).toContain("default");
     expect(claude.args).not.toContain("--dangerously-skip-permissions");
   });
 
-  it("holds a read-only Claude mission in plan mode with a reading tool list", () => {
+  it("holds a read-only Claude mission in default mode with a reading tool list plus Task, never plan mode", () => {
     const claude = createClaudePrintCommand(
       { ...nativeExecutable, commandName: "claude" },
       { workspacePath: "C:\\workspace", sandbox:"read-only" },
     );
     expect(claude.args).toContain("--restricted");
-    expect(claude.args.join(" ")).toContain("--permission-mode plan");
-    expect(claude.args.join(" ")).toContain("--tools Read,Glob,Grep ");
+    expect(claude.args.join(" ")).toContain("--permission-mode default");
+    expect(claude.args.join(" ")).toContain("--tools Read,Glob,Grep,Task ");
     expect(claude.args.join(" ")).not.toContain("Edit");
   });
 
@@ -839,7 +839,7 @@ function fakeProbe(command: ProbeCommand) {
     return Promise.resolve({
       exitCode: 0,
       stdout: isClaude
-        ? "--print stdin --output-format stream-json --restricted --verbose --include-partial-messages --permission-mode plan --tools --disallowedTools"
+        ? "--print stdin --output-format stream-json --restricted --verbose --include-partial-messages --permission-mode default --tools --disallowedTools"
         : "Run non-interactively stdin --json --cd --sandbox read-only",
       stderr: "",
     });

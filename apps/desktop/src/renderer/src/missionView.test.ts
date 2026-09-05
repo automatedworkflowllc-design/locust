@@ -347,6 +347,8 @@ describe('collapsed activity', () => {
 
   it('singularizes honestly', () => {
     expect(activitySummary([{ kind: 'edit', name: 'x', settled: true }])).toBe('Edited 1 file')
+    // A refused write edited nothing; it is a call, and its row says failed.
+    expect(activitySummary([{ kind: 'edit', name: 'C:/Users/x/.claude/plans/p.md', settled: true, failed: true }])).toBe('1 tool call')
   })
 
   it('says so when there was no tool activity', () => {

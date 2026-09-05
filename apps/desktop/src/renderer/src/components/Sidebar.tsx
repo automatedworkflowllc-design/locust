@@ -295,7 +295,7 @@ export function Sidebar({
                       <span
                         className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}`}
                       />
-                      <span>{mission.title}</span>
+                      <span className="lc-teammate__title">{mission.title}</span>
                       {(mission.turns ?? 1) > 1 && (
                         <span className="lc-teammate__turns lc-mono">{mission.turns}</span>
                       )}

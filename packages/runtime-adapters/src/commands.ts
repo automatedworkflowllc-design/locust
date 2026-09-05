@@ -145,7 +145,10 @@ export function detectSupportedFeatures(
     add("restricted-mode", scan(helpText, "--restricted"));
     add("verbose-streaming", scan(helpText, "--verbose"));
     add("partial-messages", scan(helpText, "--include-partial-messages"));
-    add("plan-permission-mode", scan(helpText, "--permission-mode") && scan(helpText, "plan"));
+    // Historical name: read-only Claude ran in plan mode until 0.32.2. What
+    // the app needs is the flag itself; the modes it sends are default and
+    // acceptEdits, both older than plan.
+    add("plan-permission-mode", scan(helpText, "--permission-mode"));
     add("tool-allowlist", scan(helpText, "--tools"));
     add("tool-denylist", scan(helpText, "--disallowedTools"));
   } else if (runtime === "cursor") {
@@ -436,10 +439,22 @@ export function createClaudePrintCommand(
     "stream-json",
     "--verbose",
     "--include-partial-messages",
+    // Read-only used to be plan mode. Plan mode has side effects of its own:
+    // Claude Code writes its plan under ~/.claude/plans (which the activity
+    // fold then counted as "Edited 1 file", outside the folder) and calls
+    // ExitPlanMode, which fails without a person to answer it (seen driving
+    // the app, 2026-09-05). The tool list is what keeps a run read-only;
+    // default mode with only reading tools has nothing to plan or exit.
+    //
+    // Task is the subagent launcher. Without it no Claude Code teammate
+    // could spawn a helper at all (Colin, 2026-09-05: "do we have the
+    // ability to run subagents through the capable models?"). A helper
+    // inherits the tools of the run that asked for it, so a read-only run's
+    // helpers read only.
     "--permission-mode",
-    editing ? "acceptEdits" : "plan",
+    editing ? "acceptEdits" : "default",
     "--tools",
-    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash" : "Read,Glob,Grep",
+    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task" : "Read,Glob,Grep,Task",
     "--disallowedTools",
     "mcp__*",
   ];

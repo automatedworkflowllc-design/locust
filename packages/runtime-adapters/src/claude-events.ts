@@ -127,7 +127,12 @@ export function claudeToolTarget(name: string, input: unknown): string | undefin
     case "Grep":
       return first("pattern", "path");
     case "Task":
-      return first("description");
+    case "Agent":
+      // Claude Code 2.x names its subagent launcher Agent; older builds said
+      // Task. The description is the row's text; without one, the first
+      // words of the prompt (seen driving the app, 2026-09-05: a live helper
+      // read "a helper, unnamed").
+      return first("description", "prompt");
     case "WebFetch":
     case "WebSearch":
       return first("url", "query");

@@ -459,8 +459,11 @@ export function relativePath(path: string, workspacePath: string | undefined): s
 export function activitySummary(details: readonly ActivityDetail[]): string {
   // Files, not edit calls: one Codex file_change can touch several files, and
   // "Edited 1 file" over a two-file change is the wrong number.
+  // An edit that FAILED edited nothing: a read-only Claude Code run whose
+  // Write was refused still read "Edited 1 file" (seen driving, 2026-09-05).
+  // The refused row stays in the list, marked failed; it counts as a call.
   const edits = details
-    .filter((detail) => detail.kind === 'edit')
+    .filter((detail) => detail.kind === 'edit' && detail.failed !== true)
     .reduce((sum, detail) => sum + Math.max(1, detail.name.split('\n').filter((line) => line.length > 0).length), 0)
   const commands = details.filter((detail) => detail.kind === 'shell').length
   const helpers = details.filter((detail) => detail.kind === 'helper').length
