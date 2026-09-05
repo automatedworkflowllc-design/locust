@@ -85,6 +85,8 @@ import {
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
   RUNTIME_SETUP_CHANNEL,
+  WORKTREE_LIST_CHANNEL,
+  WORKTREE_REMOVE_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
@@ -1299,6 +1301,50 @@ if (!ownsSingleInstanceLock) {
         return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The request was rejected.' } } as const
       }
       return updates.install()
+    })
+
+    // The teammates' own worktrees: listed from git, removed on request when
+    // no run is live in them. The branch stays either way.
+    const worktreesRejected = (message: string) => ({ ok: false, error: { code: 'WORKTREES_UNAVAILABLE', message } }) as const
+    const worktreeList = async () => {
+      if (worktrees === undefined) return { ok: true, data: { worktrees: [], reason: 'No project folder is chosen.' } } as const
+      const probe = await worktrees.probe()
+      const [roster, owners] = await Promise.all([teammates.list(), teammates.missionOwners()])
+      const live = new Set(
+        [...codexMissions.liveMissionIds(), ...appServerMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
+          .map((missionId) => owners[missionId])
+          .filter((owner): owner is string => owner !== undefined)
+      )
+      const listed = (await worktrees.list()).map((tree) => ({
+        teammateId: tree.teammateId,
+        teammateName: roster.find((entry) => entry.teammateId === tree.teammateId)?.name,
+        branch: tree.branch,
+        path: tree.path,
+        busy: live.has(tree.teammateId)
+      }))
+      return { ok: true, data: { worktrees: listed, reason: probe.reason } } as const
+    }
+    ipcMain.handle(WORKTREE_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return worktreesRejected('The request was rejected.')
+      try {
+        return await worktreeList()
+      } catch {
+        return worktreesRejected('The worktrees could not be listed.')
+      }
+    })
+    ipcMain.handle(WORKTREE_REMOVE_CHANNEL, async (event, teammateId: unknown) => {
+      if (!fromOwnWindow(event)) return worktreesRejected('The request was rejected.')
+      if (typeof teammateId !== 'string' || worktrees === undefined) return worktreesRejected('That worktree could not be removed.')
+      try {
+        const current = await worktreeList()
+        if (current.ok && current.data.worktrees.some((tree) => tree.teammateId === teammateId && tree.busy)) {
+          return worktreesRejected('A run is live in that worktree. Stop it first.')
+        }
+        await worktrees.remove(teammateId)
+        return await worktreeList()
+      } catch (error) {
+        return worktreesRejected(error instanceof Error ? error.message : 'That worktree could not be removed.')
+      }
     })
 
     // What each runtime has set up for itself -- MCP servers and hooks --

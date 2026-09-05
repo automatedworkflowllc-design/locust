@@ -12,7 +12,8 @@ import type {
   PublicTeammate,
   MemoryMode,
   PublicRuntimeSetup,
-  PublicWorkspaceBrief
+  PublicWorkspaceBrief,
+  PublicWorktree
 } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import {
@@ -596,6 +597,8 @@ export function SettingsScreen({
   limitedRuntimes,
   runtimeSetup,
   workspaceBrief,
+  worktrees,
+  onRemoveWorktree,
   workspacePath,
   onChooseFolder,
   ledgerPath,
@@ -623,6 +626,9 @@ export function SettingsScreen({
   readonly runtimeSetup: Readonly<Record<string, PublicRuntimeSetup>> | undefined
   /** The folder's LOCUST.md as last read: null when none, undefined until the host has answered. */
   readonly workspaceBrief: PublicWorkspaceBrief | null | undefined
+  /** The teammates' own worktrees under the folder, and why there can be none; undefined until read. */
+  readonly worktrees: { readonly list: readonly PublicWorktree[]; readonly reason: string | undefined } | undefined
+  readonly onRemoveWorktree: (teammateId: string) => Promise<string | undefined>
   /** The folder every teammate works in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly onChooseFolder: () => void
@@ -695,6 +701,37 @@ export function SettingsScreen({
                   ? 'None in this folder. Add a LOCUST.md at its root and every teammate, on every runtime, is given it before each mission.'
                   : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' -- longer than 200 lines, so the rest is not loaded' : ''}.`}
               </span>
+            </div>
+          )}
+          {workspacePath !== undefined && worktrees !== undefined && (
+            <div className="lc-policyrow lc-policyrow--stack">
+              <span className="lc-tag">OWN BRANCHES</span>
+              <span className="lc-settings__note">
+                {worktrees.reason !== undefined
+                  ? `${worktrees.reason} A teammate with Own branch on cannot start until this is fixed.`
+                  : worktrees.list.length === 0
+                    ? 'No teammate has its own worktree yet. Turn Own branch on in a teammate\'s card and its next run makes one.'
+                    : 'Each is a worktree of this folder\'s repository, kept under .locust/worktrees. Removing one keeps its branch; merging is yours to do.'}
+              </span>
+              {worktrees.list.length > 0 && (
+                <div className="lc-worktreelist">
+                  {worktrees.list.map((tree) => (
+                    <div className="lc-worktreerow" key={tree.teammateId}>
+                      <span className="lc-worktreerow__who">{tree.teammateName ?? tree.teammateId}</span>
+                      <span className="lc-worktreerow__branch lc-mono" title={tree.path}>{tree.branch}</span>
+                      <button
+                        type="button"
+                        className="lc-ghostbutton"
+                        disabled={tree.busy}
+                        title={tree.busy ? 'A run is live in this worktree' : `Remove the worktree; the branch ${tree.branch} stays`}
+                        onClick={() => void onRemoveWorktree(tree.teammateId)}
+                      >
+                        {tree.busy ? 'In use' : 'Remove'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>

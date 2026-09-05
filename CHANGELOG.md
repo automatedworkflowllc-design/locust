@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.31.0 — 2026-09-05
+
+- **Own branch.** A teammate can work in its own copy of the project
+  folder: turn Own branch on in its card and its runs happen in a worktree
+  of the folder's repository, on branch locust/<name>, so two teammates
+  editing one repository never collide. The sidebar says which branch each
+  is on. Settings lists the worktrees and can remove one; the branch stays,
+  and merging back is yours to do. Needs the folder to be a git
+  repository; a teammate that cannot get its tree says why instead of
+  running in the folder unannounced.
+- A Custom teammate's title is kept. It was dropped on the way to disk, so
+  every Custom teammate read "Custom".
+
 ## 0.30.0 — 2026-09-05
 
 - **The approval card shows the change.** When Codex asks to change files

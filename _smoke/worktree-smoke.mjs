@@ -161,6 +161,31 @@ try {
     ids.add(first.metadata?.workspaceId)
   }
   check('both missions carry one workspace id', names.length === 2 && ids.size === 1, `${String(names.length)} ledgers, ${String(ids.size)} id(s)`)
+
+  say('5. Settings lists both trees; Remove takes one away and keeps its branch')
+  const settings = JSON.parse(await evaluate(`(async () => {
+    if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /Project folder/.test(h.innerText))) {
+      document.querySelector('button[title="Settings (Ctrl 3)"]').click()
+    }
+    for (let i = 0; i < 40; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      if (document.querySelectorAll('.lc-worktreerow').length >= 2) break
+    }
+    const rows = [...document.querySelectorAll('.lc-worktreerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim())
+    const booty = [...document.querySelectorAll('.lc-worktreerow')].find(r => /Booty/.test(r.innerText))
+    const remove = booty && [...booty.querySelectorAll('button')].find(b => b.innerText.trim() === 'Remove')
+    if (remove) remove.click()
+    for (let i = 0; i < 40; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      if (document.querySelectorAll('.lc-worktreerow').length === 1) break
+    }
+    return JSON.stringify({ rows, after: [...document.querySelectorAll('.lc-worktreerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()) })
+  })()`))
+  check('Settings listed both, each with its branch', settings.rows.length === 2 && settings.rows.some((r) => /Wren.*locust\/wren/.test(r)) && settings.rows.some((r) => /Booty.*locust\/booty/.test(r)), JSON.stringify(settings.rows))
+  check('after Remove only Wren\'s tree is listed', settings.after.length === 1 && /Wren/.test(settings.after[0] ?? ''), JSON.stringify(settings.after))
+  const treesAfter = await git(['worktree', 'list', '--porcelain'], workspace)
+  check('git agrees: one Locust tree left', /tm_wren/.test(treesAfter.replace(/\\/g, '/')) && !/tm_booty/.test(treesAfter.replace(/\\/g, '/')), treesAfter.replace(/\s+/g, ' ').slice(0, 200))
+  check('the removed tree\'s branch stays', /locust\/booty/.test(await git(['branch', '--list', 'locust/booty'], workspace)))
 } catch (error) {
   failures += 1
   say(`  [FAIL] ${error instanceof Error ? error.message : String(error)}`)

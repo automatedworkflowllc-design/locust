@@ -66,6 +66,20 @@ export interface PublicWorkspaceBrief {
   readonly truncated: boolean
 }
 
+/** A teammate's own worktree, as git reports it. */
+export interface PublicWorktree {
+  readonly teammateId: string
+  readonly teammateName: string | undefined
+  readonly branch: string
+  readonly path: string
+  /** A run is live in it, so it cannot be removed now. */
+  readonly busy: boolean
+}
+
+export type WorktreeListResponse =
+  | { readonly ok: true; readonly data: { readonly worktrees: readonly PublicWorktree[]; readonly reason: string | undefined } }
+  | { readonly ok: false; readonly error: { readonly code: 'WORKTREES_UNAVAILABLE'; readonly message: string } }
+
 export type RuntimeSetupResponse =
   | {
       readonly ok: true
@@ -221,6 +235,8 @@ export const MEMORY_UPDATE_CHANNEL = 'memory:update'
 export const MEMORY_REMOVE_CHANNEL = 'memory:remove'
 export const MEMORY_CLEAR_CHANNEL = 'memory:clear'
 export const RUNTIME_SETUP_CHANNEL = 'runtime:setup'
+export const WORKTREE_LIST_CHANNEL = 'worktrees:list'
+export const WORKTREE_REMOVE_CHANNEL = 'worktrees:remove'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
@@ -1038,6 +1054,10 @@ export interface DesktopApi {
   listMemories(): Promise<MemoryListResponse>
   /** Each runtime's own MCP servers and hooks, read-only. */
   readRuntimeSetup(): Promise<RuntimeSetupResponse>
+  /** The teammates' own worktrees under the folder, and whether the folder can have them. */
+  listWorktrees(): Promise<WorktreeListResponse>
+  /** Remove a teammate's worktree. The branch stays. Refused while a run is live in it. */
+  removeWorktree(teammateId: string): Promise<WorktreeListResponse>
   addMemory(request: MemoryAddRequest): Promise<MemoryListResponse>
   updateMemory(request: MemoryUpdateRequest): Promise<MemoryListResponse>
   removeMemory(memoryId: string): Promise<MemoryListResponse>

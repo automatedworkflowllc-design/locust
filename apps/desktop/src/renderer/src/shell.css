@@ -1605,6 +1605,41 @@ textarea {
   gap: 2px;
 }
 
+.lc-policyrow--stack {
+  flex-wrap: wrap;
+}
+
+.lc-worktreelist {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+  margin-top: var(--lc-space-2);
+}
+
+.lc-worktreerow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-worktreerow__who {
+  color: var(--lc-text-primary);
+}
+
+.lc-worktreerow__branch {
+  color: var(--lc-text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .lc-linkbutton {
   background: none;
   border: 0;

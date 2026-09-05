@@ -40,7 +40,9 @@ import {
   MEMORY_UPDATE_CHANNEL,
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
-  RUNTIME_SETUP_CHANNEL
+  RUNTIME_SETUP_CHANNEL,
+  WORKTREE_LIST_CHANNEL,
+  WORKTREE_REMOVE_CHANNEL
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
@@ -86,7 +88,8 @@ import type {
   MemoryClearRequest,
   MemoryListResponse,
   MemoryUpdateRequest,
-  RuntimeSetupResponse
+  RuntimeSetupResponse,
+  WorktreeListResponse
 } from '../shared/ipc.js'
 
 export type {
@@ -179,6 +182,8 @@ const desktopApi: DesktopApi = {
   updateRoomTask: (request: RoomTaskRequest) => ipcRenderer.invoke(ROOM_TASK_CHANNEL, request) as Promise<RoomTaskResponse>,
   listMemories: () => ipcRenderer.invoke(MEMORY_LIST_CHANNEL) as Promise<MemoryListResponse>,
   readRuntimeSetup: () => ipcRenderer.invoke(RUNTIME_SETUP_CHANNEL) as Promise<RuntimeSetupResponse>,
+  listWorktrees: () => ipcRenderer.invoke(WORKTREE_LIST_CHANNEL) as Promise<WorktreeListResponse>,
+  removeWorktree: (teammateId: string) => ipcRenderer.invoke(WORKTREE_REMOVE_CHANNEL, teammateId) as Promise<WorktreeListResponse>,
   addMemory: (request: MemoryAddRequest) => ipcRenderer.invoke(MEMORY_ADD_CHANNEL, request) as Promise<MemoryListResponse>,
   updateMemory: (request: MemoryUpdateRequest) => ipcRenderer.invoke(MEMORY_UPDATE_CHANNEL, request) as Promise<MemoryListResponse>,
   removeMemory: (memoryId: string) => ipcRenderer.invoke(MEMORY_REMOVE_CHANNEL, memoryId) as Promise<MemoryListResponse>,

@@ -31,7 +31,8 @@ import type {
   MemoryUpdateRequest,
   PublicMemory,
   PublicRuntimeSetup,
-  PublicWorkspaceBrief
+  PublicWorkspaceBrief,
+  PublicWorktree
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
@@ -631,6 +632,7 @@ export default function App(): ReactElement {
   /** Each runtime's own MCP servers and hooks, read once at boot and again when Settings opens. */
   const [runtimeSetup, setRuntimeSetup] = useState<Readonly<Record<string, PublicRuntimeSetup>>>()
   const [workspaceBrief, setWorkspaceBrief] = useState<PublicWorkspaceBrief | null>()
+  const [worktrees, setWorktrees] = useState<{ readonly list: readonly PublicWorktree[]; readonly reason: string | undefined }>()
   /**
    * What a person typed while a mission was running, waiting to go as the
    * next turn. Kept against the RUN it was typed at, not the teammate, so it
@@ -728,6 +730,27 @@ export default function App(): ReactElement {
    * not lost data, and the cheapest honest fix is to read it again whenever
    * the screen that shows it is opened.
    */
+  const refreshWorktrees = (): void => {
+    void window.desktop
+      ?.listWorktrees()
+      .then((response) => {
+        if (response.ok) setWorktrees({ list: response.data.worktrees, reason: response.data.reason })
+      })
+      .catch(() => undefined)
+  }
+  const removeWorktree = async (teammateId: string): Promise<string | undefined> => {
+    const bridge = window.desktop
+    if (bridge === undefined) return 'Worktrees are not available here.'
+    try {
+      const response = await bridge.removeWorktree(teammateId)
+      if (!response.ok) return response.error.message
+      setWorktrees({ list: response.data.worktrees, reason: response.data.reason })
+      return undefined
+    } catch {
+      return 'That worktree could not be removed.'
+    }
+  }
+
   const refreshRuntimeSetup = (): void => {
     void window.desktop
       ?.readRuntimeSetup()
@@ -1035,6 +1058,15 @@ export default function App(): ReactElement {
       })
 
     void bridge
+      .listWorktrees()
+      .then((response) => {
+        if (active && response.ok) setWorktrees({ list: response.data.worktrees, reason: response.data.reason })
+      })
+      .catch(() => {
+        // A runtime's own configuration is shown when it can be read, never guessed.
+      })
+
+    void bridge
       .getMissionHistory()
       .then((response) => {
         seedLimitsFrom(response)
@@ -1127,7 +1159,7 @@ export default function App(): ReactElement {
       if (event.key === '2') { event.preventDefault(); setScreen('teammates') }
       // Ctrl 3 reads the storage number too, or the shortcut would be the
       // one way into Settings that still showed the launch reading.
-      if (event.key === '3') { event.preventDefault(); refreshStorage(); refreshRuntimeSetup(); setScreen('settings') }
+      if (event.key === '3') { event.preventDefault(); refreshStorage(); refreshRuntimeSetup(); refreshWorktrees(); setScreen('settings') }
       if (event.key === '4') { event.preventDefault(); setScreen('rooms') }
       if (event.key === '5') { event.preventDefault(); setScreen('memory') }
     }
@@ -2224,6 +2256,8 @@ export default function App(): ReactElement {
           }}
           composerShown={screen === 'workroom'}
           onOpenSettings={() => {
+            refreshWorktrees()
+            refreshRuntimeSetup()
             const next = screen === 'settings' ? 'workroom' : 'settings'
             // Read the number when the screen that shows it opens, so it
             // cannot be the one from launch.
@@ -2327,6 +2361,8 @@ export default function App(): ReactElement {
               limitedRuntimes={limitedRuntimes}
               runtimeSetup={runtimeSetup}
               workspaceBrief={workspaceBrief}
+              worktrees={worktrees}
+              onRemoveWorktree={removeWorktree}
               ledgerPath={undefined}
               build={build}
               storage={storage}
