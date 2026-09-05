@@ -746,7 +746,11 @@ textarea {
 }
 
 .lc-decision__option:hover:not(:disabled) {
-  border-color: var(--lc-accent);
+  /* Was `--lc-accent`, a token this app never defined, so the decision card's
+     options had no hover border at all from 0.17.0 until the token gate
+     learned to catch an undefined var (2026-09-05). This is the token every
+     other hoverable row uses. */
+  border-color: var(--lc-hover-border);
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -4106,4 +4110,55 @@ textarea {
    collapse, so wrapped Markdown reads as prose, not as a code block. */
 .lc-para {
   white-space: pre-line;
+}
+
+/* A routine's steps in the save/edit dialog: the number is the order they
+   run in, so it is a label, not decoration. */
+.lc-routinestep {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+  margin-bottom: 0.5rem;
+}
+
+.lc-routinestep__n {
+  padding-top: 0.55rem;
+  text-align: right;
+  color: var(--lc-text-muted);
+}
+
+.lc-routinestep__text {
+  resize: vertical;
+  min-height: 3.2rem;
+  white-space: pre-wrap;
+}
+
+.lc-routinestep__drop {
+  padding-inline: 0.5rem;
+}
+
+/* Routines under a teammate on the Team screen. */
+.lc-routinelist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+}
+
+.lc-routinerow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.lc-routinerow__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-routinerow__meta {
+  color: var(--lc-text-muted);
 }

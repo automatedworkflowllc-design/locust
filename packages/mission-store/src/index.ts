@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 12 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 13 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -86,14 +86,20 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 12 as const
  * briefing the host wrote, so nothing may show it as a mission title -- and a
  * v10 reader would refuse the record outright, since `relay` was the only kind
  * it knew.
+ *
+ * v12 -> v13: `startedBy.kind` gains `routine`, a run the host started to
+ * replay one step of a routine a person saved from an earlier conversation
+ * (`routineId`, and which `step` this run is). Same rule as relay and resume:
+ * the ledger says a person did not ask for this run, and a v12 reader would
+ * refuse a starter it does not know rather than mislabel it.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11 || value === 12
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11 || value === 12 || value === 13
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -188,6 +194,13 @@ export type MissionStarter =
       readonly kind: 'resume'
       /** The checkpoint epoch the new run continues from. */
       readonly epoch: number
+    }
+  | {
+      /** One step of a routine a person saved from an earlier conversation, replayed by the host. */
+      readonly kind: 'routine'
+      readonly routineId: string
+      /** Which step of the routine this run is, counting from 1. */
+      readonly step: number
     }
 
 /**
@@ -528,15 +541,23 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
   }
   if (metadata.startedBy !== undefined) {
     const starter = metadata.startedBy
-    const counter = starter.kind === 'relay' ? starter.hop : starter.kind === 'resume' ? starter.epoch : undefined
+    const counter =
+      starter.kind === 'relay'
+        ? starter.hop
+        : starter.kind === 'resume'
+          ? starter.epoch
+          : starter.kind === 'routine'
+            ? starter.step
+            : undefined
     if (
-      (starter.kind !== 'relay' && starter.kind !== 'resume')
+      (starter.kind !== 'relay' && starter.kind !== 'resume' && starter.kind !== 'routine')
       || counter === undefined
       || !Number.isSafeInteger(counter)
       || counter < 1
     ) {
       throw new Error('Mission starter is invalid')
     }
+    if (starter.kind === 'routine') requireText(starter.routineId, 'startedBy.routineId', 200)
   }
   return metadata
 }
@@ -636,6 +657,10 @@ function parsedMetadata(
   }
   // And no writer before v11 knew any starter but the relay.
   if (schemaVersion < 11 && candidate.startedBy !== undefined && candidate.startedBy.kind !== 'relay') {
+    return undefined
+  }
+  // And no writer before v13 knew the routine starter.
+  if (schemaVersion < 13 && candidate.startedBy?.kind === 'routine') {
     return undefined
   }
   // And no writer before v7 knew Cursor Agent or Gemini CLI.

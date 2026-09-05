@@ -161,7 +161,7 @@ describe('relaying a share', () => {
     expect(starts[0]?.prompt).toContain('Wren (Code & Migrations) sent you a message')
     expect(owners).toEqual([[BOOTY.teammateId, 'mission_1']])
     const started = notices.find((update) => update.kind === 'mission-started')
-    expect(started).toMatchObject({ kind: 'mission-started', teammateId: BOOTY.teammateId, hop: 1 })
+    expect(started).toMatchObject({ kind: 'mission-started', teammateId: BOOTY.teammateId, startedBy: { kind: 'relay', hop: 1 } })
   })
 
   it('a teammate who has never run borrows the sender\'s route, and the thread says so', async () => {

@@ -24,6 +24,9 @@ import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
 import { createModelCatalog } from './model-catalog.js'
 import { createTeammateStore } from './teammate-store.js'
+import { createRoutineStore } from './routine-store.js'
+import { createRoutineRunner } from './routine-runner.js'
+import type { RoutineRunner } from './routine-runner.js'
 import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { AppServerMissionService } from './app-server-mission.js'
@@ -52,6 +55,11 @@ import {
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
+  ROUTINE_LIST_CHANNEL,
+  ROUTINE_CREATE_CHANNEL,
+  ROUTINE_UPDATE_CHANNEL,
+  ROUTINE_REMOVE_CHANNEL,
+  ROUTINE_RUN_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
@@ -324,6 +332,7 @@ if (!ownsSingleInstanceLock) {
     })
     // Bound late: the relay starts runs through the service that calls it.
     let relay: Relay | undefined
+    let routineRunner: RoutineRunner | undefined
     const codexMissions = createCodexMissionService({
       workspacePath: process.cwd(),
       discover: discoverForWork,
@@ -335,6 +344,7 @@ if (!ownsSingleInstanceLock) {
       },
       onRunEnded: async (mission) => {
         await relay?.onRunEnded(mission)
+        await routineRunner?.onRunEnded(mission)
       }
     })
     // The approval transport. It only runs for the mode that asked for it, so
@@ -379,6 +389,7 @@ if (!ownsSingleInstanceLock) {
       },
       onRunEnded: async (mission) => {
         await relay?.onRunEnded(mission)
+        await routineRunner?.onRunEnded(mission)
       }
     })
     const sendToWindow = (update: CodexMissionUpdate): void => {
@@ -585,6 +596,31 @@ if (!ownsSingleInstanceLock) {
       notify: sendToWindow
     })
 
+    // Routines replay through the same start path a teammate's reply uses,
+    // so a replayed step is a real mission on the teammate's own route, in
+    // its own ledger, recorded as started by the routine.
+    const routines = createRoutineStore({ rootDirectory: app.getPath('userData') })
+    routineRunner = createRoutineRunner({
+      routines,
+      peerContextFor,
+      start: (input) =>
+        codexMissions.start(
+          input.prompt,
+          input.runtime,
+          input.mode,
+          input.model === undefined ? {} : { model: input.model },
+          sendToWindow,
+          undefined,
+          input.peer,
+          input.followUpOf,
+          undefined,
+          input.startedBy
+        ),
+      assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
+      phaseOf: async (missionId) => (await missionLedger.getMission(missionId))?.phase,
+      notify: sendToWindow
+    })
+
     ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
@@ -678,6 +714,8 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return teammateRejected('The teammate could not be removed.')
       try {
         await teammates.remove(teammateId)
+        // Their routines had nobody left to run them.
+        await routines.removeForTeammate(teammateId).catch(() => undefined)
         return { ok: true, data: {} } as const
       } catch {
         return teammateRejected('That teammate could not be removed.')
@@ -693,6 +731,61 @@ if (!ownsSingleInstanceLock) {
       } catch {
         return teammateRejected('That mission could not be assigned.')
       }
+    })
+
+    const routineRejected = (message: string) => ({ ok: false, error: { code: 'ROUTINE_REJECTED', message } }) as const
+
+    ipcMain.handle(ROUTINE_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'ROUTINES_UNAVAILABLE', message: 'Routines are unavailable.' } } as const
+      try {
+        return { ok: true, data: { routines: await routines.list() } } as const
+      } catch {
+        return { ok: false, error: { code: 'ROUTINES_UNAVAILABLE', message: 'Routines could not be read.' } } as const
+      }
+    })
+
+    ipcMain.handle(ROUTINE_CREATE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return routineRejected('The routine could not be saved.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        const routine = await routines.create({
+          name: input.name,
+          teammateId: input.teammateId,
+          route: input.route,
+          steps: input.steps,
+          learnedFrom: input.learnedFrom
+        })
+        return { ok: true, data: { routine } } as const
+      } catch (error) {
+        return routineRejected(error instanceof Error ? error.message : 'That routine could not be saved.')
+      }
+    })
+
+    ipcMain.handle(ROUTINE_UPDATE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return routineRejected('The routine could not be changed.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        const routine = await routines.update({ routineId: input.routineId, name: input.name, steps: input.steps })
+        return { ok: true, data: { routine } } as const
+      } catch (error) {
+        return routineRejected(error instanceof Error ? error.message : 'That routine could not be changed.')
+      }
+    })
+
+    ipcMain.handle(ROUTINE_REMOVE_CHANNEL, async (event, routineId: unknown) => {
+      if (!fromOwnWindow(event)) return routineRejected('The routine could not be removed.')
+      try {
+        await routines.remove(routineId)
+        return { ok: true, data: {} } as const
+      } catch {
+        return routineRejected('That routine could not be removed.')
+      }
+    })
+
+    ipcMain.handle(ROUTINE_RUN_CHANNEL, async (event, routineId: unknown) => {
+      if (!fromOwnWindow(event)) return routineRejected('The routine could not be started.')
+      if (typeof routineId !== 'string' || routineRunner === undefined) return routineRejected('That routine could not be started.')
+      return routineRunner.run(routineId)
     })
 
     ipcMain.handle(MISSION_HISTORY_CHANNEL, async (event) => {

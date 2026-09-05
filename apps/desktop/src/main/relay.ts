@@ -260,7 +260,7 @@ export function createRelay(options: RelayOptions): Relay {
       teammateId: recipient.self.teammateId,
       prompt: input.prompt,
       data: response.data,
-      hop: input.origin.hop
+      startedBy: { kind: 'relay', hop: input.origin.hop }
     })
     return { missionId: response.data.missionId }
   }

@@ -6,6 +6,7 @@ import type {
   AppUpdateState,
   MissionPruneResponse,
   PublicRecoveredMission,
+  PublicRoutine,
   PublicRuntimeStatus,
   PublicStorageReport,
   PublicTeammate
@@ -23,6 +24,7 @@ import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
 import { costLine, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
+import { routineRunSummary, routineStepLabel } from '../routines.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
@@ -35,6 +37,9 @@ function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: 
     </div>
   )
 }
+
+/** Between a routine's steps in its hover text, so each is readable on its own line. */
+const STEP_GAP = '\n\n'
 
 const FILTERS = ['All', 'Running', 'Interrupted', 'Completed'] as const
 type Filter = (typeof FILTERS)[number]
@@ -192,7 +197,12 @@ export function TeammatesScreen({
   onOpenMission,
   onNewTeammate,
   onEdit,
-  onRemove
+  onRemove,
+  routines,
+  routineStepByTeammate,
+  onRunRoutine,
+  onEditRoutine,
+  onRemoveRoutine
 }: {
   readonly teammates: readonly PublicTeammate[]
   /** Every recovered mission, so a card can say what its teammate has done. */
@@ -206,6 +216,13 @@ export function TeammatesScreen({
   readonly onNewTeammate: () => void
   readonly onEdit: (teammate: PublicTeammate) => void
   readonly onRemove: (teammateId: string) => void
+  /** Every routine on file. Each is filed under the teammate that runs it. */
+  readonly routines: readonly PublicRoutine[]
+  /** Which routine each teammate is replaying right now, if any. */
+  readonly routineStepByTeammate: Readonly<Record<string, { readonly name: string; readonly step: number; readonly of: number }>>
+  readonly onRunRoutine: (routineId: string) => void
+  readonly onEditRoutine: (routine: PublicRoutine) => void
+  readonly onRemoveRoutine: (routineId: string) => void
 }): ReactElement {
   return (
     <div className="lc-screen">
@@ -218,6 +235,8 @@ export function TeammatesScreen({
           {teammates.map((teammate) => {
             const owned = Object.values(missionOwners).filter((owner) => owner === teammate.teammateId).length
             const work = teammateWork(teammate.teammateId, missions, missionOwners, titleOf)
+            const theirRoutines = routines.filter((routine) => routine.teammateId === teammate.teammateId)
+            const replaying = routineStepByTeammate[teammate.teammateId]
             return (
               <div className="lc-rostercard" key={teammate.teammateId}>
                 <div className="lc-rostercard__head">
@@ -297,6 +316,46 @@ export function TeammatesScreen({
                         <span className="lc-rostercard__missiontitle">{entry.title}</span>
                         <span className="lc-rostercard__missionage lc-mono">{agoLabel(entry.at) ?? ''}</span>
                       </button>
+                    ))}
+                  </div>
+                )}
+                {/*
+                  * Routines: conversations this teammate has been taught, and
+                  * can replay. Shown here rather than in a screen of their own
+                  * because a routine belongs to a teammate -- it runs on their
+                  * route, with their permissions, and dies with them.
+                  */}
+                {theirRoutines.length > 0 && (
+                  <div className="lc-routinelist">
+                    <div className="lc-rostercard__recentlabel lc-mono">Routines</div>
+                    {theirRoutines.map((routine) => (
+                      <div className="lc-routinerow" key={routine.routineId}>
+                        <span className="lc-routinerow__name" title={routine.steps.join(STEP_GAP)}>
+                          {routine.name}
+                          <span className="lc-routinerow__meta lc-mono"> · {routineRunSummary(routine)}</span>
+                        </span>
+                        <button
+                          type="button"
+                          className="lc-ghostbutton"
+                          disabled={replaying !== undefined}
+                          title={
+                            replaying === undefined
+                              ? undefined
+                              : `${replaying.name} is running: ${routineStepLabel(replaying)}`
+                          }
+                          onClick={() => onRunRoutine(routine.routineId)}
+                        >
+                          Run
+                        </button>
+                        <span className="lc-routinerow__meta">
+                          <button type="button" className="lc-ghostbutton" onClick={() => onEditRoutine(routine)}>
+                            Edit
+                          </button>
+                          <button type="button" className="lc-ghostbutton" onClick={() => onRemoveRoutine(routine.routineId)}>
+                            Remove
+                          </button>
+                        </span>
+                      </div>
                     ))}
                   </div>
                 )}

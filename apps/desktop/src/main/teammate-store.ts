@@ -80,7 +80,7 @@ interface StoredFile {
 // point of having more than one, and the hop cap is what bounds the spend.
 const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true }
 
-function isTeammateRoute(value: unknown): value is TeammateRoute {
+export function isTeammateRoute(value: unknown): value is TeammateRoute {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Record<string, unknown>
   return (
@@ -130,7 +130,7 @@ export function validName(value: unknown): value is string {
   return trimmed.length > 0 && trimmed.length <= 40 && !/[\u0000-\u001f\u007f]/.test(trimmed)
 }
 
-function safeId(value: unknown): value is string {
+export function safeId(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value)
 }
 

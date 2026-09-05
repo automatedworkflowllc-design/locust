@@ -41,8 +41,53 @@ const COST = join(ROOT, 'src', 'renderer', 'src', 'cost.ts')
 const AGENT_TEXT = join(ROOT, 'src', 'renderer', 'src', 'agentText.ts')
 const TEAMMATE_WORK = join(ROOT, 'src', 'renderer', 'src', 'teammateWork.ts')
 const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
+const ROUTINE_RUNNER = join(ROOT, 'src', 'main', 'routine-runner.ts')
+const ROUTINE_STORE = join(ROOT, 'src', 'main', 'routine-store.ts')
+const ROUTINES_VIEW = join(ROOT, 'src', 'renderer', 'src', 'routines.ts')
 
 const MUTATIONS = [
+  {
+    file: ROUTINE_RUNNER,
+    name: 'a routine runs its next step even when the one before did not complete',
+    from: "      if (phase !== 'completed') {",
+    to: '      if (false) {',
+    expect: 'a step that failed, was stopped or was interrupted ends the routine there and says which'
+  },
+  {
+    file: ROUTINE_RUNNER,
+    name: 'a routine step starts a stranger instead of continuing the same conversation',
+    from: '      const response = await startStep(routine, peer, next, mission.missionId)',
+    to: '      const response = await startStep(routine, peer, next, undefined)',
+    expect: 'each later step follows up the one before it, and only after it COMPLETED'
+  },
+  {
+    file: ROUTINE_RUNNER,
+    name: 'two routines run at once for one teammate',
+    from: '      if (already !== undefined) {',
+    to: '      if (false) {',
+    expect: 'one routine at a time per teammate'
+  },
+  {
+    file: ROUTINE_STORE,
+    name: 'an empty step is saved, so a run would start with nothing to do',
+    from: '      && step.trim().length > 0\n',
+    to: '',
+    expect: "steps are the person's words: newlines allowed, empties and control bytes refused, count bounded"
+  },
+  {
+    file: ROUTINE_STORE,
+    name: 'editing a routine rewrites the teammate and route it was learned on',
+    from: '        const next: PublicRoutine = { ...held, name: input.name.trim(), steps: [...input.steps] }',
+    to: "        const next: PublicRoutine = { ...held, name: input.name.trim(), steps: [...input.steps], teammateId: 'tm_other' }",
+    expect: 'creates, lists, gets, corrects, counts runs and removes'
+  },
+  {
+    file: ROUTINES_VIEW,
+    name: "a host-written turn is saved as one of the person's steps",
+    from: '    if (held?.startedBy !== undefined) continue',
+    to: '    if (false) continue',
+    expect: 'drops turns the HOST wrote, whatever started them'
+  },
   {
     file: CMDLEN,
     name: 'a command that cannot fit is launched anyway, to fail as cmd.exe sees fit',
@@ -1233,6 +1278,9 @@ const originals = new Map([
   [ANTIGRAVITY, readFileSync(ANTIGRAVITY, 'utf8')],
   [COST, readFileSync(COST, 'utf8')],
   [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')],
+  [ROUTINE_RUNNER, readFileSync(ROUTINE_RUNNER, 'utf8')],
+  [ROUTINE_STORE, readFileSync(ROUTINE_STORE, 'utf8')],
+  [ROUTINES_VIEW, readFileSync(ROUTINES_VIEW, 'utf8')],
   [AGENT_TEXT, readFileSync(AGENT_TEXT, 'utf8')],
   [TEAMMATE_WORK, readFileSync(TEAMMATE_WORK, 'utf8')]
 ])

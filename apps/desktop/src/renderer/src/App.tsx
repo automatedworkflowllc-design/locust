@@ -19,11 +19,16 @@ import type {
   MissionMode,
   PublicModel,
   PublicPeerMessage,
+  PublicRoutine,
   PublicTeammate,
   TeammateHue,
-  TeammateRole
+  TeammateRole,
+  TeammateRoute
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
+import { routineDraft } from './routines.js'
+import type { RoutineDraft } from './routines.js'
+import { RoutineDialog } from './components/RoutineDialog.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { Composer } from './components/Composer.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
@@ -374,6 +379,18 @@ export default function App(): ReactElement {
    * place, and a running mission cannot be deleted at all -- the host would
    * refuse it anyway, and saying so here beats an error card afterwards.
    */
+  /**
+   * The routine this conversation would make, if any. Read through the refs
+   * because the row menu is built before the memoised history exists, and a
+   * menu item that promises an action the app cannot perform is worse than
+   * one that says why it is unavailable.
+   */
+  const routineDraftFor = (missionId: string): RoutineDraft | undefined => {
+    const mission = historyByIdRef.current.get(missionId)
+    if (mission === undefined || missionOwnersRef.current[missionId] === undefined) return undefined
+    return routineDraft(mission, historyByIdRef.current)
+  }
+
   const openMissionMenu = (missionId: string, at: { readonly x: number; readonly y: number }): void => {
     const live = [...runsRef.current.values()].some(
       (run) => liveRunIsActive(run) && run.data?.missionId === missionId
@@ -391,6 +408,18 @@ export default function App(): ReactElement {
           onSelect: () => {
             void navigator.clipboard.writeText(missionId).catch(() => undefined)
           }
+        },
+        {
+          label: 'Save as routine',
+          // Only where there is something to replay: a conversation whose
+          // turns were all written by the host has no words of the person's
+          // in it, and one still running has not finished the work yet.
+          ...(live
+            ? { disabledReason: 'This mission is still running. It can be saved when it finishes.' }
+            : routineDraftFor(missionId) === undefined
+              ? { disabledReason: 'Nothing here was typed by you, so there are no steps to replay.' }
+              : {}),
+          onSelect: () => openSaveRoutine(missionId)
         },
         {
           label: 'Delete',
@@ -472,6 +501,19 @@ export default function App(): ReactElement {
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
+  const [routines, setRoutines] = useState<readonly PublicRoutine[]>([])
+  /** The save/edit dialog, open on a draft taken from a conversation or on a routine already saved. */
+  const [routineDialog, setRoutineDialog] = useState<{
+    readonly teammateId: string
+    readonly routineId?: string
+    readonly name: string
+    readonly steps: readonly string[]
+    readonly learnedFrom: readonly string[]
+    readonly truncated: boolean
+    readonly route?: TeammateRoute
+    readonly busy: boolean
+    readonly error?: string
+  }>()
   /** The teammate being edited in the same dialog, when it is open for editing. */
   const [editingTeammate, setEditingTeammate] = useState<PublicTeammate>()
   const [inspectorOpen, setInspectorOpen] = useState(false)
@@ -623,7 +665,7 @@ export default function App(): ReactElement {
             events: [],
             teammateId: update.teammateId,
             peerMessages: update.data.peerMessages,
-            startedBy: { kind: 'relay' as const, hop: update.hop },
+            startedBy: update.startedBy,
             ...(update.data.followsUp === undefined
               ? {}
               : {
@@ -716,6 +758,16 @@ export default function App(): ReactElement {
       })
       .catch(() => {
         // The roster is optional at startup; missions still run without it.
+      })
+
+    void bridge
+      .listRoutines()
+      .then((response) => {
+        if (!active || !response.ok) return
+        setRoutines(response.data.routines)
+      })
+      .catch(() => {
+        // Routines are optional too: without them the app is what it was.
       })
 
     void bridge
@@ -1160,16 +1212,102 @@ export default function App(): ReactElement {
       .catch(() => setTeammateError('That teammate could not be updated.'))
   }
 
+  const reloadRoutines = async (): Promise<void> => {
+    const bridge = window.desktop
+    if (!bridge) return
+    const listed = await bridge.listRoutines()
+    if (listed.ok) setRoutines(listed.data.routines)
+  }
+
+  /** Open the dialog on a draft taken from a finished conversation. */
+  const openSaveRoutine = (missionId: string): void => {
+    const mission = historyByIdRef.current.get(missionId)
+    if (mission === undefined) return
+    const draft = routineDraftFor(missionId)
+    const teammateId = missionOwnersRef.current[missionId]
+    if (draft === undefined || teammateId === undefined) return
+    const teammate = teammates.find((entry) => entry.teammateId === teammateId)
+    setRoutineDialog({
+      teammateId,
+      name: draft.name,
+      steps: draft.steps,
+      learnedFrom: draft.learnedFrom,
+      truncated: draft.truncated,
+      // The route the routine will replay on: the teammate's own, else the
+      // one this conversation actually ran on. Never a guess.
+      route: teammate?.route ?? { runtime: mission.runtime, model: mission.model ?? 'account-default', mode: 'ask' },
+      busy: false
+    })
+  }
+
+  const saveRoutine = (input: { readonly name: string; readonly steps: readonly string[] }): void => {
+    const bridge = window.desktop
+    const dialog = routineDialog
+    if (!bridge || dialog === undefined) return
+    setRoutineDialog({ ...dialog, busy: true, error: undefined })
+    const request =
+      dialog.routineId === undefined
+        ? bridge.createRoutine({
+            name: input.name,
+            teammateId: dialog.teammateId,
+            route: dialog.route ?? { runtime: 'codex', model: 'account-default', mode: 'ask' },
+            steps: input.steps,
+            learnedFrom: dialog.learnedFrom
+          })
+        : bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps })
+    void request
+      .then(async (response) => {
+        if (!response.ok) {
+          setRoutineDialog({ ...dialog, busy: false, error: response.error.message })
+          return
+        }
+        setRoutineDialog(undefined)
+        await reloadRoutines()
+      })
+      .catch(() => setRoutineDialog({ ...dialog, busy: false, error: 'That routine could not be saved.' }))
+  }
+
+  const runRoutine = (routineId: string): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .runRoutine(routineId)
+      .then(async (response) => {
+        if (!response.ok) {
+          setTeammateError(response.error.message)
+          return
+        }
+        setTeammateError(undefined)
+        // Follow the routine into the thread it is running in, the way the
+        // view follows a teammate's reply.
+        setScreen('workroom')
+        openMission(response.data.missionId)
+        await reloadRoutines()
+      })
+      .catch(() => setTeammateError('That routine could not be started.'))
+  }
+
+  const removeRoutine = (routineId: string): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .removeRoutine(routineId)
+      .then(() => reloadRoutines())
+      .catch(() => undefined)
+  }
+
   const removeTeammate = (teammateId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
     void bridge
       .removeTeammate(teammateId)
       .then(() => bridge.listTeammates())
-      .then((listed) => {
+      .then(async (listed) => {
         if (!listed.ok) return
         setTeammates(listed.data.teammates)
         setMissionOwners(listed.data.missionOwners)
+        // Their routines went with them; the host drops those, so re-read.
+        await reloadRoutines()
       })
       .catch(() => undefined)
   }
@@ -1385,6 +1523,22 @@ export default function App(): ReactElement {
     const owner = run === undefined ? undefined : ownerOf(run)
     if (owner !== undefined) pendingApprovalsByOwner.set(owner, (pendingApprovalsByOwner.get(owner) ?? 0) + 1)
   }
+  // Which teammate is replaying a routine, and which step it is on. DERIVED
+  // from the runs that are actually live rather than tracked alongside them:
+  // a step that ended stops being reported because its run stopped running,
+  // so the label can never outlive the work it describes.
+  const routineStepByTeammate: Record<string, { readonly name: string; readonly step: number; readonly of: number }> = {}
+  for (const run of runs.values()) {
+    const startedBy = run.startedBy
+    if (!liveRunIsActive(run) || startedBy?.kind !== 'routine' || run.teammateId === undefined) continue
+    const routine = routines.find((entry) => entry.routineId === startedBy.routineId)
+    if (routine === undefined) continue
+    routineStepByTeammate[run.teammateId] = {
+      name: routine.name,
+      step: startedBy.step,
+      of: routine.steps.length
+    }
+  }
   // And each teammate's face, decided once here with the same inputs the
   // sidebar uses, for the surfaces that do not compute their own status.
   const activityByTeammate: Record<string, FaceActivity> = {}
@@ -1424,6 +1578,7 @@ export default function App(): ReactElement {
           runtimes={runtimes}
           missions={sidebarMissions}
           teammates={teammates}
+          routineStepByTeammate={routineStepByTeammate}
           missionOwners={missionOwners}
           selectedMissionId={liveRun?.data?.missionId ?? shownKey}
           selectedTeammateId={selectedTeammate?.teammateId}
@@ -1473,6 +1628,21 @@ export default function App(): ReactElement {
                 setScreen('workroom')
                 openMission(missionId)
               }}
+              routines={routines}
+              routineStepByTeammate={routineStepByTeammate}
+              onRunRoutine={runRoutine}
+              onRemoveRoutine={removeRoutine}
+              onEditRoutine={(routine) =>
+                setRoutineDialog({
+                  teammateId: routine.teammateId,
+                  routineId: routine.routineId,
+                  name: routine.name,
+                  steps: routine.steps,
+                  learnedFrom: routine.learnedFrom,
+                  truncated: false,
+                  busy: false
+                })
+              }
               onNewTeammate={() => {
                 setTeammateError(undefined)
                 setNewTeammateOpen(true)
@@ -1835,6 +2005,24 @@ export default function App(): ReactElement {
           error={teammateError}
           onCancel={() => setEditingTeammate(undefined)}
           onCreate={(input) => updateTeammate(editingTeammate.teammateId, input)}
+        />
+      )}
+      {routineDialog !== undefined && (
+        <RoutineDialog
+          key={routineDialog.routineId ?? 'new'}
+          teammate={teammates.find((entry) => entry.teammateId === routineDialog.teammateId)}
+          initialName={routineDialog.name}
+          initialSteps={routineDialog.steps}
+          truncated={routineDialog.truncated}
+          routeLabel={
+            routineDialog.route === undefined
+              ? undefined
+              : `${runtimeDisplayName(routineDialog.route.runtime)} / ${routineDialog.route.model}`
+          }
+          busy={routineDialog.busy}
+          error={routineDialog.error}
+          onCancel={() => setRoutineDialog(undefined)}
+          onSave={saveRoutine}
         />
       )}
     </div>

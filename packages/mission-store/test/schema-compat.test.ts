@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(12)
-    expect(header.schemaVersion).toBe(12)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(13)
+    expect(header.schemaVersion).toBe(13)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -446,6 +446,49 @@ describe('ledger schema versions', () => {
     expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
   })
 
+  it('round-trips a routine starter at the current version', async () => {
+    const root = await temporaryRoot()
+    await createFileMissionLedger({ rootDirectory: root }).createMission(
+      v1Metadata({ startedBy: { kind: 'routine', routineId: 'rt_abc', step: 2 } }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.startedBy).toEqual({ kind: 'routine', routineId: 'rt_abc', step: 2 })
+  })
+
+  it('refuses a routine starter with no routine id or a step below 1', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await expect(
+      ledger.createMission(v1Metadata({ startedBy: { kind: 'routine', routineId: '', step: 1 } }) as unknown as MissionLedgerMetadata)
+    ).rejects.toThrow()
+    await expect(
+      ledger.createMission(v1Metadata({ startedBy: { kind: 'routine', routineId: 'rt_abc', step: 0 } }) as unknown as MissionLedgerMetadata)
+    ).rejects.toThrow()
+  })
+
+  it('refuses a routine starter in a file written before version 13', async () => {
+    const root = await temporaryRoot()
+    // A v12 file knew relay and resume; a routine starter there was hand-edited.
+    const metadata = v1Metadata({ startedBy: { kind: 'routine', routineId: 'rt_abc', step: 1 } })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 12,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}
+`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
   it('round-trips a resume starter at the current version', async () => {
     const root = await temporaryRoot()
     await createFileMissionLedger({ rootDirectory: root }).createMission(
@@ -584,7 +627,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 13,
+        schemaVersion: 14,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

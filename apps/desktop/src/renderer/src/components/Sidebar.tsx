@@ -18,6 +18,7 @@ import {
 } from '../status.js'
 import { PixelFace } from './PixelFace.js'
 import { Icon } from './Icon.js'
+import { routineStepLabel } from '../routines.js'
 
 export interface SidebarMission {
   /**
@@ -63,6 +64,7 @@ export function Sidebar({
   runtimes,
   missions,
   teammates,
+  routineStepByTeammate,
   missionOwners,
   selectedMissionId,
   selectedTeammateId,
@@ -82,6 +84,8 @@ export function Sidebar({
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
   readonly teammates: readonly PublicTeammate[]
+  /** Which routine each teammate is replaying right now, if any. */
+  readonly routineStepByTeammate: Readonly<Record<string, { readonly name: string; readonly step: number; readonly of: number }>>
   readonly missionOwners: Readonly<Record<string, string>>
   readonly selectedMissionId: string | undefined
   /** Who the composer is addressing. Selecting a teammate makes them the next mission's owner. */
@@ -194,6 +198,16 @@ export function Sidebar({
                   <span className={`lc-row__meta lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
                     {status.label}
                   </span>
+                  {/*
+                    * Which step of which routine is running. Derived in the
+                    * shell from the live runs, so it disappears when the work
+                    * does rather than being cleared by hand.
+                    */}
+                  {routineStepByTeammate[teammate.teammateId] !== undefined && (
+                    <span className="lc-row__route lc-mono" title={routineStepByTeammate[teammate.teammateId]!.name}>
+                      {routineStepLabel(routineStepByTeammate[teammate.teammateId]!)}
+                    </span>
+                  )}
                   {teammate.route !== undefined && (
                     // Which model this teammate IS. People pit models against
                     // each other on purpose, and that only reads if each row

@@ -20,6 +20,11 @@ import {
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
+  ROUTINE_LIST_CHANNEL,
+  ROUTINE_CREATE_CHANNEL,
+  ROUTINE_UPDATE_CHANNEL,
+  ROUTINE_REMOVE_CHANNEL,
+  ROUTINE_RUN_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
@@ -51,7 +56,12 @@ import type {
   TeammateCreateRequest,
   TeammateListResponse,
   TeammateMutationResponse,
-  TeammateUpdateRequest
+  TeammateUpdateRequest,
+  RoutineCreateRequest,
+  RoutineListResponse,
+  RoutineMutationResponse,
+  RoutineRunResponse,
+  RoutineUpdateRequest
 } from '../shared/ipc.js'
 
 export type {
@@ -116,6 +126,14 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TEAMMATE_UPDATE_CHANNEL, request) as Promise<TeammateMutationResponse>,
   assignMission: (teammateId: string, missionId: string) =>
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
+  listRoutines: () => ipcRenderer.invoke(ROUTINE_LIST_CHANNEL) as Promise<RoutineListResponse>,
+  createRoutine: (request: RoutineCreateRequest) =>
+    ipcRenderer.invoke(ROUTINE_CREATE_CHANNEL, request) as Promise<RoutineMutationResponse>,
+  updateRoutine: (request: RoutineUpdateRequest) =>
+    ipcRenderer.invoke(ROUTINE_UPDATE_CHANNEL, request) as Promise<RoutineMutationResponse>,
+  removeRoutine: (routineId: string) =>
+    ipcRenderer.invoke(ROUTINE_REMOVE_CHANNEL, routineId) as Promise<RoutineMutationResponse>,
+  runRoutine: (routineId: string) => ipcRenderer.invoke(ROUTINE_RUN_CHANNEL, routineId) as Promise<RoutineRunResponse>,
   startCodexMission: (request: CodexMissionStartRequest) =>
     ipcRenderer.invoke(CODEX_MISSION_START_CHANNEL, request) as Promise<CodexMissionStartResponse>,
   cancelCodexMission: (request: CodexMissionCancelRequest) =>

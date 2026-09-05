@@ -183,6 +183,24 @@ function check(tokensCss, componentFiles, shellCss = '') {
     if (file.endsWith('.css')) failures.push(...faintTextFindings(file, source))
   }
 
+  // A custom property nobody defines is not an error in CSS -- the
+  // declaration is simply dropped, so the element keeps whatever it
+  // inherited and the page looks almost right. MEASURED 2026-09-05: two new
+  // rules shipped `color: var(--ink-faint)`, a token from a different
+  // project's stylesheet, and this gate passed because it only knew how to
+  // look for the faint token by name. Every var() a stylesheet uses must be
+  // one this app defines.
+  const defined = new Set([...`${tokensCss}\n${shellCss}`.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]))
+  for (const [file, source] of [['shell.css', shellCss], ...componentFiles]) {
+    if (!file.endsWith('.css')) continue
+    for (const match of source.matchAll(/var\((--[\w-]+)/g)) {
+      // A var() with a fallback still paints something, so it is not a silent drop.
+      if (!defined.has(match[1]) && !new RegExp(`var\\(\\s*${match[1]}\\s*,`).test(source)) {
+        failures.push(`${file}: var(${match[1]}) is never defined -- the declaration is silently dropped`)
+      }
+    }
+  }
+
   const appSurfaceText = `${tokensCss}\n${componentFiles.map(([, source]) => source).join('\n')}`.toLowerCase()
   for (const banned of FORBIDDEN_IN_APP) {
     if (appSurfaceText.includes(banned)) {

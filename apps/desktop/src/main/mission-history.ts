@@ -111,7 +111,15 @@ export function publicRecoveredMission(
       ? {}
       : mission.metadata.startedBy.kind === 'relay'
         ? { startedBy: { kind: 'relay' as const, hop: mission.metadata.startedBy.hop } }
-        : { startedBy: { kind: 'resume' as const, epoch: mission.metadata.startedBy.epoch } })
+        : mission.metadata.startedBy.kind === 'routine'
+          ? {
+              startedBy: {
+                kind: 'routine' as const,
+                routineId: mission.metadata.startedBy.routineId,
+                step: mission.metadata.startedBy.step
+              }
+            }
+          : { startedBy: { kind: 'resume' as const, epoch: mission.metadata.startedBy.epoch } })
   }
 }
 

@@ -6,6 +6,31 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.19.0 — 2026-09-05
+
+- **Routines: teach a teammate a job once, then hand it back any time.**
+  Right-click a finished conversation and choose *Save as routine*. The
+  dialog arrives already filled in with what you typed on each turn, in
+  order, so you are editing rather than writing. Press Run on the Team
+  screen and the teammate replays it: step one starts, and each later step
+  starts only when the one before it **completed**. A step that fails, is
+  stopped, or is interrupted ends the routine there and says which step and
+  why, rather than building the next step on work that never happened.
+  - A routine belongs to a teammate and replays on the route it was learned
+    on, so one saved read-only stays read-only.
+  - Corrections are the point: edit the name or any step, and the next run
+    uses the corrected version. Editing cannot move a routine to another
+    teammate, change what it runs on, or lose where it came from.
+  - Every replayed run is recorded as one, with the routine and the step
+    number in the mission's own header, so a shared record never reads as
+    though a person asked for it.
+  - The sidebar says which step is running, read from the runs themselves,
+    so the label cannot outlive the work.
+  - **What this is not:** a teammate still cannot watch you work outside
+    Locust. It has no view of your editor, browser or terminal. It can only
+    learn from work it did with you, which every mission already records.
+    That is the honest version of the feature, and it is most of the value.
+
 ## 0.18.3 — 2026-09-05
 
 Found by using the app as a new person would, in a fresh profile, with the

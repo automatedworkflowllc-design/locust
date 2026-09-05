@@ -103,6 +103,11 @@ export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
 export const TEAMMATE_UPDATE_CHANNEL = 'teammates:update'
 export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
+export const ROUTINE_LIST_CHANNEL = 'routines:list'
+export const ROUTINE_CREATE_CHANNEL = 'routines:create'
+export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
+export const ROUTINE_REMOVE_CHANNEL = 'routines:remove'
+export const ROUTINE_RUN_CHANNEL = 'routines:run'
 export const MODEL_CATALOG_CHANNEL = 'models:list'
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
@@ -212,6 +217,54 @@ export type TeammateListResponse =
 export type TeammateMutationResponse =
   | { readonly ok: true; readonly data: { readonly teammate?: PublicTeammate } }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATE_REJECTED'; readonly message: string } }
+
+/**
+ * A routine: a conversation a person saved as steps a teammate can replay.
+ * The teammate cannot watch a person work outside the app; what it can learn
+ * from is work it did WITH them, which every mission already records. So a
+ * routine is the words typed on each turn of one conversation, in order,
+ * editable, tied to the teammate and the route it was learned on.
+ */
+export interface PublicRoutine {
+  readonly routineId: string
+  readonly name: string
+  readonly teammateId: string
+  /** The route the routine was learned on and replays on: a read-only routine stays read-only. */
+  readonly route: TeammateRoute
+  /** What the person typed on each turn, in order. Corrections are edits here. */
+  readonly steps: readonly string[]
+  /** The missions the steps were taken from, oldest first. A routine can always show where it came from. */
+  readonly learnedFrom: readonly string[]
+  readonly createdAt: string
+  readonly runs: number
+  readonly lastRunAt?: string
+}
+
+export interface RoutineCreateRequest {
+  readonly name: string
+  readonly teammateId: string
+  readonly route: TeammateRoute
+  readonly steps: readonly string[]
+  readonly learnedFrom: readonly string[]
+}
+
+export interface RoutineUpdateRequest {
+  readonly routineId: string
+  readonly name: string
+  readonly steps: readonly string[]
+}
+
+export type RoutineListResponse =
+  | { readonly ok: true; readonly data: { readonly routines: readonly PublicRoutine[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROUTINES_UNAVAILABLE'; readonly message: string } }
+
+export type RoutineMutationResponse =
+  | { readonly ok: true; readonly data: { readonly routine?: PublicRoutine } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROUTINE_REJECTED'; readonly message: string } }
+
+export type RoutineRunResponse =
+  | { readonly ok: true; readonly data: { readonly missionId: string; readonly runId: string } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROUTINE_REJECTED'; readonly message: string } }
 export type RuntimeAuthState = 'authenticated' | 'unauthenticated' | 'unknown' | 'not-applicable'
 export type RuntimeProbeStatus = 'ready' | 'not-installed' | 'auth-required' | 'offline' | 'probe-failed'
 
@@ -542,8 +595,10 @@ export type CodexMissionUpdate =
       readonly teammateId: string
       readonly prompt: string
       readonly data: CodexMissionStartData
-      /** Which automatic hop of the exchange this is. */
-      readonly hop: number
+      /** Who started it: a relay hop of an exchange, or one step of a routine being replayed. */
+      readonly startedBy:
+        | { readonly kind: 'relay'; readonly hop: number }
+        | { readonly kind: 'routine'; readonly routineId: string; readonly step: number }
     }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */
   | {
@@ -625,6 +680,12 @@ export interface PublicRecoveredMission {
         readonly kind: 'resume'
         readonly epoch: number
       }
+    | {
+        /** One step of a routine a person saved, replayed by the host. */
+        readonly kind: 'routine'
+        readonly routineId: string
+        readonly step: number
+      }
 }
 
 export type MissionHistoryResponse =
@@ -676,6 +737,12 @@ export interface DesktopApi {
   updateTeammate(request: TeammateUpdateRequest): Promise<TeammateMutationResponse>
   removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
+  listRoutines(): Promise<RoutineListResponse>
+  createRoutine(request: RoutineCreateRequest): Promise<RoutineMutationResponse>
+  updateRoutine(request: RoutineUpdateRequest): Promise<RoutineMutationResponse>
+  removeRoutine(routineId: string): Promise<RoutineMutationResponse>
+  /** Replay a routine: its first step starts now, each later step when the one before completes. */
+  runRoutine(routineId: string): Promise<RoutineRunResponse>
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */
   listModels(): Promise<ModelCatalogResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>
