@@ -30,7 +30,8 @@ import type {
   MemoryScope,
   MemoryUpdateRequest,
   PublicMemory,
-  PublicRuntimeSetup
+  PublicRuntimeSetup,
+  PublicWorkspaceBrief
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
@@ -629,6 +630,7 @@ export default function App(): ReactElement {
   const [memoryNotice, setMemoryNotice] = useState<string>()
   /** Each runtime's own MCP servers and hooks, read once at boot and again when Settings opens. */
   const [runtimeSetup, setRuntimeSetup] = useState<Readonly<Record<string, PublicRuntimeSetup>>>()
+  const [workspaceBrief, setWorkspaceBrief] = useState<PublicWorkspaceBrief | null>()
   /**
    * What a person typed while a mission was running, waiting to go as the
    * next turn. Kept against the RUN it was typed at, not the teammate, so it
@@ -730,7 +732,9 @@ export default function App(): ReactElement {
     void window.desktop
       ?.readRuntimeSetup()
       .then((response) => {
-        if (response.ok) setRuntimeSetup(response.data.runtimes)
+        if (!response.ok) return
+        setRuntimeSetup(response.data.runtimes)
+        setWorkspaceBrief(response.data.workspaceBrief)
       })
       .catch(() => undefined)
   }
@@ -1022,7 +1026,9 @@ export default function App(): ReactElement {
     void bridge
       .readRuntimeSetup()
       .then((response) => {
-        if (active && response.ok) setRuntimeSetup(response.data.runtimes)
+        if (!active || !response.ok) return
+        setRuntimeSetup(response.data.runtimes)
+        setWorkspaceBrief(response.data.workspaceBrief)
       })
       .catch(() => {
         // A runtime's own configuration is shown when it can be read, never guessed.
@@ -2320,6 +2326,7 @@ export default function App(): ReactElement {
               runtimes={runtimes}
               limitedRuntimes={limitedRuntimes}
               runtimeSetup={runtimeSetup}
+              workspaceBrief={workspaceBrief}
               ledgerPath={undefined}
               build={build}
               storage={storage}

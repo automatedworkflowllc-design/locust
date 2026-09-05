@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.29.0 — 2026-09-05
+
+- **One instruction file for the whole team: LOCUST.md.** Put a LOCUST.md
+  at the root of the project folder and every teammate, on every runtime,
+  is given it before each mission -- the file they all read in common,
+  beside each runtime's own CLAUDE.md, AGENTS.md or rules. Read fresh at
+  every start, so an edit lands on the next mission. Bounded at 200 lines,
+  and the brief says when the rest was cut. Settings shows whether one was
+  read and how much of it.
+
 ## 0.28.1 — 2026-09-05
 
 - **Two more things reach the desk while you are away.** A teammate that

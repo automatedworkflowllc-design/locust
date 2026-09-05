@@ -32,6 +32,7 @@ import { taskSection } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { readRuntimeSetup } from './runtime-setup.js'
+import { briefSection, readWorkspaceBrief } from './workspace-brief.js'
 import { createMemoryReader } from './memory-reader.js'
 import { createAttentionReader } from './attention-reader.js'
 import type { AttentionReader } from './attention-reader.js'
@@ -393,10 +394,21 @@ if (!ownsSingleInstanceLock) {
     const memories = createMemoryStore({ rootDirectory: app.getPath('userData') })
     const memoryWorkspaceId = workspaceChosen ? workspaceIdFor(workspacePath) : 'ws_none'
     const memoryWorkspaceName = workspaceChosen ? basename(workspacePath) || workspacePath : 'no folder'
+    // The folder's own LOCUST.md rides in the same slot, first: read fresh at
+    // every start so an edit lands on the next mission (parity row 45).
     const memoryBriefing: MemoryBriefing = {
       section: async (peer) => {
+        if (!workspaceChosen) return undefined
+        const sections: string[] = []
+        const brief = await readWorkspaceBrief(workspacePath).catch(() => undefined)
+        if (brief !== undefined) sections.push(briefSection(brief, memoryWorkspaceName))
         const settings = await teammates.readSettings()
-        if (settings.memoryMode === 'off' || !workspaceChosen) return undefined
+        if (settings.memoryMode !== 'off') sections.push(await memoryPart(peer))
+        return sections.length === 0 ? undefined : sections.join('\n\n')
+      }
+    }
+    async function memoryPart(peer: MissionPeerContext): Promise<string> {
+        const settings = await teammates.readSettings()
         const listed = await memories.briefed(memoryWorkspaceId)
         return memorySection({
           selfName: peer.self.name,
@@ -409,7 +421,6 @@ if (!ownsSingleInstanceLock) {
           })),
           askFirst: settings.memoryMode === 'ask'
         })
-      }
     }
     const workroom = createFileWorkroom({
       rootDirectory: join(app.getPath('userData'), 'workroom')
@@ -1275,7 +1286,14 @@ if (!ownsSingleInstanceLock) {
         return { ok: false, error: { code: 'SETUP_UNAVAILABLE', message: 'The request was rejected.' } } as const
       }
       try {
-        return { ok: true, data: { runtimes: await readRuntimeSetup({ workspacePath: workspaceChosen ? workspacePath : undefined }) } } as const
+        const brief = workspaceChosen ? await readWorkspaceBrief(workspacePath).catch(() => undefined) : undefined
+        return {
+          ok: true,
+          data: {
+            runtimes: await readRuntimeSetup({ workspacePath: workspaceChosen ? workspacePath : undefined }),
+            workspaceBrief: brief === undefined ? null : { lines: brief.lines, truncated: brief.truncated }
+          }
+        } as const
       } catch {
         return { ok: false, error: { code: 'SETUP_UNAVAILABLE', message: 'The runtimes\' own configuration could not be read.' } } as const
       }

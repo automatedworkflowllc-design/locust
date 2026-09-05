@@ -11,7 +11,8 @@ import type {
   PublicStorageReport,
   PublicTeammate,
   MemoryMode,
-  PublicRuntimeSetup
+  PublicRuntimeSetup,
+  PublicWorkspaceBrief
 } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import {
@@ -594,6 +595,7 @@ export function SettingsScreen({
   runtimes,
   limitedRuntimes,
   runtimeSetup,
+  workspaceBrief,
   workspacePath,
   onChooseFolder,
   ledgerPath,
@@ -619,6 +621,8 @@ export function SettingsScreen({
   readonly limitedRuntimes: ReadonlyMap<string, string>
   /** Each runtime's own MCP servers and hooks, by runtime id; undefined until read. */
   readonly runtimeSetup: Readonly<Record<string, PublicRuntimeSetup>> | undefined
+  /** The folder's LOCUST.md as last read: null when none, undefined until the host has answered. */
+  readonly workspaceBrief: PublicWorkspaceBrief | null | undefined
   /** The folder every teammate works in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly onChooseFolder: () => void
@@ -683,6 +687,16 @@ export function SettingsScreen({
               {workspacePath === undefined ? 'Choose folder' : 'Change'}
             </button>
           </div>
+          {workspacePath !== undefined && workspaceBrief !== undefined && (
+            <div className="lc-policyrow">
+              <span className="lc-tag">LOCUST.md</span>
+              <span className="lc-settings__note">
+                {workspaceBrief === null
+                  ? 'None in this folder. Add a LOCUST.md at its root and every teammate, on every runtime, is given it before each mission.'
+                  : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' -- longer than 200 lines, so the rest is not loaded' : ''}.`}
+              </span>
+            </div>
+          )}
         </section>
 
         <section className="lc-settings__section">

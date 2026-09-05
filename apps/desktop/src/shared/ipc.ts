@@ -60,8 +60,17 @@ export interface PublicRuntimeSetup {
   readonly unreadable: readonly string[]
 }
 
+/** The folder's LOCUST.md as the host last read it: how much, and whether the rest was cut. Null when there is none. */
+export interface PublicWorkspaceBrief {
+  readonly lines: number
+  readonly truncated: boolean
+}
+
 export type RuntimeSetupResponse =
-  | { readonly ok: true; readonly data: { readonly runtimes: Readonly<Record<string, PublicRuntimeSetup>> } }
+  | {
+      readonly ok: true
+      readonly data: { readonly runtimes: Readonly<Record<string, PublicRuntimeSetup>>; readonly workspaceBrief: PublicWorkspaceBrief | null }
+    }
   | { readonly ok: false; readonly error: { readonly code: 'SETUP_UNAVAILABLE'; readonly message: string } }
 
 export type MemoryListResponse =
