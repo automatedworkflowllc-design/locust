@@ -34,6 +34,8 @@ const askMode = `(async () => {
   await new Promise(r => setTimeout(r, 300))
   const choice = [...document.querySelectorAll('[role=menuitemradio]')].find(b => /^Ask\\b/.test(b.innerText.trim()))
   if (choice) choice.click()
+  // No read-only on this runtime: leave the menu the way a person would.
+  else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   await new Promise(r => setTimeout(r, 300))
   return mode.innerText.replace(/\\s+/g, ' ').trim()
 })()`
