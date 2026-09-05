@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
@@ -35,8 +36,15 @@ export function ApprovalCard({
         ? 'Yes for tracked files, if the workspace is under version control.'
         : 'Nothing is changed by answering.'
 
+  // A card that waits on the person is brought into view when it appears.
+  // Its buttons sat below the fold while the run said "waiting on you"
+  // (seen driving the app, 2026-09-05).
+  const root = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    root.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [])
   return (
-    <div className="lc-card is-pending is-amber" role="group" aria-label="Approval required">
+    <div ref={root} className="lc-card is-pending is-amber" role="group" aria-label="Approval required">
       <div className="lc-card__head">
         <span className="lc-approval__title">
           <Icon name="shield" size={13} />{' '}

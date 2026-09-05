@@ -6,6 +6,25 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.32.0 — 2026-09-05
+
+- **Locust makes a folder when none is chosen.** Opened from the Start
+  menu with no folder picked, it now works in Documents\Locust, the way a
+  terminal always has a working directory, and says so where the folder is
+  named. Any other folder is one click away in Settings.
+- **Settings reads in one screen fewer.** Each section opens with one line
+  and folds its explanation under "How it works"; the folder, its LOCUST.md
+  and Own branches sit in one card; runtimes list with the version beside
+  the name; the switches sit in aligned rows.
+- **The window icon is Locust's.** The taskbar showed Electron's icon,
+  because the icon file was not shipped in the package.
+- **An approved Codex edit shows its diff in the activity fold.** The row
+  read "did not report the change" after the card had shown the change.
+- **The approval card scrolls into view when it appears.**
+- **Small things seen driving the app:** a mission that failed before it
+  started said "Codex CLI" in its header whatever route it was sent to; the
+  "Thinking" row showed an item type as if it were a tool.
+
 ## 0.31.1 — 2026-09-05
 
 - **A teammate on its own branch reads like one in the folder.** The

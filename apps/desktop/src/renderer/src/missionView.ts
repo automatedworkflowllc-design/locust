@@ -599,9 +599,14 @@ export function buildThread(
         // put "skill descriptions were shortened" back in every thread.
         if (event.payload.stepKind !== 'turn') workBegan = true
         const message = event.payload.message
+        // A message item is the model writing, not a tool: "Thinking ·
+        // userMessage · 5s" beside an approval card read as a tool nobody
+        // had heard of (seen driving the app, 2026-09-05). The label stays;
+        // the item type is only worth showing when it names real work.
+        const itemType = event.payload.itemType
         runningStep = {
           label: message ?? (event.payload.stepKind === 'turn' ? 'Working' : 'Thinking'),
-          detail: event.payload.itemType,
+          detail: itemType !== undefined && /message$/i.test(itemType) ? undefined : itemType,
           startedAt: event.occurredAt,
           kind: event.payload.stepKind
         }

@@ -20,6 +20,7 @@ import type {
 } from '../shared/ipc.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
 import { approvalPatchFrom, fileChangesOf, itemOf } from './approval-patch.js'
+import { relativeToFolder } from '../shared/approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
@@ -170,6 +171,40 @@ export function protocolDecisionFor(decision: MissionApprovalAnswer['decision'])
   // one to take mid-run under time pressure.
   if (decision === 'approve-always') return 'acceptForSession'
   return 'reject'
+}
+
+/**
+ * A fileChange item's tool rows carry the change itself.
+ *
+ * The app-server normaliser writes "N file change(s)" as the row's command
+ * and no patch, so after an APPROVED edit the activity fold read "Codex CLI
+ * did not report the change" beside a row for a file whose diff the
+ * approval card had just shown (seen driving the app, 2026-09-05). The
+ * item's `changes` are remembered by id for the approval; the same record
+ * gives the row its paths and its patch.
+ */
+export function withFileChanges(
+  events: readonly NormalizedRuntimeEvent[],
+  changesByItem: ReadonlyMap<string, readonly FileChangeRecord[]>,
+  workspacePath: string
+): readonly NormalizedRuntimeEvent[] {
+  return events.map((event) => {
+    if (event.type !== 'tool.started' && event.type !== 'tool.completed' && event.type !== 'tool.failed') return event
+    const payload = event.payload as { readonly itemId?: string; readonly toolKind?: string; readonly command?: string; readonly patch?: unknown }
+    if (payload.toolKind !== 'fileChange' || payload.itemId === undefined) return event
+    const changes = changesByItem.get(payload.itemId)
+    if (changes === undefined || changes.length === 0) return event
+    const patch = approvalPatchFrom(changes, workspacePath)
+    const paths = changes.map((change) => relativeToFolder(change.path, workspacePath)).join('\n')
+    return {
+      ...event,
+      payload: {
+        ...payload,
+        command: paths,
+        ...(patch === undefined ? {} : { patch })
+      }
+    } as NormalizedRuntimeEvent
+  })
 }
 
 export function createAppServerMissionService(
@@ -378,7 +413,7 @@ export function createAppServerMissionService(
               if (changes !== undefined) changesByItem.set(found.id, changes)
             }
             const produced = normalizer.accept(notification)
-            void persistAndEmit(run, produced).catch(() => undefined)
+            void persistAndEmit(run, withFileChanges(produced, changesByItem, peer?.cwd ?? options.workspacePath)).catch(() => undefined)
           },
           onRequest: async (request) => {
             const described = describeApproval(request)

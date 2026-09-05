@@ -1,3 +1,4 @@
+import type { FileChangeRecord } from './approval-patch.js'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
@@ -7,8 +8,7 @@ import {
   approvalKindFor,
   createAppServerMissionService,
   describeApproval,
-  protocolDecisionFor
-} from './app-server-mission.js'
+  protocolDecisionFor, withFileChanges } from './app-server-mission.js'
 import type { AppServerProcess } from './app-server-mission.js'
 import type { CodexMissionUpdate, MissionApprovalRequest } from '../shared/ipc.js'
 
@@ -451,5 +451,34 @@ describe('approve-each runs side by side', () => {
     expect(instance.decide({ approvalId: atlasApproval.approvalId, decision: 'approve-once' })).toBe(false)
     expect(fakes[1]!.parsed().find((message) => message.id === 'w1')).toBeUndefined()
     expect(fakes[1]!.isKilled()).toBe(false)
+  })
+})
+
+describe('a fileChange item carries its change into the activity row', () => {
+  const at = '2026-09-05T05:00:00.000Z'
+  const base = { id: 'e1', runId: 'run_1', sequence: 1, occurredAt: at, sourceAdapter: 'codex' as const }
+  const changes: readonly FileChangeRecord[] = [{ path: 'C:\\work\\pebble\\HELLO.txt', kind: 'add', movePath: undefined, diff: 'hello from wren\n' }]
+  const byItem: ReadonlyMap<string, readonly FileChangeRecord[]> = new Map([['item_fc', changes]])
+
+  it("gives a tool row the file's path and a patch, where the normaliser wrote only a count", () => {
+    const [out] = withFileChanges(
+      [{ ...base, type: 'tool.completed', payload: { itemId: 'item_fc', toolKind: 'fileChange', name: 'apply_patch', command: '1 file change(s)', phase: 'completed', evidence: { runtimeEventType: 'item/completed', redacted: true } } } as never],
+      byItem,
+      'C:\\work\\pebble'
+    )
+    const payload = out!.payload as { command?: string; patch?: { text: string; added: number } }
+    expect(payload.command).toBe('HELLO.txt')
+    expect(payload.patch?.added).toBe(1)
+    expect(payload.patch?.text).toContain('+hello from wren')
+  })
+
+  it('leaves every other event, and a fileChange it never saw, exactly as it was', () => {
+    const shell = { ...base, type: 'tool.completed', payload: { itemId: 'item_sh', toolKind: 'commandExecution', name: 'shell', command: 'ls', phase: 'completed', evidence: { runtimeEventType: 'item/completed', redacted: true } } } as never
+    const unknown = { ...base, type: 'tool.started', payload: { itemId: 'item_other', toolKind: 'fileChange', name: 'apply_patch', phase: 'started', evidence: { runtimeEventType: 'item/started', redacted: true } } } as never
+    const message = { ...base, type: 'message.delta', payload: { itemId: 'm', operation: 'append', text: 'hi', final: false, evidence: { runtimeEventType: 'x', redacted: true } } } as never
+    const out = withFileChanges([shell, unknown, message], byItem, 'C:\\work\\pebble')
+    expect(out[0]).toBe(shell)
+    expect(out[1]).toBe(unknown)
+    expect(out[2]).toBe(message)
   })
 })

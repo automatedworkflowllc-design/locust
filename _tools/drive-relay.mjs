@@ -31,6 +31,10 @@ const sidebar = () => drive.evaluate(`document.querySelector('.lc-sidebar').inne
 try {
   await drive.capture('launch: two teammates, replies on', () => drive.ready())
   await drive.capture('ask Wren to get a passphrase from Booty', () => drive.evaluate(`(async () => {
+    // Every update the host sends the window, kept so the record can say
+    // what the relay said even when the screen shows nothing.
+    window.__updates = []
+    window.desktop.onCodexMissionUpdate(u => { if (u.kind !== 'event') window.__updates.push({ kind: u.kind, message: u.message, teammateId: u.teammateId, startedBy: u.startedBy, phase: u.phase }) })
     const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
     who.click()
     await new Promise(r => setTimeout(r, 500))
@@ -46,14 +50,28 @@ try {
     return 'no send'
   })()`))
   await drive.capture("Wren's run, a few seconds in", async () => { await new Promise((r) => setTimeout(r, 6000)); return sidebar() })
-  await drive.capture("Booty's run starts on its own", () => drive.evaluate(`(async () => {
-    for (let i = 0; i < 360; i += 1) {
-      await new Promise(r => setTimeout(r, 500))
-      const rows = [...document.querySelectorAll('.lc-teammate')]
-      const booty = rows.find(r => /Booty/.test(r.innerText))
-      if (booty && /working|running|starting|replying/i.test(booty.innerText)) return 'Booty: ' + booty.innerText.replace(/\\s+/g, ' ').slice(0, 160)
+  await drive.capture("the moment Wren's run ends: the thread as it stands, notices included", () => drive.evaluate(`(async () => {
+    for (let i = 0; i < 480; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      if (!document.querySelector('button[aria-label^="Stop the running"]')) break
     }
-    return 'Booty never showed a run: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
+    await new Promise(r => setTimeout(r, 4000))
+    return (document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-300) ?? '') + ' || host updates: ' + JSON.stringify(window.__updates ?? []).slice(0, 700)
+  })()`))
+  // The host's own words, in full, beside the pictures: a relay that starts
+  // nothing and says nothing on screen still leaves its updates here.
+  {
+    const { writeFile } = await import('node:fs/promises')
+    const { join } = await import('node:path')
+    await writeFile(join(drive.out, 'host-updates.json'), String(await drive.evaluate(`JSON.stringify(window.__updates ?? [], null, 2)`)), 'utf8')
+  }
+  await drive.capture("Booty's run starts on its own", () => drive.evaluate(`(async () => {
+    for (let i = 0; i < 240; i += 1) {
+      await new Promise(r => setTimeout(r, 500))
+      const booty = [...document.querySelectorAll('.lc-teammate')].find(r => (r.querySelector('.lc-teammate__name, .lc-row__name')?.textContent ?? r.innerText.split('\\n')[0]).trim() === 'Booty')
+      if (booty && (/working|running|starting|replying/i.test(booty.innerText) || booty.querySelector('.lc-teammate__mission'))) return 'Booty: ' + booty.innerText.replace(/\\s+/g, ' ').slice(0, 160)
+    }
+    return 'Booty never showed a run in two minutes: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
   })()`))
   await drive.capture("open Booty's conversation while it runs", () => drive.evaluate(`(async () => {
     const row = [...document.querySelectorAll('.lc-teammate')].find(r => /Booty/.test(r.innerText))
@@ -65,7 +83,9 @@ try {
   await drive.capture('wait for the whole exchange to settle', () => drive.evaluate(`(async () => {
     for (let i = 0; i < 720; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      if (i > 20 && !document.querySelector('button[aria-label^="Stop the running"]') && ![...document.querySelectorAll('.lc-teammate')].some(r => /working|running|starting|replying/i.test(r.innerText))) return 'settled: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
+      // "listening" is Wren waiting for the reply-back turn, "thinking" is a run
+      // between tool calls: both are the exchange still going.
+      if (i > 20 && !document.querySelector('button[aria-label^="Stop the running"]') && ![...document.querySelectorAll('.lc-teammate')].some(r => /working|running|starting|replying|listening|thinking|waiting/i.test(r.innerText))) return 'settled: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
     }
     return 'still going'
   })()`))
