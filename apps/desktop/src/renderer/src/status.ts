@@ -98,6 +98,14 @@ export function runtimeIsUsable(runtime: PublicRuntimeStatus): boolean {
  * the route to Codex; before this, that row wore a lime ACTIVE tag directly
  * above the sentence "Codex CLI was not found on this machine."
  */
+/**
+ * What a signed-in runtime says about itself. Exported because the welcome
+ * screen states it ONCE above the list instead of six times inside it, and a
+ * second copy of the sentence would drift from this one (design pass,
+ * 2026-09-05).
+ */
+export const SIGNED_IN_DETAIL = 'Signed in on this machine, using your own account.'
+
 export function routeRowTag(status: RouteRowStatus, isActive: boolean): RouteTag {
   // AT LIMIT outranks ACTIVE: the active route being the one that just
   // refused to run is exactly what a person needs to see.
@@ -187,7 +195,7 @@ function baseRouteRowStatus(
   return {
     tag: isActive ? 'ACTIVE' : 'READY',
     selectable: true,
-    detail: 'Signed in on this machine, using your own account.'
+    detail: SIGNED_IN_DETAIL
   }
 }
 

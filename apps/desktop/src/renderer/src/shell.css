@@ -1271,6 +1271,43 @@ textarea {
   display: grid;
   place-items: center;
   padding: var(--lc-space-8) var(--lc-space-6);
+  /* Never push the box you type in off the screen. Without `min-height: 0` a
+     flex child refuses to shrink below its content, so at 1280x860 the
+     welcome grew the whole column and the composer went below the fold --
+     while the copy said "in the box below" (Colin, 2026-09-05). The sentence
+     was true and the layout made it a lie; the welcome scrolls in its own
+     space instead. */
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The roster as evidence: a count you can open, not eight rows you must
+   scroll past to reach the composer. */
+.lc-roster {
+  width: 100%;
+}
+
+.lc-roster__summary {
+  cursor: pointer;
+  color: var(--lc-text-muted);
+  list-style: none;
+}
+
+.lc-roster__summary::-webkit-details-marker {
+  display: none;
+}
+
+.lc-roster__summary::after {
+  content: ' · details';
+  color: var(--lc-text-muted);
+}
+
+.lc-roster[open] .lc-roster__summary::after {
+  content: ' · hide';
+}
+
+.lc-roster__summary:hover {
+  color: var(--lc-text-secondary);
 }
 
 .lc-empty__inner {

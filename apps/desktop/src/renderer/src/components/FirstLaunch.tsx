@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 
 import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
 import logo from '../assets/locust-logo.svg'
-import { integrationOf, routeRowStatus } from '../status.js'
+import { SIGNED_IN_DETAIL, integrationOf, routeRowStatus } from '../status.js'
 
 /**
  * First launch, and the empty state generally.
@@ -29,6 +29,18 @@ export function FirstLaunch({
       const tag = routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id)).tag
       return tag === 'READY' || tag === 'ACTIVE'
     })
+  // What discovery actually found, as one line. Eight rows are evidence for a
+  // claim that needs a count and a way to look, not eight repetitions of one
+  // sentence -- and on a 1280x860 window those rows pushed the box you type
+  // in below the fold while the copy said "in the box below" (Colin,
+  // 2026-09-05; design pass section 5).
+  const rows = runtimes.map((runtime) => ({
+    runtime,
+    status: routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id))
+  }))
+  const ready = rows.filter((row) => row.status.tag === 'READY' || row.status.tag === 'ACTIVE')
+  const roster = `${String(ready.length)} of ${String(rows.length)} runtimes signed in under your own accounts`
+
   return (
     <div className="lc-empty">
       <div className="lc-empty__inner">
@@ -58,10 +70,16 @@ export function FirstLaunch({
         )}
 
         {discoveryPhase === 'ready' && (
-          <div className="lc-runtimelist">
-            {runtimes.map((runtime) => {
-              const status = routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id))
-              return (
+          // Open when nothing is ready -- then the list IS the content and
+          // the screen's job is to get a runtime connected. Closed when
+          // something can run, because then the job is to get a mission
+          // typed and the roster is a footnote.
+          <details className="lc-roster" open={!anyReady}>
+            <summary className="lc-roster__summary lc-mono">{roster}</summary>
+            {/* Said once, above the list, rather than on every signed-in row. */}
+            <p className="lc-footnote">{SIGNED_IN_DETAIL}</p>
+            <div className="lc-runtimelist">
+              {rows.map(({ runtime, status }) => (
                 <div
                   key={runtime.id}
                   className={`lc-runtimerow${status.tag === 'READY' || status.tag === 'ACTIVE' ? ' is-ready' : ''}`}
@@ -71,10 +89,11 @@ export function FirstLaunch({
                     <div className="lc-runtimerow__detail">
                       {runtime.version !== null && (
                         <>
-                          <span className="lc-mono">{runtime.version}</span>{' · '}
+                          <span className="lc-mono">{runtime.version}</span>
+                          {status.detail === SIGNED_IN_DETAIL ? '' : ' · '}
                         </>
                       )}
-                      {status.detail}
+                      {status.detail === SIGNED_IN_DETAIL ? '' : status.detail}
                     </div>
                   </div>
                   <span
@@ -96,9 +115,9 @@ export function FirstLaunch({
                     {status.tag}
                   </span>
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          </details>
         )}
 
         <p className="lc-footnote">

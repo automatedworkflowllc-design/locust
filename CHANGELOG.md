@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.21.2 — 2026-09-05
+
+- **The box you type in is on screen when the app opens.** On a 1280x860
+  window the welcome screen's eight runtime rows pushed the composer below
+  the fold, while the copy said "describe a mission in the box below" — the
+  sentence was true and the layout made it a lie. The welcome now keeps to
+  the space it has and scrolls inside it, so it can never push the composer
+  anywhere. Measured: 16 pixels above the edge, where it used to be 395
+  below.
+- **The runtime list is a count you can open.** It reads "5 of 8 runtimes
+  signed in under your own accounts", and opens to the full list. It starts
+  open when nothing is ready, because then the list is the whole point of the
+  screen, and closed when something can run, because then the point is to
+  type a mission. The sentence every signed-in runtime repeated is said once,
+  above the list, so each row is a name, a version and its state.
+
 ## 0.21.1 — 2026-09-05
 
 The rest of the design pass's objections.
