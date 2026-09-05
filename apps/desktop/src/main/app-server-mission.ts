@@ -19,6 +19,8 @@ import type {
   PublicPeerMessage
 } from '../shared/ipc.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
+import { approvalPatchFrom, fileChangesOf, itemOf } from './approval-patch.js'
+import type { FileChangeRecord } from './approval-patch.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
@@ -361,12 +363,20 @@ export function createAppServerMissionService(
         ])
         run.process = child
 
+        // Each fileChange item's changes, by item id, so the approval that
+        // names the item can show the change itself (approval-patch.ts).
+        const changesByItem = new Map<string, readonly FileChangeRecord[]>()
         const rpc = createAppServerClient({
           transport: {
             send: (line) => child.write(line),
             close: () => child.kill()
           },
           onNotification: (notification) => {
+            const found = itemOf(notification.params)
+            if (found !== undefined) {
+              const changes = fileChangesOf(found.item)
+              if (changes !== undefined) changesByItem.set(found.id, changes)
+            }
             const produced = normalizer.accept(notification)
             void persistAndEmit(run, produced).catch(() => undefined)
           },
@@ -380,6 +390,10 @@ export function createAppServerMissionService(
             }
             if (approvals.size >= MAX_PENDING_APPROVALS) return { decision: 'reject' }
             const approvalId = `ap_${createId()}`
+            const requestParams = (typeof request.params === 'object' && request.params !== null ? request.params : {}) as Record<string, unknown>
+            const itemId = typeof requestParams.itemId === 'string' ? requestParams.itemId : undefined
+            const changes = described.kind === 'file-change' && itemId !== undefined ? changesByItem.get(itemId) : undefined
+            const patch = approvalPatchFrom(changes, options.workspacePath)
             return await new Promise<JsonValue>((resolve) => {
               approvals.set(approvalId, { runId, resolve })
               options.emitApproval({
@@ -387,10 +401,12 @@ export function createAppServerMissionService(
                 runId,
                 missionId,
                 kind: described.kind,
-                summary: described.summary,
+                // The item names its files; the request alone does not.
+                summary: changes !== undefined && changes.length > 0 ? `Change ${String(changes.length)} file${changes.length === 1 ? '' : 's'}` : described.summary,
                 detail: described.detail,
                 cwd: described.cwd,
-                requestedAt: now().toISOString()
+                requestedAt: now().toISOString(),
+                ...(patch === undefined ? {} : { patch: { text: patch.text, added: patch.added, removed: patch.removed, truncated: patch.truncated } })
               })
             })
           },

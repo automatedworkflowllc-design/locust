@@ -618,6 +618,19 @@ export interface MissionApprovalRequest {
   /** Where it would happen. */
   readonly cwd: string | null
   readonly requestedAt: string
+  /**
+   * For a file change: the unified diff Codex attached to the item the
+   * approval is about, bounded like a ledger patch. Absent when the runtime
+   * sent none -- the card then says what it was told and no more.
+   */
+  readonly patch?: ApprovalPatch
+}
+
+export interface ApprovalPatch {
+  readonly text: string
+  readonly added: number
+  readonly removed: number
+  readonly truncated: boolean
 }
 
 /**

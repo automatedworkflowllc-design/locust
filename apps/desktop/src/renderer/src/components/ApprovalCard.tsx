@@ -2,6 +2,8 @@ import type { ReactElement } from 'react'
 
 import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
 import { Icon } from './Icon.js'
+import { DiffView } from './DiffView.js'
+import { fileCounts, parseUnifiedDiff } from '../diff.js'
 
 /**
  * The approval card.
@@ -22,6 +24,10 @@ export function ApprovalCard({
   readonly busy: boolean
 }): ReactElement {
   const isQuestion = request.kind === 'question'
+  // The change itself, when Codex sent it with the item (parity row 32).
+  // Drawn with the same viewer the activity fold uses, so an approval and
+  // its record read the same.
+  const files = request.patch === undefined ? [] : parseUnifiedDiff(request.patch.text)
   const reversible =
     request.kind === 'command'
       ? 'Unknown — a command can do anything the workspace sandbox allows.'
@@ -57,6 +63,25 @@ export function ApprovalCard({
           </>
         )}
       </dl>
+
+      {request.patch !== undefined && (
+        <div className="lc-approval__patch">
+          <div className="lc-approval__patchhead lc-mono">
+            <span>The change, as Codex would apply it</span>
+            <span className="lc-activity__counts">
+              <span className="lc-diff__addmark">+{request.patch.added}</span>
+              <span className="lc-diff__delmark">−{request.patch.removed}</span>
+            </span>
+          </div>
+          {files.length === 0 ? (
+            <p className="lc-settings__note">Codex sent a change this build could not read as a diff.</p>
+          ) : (
+            files.map((file) => (
+              <DiffView key={file.path} file={file} truncated={request.patch!.truncated} reported={request.patch!.truncated ? { added: request.patch!.added, removed: request.patch!.removed } : fileCounts(file)} />
+            ))
+          )}
+        </div>
+      )}
 
       <div className="lc-approval__actions">
         <button

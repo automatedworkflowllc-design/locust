@@ -20,7 +20,22 @@ const { createAppServerClient } = await import(
   new URL('../packages/runtime-adapters/dist/index.js', import.meta.url).href
 )
 
-const CODEX = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e\\codex.exe'
+// The binary the npm package actually runs (its shim spawns this exe), else
+// the newest of the OpenAI-managed installs. The old hard-coded path died
+// with an update on 2026-09-05 and the smoke spawned nothing.
+import { existsSync, readdirSync, statSync } from 'node:fs'
+const NPM_CODEX = 'C:\\Users\\<home>\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe'
+const OPENAI_BIN = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin'
+function resolveCodex() {
+  if (existsSync(NPM_CODEX)) return NPM_CODEX
+  try {
+    const dirs = readdirSync(OPENAI_BIN).map((name) => join(OPENAI_BIN, name, 'codex.exe')).filter((p) => existsSync(p))
+    dirs.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+    if (dirs[0]) return dirs[0]
+  } catch { /* none */ }
+  throw new Error('no codex.exe found for the smoke')
+}
+const CODEX = resolveCodex()
 
 let failures = 0
 function check(label, ok, detail) {
@@ -152,6 +167,51 @@ await session(async ({ client, root, approvals, notifications }) => {
     'the turn settled after the refusal',
     notifications.some((entry) => entry.method === 'turn/completed')
   )
+})
+
+console.error('3. a turn that must ask permission to change a file -- and what the item carries')
+await session(async ({ client, root, approvals, notifications }) => {
+  await client.request('initialize', { clientInfo: { name: 'locust-smoke', version: '0.0.1' } })
+  client.notify('initialized')
+  const thread = await client.request('thread/start', {
+    cwd: root,
+    sandbox: 'read-only',
+    approvalPolicy: 'untrusted'
+  })
+  const threadId = thread?.thread?.id ?? thread?.threadId
+  await client.request('turn/start', {
+    threadId,
+    approvalPolicy: 'untrusted',
+    input: [
+      {
+        type: 'text',
+        text: 'Using your file-editing tool (apply_patch), create a new file named SMOKE.txt in this directory containing exactly the line: smoke ok. Do not run shell commands and do not ask me anything first.'
+      }
+    ]
+  })
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (approvals.some((entry) => entry.method === 'item/fileChange/requestApproval')) break
+    await sleep(500)
+  }
+  const request = approvals.find((entry) => entry.method === 'item/fileChange/requestApproval')
+  check('a file-change approval reached the client', request !== undefined, approvals.map((entry) => entry.method).join(', '))
+  // The schema (generated from the CLI on 2026-09-05) says the approval
+  // carries only the item id; the change itself rides on the fileChange
+  // item's notification. This is the live check of that reading.
+  check('the approval names its item and nothing more about the change', typeof request?.params?.itemId === 'string' && request?.params?.changes === undefined, JSON.stringify(request?.params ?? {}).slice(0, 200))
+  const itemId = request?.params?.itemId
+  const carrying = notifications.find((entry) => entry?.params?.item?.id === itemId && entry?.params?.item?.type === 'fileChange')
+  const changes = carrying?.params?.item?.changes
+  check('a notification carried the fileChange item with its changes', Array.isArray(changes) && changes.length > 0, `${carrying?.method ?? 'none'} · ${JSON.stringify(changes ?? []).slice(0, 160)}`)
+  const first = Array.isArray(changes) ? changes[0] : undefined
+  // Measured live 2026-09-05: for an ADD the diff is the file's CONTENT, not a hunk; the host synthesises the hunk (approval-patch.ts).
+  check('each change has a path, a kind and diff text', typeof first?.path === 'string' && typeof first?.kind?.type === 'string' && typeof first?.diff === 'string' && first.diff.length > 0, JSON.stringify(first ?? {}).slice(0, 200))
+  check('the diff names the new file and its line', /SMOKE\.txt|smoke ok/.test(JSON.stringify(first ?? {})), JSON.stringify(first?.diff ?? '').slice(0, 160))
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (notifications.some((entry) => entry.method === 'turn/completed')) break
+    await sleep(500)
+  }
+  check('the turn settled after the refusal, and nothing was written', notifications.some((entry) => entry.method === 'turn/completed'))
 })
 
 console.error(`\n${failures === 0 ? 'APP-SERVER SMOKE PASSED' : `APP-SERVER SMOKE FAILED (${failures})`}`)
