@@ -6,6 +6,30 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.21.6 — 2026-09-05
+
+- **A runtime's usage limit survives a restart.** Settings said AT LIMIT, a
+  reload said READY, and nothing had changed. The ledger knew; now the window
+  asks it on the way up.
+- **Reply on another model after a run stopped.** Switching provider after a
+  failure used to start a stranger with no memory of the task. The next turn
+  now starts on the new runtime from the old run's checkpoint, briefed on what
+  was done and what was left unsettled, with your reply as its latest
+  instruction. The composer says so before you send.
+- **Edits a runtime never mentioned are still shown.** When a run allowed to
+  write ends, Locust compares the working tree (git) with how it was before,
+  and every changed file no tool named becomes an *observed on disk* row.
+- **A conversation with nobody, and Assign to a teammate later.** From the
+  home screen with no one picked, a message is just a message. Right-click
+  the conversation to hand it to a teammate.
+- **Headings and bold render in replies.** `### Summary` and `**like this**`
+  no longer arrive as punctuation. Links stay labels on purpose.
+- **Settings tells the truth about limits.** Hand off, continue elsewhere,
+  and the automatic fallback that is deliberately not built.
+- **The route picker's search no longer floods.** One letter gave 92 rows;
+  each runtime now shows twelve and says how many more match.
+- Small windows: no stray scrollbar or clipped text in the collapsed sidebar.
+
 ## 0.21.5 — 2026-09-05
 
 - **Your teammates work in a folder you choose.** Opened from the Start menu,
