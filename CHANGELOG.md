@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.22.0 — 2026-09-05
+
+- **See the exchange.** When teammates are talking to each other, the
+  conversation shows who is in it and on what model, how many automatic
+  replies it has used of your budget, what every run in it has cost so far,
+  and a Stop that halts all of them at once.
+- **The budget is yours.** Settings → Teammates now has "Automatic replies
+  per exchange" as fixed steps (1 to 12). Six was a constant; now it is a
+  number you chose, and the exchange line counts against it.
+
 ## 0.21.6 — 2026-09-05
 
 - **A runtime's usage limit survives a restart.** Settings said AT LIMIT, a
