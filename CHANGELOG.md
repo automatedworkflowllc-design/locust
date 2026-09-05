@@ -6,6 +6,36 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.21.5 — 2026-09-05
+
+- **Your teammates work in a folder you choose.** Opened from the Start menu,
+  Locust took its own install folder as the workspace, so every teammate was
+  reading and editing inside `AppData\Local\Programs\Locust`. Antigravity
+  refused outright and OpenCode auto-rejected its way out and failed. Now the
+  install folder is never a workspace: Locust uses the folder you last chose,
+  and until you choose one it refuses to start anything and says so. The
+  folder lives in Settings, on a chip beside the permission mode, and in the
+  title bar.
+- **The permission menu no longer folds under the window.** It opens from a
+  control at the bottom edge, and a stylesheet rule left behind by a deleted
+  overflow menu had flipped it to open downward. Two pixels of a 305px menu
+  were on screen.
+- **A runtime's own words arrive readable.** Failure cards showed the terminal
+  colour codes around them as little empty boxes.
+- **Right-click a teammate** to message, edit, or remove them. Removing says
+  how many routines go with them.
+- **A refused delete says so.** The message only appeared inside the
+  conversation you were looking at, so refusing a delete from the sidebar
+  reported nothing anywhere and looked like the menu doing nothing.
+- **Claude Code's refusals are reported.** When it is not permitted to run
+  something it stops quietly; the run now says which tool was blocked.
+- **First run rebuilt.** The mark sits in its own card, the runtimes are one
+  panel in two columns rather than a stack, connected ones come first, and
+  the count on the screen agrees with the count in the sidebar footer. The
+  route and effort now read as a pair of boxed controls.
+- **The sidebar's empty message no longer wraps to one word per line** on a
+  narrow window.
+
 ## 0.21.4 — 2026-09-05
 
 - **Delete in the mission header removes the whole conversation.** It removed
