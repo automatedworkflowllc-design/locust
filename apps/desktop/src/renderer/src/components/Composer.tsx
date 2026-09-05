@@ -186,18 +186,15 @@ export function Composer({
     : !routeCanRun
       ? `The ${selected?.displayName ?? 'selected'} adapter is not finished — switch the route to run a mission…`
       : selectedReady
-        ? mode === 'approve-each' && route.runtime === 'codex'
-          ? 'Describe a mission. You will be asked before each action…'
-          : mode === 'accept-edits'
-          ? 'Describe a mission. It may edit files in this workspace…'
-          : // Claude Code used to be read-only whatever the mode said, and
-            // this line said so. It can edit now, so the mode -- not the
-            // runtime -- decides what the box promises.
-            route.runtime === 'claude'
-            ? 'Describe a mission. Claude Code will read, not write, in this mode…'
-            : teammateName !== undefined
-              ? `Message ${teammateName}, or describe a mission…`
-              : 'Describe a mission for this workspace…'
+        ? // Just the invitation. Three of these used to restate the
+          // permission mode -- "it may edit files in this workspace" -- which
+          // the mode control says in two words directly underneath, so the
+          // box was the second voice saying the same thing (Colin,
+          // 2026-09-05). Every OTHER line here survives, because each says
+          // something no other part of the screen does.
+          teammateName === undefined
+          ? 'Write a message…'
+          : `Message ${teammateName}…`
         : discoveryPhase === 'loading'
           ? 'Checking local runtimes…'
           : discoveryPhase === 'error'

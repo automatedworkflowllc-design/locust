@@ -1361,6 +1361,13 @@ textarea {
 
 .lc-composer {
   padding: var(--lc-space-5) var(--lc-space-6) var(--lc-space-6);
+  /* Never give up height. The thread beside it is `flex: 1` and scrolls, so
+     it can absorb any squeeze; the composer taking the default shrink meant
+     that in a short window its bottom row -- route, effort, swarm -- was
+     clipped by the window edge and read as "folding under the app" (Colin,
+     2026-09-05, screenshot). The box a person types in is the last thing
+     that should lose room. */
+  flex: 0 0 auto;
 }
 
 .lc-composer__inner {
@@ -1476,6 +1483,12 @@ textarea {
   gap: var(--lc-space-1);
   margin-top: 9px;
   padding: 0 var(--lc-space-1);
+  /* A long model id (`gpt-5.6-luna`) plus mode, effort and swarm can outrun
+     the row. Wrapping keeps every control reachable instead of pushing the
+     last of them past the edge; the composer's own `flex: 0 0 auto` above is
+     what makes the extra line take space rather than be cut off. */
+  flex-wrap: wrap;
+  row-gap: var(--lc-space-1);
 }
 
 .lc-composer__group {

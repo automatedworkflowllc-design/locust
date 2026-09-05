@@ -29,6 +29,17 @@ Three things Colin found in an evening of real use.
   message never arriving. A meeting has always said who stayed silent; a
   one-to-one exchange now does too, and says the answer is in that
   teammate's own conversation.
+- **The message box says "Write a message", and nothing more.** Three of its
+  lines used to restate the permission mode — "it may edit files in this
+  workspace" — which the mode control says in two words directly underneath.
+  Every other line it can show survives, because each says something no
+  other part of the screen does: a runtime still being looked for, one that
+  needs signing in, a route this build cannot run, and what happens to what
+  you type while a mission is working.
+- **The composer no longer gets clipped by the window edge.** It could give
+  up height when the window was short, so its bottom row — route, effort,
+  swarm — folded under the edge. It now keeps its height, and its controls
+  wrap rather than running off the end when a model id is long.
 
 ## 0.20.0 — 2026-09-05
 
