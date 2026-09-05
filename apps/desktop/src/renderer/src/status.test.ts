@@ -30,8 +30,7 @@ import {
   routeRowTag,
   runtimeIsUsable,
   shortMissionId,
-  teammateStatusView
-} from './status.js'
+  teammateStatusView, ROUTE_SEARCH_GROUP_LIMIT } from './status.js'
 import type { RouteTag } from './status.js'
 
 function runtime(overrides: Partial<PublicRuntimeStatus> = {}): PublicRuntimeStatus {
@@ -402,11 +401,18 @@ describe('a picker group that would not fit', () => {
     expect(capped.hiddenByGroup.get('Cursor Agent')).toBe(217 - ROUTE_GROUP_LIMIT)
   })
 
-  it('lifts the cap entirely once someone is searching', () => {
+  it('widens the cap while searching, and still counts what it holds back', () => {
+    // It used to lift the cap entirely, and one letter produced 92 rows
+    // (0.21.2 QA). A search for `a` narrows nothing; the count is what keeps
+    // the narrowing honest.
     const rows = many('Cursor Agent', 217)
     const capped = capRouteRows(rows, ROUTE_GROUP_LIMIT, true)
-    expect(capped.rows).toEqual(rows)
-    expect(capped.hiddenByGroup.size).toBe(0)
+    expect(capped.rows).toHaveLength(ROUTE_SEARCH_GROUP_LIMIT)
+    expect(capped.hiddenByGroup.get('Cursor Agent')).toBe(217 - ROUTE_SEARCH_GROUP_LIMIT)
+    // A group that fits under the wider cap is untouched.
+    const few = capRouteRows(many('Claude Code', 9), ROUTE_GROUP_LIMIT, true)
+    expect(few.rows).toHaveLength(9)
+    expect(few.hiddenByGroup.size).toBe(0)
   })
 })
 

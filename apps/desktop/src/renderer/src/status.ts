@@ -419,16 +419,21 @@ export interface CappedRouteRows<TRow> {
  * - Nothing is dropped silently: every group over the cap reports how many
  *   rows it is not showing, and the caller must say so.
  *
- * While a search is running there is no cap: the person has narrowed the list
- * themselves, and a second, invisible narrowing on top of theirs would make
- * the result a lie about what matched.
+ * While a search is running the cap is WIDER, not gone. It used to be lifted
+ * entirely -- "the person has narrowed the list themselves" -- and one letter
+ * then produced 92 rows (0.21.2 QA): a search for `a` narrows nothing, and a
+ * wall of matches is the thing the cap exists to prevent. What made the cap
+ * honest before still makes it honest here: the rows held back are counted
+ * and the picker says so, so a narrowing is visible rather than a lie.
  */
+export const ROUTE_SEARCH_GROUP_LIMIT = ROUTE_GROUP_LIMIT * 2
+
 export function capRouteRows<TRow extends { readonly group: string; readonly tag: RouteTag }>(
   rows: readonly TRow[],
   limit: number,
   searching: boolean
 ): CappedRouteRows<TRow> {
-  if (searching) return { rows, hiddenByGroup: new Map() }
+  if (searching) limit = Math.max(limit, ROUTE_SEARCH_GROUP_LIMIT)
   const counts = new Map<string, number>()
   const kept: TRow[] = []
   const hidden = new Map<string, number>()

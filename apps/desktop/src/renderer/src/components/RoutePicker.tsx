@@ -237,7 +237,7 @@ export function RoutePicker({
               </button>
               {hidden > 0 && (
                 <p className="lc-picker__more lc-mono">
-                  {hidden} more {hidden === 1 ? 'model' : 'models'} · type to search them
+                  {hidden} more {hidden === 1 ? 'model' : 'models'} {needle.length > 0 ? 'match · keep typing' : '· type to search them'}
                 </p>
               )}
             </div>
