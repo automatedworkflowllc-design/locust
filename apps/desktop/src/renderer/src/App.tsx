@@ -131,6 +131,13 @@ interface LiveRunState {
   /** Who the run was messaged to, known before the host has even assigned a missionId. */
   readonly teammateId?: string
   /**
+   * The runtime the message was sent to, known before the host answers. A
+   * run that fails before it starts has no route summary, and the header
+   * was naming Codex for an Antigravity refusal (Colin's screenshot,
+   * 2026-09-05).
+   */
+  readonly runtime?: MissionRuntimeId
+  /**
    * Earlier turns of this conversation, oldest first. Held in renderer state
    * so a reply shows the exchange immediately rather than after a history
    * refresh; recovered missions rebuild the same list from the ledger.
@@ -685,6 +692,7 @@ export default function App(): ReactElement {
   const [workspaceName, setWorkspaceName] = useState('Local workspace')
   /** The folder itself, so activity rows can show paths the way a person writes them. */
   const [workspacePath, setWorkspacePath] = useState<string | undefined>(undefined)
+  const [workspaceMade, setWorkspaceMade] = useState(false)
   // A word about the folder, at shell level: a refused start, a refused
   // choice, or the reopen that follows a successful one.
   const [workspaceNotice, setWorkspaceNotice] = useState<string>()
@@ -937,6 +945,7 @@ export default function App(): ReactElement {
           setBuild({ version: info.version, packaged: info.packaged, platform: info.platform })
           setWorkspaceName(info.workspaceName)
           setWorkspacePath(info.workspacePath.length === 0 ? undefined : info.workspacePath)
+          setWorkspaceMade(info.workspaceMade === true)
         }
       })
       .catch(() => undefined)
@@ -1457,6 +1466,7 @@ export default function App(): ReactElement {
       phase: 'starting',
       events: [],
       startedAtIso: new Date().toISOString(),
+      runtime: route.runtime,
       ...(teammateId === undefined ? {} : { teammateId }),
       ...(earlierTurns.length === 0 ? {} : { earlierTurns }),
       ...(coldStart ? { coldStart: true } : {}),
@@ -2356,6 +2366,7 @@ export default function App(): ReactElement {
           ) : screen === 'settings' ? (
             <SettingsScreen
               workspacePath={workspacePath}
+              workspaceMade={workspaceMade}
               onChooseFolder={chooseWorkspace}
               runtimes={runtimes}
               limitedRuntimes={limitedRuntimes}
@@ -2463,7 +2474,7 @@ export default function App(): ReactElement {
                       </span>
                       <span className="lc-workroom__role">
                         {missionOwner === undefined ? '' : `${roleLabelOf(missionOwner)} · `}
-                        {runtimeDisplayName(liveRun.data?.runtime ?? 'codex')}
+                        {runtimeDisplayName(liveRun.data?.runtime ?? liveRun.runtime ?? 'codex')}
                       </span>
                     </div>
                     <div className="lc-workroom__mission">
@@ -2688,6 +2699,7 @@ export default function App(): ReactElement {
             continuationNote={continuationNote}
             workspaceName={workspaceName.length === 0 ? undefined : workspaceName}
             workspacePath={workspacePath}
+            workspaceMade={workspaceMade}
             onChooseFolder={chooseWorkspace}
             runtimes={runtimes}
             limitedRuntimes={limitedRuntimes}

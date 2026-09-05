@@ -126,6 +126,55 @@ describe('which folder the teammates work in', () => {
     ).toEqual({ path: 'C:\\repo\\apps\\desktop', source: 'launch-folder' })
   })
 
+  it('makes do with the default folder when nothing is chosen -- the way a terminal always has a cwd (Colin, 2026-09-05)', () => {
+    expect(
+      resolveWorkspacePath({
+        argv: ['Locust.exe'],
+        cwd: INSTALL,
+        installDirectory: INSTALL,
+        remembered: undefined,
+        defaultWorkspace: 'C:\\Users\\colin\\Documents\\Locust',
+        platform: 'win32'
+      })
+    ).toEqual({ path: 'C:\\Users\\colin\\Documents\\Locust', source: 'default' })
+  })
+
+  it('but a remembered folder beats the default, and a real launch folder beats both', () => {
+    const remembered = resolveWorkspacePath({
+      argv: ['Locust.exe'],
+      cwd: INSTALL,
+      installDirectory: INSTALL,
+      remembered: 'C:\\work\\pebble',
+      defaultWorkspace: 'C:\\Users\\colin\\Documents\\Locust',
+      platform: 'win32'
+    })
+    expect(remembered).toEqual({ path: 'C:\\work\\pebble', source: 'remembered' })
+    const launched = resolveWorkspacePath({
+      argv: ['Locust.exe'],
+      cwd: 'C:\\work\\other',
+      installDirectory: INSTALL,
+      remembered: 'C:\\work\\pebble',
+      defaultWorkspace: 'C:\\Users\\colin\\Documents\\Locust',
+      platform: 'win32'
+    })
+    expect(launched).toEqual({ path: 'C:\\work\\other', source: 'launch-folder' })
+  })
+
+  it('never defaults INTO the install folder, and a relative default is ignored', () => {
+    for (const bad of [`${INSTALL}\\workspace`, 'Documents\\Locust']) {
+      expect(
+        resolveWorkspacePath({
+          argv: ['Locust.exe'],
+          cwd: INSTALL,
+          installDirectory: INSTALL,
+          remembered: undefined,
+          defaultWorkspace: bad,
+          platform: 'win32'
+        })
+      ).toEqual({ path: undefined, source: 'none' })
+    }
+  })
+
   it('gives the same folder the same id, and a different folder a different one', () => {
     expect(workspaceIdFor('C:\\work\\pebble')).toBe(workspaceIdFor('C:\\work\\pebble'))
     expect(workspaceIdFor('C:\\work\\pebble')).not.toBe(workspaceIdFor('C:\\work\\otter'))

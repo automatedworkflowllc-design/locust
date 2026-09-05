@@ -16,7 +16,7 @@ import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-s
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -371,14 +371,34 @@ if (!ownsSingleInstanceLock) {
         ? undefined
         : process.env.LOCUST_INSTALL_DIR
     const rememberedWorkspaceFile = join(app.getPath('userData'), 'workspace.json')
-    const workspace = resolveWorkspacePath({
+    // With nothing chosen, Locust makes a folder rather than refusing the
+    // first message (Colin, 2026-09-05). `LOCUST_DEFAULT_WORKSPACE` is the
+    // test seam, so a smoke never creates the real Documents\Locust.
+    const defaultWorkspace =
+      process.env.LOCUST_DEFAULT_WORKSPACE !== undefined && process.env.LOCUST_DEFAULT_WORKSPACE.length > 0
+        ? process.env.LOCUST_DEFAULT_WORKSPACE
+        : join(app.getPath('documents'), 'Locust')
+    const resolved = resolveWorkspacePath({
       argv: process.argv,
       cwd: process.cwd(),
       installDirectory,
       remembered: readRememberedWorkspace(rememberedWorkspaceFile),
+      defaultWorkspace,
       platform: process.platform
     })
+    // A default that cannot be made falls back to the old answer: no
+    // workspace, every start refused with the reason. Never a crash at boot.
+    const workspace = ((): typeof resolved => {
+      if (resolved.source !== 'default' || resolved.path === undefined) return resolved
+      try {
+        mkdirSync(resolved.path, { recursive: true })
+        return resolved
+      } catch {
+        return { path: undefined, source: 'none' }
+      }
+    })()
     const workspaceChosen = workspace.path !== undefined
+    const workspaceMade = workspace.source === 'default'
     const workspacePath = workspace.path ?? process.cwd()
     const NO_WORKSPACE_MESSAGE =
       'Choose the folder your teammates work in first. Locust was opened from its own install folder, and no teammate should work in there.'
@@ -1256,7 +1276,7 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(APP_INFO_CHANNEL, (event) => {
-      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged, platform: process.platform, workspaceName: '', workspacePath: '' } as const
+      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged, platform: process.platform, workspaceName: '', workspacePath: '', workspaceMade: false } as const
       // The version electron-builder stamped, which is the one on the installer.
       return {
         name: 'Locust',
@@ -1264,7 +1284,8 @@ if (!ownsSingleInstanceLock) {
         packaged: app.isPackaged,
         platform: process.platform,
         workspaceName: workspaceChosen ? basename(workspacePath) || workspacePath : '',
-        workspacePath: workspaceChosen ? workspacePath : ''
+        workspacePath: workspaceChosen ? workspacePath : '',
+        workspaceMade
       } as const
     })
 

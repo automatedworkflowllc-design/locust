@@ -8,13 +8,20 @@
 // and Antigravity was the route that said so ("Antigravity has not opened
 // C:\...\Programs\Locust"). Three launches, one app at a time:
 //
-//   A. launched from the install folder, nothing chosen  -> no workspace,
-//      the home screen says so, a start is refused, the composer says why
+//   A. launched from the install folder, nothing chosen  -> Locust MAKES a
+//      folder (Documents\Locust in life; a temp path here) and works there,
+//      saying so where the folder is named (Colin, 2026-09-05: "every
+//      similar program lets you do it, so maybe it just writes a project
+//      folder if you don't have one")
+//   A2. the same, but the default folder cannot be made -> the 0.21.5 answer:
+//      no workspace, the home screen says so, a start is refused with why
 //   B. launched from the install folder, a folder remembered -> that folder
 //   C. launched from a real folder (the control every other smoke relies on)
 //
 // A development build has no install folder, so `LOCUST_INSTALL_DIR` names
-// one for it -- the seam the main process documents.
+// one for it, and `LOCUST_DEFAULT_WORKSPACE` names the folder to make -- the
+// two seams the main process documents. Every launch here sets the second,
+// so no case can create the real Documents\Locust on the machine.
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
@@ -45,6 +52,12 @@ try {
 
 const install = await mkdtemp(join(tmpdir(), 'locust-install-'))
 const project = await mkdtemp(join(tmpdir(), 'locust-project-'))
+const scratch = await mkdtemp(join(tmpdir(), 'locust-default-'))
+// Does not exist until the app makes it; that is the point of case A.
+const made = join(scratch, 'Locust')
+// A path under a FILE cannot be made; that is the point of case A2.
+await writeFile(join(scratch, 'blocker'), 'not a directory\n', 'utf8')
+const unmakeable = join(scratch, 'blocker', 'Locust')
 await writeFile(join(project, 'README.md'), '# pebble\n', 'utf8')
 
 async function launch({ cwd, env, remembered }) {
@@ -68,7 +81,7 @@ async function launch({ cwd, env, remembered }) {
   // folder that is NOT the app.
   const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(PORT)}`, `--user-data-dir=${profile}`], {
     cwd,
-    env: { ...process.env, ...env },
+    env: { ...process.env, LOCUST_DEFAULT_WORKSPACE: made, ...env },
     stdio: ['ignore', 'pipe', 'pipe']
   })
   const output = []
@@ -172,19 +185,44 @@ const SETTINGS_STATE = `(async () => {
 })()`
 
 try {
-  say('A. launched from the install folder with nothing chosen')
+  say('A. launched from the install folder with nothing chosen: Locust makes a folder')
   {
     const app = await launch({ cwd: install, env: { LOCUST_INSTALL_DIR: install } })
     try {
       const home = JSON.parse(await app.evaluate(HOME_STATE))
       say(`       ${JSON.stringify(home)}`)
+      const { stat } = await import('node:fs/promises')
+      const exists = await stat(made).then((s) => s.isDirectory()).catch(() => false)
+      check('the default folder now exists on disk', exists, made)
       check('the app opens on the home screen', home.home === true)
-      // Since 0.27.2 the bar shows the BUILD when no folder is chosen (the composer chip already says No folder).
+      check('the title bar names the made folder', home.title === 'Locust', home.title)
+      check('the intro screen has no missing-folder card: there is nothing missing', home.folder === false)
+      check('every runtime is listed, so connections are visible on launch', home.runtimeRows >= 5, String(home.runtimeRows))
+      check('the composer chip names the made folder', home.chip === 'Locust', home.chip)
+      check('and is not marked missing', home.chipMissing === false)
+      check('its tooltip says Locust made the folder and that any other is one click away', /Locust made this folder/.test(home.chipTitle) && home.chipTitle.includes(made), home.chipTitle)
+      const gate = JSON.parse(await app.evaluate(`window.desktop.startCodexMission({ prompt: '', mode: 'ask', runtime: 'codex' }).then(r => JSON.stringify(r))`))
+      check('the start gate is open (an empty prompt is refused for being empty, not for the folder)', gate.error?.code === 'INVALID_PROMPT', JSON.stringify(gate))
+      const settings = JSON.parse(await app.evaluate(SETTINGS_STATE))
+      say(`       settings -> ${JSON.stringify(settings)}`)
+      check('Settings says the folder is one Locust made', settings.label === 'Teammates work in a folder Locust made' && settings.path === made, `${settings.label} · ${settings.path}`)
+      check('with a Change control', settings.button === 'Change', settings.button)
+    } finally {
+      await app.close()
+    }
+  }
+
+  say('A2. the same launch, but the default folder cannot be made: the old refusal, with its reason')
+  {
+    const app = await launch({ cwd: install, env: { LOCUST_INSTALL_DIR: install, LOCUST_DEFAULT_WORKSPACE: unmakeable } })
+    try {
+      const home = JSON.parse(await app.evaluate(HOME_STATE))
+      say(`       ${JSON.stringify(home)}`)
+      check('the app opens on the home screen', home.home === true)
       check('the title bar shows the build, not the missing folder', /^Locust( [0-9]+\.[0-9]+\.[0-9]+)?$/.test(String(home.title)), home.title)
       check('the one line that has to be said is said', home.folder === true && home.missing === true)
       check('it says so in words', home.label === 'No folder chosen', home.label)
       check('and offers to choose one', home.button === 'Choose folder', home.button)
-      check('every runtime is listed, so connections are visible on launch', home.runtimeRows >= 5, String(home.runtimeRows))
       check('the composer chip says there is no folder', home.chip === 'No folder', home.chip)
       check('and is marked as the exception it is', home.chipMissing === true)
 
@@ -267,6 +305,7 @@ try {
 } finally {
   await rm(install, { recursive: true, force: true }).catch(() => undefined)
   await rm(project, { recursive: true, force: true }).catch(() => undefined)
+  await rm(scratch, { recursive: true, force: true }).catch(() => undefined)
 }
 
 if (failures > 0) {

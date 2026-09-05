@@ -3326,6 +3326,90 @@ textarea {
   background: var(--lc-bg-raised);
 }
 
+/* Settings, tidied (2026-09-05): one line under a heading, the manual folded
+   under it, groups in one card with divider rows, controls in aligned rows. */
+.lc-settings__more {
+  margin: 0 0 var(--lc-space-5);
+  font-size: var(--lc-text-secondary-size);
+  color: var(--lc-text-muted);
+}
+.lc-settings__more > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--lc-text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lc-text-muted);
+  user-select: none;
+}
+.lc-settings__more > summary::-webkit-details-marker { display: none; }
+.lc-settings__more > summary::before {
+  content: '\203A';
+  display: inline-block;
+  width: 10px;
+  transition: transform 120ms ease;
+}
+.lc-settings__more[open] > summary::before { transform: rotate(90deg); }
+.lc-settings__more > summary:hover { color: var(--lc-text-secondary); }
+.lc-settings__moretext {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-3);
+  text-wrap: pretty;
+}
+.lc-settings__moretext p { margin: 0; }
+.lc-settings__moretext .lc-settingcard { margin-top: var(--lc-space-2); }
+
+.lc-settingcard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  overflow: hidden;
+}
+.lc-settingcard > .lc-folder,
+.lc-settingcard > .lc-policyrow,
+.lc-settingcard > .lc-runtimerow {
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--lc-border-card);
+  background: transparent;
+  padding: var(--lc-space-4) var(--lc-space-5);
+}
+.lc-settingcard > :first-child { border-top: 0; }
+.lc-settingcard .lc-worktreerow {
+  border: 0;
+  background: var(--lc-bg-control);
+}
+
+.lc-settingrows {
+  display: flex;
+  flex-direction: column;
+}
+.lc-settingrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-5);
+  padding: var(--lc-space-3) 0;
+  border-top: 1px solid var(--lc-border-card);
+}
+.lc-settingrow:first-child { border-top: 0; }
+.lc-settingrow > .lc-settings__note { flex: 1 1 auto; min-width: 0; }
+
+.lc-runtimerow__version {
+  margin-left: 8px;
+  font-size: var(--lc-text-description);
+  font-weight: 400;
+  color: var(--lc-text-muted);
+}
+
 .lc-settings__note {
   font-size: var(--lc-text-secondary-size);
   color: var(--lc-text-secondary);

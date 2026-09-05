@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 
 import type {
   AppUpdateResponse,
@@ -578,6 +578,21 @@ function UpdateControl({
  * files they were read from in the tooltip. Nothing configured says so in
  * words, so an empty line never reads as "not checked".
  */
+/**
+ * The explanation a section used to open with, folded under one line.
+ * Settings read as a manual: every heading had a paragraph before its first
+ * control (Colin, 2026-09-05: "the settings screen looks a little clunky").
+ * The words are all still here; they wait behind "How it works".
+ */
+function More({ children }: { readonly children: ReactNode }): ReactElement {
+  return (
+    <details className="lc-settings__more">
+      <summary>How it works</summary>
+      <div className="lc-settings__moretext">{children}</div>
+    </details>
+  )
+}
+
 function RuntimeSetupLine({ setup }: { readonly setup: PublicRuntimeSetup }): ReactElement {
   const parts: string[] = []
   if (setup.mcpServers.length > 0) parts.push(`MCP: ${setup.mcpServers.join(', ')}`)
@@ -600,6 +615,7 @@ export function SettingsScreen({
   worktrees,
   onRemoveWorktree,
   workspacePath,
+  workspaceMade = false,
   onChooseFolder,
   ledgerPath,
   build,
@@ -631,6 +647,7 @@ export function SettingsScreen({
   readonly onRemoveWorktree: (teammateId: string) => Promise<string | undefined>
   /** The folder every teammate works in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
+  readonly workspaceMade?: boolean
   readonly onChooseFolder: () => void
   readonly ledgerPath: string | undefined
   /** Which build this is; undefined until the host has answered. */
@@ -677,13 +694,21 @@ export function SettingsScreen({
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Project folder</h2>
           <p className="lc-settings__lede">
-            Every teammate works inside one folder, and every mission runs there. Changing it reopens
-            Locust, so stop anything running first.
+            Every teammate works inside one folder, and every mission runs there.
           </p>
+          <More>
+            <p>Changing the folder reopens Locust, so stop anything running first.</p>
+            <p>
+              A LOCUST.md at the folder&rsquo;s root is given to every teammate, on every runtime, before each
+              mission. A teammate with Own branch on works in its own worktree of the folder&rsquo;s repository,
+              kept under .locust/worktrees; removing one here keeps its branch, and merging is yours to do.
+            </p>
+          </More>
+          <div className="lc-settingcard">
           <div className={`lc-folder${workspacePath === undefined ? ' is-missing' : ''}`}>
             <div className="lc-folder__text">
               <div className="lc-folder__label">
-                {workspacePath === undefined ? 'No folder chosen' : 'Teammates work in'}
+                {workspacePath === undefined ? 'No folder chosen' : workspaceMade ? 'Teammates work in a folder Locust made' : 'Teammates work in'}
               </div>
               <div className={`lc-folder__path${workspacePath === undefined ? '' : ' lc-mono'}`}>
                 {workspacePath ?? 'Pick a project folder before the first mission.'}
@@ -710,8 +735,8 @@ export function SettingsScreen({
                 {worktrees.reason !== undefined
                   ? `${worktrees.reason} A teammate with Own branch on cannot start until this is fixed.`
                   : worktrees.list.length === 0
-                    ? 'No teammate has its own worktree yet. Turn Own branch on in a teammate\'s card and its next run makes one.'
-                    : 'Each is a worktree of this folder\'s repository, kept under .locust/worktrees. Removing one keeps its branch; merging is yours to do.'}
+                    ? 'None yet. Turn Own branch on in a teammate\'s card and its next run makes one.'
+                    : 'Removing one keeps its branch.'}
               </span>
               {worktrees.list.length > 0 && (
                 <div className="lc-worktreelist">
@@ -734,32 +759,33 @@ export function SettingsScreen({
               )}
             </div>
           )}
+          </div>
         </section>
 
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>
           <p className="lc-settings__lede">
-            Locust uses the accounts already on this machine. It never pools subscriptions or proxies
-            your requests. Under each runtime is what it has set up for itself -- MCP servers and
-            hooks, read from its own files -- so a tool a teammate reaches for, or a script that runs
-            mid-mission, is never a surprise. Locust adds none of its own and changes nothing there.
+            Each runtime uses the account already signed in on this machine. Locust adds nothing of its own.
           </p>
-          <div className="lc-runtimelist">
+          <More>
+            <p>
+              Locust never pools subscriptions or proxies your requests. Under each runtime is what it has
+              set up for itself -- MCP servers and hooks, read from its own files -- so a tool a teammate
+              reaches for, or a script that runs mid-mission, is never a surprise. Locust changes nothing there.
+            </p>
+          </More>
+          <div className="lc-runtimelist lc-settingcard">
             {runtimes.map((runtime) => {
               const status = routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id))
               return (
                 <div className="lc-runtimerow" key={runtime.id}>
                   <div className="lc-runtimerow__text">
-                    <div className="lc-runtimerow__name">{runtime.displayName}</div>
-                    <div className="lc-runtimerow__detail">
-                      {runtime.version !== null && (
-                        <>
-                          <span className="lc-mono">{runtime.version}</span>
-                          {' · '}
-                        </>
-                      )}
-                      {status.detail}
+                    <div className="lc-runtimerow__name">
+                      {runtime.displayName}
+                      {runtime.version !== null && <span className="lc-runtimerow__version lc-mono">{runtime.version}</span>}
                     </div>
+                    {/* "Signed in on this machine" is said once, in the lede; a row only speaks when its state is not the ordinary one. */}
+                    {status.tag !== 'READY' && <div className="lc-runtimerow__detail">{status.detail}</div>}
                     {runtimeSetup?.[runtime.id] !== undefined && <RuntimeSetupLine setup={runtimeSetup[runtime.id]!} />}
                   </div>
                   <span
@@ -789,26 +815,37 @@ export function SettingsScreen({
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Updates</h2>
           <p className="lc-settings__lede">
-            Locust checks for a new version on its own and downloads it quietly. It never installs
-            one while a mission is running — restarting then would cut the run off and leave its
-            record without a receipt.
+            Locust checks for a new version on its own and downloads it quietly.
           </p>
+          <More>
+            <p>
+              It never installs one while a mission is running: restarting then would cut the run off and
+              leave its record without a receipt.
+            </p>
+          </More>
           <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
         </section>
 
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Teammates</h2>
           <p className="lc-settings__lede">
-            When a teammate writes to another, the other can answer on their own: Locust starts a run
-            for them with the message as its brief, and their answer starts the sender's next turn, so
-            it lands in the thread that asked. They keep going while a reply helps finish the work, and
-            stop when one has nothing more to say -- or after {String(relayHopCap)} automatic {relayHopCap === 1 ? 'reply' : 'replies'}, the budget
-            below. Each teammate answers on their own route -- their runtime, model and mode, not the sender's --
-            which is how two models end up on one piece of work. Switch this off to make messages wait
-            for you instead.
+            Teammates answer each other on their own, each on its own route, and stop after {String(relayHopCap)} automatic {relayHopCap === 1 ? 'reply' : 'replies'}.
           </p>
-          <div className="lc-retention">
-            <div className="lc-retention__row">
+          <More>
+            <p>
+              When a teammate writes to another, the other can answer on their own: Locust starts a run for
+              them with the message as its brief, and their answer starts the sender&rsquo;s next turn, so it
+              lands in the thread that asked. They keep going while a reply helps finish the work, and stop
+              when one has nothing more to say, or when the budget below is spent.
+            </p>
+            <p>
+              Each teammate answers on their own route -- their runtime, model and mode, not the sender&rsquo;s --
+              which is how two models end up on one piece of work. Switch replies off to make messages wait
+              for you instead.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
               <span className="lc-settings__note">
                 {relay ? 'Teammates reply to each other until the work is done.' : 'Messages wait for the recipient\'s next run.'}
               </span>
@@ -828,7 +865,7 @@ export function SettingsScreen({
               * person owns. Fixed steps rather than a free number: each is
               * a real answer to "how far may they go without me".
               */}
-            <div className="lc-retention__row">
+            <div className="lc-settingrow">
               <span className="lc-settings__note">
                 Automatic replies per exchange before they wait for you
               </span>
@@ -854,12 +891,17 @@ export function SettingsScreen({
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">What your team remembers</h2>
           <p className="lc-settings__lede">
-            Teammates keep a shared memory per folder, plus a smaller set marked everywhere -- the way
-            Claude Code and Cursor do, managed from here. A teammate writes one by ending a reply with
-            it; every teammate in the folder reads what is kept. Each memory says who wrote it, where,
-            and from which conversation, and you can edit, switch off, or remove any of them.
+            Teammates keep a shared memory per folder, plus a smaller set marked everywhere.
           </p>
-          <div className="lc-settings__row">
+          <More>
+            <p>
+              The way Claude Code and Cursor do, managed from here. A teammate writes one by ending a reply
+              with it; every teammate in the folder reads what is kept. Each memory says who wrote it, where,
+              and from which conversation, and you can edit, switch off, or remove any of them.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+          <div className="lc-settingrow">
             <span className="lc-settings__note">When a teammate writes a memory</span>
             <div className="lc-segmented" role="radiogroup" aria-label="When a teammate writes a memory">
               {(
@@ -882,25 +924,29 @@ export function SettingsScreen({
               ))}
             </div>
           </div>
-          <div className="lc-policyrow">
-            <button type="button" className="lc-ghostbutton" onClick={onOpenMemory}>
-              Open memory
-            </button>
+          <div className="lc-settingrow">
             <span className="lc-settings__note">
               {memoryCount === 0 ? 'Nothing remembered yet.' : `${String(memoryCount)} ${memoryCount === 1 ? 'memory' : 'memories'} kept.`}
-              {memoryWaiting > 0 ? ` ${String(memoryWaiting)} waiting for you.` : ''} Ctrl 5.
+              {memoryWaiting > 0 ? ` ${String(memoryWaiting)} waiting for you.` : ''}
             </span>
+            <button type="button" className="lc-ghostbutton" title="Ctrl 5" onClick={onOpenMemory}>
+              Open memory
+            </button>
+          </div>
           </div>
         </section>
 
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">When a route hits its limit</h2>
           <p className="lc-settings__lede">
-            A run that hits its account&rsquo;s limit stops at a durable checkpoint and waits for you.
-            Nothing switches provider on its own: you choose where the work continues, and Locust
-            carries it there with a briefing of what was done and what was left unsettled. Two ways to
-            do that exist today; the third is not built.
+            A run that hits its account&rsquo;s limit stops at a checkpoint and waits for you. Nothing switches provider on its own.
           </p>
+          <More>
+            <p>
+              You choose where the work continues, and Locust carries it there with a briefing of what was
+              done and what was left unsettled. Two ways to do that exist today; the third is not built.
+            </p>
+          <div className="lc-settingcard">
           <div className="lc-policyrow">
             <span className="lc-tag">HAND OFF</span>
             <span className="lc-settings__note">
@@ -921,6 +967,8 @@ export function SettingsScreen({
               Not built. Locust will not move your work to a provider you did not choose.
             </span>
           </div>
+          </div>
+          </More>
         </section>
 
         <section className="lc-settings__section">
@@ -944,11 +992,13 @@ export function SettingsScreen({
             <dt>Network</dt>
             <dd>The window itself makes no outbound requests; runtimes talk to their own providers.</dd>
           </dl>
-          <p className="lc-settings__lede">
-            Nothing here is ever deleted on a timer. Missions go when you ask, after you have been
-            shown exactly what would go — and a mission an ongoing conversation continues from is
-            kept even when it is old.
-          </p>
+          <More>
+            <p>
+              Nothing here is ever deleted on a timer. Missions go when you ask, after you have been shown
+              exactly what would go, and a mission an ongoing conversation continues from is kept even
+              when it is old.
+            </p>
+          </More>
           <RetentionControl report={storage} onPreview={onPreviewPrune} onPrune={onPrune} />
         </section>
       </div>

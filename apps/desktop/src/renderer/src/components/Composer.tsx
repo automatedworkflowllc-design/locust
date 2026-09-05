@@ -88,6 +88,7 @@ export interface ComposerProps {
   readonly workspaceName: string | undefined
   /** The whole path, for the chip's tooltip -- a name alone is ambiguous across projects. */
   readonly workspacePath: string | undefined
+  readonly workspaceMade?: boolean
   readonly onChooseFolder: () => void
   /** Who the next mission is messaged to; the placeholder says so. */
   readonly teammateName: string | undefined
@@ -128,6 +129,7 @@ export function Composer({
   continuationNote,
   workspaceName,
   workspacePath,
+  workspaceMade = false,
   onChooseFolder,
   runtimes,
   limitedRuntimes,
@@ -442,7 +444,9 @@ export function Composer({
                 title={
                   workspacePath === undefined
                     ? 'No folder chosen. Every teammate works inside one project folder.'
-                    : `Teammates work in ${workspacePath}`
+                    : workspaceMade
+                      ? `Teammates work in ${workspacePath}. Locust made this folder; pick any other to work there instead.`
+                      : `Teammates work in ${workspacePath}`
                 }
                 onClick={onChooseFolder}
               >

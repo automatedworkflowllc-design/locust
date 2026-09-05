@@ -33,13 +33,17 @@ export function workspaceIdFor(workspacePath: string): string {
  * (2026-09-05: "Antigravity has not opened C:\...\Programs\Locust").
  *
  * So the install folder is never a workspace. Launched from there, the app
- * uses the folder the person chose last time, and with none chosen it opens
- * with no workspace at all and says so -- a start is refused until a folder
- * is picked, rather than quietly editing the app's own files.
+ * uses the folder the person chose last time -- and with none chosen, a
+ * folder Locust makes for it (Documents\Locust), the way a terminal always
+ * has a working directory. Colin, 2026-09-05: "every similar program lets
+ * you do it, so maybe it just writes a project folder if you don't have
+ * one". The 0.21.5-0.31.1 answer was to open with no workspace and refuse
+ * the first message, which read as a bug in the first minute of use.
+ * The install folder is still never the workspace.
  */
 export interface WorkspaceResolution {
   readonly path: string | undefined
-  readonly source: 'argument' | 'launch-folder' | 'remembered' | 'none'
+  readonly source: 'argument' | 'launch-folder' | 'remembered' | 'default' | 'none'
 }
 
 export const WORKSPACE_ARGUMENT = '--workspace='
@@ -50,6 +54,8 @@ export function resolveWorkspacePath(options: {
   /** Where the installed app lives; undefined for a development build, which can be launched from anywhere. */
   readonly installDirectory: string | undefined
   readonly remembered: string | undefined
+  /** The folder to make and use when nothing else names one; undefined keeps the old "no workspace" answer. */
+  readonly defaultWorkspace?: string | undefined
   readonly platform: NodeJS.Platform
 }): WorkspaceResolution {
   // An explicit argument wins: it is how the app reopens itself in a folder
@@ -69,6 +75,13 @@ export function resolveWorkspacePath(options: {
     && !isInsideDirectory(options.remembered, options.installDirectory, options.platform)
   ) {
     return { path: resolve(options.remembered), source: 'remembered' }
+  }
+  if (
+    options.defaultWorkspace !== undefined
+    && isAbsolute(options.defaultWorkspace)
+    && !isInsideDirectory(options.defaultWorkspace, options.installDirectory, options.platform)
+  ) {
+    return { path: resolve(options.defaultWorkspace), source: 'default' }
   }
   return { path: undefined, source: 'none' }
 }

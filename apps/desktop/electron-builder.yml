@@ -30,6 +30,10 @@ directories:
 files:
   - out/**/*
   - package.json
+  # The window icon the main process hands BrowserWindow. It was not shipped
+  # until 0.32.0, so the packaged window fell back to Electron's own icon in
+  # the taskbar (Colin, 2026-09-05: "app icon is showing as electron app").
+  - resources/icon-512.png
 
 # Never ship the caller's mission ledger, smoke profiles, or source maps.
 asar: true

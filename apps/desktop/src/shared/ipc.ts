@@ -194,6 +194,13 @@ export interface AppInfo {
    */
   readonly workspaceName: string
   readonly workspacePath: string
+  /**
+   * Locust made the folder itself (Documents\Locust) because nothing was
+   * chosen and the app was launched from its install folder. The window
+   * says so where the folder is named, so a person knows where their
+   * teammates' files went and that any other folder is one click away.
+   */
+  readonly workspaceMade: boolean
 }
 
 /**
