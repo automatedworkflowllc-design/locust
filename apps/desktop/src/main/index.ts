@@ -33,6 +33,8 @@ import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { readRuntimeSetup } from './runtime-setup.js'
 import { createMemoryReader } from './memory-reader.js'
+import { createAttentionReader } from './attention-reader.js'
+import type { AttentionReader } from './attention-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import { memorySection } from '../shared/memory.js'
@@ -416,6 +418,7 @@ if (!ownsSingleInstanceLock) {
     let relay: Relay | undefined
     let routineRunner: RoutineRunner | undefined
     let memoryReader: MemoryReader | undefined
+    let attentionReader: AttentionReader | undefined
     // Bound late for the same reason: it reads the ledger the service writes.
     let roomTasks: RoomTasks | undefined
     const codexMissions = createCodexMissionService({
@@ -433,6 +436,7 @@ if (!ownsSingleInstanceLock) {
         await routineRunner?.onRunEnded(mission)
         await roomTasks?.onRunEnded(mission)
         await memoryReader?.onRunEnded(mission)
+        await attentionReader?.onRunEnded(mission)
       }
     })
     // The approval transport. It only runs for the mode that asked for it, so
@@ -481,6 +485,7 @@ if (!ownsSingleInstanceLock) {
         await routineRunner?.onRunEnded(mission)
         await roomTasks?.onRunEnded(mission)
         await memoryReader?.onRunEnded(mission)
+        await attentionReader?.onRunEnded(mission)
       }
     })
     const sendToWindow = (update: CodexMissionUpdate): void => {
@@ -735,6 +740,17 @@ if (!ownsSingleInstanceLock) {
     app.once('before-quit', () => {
       clearTimeout(firstRoutineTick)
       clearInterval(routineTicks)
+    })
+    // A run that ended waiting for the person -- a question card, an account
+    // limit -- is said to the desk the way an approval is (parity row 62).
+    attentionReader = createAttentionReader({
+      ledger: missionLedger,
+      teammates,
+      attention: {
+        decisionAsked: (name, question) => attention.decisionAsked(name, question),
+        limitHit: (name, runtime, message) =>
+          attention.limitHit(name, isMissionRuntime(runtime) ? runtimeDisplayName(runtime) : runtime, message)
+      }
     })
     memoryReader = createMemoryReader({
       memories,

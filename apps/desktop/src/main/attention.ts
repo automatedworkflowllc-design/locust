@@ -55,6 +55,28 @@ export function approvalNotificationText(
  * person who has stepped away is not worse off for hearing about a board
  * two minutes late. The window that is in front hears nothing either way.
  */
+/** A teammate asked and stopped: the question, bounded to a toast. */
+export function decisionNotificationText(teammateName: string | undefined, question: string): { readonly title: string; readonly body: string } {
+  const one = question.replace(/\s+/g, ' ').trim()
+  return {
+    title: `${teammateName ?? 'A teammate'} is asking you something`,
+    body: `${one.length > 140 ? `${one.slice(0, 139).trimEnd()}…` : one} · the run waits for your answer.`
+  }
+}
+
+/** A run stopped at its account's limit: where it stopped, in the runtime's own words when it had any. */
+export function limitNotificationText(
+  teammateName: string | undefined,
+  runtimeName: string,
+  message: string | undefined
+): { readonly title: string; readonly body: string } {
+  const said = message === undefined ? undefined : message.replace(/\s+/g, ' ').trim()
+  return {
+    title: `${teammateName ?? 'A teammate'} hit the ${runtimeName} limit`,
+    body: `${said === undefined || said.length === 0 ? 'The run stopped at a checkpoint' : said.length > 120 ? `${said.slice(0, 119).trimEnd()}…` : said} · pick where it continues.`
+  }
+}
+
 export const ROOM_TOAST_WINDOW_MS = 120_000
 export const ROOM_TOAST_LINES = 3
 
@@ -86,6 +108,10 @@ export function createAttention(
    * the room screen already says it.
    */
   roomChanged(input: { readonly roomId: string; readonly roomName: string; readonly message: string }): void
+  /** A teammate ended a run with a question card. Said at once, like an approval. */
+  decisionAsked(teammateName: string | undefined, question: string): boolean
+  /** A run stopped at its account limit and waits for a person to pick where it continues. */
+  limitHit(teammateName: string | undefined, runtimeName: string, message: string | undefined): boolean
   /** Test seam: what is waiting to be said. */
   pending(): ReadonlyMap<string, readonly string[]>
 } {
@@ -102,6 +128,16 @@ export function createAttention(
       if (!shouldNotify({ focused: surface.focused(), supported: surface.supported() })) return false
       const text = approvalNotificationText(request, teammateName)
       surface.notify({ ...text, onClick: () => surface.focusWindow() })
+      return true
+    },
+    decisionAsked(teammateName, question) {
+      if (!shouldNotify({ focused: surface.focused(), supported: surface.supported() })) return false
+      surface.notify({ ...decisionNotificationText(teammateName, question), onClick: () => surface.focusWindow() })
+      return true
+    },
+    limitHit(teammateName, runtimeName, message) {
+      if (!shouldNotify({ focused: surface.focused(), supported: surface.supported() })) return false
+      surface.notify({ ...limitNotificationText(teammateName, runtimeName, message), onClick: () => surface.focusWindow() })
       return true
     },
     roomChanged(input) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { approvalNotificationText, createAttention, ROOM_TOAST_LINES, ROOM_TOAST_WINDOW_MS, roomNotificationText, shouldNotify } from './attention.js'
+import { approvalNotificationText, createAttention, ROOM_TOAST_LINES, ROOM_TOAST_WINDOW_MS, roomNotificationText, shouldNotify, decisionNotificationText, limitNotificationText } from './attention.js'
 
 describe('when an approval earns a notification', () => {
   it('only when the window is not in front, and only where the OS can show one', () => {
@@ -165,5 +165,35 @@ describe('when a room changes while the person is elsewhere', () => {
     attention.roomChanged({ roomId: 'room_b', roomName: 'Beta', message: 'b' })
     time.advance(ROOM_TOAST_WINDOW_MS)
     expect(shown.map((toast) => toast.title).sort()).toEqual(['Alpha', 'Beta'])
+  })
+})
+
+describe('the two other ways a run ends waiting for a person', () => {
+  it('a question card is said as the teammate asking, with the question and that the run waits', () => {
+    expect(decisionNotificationText('Wren', 'Which  database?')).toEqual({
+      title: 'Wren is asking you something',
+      body: 'Which database? · the run waits for your answer.'
+    })
+    expect(decisionNotificationText(undefined, 'x'.repeat(200)).body.length).toBeLessThan(180)
+  })
+
+  it("a limit is said with the runtime and its own words, or a plain line when it had none", () => {
+    expect(limitNotificationText('Booty', 'Claude Code', 'You have hit your weekly limit.')).toEqual({
+      title: 'Booty hit the Claude Code limit',
+      body: 'You have hit your weekly limit. · pick where it continues.'
+    })
+    expect(limitNotificationText(undefined, 'Codex CLI', undefined).body).toBe('The run stopped at a checkpoint · pick where it continues.')
+  })
+
+  it('both are shown at once when the window is elsewhere, and not at all when it has attention', () => {
+    const shown: { title: string }[] = []
+    const away = createAttention({ focused: () => false, supported: () => true, notify: (input) => shown.push(input), focusWindow: () => undefined })
+    expect(away.decisionAsked('Wren', 'Which database?')).toBe(true)
+    expect(away.limitHit('Wren', 'Claude Code', undefined)).toBe(true)
+    expect(shown.map((entry) => entry.title)).toEqual(['Wren is asking you something', 'Wren hit the Claude Code limit'])
+    const here = createAttention({ focused: () => true, supported: () => true, notify: (input) => shown.push(input), focusWindow: () => undefined })
+    expect(here.decisionAsked('Wren', 'Which database?')).toBe(false)
+    expect(here.limitHit('Wren', 'Claude Code', undefined)).toBe(false)
+    expect(shown).toHaveLength(2)
   })
 })

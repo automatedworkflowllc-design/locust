@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.28.1 — 2026-09-05
+
+- **Two more things reach the desk while you are away.** A teammate that
+  ends a run with a question card, and a run that stops at its account's
+  limit, now show a desktop notification like an approval does -- only when
+  Locust is not the window in front. Clicking it brings Locust forward.
+
 ## 0.28.0 — 2026-09-05
 
 - **Settings shows what each runtime has set up for itself.** Under every
