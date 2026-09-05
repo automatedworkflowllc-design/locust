@@ -710,6 +710,32 @@ export function buildThread(
     }
   }
 
+  // A turn that finished and said nothing.
+  //
+  // MEASURED 2026-09-05, Colin watching a live test: a follow-up on Cursor
+  // completed cleanly -- exit 0, tokens spent, reasoning recorded -- and
+  // emitted no assistant text at all. The thread drew the person's message,
+  // then blank space, and the header said `completed`. That reads as the app
+  // losing the answer, or the teammate ignoring you. Neither is what
+  // happened, and the record can say which: the runtime thought and then
+  // ended the turn without writing a reply.
+  //
+  // Only for a finished run, and only when there is genuinely nothing to
+  // read -- a turn that did work says so through its activity card, and a
+  // failure has its own card already.
+  if (!options.running && events.some((event) => event.type === 'run.completed')) {
+    const saidSomething = items.some((item) => item.type === 'agent-message' || item.type === 'activity')
+    if (!saidSomething) {
+      items.push({
+        key: 'silent_turn',
+        type: 'diagnostic',
+        level: 'warning',
+        message:
+          'This turn ended without a reply: the runtime finished and wrote nothing back. Nothing was changed. Sending it again usually works.'
+      })
+    }
+  }
+
   return items
 }
 

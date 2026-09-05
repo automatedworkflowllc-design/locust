@@ -40,6 +40,21 @@ await mkdir(profile, { recursive: true })
 await writeFile(join(workspace, 'status.ts'), 'export const status = "draft";\n', 'utf8')
 await writeFile(join(workspace, 'README.md'), '# scratch\n', 'utf8')
 
+// Refuse to start if something already answers on this port. Two of these
+// running at once both bind the SAME debugging port: the second one loses the
+// bind, silently drives the FIRST app, and then hangs forever when that app is
+// killed -- which is exactly what happened on 2026-09-05 and looked like the
+// product wedging. A port already in use is an operator error, said out loud.
+try {
+  const already = await fetch(`http://127.0.0.1:${String(PORT)}/json/list`, { signal: AbortSignal.timeout(1500) })
+  if (already.ok) {
+    say(`  [FAIL] something is already debugging on port ${String(PORT)} -- close the other smoke first`)
+    process.exit(1)
+  }
+} catch {
+  // Nothing listening, which is what we want.
+}
+
 const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(PORT)}`, `--user-data-dir=${profile}`], {
   cwd: workspace,
   env: { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}` },
@@ -95,7 +110,16 @@ try {
   const evaluate = (expression) =>
     new Promise((resolve_) => {
       const next = ++id
+      // A dead renderer never answers, and an await with no timeout then hangs
+      // the whole run with no output at all. Say so and carry on failing.
+      const gaveUp = setTimeout(() => {
+        if (pending.delete(next)) {
+          say('  eval timed out: the app stopped answering')
+          resolve_(undefined)
+        }
+      }, 120_000)
       pending.set(next, (message) => {
+        clearTimeout(gaveUp)
         const thrown = message.result?.exceptionDetails
         if (thrown !== undefined) say(`  eval threw: ${thrown.exception?.description ?? ''}`.slice(0, 300))
         resolve_(message.result?.result?.value)

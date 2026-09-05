@@ -121,6 +121,31 @@ function askSection(): string {
 }
 
 /**
+ * Plan first: work the problem out and write down what you WOULD do, without
+ * doing any of it.
+ *
+ * The sandbox already refuses writes in this mode, so this section is not
+ * what makes a plan run safe -- it is what makes the answer a plan rather
+ * than an explanation. Both of the products people compare this one to have
+ * a plan mode, and the reason it is worth having is that reviewing a list of
+ * intended steps is far cheaper than reviewing a diff of steps already taken.
+ *
+ * Deliberately not asked for: a decision block. The person decides by
+ * pressing Build, which is a real button on a real turn, and a card asking
+ * "shall I do it?" beside that button would be two ways to answer one
+ * question.
+ */
+export function planSection(): string {
+  return [
+    'PLAN FIRST. Do not change anything in this workspace on this turn, and do not run commands that change state.',
+    'Read what you need, then answer with the plan itself: numbered steps, in the order you would do them, each one concrete enough to check off.',
+    'Name anything you had to assume, and anything you found that changes what was asked.',
+    'If the work is small enough that a plan would be longer than doing it, say so in one line and give the steps anyway -- brevity is a fine plan.',
+    'The person reads this and decides whether to have you carry it out; you are not being asked to start.'
+  ].join('\n')
+}
+
+/**
  * Compose what the runtime is sent. Inbound messages that do not fit are left
  * out from the newest end and are NOT reported as delivered, so they wait for
  * the next mission rather than vanishing; the notice line then counts them.

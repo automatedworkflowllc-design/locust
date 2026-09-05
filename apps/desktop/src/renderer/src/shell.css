@@ -4162,3 +4162,33 @@ textarea {
 .lc-routinerow__meta {
   color: var(--lc-text-muted);
 }
+
+/* What is waiting to be sent when the running mission finishes. Sits above
+   the composer, in the composer's own well, because it is about the next
+   thing you will say rather than about the work on screen. */
+.lc-queued {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised);
+}
+
+.lc-queued__label {
+  color: var(--lc-text-muted);
+  letter-spacing: 0.08em;
+}
+
+.lc-queued__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-queued__note {
+  color: var(--lc-text-muted);
+}

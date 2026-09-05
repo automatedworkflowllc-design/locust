@@ -44,8 +44,30 @@ const CATALOG_MODELS = join(ROOT, 'src', 'main', 'model-catalog.ts')
 const ROUTINE_RUNNER = join(ROOT, 'src', 'main', 'routine-runner.ts')
 const ROUTINE_STORE = join(ROOT, 'src', 'main', 'routine-store.ts')
 const ROUTINES_VIEW = join(ROOT, 'src', 'renderer', 'src', 'routines.ts')
+const STEERING = join(ROOT, 'src', 'renderer', 'src', 'steering.ts')
 
 const MUTATIONS = [
+  {
+    file: MISSIONS,
+    name: 'plan first is honoured even in a mode that can write',
+    from: "        if (plan === true && sandbox === 'read-only') {",
+    to: '        if (plan === true) {',
+    expect: 'plans first when asked, and only where the sandbox already refuses writes'
+  },
+  {
+    file: STEERING,
+    name: 'a queued message is sent after a run that did not complete',
+    from: "  if (input.phase !== 'completed') {",
+    to: '  if (false) {',
+    expect: 'is HELD when the run did not complete, and says which way it ended'
+  },
+  {
+    file: STEERING,
+    name: 'a queued message is sent into whatever conversation is on screen now',
+    from: '  if (!input.onScreen) return',
+    to: '  if (false) return',
+    expect: 'is held when the person has moved to another conversation'
+  },
   {
     file: ROUTINE_RUNNER,
     name: 'a routine runs its next step even when the one before did not complete',
@@ -1281,6 +1303,7 @@ const originals = new Map([
   [ROUTINE_RUNNER, readFileSync(ROUTINE_RUNNER, 'utf8')],
   [ROUTINE_STORE, readFileSync(ROUTINE_STORE, 'utf8')],
   [ROUTINES_VIEW, readFileSync(ROUTINES_VIEW, 'utf8')],
+  [STEERING, readFileSync(STEERING, 'utf8')],
   [AGENT_TEXT, readFileSync(AGENT_TEXT, 'utf8')],
   [TEAMMATE_WORK, readFileSync(TEAMMATE_WORK, 'utf8')]
 ])

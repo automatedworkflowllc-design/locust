@@ -1028,7 +1028,10 @@ if (!ownsSingleInstanceLock) {
           },
           undefined,
           peer,
-          followUpOf
+          followUpOf,
+          undefined,
+          undefined,
+          payload.plan === true
         )
         if (response.ok) {
           await assignOwner(peer?.self.teammateId, response.data.missionId)

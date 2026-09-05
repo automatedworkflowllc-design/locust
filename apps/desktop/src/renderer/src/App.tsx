@@ -27,6 +27,7 @@ import type {
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
+import { queuedVerdict } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
@@ -139,6 +140,8 @@ interface LiveRunState {
    * mission title while this is set.
    */
   readonly startedBy?: PublicRecoveredMission['startedBy']
+  /** This run was asked to PLAN rather than do, so the offer after it is the build step. */
+  readonly plan?: boolean
   /**
    * When the person pressed send, ISO. The thread's waiting line clocks the
    * launch from here -- before the first event there is nothing else to time,
@@ -502,6 +505,19 @@ export default function App(): ReactElement {
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
   const [routines, setRoutines] = useState<readonly PublicRoutine[]>([])
+  /**
+   * What a person typed while a mission was running, waiting to go as the
+   * next turn. Kept against the RUN it was typed at, not the teammate, so it
+   * can never be sent into some other conversation: if that run is no longer
+   * the one on screen, it waits and says so rather than guessing.
+   */
+  const [queued, setQueued] = useState<{ readonly key: string; readonly text: string }>()
+  /**
+   * Plan first: the next mission answers with the steps it would take and
+   * changes nothing. Sent only with a mode whose sandbox already refuses
+   * writes, and the host checks that again rather than trusting this.
+   */
+  const [planFirst, setPlanFirst] = useState(false)
   /** The save/edit dialog, open on a draft taken from a conversation or on a routine already saved. */
   const [routineDialog, setRoutineDialog] = useState<{
     readonly teammateId: string
@@ -915,7 +931,8 @@ export default function App(): ReactElement {
       startedAtIso: new Date().toISOString(),
       ...(teammateId === undefined ? {} : { teammateId }),
       ...(earlierTurns.length === 0 ? {} : { earlierTurns }),
-      ...(coldStart ? { coldStart: true } : {})
+      ...(coldStart ? { coldStart: true } : {}),
+      ...(planFirst && (modeOverride ?? mode) !== 'accept-edits' ? { plan: true } : {})
     }
     setRuns((current) => withNewRun(current, key, starting))
     setShownKey(key)
@@ -942,6 +959,10 @@ export default function App(): ReactElement {
         model: chosenModelId(models, route.model, swarmEffortFor(models, route.model, swarm, effort, route.runtime)),
         ...(teammateId === undefined ? {} : { teammateId }),
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
+        // Plan first only where the mode already refuses writes. The host
+        // checks this again; sending it with an editing mode would be asking
+        // for a promise neither side can keep.
+        ...(planFirst && (modeOverride ?? mode) !== 'accept-edits' ? { plan: true } : {}),
         // Only sent when the chosen model advertised it; the composer cannot
         // offer an effort the catalog did not report for that model.
         // Swarm overrides the picked effort with the model's maximum, and the
@@ -1339,6 +1360,30 @@ export default function App(): ReactElement {
     if (settledSignature.length === 0) return
     refreshHistory()
   }, [settledSignature])
+
+  // A queued message goes as the next turn the moment its run COMPLETES, and
+  // only then. A run that failed, was stopped or was interrupted leaves it
+  // waiting with the reason on screen: sending the next instruction into a
+  // conversation whose last turn did not happen would build on work that
+  // never ran, which is the same rule a routine's steps follow.
+  const queuedRun = queued === undefined ? undefined : runs.get(queued.key)
+  const verdict =
+    queued === undefined
+      ? undefined
+      : queuedVerdict({
+          running: queuedRun !== undefined && liveRunIsActive(queuedRun),
+          phase: queuedRun?.phase,
+          onScreen: shownKey === queued.key
+        })
+  const queuedNote = verdict?.kind === 'held' ? verdict.note : undefined
+  useEffect(() => {
+    if (queued === undefined || verdict?.kind !== 'send') return
+    const text = queued.text
+    // Cleared BEFORE sending: this effect runs again on the state the send
+    // produces, and a queue still holding the message would send it twice.
+    setQueued(undefined)
+    void startMission(text)
+  }, [queued, verdict?.kind])
 
   /** The addressed teammate's live run, if they have one: they cannot be given a second. */
   const busyRun = [...runs.values()].find(
@@ -1804,6 +1849,7 @@ export default function App(): ReactElement {
                 earlierTurns={liveRun.earlierTurns ?? []}
                 coldStart={liveRun.coldStart ?? false}
                 workspacePath={workspacePath}
+                wasPlan={liveRun.plan === true}
                 onRunWithEdits={
                   // Offered only where it is genuinely the next thing a
                   // person wants: a finished READ-ONLY run whose reply
@@ -1817,6 +1863,9 @@ export default function App(): ReactElement {
                   && modeRunsOn('accept-edits', liveRun.data.runtime, build?.platform)
                     ? () => {
                         setMode('accept-edits')
+                        // Building is the doing turn: plan-first would ask
+                        // for a second plan of the plan.
+                        setPlanFirst(false)
                         void startMission(liveRun.prompt, 'accept-edits')
                       }
                     : undefined
@@ -1928,6 +1977,28 @@ export default function App(): ReactElement {
             handingOff={handingOff}
             teammateName={selectedTeammate?.name}
             busyWith={busyRun === undefined ? undefined : (selectedTeammate?.name ?? 'This teammate')}
+            queued={queued?.text}
+            queuedNote={queuedNote}
+            queuedElsewhere={queued !== undefined && shownKey !== queued.key}
+            onQueue={(text) => {
+              // Against the LIVE run on screen -- that is the conversation
+              // being replied into. Keyed on the addressed teammate's busy
+              // run instead, this did nothing at all on a fresh profile,
+              // where every mission belongs to nobody (steering smoke,
+              // 2026-09-05); the teammate's run is the fallback for when the
+              // thread on screen is someone else's.
+              const onScreen = shownKey !== undefined && liveRunIsActive(runs.get(shownKey)) ? shownKey : undefined
+              const key = onScreen ?? [...runs.entries()].find(([, run]) => run === busyRun)?.[0]
+              if (key !== undefined) setQueued({ key, text })
+            }}
+            onUnqueue={() => setQueued(undefined)}
+            planFirst={planFirst}
+            onPlanFirstChange={setPlanFirst}
+            onSendQueued={() => {
+              const text = queued?.text
+              setQueued(undefined)
+              if (text !== undefined) void startMission(text)
+            }}
           />
           )}
         </main>

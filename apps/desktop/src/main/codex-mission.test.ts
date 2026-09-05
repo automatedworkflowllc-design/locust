@@ -1286,6 +1286,53 @@ describe('the workroom around a mission', () => {
     expect(response.data.peerDeliveryFailed).toBe(false)
   })
 
+  it('plans first when asked, and only where the sandbox already refuses writes', async () => {
+    const { workroom } = fakeWorkroom()
+    const planning = peerService({ run: transcript('Here is the plan.'), workroom })
+    const planned = await planning.service.start(
+      'Add retries to the fetch helper.',
+      'codex',
+      'ask',
+      {},
+      () => undefined,
+      undefined,
+      PEER,
+      undefined,
+      undefined,
+      undefined,
+      true
+    )
+    expect(planned.ok).toBe(true)
+    const withPlan = planning.start.mock.calls[0]?.[1] as string
+    expect(withPlan.startsWith('Add retries to the fetch helper.')).toBe(true)
+    expect(withPlan).toContain('PLAN FIRST')
+    expect(withPlan).toContain('numbered steps')
+
+    // Accept edits CAN change the workspace, so a plan section there would be
+    // a promise the containment does not keep: it is refused, not trusted.
+    const editing = peerService({ run: transcript('Done.'), workroom })
+    const edited = await editing.service.start(
+      'Add retries to the fetch helper.',
+      'codex',
+      'accept-edits',
+      {},
+      () => undefined,
+      undefined,
+      PEER,
+      undefined,
+      undefined,
+      undefined,
+      true
+    )
+    expect(edited.ok).toBe(true)
+    expect(editing.start.mock.calls[0]?.[1] as string).not.toContain('PLAN FIRST')
+
+    // And a read-only run that did NOT ask to plan is unchanged.
+    const plain = peerService({ run: transcript('Done.'), workroom })
+    await plain.service.start('Add retries to the fetch helper.', 'codex', 'ask', {}, () => undefined, undefined, PEER)
+    expect(plain.start.mock.calls[0]?.[1] as string).not.toContain('PLAN FIRST')
+  })
+
   it('keeps the person\'s own words as the recorded prompt, not the briefing', async () => {
     const { workroom } = fakeWorkroom()
     const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)

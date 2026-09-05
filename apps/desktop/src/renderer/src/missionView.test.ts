@@ -382,6 +382,29 @@ describe('thread composition', () => {
     expect(thread.find((i) => i.type === 'diagnostic')).toMatchObject({ level: 'warning' })
   })
 
+  it('says so when a turn finished and wrote nothing back', () => {
+    // MEASURED 2026-09-05 while Colin watched a live test: a follow-up on
+    // Cursor completed cleanly, spent tokens, recorded reasoning, and emitted
+    // no assistant text. The thread drew the person's message and then blank
+    // space under a header saying `completed`.
+    const silent = buildThread([event('run.started', {}), event('run.completed', { process: {} })], { running: false })
+    expect(silent.filter((item) => item.type === 'diagnostic').map((item) => item.message)).toEqual([
+      'This turn ended without a reply: the runtime finished and wrote nothing back. Nothing was changed. Sending it again usually works.'
+    ])
+
+    // A turn that answered says nothing of the kind...
+    const answered = buildThread([delta('a', 'ALPHA', 'append', true), event('run.completed', { process: {} })], { running: false })
+    expect(answered.some((item) => item.type === 'diagnostic')).toBe(false)
+    // ...nor does one that did work without narrating it...
+    const worked = buildThread(
+      [toolStart('t1', 'shell', 'pnpm test'), toolDone('t1'), event('run.completed', { process: {} })],
+      { running: false }
+    )
+    expect(worked.some((item) => item.type === 'diagnostic')).toBe(false)
+    // ...and a run still going has not finished saying anything yet.
+    expect(buildThread([event('run.started', {})], { running: true }).some((item) => item.type === 'diagnostic')).toBe(false)
+  })
+
   it('says a quota failure once, not as a card and again as a red line', () => {
     // MEASURED user session 1, 2026-09-05: one Codex quota failure drew the
     // limit card, the runtime's error line and the run's failure card, all

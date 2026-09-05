@@ -203,6 +203,8 @@ export interface ThreadProps {
   readonly workspacePath?: string
   /** Present only when re-running with edits allowed is possible; see App. */
   readonly onRunWithEdits?: () => void
+  /** Whether that run was asked to PLAN rather than do; the offer then reads as the build step. */
+  readonly wasPlan?: boolean
   /**
    * How a person answers a question the run ended on. Absent when this thread
    * cannot take a next turn at all, which is what keeps a card from appearing
@@ -280,6 +282,7 @@ export function Thread({
   earlierTurns,
   coldStart = false,
   onRunWithEdits,
+  wasPlan,
   onAnswer,
   onResume,
   sandbox,
@@ -439,14 +442,20 @@ export function Thread({
           </div>
         )}
 
-        {onRunWithEdits !== undefined && answeredWithCode && (
+        {onRunWithEdits !== undefined && (wasPlan === true || answeredWithCode) && (
           // Deliberately not an error: the run did exactly what its mode
           // allows. This is the one click that would otherwise be a mode
-          // change and a retyped prompt.
+          // change and a retyped prompt. A plan run says so in its own
+          // words -- the point of planning is that carrying it out is the
+          // next, separate decision.
           <div className="lc-rerun">
-            <span>This run could not write to the workspace, so the change is only in the reply.</span>
+            <span>
+              {wasPlan === true
+                ? 'This is the plan, not the work: nothing in the workspace has changed.'
+                : 'This run could not write to the workspace, so the change is only in the reply.'}
+            </span>
             <button type="button" className="lc-button" onClick={onRunWithEdits}>
-              <Icon name="diff" size={13} /> Run again with edits allowed
+              <Icon name="diff" size={13} /> {wasPlan === true ? 'Build this plan' : 'Run again with edits allowed'}
             </button>
           </div>
         )}

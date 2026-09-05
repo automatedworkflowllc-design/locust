@@ -87,6 +87,18 @@ export interface ComposerProps {
    * run being on screen does not block this one.
    */
   readonly busyWith: string | undefined
+  /** What is waiting to be sent when the running mission finishes, if anything. */
+  readonly queued: string | undefined
+  /** Why a queued message has not gone yet, when it is not simply still running. */
+  readonly queuedNote: string | undefined
+  readonly onQueue: (text: string) => void
+  readonly onUnqueue: () => void
+  readonly onSendQueued: () => void
+  /** The queued message belongs to a conversation that is NOT the one on screen. */
+  readonly queuedElsewhere: boolean
+  /** Plan first: the run answers with the steps it would take and changes nothing. */
+  readonly planFirst: boolean
+  readonly onPlanFirstChange: (planFirst: boolean) => void
 }
 
 /**
@@ -125,7 +137,15 @@ export function Composer({
   onHandOff,
   handingOff,
   teammateName,
-  busyWith
+  busyWith,
+  queued,
+  queuedNote,
+  onQueue,
+  onUnqueue,
+  onSendQueued,
+  queuedElsewhere,
+  planFirst,
+  onPlanFirstChange
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
   const [modeOpen, setModeOpen] = useState(false)
@@ -146,9 +166,23 @@ export function Composer({
   // cannot be started.
   const routeCanRun = hostCanRunMission(route.runtime)
   const canStart = selectedReady && routeCanRun && busyWith === undefined && value.trim().length > 0
+  // While a mission works, what you type is not lost and not sent into a run
+  // that cannot hear it: it waits and goes as the next turn when this one
+  // finishes. Before 0.20.0 the box was simply disabled, so the only way to
+  // say the next thing was to stop the work first.
+  //
+  // Keyed on the RUN being live, not on a teammate being busy: a mission
+  // that belongs to nobody -- which is every mission until someone makes a
+  // teammate -- has no busy teammate, and the first version of this could
+  // not be used at all on a fresh profile (steering smoke, 2026-09-05).
+  const workingNow = running || busyWith !== undefined
+  const canQueue = workingNow && queued === undefined && value.trim().length > 0
+  const workingName = busyWith ?? 'this mission'
 
-  const placeholder = busyWith !== undefined
-    ? `${busyWith} is still working — stop that mission or pick another teammate…`
+  const placeholder = workingNow
+    ? queued === undefined
+      ? `Say what is next — it goes to ${workingName} when this finishes…`
+      : `Waiting to send when ${workingName} finishes…`
     : !routeCanRun
       ? `The ${selected?.displayName ?? 'selected'} adapter is not finished — switch the route to run a mission…`
       : selectedReady
@@ -173,7 +207,13 @@ export function Composer({
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()
     const prompt = value.trim()
-    if (!canStart || prompt.length === 0) return
+    if (prompt.length === 0) return
+    if (canQueue) {
+      onQueue(prompt)
+      setValue('')
+      return
+    }
+    if (!canStart) return
     void onStart(prompt).then((started) => {
       if (started) setValue('')
     })
@@ -224,6 +264,26 @@ export function Composer({
             {error}
           </div>
         )}
+        {queued !== undefined && (
+          <div className="lc-queued" role="status" aria-live="polite">
+            <span className="lc-queued__label lc-mono">NEXT</span>
+            <span className="lc-queued__text">{queued}</span>
+            <span className="lc-queued__note lc-mono">
+              {queuedNote ?? (workingNow ? 'sends when this finishes' : 'ready to send')}
+            </span>
+            {!workingNow && (
+              <button type="button" className="lc-ghostbutton" onClick={onSendQueued}>
+                {/* It always goes into the conversation ON SCREEN, so where
+                    that is not the one it was typed at, the button says so
+                    rather than reading as "send it where it was going". */}
+                {queuedElsewhere ? 'Send here' : 'Send now'}
+              </button>
+            )}
+            <button type="button" className="lc-ghostbutton" onClick={onUnqueue} aria-label="Discard the queued message">
+              Discard
+            </button>
+          </div>
+        )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>
           <div className="lc-composer__box">
             <textarea
@@ -234,9 +294,9 @@ export function Composer({
               aria-label="Mission instruction"
               rows={1}
               maxLength={MAX_PROMPT_LENGTH}
-              disabled={running}
+              disabled={workingNow && queued !== undefined}
             />
-            {running ? (
+            {running && !canQueue ? (
               <button
                 type="button"
                 className="send-button lc-send is-stop"
@@ -246,6 +306,18 @@ export function Composer({
               >
                 {/* A small rounded square, as drawn -- not a pause icon. */}
                 <span className="lc-stopsquare" />
+              </button>
+            ) : canQueue ? (
+              // Typed text turns the control into "queue this", so the stop
+              // button is still one click away with an empty box. What the
+              // button does is what the placeholder just promised.
+              <button
+                type="submit"
+                className="send-button lc-send is-queue"
+                aria-label="Send this when the mission finishes"
+                title="Send this when the mission finishes"
+              >
+                <Icon name="arrow-up" size={15} />
               </button>
             ) : (
               <button
@@ -300,6 +372,32 @@ export function Composer({
                   {MODES.find((option) => option.mode === effectiveMode)?.name ?? 'Ask'}
                 </button>
               </span>
+              {/*
+                * Plan first. Offered only where the sandbox already refuses
+                * writes, because a plan that could edit the workspace is a
+                * promise the app cannot keep -- so in Accept edits the
+                * control says why rather than sitting there doing nothing.
+                */}
+              <button
+                type="button"
+                className={`lc-control lc-plan${planFirst && effectiveMode !== 'accept-edits' ? ' is-on' : ''}`}
+                aria-pressed={planFirst && effectiveMode !== 'accept-edits'}
+                disabled={running || effectiveMode === 'accept-edits'}
+                title={
+                  effectiveMode !== 'accept-edits'
+                    ? 'Answer with the steps it would take, and change nothing'
+                    : // "Switch to Ask" is bad advice where Ask cannot be
+                      // chosen at all. On Cursor for Windows the sandbox
+                      // that would hold a run read-only does not exist, so
+                      // the honest line is the runtime's own reason
+                      // (steering smoke, 2026-09-05).
+                      (modeUnavailableReason('ask', route.runtime, platform)
+                        ?? 'Plan first needs a mode that changes nothing — switch to Ask')
+                }
+                onClick={() => onPlanFirstChange(!planFirst)}
+              >
+                Plan first
+              </button>
               <button type="button" className="lc-control" disabled title="Attachments and slash commands are not built yet">
                 <Icon name="plus" size={14} />
               </button>

@@ -35,6 +35,7 @@ import { composeHandoffPrompt } from './handoff.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
+import { planSection } from './workroom-briefing.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionStarter } from '@teammate/mission-store'
 import { recordableCommand } from './command-record.js'
@@ -104,7 +105,13 @@ export interface CodexMissionService {
      * Who started this run, when it was not a person and not the relay. Only
      * `resume` supplies it; the relay derives its own from `relay` above.
      */
-    startedBy?: MissionStarter
+    startedBy?: MissionStarter,
+    /**
+     * Plan first: answer with the steps you WOULD take and change nothing.
+     * Honoured only where the sandbox is already read-only, so it can never
+     * be a promise the containment does not keep.
+     */
+    plan?: boolean
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   /**
@@ -445,7 +452,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       peer?: MissionPeerContext,
       followUpOf?: string,
       relay?: RelayOrigin,
-      startedBy?: MissionStarter
+      startedBy?: MissionStarter,
+      plan?: boolean
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -706,6 +714,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered
           peerDeliveryFailed = prepared.failed
+        }
+        // Plan first, for a teammate's mission or a plain one. Appended last
+        // so it is the instruction closest to the model's answer, and only
+        // where the sandbox already refuses writes -- a "plan" that could
+        // edit the workspace is a promise the app cannot keep.
+        if (plan === true && sandbox === 'read-only') {
+          runtimePrompt = [runtimePrompt, planSection()].join('\n\n')
         }
 
         try {

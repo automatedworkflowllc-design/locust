@@ -427,6 +427,12 @@ export interface CodexMissionStartRequest {
    * cannot be resumed is refused rather than silently started blank.
    */
   readonly followUpOf?: string
+  /**
+   * Plan first: the runtime answers with the steps it WOULD take and changes
+   * nothing. Honoured only where the sandbox is already read-only, so a plan
+   * run cannot be a promise the containment does not keep.
+   */
+  readonly plan?: boolean
 }
 
 /**

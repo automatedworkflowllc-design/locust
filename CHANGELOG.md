@@ -6,6 +6,34 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.20.0 — 2026-09-05
+
+The two habits people bring from other agent tools, and miss first.
+
+- **Say the next thing while a teammate is still working.** The box used to
+  be dead during a run, so the only way to add an instruction was to stop
+  the work. Now it stays usable: what you type waits, the screen shows it
+  waiting, and it goes as the next turn the moment that run **completes**.
+  If the run failed, was stopped, or never finished, it is held instead,
+  with the reason and a Send now button — the next instruction assumes the
+  last turn happened, and sending it into a turn that did not is how you
+  end up building on work nobody did.
+- **Plan first.** A control beside the mode: the run answers with the steps
+  it would take, numbered, and changes nothing. The thread then says so in
+  its own words and offers **Build this plan**, which starts the doing turn
+  of the same conversation with edits allowed. Offered only in a mode whose
+  sandbox already refuses writes, and the host checks that again rather
+  than trusting the window — a plan that could edit your files is a promise
+  the app cannot keep. Cursor Agent on Windows has no sandbox that can hold
+  a run read-only, so plan first is not offered there, and the control says
+  that rather than telling you to switch to a mode you cannot pick.
+- **A turn that ends without a reply now says so.** Found by Colin watching a
+  live test: a follow-up finished cleanly, spent tokens, recorded its
+  reasoning and wrote nothing back. The thread showed the message, then
+  blank space, under a header reading "completed" — which reads as the app
+  losing the answer. It now says the runtime finished and wrote nothing,
+  that nothing was changed, and that sending again usually works.
+
 ## 0.19.0 — 2026-09-05
 
 - **Routines: teach a teammate a job once, then hand it back any time.**
