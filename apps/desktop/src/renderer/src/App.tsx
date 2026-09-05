@@ -57,6 +57,7 @@ import {
   resolvedModelNames,
   resumableSessionOf,
   relayedTitle,
+  peerRunFor,
   rootMission,
   startedLabel,
   stitchedHandoff,
@@ -1848,6 +1849,14 @@ export default function App(): ReactElement {
               <Thread
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
+                onOpenPeerRun={(messageId) => {
+                  // Only where the record shows the message actually reached
+                  // a run. Nothing received it yet is a real state -- it
+                  // waits for that teammate's next run -- and a control that
+                  // led nowhere would say otherwise.
+                  const reached = peerRunFor(messageId, history)
+                  return reached === undefined ? undefined : () => openMission(reached.missionId)
+                }}
                 earlierTurns={liveRun.earlierTurns ?? []}
                 coldStart={liveRun.coldStart ?? false}
                 workspacePath={workspacePath}

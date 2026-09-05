@@ -1357,6 +1357,30 @@ export function typedPrompt(
  * and otherwise not at all -- the peer card beside it already says who wrote
  * to whom, so silence here loses nothing and inventing a sentence would.
  */
+/**
+ * The run a peer message was DELIVERED into, so a person reading one side of
+ * an exchange can open the other.
+ *
+ * Colin's third point on 2026-09-04, the one still unbuilt: a teammate's
+ * relayed run is filed under that teammate with a readable title, but the
+ * thread that asked has no way to reach it -- you go looking in the sidebar.
+ * The link is already in the record: the same `messageId` appears as
+ * `posted` on the run that wrote it and as `received` on the run it was
+ * quoted into.
+ *
+ * Undefined when nothing received it, which is a real state and not an
+ * error: the message may still be waiting for that teammate's next run.
+ */
+export function peerRunFor(
+  messageId: string,
+  missions: readonly PublicRecoveredMission[]
+): PublicRecoveredMission | undefined {
+  if (messageId.length === 0) return undefined
+  return missions.find((mission) =>
+    mission.peerMessages.some((message) => message.messageId === messageId && message.direction === 'received')
+  )
+}
+
 export function turnPromptLine(turn: {
   readonly prompt: string
   readonly startedBy?: PublicRecoveredMission['startedBy']

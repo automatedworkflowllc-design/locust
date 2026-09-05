@@ -22,7 +22,8 @@ export function PeerThread({
   self,
   peer,
   messages,
-  teammates
+  teammates,
+  onOpenPeerRun
 }: {
   /** The teammate whose mission this thread belongs to. */
   readonly self: PublicTeammate | undefined
@@ -30,6 +31,15 @@ export function PeerThread({
   /** Chronological. */
   readonly messages: readonly PublicPeerMessage[]
   readonly teammates: readonly PublicTeammate[]
+  /**
+   * Open the run this message was delivered into, when the record shows one.
+   * Colin, 2026-09-04: a teammate's relayed run should be reachable from the
+   * exchange in the thread you are actually in, not found by scrolling the
+   * sidebar. Absent when nothing received it -- the message may still be
+   * waiting for that teammate's next run, and a dead control would say
+   * otherwise.
+   */
+  readonly onOpenPeerRun: (messageId: string) => (() => void) | undefined
 }): ReactElement {
   // A short exchange opens itself. The collapse exists so a long aside does
   // not read as the mission's own work; an ask-and-answer pair is not that,
@@ -93,6 +103,15 @@ export function PeerThread({
                   <div className={`lc-peer__bubble${message.text === null ? ' is-missing' : ''}`}>
                     {message.text ?? 'This message is no longer in the workroom.'}
                   </div>
+                  {onOpenPeerRun(message.messageId) !== undefined && (
+                    <button
+                      type="button"
+                      className="lc-peer__open lc-mono"
+                      onClick={onOpenPeerRun(message.messageId)}
+                    >
+                      open the run this reached
+                    </button>
+                  )}
                 </div>
               </div>
             )

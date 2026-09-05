@@ -4205,3 +4205,20 @@ textarea {
 .lc-queued__note {
   color: var(--lc-text-muted);
 }
+
+/* "Open the run this reached" on an exchange message. Quiet: it is a way
+   through to another conversation, not an action on this one. */
+.lc-peer__open {
+  margin-top: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lc-text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lc-peer__open:hover {
+  color: var(--lc-text-primary);
+}

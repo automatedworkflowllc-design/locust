@@ -15,6 +15,7 @@ import {
   decisionStanding,
   errorAlreadyShown,
   turnPromptLine,
+  peerRunFor,
   defaultOpenEntry,
   failureMessage,
   peerExchangeStartsOpen,
@@ -381,6 +382,30 @@ describe('thread composition', () => {
     )
     expect(thread.find((i) => i.type === 'limit')).toMatchObject({ kind: 'temporary-rate-limit' })
     expect(thread.find((i) => i.type === 'diagnostic')).toMatchObject({ level: 'warning' })
+  })
+
+  it('finds the run a peer message was delivered into, so the exchange can be opened', () => {
+    // Colin, 2026-09-04: a relayed run should be reachable "from the exchange
+    // card in the thread the person is actually in". The same messageId is
+    // `posted` on the run that wrote it and `received` on the run it reached.
+    const link = (messageId: string, direction: 'received' | 'posted'): PublicPeerMessage => ({
+      messageId,
+      direction,
+      from: { teammateId: 'tm_booty', name: 'Booty' },
+      to: { teammateId: 'tm_wren', name: 'Wren' },
+      text: 'How is your day?',
+      at: NOW
+    })
+    const asked = { missionId: 'mission_booty', peerMessages: [link('wm_1', 'posted')] } as unknown as PublicRecoveredMission
+    const answered = { missionId: 'mission_wren', peerMessages: [link('wm_1', 'received')] } as unknown as PublicRecoveredMission
+    const unrelated = { missionId: 'mission_other', peerMessages: [link('wm_2', 'received')] } as unknown as PublicRecoveredMission
+
+    expect(peerRunFor('wm_1', [asked, answered, unrelated])?.missionId).toBe('mission_wren')
+    // Not the run that WROTE it -- that is the thread you are already in.
+    expect(peerRunFor('wm_1', [asked])).toBeUndefined()
+    // Still waiting for that teammate's next run is a real state, not an error.
+    expect(peerRunFor('wm_3', [asked, answered])).toBeUndefined()
+    expect(peerRunFor('', [asked, answered])).toBeUndefined()
   })
 
   it('never draws a turn the HOST briefed as the person\'s own words', () => {

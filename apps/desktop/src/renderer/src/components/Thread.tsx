@@ -195,6 +195,8 @@ export interface ThreadProps {
   readonly prompt: string
   /** Who started the current turn; a host-briefed one is not the person's words. */
   readonly startedBy?: PublicRecoveredMission['startedBy']
+  /** Open the run a peer message reached; undefined for one nothing received yet. */
+  readonly onOpenPeerRun: (messageId: string) => (() => void) | undefined
   /**
    * Earlier turns of the same conversation, oldest first, each with the words
    * the person typed for it. Empty for a first turn. They render above this
@@ -284,6 +286,7 @@ export interface ThreadProps {
 export function Thread({
   prompt,
   startedBy,
+  onOpenPeerRun,
   earlierTurns,
   coldStart = false,
   onRunWithEdits,
@@ -338,6 +341,7 @@ export function Thread({
       peer={card.group.peer}
       messages={card.group.messages}
       teammates={peers.teammates}
+      onOpenPeerRun={onOpenPeerRun}
     />
   )
   const cardsFor = (turnIndex: number, placement: ThreadPeerCard['placement']): readonly ThreadPeerCard[] =>
