@@ -1378,27 +1378,44 @@ textarea {
   text-align: center;
 }
 
-/* The mark itself. It used to sit in a bordered card -- a box around a logo
-   that is already in the rail 40px away (design pass, 2026-09-04) -- and with
-   the box gone the mark takes the room instead. */
-.lc-empty__mark {
-  width: 100%;
-  max-width: 320px;
+/* The mark in its own card, at panel A's measurements: 480px wide, 40px of
+   air above and below, mark 172px over wordmark 232px with 22px between.
+   The 2026-09-04 pass had removed the card as "a box around a logo that is
+   already in the rail"; Colin ratified panel A on 2026-09-05 -- "do it
+   exactly this way" -- and the card comes back with the two images sized
+   as drawn rather than one combined logo scaled to fit. */
+.lc-markcard {
+  width: 480px;
+  max-width: 100%;
+  padding: 40px 0;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.lc-markcard__mark {
+  width: 172px;
+  max-width: 60%;
   height: auto;
 }
 
-.lc-empty__logo img {
-  width: 190px;
-  max-width: 100%;
+.lc-markcard__wordmark {
+  width: 232px;
+  max-width: 80%;
+  height: auto;
 }
 
-/* One of the two display moments in the product. */
-.lc-empty h1 {
+/* The two claim lines. Mono reads as machine output rather than marketing. */
+.lc-claim {
   margin: 0;
-  font-size: var(--lc-text-display);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+  font-family: var(--lc-font-mono);
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--lc-text-muted);
+  text-align: center;
 }
 
 .lc-empty p {
@@ -1406,6 +1423,99 @@ textarea {
   color: var(--lc-text-muted);
   font-size: var(--lc-text-secondary-size);
   text-wrap: pretty;
+}
+
+/* Every runtime in ONE panel, two columns, hairline dividers -- panel A of
+   FIRST-RUN-2026-09-04. Six cards stacked in a column was also what pushed
+   the composer down the window, so the two columns are structural as well as
+   quieter (Colin, 2026-09-05: "this way of showing the models also helps the
+   stacking issue"). The last cell in an odd-length list spans both columns
+   so the panel never ends on a half-empty row with a stray divider. */
+.lc-runtimepanel {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  overflow: hidden;
+}
+
+.lc-runtimecell {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+/* The first row of each column has nothing above it to divide from. */
+.lc-runtimecell:nth-child(1),
+.lc-runtimecell:nth-child(2) {
+  border-top: 0;
+}
+
+.lc-runtimecell:nth-child(odd) {
+  border-right: 1px solid var(--lc-border-hairline);
+}
+
+.lc-runtimecell:nth-child(odd):last-child {
+  grid-column: 1 / -1;
+  border-right: 0;
+}
+
+.lc-runtimecell__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: block;
+}
+
+.lc-runtimecell__dot.is-green {
+  background: var(--lc-green);
+}
+
+.lc-runtimecell__dot.is-red {
+  background: var(--lc-red);
+}
+
+.lc-runtimecell__dot.is-muted {
+  background: var(--lc-text-muted);
+}
+
+/* Absence is not a state, so it gets no colour. */
+.lc-runtimecell__dot.is-hollow {
+  background: transparent;
+  border: 1px solid var(--lc-border-button);
+}
+
+.lc-runtimecell__name {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-runtimecell.is-ready .lc-runtimecell__name {
+  color: var(--lc-text-name);
+}
+
+.lc-runtimecell__version {
+  font-family: var(--lc-font-mono);
+  font-size: 11px;
+  color: var(--lc-text-muted);
+}
+
+/* READY needs no tag once its dot is green; only the exception is tagged. */
+.lc-runtimecell__tag {
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--lc-text-muted);
+  white-space: nowrap;
 }
 
 .lc-runtimelist {
@@ -1623,6 +1733,29 @@ textarea {
 
 .lc-control:hover:not(:disabled) {
   background: var(--lc-hover-surface);
+}
+
+/* Boxed controls: the route and the effort beside it.
+ *
+ * Colin, 2026-09-05, on the first-run reference -- "switch to that way of
+ * showing the model selection, looks better imo, have effort next to it in
+ * the same style box". The reference draws the route as a bordered chip
+ * rather than bare text on the bar, and the two facts that decide what a
+ * message costs then read as one pair instead of drifting apart across the
+ * row. Same control, a box around it; nothing about its behaviour changes.
+ */
+.lc-control--boxed {
+  border: 1px solid var(--lc-border-control);
+  background: var(--lc-bg-control);
+}
+
+.lc-control--boxed:hover:not(:disabled) {
+  border-color: var(--lc-border-hover);
+  background: var(--lc-hover-surface);
+}
+
+.lc-control--boxed:disabled {
+  border-color: var(--lc-border-hairline);
 }
 
 .lc-control:disabled {
@@ -1845,7 +1978,12 @@ textarea {
   .lc-sidebar .lc-sectionlabel,
   .lc-search,
   .lc-sidebar__footer button span,
-  .lc-connected {
+  .lc-connected,
+  /* A sentence in a 68px rail wraps to one word per line and reads as a
+     column of fragments -- "No / mis... / yet. / Des... / one". Measured on
+     screen at 1014px wide, 2026-09-05. Every other piece of prose in this
+     rail is already hidden here; this one was missed. */
+  .lc-sidebar__empty {
     display: none;
   }
 

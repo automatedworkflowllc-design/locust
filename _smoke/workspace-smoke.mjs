@@ -143,7 +143,7 @@ const HOME_STATE = `(() => {
     label: folder?.querySelector('.lc-folder__label')?.textContent.trim() ?? '',
     path: folder?.querySelector('.lc-folder__path')?.innerText.trim() ?? '',
     button: folder?.querySelector('button')?.innerText.trim() ?? '',
-    rosterOpen: document.querySelector('.lc-roster')?.open ?? false,
+    runtimeRows: document.querySelectorAll('.lc-runtimecell').length,
     chip: chip?.textContent.trim() ?? '',
     chipMissing: chip?.classList.contains('is-missing') ?? false,
     chipTitle: chip?.title ?? ''
@@ -181,7 +181,7 @@ try {
       check('the one line that has to be said is said', home.folder === true && home.missing === true)
       check('it says so in words', home.label === 'No folder chosen', home.label)
       check('and offers to choose one', home.button === 'Choose folder', home.button)
-      check('the runtime roster is open, so connections are visible on launch', home.rosterOpen === true)
+      check('every runtime is listed, so connections are visible on launch', home.runtimeRows >= 5, String(home.runtimeRows))
       check('the composer chip says there is no folder', home.chip === 'No folder', home.chip)
       check('and is marked as the exception it is', home.chipMissing === true)
 

@@ -101,27 +101,30 @@ try {
   const ready = await evaluate(`!!document.querySelector('.lc-empty')`)
   check('the welcome screen is what is on screen', ready === true)
 
-  const measure = async (width, height, oldRule) => {
+  // `tall` plants a block taller than the pane inside the welcome, which is
+  // what the old six-row runtime list did on a small window. That is the
+  // condition the rule exists for, so the control has to create it: since the
+  // roster became a two-column panel the real screen is short enough to pass
+  // with or without the rule, and a control that cannot fail proves nothing.
+  const measure = async (width, height, oldRule, tall) => {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
     await sleep(400)
     return JSON.parse(await evaluate(`(async () => {
       const empty = document.querySelector('.lc-empty')
-      // The whole pre-0.21.2 state, not half of it: the welcome free to grow
-      // the column AND every runtime row expanded. Restoring only the rule
-      // left the roster collapsed, the screen short, and the control passing
-      // -- which said the check could not fail when it can.
-      const roster = document.querySelector('.lc-roster')
+      document.getElementById('firstfold-tall-probe')?.remove()
+      if (${tall ? 'true' : 'false'}) {
+        const filler = document.createElement('div')
+        filler.id = 'firstfold-tall-probe'
+        filler.style.height = '900px'
+        filler.style.flex = '0 0 auto'
+        empty.querySelector('.lc-empty__inner').append(filler)
+      }
       if (${oldRule ? 'true' : 'false'}) {
         empty.style.minHeight = 'auto'
         empty.style.overflowY = 'visible'
-        if (roster) roster.open = true
       } else {
         empty.style.minHeight = ''
         empty.style.overflowY = ''
-        // The page's own state, not a tidier one: since 0.21.5 the roster
-        // opens by default (Colin wants connections visible on launch), so
-        // the check measures it open. Closing it here would measure a
-        // screen nobody sees.
       }
       await new Promise(r => setTimeout(r, 250))
       const dock = document.querySelector('form.command-dock')
@@ -135,7 +138,7 @@ try {
   }
 
   for (const [width, height, name] of [[1280, 860, "Colin's window"], [1014, 786, 'the design pass pane']]) {
-    const now = await measure(width, height, false)
+    const now = await measure(width, height, false, false)
     check(
       `the composer is above the fold at ${String(width)}x${String(height)} · ${name}`,
       now.below <= 0,
@@ -145,9 +148,18 @@ try {
 
   // Control: the same check must FAIL on the rule this replaced, or it is
   // not measuring what it claims to.
-  const old = await measure(1280, 860, true)
+  // Both halves of the control, because either alone is misleading: a tall
+  // welcome WITH the rule must still keep the composer on screen, and the
+  // same tall welcome WITHOUT it must push it off.
+  const tallFixed = await measure(1280, 860, false, true)
   check(
-    'CONTROL: the old rule pushes it below the fold, so this check can fail',
+    'a welcome taller than the pane still keeps the composer on screen',
+    tallFixed.below <= 0,
+    JSON.stringify(tallFixed)
+  )
+  const old = await measure(1280, 860, true, true)
+  check(
+    'CONTROL: without the rule that same welcome pushes it below the fold, so this check can fail',
     old.below > 0,
     JSON.stringify(old)
   )

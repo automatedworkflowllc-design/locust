@@ -471,7 +471,7 @@ export function Composer({
                 */}
                 <button
                   type="button"
-                  className="lc-control"
+                  className="lc-control lc-control--boxed"
                   title={handoffTitle(handoff)}
                   onClick={() => {
                     onOpenRoutePicker()
@@ -512,7 +512,7 @@ export function Composer({
                 )}
                 <button
                   type="button"
-                  className="lc-control"
+                  className="lc-control lc-control--boxed"
                   aria-haspopup="menu"
                   aria-expanded={effortOpen}
                   disabled={running || supportedEfforts.length === 0 || swarm}
