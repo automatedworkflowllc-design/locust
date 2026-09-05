@@ -1897,7 +1897,10 @@ export default function App(): ReactElement {
           routineStepByTeammate={routineStepByTeammate}
           missionOwners={missionOwners}
           selectedMissionId={liveRun?.data?.missionId ?? shownKey}
-          selectedTeammateId={selectedTeammate?.teammateId}
+          // Highlight the pick, not the fallback: with nobody picked the
+          // first teammate read as chosen while the composer addressed
+          // nobody (user session, 2026-09-05).
+          selectedTeammateId={pickedTeammate?.teammateId}
           onSelectMission={openMission}
           onMissionMenu={openMissionMenu}
           onTeammateMenu={openTeammateMenu}

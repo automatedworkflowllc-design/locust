@@ -134,19 +134,28 @@ try {
   say('1. the home screen addresses nobody')
   const home = JSON.parse(await evaluate(`JSON.stringify({
     placeholder: document.querySelector('form.command-dock textarea').placeholder,
-    sidebar: document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ')
+    sidebar: document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' '),
+    highlighted: document.querySelectorAll('.lc-teammate.is-selected').length
   })`))
   say(`       ${JSON.stringify(home)}`)
   check('the box invites a plain message, not a message to the first teammate', home.placeholder === 'Write a message…', home.placeholder)
+  // User session, 2026-09-05: with nobody picked the first teammate was drawn
+  // as chosen while the composer addressed nobody.
+  check('no teammate is drawn as chosen when nobody is', home.highlighted === 0, String(home.highlighted))
   check('the mission of nobody\'s is listed outside the roster', /OTHER MISSIONS.*release date/i.test(home.sidebar), home.sidebar.slice(0, 200))
 
   say('2. picking a teammate addresses them')
   const picked = await evaluate(`(async () => {
     document.querySelector('.lc-teammate .lc-row').click()
     await new Promise(r => setTimeout(r, 400))
-    return document.querySelector('form.command-dock textarea').placeholder
+    return JSON.stringify({
+      placeholder: document.querySelector('form.command-dock textarea').placeholder,
+      highlighted: document.querySelectorAll('.lc-teammate.is-selected').length
+    })
   })()`)
-  check('the box now says who it goes to', picked === 'Message Wren…', picked)
+  const pickedState = JSON.parse(picked)
+  check('the box now says who it goes to', pickedState.placeholder === 'Message Wren…', pickedState.placeholder)
+  check('and the pick is drawn as chosen', pickedState.highlighted === 1, String(pickedState.highlighted))
 
   say('3. the mission\'s own menu can hand it to a teammate')
   const menu = JSON.parse(await evaluate(`(async () => {

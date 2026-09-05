@@ -669,8 +669,13 @@ export function SettingsScreen({
                   </div>
                   <span
                     className={`lc-tag${
+                      // Green is available, lime is happening now (design
+                      // pass, objection 5). The first-run panel took the
+                      // rule in 0.21.2; Settings kept five lime tags for a
+                      // list where nothing is running -- seen in the user
+                      // session, 2026-09-05.
                       status.tag === 'READY' || status.tag === 'ACTIVE'
-                        ? ' is-lime'
+                        ? ' is-green'
                         : status.tag === 'SIGN IN'
                           ? ' is-red'
                           : status.tag === 'PREVIEW' || status.tag === 'EXPERIMENTAL' || status.tag === 'AT LIMIT'

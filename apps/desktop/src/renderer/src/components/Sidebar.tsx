@@ -315,7 +315,17 @@ export function Sidebar({
                 ? 'No missions yet. They are recorded here as they run.'
                 : teammates.length === 0
                   ? 'No missions yet. Describe one below and it is recorded locally as it runs.'
-                  : `No missions yet. Describe one below and ${teammates[0]!.name} picks it up.`}
+                  : // A message with nobody picked belongs to nobody now (0.21.6), so this
+                    // must not promise the first teammate will pick it up -- the composer
+                    // right under it said "Write a message…" while this said Juno would
+                    // take it (user session, 2026-09-05). With a teammate actually
+                    // picked, the promise is true and it says their name.
+                    (() => {
+                      const picked = teammates.find((teammate) => teammate.teammateId === selectedTeammateId)
+                      return picked === undefined
+                        ? 'No missions yet. Pick a teammate, or write below and assign it to one later.'
+                        : `No missions yet. Describe one below and ${picked.name} picks it up.`
+                    })()}
             </p>
           </>
         )}

@@ -142,7 +142,7 @@ export function FirstLaunch({
           <p className="lc-footnote">Discovery runs locally · no model is shown as live until it answers</p>
         )}
         {anyReady && teammateCount > 0 && workspacePath !== undefined && (
-          <p className="lc-footnote">Pick a teammate in the sidebar to start, or write to whoever is free below.</p>
+          <p className="lc-footnote">Pick a teammate in the sidebar to start, or write below and assign it to one later.</p>
         )}
       </div>
     </div>
