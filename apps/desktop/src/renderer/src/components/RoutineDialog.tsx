@@ -148,11 +148,15 @@ export function RoutineDialog({
                     role="radio"
                     aria-checked={scheduleKind === kind}
                     className={`lc-button${scheduleKind === kind ? ' is-active' : ''}`}
-                    onClick={() =>
+                    onClick={() => {
+                      // Pressing the choice already made keeps what was set
+                      // under it: a person who taps "Daily" twice has not
+                      // asked for 09:00 back.
+                      if (kind === scheduleKind) return
                       setSchedule(
                         kind === 'off' ? undefined : kind === 'every' ? { kind: 'every', hours: 4 } : { kind: 'daily', at: '09:00' }
                       )
-                    }
+                    }}
                   >
                     {label}
                   </button>

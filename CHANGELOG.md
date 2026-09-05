@@ -6,6 +6,12 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.26.1 — 2026-09-05
+
+- **Editing a schedule keeps what you set.** Pressing the choice a routine
+  already has (Daily, or Every few hours) no longer resets its time or its
+  hours. Found by driving the edit path after 0.26.0 shipped.
+
 ## 0.26.0 — 2026-09-05
 
 - **Routines can run on their own.** Saving or editing a routine now offers
