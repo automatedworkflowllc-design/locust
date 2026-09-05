@@ -430,6 +430,8 @@ export function shellCommandText(command: string): string {
  * outside the workspace keeps its full path, because there the location IS
  * the information.
  */
+const WORKTREE_PATH_PREFIX = /^\.locust\/worktrees\/[^/]+\//
+
 export function relativePath(path: string, workspacePath: string | undefined): string {
   if (workspacePath === undefined || workspacePath.length === 0) return path
   const normalise = (value: string): string => value.replace(/[\\/]+/g, '/').replace(/\/$/, '')
@@ -438,9 +440,20 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   if (root.length === 0) return path
   // Windows paths are case-insensitive; comparing them case-sensitively is how
   // a correct prefix fails to match and the row keeps the unreadable path.
-  if (!full.toLowerCase().startsWith(`${root.toLowerCase()}/`)) return path
+  if (!full.toLowerCase().startsWith(`${root.toLowerCase()}/`)) {
+    // Already relative (a runtime that reports paths from its cwd): the tree
+    // prefix is still noise. An absolute path elsewhere stays whole.
+    const relative = /^([a-z]:)?\//i.test(full) ? full : full.replace(WORKTREE_PATH_PREFIX, '')
+    return relative.length === 0 ? path : relative === full ? path : relative
+  }
   const inside = full.slice(root.length + 1)
-  return inside.length === 0 ? path : inside
+  if (inside.length === 0) return path
+  // A teammate on its own branch works in <folder>/.locust/worktrees/<id>/,
+  // and every path it touches carries that prefix. The tree is the same
+  // project, so the row reads the way it would in the folder; the sidebar
+  // already says which branch the teammate is on.
+  const stripped = inside.replace(WORKTREE_PATH_PREFIX, '')
+  return stripped.length === 0 ? inside : stripped
 }
 
 export function activitySummary(details: readonly ActivityDetail[]): string {

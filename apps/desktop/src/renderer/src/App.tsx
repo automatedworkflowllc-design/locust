@@ -2439,7 +2439,7 @@ export default function App(): ReactElement {
                           anyRuntimeUsable: runtimes.some(runtimeIsUsable),
                           hasRunningMission: running,
                           pendingApprovals: shownApprovals.length,
-                          roleLabel: missionOwner.role,
+                          roleLabel: roleLabelOf(missionOwner),
                           ...(liveActivityByOwner[missionOwner.teammateId] === undefined
                             ? {}
                             : { liveActivity: liveActivityByOwner[missionOwner.teammateId] }),
@@ -2462,7 +2462,7 @@ export default function App(): ReactElement {
                         {missionOwner?.name ?? missionTitle(liveRun.prompt)}
                       </span>
                       <span className="lc-workroom__role">
-                        {missionOwner === undefined ? '' : `${missionOwner.role} · `}
+                        {missionOwner === undefined ? '' : `${roleLabelOf(missionOwner)} · `}
                         {runtimeDisplayName(liveRun.data?.runtime ?? 'codex')}
                       </span>
                     </div>

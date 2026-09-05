@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.31.1 — 2026-09-05
+
+- **A teammate on its own branch reads like one in the folder.** The
+  activity fold showed every path as .locust/worktrees/<id>/README.md; now
+  it shows README.md, since the tree is the same project and the sidebar
+  already says which branch the teammate is on.
+- **The thread header uses a Custom teammate's title.** It said "Custom"
+  where the sidebar said "Release manager".
+- Found by driving the built app through a first session as a person
+  would; the record is in docs/user-session/.
+
 ## 0.31.0 — 2026-09-05
 
 - **Own branch.** A teammate can work in its own copy of the project

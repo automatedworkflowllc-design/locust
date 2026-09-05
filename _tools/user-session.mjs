@@ -131,7 +131,7 @@ try {
     const input = dialog.querySelector('input')
     const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
     set.call(input, 'Nova'); input.dispatchEvent(new Event('input', { bubbles: true }))
-    const custom = [...dialog.querySelectorAll('button')].find(b => b.innerText.trim() === 'Custom')
+    const custom = [...dialog.querySelectorAll('.lc-rolecard')].find(b => b.querySelector('.lc-rolecard__name')?.textContent.trim() === 'Custom')
     if (custom) custom.click()
     await new Promise(r => setTimeout(r, 200))
     const title = [...dialog.querySelectorAll('input')].find(i => /Release manager/.test(i.placeholder))

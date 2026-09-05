@@ -135,6 +135,15 @@ describe('how a path is written in a row', () => {
   it('leaves a path that is already relative alone', () => {
     expect(relativePath('src/streak.js', WS)).toBe('src/streak.js')
   })
+
+  it("drops a teammate's own-branch tree too, because the tree is the same project", () => {
+    expect(relativePath(String.raw`C:\Users\x\projects\streaks\.locust\worktrees\tm_abc123\src\streak.js`, WS)).toBe('src/streak.js')
+    expect(relativePath('.locust/worktrees/tm_abc123/README.md', WS)).toBe('README.md')
+  })
+
+  it('keeps the tree root itself, since there is nothing shorter that is true', () => {
+    expect(relativePath(String.raw`C:\Users\x\projects\streaks\.locust\worktrees\tm_abc123`, WS)).toBe('.locust/worktrees/tm_abc123')
+  })
 })
 
 describe('when a mission says it began', () => {
