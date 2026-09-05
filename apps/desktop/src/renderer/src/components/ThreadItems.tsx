@@ -109,8 +109,13 @@ export function AgentText({
             </ul>
           )
         }
+        // Line breaks inside a paragraph are kept (`lc-para` is pre-line):
+        // asked for "every file, one per line", Composer answered
+        // "README.md\nstatus.ts" and the thread drew "README.md status.ts",
+        // which reads as the teammate ignoring the request. User session 3,
+        // 2026-09-05, checked against the ledger.
         return (
-          <p key={`b${String(index)}`}>
+          <p className="lc-para" key={`b${String(index)}`}>
             {inline(block.text)}
             {streaming && last && <span className="lc-caret" />}
           </p>

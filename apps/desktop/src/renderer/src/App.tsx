@@ -484,6 +484,11 @@ export default function App(): ReactElement {
   // 2026-09-03. Ask stays one click away and a teammate who has run keeps
   // whatever they last ran on.
   const [mode, setMode] = useState<MissionMode>('accept-edits')
+  // Runtimes whose last run ended on the account's usage limit, with the
+  // runtime's own words, until a run on them completes. Session-only on
+  // purpose: the limit is on the provider's clock, and a note that outlived
+  // it would be the false claim in the other direction.
+  const [limitedRuntimes, setLimitedRuntimes] = useState<ReadonlyMap<string, string>>(new Map())
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
@@ -575,6 +580,21 @@ export default function App(): ReactElement {
     const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
       // A finished mission hops once; a message that just arrived earns a
       // glance. Both are moments, so both clear themselves.
+      if (update.kind === 'event') {
+        const runtime = update.event.sourceAdapter
+        if (update.event.type === 'route.limit_detected' && update.event.payload.kind === 'quota-exhausted') {
+          const said = update.event.payload.message
+          setLimitedRuntimes((current) => (current.get(runtime) === said ? current : new Map(current).set(runtime, said)))
+        }
+        if (update.event.type === 'run.completed') {
+          setLimitedRuntimes((current) => {
+            if (!current.has(runtime)) return current
+            const next = new Map(current)
+            next.delete(runtime)
+            return next
+          })
+        }
+      }
       if (update.kind === 'event' && update.event.type === 'run.completed') {
         const owner = missionOwnersRef.current[update.missionId]
         if (owner !== undefined) {
@@ -1466,6 +1486,7 @@ export default function App(): ReactElement {
           ) : screen === 'settings' ? (
             <SettingsScreen
               runtimes={runtimes}
+              limitedRuntimes={limitedRuntimes}
               ledgerPath={undefined}
               build={build}
               storage={storage}
@@ -1490,12 +1511,13 @@ export default function App(): ReactElement {
               <IdleTeammate
                 teammate={selectedTeammate ?? teammates[0]!}
                 canStart={busyRun === undefined}
+                mode={mode}
                 onStarter={(prompt) => {
                   void startMission(prompt)
                 }}
               />
             ) : (
-              <FirstLaunch runtimes={runtimes} discoveryPhase={runtimeState.phase} />
+              <FirstLaunch runtimes={runtimes} limitedRuntimes={limitedRuntimes} discoveryPhase={runtimeState.phase} />
             )
           ) : (
             <>
@@ -1685,6 +1707,7 @@ export default function App(): ReactElement {
           {screen === 'workroom' && (
           <Composer
             runtimes={runtimes}
+            limitedRuntimes={limitedRuntimes}
             discoveryPhase={runtimeState.phase}
             running={running}
             cancelling={liveRun?.phase === 'cancelling'}
@@ -1763,7 +1786,7 @@ export default function App(): ReactElement {
               {
                 id: 'go-teammates',
                 group: 'Go to',
-                label: 'Teammates',
+                label: 'Team',
                 hint: 'Ctrl 2',
                 run: () => setScreen('teammates')
               },

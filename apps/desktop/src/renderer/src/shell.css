@@ -4100,3 +4100,10 @@ textarea {
   background: var(--lc-red-tint);
   color: var(--lc-red-text);
 }
+
+/* Agent prose keeps the line breaks the model wrote: "one per line" must
+   draw one per line (user session 3, 2026-09-05). Runs of spaces still
+   collapse, so wrapped Markdown reads as prose, not as a code block. */
+.lc-para {
+  white-space: pre-line;
+}

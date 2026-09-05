@@ -600,6 +600,11 @@ export function buildThread(
         // in trouble, an item diagnostic is the provider talking about one
         // item. Only the former is worth interrupting an empty thread for.
         if (!workBegan && !/\.runtime_error$/.test(event.payload.code)) break
+        // Said once. A quota failure arrives as a limit event AND as the
+        // runtime's error line carrying the same sentence; user session 1
+        // (2026-09-05) showed "You've hit your usage limit..." three times in
+        // a row for one failure. The limit card is the one that names it.
+        if (items.some((held) => held.type === 'limit' && sameSentence(held.message, event.payload.message))) break
         items.push({
           key: event.id,
           type: 'diagnostic',
@@ -1229,6 +1234,31 @@ export function failureMessage(payload: {
     return `${payload.message} The runtime reported that it is out of capacity right now — its own limit, not this machine's: ${said}`
   }
   return `${payload.message} The runtime's own last word was: ${said}`
+}
+
+/**
+ * Two messages that say the same thing, allowing for the trim and the
+ * trailing period one channel adds and another does not.
+ */
+export function sameSentence(a: string, b: string): boolean {
+  const norm = (text: string): string => text.trim().replace(/\.\s*$/, '').toLowerCase()
+  const left = norm(a)
+  const right = norm(b)
+  return left.length > 0 && (left === right || left.includes(right) || right.includes(left))
+}
+
+/**
+ * Whether the run-level error card would only repeat a limit card already in
+ * the thread. The run's error is the runtime's own last word wrapped in the
+ * host's sentence, and for a quota failure that word is the limit message --
+ * so the bottom card was the third rendering of one fact (user session 1,
+ * 2026-09-05). Only a limit that ENDS the run counts: a slow-down warning is
+ * not why a run failed, and its presence must not hide the real reason.
+ */
+export function errorAlreadyShown(items: readonly ThreadItem[], error: string): boolean {
+  return items.some(
+    (item) => item.type === 'limit' && item.kind === 'quota-exhausted' && sameSentence(error, item.message)
+  )
 }
 
 export function resumableSessionOf(

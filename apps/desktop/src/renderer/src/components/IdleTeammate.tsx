@@ -1,8 +1,26 @@
 import type { ReactElement } from 'react'
 
-import type { PublicTeammate, TeammateRole } from '../../../shared/ipc.js'
+import type { MissionMode, PublicTeammate, TeammateRole } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import { PixelFace } from './PixelFace.js'
+
+/**
+ * What the current mode lets this teammate do, said for THAT mode. The
+ * sentence used to be fixed -- "Nothing is changed unless you pick a mode
+ * that allows it" -- above a composer whose default is Accept edits, so a
+ * fresh Research teammate promised read-only while the footer said it may
+ * edit the workspace (user session 1, 2026-09-05).
+ */
+export function modeSentence(mode: MissionMode): string {
+  switch (mode) {
+    case 'ask':
+      return 'In Ask mode nothing is changed: every write is refused.'
+    case 'approve-each':
+      return 'Every change waits for your approval before it lands.'
+    case 'accept-edits':
+      return 'Accept edits is on, so it may change files here; switch to Ask below to keep it read-only.'
+  }
+}
 
 /**
  * The idle teammate: a capability-led empty state.
@@ -52,11 +70,14 @@ const STARTERS: Readonly<Record<TeammateRole, readonly string[]>> = {
 export function IdleTeammate({
   teammate,
   canStart,
-  onStarter
+  onStarter,
+  mode
 }: {
   readonly teammate: PublicTeammate
   readonly canStart: boolean
   readonly onStarter: (prompt: string) => void
+  /** The composer's current permission mode: the sentence below must say what THIS mode does. */
+  readonly mode: MissionMode
 }): ReactElement {
   const starters = STARTERS[teammate.role] ?? STARTERS.Custom
 
@@ -66,8 +87,7 @@ export function IdleTeammate({
         <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={56} />
         <h1>{teammate.name}</h1>
         <p>
-          {roleLabelOf(teammate)} · reads this workspace and explains what it finds. Nothing is changed
-          unless you pick a mode that allows it.
+          {roleLabelOf(teammate)} · reads this workspace and explains what it finds. {modeSentence(mode)}
         </p>
 
         <div className="lc-starters">

@@ -33,13 +33,14 @@ function buildRows(
   models: readonly PublicModel[],
   active: RouteChoice,
   resolved: ReadonlyMap<string, string>,
-  recent: readonly string[]
+  recent: readonly string[],
+  limited: ReadonlyMap<string, string>
 ): readonly RouteRow[] {
   const rows: RouteRow[] = []
   for (const runtime of runtimes) {
     if (runtime.id === 'omniroute') continue
     const integration = integrationOf(runtime.id)
-    const status = routeRowStatus(runtime, integration, false)
+    const status = routeRowStatus(runtime, integration, false, limited.get(runtime.id))
     const group = `${runtime.displayName} · your account`
 
     // Every catalog model names its runtime -- Codex's from a live server
@@ -51,7 +52,7 @@ function buildRows(
         ? forRuntime.map((model) => {
             const efforts =
               model.supportedEfforts.length > 0
-                ? `${model.supportedEfforts.length} effort levels · ${model.supportedEfforts.join(', ')}`
+                ? `${model.supportedEfforts.length} effort level${model.supportedEfforts.length === 1 ? '' : 's'} · ${model.supportedEfforts.join(', ')}`
                 : 'no effort levels reported'
             // The name the runtime itself reported the last time a mission ran
             // on this route. Absent until one has, which is the honest state.
@@ -94,9 +95,12 @@ export function RoutePicker({
   recentRoutes,
   onSelect,
   onClose,
-  notice
+  notice,
+  limitedRuntimes
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
+  /** Runtimes whose last run ended on the account's usage limit, with its own words. */
+  readonly limitedRuntimes: ReadonlyMap<string, string>
   readonly models: readonly PublicModel[]
   /** What each route's model resolved to last time, keyed `runtime:model`. */
   readonly resolvedModels: ReadonlyMap<string, string>
@@ -120,8 +124,8 @@ export function RoutePicker({
   }, [])
 
   const rows = useMemo(
-    () => buildRows(runtimes, models, active, resolvedModels, recentRoutes),
-    [runtimes, models, active, resolvedModels, recentRoutes]
+    () => buildRows(runtimes, models, active, resolvedModels, recentRoutes, limitedRuntimes),
+    [runtimes, models, active, resolvedModels, recentRoutes, limitedRuntimes]
   )
   const needle = routeSearchText(query)
   const matched = useMemo(
@@ -199,7 +203,7 @@ export function RoutePicker({
                       ? 'lc-tone-lime'
                       : row.tag === 'READY'
                         ? 'lc-tone-green'
-                        : row.tag === 'PREVIEW' || row.tag === 'EXPERIMENTAL'
+                        : row.tag === 'PREVIEW' || row.tag === 'EXPERIMENTAL' || row.tag === 'AT LIMIT'
                           ? 'lc-tone-amber'
                           : 'lc-tone-muted'
                   }`}

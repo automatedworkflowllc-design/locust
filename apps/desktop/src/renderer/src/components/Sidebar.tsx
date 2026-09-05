@@ -313,7 +313,7 @@ export function Sidebar({
             <Icon name="inbox" size={14} />
             <span>Missions</span>
           </button>
-          <button type="button" onClick={onOpenTeammates} title="Teammates (Ctrl 2)">
+          <button type="button" onClick={onOpenTeammates} title="Team (Ctrl 2)">
             <Icon name="users" size={14} />
             {/* "Team", not "Teammates": Colin's call, and the design agent's
               * original. The full name needed 63px of a cell and rendered as

@@ -15,15 +15,18 @@ import { integrationOf, routeRowStatus } from '../status.js'
  */
 export function FirstLaunch({
   runtimes,
+  limitedRuntimes,
   discoveryPhase
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
+  /** Runtimes whose last run ended on the account's usage limit, with its own words. */
+  readonly limitedRuntimes: ReadonlyMap<string, string>
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
 }): ReactElement {
   const anyReady =
     discoveryPhase === 'ready'
     && runtimes.some((runtime) => {
-      const tag = routeRowStatus(runtime, integrationOf(runtime.id), false).tag
+      const tag = routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id)).tag
       return tag === 'READY' || tag === 'ACTIVE'
     })
   return (
@@ -57,7 +60,7 @@ export function FirstLaunch({
         {discoveryPhase === 'ready' && (
           <div className="lc-runtimelist">
             {runtimes.map((runtime) => {
-              const status = routeRowStatus(runtime, integrationOf(runtime.id), false)
+              const status = routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id))
               return (
                 <div
                   key={runtime.id}
@@ -80,7 +83,7 @@ export function FirstLaunch({
                         ? ' is-lime'
                         : status.tag === 'SIGN IN'
                           ? ' is-red'
-                          : status.tag === 'PREVIEW' || status.tag === 'EXPERIMENTAL'
+                          : status.tag === 'PREVIEW' || status.tag === 'EXPERIMENTAL' || status.tag === 'AT LIMIT'
                             ? ' is-amber'
                             : ''
                     }`}

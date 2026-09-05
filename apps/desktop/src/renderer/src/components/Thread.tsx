@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, readPlan, threadMarkers, threadPeerCards } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
@@ -453,7 +453,7 @@ export function Thread({
 
         {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} />}
 
-        {error !== undefined && (
+        {error !== undefined && !errorAlreadyShown(items, error) && (
           <div className="lc-card is-terminal is-red">
             <div className="lc-card__head">
               <span>

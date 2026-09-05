@@ -22,6 +22,8 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 export type RouteTag =
   | 'ACTIVE'
   | 'READY'
+  /** Signed in, and the last run on it ended on the account's own usage limit. */
+  | 'AT LIMIT'
   | 'PREVIEW'
   | 'SIGN IN'
   | 'UNAVAILABLE'
@@ -97,10 +99,37 @@ export function runtimeIsUsable(runtime: PublicRuntimeStatus): boolean {
  * above the sentence "Codex CLI was not found on this machine."
  */
 export function routeRowTag(status: RouteRowStatus, isActive: boolean): RouteTag {
+  // AT LIMIT outranks ACTIVE: the active route being the one that just
+  // refused to run is exactly what a person needs to see.
+  if (status.tag === 'AT LIMIT') return status.tag
   return isActive && status.selectable ? 'ACTIVE' : status.tag
 }
 
+/**
+ * @param limited  The runtime's own words the last time a run on it ended on
+ *   the account's usage limit, while nothing on it has completed since.
+ *   READY means "signed in"; it had been saying so beside a runtime that had
+ *   just refused two missions in a row (user session 1, 2026-09-05), and the
+ *   picker offered every model of it as READY. The row stays selectable --
+ *   the limit is the account's and may lift on the provider's clock -- but
+ *   the tag and the sentence say what happened.
+ */
 export function routeRowStatus(
+  runtime: PublicRuntimeStatus,
+  integration: IntegrationLevel,
+  isActive: boolean,
+  limited?: string
+): RouteRowStatus {
+  const status = baseRouteRowStatus(runtime, integration, isActive)
+  if (limited === undefined || !status.selectable) return status
+  return {
+    tag: 'AT LIMIT',
+    selectable: true,
+    detail: `Signed in, but the last run on it ended on your account's usage limit: ${limited}`
+  }
+}
+
+function baseRouteRowStatus(
   runtime: PublicRuntimeStatus,
   integration: IntegrationLevel,
   isActive: boolean

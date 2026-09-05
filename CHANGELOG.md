@@ -6,6 +6,36 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.18.3 — 2026-09-05
+
+Found by using the app as a new person would, in a fresh profile, with the
+screen at every step kept and read afterwards.
+
+- **A runtime that just ran out of quota no longer says READY.** Two missions
+  in a row failed on Codex's usage limit and Settings, the welcome list and
+  every Codex row in the route picker still read READY — which means signed
+  in, not able to run. Until a run on that runtime completes, those rows now
+  say AT LIMIT and carry the runtime's own sentence, reset time included.
+  The row stays pickable: the limit is your account's and lifts on the
+  provider's clock.
+- **One failure, said once.** A quota failure was drawn three times in a row:
+  the limit card, the runtime's red error line, and the run's own failure
+  card, each carrying the same sentence. The limit card is the one that
+  names it; the other two stay out of its way. A slow-down warning never
+  hides a real failure reason.
+- **The idle teammate's sentence now matches the mode.** It said "Nothing is
+  changed unless you pick a mode that allows it" above a composer whose
+  default is Accept edits, so a fresh Research teammate promised read-only
+  while the footer said it may edit the workspace. It now says what the
+  current mode does.
+- **A reply keeps its line breaks.** Asked for "every file, one per line",
+  the teammate answered with one per line and the thread drew them on one
+  line, which read as the teammate ignoring the request. Checked against the
+  record: the newline was there; the screen dropped it.
+- The Missions list says "checkpoints", not "ck". The teammates screen is
+  titled Team, as its button already was. A model with one effort level no
+  longer reports "1 effort levels".
+
 ## 0.18.2 — 2026-09-05
 
 - **A teammate answering a teammate no longer asks a person who isn't there.**

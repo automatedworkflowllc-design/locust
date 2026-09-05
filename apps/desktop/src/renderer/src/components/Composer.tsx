@@ -45,6 +45,8 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
 
 export interface ComposerProps {
   readonly runtimes: readonly PublicRuntimeStatus[]
+  /** Runtimes whose last run ended on the account's usage limit, with its own words. */
+  readonly limitedRuntimes: ReadonlyMap<string, string>
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
   readonly running: boolean
   readonly cancelling: boolean
@@ -99,6 +101,7 @@ export interface ComposerProps {
  */
 export function Composer({
   runtimes,
+  limitedRuntimes,
   discoveryPhase,
   running,
   cancelling,
@@ -306,6 +309,7 @@ export function Composer({
                 {pickerOpen && (
                   <RoutePicker
                     runtimes={runtimes}
+                    limitedRuntimes={limitedRuntimes}
                     models={models}
                     resolvedModels={resolvedModels}
                     recentRoutes={recentRoutes}

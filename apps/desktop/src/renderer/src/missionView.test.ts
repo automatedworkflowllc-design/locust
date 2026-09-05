@@ -13,6 +13,7 @@ import {
   cancellationSummary,
   conversationTurns,
   decisionStanding,
+  errorAlreadyShown,
   defaultOpenEntry,
   failureMessage,
   peerExchangeStartsOpen,
@@ -379,6 +380,30 @@ describe('thread composition', () => {
     )
     expect(thread.find((i) => i.type === 'limit')).toMatchObject({ kind: 'temporary-rate-limit' })
     expect(thread.find((i) => i.type === 'diagnostic')).toMatchObject({ level: 'warning' })
+  })
+
+  it('says a quota failure once, not as a card and again as a red line', () => {
+    // MEASURED user session 1, 2026-09-05: one Codex quota failure drew the
+    // limit card, the runtime's error line and the run's failure card, all
+    // carrying "You've hit your usage limit...".
+    const said = "You've hit your usage limit. Upgrade to Pro or try again at Sep 7th, 2026 1:57 AM."
+    const thread = buildThread(
+      [
+        toolStart('t1', 'shell', 'pnpm test'),
+        event('route.limit_detected', { kind: 'quota-exhausted', message: said }),
+        event('adapter.diagnostic', { level: 'error', code: 'codex.runtime_error', message: said, terminal: true }),
+        event('adapter.diagnostic', { level: 'warning', code: 'x', message: 'Something else', terminal: false })
+      ],
+      { running: false }
+    )
+    expect(thread.filter((i) => i.type === 'limit')).toHaveLength(1)
+    expect(thread.filter((i) => i.type === 'diagnostic').map((i) => i.message)).toEqual(['Something else'])
+    // The run-level card would be the third copy; a slow-down warning must
+    // never hide a real failure reason, so only an ending limit counts.
+    expect(errorAlreadyShown(thread, `The run could not continue. ${said}`)).toBe(true)
+    expect(errorAlreadyShown(thread, 'The process died')).toBe(false)
+    const warned = buildThread([event('route.limit_detected', { kind: 'temporary-rate-limit', message: said })], { running: false })
+    expect(errorAlreadyShown(warned, said)).toBe(false)
   })
 
   it('does not invent an activity card when nothing ran', () => {

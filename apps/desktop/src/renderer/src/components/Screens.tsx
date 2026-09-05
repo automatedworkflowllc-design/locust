@@ -167,7 +167,7 @@ export function MissionsScreen({
                     {mission.runtime} / {mission.model}
                   </span>
                   <span className="lc-missionrow__stats lc-mono">
-                    {mission.checkpoints.length} ck · {elapsed}m
+                    {mission.checkpoints.length} checkpoint{mission.checkpoints.length === 1 ? '' : 's'} · {elapsed}m
                   </span>
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
                     {costLine(runCostOf(mission.events)) ?? '—'}
@@ -210,8 +210,8 @@ export function TeammatesScreen({
   return (
     <div className="lc-screen">
       <ScreenHeader
-        title="Teammates"
-        meta={`${teammates.length} defined · avatars and roles are yours to set`}
+        title="Team"
+        meta={`${teammates.length} teammate${teammates.length === 1 ? '' : 's'} · avatars and roles are yours to set`}
       />
       <div className="lc-screen__scroll">
         <div className="lc-rostergrid">
@@ -507,6 +507,7 @@ function UpdateControl({
 
 export function SettingsScreen({
   runtimes,
+  limitedRuntimes,
   ledgerPath,
   build,
   storage,
@@ -519,6 +520,8 @@ export function SettingsScreen({
   onPrune
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
+  /** Runtimes whose last run ended on the account's usage limit, with its own words. */
+  readonly limitedRuntimes: ReadonlyMap<string, string>
   readonly ledgerPath: string | undefined
   /** Which build this is; undefined until the host has answered. */
   readonly build: { readonly version: string; readonly packaged: boolean } | undefined
@@ -553,7 +556,7 @@ export function SettingsScreen({
           </p>
           <div className="lc-runtimelist">
             {runtimes.map((runtime) => {
-              const status = routeRowStatus(runtime, integrationOf(runtime.id), false)
+              const status = routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id))
               return (
                 <div className="lc-runtimerow" key={runtime.id}>
                   <div className="lc-runtimerow__text">
@@ -574,7 +577,7 @@ export function SettingsScreen({
                         ? ' is-lime'
                         : status.tag === 'SIGN IN'
                           ? ' is-red'
-                          : status.tag === 'PREVIEW' || status.tag === 'EXPERIMENTAL'
+                          : status.tag === 'PREVIEW' || status.tag === 'EXPERIMENTAL' || status.tag === 'AT LIMIT'
                             ? ' is-amber'
                             : ''
                     }`}

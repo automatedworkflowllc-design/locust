@@ -166,6 +166,24 @@ describe('nothing is live unless discovery proved it', () => {
     expect(routeRowStatus(runtime(), 'live', false).tag).toBe('READY')
   })
 
+  it('a runtime whose last run ended on the usage limit says so instead of READY', () => {
+    // MEASURED user session 1, 2026-09-05: two Codex missions in a row failed
+    // on quota, and Settings, the welcome list and every picker row of it
+    // still read READY. Signed in was true; runnable was not.
+    const said = "You've hit your usage limit. Try again at Sep 7th, 2026 1:57 AM."
+    const limited = routeRowStatus(runtime(), 'live', false, said)
+    expect(limited.tag).toBe('AT LIMIT')
+    expect(limited.selectable).toBe(true)
+    expect(limited.detail).toContain(said)
+    // Outranks ACTIVE: the active route refusing to run is the thing to show.
+    expect(routeRowTag(routeRowStatus(runtime(), 'live', true, said), true)).toBe('AT LIMIT')
+    // A runtime that is not runnable anyway keeps its own reason; the limit
+    // note must not upgrade a SIGN IN row to something selectable.
+    const signedOut = routeRowStatus(runtime({ ready: false, status: 'ready' }), 'live', false, said)
+    expect(signedOut.tag).not.toBe('AT LIMIT')
+    expect(signedOut.selectable).toBe(false)
+  })
+
   it('never calls a half-built adapter live, even when its runtime is ready', () => {
     const status = routeRowStatus(runtime({ id: 'claude', displayName: 'Claude Code' }), 'preview', true)
     expect(status.tag).toBe('PREVIEW')
