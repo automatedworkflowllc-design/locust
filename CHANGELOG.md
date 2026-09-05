@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.22.1 — 2026-09-05
+
+- **The sidebar no longer promises a teammate will pick up a message you
+  are sending to nobody.** With no one picked it says so; once someone is
+  picked it names them. The first-run footnote said the same wrong thing.
+- **Nobody is drawn as chosen until you choose them.**
+- **Settings' READY tags are green, not lime.** Lime means something is
+  happening right now.
+
 ## 0.22.0 — 2026-09-05
 
 - **See the exchange.** When teammates are talking to each other, the
