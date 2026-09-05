@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.27.4 — 2026-09-05
+
+- **The home screen, tightened after a design review.** The count says how
+  many runtimes are connected, without the two planned ones in the
+  denominator; those are named once under the panel as coming soon. The
+  privacy claim is made once. The instruction to pick a teammate is the
+  sidebar's alone. The mark card is smaller. Runtime names sit against
+  their dots. Cursor's build stamp shows its date, not its commit hash.
+- **The permission mode looks like the control it is**: boxed like the
+  route and effort chips, with a shield and a chevron.
+- "no effort" reads as "effort · fixed" (or "effort · default").
+
 ## 0.27.3 — 2026-09-05
 
 - **The logo takes you home.** Click the Locust mark in the sidebar to

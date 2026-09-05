@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
-import { SIGNED_IN_DETAIL, connectedRuntimeCount, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
+import { connectedRuntimeCount, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 
 /**
  * First run, and the empty state generally.
@@ -56,8 +56,17 @@ export function FirstLaunch({
       connected: runtimeIsUsable(runtime) && integrationOf(runtime.id) !== 'planned'
     }))
     .sort((left, right) => rank(left) - rank(right))
+  // A planned runtime cannot be connected by anyone, so it is not in the
+  // count's denominator and not in the panel: it is named once, under it
+  // (design review, 2026-09-05: "a progress meter the user can't complete").
+  const shown = rows.filter((row) => integrationOf(row.runtime.id) !== 'planned')
+  const planned = rows.filter((row) => integrationOf(row.runtime.id) === 'planned').map((row) => row.runtime.displayName)
   const connected = connectedRuntimeCount(runtimes)
   const anyReady = discoveryPhase === 'ready' && connected > 0
+  void teammateCount
+  // A build stamp with a commit hash is a fact for a changelog, not a
+  // status panel: "2026.09.02-c22c1a3" reads as its date.
+  const shortVersion = (version: string | null | undefined): string => (version === undefined || version === null ? '' : version.replace(/-[0-9a-f]{6,}$/i, ''))
 
   return (
     <div className="lc-empty">
@@ -79,7 +88,7 @@ export function FirstLaunch({
             ? 'checking the runtimes on this machine'
             : discoveryPhase === 'error'
               ? 'runtime discovery could not run — no credentials were read'
-              : `${String(connected)} of ${String(rows.length)} runtimes connected under your own accounts`}
+              : `${String(connected)} runtime${connected === 1 ? '' : 's'} connected`}
           <br />
           nothing pooled, proxied, or sent anywhere you have not connected
         </p>
@@ -107,18 +116,11 @@ export function FirstLaunch({
 
         {discoveryPhase === 'ready' && (
           <div className="lc-runtimepanel">
-            {rows.map(({ runtime, status, connected: usable }) => {
+            {shown.map(({ runtime, status, connected: usable }) => {
               const settled = usable
-              // Absence is not a state, so it gets no colour: a planned
-              // runtime's dot is hollow rather than grey-filled.
-              const hollow = integrationOf(runtime.id) === 'planned'
               return (
                 <div className={`lc-runtimecell${settled ? ' is-ready' : ''}`} key={runtime.id}>
-                  <span
-                    className={`lc-runtimecell__dot${hollow ? ' is-hollow' : ''}${
-                      settled ? ' is-green' : status.tag === 'SIGN IN' ? ' is-red' : ' is-muted'
-                    }`}
-                  />
+                  <span className={`lc-runtimecell__dot${settled ? ' is-green' : status.tag === 'SIGN IN' ? ' is-red' : ' is-muted'}`} />
                   <span className="lc-runtimecell__name" title={status.detail}>
                     {runtime.displayName}
                   </span>
@@ -126,7 +128,7 @@ export function FirstLaunch({
                     * state does, connected or not -- EXPERIMENTAL is the
                     * caveat on a runtime that IS connected. */}
                   {status.tag === 'READY' || status.tag === 'ACTIVE' ? (
-                    <span className="lc-runtimecell__version">{runtime.version ?? ''}</span>
+                    <span className="lc-runtimecell__version">{shortVersion(runtime.version)}</span>
                   ) : (
                     <span className="lc-runtimecell__tag">{status.tag}</span>
                   )}
@@ -136,13 +138,16 @@ export function FirstLaunch({
           </div>
         )}
 
-        {/* Said once, under the list, rather than on every signed-in row. */}
-        {anyReady && <p className="lc-footnote">{SIGNED_IN_DETAIL}</p>}
+        {/*
+          * The privacy claim is made once, in the claim line above; the
+          * instruction to pick a teammate is the sidebar's (its missions
+          * empty state says it) -- the review found both said twice.
+          */}
+        {discoveryPhase === 'ready' && planned.length > 0 && (
+          <p className="lc-footnote">coming soon: {planned.join(', ')}</p>
+        )}
         {!anyReady && discoveryPhase === 'ready' && (
           <p className="lc-footnote">Discovery runs locally · no model is shown as live until it answers</p>
-        )}
-        {anyReady && teammateCount > 0 && workspacePath !== undefined && (
-          <p className="lc-footnote">Pick a teammate in the sidebar to start, or write below and assign it to one later.</p>
         )}
       </div>
     </div>

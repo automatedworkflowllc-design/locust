@@ -410,15 +410,22 @@ export function Composer({
                     })}
                   </div>
                 )}
+                {/* The permission mode is the most consequential control on
+                  * the bar, and read as a label (design review, 2026-09-05).
+                  * Boxed like the route and effort chips, with a chevron. */}
                 <button
                   type="button"
-                  className="lc-control"
+                  className="lc-control lc-control--boxed"
                   aria-haspopup="menu"
                   aria-expanded={modeOpen}
+                  aria-label="Permission mode"
+                  title="Permission mode"
                   disabled={running}
                   onClick={() => setModeOpen(!modeOpen)}
                 >
+                  <Icon name="shield" size={12} />
                   {MODES.find((option) => option.mode === effectiveMode)?.name ?? 'Ask'}
+                  <Icon name="chevron-down" size={11} />
                 </button>
               </span>
               {/*
@@ -539,7 +546,7 @@ export function Composer({
                   onClick={() => setEffortOpen(!effortOpen)}
                 >
                   <span className="lc-control__mono">
-                    {supportedEfforts.length === 0 ? 'no effort' : (effectiveEffort ?? 'default')}
+                    {supportedEfforts.length === 0 ? 'effort · fixed' : `effort · ${effectiveEffort ?? 'default'}`}
                   </span>
                 </button>
               </span>

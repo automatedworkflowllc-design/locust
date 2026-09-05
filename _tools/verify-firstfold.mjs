@@ -98,7 +98,9 @@ try {
   })()`)
 
   // A first launch is what this screen is: no teammate, no mission.
-  const ready = await evaluate(`!!document.querySelector('.lc-empty')`)
+  // The welcome renders a tick after discovery settles; give it a moment
+  // rather than reading the one frame in between (a flake seen 2026-09-05).
+  const ready = await evaluate(`(async () => { for (let i = 0; i < 12; i += 1) { if (document.querySelector('.lc-empty')) return true; await new Promise(r => setTimeout(r, 250)) } return false })()`)
   check('the welcome screen is what is on screen', ready === true)
 
   // `tall` plants a block taller than the pane inside the welcome, which is
