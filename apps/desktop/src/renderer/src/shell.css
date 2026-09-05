@@ -1348,9 +1348,10 @@ textarea {
   gap: var(--lc-space-2);
 }
 
+/* No folder yet reads in the usual soft gray: the chip says it, and the
+   amber pulled the eye harder than the fact deserved (Colin, 2026-09-05). */
 .lc-control--folder.is-missing {
-  border-color: var(--lc-amber-border);
-  color: var(--lc-amber-text);
+  color: var(--lc-text-muted);
 }
 
 /* The exchange strip: who is in it, on what, how far into the budget,

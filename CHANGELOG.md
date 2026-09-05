@@ -6,6 +6,12 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.27.2 — 2026-09-05
+
+- With no folder chosen, the title bar shows the build (Locust 0.27.2)
+  instead of repeating what the composer's folder chip already says, and
+  that chip reads in the usual soft gray rather than amber.
+
 ## 0.27.1 — 2026-09-05
 
 - **Locust opens on the home screen.** Launch showed the newest finished

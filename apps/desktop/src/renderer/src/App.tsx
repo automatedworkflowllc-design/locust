@@ -2099,7 +2099,9 @@ export default function App(): ReactElement {
   return (
     <div className="lc-shell">
       <TitleBar
-        workspaceName={workspaceName.length === 0 ? 'No folder chosen' : workspaceName}
+        // With no folder the composer chip already says so; the bar shows the
+        // build instead (Colin, 2026-09-05).
+        workspaceName={workspaceName.length === 0 ? `Locust${build === undefined ? '' : ` ${build.version}`}` : workspaceName}
         runningCount={runningCount}
         swarm={swarm}
       />
