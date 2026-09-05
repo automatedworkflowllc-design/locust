@@ -26,6 +26,9 @@ import { createModelCatalog } from './model-catalog.js'
 import { createTeammateStore } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
+import { createRoomTasks } from './room-tasks.js'
+import type { RoomTasks } from './room-tasks.js'
+import { taskSection } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
 import type { RoutineRunner } from './routine-runner.js'
 import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
@@ -70,6 +73,7 @@ import {
   ROOM_CREATE_CHANNEL,
   ROOM_REMOVE_CHANNEL,
   ROOM_POST_CHANNEL,
+  ROOM_TASK_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
@@ -369,6 +373,8 @@ if (!ownsSingleInstanceLock) {
     // Bound late: the relay starts runs through the service that calls it.
     let relay: Relay | undefined
     let routineRunner: RoutineRunner | undefined
+    // Bound late for the same reason: it reads the ledger the service writes.
+    let roomTasks: RoomTasks | undefined
     const codexMissions = createCodexMissionService({
       workspacePath,
       discover: discoverForWork,
@@ -381,6 +387,7 @@ if (!ownsSingleInstanceLock) {
       onRunEnded: async (mission) => {
         await relay?.onRunEnded(mission)
         await routineRunner?.onRunEnded(mission)
+        await roomTasks?.onRunEnded(mission)
       }
     })
     // The approval transport. It only runs for the mode that asked for it, so
@@ -426,6 +433,7 @@ if (!ownsSingleInstanceLock) {
       onRunEnded: async (mission) => {
         await relay?.onRunEnded(mission)
         await routineRunner?.onRunEnded(mission)
+        await roomTasks?.onRunEnded(mission)
       }
     })
     const sendToWindow = (update: CodexMissionUpdate): void => {
@@ -658,6 +666,7 @@ if (!ownsSingleInstanceLock) {
       phaseOf: async (missionId) => (await missionLedger.getMission(missionId))?.phase,
       notify: sendToWindow
     })
+    roomTasks = createRoomTasks({ rooms, ledger: missionLedger, teammates, notify: sendToWindow })
 
     ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
@@ -861,6 +870,28 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    ipcMain.handle(ROOM_TASK_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return roomRejected('The board could not be changed.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      const op = input.op
+      if (op !== 'add' && op !== 'assign' && op !== 'done' && op !== 'reopen' && op !== 'remove') {
+        return roomRejected('That is not a way to move a task.')
+      }
+      if (typeof input.roomId !== 'string') return roomRejected('That room could not be found.')
+      try {
+        const room = await rooms.updateTask({
+          roomId: input.roomId,
+          op,
+          ...(typeof input.taskId === 'string' ? { taskId: input.taskId } : {}),
+          ...(typeof input.text === 'string' ? { text: input.text } : {}),
+          ...(typeof input.ownerId === 'string' ? { ownerId: input.ownerId } : {})
+        })
+        return { ok: true, data: { room } } as const
+      } catch (error) {
+        return roomRejected(error instanceof Error ? error.message : 'The board could not be changed.')
+      }
+    })
+
     ipcMain.handle(ROOM_POST_CHANNEL, async (event, request: unknown) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (owner === null || !fromOwnWindow(event)) return roomRejected('The post could not be made.')
@@ -888,11 +919,26 @@ if (!ownsSingleInstanceLock) {
           continue
         }
         const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
+        // The person's words, then the board: which room this is, who else
+        // is in it, every task as it stands, and how to move one. The room
+        // keeps only the person's words as the post; this trailer is what
+        // the mission is briefed with.
+        const memberNames = room.teammateIds.map((id) => roster.find((entry) => entry.teammateId === id)?.name ?? id)
+        const briefed = `${text}\n\n${taskSection({
+          roomName: room.name,
+          selfName: teammate.name,
+          memberNames,
+          tasks: room.tasks.map((task) => ({
+            text: task.text,
+            state: task.state,
+            ownerName: task.ownerId === undefined ? undefined : roster.find((entry) => entry.teammateId === task.ownerId)?.name ?? task.ownerId
+          }))
+        })}`
         const response =
           route.runtime === 'antigravity'
             ? roomRejected('Antigravity cannot be posted to from a room yet.')
             : await codexMissions.start(
-                text,
+                briefed,
                 route.runtime,
                 route.mode,
                 route.model === 'account-default' ? {} : { model: route.model },

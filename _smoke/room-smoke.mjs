@@ -82,7 +82,11 @@ await writeFile(
         name: 'Release',
         teammateIds: ['tm_wren', 'tm_booty'],
         createdAt: T0,
-        posts: [{ postId: 'post_1', text: 'Which files mention the release date?', at: T0, missions: { tm_wren: 'mission_wren1', tm_booty: 'mission_booty1' } }]
+        posts: [{ postId: 'post_1', text: 'Which files mention the release date?', at: T0, missions: { tm_wren: 'mission_wren1', tm_booty: 'mission_booty1' } }],
+        tasks: [
+          { taskId: 'task_notes', text: 'Write the release notes', ownerId: 'tm_wren', state: 'in-hand', missionId: 'mission_wren1', at: T1 },
+          { taskId: 'task_version', text: 'Check the version string', ownerId: undefined, state: 'open', missionId: undefined, at: T0 }
+        ]
       }
     ]
   })
@@ -178,9 +182,15 @@ try {
       route: card.querySelector('.lc-roomanswer__route')?.textContent.trim() ?? '',
       text: card.querySelector('.lc-roomanswer__text')?.textContent.trim() ?? ''
     }))
+    const board = [...document.querySelectorAll('.lc-task')].map(row => ({
+      state: row.querySelector('.lc-task__state')?.textContent.trim() ?? '',
+      text: row.querySelector('.lc-task__text')?.textContent.trim() ?? '',
+      owner: row.querySelector('.lc-task__owner')?.textContent.trim() ?? ''
+    }))
     return JSON.stringify({
       title: document.querySelector('.lc-screen__title')?.textContent.trim() ?? '',
       posts: document.querySelectorAll('.lc-roompost').length,
+      board,
       cards,
       sidebarRooms: [...document.querySelectorAll('.lc-roomrow .lc-row__name')].map(el => el.textContent.trim())
     })
@@ -214,6 +224,10 @@ try {
   check('each card is attributed and completed', (opened.cards ?? []).every((c) => /Wren|Booty/.test(c.name) && c.phase === 'completed'), JSON.stringify(opened.cards))
   check('each card carries the teammate\'s last words', (opened.cards ?? []).some((c) => /README\.md and CHANGELOG\.md/.test(c.text)) && (opened.cards ?? []).some((c) => /first line/.test(c.text)), JSON.stringify(opened.cards))
   check('each card names its route', (opened.cards ?? []).every((c) => /OpenCode/.test(c.route)), JSON.stringify(opened.cards))
+  check('the board reads back: one in hand with Wren, one open with nobody', JSON.stringify(opened.board) === JSON.stringify([
+    { state: 'IN HAND', text: 'Write the release notes', owner: 'Wren' },
+    { state: 'OPEN', text: 'Check the version string', owner: 'nobody' }
+  ]), JSON.stringify(opened.board))
 
   say('2. Open on a card goes to that mission')
   const openedMission = await evaluate(`(async () => {
@@ -233,7 +247,7 @@ try {
     await new Promise(r => setTimeout(r, 500))
     const box = document.querySelector('.lc-roomcompose__box')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    setter.call(box, 'Reply with only the single word: ready')
+    setter.call(box, 'Reply with the single word: ready. Then, using the task block you were shown, mark the task "Check the version string" done.')
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 200))
     document.querySelector('.lc-roomcompose').requestSubmit()
@@ -258,12 +272,71 @@ try {
   say(`       ${JSON.stringify(settled.cards.slice(2))}`)
   check('both runs finished', settled.cards.slice(2).every((c) => c.phase === 'completed'), JSON.stringify(settled.cards.slice(2)))
   check('and each answered in its own card', settled.cards.slice(2).every((c) => /ready/i.test(c.text)), JSON.stringify(settled.cards.slice(2)))
+  // Whether a free model follows the block is the model's business, not the
+  // product's; what the product owes is that a block that arrives moves the
+  // board and a block that does not leaves it. Logged, not asserted.
+  await sleep(1500)
+  const afterRun = JSON.parse(await evaluate(ROOM_STATE))
+  say(`       board after the run (model-moved, informational): ${JSON.stringify(afterRun.board)}`)
+  const answerTexts = settled.cards.slice(2).map((c) => c.text)
+  check('the block, if any, is stripped from the shown answer', answerTexts.every((t) => !/locust-task/.test(t)), JSON.stringify(answerTexts))
 
   const stored = JSON.parse(await readFile(ROOMS, 'utf8'))
   const release = stored.rooms.find((r) => r.roomId === 'room_release')
   check('the room file records the post with both missions', release?.posts?.length === 2 && Object.keys(release.posts[1].missions).length === 2, JSON.stringify(release?.posts?.[1]))
 
-  say('4. a new room from the form')
+  say('4. the person moves the board by hand')
+  const moved = JSON.parse(await evaluate(`(async () => {
+    const steps = []
+    const rows = () => [...document.querySelectorAll('.lc-task')]
+    const find = (text) => rows().find(r => (r.querySelector('.lc-task__text')?.textContent ?? '').includes(text))
+    const state = () => JSON.stringify([...document.querySelectorAll('.lc-task')].map(r => [r.querySelector('.lc-task__text')?.textContent.trim(), r.querySelector('.lc-task__state')?.textContent.trim(), r.querySelector('.lc-task__owner')?.textContent.trim()]))
+    // add
+    const input = document.querySelector('.lc-board__add input')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    setter.call(input, 'Sign the installer')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 150))
+    document.querySelector('.lc-board__add').requestSubmit()
+    await new Promise(r => setTimeout(r, 600))
+    steps.push(['added', state()])
+    // assign to Booty
+    let row = find('Sign the installer')
+    ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Assign').click()
+    await new Promise(r => setTimeout(r, 200))
+    row = find('Sign the installer')
+    ;[...row.querySelectorAll('.lc-task__assign button')].find(b => b.innerText.trim() === 'Booty').click()
+    await new Promise(r => setTimeout(r, 600))
+    steps.push(['assigned', state()])
+    // done
+    row = find('Sign the installer')
+    ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Done').click()
+    await new Promise(r => setTimeout(r, 600))
+    steps.push(['done', state()])
+    // reopen
+    row = find('Sign the installer')
+    ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Reopen').click()
+    await new Promise(r => setTimeout(r, 600))
+    steps.push(['reopened', state()])
+    // remove
+    row = find('Sign the installer')
+    ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Remove').click()
+    await new Promise(r => setTimeout(r, 600))
+    steps.push(['removed', state()])
+    return JSON.stringify(steps)
+  })()`))
+  for (const [step, state] of moved) say(`       ${step}: ${state}`)
+  const at = (step) => JSON.parse(moved.find((entry) => entry[0] === step)[1])
+  const signRow = (step) => at(step).find((row) => row[0] === 'Sign the installer')
+  check('add puts an open task with nobody on the board', JSON.stringify(signRow('added')) === JSON.stringify(['Sign the installer', 'OPEN', 'nobody']), JSON.stringify(signRow('added')))
+  check('assign hands it to Booty, in hand', JSON.stringify(signRow('assigned')) === JSON.stringify(['Sign the installer', 'IN HAND', 'Booty']), JSON.stringify(signRow('assigned')))
+  check('done finishes it', signRow('done')?.[1] === 'DONE', JSON.stringify(signRow('done')))
+  check('reopen puts it back in Booty\'s hands', JSON.stringify(signRow('reopened')) === JSON.stringify(['Sign the installer', 'IN HAND', 'Booty']), JSON.stringify(signRow('reopened')))
+  check('remove takes it off the board', signRow('removed') === undefined, JSON.stringify(at('removed')))
+  const storedBoard = JSON.parse(await readFile(ROOMS, 'utf8')).rooms.find((r) => r.roomId === 'room_release').tasks
+  check('the file agrees with the screen', !storedBoard.some((t) => t.text === 'Sign the installer') && storedBoard.length >= 2, JSON.stringify(storedBoard.map((t) => [t.text, t.state, t.ownerId])))
+
+  say('5. a new room from the form')
   const made = JSON.parse(await evaluate(`(async () => {
     [...document.querySelectorAll('.lc-roomrow--new')][0].click()
     await new Promise(r => setTimeout(r, 500))

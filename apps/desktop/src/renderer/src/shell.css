@@ -1613,6 +1613,79 @@ textarea {
   gap: var(--lc-space-3);
 }
 
+/* The board on a room: one line per task -- state, text, owner, the
+   mission that last moved it, and what a person can do to it. */
+.lc-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-board__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lc-board__count {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-task {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-2) 0;
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+.lc-task.is-done .lc-task__text {
+  color: var(--lc-text-muted);
+  text-decoration: line-through;
+}
+
+.lc-task__text {
+  flex: 1 1 240px;
+  min-width: 0;
+  color: var(--lc-text-primary);
+}
+
+.lc-task__owner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-secondary-size);
+}
+
+.lc-task__actions,
+.lc-task__assign {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-1);
+  margin-left: auto;
+}
+
+.lc-board__add {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
+  padding-top: var(--lc-space-2);
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+.lc-board__add .lc-roomform__name {
+  flex: 1 1 200px;
+}
+
 /* A room row in the sidebar. */
 .lc-roomrow {
   gap: var(--lc-space-3);

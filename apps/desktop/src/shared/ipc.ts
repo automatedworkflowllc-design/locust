@@ -136,6 +136,7 @@ export const ROOM_LIST_CHANNEL = 'rooms:list'
 export const ROOM_CREATE_CHANNEL = 'rooms:create'
 export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
 export const ROOM_POST_CHANNEL = 'rooms:post'
+export const ROOM_TASK_CHANNEL = 'rooms:task'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
@@ -301,13 +302,43 @@ export interface RoomPost {
   readonly missions: Readonly<Record<string, string>>
 }
 
+/**
+ * A task on a room's board: a line of text, an owner, a state, and the
+ * mission that last touched it (vision #2, "ownership"). Teammates move it
+ * with a task block at the end of a reply; a person moves it from the room.
+ */
+export interface RoomTask {
+  readonly taskId: string
+  readonly text: string
+  readonly ownerId: string | undefined
+  readonly state: 'open' | 'in-hand' | 'done'
+  /** The mission whose reply last moved this task, when a teammate did. */
+  readonly missionId: string | undefined
+  readonly at: string
+}
+
 export interface PublicRoom {
   readonly roomId: string
   readonly name: string
   readonly teammateIds: readonly string[]
   readonly createdAt: string
   readonly posts: readonly RoomPost[]
+  readonly tasks: readonly RoomTask[]
 }
+
+/** A person moving the board: add a task, hand it to someone, finish it, or open it again. */
+export interface RoomTaskRequest {
+  readonly roomId: string
+  readonly op: 'add' | 'assign' | 'done' | 'reopen' | 'remove'
+  readonly taskId?: string
+  readonly text?: string
+  /** For `assign`: a teammate in the room, or undefined to leave it with nobody. */
+  readonly ownerId?: string
+}
+
+export type RoomTaskResponse =
+  | { readonly ok: true; readonly data: { readonly room: PublicRoom } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROOM_REJECTED'; readonly message: string } }
 
 export interface RoomCreateRequest {
   readonly name: string
@@ -707,6 +738,16 @@ export type CodexMissionUpdate =
         | { readonly kind: 'routine'; readonly routineId: string; readonly step: number }
         | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
     }
+  /**
+   * A room's board moved because a teammate's reply moved it. The window
+   * re-reads the room; `message` is the host's one-line account, for the
+   * room screen and, later, a toast.
+   */
+  | {
+      readonly kind: 'room-changed'
+      readonly roomId: string
+      readonly message: string
+    }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */
   | {
       readonly kind: 'relay-notice'
@@ -868,6 +909,7 @@ export interface DesktopApi {
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>
   removeRoom(roomId: string): Promise<RoomMutationResponse>
   postToRoom(request: RoomPostRequest): Promise<RoomPostResponse>
+  updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void

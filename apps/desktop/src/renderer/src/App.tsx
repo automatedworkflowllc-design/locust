@@ -23,7 +23,7 @@ import type {
   PublicTeammate,
   TeammateHue,
   TeammateRole,
-  TeammateRoute, PublicRoom } from '../../shared/ipc.js'
+  TeammateRoute, PublicRoom, RoomTaskRequest } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
 import { queuedVerdict } from './steering.js'
@@ -31,6 +31,9 @@ import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { DEFAULT_RELAY_HOP_CAP } from '../../shared/ipc.js'
+import { stripTaskBlocks } from '../../shared/room-task.js'
+import { stripDecisionBlocks } from '../../shared/decision.js'
+import { stripShareBlocks } from '../../shared/peer-share.js'
 import { Composer } from './components/Composer.js'
 import { ExchangeStrip } from './components/ExchangeStrip.js'
 import { RoomScreen } from './components/RoomScreen.js'
@@ -201,6 +204,8 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   }
   // A host-started run is adopted by the listener, never applied to a run.
   if (update.kind === 'mission-started') return live
+  // A room's board moving is the room's business, not this run's.
+  if (update.kind === 'room-changed') return live
 
   const events = [...live.events, update.event].slice(-500)
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
@@ -787,6 +792,14 @@ export default function App(): ReactElement {
         setRecentlyReceived((current) => [...current.filter((id) => id !== to), to])
         setTimeout(() => setRecentlyReceived((current) => current.filter((id) => id !== to)), RECEIVED_GLANCE_MS)
       }
+      if (update.kind === 'room-changed') {
+        // A teammate's reply moved a board. Re-read the rooms so the screen
+        // shows the board as the host now holds it, and keep the host's one
+        // line for the room to show.
+        refreshRooms()
+        setRoomNotice(update.message)
+        return
+      }
       if (update.kind === 'mission-started') {
         // A teammate replying on their own. The host started it; the renderer
         // adopts it exactly as it adopts a run it asked for, so the sidebar
@@ -1106,7 +1119,11 @@ export default function App(): ReactElement {
       const recorded = historyByIdRef.current.get(missionId)
       const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
       const finals = assistantMessages(events).filter((message) => message.final)
-      const last = finals.at(-1)?.text ?? assistantMessages(events).at(-1)?.text
+      const raw = finals.at(-1)?.text ?? assistantMessages(events).at(-1)?.text
+      // The words, not the blocks: what a reply shared, asked or moved on the
+      // board is shown by those surfaces. The room smoke's first live run
+      // drew a raw task block inside the card (2026-09-05).
+      const last = raw === undefined ? undefined : stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw)))
       const phase = live !== undefined ? live.phase : recorded?.phase ?? 'unknown'
       const runtime = live?.data?.runtime ?? recorded?.runtime ?? 'codex'
       const model = live?.data?.model ?? recorded?.model ?? 'account-default'
@@ -1169,6 +1186,17 @@ export default function App(): ReactElement {
         ? undefined
         : response.data.refused.map((entry) => `${entry.name}: ${entry.message}`).join(' · ')
     )
+    return undefined
+  }
+
+  /** A person moving a room's board. The host answers with the room as it now stands. */
+  const updateRoomTask = async (request: RoomTaskRequest): Promise<string | undefined> => {
+    const bridge = window.desktop
+    if (bridge === undefined) return 'The secure desktop bridge is unavailable.'
+    const response = await bridge.updateRoomTask(request).catch(() => undefined)
+    if (response === undefined) return 'The board could not be changed.'
+    if (!response.ok) return response.error.message
+    setRooms((current) => current.map((room) => (room.roomId === response.data.room.roomId ? response.data.room : room)))
     return undefined
   }
 
@@ -2102,6 +2130,7 @@ export default function App(): ReactElement {
               onCreateRoom={createRoom}
               onRemoveRoom={removeRoom}
               onPost={postToRoom}
+              onTask={updateRoomTask}
               onOpenMission={openMission}
               notice={roomNotice}
             />

@@ -22,7 +22,7 @@ describe('a room', () => {
   it('is a named set of teammates, kept on disk, with no posts to begin with', async () => {
     const rooms = await store()
     const room = await rooms.create({ name: '  Release  ', teammateIds: ['tm_wren', 'tm_booty'] })
-    expect(room).toEqual({ roomId: 'room_id1', name: 'Release', teammateIds: ['tm_wren', 'tm_booty'], createdAt: NOW, posts: [] })
+    expect(room).toEqual({ roomId: 'room_id1', name: 'Release', teammateIds: ['tm_wren', 'tm_booty'], createdAt: NOW, posts: [], tasks: [] })
     expect(await rooms.list()).toEqual([room])
     expect(JSON.parse(await readFile(join(root, 'rooms.json'), 'utf8'))).toMatchObject({ schemaVersion: 1, rooms: [room] })
     // A second store over the same folder reads it back.
@@ -94,8 +94,106 @@ describe('a room', () => {
     const rooms = await store()
     await writeFile(join(root, 'rooms.json'), '{not json', 'utf8')
     expect(await rooms.list()).toEqual([])
-    const good = { roomId: 'room_a', name: 'A', teammateIds: ['tm_wren'], createdAt: NOW, posts: [] }
+    const good = { roomId: 'room_a', name: 'A', teammateIds: ['tm_wren'], createdAt: NOW, posts: [], tasks: [] }
     const bad = { roomId: 'room_b', name: '', teammateIds: [], createdAt: NOW, posts: [] }
     expect(parsedFile(JSON.stringify({ schemaVersion: 1, rooms: [bad, good, good] })).rooms).toEqual([good])
+  })
+})
+
+describe('the board', () => {
+  const ROSTER = [
+    { teammateId: 'tm_wren', name: 'Wren' },
+    { teammateId: 'tm_booty', name: 'Booty' },
+    { teammateId: 'tm_atlas', name: 'Atlas' }
+  ]
+  const WREN = { teammateId: 'tm_wren', name: 'Wren', missionId: 'mission_w' }
+
+  it('moves as a teammate’s block says: claim creates or takes, done finishes, handoff gives, new adds', async () => {
+    const rooms = await store()
+    const room = await rooms.create({ name: 'Release', teammateIds: ['tm_wren', 'tm_booty'] })
+    const first = await rooms.applyTaskOps(
+      room.roomId,
+      [
+        { kind: 'claim', text: 'Write the release notes' },
+        { kind: 'new', text: 'Verify the installer signs' },
+        { kind: 'handoff', text: 'Check the version string', to: 'booty' }
+      ],
+      WREN,
+      ROSTER
+    )
+    expect(first.refused).toEqual([])
+    expect(first.changed).toEqual([
+      'Wren took on "Write the release notes".',
+      'Wren added "Verify the installer signs".',
+      'Wren handed "Check the version string" to Booty.'
+    ])
+    let board = (await rooms.get(room.roomId))!.tasks
+    expect(board.map((task) => [task.text, task.ownerId, task.state, task.missionId])).toEqual([
+      ['Write the release notes', 'tm_wren', 'in-hand', 'mission_w'],
+      ['Verify the installer signs', undefined, 'open', 'mission_w'],
+      ['Check the version string', 'tm_booty', 'open', 'mission_w']
+    ])
+
+    // Matching is blind to case and punctuation, so quoting the board loosely still hits it.
+    const second = await rooms.applyTaskOps(room.roomId, [{ kind: 'done', text: 'write the RELEASE notes!' }], WREN, ROSTER)
+    expect(second.changed).toEqual(['Wren finished "Write the release notes".'])
+    board = (await rooms.get(room.roomId))!.tasks
+    expect(board[0]).toMatchObject({ state: 'done', ownerId: 'tm_wren' })
+  })
+
+  it('refuses what it cannot honour, by name, without dropping the rest', async () => {
+    const rooms = await store()
+    const room = await rooms.create({ name: 'Release', teammateIds: ['tm_wren', 'tm_booty'] })
+    await rooms.applyTaskOps(room.roomId, [{ kind: 'new', text: 'Ship it' }], WREN, ROSTER)
+    const result = await rooms.applyTaskOps(
+      room.roomId,
+      [
+        { kind: 'new', text: 'Ship it' },
+        { kind: 'done', text: 'Not on the board' },
+        // Atlas is on the roster but not in this room.
+        { kind: 'handoff', text: 'Ship it', to: 'Atlas' },
+        { kind: 'claim', text: 'Ship it' }
+      ],
+      WREN,
+      ROSTER
+    )
+    expect(result.refused).toEqual([
+      'Wren: "Ship it" is already on the board.',
+      'Wren marked "Not on the board" done, but it is not on the board.',
+      'Wren handed "Ship it" to "Atlas", who is not in this room.'
+    ])
+    expect(result.changed).toEqual(['Wren took on "Ship it".'])
+    // A done task cannot be claimed back by a block; a person reopens it.
+    await rooms.applyTaskOps(room.roomId, [{ kind: 'done', text: 'Ship it' }], WREN, ROSTER)
+    const again = await rooms.applyTaskOps(room.roomId, [{ kind: 'claim', text: 'Ship it' }], WREN, ROSTER)
+    expect(again.refused).toEqual(['Wren tried to claim "Ship it", which is done.'])
+  })
+
+  it('lets a person add, assign, finish, reopen and remove', async () => {
+    const rooms = await store()
+    const room = await rooms.create({ name: 'Release', teammateIds: ['tm_wren', 'tm_booty'] })
+    let next = await rooms.updateTask({ roomId: room.roomId, op: 'add', text: 'Write the notes', ownerId: 'tm_booty' })
+    const task = next.tasks[0]!
+    expect(task).toMatchObject({ text: 'Write the notes', ownerId: 'tm_booty', state: 'in-hand', missionId: undefined })
+    next = await rooms.updateTask({ roomId: room.roomId, op: 'assign', taskId: task.taskId, ownerId: undefined })
+    expect(next.tasks[0]).toMatchObject({ ownerId: undefined, state: 'open' })
+    next = await rooms.updateTask({ roomId: room.roomId, op: 'done', taskId: task.taskId })
+    expect(next.tasks[0]).toMatchObject({ state: 'done' })
+    next = await rooms.updateTask({ roomId: room.roomId, op: 'reopen', taskId: task.taskId })
+    expect(next.tasks[0]).toMatchObject({ state: 'open' })
+    await expect(rooms.updateTask({ roomId: room.roomId, op: 'add', text: 'write the notes' })).rejects.toThrow(/already on the board/)
+    await expect(rooms.updateTask({ roomId: room.roomId, op: 'assign', taskId: task.taskId, ownerId: 'tm_atlas' })).rejects.toThrow(/in the room/)
+    next = await rooms.updateTask({ roomId: room.roomId, op: 'remove', taskId: task.taskId })
+    expect(next.tasks).toEqual([])
+    await expect(rooms.updateTask({ roomId: room.roomId, op: 'done', taskId: task.taskId })).rejects.toThrow(/no longer on the board/)
+  })
+
+  it('reads tasks back from disk, and an older file without them as a room with none', async () => {
+    const rooms = await store()
+    const room = await rooms.create({ name: 'Release', teammateIds: ['tm_wren'] })
+    await rooms.updateTask({ roomId: room.roomId, op: 'add', text: 'Persist me' })
+    expect((await createRoomStore({ rootDirectory: root }).get(room.roomId))?.tasks.map((task) => task.text)).toEqual(['Persist me'])
+    const old = { roomId: 'room_old', name: 'Old', teammateIds: ['tm_wren'], createdAt: NOW, posts: [] }
+    expect(parsedFile(JSON.stringify({ schemaVersion: 1, rooms: [old] })).rooms[0]?.tasks).toEqual([])
   })
 })

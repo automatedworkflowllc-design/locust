@@ -3,7 +3,9 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import type { PublicRoom, RoomPost } from '../shared/ipc.js'
+import type { PublicRoom, RoomPost, RoomTask, RoomTaskRequest } from '../shared/ipc.js'
+import { boundedTaskText, taskKey } from '../shared/room-task.js'
+import type { TaskOp } from '../shared/room-task.js'
 import { safeId } from './teammate-store.js'
 
 /**
@@ -25,6 +27,7 @@ export const MAX_ROOM_TEAMMATES = 8
 export const MAX_ROOM_POSTS = 200
 export const MAX_ROOM_NAME_LENGTH = 60
 export const MAX_POST_LENGTH = 8_000
+export const MAX_ROOM_TASKS = 100
 
 export interface RoomStore {
   list(): Promise<readonly PublicRoom[]>
@@ -35,6 +38,20 @@ export interface RoomStore {
   addPost(roomId: unknown, post: { readonly text: string; readonly missions: Readonly<Record<string, string>> }): Promise<RoomPost>
   /** A teammate who is gone leaves every room; a room left empty is removed. */
   removeTeammate(teammateId: unknown): Promise<void>
+  /**
+   * A teammate's reply moved the board. Ops are matched to tasks by text;
+   * `claim` and `new` create a task that does not exist; `handoff` needs a
+   * name that is in the room. Returns what changed and what was refused,
+   * in words, so the room can say so.
+   */
+  applyTaskOps(
+    roomId: unknown,
+    ops: readonly TaskOp[],
+    actor: { readonly teammateId: string; readonly name: string; readonly missionId: string },
+    roster: readonly { readonly teammateId: string; readonly name: string }[]
+  ): Promise<{ readonly changed: readonly string[]; readonly refused: readonly string[] }>
+  /** A person moving the board from the room screen. */
+  updateTask(request: RoomTaskRequest): Promise<PublicRoom>
 }
 
 interface StoredFile {
@@ -70,6 +87,25 @@ export function validPostText(value: unknown): value is string {
     && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
 }
 
+function parsedTask(value: unknown): RoomTask | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const record = value as Record<string, unknown>
+  if (!safeId(record.taskId)) return undefined
+  if (typeof record.text !== 'string' || boundedTaskText(record.text).length === 0) return undefined
+  if (record.state !== 'open' && record.state !== 'in-hand' && record.state !== 'done') return undefined
+  if (record.ownerId !== undefined && !safeId(record.ownerId)) return undefined
+  if (record.missionId !== undefined && !safeId(record.missionId)) return undefined
+  if (typeof record.at !== 'string' || Number.isNaN(Date.parse(record.at))) return undefined
+  return {
+    taskId: record.taskId,
+    text: boundedTaskText(record.text),
+    ownerId: record.ownerId,
+    state: record.state,
+    missionId: record.missionId,
+    at: record.at
+  }
+}
+
 function parsedPost(value: unknown): RoomPost | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const record = value as Record<string, unknown>
@@ -97,12 +133,24 @@ export function parsedRoom(value: unknown): PublicRoom | undefined {
     posts.push(post)
     if (posts.length >= MAX_ROOM_POSTS) break
   }
+  // Tasks arrived after rooms did; a file without them is a room with none.
+  const tasks: RoomTask[] = []
+  if (record.tasks !== undefined) {
+    if (!Array.isArray(record.tasks)) return undefined
+    for (const entry of record.tasks) {
+      const task = parsedTask(entry)
+      if (task === undefined) return undefined
+      tasks.push(task)
+      if (tasks.length >= MAX_ROOM_TASKS) break
+    }
+  }
   return {
     roomId: record.roomId,
     name: record.name.trim(),
     teammateIds: [...record.teammateIds],
     createdAt: record.createdAt,
-    posts
+    posts,
+    tasks
   }
 }
 
@@ -199,7 +247,8 @@ export function createRoomStore(options: {
           name: input.name.trim(),
           teammateIds: [...input.teammateIds],
           createdAt: now().toISOString(),
-          posts: []
+          posts: [],
+          tasks: []
         }
         await write({ ...file, rooms: [...file.rooms, room] })
         return room
@@ -233,6 +282,125 @@ export function createRoomStore(options: {
           rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))
         })
         return added
+      })
+    },
+
+    applyTaskOps(roomId, ops, actor, roster): Promise<{ readonly changed: readonly string[]; readonly refused: readonly string[] }> {
+      return serialize(async () => {
+        const file = await read()
+        const room = file.rooms.find((entry) => entry.roomId === roomId)
+        if (room === undefined) return { changed: [], refused: ['That room no longer exists.'] }
+        const changed: string[] = []
+        const refused: string[] = []
+        let tasks = [...room.tasks]
+        const at = now().toISOString()
+        const find = (text: string): number => tasks.findIndex((task) => taskKey(task.text) === taskKey(text))
+        for (const op of ops) {
+          const index = find(op.text)
+          if (op.kind === 'new') {
+            if (index >= 0) {
+              refused.push(`${actor.name}: "${op.text}" is already on the board.`)
+              continue
+            }
+            if (tasks.length >= MAX_ROOM_TASKS) {
+              refused.push(`The board is full (${String(MAX_ROOM_TASKS)} tasks).`)
+              continue
+            }
+            tasks.push({ taskId: `task_${createId()}`, text: op.text, ownerId: undefined, state: 'open', missionId: actor.missionId, at })
+            changed.push(`${actor.name} added "${op.text}".`)
+            continue
+          }
+          if (op.kind === 'claim') {
+            if (index < 0) {
+              if (tasks.length >= MAX_ROOM_TASKS) {
+                refused.push(`The board is full (${String(MAX_ROOM_TASKS)} tasks).`)
+                continue
+              }
+              tasks.push({ taskId: `task_${createId()}`, text: op.text, ownerId: actor.teammateId, state: 'in-hand', missionId: actor.missionId, at })
+              changed.push(`${actor.name} took on "${op.text}".`)
+              continue
+            }
+            const task = tasks[index]!
+            if (task.state === 'done') {
+              refused.push(`${actor.name} tried to claim "${task.text}", which is done.`)
+              continue
+            }
+            tasks[index] = { ...task, ownerId: actor.teammateId, state: 'in-hand', missionId: actor.missionId, at }
+            changed.push(`${actor.name} took on "${task.text}".`)
+            continue
+          }
+          if (op.kind === 'done') {
+            if (index < 0) {
+              refused.push(`${actor.name} marked "${op.text}" done, but it is not on the board.`)
+              continue
+            }
+            const task = tasks[index]!
+            tasks[index] = { ...task, ownerId: task.ownerId ?? actor.teammateId, state: 'done', missionId: actor.missionId, at }
+            changed.push(`${actor.name} finished "${task.text}".`)
+            continue
+          }
+          // handoff
+          const target = roster.find(
+            (entry) => room.teammateIds.includes(entry.teammateId) && entry.name.toLowerCase() === op.to.toLowerCase()
+          )
+          if (target === undefined) {
+            refused.push(`${actor.name} handed "${op.text}" to "${op.to}", who is not in this room.`)
+            continue
+          }
+          if (index < 0) {
+            if (tasks.length >= MAX_ROOM_TASKS) {
+              refused.push(`The board is full (${String(MAX_ROOM_TASKS)} tasks).`)
+              continue
+            }
+            tasks.push({ taskId: `task_${createId()}`, text: op.text, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, at })
+          } else {
+            const task = tasks[index]!
+            tasks[index] = { ...task, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, at }
+          }
+          changed.push(`${actor.name} handed "${op.text}" to ${target.name}.`)
+        }
+        if (changed.length > 0) {
+          await write({ ...file, rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, tasks } : entry)) })
+        }
+        return { changed, refused }
+      })
+    },
+
+    updateTask(request): Promise<PublicRoom> {
+      return serialize(async () => {
+        const file = await read()
+        const room = file.rooms.find((entry) => entry.roomId === request.roomId)
+        if (room === undefined) throw new Error('That room no longer exists.')
+        const at = now().toISOString()
+        let tasks = [...room.tasks]
+        if (request.op === 'add') {
+          const text = boundedTaskText(typeof request.text === 'string' ? request.text : '')
+          if (text.length === 0) throw new Error('Write the task first.')
+          if (tasks.some((task) => taskKey(task.text) === taskKey(text))) throw new Error('That task is already on the board.')
+          if (tasks.length >= MAX_ROOM_TASKS) throw new Error(`The board is full (${String(MAX_ROOM_TASKS)} tasks).`)
+          const ownerId = typeof request.ownerId === 'string' && room.teammateIds.includes(request.ownerId) ? request.ownerId : undefined
+          tasks.push({ taskId: `task_${createId()}`, text, ownerId, state: ownerId === undefined ? 'open' : 'in-hand', missionId: undefined, at })
+        } else {
+          const index = tasks.findIndex((task) => task.taskId === request.taskId)
+          if (index < 0) throw new Error('That task is no longer on the board.')
+          const task = tasks[index]!
+          if (request.op === 'assign') {
+            const ownerId = typeof request.ownerId === 'string' ? request.ownerId : undefined
+            if (ownerId !== undefined && !room.teammateIds.includes(ownerId)) throw new Error('Only a teammate in the room can own its task.')
+            tasks[index] = { ...task, ownerId, state: task.state === 'done' ? 'done' : ownerId === undefined ? 'open' : 'in-hand', at }
+          } else if (request.op === 'done') {
+            tasks[index] = { ...task, state: 'done', at }
+          } else if (request.op === 'reopen') {
+            tasks[index] = { ...task, state: task.ownerId === undefined ? 'open' : 'in-hand', at }
+          } else if (request.op === 'remove') {
+            tasks = tasks.filter((entry) => entry.taskId !== request.taskId)
+          } else {
+            throw new Error('That is not a way to move a task.')
+          }
+        }
+        const next = { ...room, tasks }
+        await write({ ...file, rooms: file.rooms.map((entry) => (entry.roomId === request.roomId ? next : entry)) })
+        return next
       })
     },
 

@@ -24,6 +24,7 @@ import {
   ROOM_CREATE_CHANNEL,
   ROOM_REMOVE_CHANNEL,
   ROOM_POST_CHANNEL,
+  ROOM_TASK_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
@@ -64,6 +65,8 @@ import type {
   RoomPostResponse,
   RoomCreateRequest,
   RoomPostRequest,
+  RoomTaskRequest,
+  RoomTaskResponse,
   TeammateCreateRequest,
   TeammateListResponse,
   TeammateMutationResponse,
@@ -162,6 +165,7 @@ const desktopApi: DesktopApi = {
   createRoom: (request: RoomCreateRequest) => ipcRenderer.invoke(ROOM_CREATE_CHANNEL, request) as Promise<RoomMutationResponse>,
   removeRoom: (roomId: string) => ipcRenderer.invoke(ROOM_REMOVE_CHANNEL, roomId) as Promise<RoomMutationResponse>,
   postToRoom: (request: RoomPostRequest) => ipcRenderer.invoke(ROOM_POST_CHANNEL, request) as Promise<RoomPostResponse>,
+  updateRoomTask: (request: RoomTaskRequest) => ipcRenderer.invoke(ROOM_TASK_CHANNEL, request) as Promise<RoomTaskResponse>,
   writeWorkspaceSettings: (settings: WorkspaceSettings) =>
     ipcRenderer.invoke(WORKSPACE_SETTINGS_WRITE_CHANNEL, settings) as Promise<WorkspaceSettings>,
   decideMissionApproval: (answer: MissionApprovalAnswer) =>

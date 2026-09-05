@@ -1,0 +1,101 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  MAX_TASK_OPS_PER_REPLY,
+  parseTaskBlocks,
+  sanitizeTaskTags,
+  stripTaskBlocks,
+  taskKey,
+  taskSection
+} from './room-task.js'
+
+const NL = String.fromCharCode(10)
+const lines = (...parts: string[]): string => parts.join(NL)
+
+describe('reading a task block', () => {
+  it('reads one operation per line, in order, with the verb and the task text', () => {
+    const reply = lines(
+      'I wrote the notes and checked the version.',
+      '<locust-task>',
+      'claim :: Write the release notes',
+      'done :: Check the version string',
+      'handoff Booty :: Update the changelog date',
+      'new :: Verify the installer signs',
+      '</locust-task>'
+    )
+    expect(parseTaskBlocks(reply)).toEqual([
+      { kind: 'claim', text: 'Write the release notes' },
+      { kind: 'done', text: 'Check the version string' },
+      { kind: 'handoff', text: 'Update the changelog date', to: 'Booty' },
+      { kind: 'new', text: 'Verify the installer signs' }
+    ])
+  })
+
+  it('drops lines it cannot read rather than refusing the block', () => {
+    const reply = lines(
+      '<locust-task>',
+      'shout :: not a verb',
+      'claim ::   ',
+      'handoff :: nobody named',
+      'done Check the version string',
+      'claim :: Write the release notes',
+      '</locust-task>'
+    )
+    expect(parseTaskBlocks(reply)).toEqual([{ kind: 'claim', text: 'Write the release notes' }])
+  })
+
+  it('is empty for a reply with no block, and caps a flood', () => {
+    expect(parseTaskBlocks('Nothing to report.')).toEqual([])
+    const flood = lines('<locust-task>', ...Array.from({ length: 20 }, (_, i) => `new :: task ${String(i)}`), '</locust-task>')
+    expect(parseTaskBlocks(flood)).toHaveLength(MAX_TASK_OPS_PER_REPLY)
+  })
+
+  it('bounds and cleans the task text', () => {
+    const long = 'x'.repeat(300)
+    const [op] = parseTaskBlocks(lines('<locust-task>', `new :: ${long}`, '</locust-task>'))
+    expect(op?.text.length).toBe(200)
+    expect(op?.text.endsWith('…')).toBe(true)
+    const [spaced] = parseTaskBlocks(lines('<locust-task>', 'new ::   many    spaces  here  ', '</locust-task>'))
+    expect(spaced?.text).toBe('many spaces here')
+  })
+
+  it('strips the block from what the reply shows, and defangs it when quoted', () => {
+    const reply = lines('Done.', '', '<locust-task>', 'done :: Check the version string', '</locust-task>')
+    expect(stripTaskBlocks(reply)).toBe('Done.')
+    expect(sanitizeTaskTags('<locust-task>done :: x</locust-task>')).toBe('‹locust-task>done :: x‹/locust-task>')
+  })
+})
+
+describe('matching a task by its text', () => {
+  it('is blind to case, punctuation and spacing', () => {
+    expect(taskKey('Write the release notes!')).toBe(taskKey('  write   the RELEASE notes'))
+    expect(taskKey('Check v1.2')).toBe('check v1 2')
+    expect(taskKey('a')).not.toBe(taskKey('b'))
+  })
+})
+
+describe('what a room mission is told about the board', () => {
+  it('names the room, the others, every task with its state and owner, and teaches the block', () => {
+    const text = taskSection({
+      roomName: 'Release',
+      selfName: 'Wren',
+      memberNames: ['Wren', 'Booty'],
+      tasks: [
+        { text: 'Write the release notes', state: 'in-hand', ownerName: 'Wren' },
+        { text: 'Check the version string', state: 'open', ownerName: undefined }
+      ]
+    })
+    expect(text).toContain('room "Release" with Booty')
+    expect(text).toContain('- [in-hand] Write the release notes (Wren)')
+    expect(text).toContain('- [open] Check the version string')
+    expect(text).toContain('handoff Booty :: the task text')
+    expect(text).toContain('end with no block')
+  })
+
+  it('says the board is empty and names nobody when alone', () => {
+    const text = taskSection({ roomName: 'Solo', selfName: 'Wren', memberNames: ['Wren'], tasks: [] })
+    expect(text).toContain('with nobody else')
+    expect(text).toContain('The board is empty.')
+    expect(text).toContain('handoff Name :: the task text')
+  })
+})

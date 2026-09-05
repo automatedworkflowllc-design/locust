@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { useState } from 'react'
 
-import type { PublicRoom, PublicTeammate } from '../../../shared/ipc.js'
+import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
 import { PixelFace } from './PixelFace.js'
 
 /**
@@ -38,6 +38,7 @@ export function RoomScreen({
   onRemoveRoom,
   onPost,
   onOpenMission,
+  onTask,
   notice
 }: {
   readonly rooms: readonly PublicRoom[]
@@ -51,6 +52,8 @@ export function RoomScreen({
   readonly onRemoveRoom: (roomId: string) => void
   readonly onPost: (roomId: string, text: string) => Promise<string | undefined>
   readonly onOpenMission: (missionId: string) => void
+  /** A person moving the board. Resolves with the host's refusal, if any. */
+  readonly onTask: (request: RoomTaskRequest) => Promise<string | undefined>
   /** The host's last word about a post or a room, when it had one. */
   readonly notice: string | undefined
 }): ReactElement {
@@ -58,6 +61,9 @@ export function RoomScreen({
   const [draftName, setDraftName] = useState('')
   const [draftMembers, setDraftMembers] = useState<readonly string[]>([])
   const [draftText, setDraftText] = useState('')
+  const [draftTask, setDraftTask] = useState('')
+  const [assigning, setAssigning] = useState<string>()
+  const [boardError, setBoardError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState<string>()
 
@@ -74,6 +80,13 @@ export function RoomScreen({
     }
     setDraftName('')
     setDraftMembers([])
+  }
+
+  const move = async (request: RoomTaskRequest): Promise<void> => {
+    setBoardError(undefined)
+    setAssigning(undefined)
+    const error = await onTask(request)
+    if (error !== undefined) setBoardError(error)
   }
 
   const post = async (): Promise<void> => {
@@ -191,6 +204,103 @@ export function RoomScreen({
         </button>
       </div>
       <div className="lc-screen__scroll lc-room__thread">
+        {/*
+          * The board. A task is a line of text, an owner, a state, and the
+          * mission that last touched it. Teammates move it with a block at
+          * the end of a reply; this is where a person moves it by hand.
+          */}
+        <section className="lc-board" aria-label="Task board">
+          <div className="lc-board__head">
+            <span className="lc-sectionlabel">Tasks</span>
+            <span className="lc-board__count lc-mono">
+              {room.tasks.length === 0
+                ? 'none yet'
+                : `${String(room.tasks.filter((task) => task.state !== 'done').length)} open · ${String(room.tasks.filter((task) => task.state === 'done').length)} done`}
+            </span>
+          </div>
+          {room.tasks.map((task) => {
+            const owner = teammates.find((entry) => entry.teammateId === task.ownerId)
+            return (
+              <div key={task.taskId} className={`lc-task is-${task.state}`}>
+                <span className={`lc-tag lc-task__state${task.state === 'done' ? ' is-green' : task.state === 'in-hand' ? ' is-amber' : ''}`}>
+                  {task.state === 'in-hand' ? 'IN HAND' : task.state.toUpperCase()}
+                </span>
+                <span className="lc-task__text">{task.text}</span>
+                <span className="lc-task__owner">
+                  {owner === undefined ? (
+                    <span className="lc-settings__note">nobody</span>
+                  ) : (
+                    <>
+                      <PixelFace hue={owner.hue} avatar={owner.avatar} size={16} activity="idle" presence="none" />
+                      {owner.name}
+                    </>
+                  )}
+                </span>
+                {task.missionId !== undefined && (
+                  <button type="button" className="lc-ghostbutton" title="The conversation whose reply last moved this task" onClick={() => onOpenMission(task.missionId!)}>
+                    Open
+                  </button>
+                )}
+                <span className="lc-task__actions">
+                  {assigning === task.taskId ? (
+                    <span className="lc-task__assign" role="group" aria-label="Assign to">
+                      {members.filter((entry) => entry !== undefined).map((entry) => (
+                        <button key={entry!.teammateId} type="button" className="lc-button" onClick={() => void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId, ownerId: entry!.teammateId })}>
+                          {entry!.name}
+                        </button>
+                      ))}
+                      <button type="button" className="lc-button" onClick={() => void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId })}>
+                        Nobody
+                      </button>
+                      <button type="button" className="lc-ghostbutton" onClick={() => setAssigning(undefined)}>
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <>
+                      <button type="button" className="lc-ghostbutton" onClick={() => setAssigning(task.taskId)}>
+                        Assign
+                      </button>
+                      {task.state === 'done' ? (
+                        <button type="button" className="lc-ghostbutton" onClick={() => void move({ roomId: room.roomId, op: 'reopen', taskId: task.taskId })}>
+                          Reopen
+                        </button>
+                      ) : (
+                        <button type="button" className="lc-ghostbutton" onClick={() => void move({ roomId: room.roomId, op: 'done', taskId: task.taskId })}>
+                          Done
+                        </button>
+                      )}
+                      <button type="button" className="lc-ghostbutton" title="Take it off the board" onClick={() => void move({ roomId: room.roomId, op: 'remove', taskId: task.taskId })}>
+                        Remove
+                      </button>
+                    </>
+                  )}
+                </span>
+              </div>
+            )
+          })}
+          <form
+            className="lc-board__add"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (draftTask.trim().length === 0) return
+              void move({ roomId: room.roomId, op: 'add', text: draftTask }).then(() => setDraftTask(''))
+            }}
+          >
+            <input
+              className="lc-roomform__name"
+              value={draftTask}
+              onChange={(event) => setDraftTask(event.target.value)}
+              placeholder="Add a task"
+              aria-label="Add a task"
+              maxLength={200}
+            />
+            <button type="submit" className="lc-button" disabled={draftTask.trim().length === 0}>
+              Add
+            </button>
+            {boardError !== undefined && <span className="lc-settings__note lc-tone-red">{boardError}</span>}
+          </form>
+        </section>
         {room.posts.length === 0 && (
           <p className="lc-settings__note">Nothing posted yet. Whatever you write below goes to everyone in the room.</p>
         )}
