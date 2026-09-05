@@ -1341,6 +1341,34 @@ export function typedPrompt(
  * longer holds the message -- because inventing a title is worse than showing
  * the briefing, which is at least true.
  */
+/**
+ * The line drawn above a turn's work, or nothing.
+ *
+ * The thread's own rule, written when handoffs were built: a run the HOST
+ * briefed must never be drawn as a person's bubble, because that attributes
+ * to them something they never said. A relayed run broke that rule --
+ * Colin, 2026-09-05, screenshot: the whole machine briefing ("...end with one
+ * <locust-share to="Wren"> block... Do not use a <locust-ask> block here...")
+ * sat in the thread as the most prominent text on screen, in the place a
+ * person's message goes.
+ *
+ * A person's words are drawn as they were typed. A host-briefed turn is drawn
+ * by the message that caused it, when the record still holds that message,
+ * and otherwise not at all -- the peer card beside it already says who wrote
+ * to whom, so silence here loses nothing and inventing a sentence would.
+ */
+export function turnPromptLine(turn: {
+  readonly prompt: string
+  readonly startedBy?: PublicRecoveredMission['startedBy']
+  readonly peerMessages?: readonly PublicPeerMessage[]
+}): string | undefined {
+  if (turn.startedBy === undefined) return turn.prompt
+  // A routine step is the person's own words, saved from a conversation they
+  // had; it is theirs to see, even though the host pressed go.
+  if (turn.startedBy.kind === 'routine') return turn.prompt
+  return relayedTitle({ startedBy: turn.startedBy, peerMessages: turn.peerMessages ?? [] })
+}
+
 export function relayedTitle(mission: {
   readonly startedBy?: PublicRecoveredMission['startedBy']
   readonly peerMessages: PublicRecoveredMission['peerMessages']

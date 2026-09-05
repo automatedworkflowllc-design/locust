@@ -204,6 +204,18 @@ export function meetingPrompt(input: { readonly repliers: readonly string[]; rea
 export function createRelay(options: RelayOptions): Relay {
   /** Open meetings by the asker's mission id. */
   const meetings = new Map<string, Meeting>()
+  /**
+   * One-to-one exchanges the host started and is still waiting on, keyed by
+   * the RECIPIENT's mission. A meeting keeps minutes and says who stayed
+   * silent; an ordinary exchange kept nothing, so when a recipient answered
+   * in prose instead of a reply block the asker's thread simply showed
+   * nothing at all -- Colin, 2026-09-05: "wren answered it but only in his
+   * own chat, we never got the reply in booty's chat".
+   */
+  const exchanges = new Map<
+    string,
+    { readonly askerRunId: string; readonly askerMissionId: string; readonly askerId: string; readonly recipientName: string }
+  >()
   /** Which meeting a relayed run is answering, by that run's mission id. */
   const answering = new Map<string, Meeting>()
 
@@ -328,6 +340,13 @@ export function createRelay(options: RelayOptions): Relay {
 
       // One automatic run per recipient per share, whatever was posted: a
       // run that wrote to the same teammate twice gets one reply, not two.
+      // This run answering an exchange it was started for: whatever else it
+      // does, the asker is no longer waiting in silence.
+      const waiting = exchanges.get(mission.missionId)
+      if (waiting !== undefined && posted.some((message) => message.to.teammateId === waiting.askerId)) {
+        exchanges.delete(mission.missionId)
+      }
+
       const seen = new Set<string>()
       const started: { readonly teammateId: string; readonly name: string; readonly missionId: string }[] = []
       for (const message of posted) {
@@ -379,10 +398,32 @@ export function createRelay(options: RelayOptions): Relay {
         meetings.set(mission.missionId, opened)
         for (const entry of started) answering.set(entry.missionId, opened)
         notice(`Waiting on ${started.map((entry) => entry.name).join(', ')} to reply before your next turn.`)
+      } else {
+        for (const entry of started) {
+          exchanges.set(entry.missionId, {
+            askerRunId: mission.runId,
+            askerMissionId: mission.missionId,
+            askerId: mission.peer.self.teammateId,
+            recipientName: entry.name
+          })
+        }
       }
     },
 
     async onRunEnded(mission) {
+      // An ordinary exchange that ended with nothing written back. The reply
+      // is not lost -- it is in the recipient's own conversation -- and the
+      // person watching the thread that asked is told where to find it,
+      // rather than being left to conclude the message never arrived.
+      const exchange = exchanges.get(mission.missionId)
+      exchanges.delete(mission.missionId)
+      if (exchange !== undefined) {
+        notify(
+          exchange.askerRunId,
+          exchange.askerMissionId,
+          `${exchange.recipientName} finished without writing back. Anything they said is in their own conversation.`
+        )
+      }
       const meeting = answering.get(mission.missionId)
       answering.delete(mission.missionId)
       if (meeting === undefined || mission.peer === undefined) return

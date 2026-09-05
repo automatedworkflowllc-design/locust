@@ -214,8 +214,14 @@ export function Composer({
       return
     }
     if (!canStart) return
+    // Cleared NOW, not when the host answers. The turn is already on screen as
+    // a bubble the instant it is sent, so waiting for the round trip left the
+    // same sentence in two places for the whole "Starting..." window and read
+    // as lag (Colin, 2026-09-05, screenshot). If the send never happened at
+    // all, the words come straight back rather than being lost.
+    setValue('')
     void onStart(prompt).then((started) => {
-      if (started) setValue('')
+      if (!started) setValue(prompt)
     })
   }
 

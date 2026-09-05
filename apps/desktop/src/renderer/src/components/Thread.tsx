@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnPromptLine } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
@@ -193,6 +193,8 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
 
 export interface ThreadProps {
   readonly prompt: string
+  /** Who started the current turn; a host-briefed one is not the person's words. */
+  readonly startedBy?: PublicRecoveredMission['startedBy']
   /**
    * Earlier turns of the same conversation, oldest first, each with the words
    * the person typed for it. Empty for a first turn. They render above this
@@ -231,6 +233,8 @@ export interface ThreadProps {
     readonly events: readonly NormalizedRuntimeEvent[]
     /** What that turn exchanged with peers. Drawn with the turn, not with the last one. */
     readonly peerMessages?: readonly PublicPeerMessage[]
+    /** Who started it. A host-briefed turn is not drawn as the person's words. */
+    readonly startedBy?: PublicRecoveredMission['startedBy']
   }[]
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean
@@ -279,6 +283,7 @@ export interface ThreadProps {
 
 export function Thread({
   prompt,
+  startedBy,
   earlierTurns,
   coldStart = false,
   onRunWithEdits,
@@ -322,6 +327,9 @@ export function Thread({
   // Every turn's exchange, not only the last one: the message a teammate SENT
   // was written on an earlier turn than the reply it drew, so a thread that
   // only drew the current turn showed the answer and never the question.
+  // What the current turn is called: the person's words, or -- for a turn the
+  // host briefed -- the message that caused it, or nothing at all.
+  const currentLine = turnPromptLine({ prompt, startedBy, peerMessages: peers.messages })
   const exchanges = threadPeerCards([...earlierTurns.map((turn) => turn.peerMessages ?? []), peers.messages])
   const peerCard = (card: ThreadPeerCard): ReactElement => (
     <PeerThread
@@ -370,7 +378,7 @@ export function Thread({
               {marker !== undefined && (
                 <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
               )}
-              <div className="lc-bubble">{turn.prompt}</div>
+              {turnPromptLine(turn) !== undefined && <div className="lc-bubble">{turnPromptLine(turn)}</div>}
               {cardsFor(index, 'before-work').map(peerCard)}
               <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
               {cardsFor(index, 'after-work').map(peerCard)}
@@ -381,7 +389,7 @@ export function Thread({
         {currentMarker !== undefined && (
           <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
         )}
-        <div className="lc-bubble">{prompt}</div>
+        {currentLine !== undefined && <div className="lc-bubble">{currentLine}</div>}
 
         {handoff !== undefined && (
           <>

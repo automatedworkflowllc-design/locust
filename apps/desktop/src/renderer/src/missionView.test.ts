@@ -14,6 +14,7 @@ import {
   conversationTurns,
   decisionStanding,
   errorAlreadyShown,
+  turnPromptLine,
   defaultOpenEntry,
   failureMessage,
   peerExchangeStartsOpen,
@@ -380,6 +381,38 @@ describe('thread composition', () => {
     )
     expect(thread.find((i) => i.type === 'limit')).toMatchObject({ kind: 'temporary-rate-limit' })
     expect(thread.find((i) => i.type === 'diagnostic')).toMatchObject({ level: 'warning' })
+  })
+
+  it('never draws a turn the HOST briefed as the person\'s own words', () => {
+    // MEASURED 2026-09-05, Colin's screenshot: the whole relay briefing --
+    // "end with one <locust-share to=\"Wren\"> block... Do not use a
+    // <locust-ask> block here" -- sat in the thread in the place a person's
+    // message goes, as the most prominent text on screen.
+    const briefing =
+      'Wren (Code & Migrations) replied to you; it is quoted below. Do what it asks... end with one <locust-share to="Wren"> block holding your reply.'
+    const received: PublicPeerMessage = {
+      messageId: 'wm_1',
+      direction: 'received',
+      from: { teammateId: 'tm_wren', name: 'Wren' },
+      to: { teammateId: 'tm_booty', name: 'Booty' },
+      text: "Day's going well on my side.",
+      at: '2026-09-05T00:00:00.000Z'
+    }
+    expect(
+      turnPromptLine({ prompt: briefing, startedBy: { kind: 'relay', hop: 2 }, peerMessages: [received] })
+    ).toBe("Wren asked: Day's going well on my side.")
+
+    // The record no longer holds the message: draw NOTHING rather than the
+    // briefing. The peer card beside it still says who wrote to whom.
+    expect(turnPromptLine({ prompt: briefing, startedBy: { kind: 'relay', hop: 2 }, peerMessages: [] })).toBeUndefined()
+    expect(turnPromptLine({ prompt: 'resumed briefing', startedBy: { kind: 'resume', epoch: 2 } })).toBeUndefined()
+
+    // A person's words are theirs, and so are a routine's steps -- they were
+    // typed by the person in the conversation the routine was saved from.
+    expect(turnPromptLine({ prompt: 'read status.ts' })).toBe('read status.ts')
+    expect(
+      turnPromptLine({ prompt: 'read status.ts', startedBy: { kind: 'routine', routineId: 'rt_1', step: 2 } })
+    ).toBe('read status.ts')
   })
 
   it('says so when a turn finished and wrote nothing back', () => {

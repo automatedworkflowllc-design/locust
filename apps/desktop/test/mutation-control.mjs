@@ -48,6 +48,20 @@ const STEERING = join(ROOT, 'src', 'renderer', 'src', 'steering.ts')
 
 const MUTATIONS = [
   {
+    file: RELAY,
+    name: 'a one-to-one exchange that ends in silence says nothing at all',
+    from: '      if (exchange !== undefined) {',
+    to: '      if (false) {',
+    expect: 'says so when a one-to-one reply never comes back, and where it went'
+  },
+  {
+    file: VIEW,
+    name: "a host-written briefing is drawn as the person's own words",
+    from: '  if (turn.startedBy === undefined) return turn.prompt',
+    to: '  if (true) return turn.prompt',
+    expect: "never draws a turn the HOST briefed as the person's own words"
+  },
+  {
     file: MISSIONS,
     name: 'plan first is honoured even in a mode that can write',
     from: "        if (plan === true && sandbox === 'read-only') {",

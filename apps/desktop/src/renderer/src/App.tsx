@@ -228,7 +228,8 @@ function earlierTurnsOf(
         missionId,
         prompt: live.prompt,
         events: live.events,
-        ...(live.peerMessages === undefined ? {} : { peerMessages: live.peerMessages })
+        ...(live.peerMessages === undefined ? {} : { peerMessages: live.peerMessages }),
+        ...(live.startedBy === undefined ? {} : { startedBy: live.startedBy })
       }
     ]
   }
@@ -1846,6 +1847,7 @@ export default function App(): ReactElement {
               )}
               <Thread
                 prompt={liveRun.prompt}
+                startedBy={liveRun.startedBy}
                 earlierTurns={liveRun.earlierTurns ?? []}
                 coldStart={liveRun.coldStart ?? false}
                 workspacePath={workspacePath}

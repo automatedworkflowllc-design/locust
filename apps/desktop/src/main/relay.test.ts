@@ -164,6 +164,39 @@ describe('relaying a share', () => {
     expect(started).toMatchObject({ kind: 'mission-started', teammateId: BOOTY.teammateId, startedBy: { kind: 'relay', hop: 1 } })
   })
 
+  it('says so when a one-to-one reply never comes back, and where it went', async () => {
+    // MEASURED 2026-09-05, Colin: Booty asked Wren whether Alphabet was
+    // overvalued. Wren answered -- in prose, in its own conversation, with no
+    // reply block -- so nothing came back and Booty's thread showed nothing
+    // at all. A meeting says who stayed silent; an ordinary exchange said
+    // nothing, which reads as the message never arriving.
+    const { relay, starts, notices } = harness()
+    await relay.onShared(sharing(), [message(BOOTY)])
+    expect(starts).toHaveLength(1)
+
+    await relay.onRunEnded({ missionId: 'mission_1', peer: bootyPeer, relay: { hop: 1, lastMissionOf: {} } })
+    const said = notices.filter((update) => update.kind === 'relay-notice').at(-1)
+    expect(said?.kind === 'relay-notice' ? said.message : '').toBe(
+      'Booty finished without writing back. Anything they said is in their own conversation.'
+    )
+    // Addressed to the thread that ASKED, not to the run that stayed quiet.
+    expect(said?.kind === 'relay-notice' ? said.missionId : '').toBe('mission_wren1')
+  })
+
+  it('stays quiet when the reply DID come back', async () => {
+    const { relay, notices } = harness()
+    await relay.onShared(sharing(), [message(BOOTY)])
+    // Booty's run answers Wren, which is the whole point; nothing to report.
+    await relay.onShared(
+      { runId: 'run_booty', missionId: 'mission_1', peer: bootyPeer, relay: { hop: 1, lastMissionOf: {} } },
+      [message(WREN)]
+    )
+    await relay.onRunEnded({ missionId: 'mission_1', peer: bootyPeer, relay: { hop: 1, lastMissionOf: {} } })
+    expect(
+      notices.filter((update) => update.kind === 'relay-notice').map((update) => (update.kind === 'relay-notice' ? update.message : ''))
+    ).not.toContain('Booty finished without writing back. Anything they said is in their own conversation.')
+  })
+
   it('a teammate who has never run borrows the sender\'s route, and the thread says so', async () => {
     const { relay, starts, notices } = harness({ booty: newBootyPeer })
     await relay.onShared(sharing(), [message(BOOTY)])

@@ -6,6 +6,30 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.20.1 — 2026-09-05
+
+Three things Colin found in an evening of real use.
+
+- **A teammate's briefing is no longer shown as your own message.** When one
+  teammate answers another, the host writes that run a briefing — *"end with
+  one <locust-share to="Wren"> block... do not use a <locust-ask> block
+  here"* — and the thread was drawing that whole paragraph in the place your
+  message goes, as the most prominent text on screen. It now shows the
+  message that caused the turn, the way the mission list already did, and
+  shows nothing at all when the record no longer holds it. The rule the
+  thread was written with, and had been breaking: a run the host briefed is
+  never drawn as a person's words.
+- **The box empties the moment you send.** It was waiting for the host to
+  answer first, so your words sat in the box beside the bubble for the whole
+  "Starting…" second or two and read as lag. If a send genuinely never
+  happens, the words come straight back.
+- **A teammate who never writes back now says so.** Booty asked Wren a
+  question; Wren answered in its own conversation without a reply block, so
+  nothing came back and Booty's thread showed nothing — which reads as the
+  message never arriving. A meeting has always said who stayed silent; a
+  one-to-one exchange now does too, and says the answer is in that
+  teammate's own conversation.
+
 ## 0.20.0 — 2026-09-05
 
 The two habits people bring from other agent tools, and miss first.
