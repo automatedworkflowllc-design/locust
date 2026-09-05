@@ -10,8 +10,6 @@
 import { createHash } from 'node:crypto'
 
 import { FREE_ROUTE, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 
 const workspace = await scratchRepository('locust-drive-memory-ws-')
 const workspaceId = `ws_${createHash('sha256').update(workspace, 'utf8').digest('hex').slice(0, 32)}`

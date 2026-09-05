@@ -86,7 +86,7 @@ export function ActivityCard({
                 <div className="lc-filerow is-static is-helper">
                   <Icon name="users" size={14} />
                   <span className="lc-filerow__path">{entry.description}</span>
-                  <span className="lc-filerow__status">helper</span>
+                  <span className="lc-filerow__status">subagent</span>
                   <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : 'is-running'}`}>
                     {!entry.settled ? 'working on it' : entry.failed ? 'failed' : 'reported back'}
                   </span>

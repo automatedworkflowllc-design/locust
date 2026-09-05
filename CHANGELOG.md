@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.32.3 — 2026-09-05
+
+- **The activity fold shows the diff on Codex CLI.** That route names the
+  files it changed and never sends the change, so a whole session read
+  "did not report the change". Locust now reads the change off the disk:
+  a new file as an add from its own contents, a tracked file from git, and
+  a new file edited again on a later turn as the difference between the
+  two. The diff sits on the runtime's own row.
+- **"Subagent working."** While a teammate's own subagent runs, the sidebar
+  says so instead of "working". The fold's rows and summary say subagent.
+
 ## 0.32.2 — 2026-09-05
 
 - **Claude Code teammates can use subagents.** The tool list Locust hands

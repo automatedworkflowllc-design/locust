@@ -324,6 +324,10 @@ export function createCursorEventNormalizer(
         ?? stringValue(args.path)
         ?? stringValue(refused?.command)
         ?? stringValue(refused?.path)
+        // A subagent call names its ask, not a path (seen driving, 2026-09-05:
+        // a live Cursor subagent read "a subagent, unnamed").
+        ?? stringValue(args.description)
+        ?? stringValue(args.prompt)
         ?? globTarget(args);
       const subtype = stringValue(parsed.subtype);
       if (subtype === "started") {

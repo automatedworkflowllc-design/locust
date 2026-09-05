@@ -31,8 +31,9 @@ import type {
   MissionMode
 } from '../shared/ipc.js'
 import { composeHandoffPrompt } from './handoff.js'
-import { changedPaths, observedEditEvents, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
+import { changedPaths, observedEditEvents, observedPatches, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
+import type { ToolPatch } from '@teammate/runtime-adapters'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
@@ -175,6 +176,8 @@ interface CodexMissionServiceOptions {
   readonly onRunEnded?: (mission: EndedMission) => Promise<void>
   /** Test seam: how the working tree is looked at before and after a write-capable run. Defaults to `git status`. */
   readonly observeDisk?: (workspacePath: string) => Promise<WorkspaceSnapshot | undefined>
+  /** Test seam: the change behind each changed path, read off the disk. */
+  readonly observePatches?: (workspacePath: string, after: WorkspaceSnapshot, paths: readonly string[], options?: unknown, before?: WorkspaceSnapshot) => Promise<ReadonlyMap<string, ToolPatch>>
   readonly createId?: () => string
   readonly now?: () => Date
   readonly schedule?: (task: () => void) => void
@@ -416,8 +419,16 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       try {
         const diskAfter = await (options.observeDisk ?? snapshotWorkspace)(mission.cwd)
         if (diskAfter !== undefined) {
-          const unreported = unreportedPaths(changedPaths(mission.diskBefore, diskAfter), mission.persisted)
-          if (unreported.length > 0) {
+          // Every path that changed, with the change read off the disk. A
+          // path the runtime named keeps its own row and gets the patch
+          // attached; one it never named gets a row of its own.
+          const changed = changedPaths(mission.diskBefore, diskAfter)
+          const unreported = new Set(unreportedPaths(changed, mission.persisted))
+          const patches = changed.length === 0
+            ? new Map<string, ToolPatch>()
+            : await (options.observePatches ?? observedPatches)(mission.cwd, diskAfter, changed, {}, mission.diskBefore)
+          const worth = changed.filter((path) => unreported.has(path) || patches.has(path))
+          if (worth.length > 0) {
             await persistAndEmit(
               mission,
               options.ledger,
@@ -426,8 +437,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                 missionId: mission.missionId,
                 sourceAdapter: mission.runtime,
                 nextSequence: mission.lastSequence + 1,
-                paths: unreported,
-                at: now().toISOString()
+                paths: worth,
+                at: now().toISOString(),
+                patches,
+                reported: new Set(changed.filter((path) => !unreported.has(path)))
               }) as ReturnType<CodexEventNormalizer['accept']>
             )
           }

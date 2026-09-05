@@ -1,5 +1,6 @@
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
+import { SUBAGENT_TOOL } from './faceState.js'
 import { LARGE_FILE_LINES, fileCounts, parseUnifiedDiff } from './diff.js'
 import type { DiffCounts, DiffFile } from './diff.js'
 
@@ -141,7 +142,7 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
           kind: 'helper',
           key: `helper_${String(entries.length)}`,
           // The target is what the helper was asked; without one, say so.
-          description: detail.tool !== undefined && detail.tool !== detail.name ? detail.name : 'a helper, unnamed',
+          description: detail.tool !== undefined && detail.tool !== detail.name ? detail.name : 'a subagent, unnamed',
           settled: detail.settled,
           failed: detail.failed === true
         })
@@ -471,7 +472,7 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
   const parts: string[] = []
   if (edits > 0) parts.push(`Edited ${pluralize(edits, 'file')}`)
   if (commands > 0) parts.push(`ran ${pluralize(commands, 'command')}`)
-  if (helpers > 0) parts.push(`asked ${pluralize(helpers, 'helper')}`)
+  if (helpers > 0) parts.push(`asked ${pluralize(helpers, 'subagent')}`)
   if (other > 0) parts.push(`${pluralize(other, 'tool call')}`)
   return parts.length === 0 ? 'No tool activity' : parts.join(' · ')
 }
@@ -483,7 +484,7 @@ function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started
     return command !== undefined && EDIT_COMMANDS.test(command.trim()) ? 'edit' : 'shell'
   }
   // A runtime's own sub-agent: Claude Code's `Task`, OpenCode's `task`.
-  if (/^(task|agent|subagent)$/i.test(name)) return 'helper'
+  if (SUBAGENT_TOOL.test(name)) return 'helper'
   if (/file|patch|write|edit/i.test(name)) return 'edit'
   return 'tool'
 }
@@ -558,6 +559,17 @@ export function buildThread(
     switch (event.type) {
       case 'tool.started': {
         workBegan = true
+        // The host's disk observation of a path the runtime already named:
+        // its patch belongs on the runtime's row, not on a second one.
+        if (event.payload.toolKind === 'observed_edit' && /reported by the runtime/.test(event.payload.status ?? '')) {
+          const path = (event.payload.command ?? '').toLowerCase()
+          const tail = path.split('/').at(-1) ?? path
+          const own = activity.find((detail) => detail.kind === 'edit' && detail.patch === undefined && detail.name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) === tail)
+          if (own !== undefined) {
+            openTools.set(event.payload.itemId, own)
+            break
+          }
+        }
         const detail: ActivityDetail = {
           kind: toolKindOf(event),
           name: event.payload.command ?? event.payload.name,

@@ -309,12 +309,12 @@ describe("a runtime's own helper", () => {
       ['Search the tests for flaky cases', true],
       ['Summarise README', false]
     ])
-    expect(activity?.type === 'activity' && activity.summary).toBe('asked 2 helpers')
+    expect(activity?.type === 'activity' && activity.summary).toBe('asked 2 subagents')
   })
 
   it('a helper the runtime never named is said to be unnamed, not drawn as a path', () => {
     const entries = activityEntries([{ kind: 'helper', name: 'Task', tool: 'Task', settled: true }])
-    expect(entries).toEqual([{ kind: 'helper', key: 'helper_0', description: 'a helper, unnamed', settled: true, failed: false }])
+    expect(entries).toEqual([{ kind: 'helper', key: 'helper_0', description: 'a subagent, unnamed', settled: true, failed: false }])
   })
 })
 
@@ -1483,5 +1483,29 @@ describe('the waiting line’s clock', () => {
     const items = buildThread([event('run.started', {})], { running: true, latestTurn: true })
     const line = items.find((item) => item.type === 'live-step')
     expect(line?.type === 'live-step' && line.startedAt).toBe(NOW)
+  })
+})
+
+describe("the host's disk observation of a path the runtime named", () => {
+  it('attaches the patch to the row the runtime drew, and draws a row only for a path it never named', () => {
+    const patch = { text: '--- /dev/null\n+++ b/NOTES.md\n@@ -0,0 +1,2 @@\n+# Notes\n+First entry.\n', added: 2, removed: 0, truncated: false }
+    const thread = buildThread(
+      [
+        event('tool.started', { itemId: 'fc', toolKind: 'file_change', name: 'file_change', command: 'NOTES.md', phase: 'started' }),
+        event('tool.completed', { itemId: 'fc', toolKind: 'file_change', name: 'file_change', command: 'NOTES.md', phase: 'completed' }),
+        event('tool.started', { itemId: 'disk-observed-1', toolKind: 'observed_edit', name: 'edit', command: 'NOTES.md', status: 'reported by the runtime, read from disk', phase: 'started' }),
+        event('tool.completed', { itemId: 'disk-observed-1', toolKind: 'observed_edit', name: 'edit', command: 'NOTES.md', status: 'reported by the runtime, read from disk', phase: 'completed', patch }),
+        event('tool.started', { itemId: 'disk-observed-2', toolKind: 'observed_edit', name: 'edit', command: 'other.txt', status: 'observed on disk', phase: 'started' }),
+        event('tool.completed', { itemId: 'disk-observed-2', toolKind: 'observed_edit', name: 'edit', command: 'other.txt', status: 'observed on disk', phase: 'completed' })
+      ],
+      { running: false }
+    )
+    const activity = thread.find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    const notes = details.filter((detail) => /NOTES/.test(detail.name))
+    expect(notes).toHaveLength(1)
+    expect(notes[0]?.patch?.added).toBe(2)
+    expect(details.some((detail) => /other\.txt/.test(detail.name))).toBe(true)
+    expect(activity?.type === 'activity' && activity.summary).toBe('Edited 2 files')
   })
 })

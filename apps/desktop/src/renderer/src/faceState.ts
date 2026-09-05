@@ -21,6 +21,7 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 export type FaceActivity =
   | 'thinking'
   | 'working'
+  | 'delegating'
   | 'responding'
   | 'waiting'
   | 'receiving'
@@ -41,6 +42,9 @@ export interface FaceMotion {
 export const FACE_MOTION: Readonly<Record<FaceActivity, FaceMotion>> = {
   thinking: { chip: 'lcTilt 3.4s ease-in-out infinite', eyes: 'lcEyesUp 5.5s ease-in-out infinite' },
   working: { chip: 'lcBob2 2.4s ease-in-out infinite', eyes: 'lcEyesDown 3.4s ease-in-out infinite' },
+  // Waiting on a subagent of its own: the same motion as working, a
+  // different word (Colin, 2026-09-05: "make it say subagent working").
+  delegating: { chip: 'lcBob2 2.4s ease-in-out infinite', eyes: 'lcEyesDown 3.4s ease-in-out infinite' },
   responding: {
     chip: 'lcBob 2.8s ease-in-out infinite',
     eyes: 'lcEyesFwd 5s ease-in-out infinite',
@@ -72,6 +76,8 @@ export function faceLabel(activity: FaceActivity): string {
       return 'thinking'
     case 'working':
       return 'working'
+    case 'delegating':
+      return 'subagent working'
     case 'responding':
       return 'replying'
     case 'waiting':
@@ -88,7 +94,10 @@ export function faceLabel(activity: FaceActivity): string {
 }
 
 /** What a live run is doing right now, read off its events. */
-export type LiveActivity = 'thinking' | 'working' | 'responding' | 'idle'
+export type LiveActivity = 'thinking' | 'working' | 'delegating' | 'responding' | 'idle'
+
+/** A runtime's own subagent launcher: Claude Code's Agent (Task before 2.x), OpenCode's task. */
+export const SUBAGENT_TOOL = /^(task|agent|subagent)$/i
 
 /**
  * Which of the three live states a run is in, from its event stream alone.
@@ -100,6 +109,7 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
   let streaming = false
   let reasoning = false
   let openTools = 0
+  let openSubagents = 0
   let turnOpen = false
   for (const event of events) {
     switch (event.type) {
@@ -117,11 +127,13 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
         break
       case 'tool.started':
         openTools += 1
+        if (SUBAGENT_TOOL.test(event.payload.name)) openSubagents += 1
         reasoning = false
         break
       case 'tool.completed':
       case 'tool.failed':
         openTools = Math.max(0, openTools - 1)
+        if (SUBAGENT_TOOL.test(event.payload.name)) openSubagents = Math.max(0, openSubagents - 1)
         break
       default:
         break
@@ -129,6 +141,7 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
   }
   if (streaming) return 'responding'
   if (reasoning) return 'thinking'
+  if (openSubagents > 0) return 'delegating'
   if (openTools > 0) return 'working'
   // An open TURN step is the runtime naming something it is doing, and the
   // thread draws that as a named live line with no dots. It has to resolve to

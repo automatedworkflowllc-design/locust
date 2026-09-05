@@ -144,7 +144,7 @@ try {
   let f = {}
   try { f = JSON.parse(String(fold)) } catch { /* below */ }
   say(`       ${String(fold).slice(0, 300)}`)
-  check('the summary counts the helper apart from tool calls', /asked 1 helper/.test(String(f.summary)) && /1 tool call/.test(String(f.summary)), String(f.summary))
+  check('the summary counts the helper apart from tool calls', /asked 1 subagent/.test(String(f.summary)) && /1 tool call/.test(String(f.summary)), String(f.summary))
   const helperRow = (f.rows ?? []).find((r) => r.helper)
   check('the helper row says what it was asked and that it reported back', helperRow !== undefined && /Search the tests for flaky cases/.test(helperRow.text) && /helper/.test(helperRow.text) && /reported back/.test(helperRow.text), JSON.stringify(helperRow))
   check('the Read stays an ordinary tool row', (f.rows ?? []).some((r) => !r.helper && /status[.]ts/.test(r.text)))

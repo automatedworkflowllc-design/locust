@@ -123,6 +123,9 @@ export function openCodeToolTarget(input: JsonObject, metadata: JsonObject): str
   return stringValue(input.filePath)
     ?? stringValue(input.command)
     ?? stringValue(input.pattern)
+    // OpenCode's task tool names its ask, not a path.
+    ?? stringValue(input.description)
+    ?? stringValue(input.prompt)
     ?? stringValue(metadata.filepath);
 }
 

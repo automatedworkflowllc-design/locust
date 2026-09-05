@@ -142,3 +142,17 @@ describe('one teammate, one state', () => {
     expect(teammateActivity(base)).toBe('idle')
   })
 })
+
+describe('a run waiting on its own subagent', () => {
+  const at = '2026-09-05T00:00:00.000Z'
+  const base = { runId: 'run_1', sequence: 1, occurredAt: at, sourceAdapter: 'claude' as const }
+  const started = (name: string, itemId: string) => ({ ...base, id: `s-${itemId}`, type: 'tool.started', payload: { itemId, toolKind: 'tool', name, phase: 'started', evidence: { redacted: true } } }) as never
+  const done = (name: string, itemId: string) => ({ ...base, id: `d-${itemId}`, type: 'tool.completed', payload: { itemId, toolKind: 'tool', name, phase: 'completed', evidence: { redacted: true } } }) as never
+
+  it('reads "subagent working" while an Agent or Task call is open, and working again once it reports back', () => {
+    expect(liveActivityOf([started('Read', 'r1'), done('Read', 'r1'), started('Agent', 'a1')], true)).toBe('delegating')
+    expect(faceLabel('delegating')).toBe('subagent working')
+    expect(liveActivityOf([started('Agent', 'a1'), done('Agent', 'a1'), started('Read', 'r2')], true)).toBe('working')
+    expect(liveActivityOf([started('task', 't1')], true)).toBe('delegating')
+  })
+})
