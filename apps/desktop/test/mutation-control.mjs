@@ -48,6 +48,13 @@ const STEERING = join(ROOT, 'src', 'renderer', 'src', 'steering.ts')
 
 const MUTATIONS = [
   {
+    file: VIEW,
+    name: 'the exchange link opens the run that WROTE the message, not the one it reached',
+    from: "    mission.peerMessages.some((message) => message.messageId === messageId && message.direction === 'received')",
+    to: '    mission.peerMessages.some((message) => message.messageId === messageId)',
+    expect: 'finds the run a peer message was delivered into, so the exchange can be opened'
+  },
+  {
     file: RELAY,
     name: 'a one-to-one exchange that ends in silence says nothing at all',
     from: '      if (exchange !== undefined) {',
