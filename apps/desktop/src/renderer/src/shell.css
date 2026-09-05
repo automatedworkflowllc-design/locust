@@ -376,20 +376,6 @@ textarea {
  * wrap among themselves if they still cannot fit, rather than pushing anything
  * off the edge.
  */
-.lc-sidebar__footer {
-  margin-top: auto;
-  border-top: 1px solid var(--lc-border-hairline);
-  /* Measured: the three labelled buttons come to 251px, and the row has 255
-   * at this padding. Column gap is zero because `space-between` already
-   * spaces them and 8px of gap was the whole overflow; the row gap is what
-   * separates the count's line below. */
-  padding: var(--lc-space-4) var(--lc-space-3);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--lc-space-2) 0;
-}
 
 .lc-sidebar__footer button {
   display: inline-flex;
@@ -1312,7 +1298,11 @@ textarea {
 
 .lc-empty__inner {
   width: 100%;
-  max-width: 420px;
+  /* Wide enough that the roster line does not break mid-claim. At 420px
+     "5 of 8 runtimes signed in under your own accounts · details" wrapped
+     with the affordance alone on the second line, which read as a stray
+     word rather than a control (measured on screen, 2026-09-05). */
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1320,14 +1310,13 @@ textarea {
   text-align: center;
 }
 
-.lc-empty__logo {
+/* The mark itself. It used to sit in a bordered card -- a box around a logo
+   that is already in the rail 40px away (design pass, 2026-09-04) -- and with
+   the box gone the mark takes the room instead. */
+.lc-empty__mark {
   width: 100%;
-  padding: var(--lc-space-7) var(--lc-space-6);
-  border-radius: var(--lc-radius-card);
-  background: var(--lc-bg-raised);
-  border: 1px solid var(--lc-border-card);
-  display: grid;
-  place-items: center;
+  max-width: 320px;
+  height: auto;
 }
 
 .lc-empty__logo img {
@@ -3959,6 +3948,12 @@ textarea {
  * overflow whatever the labels ever say, and the count gets its own line
  * where it is actually visible.
  */
+/* One rule, not two. A superseded `display: flex` block sat above this with a
+   comment explaining a `space-between` row that no longer exists -- every
+   property of it was either overridden here or inert under `display: block`.
+   A comment describing behaviour the file no longer has is how a reader ends
+   up trusting the wrong thing, which cost a day's scrolling bug earlier
+   (2026-09-05). The nav below is an equal-thirds grid; this is just its box. */
 .lc-sidebar__footer {
   margin-top: auto;
   border-top: 1px solid var(--lc-border-hairline);

@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.21.3 — 2026-09-05
+
+The welcome screen, as the design pass drew it.
+
+- **One greeting, not two.** The wordmark already says the name in the
+  largest type on screen, so the headline under it was a second voice saying
+  less. It survives only where it is information: nothing here can run, and
+  saying so is the screen's whole job.
+- **The mark, not a box holding the mark.** A bordered card wrapped a logo
+  that already sits in the sidebar 40 pixels away.
+- **Two claim lines, not three.** Once something is signed in, the roster
+  line says discovery ran and what it found, so the line repeating that in
+  other words steps aside. It stays when nothing is ready, where it is the
+  only account of what happened.
+
 ## 0.21.2 — 2026-09-05
 
 - **The box you type in is on screen when the app opens.** On a 1280x860

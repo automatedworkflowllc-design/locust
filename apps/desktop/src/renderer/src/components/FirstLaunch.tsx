@@ -44,21 +44,26 @@ export function FirstLaunch({
   return (
     <div className="lc-empty">
       <div className="lc-empty__inner">
-        <div className="lc-empty__logo">
-          <img src={logo} alt="Locust" />
-        </div>
+        {/* The mark, not a card holding the mark: a 420x175 bordered box
+          * around a logo that is already in the rail 40px away (design pass,
+          * 2026-09-04). */}
+        <img className="lc-empty__mark" src={logo} alt="Locust" />
         {/*
-          * The headline has to describe the state a person is actually in.
-          * It read "Connect a runtime to start working" unconditionally, so
-          * on a machine with six runtimes already signed in and marked READY
-          * it opened by asking for the one thing that was already done --
-          * measured on a first run, 2026-09-03. When something can run, the
-          * next move is to type a mission, and that is what it says.
+          * No second greeting. The wordmark above already says the name in
+          * the largest type on the screen, so a headline under it was a
+          * second voice saying less -- and "Ready when you are" is not
+          * information (design pass, 2026-09-04).
+          *
+          * The headline survives for the one state where it IS information:
+          * nothing here can run, and the screen's whole job is to say so.
+          * When something can run, the words left are the two that carry
+          * something -- what discovery found, and what the app promises about
+          * it -- and both sit in the roster line below.
           */}
-        <h1>{anyReady ? 'Ready when you are' : 'Connect a runtime to start working'}</h1>
+        {!anyReady && <h1>Connect a runtime to start working</h1>}
         <p>
           {anyReady
-            ? 'Describe a mission in the box below and it runs here, recorded as it goes. Locust uses the accounts and models already on this machine — nothing is pooled, proxied, or sent anywhere you have not connected.'
+            ? 'Nothing is pooled, proxied, or sent anywhere you have not connected.'
             : 'Locust runs on the accounts and models already on this machine. Nothing is pooled, proxied, or sent anywhere you have not connected.'}
         </p>
 
@@ -120,9 +125,16 @@ export function FirstLaunch({
           </details>
         )}
 
-        <p className="lc-footnote">
-          Discovery runs locally · no model is shown as live until it answers
-        </p>
+        {/* Two claim lines, not three. Once something is signed in, the
+          * roster line above already says discovery ran and what it found;
+          * this one repeats it in different words. It stays where nothing is
+          * ready, because there it is the only account of what happened
+          * (design pass: the two lines that carry information). */}
+        {!anyReady && (
+          <p className="lc-footnote">
+            Discovery runs locally · no model is shown as live until it answers
+          </p>
+        )}
       </div>
     </div>
   )
