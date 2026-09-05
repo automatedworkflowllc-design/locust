@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate } from '../../../shared/ipc.js'
+import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
@@ -80,7 +80,11 @@ export function Sidebar({
   composerShown,
   onOpenSettings,
   onOpenMissions,
-  onOpenTeammates
+  onOpenTeammates,
+  rooms,
+  currentRoomId,
+  onOpenRoom,
+  onOpenRooms
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
@@ -110,6 +114,11 @@ export function Sidebar({
   readonly onOpenSettings: () => void
   readonly onOpenMissions: () => void
   readonly onOpenTeammates: () => void
+  /** Rooms a person can write to at once; the one open now is highlighted. */
+  readonly rooms: readonly PublicRoom[]
+  readonly currentRoomId: string | undefined
+  readonly onOpenRoom: (roomId: string) => void
+  readonly onOpenRooms: () => void
 }): ReactElement {
   const [query, setQuery] = useState('')
   const connected = connectedRuntimeCount(runtimes)
@@ -146,6 +155,41 @@ export function Sidebar({
       </div>
 
       <div className="lc-sidebar__scroll">
+        {/*
+          * Rooms sit above the roster: a room is where several teammates
+          * are written to at once, so it reads before any one of them. Only
+          * drawn once a room exists -- the way in is the Rooms screen, one
+          * palette entry or Ctrl 4 away, so an empty section has nothing to
+          * say here.
+          */}
+        {rooms.length > 0 && (
+          <>
+            <div className="lc-sectionlabel">Rooms</div>
+            {rooms.map((room) => (
+              <button
+                key={room.roomId}
+                type="button"
+                className={`lc-row lc-row--button lc-roomrow${currentRoomId === room.roomId ? ' is-selected' : ''}`}
+                aria-current={currentRoomId === room.roomId ? 'true' : undefined}
+                title={`Open ${room.name}`}
+                onClick={() => onOpenRoom(room.roomId)}
+              >
+                <Icon name="users" size={14} />
+                <span className="lc-row__text">
+                  <span className="lc-row__name">{room.name}</span>
+                  <span className="lc-row__meta">
+                    {String(room.teammateIds.length)} teammate{room.teammateIds.length === 1 ? '' : 's'}
+                    {room.posts.length > 0 ? ` · ${String(room.posts.length)} post${room.posts.length === 1 ? '' : 's'}` : ''}
+                  </span>
+                </span>
+              </button>
+            ))}
+            <button type="button" className="lc-row lc-row--button lc-roomrow lc-roomrow--new" onClick={onOpenRooms} title="New room">
+              <Icon name="plus" size={12} />
+              <span className="lc-row__text"><span className="lc-row__meta">New room</span></span>
+            </button>
+          </>
+        )}
         {teammates.length > 0 && <div className="lc-sectionlabel">Teammates</div>}
         {teammates.map((teammate) => {
           const owned = missions.filter(

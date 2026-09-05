@@ -23,8 +23,7 @@ import type {
   PublicTeammate,
   TeammateHue,
   TeammateRole,
-  TeammateRoute
-} from '../../shared/ipc.js'
+  TeammateRoute, PublicRoom } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
 import { queuedVerdict } from './steering.js'
@@ -34,6 +33,8 @@ import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { DEFAULT_RELAY_HOP_CAP } from '../../shared/ipc.js'
 import { Composer } from './components/Composer.js'
 import { ExchangeStrip } from './components/ExchangeStrip.js'
+import { RoomScreen } from './components/RoomScreen.js'
+import type { RoomAnswer } from './components/RoomScreen.js'
 import { exchangeOf } from './exchange.js'
 import type { ExchangeMission } from './exchange.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
@@ -65,8 +66,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  typedPrompt
-} from './missionView.js'
+  typedPrompt, assistantMessages } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
@@ -378,6 +378,12 @@ function missionTitle(prompt: string): string {
 
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
+  // Declared HERE, right under its state, not a thousand lines down: a
+  // helper above it closed over `runtimes` and was called during render,
+  // which is a ReferenceError at boot -- and it fired only on a profile
+  // that opens a finished mission from another runtime on launch (room
+  // smoke, 2026-09-05), which is exactly a person's profile after an update.
+  const runtimes = runtimeState.phase === 'ready' ? runtimeState.runtimes : []
   const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean; readonly platform: string }>()
   const [storage, setStorage] = useState<PublicStorageReport>()
   const [update, setUpdate] = useState<AppUpdateState>()
@@ -591,6 +597,10 @@ export default function App(): ReactElement {
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
   const [routines, setRoutines] = useState<readonly PublicRoutine[]>([])
+  /** Rooms: a named set of teammates a person writes to at once (vision #2). */
+  const [rooms, setRooms] = useState<readonly PublicRoom[]>([])
+  const [currentRoomId, setCurrentRoomId] = useState<string>()
+  const [roomNotice, setRoomNotice] = useState<string>()
   /**
    * What a person typed while a mission was running, waiting to go as the
    * next turn. Kept against the RUN it was typed at, not the teammate, so it
@@ -900,6 +910,16 @@ export default function App(): ReactElement {
       })
 
     void bridge
+      .listRooms()
+      .then((response) => {
+        if (!active || !response.ok) return
+        setRooms(response.data.rooms)
+      })
+      .catch(() => {
+        // Rooms are optional in the same way.
+      })
+
+    void bridge
       .getMissionHistory()
       .then((response) => {
         seedLimitsFrom(response)
@@ -982,6 +1002,7 @@ export default function App(): ReactElement {
       // Ctrl 3 reads the storage number too, or the shortcut would be the
       // one way into Settings that still showed the launch reading.
       if (event.key === '3') { event.preventDefault(); refreshStorage(); setScreen('settings') }
+      if (event.key === '4') { event.preventDefault(); setScreen('rooms') }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -1069,6 +1090,87 @@ export default function App(): ReactElement {
     }
     return exchangeOf(shownData.missionId, [...byMission.values()])
   }, [shownData, history, runs, missionOwners, teammates])
+
+  /**
+   * The answers under one room post, read from the missions it started:
+   * the live run when the window holds it, else the record. The phase is
+   * the record's own word and the text is the teammate's last final
+   * message -- nothing summarised, and every card opens its mission.
+   */
+  const roomAnswersFor = (room: PublicRoom, postId: string): readonly RoomAnswer[] => {
+    const post = room.posts.find((entry) => entry.postId === postId)
+    if (post === undefined) return []
+    const answers: RoomAnswer[] = []
+    for (const [teammateId, missionId] of Object.entries(post.missions)) {
+      const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
+      const recorded = historyByIdRef.current.get(missionId)
+      const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
+      const finals = assistantMessages(events).filter((message) => message.final)
+      const last = finals.at(-1)?.text ?? assistantMessages(events).at(-1)?.text
+      const phase = live !== undefined ? live.phase : recorded?.phase ?? 'unknown'
+      const runtime = live?.data?.runtime ?? recorded?.runtime ?? 'codex'
+      const model = live?.data?.model ?? recorded?.model ?? 'account-default'
+      answers.push({
+        teammateId,
+        missionId,
+        phase,
+        text: last === undefined || last.trim().length === 0 ? undefined : last,
+        runtime,
+        model
+      })
+    }
+    return answers
+  }
+
+  const refreshRooms = (): void => {
+    void window.desktop
+      ?.listRooms()
+      .then((response) => {
+        if (response.ok) setRooms(response.data.rooms)
+      })
+      .catch(() => undefined)
+  }
+
+  const createRoom = async (name: string, teammateIds: readonly string[]): Promise<string | undefined> => {
+    const bridge = window.desktop
+    if (bridge === undefined) return 'The secure desktop bridge is unavailable.'
+    const response = await bridge.createRoom({ name, teammateIds }).catch(() => undefined)
+    if (response === undefined) return 'The room could not be created.'
+    if (!response.ok) return response.error.message
+    refreshRooms()
+    if (response.data.room !== undefined) setCurrentRoomId(response.data.room.roomId)
+    return undefined
+  }
+
+  const removeRoom = (roomId: string): void => {
+    void window.desktop
+      ?.removeRoom(roomId)
+      .then((response) => {
+        if (!response.ok) {
+          setRoomNotice(response.error.message)
+          return
+        }
+        setCurrentRoomId((current) => (current === roomId ? undefined : current))
+        refreshRooms()
+      })
+      .catch(() => setRoomNotice('That room could not be removed.'))
+  }
+
+  const postToRoom = async (roomId: string, text: string): Promise<string | undefined> => {
+    const bridge = window.desktop
+    if (bridge === undefined) return 'The secure desktop bridge is unavailable.'
+    const response = await bridge.postToRoom({ roomId, text }).catch(() => undefined)
+    if (response === undefined) return 'The post could not be made.'
+    if (!response.ok) return response.error.message
+    refreshRooms()
+    // Who could not be started is said once, by name, in the host's words.
+    setRoomNotice(
+      response.data.refused.length === 0
+        ? undefined
+        : response.data.refused.map((entry) => `${entry.name}: ${entry.message}`).join(' · ')
+    )
+    return undefined
+  }
 
   /** Stop every run in the exchange. Records stay; only the processes go. */
   const stopExchange = (runIds: readonly string[]): void => {
@@ -1545,7 +1647,6 @@ export default function App(): ReactElement {
       .catch(() => undefined)
   }
 
-  const runtimes = runtimeState.phase === 'ready' ? runtimeState.runtimes : []
   const running = liveRunIsActive(liveRun)
   /** The conversation's recorded cost, shown in the header while it is going. */
   const shownCost =
@@ -1906,6 +2007,18 @@ export default function App(): ReactElement {
           onSelectMission={openMission}
           onMissionMenu={openMissionMenu}
           onTeammateMenu={openTeammateMenu}
+          rooms={rooms}
+          currentRoomId={screen === 'rooms' ? currentRoomId : undefined}
+          onOpenRoom={(roomId) => {
+            setRoomNotice(undefined)
+            setCurrentRoomId(roomId)
+            setScreen('rooms')
+          }}
+          onOpenRooms={() => {
+            setRoomNotice(undefined)
+            setCurrentRoomId(undefined)
+            setScreen('rooms')
+          }}
           pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
           liveActivity={liveActivityByOwner}
           recentlyDone={recentlyDone}
@@ -1974,6 +2087,23 @@ export default function App(): ReactElement {
                 setEditingTeammate(teammate)
               }}
               onRemove={removeTeammate}
+            />
+          ) : screen === 'rooms' ? (
+            <RoomScreen
+              rooms={rooms}
+              teammates={teammates}
+              currentRoomId={currentRoomId}
+              answersFor={roomAnswersFor}
+              runtimeNameOf={runtimeNameOf}
+              onSelectRoom={(roomId) => {
+                setRoomNotice(undefined)
+                setCurrentRoomId(roomId)
+              }}
+              onCreateRoom={createRoom}
+              onRemoveRoom={removeRoom}
+              onPost={postToRoom}
+              onOpenMission={openMission}
+              notice={roomNotice}
             />
           ) : screen === 'settings' ? (
             <SettingsScreen
@@ -2393,6 +2523,7 @@ export default function App(): ReactElement {
                 run: () => setScreen('workroom')
               },
               { id: 'go-missions', group: 'Go to', label: 'Missions', hint: 'Ctrl 1', run: () => setScreen('missions') },
+              { id: 'go-rooms', group: 'Go to', label: 'Rooms', hint: 'Ctrl 4', run: () => setScreen('rooms') },
               {
                 id: 'go-teammates',
                 group: 'Go to',

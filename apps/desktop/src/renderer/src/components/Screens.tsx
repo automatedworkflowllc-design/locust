@@ -27,7 +27,7 @@ import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineStepLabel } from '../routines.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
-export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings'
+export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'rooms'
 
 function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
   return (

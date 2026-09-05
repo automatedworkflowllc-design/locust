@@ -797,6 +797,8 @@ if (!ownsSingleInstanceLock) {
         await teammates.remove(teammateId)
         // Their routines had nobody left to run them.
         await routines.removeForTeammate(teammateId).catch(() => undefined)
+        // And they leave every room; a room left empty goes with them.
+        await rooms.removeTeammate(teammateId).catch(() => undefined)
         return { ok: true, data: {} } as const
       } catch {
         return teammateRejected('That teammate could not be removed.')

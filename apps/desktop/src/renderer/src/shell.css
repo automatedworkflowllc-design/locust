@@ -1423,6 +1423,205 @@ textarea {
   gap: var(--lc-space-1);
 }
 
+/* Rooms. The list is a grid of cards; a room is a thread of posts, each
+   with one answer card per teammate, and a post box that reads as the
+   composer's plainer cousin -- it addresses everyone, so it says so. */
+.lc-roomlist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--lc-space-3);
+}
+
+.lc-roomcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+  padding: var(--lc-space-4);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  color: var(--lc-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-roomcard:hover {
+  border-color: var(--lc-border-hover);
+}
+
+.lc-roomcard__name {
+  font-size: var(--lc-text-name);
+  font-weight: 500;
+}
+
+.lc-roomcard__meta {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-roomform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  max-width: 560px;
+}
+
+.lc-roomform__name {
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font: inherit;
+}
+
+.lc-roomform__members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
+}
+
+.lc-roomform__members .lc-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+}
+
+.lc-roomform__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
+.lc-room {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.lc-room .lc-screen__header {
+  gap: var(--lc-space-3);
+}
+
+.lc-room__remove {
+  margin-left: auto;
+}
+
+.lc-room__thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-6);
+}
+
+.lc-roompost {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
+.lc-roompost__you {
+  align-self: flex-end;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-bubble-user);
+  color: var(--lc-text-primary);
+  white-space: pre-line;
+}
+
+.lc-roompost__at {
+  align-self: flex-end;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-roompost__answers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--lc-space-3);
+}
+
+.lc-roomanswer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-bubble-peer);
+}
+
+.lc-roomanswer.is-absent {
+  border-style: dashed;
+  color: var(--lc-text-muted);
+}
+
+.lc-roomanswer__who {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
+}
+
+.lc-roomanswer__name {
+  color: var(--lc-text-primary);
+  font-weight: 500;
+}
+
+.lc-roomanswer__route,
+.lc-roomanswer__phase {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-roomanswer__who .lc-ghostbutton {
+  margin-left: auto;
+}
+
+.lc-roomanswer__text {
+  margin: 0;
+  color: var(--lc-text-secondary);
+}
+
+.lc-roomcompose {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  padding: var(--lc-space-4) var(--lc-space-6) var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+.lc-roomcompose__box {
+  width: 100%;
+  resize: none;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font: inherit;
+}
+
+.lc-roomcompose__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-3);
+}
+
+/* A room row in the sidebar. */
+.lc-roomrow {
+  gap: var(--lc-space-3);
+}
+
+.lc-roomrow--new {
+  opacity: 0.8;
+}
+
 /* The line above the box when the next message crosses runtimes. */
 .lc-continuation {
   display: flex;
