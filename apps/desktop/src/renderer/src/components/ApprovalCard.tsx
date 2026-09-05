@@ -41,7 +41,14 @@ export function ApprovalCard({
   // (seen driving the app, 2026-09-05).
   const root = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    root.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    // Once on mount and once more a moment later: the diff arrives with the
+    // card but lays out after it, and a scroll taken before that left the
+    // buttons under the composer (the 21:12 drive). 'end', not 'nearest':
+    // the card is taller than the space below the message it follows.
+    const bring = (): void => root.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+    bring()
+    const again = window.setTimeout(bring, 300)
+    return () => window.clearTimeout(again)
   }, [])
   return (
     <div ref={root} className="lc-card is-pending is-amber" role="group" aria-label="Approval required">
