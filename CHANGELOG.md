@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.21.4 — 2026-09-05
+
+- **Delete in the mission header removes the whole conversation.** It removed
+  only the turn whose id the header carried, leaving the rest of the thread
+  you were looking at. The sidebar's Delete had the same bug and was fixed in
+  0.21.0; this was the other half of it.
+- **The header names the model, not just the runtime.** This app exists to
+  put two models on the same work, and two missions from different models
+  read identically once the composer had moved on.
+
 ## 0.21.3 — 2026-09-05
 
 The welcome screen, as the design pass drew it.

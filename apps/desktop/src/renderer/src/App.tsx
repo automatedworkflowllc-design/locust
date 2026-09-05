@@ -1789,7 +1789,17 @@ export default function App(): ReactElement {
                           // said the opposite of what happened.
                           ? `Mission · not started · ${liveRun.phase}`
                           : 'Starting…'
-                        : `Mission · ${shortMissionId(liveRun.data.missionId)} · ${
+                        // The MODEL, not just the runtime. This app exists to
+                        // put two models on the same work, and the header
+                        // named only the runtime -- so two missions from
+                        // different models read identically once the composer
+                        // had moved on (design pass, 2026-09-04, asked for a
+                        // provenance strip; this is the half of it that was
+                        // actually missing). Ledger state was the other half
+                        // and is NOT here: the receipt card below already
+                        // states it, and two places stating one fact is how
+                        // they come to disagree.
+                        : `Mission · ${shortMissionId(liveRun.data.missionId)} · ${liveRun.data.model ?? 'account-default'} · ${
                             running
                               ? 'running'
                               : liveRun.restored === true
@@ -1809,6 +1819,15 @@ export default function App(): ReactElement {
                     Two clicks, and the second says what it does. Deletion is
                     the one thing here that cannot be undone, so it is never
                     one click away and never hidden in a menu either.
+
+                    The 2026-09-04 design pass asked for it inside a `⋯` menu,
+                    on the grounds that it is destructive and sits a
+                    pixel-perfect click from Activity. Kept as it is: a menu
+                    makes it three clicks and hides the one action a person
+                    most needs to find deliberately, and the arming step
+                    already removes the misclick -- it turns red, says what it
+                    does, and disarms on blur. Adjacency is the real half of
+                    that note, and the danger state answers it.
                   */}
                   {!running && (
                     <button
@@ -1818,7 +1837,18 @@ export default function App(): ReactElement {
                       onClick={() => {
                         if (deleteArmed) {
                           const shownId = liveRun?.data?.missionId
-                          if (shownId !== undefined) deleteMissionById(shownId)
+                          // Every turn of the conversation on screen, not
+                          // just the one whose id the header carries. The
+                          // sidebar's Delete had the same bug -- it removed
+                          // the last turn and left the row, which reads as
+                          // the control doing nothing (Colin, 2026-09-05).
+                          // Here it would leave a thread you are looking at.
+                          if (shownId !== undefined) {
+                            const row = sidebarMissionsRef.current.find((entry) =>
+                              (entry.memberIds ?? [entry.missionId]).includes(shownId)
+                            )
+                            for (const turn of row?.memberIds ?? [shownId]) deleteMissionById(turn)
+                          }
                         }
                         else {
                           setDeleteError(undefined)
