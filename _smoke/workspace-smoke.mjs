@@ -179,7 +179,8 @@ try {
       const home = JSON.parse(await app.evaluate(HOME_STATE))
       say(`       ${JSON.stringify(home)}`)
       check('the app opens on the home screen', home.home === true)
-      check('the title bar says no folder is chosen', home.title === 'No folder chosen', home.title)
+      // Since 0.27.2 the bar shows the BUILD when no folder is chosen (the composer chip already says No folder).
+      check('the title bar shows the build, not the missing folder', /^Locust( [0-9]+\.[0-9]+\.[0-9]+)?$/.test(String(home.title)), home.title)
       check('the one line that has to be said is said', home.folder === true && home.missing === true)
       check('it says so in words', home.label === 'No folder chosen', home.label)
       check('and offers to choose one', home.button === 'Choose folder', home.button)

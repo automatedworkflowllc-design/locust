@@ -1,44 +1,48 @@
-// Use the app the way a person would, and keep what they would have seen.
+// Drive the BUILT app the way a person would, and write down what was seen.
 //
-//   node _tools/user-session.mjs [--out <dir>] [--keep]
+//   node _tools/user-session.mjs [--keep]
 //
-// Not a smoke: nothing here asserts. It launches the BUILT app (out/) in a
-// throwaway profile with no teammates, so the first screen is the one a new
-// person sees, then walks a first session -- make a teammate, put it on a
-// cheap route, send a real mission, follow it up, look at every screen, open
-// the row menu -- and at each step writes a PNG screenshot, the visible text
-// and any console error to the output directory. Reading those afterwards is
-// the test. The point is to notice what a smoke's assertions do not ask about.
-//
-// Cheap route on purpose: Cursor Agent / composer-2.5, the same one the smokes
-// use. The workspace is disposable, so an Accept-edits run cannot touch a
-// real tree.
+// Not a smoke: nothing here asserts. Each step does what a person does --
+// open the app on a real repository, make a teammate from the dialog with
+// Own branch on, send a message on the free model, read the reply, open
+// Memory, Rooms, Settings, go home from the logo -- and records the screen
+// as text plus a screenshot under docs/user-session/<stamp>/. The judging
+// is done afterwards by reading the record, so a hitch is a thing that was
+// seen, not a thing the script was told to look for.
 
-import { spawn } from 'node:child_process'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { spawn, execFile } from 'node:child_process'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
-const PORT = 9297
-const args = process.argv.slice(2)
-const outArg = args.indexOf('--out')
-const OUT = resolve(outArg === -1 ? join(process.cwd(), '_session-out') : args[outArg + 1])
-const KEEP = args.includes('--keep')
+const PORT = 9291
+const FREE_MODEL = 'muse spark 1.3'
+const KEEP = process.argv.includes('--keep')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const say = (line) => console.error(line)
+const git = (args, cwd) => new Promise((resolve, reject) => {
+  execFile('git', args, { cwd, windowsHide: true }, (error, stdout) => (error ? reject(error) : resolve(stdout)))
+})
+try {
+  const already = await fetch(`http://127.0.0.1:${String(PORT)}/json/list`, { signal: AbortSignal.timeout(1500) })
+  if (already.ok) { say(`something is already debugging on port ${String(PORT)}`); process.exit(1) }
+} catch { /* free */ }
 
+const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+const OUT = join(new URL('../docs/user-session/', import.meta.url).pathname.slice(1), stamp)
 await mkdir(OUT, { recursive: true })
-const profile = await mkdtemp(join(tmpdir(), 'locust-session-'))
 const workspace = await mkdtemp(join(tmpdir(), 'locust-session-ws-'))
-await writeFile(
-  join(workspace, 'status.ts'),
-  ['export const status = "draft";', '', 'export function describe(): string {', '  return status;', '}', ''].join('\n'),
-  'utf8'
-)
-await writeFile(join(workspace, 'README.md'), '# scratch\n\nA throwaway folder for a user session.\n', 'utf8')
+await git(['init', '-q', '-b', 'main'], workspace)
+await git(['config', 'user.email', 'session@locust.test'], workspace)
+await git(['config', 'user.name', 'Locust session'], workspace)
+await writeFile(join(workspace, 'README.md'), '# scratch\n\nA scratch project for a user session.\n', 'utf8')
+await writeFile(join(workspace, 'LOCUST.md'), 'Keep answers to one paragraph.\n', 'utf8')
+await git(['add', '.'], workspace)
+await git(['commit', '-q', '-m', 'first'], workspace)
+const profile = await mkdtemp(join(tmpdir(), 'locust-session-'))
 
 const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(PORT)}`, `--user-data-dir=${profile}`], {
   cwd: workspace,
@@ -48,8 +52,7 @@ const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(PORT)}
 const appOutput = []
 child.stdout.on('data', (d) => appOutput.push(String(d)))
 child.stderr.on('data', (d) => appOutput.push(String(d)))
-
-const consoleErrors = []
+const record = []
 let step = 0
 
 try {
@@ -64,219 +67,218 @@ try {
   }
   if (page === undefined) throw new Error('renderer never came up')
   const socket = new WebSocket(page.webSocketDebuggerUrl)
-  await new Promise((res, rej) => {
-    socket.addEventListener('open', res, { once: true })
-    socket.addEventListener('error', rej, { once: true })
-  })
+  await new Promise((res, rej) => { socket.addEventListener('open', res, { once: true }); socket.addEventListener('error', rej, { once: true }) })
   let id = 0
   const pending = new Map()
+  const consoleErrors = []
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data)
-    if (message.method === 'Runtime.exceptionThrown') {
-      consoleErrors.push(`exception: ${message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text}`)
-    }
-    if (message.method === 'Runtime.consoleAPICalled' && (message.params.type === 'error' || message.params.type === 'warning')) {
-      consoleErrors.push(`${message.params.type}: ${message.params.args.map((a) => a.value ?? a.description ?? '').join(' ').slice(0, 300)}`)
-    }
+    if (message.method === 'Runtime.exceptionThrown') consoleErrors.push(message.params?.exceptionDetails?.text ?? 'exception')
+    if (message.method === 'Runtime.consoleAPICalled' && message.params?.type === 'error') consoleErrors.push(String(message.params.args?.[0]?.value ?? 'console.error'))
     const waiter = pending.get(message.id)
     if (waiter) { pending.delete(message.id); waiter(message) }
   })
-  const send = (method, params = {}) =>
-    new Promise((res) => {
-      const next = ++id
-      pending.set(next, res)
-      socket.send(JSON.stringify({ id: next, method, params }))
-    })
+  const send = (method, params = {}) => new Promise((resolve_) => {
+    const next = ++id
+    const gaveUp = setTimeout(() => { if (pending.delete(next)) resolve_(undefined) }, 400_000)
+    pending.set(next, (message) => { clearTimeout(gaveUp); resolve_(message) })
+    socket.send(JSON.stringify({ id: next, method, params }))
+  })
   const evaluate = async (expression) => {
     const message = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
-    const thrown = message.result?.exceptionDetails
-    if (thrown !== undefined) say(`  eval threw: ${thrown.exception?.description ?? JSON.stringify(thrown).slice(0, 200)}`)
-    return message.result?.result?.value
+    const thrown = message?.result?.exceptionDetails
+    if (thrown !== undefined) say(`  eval threw: ${thrown.exception?.description ?? ''}`.slice(0, 200))
+    return message?.result?.result?.value
   }
   await send('Runtime.enable')
-  await send('Page.enable')
 
-  const snap = async (name, note = '') => {
+  /** One step: do it, then keep the screen's text and picture. */
+  const capture = async (title, action) => {
     step += 1
-    const tag = `${String(step).padStart(2, '0')}-${name}`
+    let note
+    try {
+      note = await action()
+    } catch (error) {
+      note = `threw: ${error instanceof Error ? error.message : String(error)}`
+    }
+    await sleep(600)
+    const text = await evaluate(`document.body.innerText`)
     const shot = await send('Page.captureScreenshot', { format: 'png' })
-    if (shot.result?.data) await writeFile(join(OUT, `${tag}.png`), Buffer.from(shot.result.data, 'base64'))
-    const text = await evaluate('document.body.innerText')
-    const red = await evaluate("[...document.querySelectorAll('.lc-card.is-red, .lc-dialog__error, [role=alert]')].map(e => e.innerText).join(' | ')")
-    await writeFile(join(OUT, `${tag}.txt`), `${note}\n\n--- red ---\n${red ?? ''}\n\n--- text ---\n${text ?? ''}\n`, 'utf8')
-    say(`[${tag}] ${note}${red ? `  RED: ${String(red).slice(0, 120)}` : ''}`)
+    const name = `${String(step).padStart(2, '0')}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
+    if (shot?.result?.data) await writeFile(join(OUT, `${name}.png`), Buffer.from(shot.result.data, 'base64'))
+    await writeFile(join(OUT, `${name}.txt`), String(text ?? ''), 'utf8')
+    record.push({ step, title, note: note ?? '', errors: consoleErrors.splice(0) })
+    say(`${String(step).padStart(2, '0')}. ${title}${note ? ` -- ${String(note).slice(0, 160)}` : ''}`)
   }
 
-  // A person waits for the app to finish looking for runtimes.
-  const ready = await evaluate(`(async () => {
+  await capture('launch', () => evaluate(`(async () => {
     for (let i = 0; i < 240; i += 1) {
       const field = document.querySelector('form.command-dock textarea')
-      if (field && !/Checking local runtimes/.test(field.placeholder)) return field.placeholder
+      if (field && !/Checking local runtimes/.test(field.placeholder)) return 'discovery finished; ' + (document.querySelector('.lc-connected')?.innerText ?? '')
       await new Promise(r => setTimeout(r, 250))
     }
-    return null
-  })()`)
-  await snap('first-launch', `composer placeholder: ${String(ready)}`)
+    return 'discovery never finished'
+  })()`))
 
-  // Make a teammate through the dialog, typing the way a person does.
-  await evaluate(`(async () => {
+  await capture('open new teammate dialog', () => evaluate(`(async () => {
     document.querySelector('button[aria-label="New teammate"]').click()
     await new Promise(r => setTimeout(r, 400))
-    return !!document.querySelector('[role=dialog]')
-  })()`)
-  await snap('new-teammate-dialog', 'dialog open, nothing typed')
-  await evaluate(`(async () => {
-    const input = document.querySelector('[role=dialog] input')
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    setter.call(input, 'Juno')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-    await new Promise(r => setTimeout(r, 200))
-    const roles = [...document.querySelectorAll('[role=dialog] .lc-rolegrid [role=radio], [role=dialog] .lc-rolegrid button')]
-    if (roles[1]) roles[1].click()
-    await new Promise(r => setTimeout(r, 200))
-    return roles.length
-  })()`)
-  await snap('teammate-filled', 'name typed, second role picked')
-  await evaluate(`(async () => {
-    const button = [...document.querySelectorAll('[role=dialog] button')].find(b => b.innerText.trim() === 'Create teammate')
-    if (!button || button.disabled) return 'create disabled'
-    button.click()
-    await new Promise(r => setTimeout(r, 600))
-    return 'clicked'
-  })()`)
-  await snap('teammate-created', 'after Create teammate')
+    return document.querySelector('[role=dialog]') ? 'dialog open' : 'no dialog'
+  })()`))
 
-  // Message the teammate on the cheap route.
-  const picked = await evaluate(`(async () => {
-    const juno = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Juno')
-    if (!juno) return 'no Message Juno button'
-    juno.click()
+  await capture('name it Nova, Custom role with a title, Own branch on', () => evaluate(`(async () => {
+    const dialog = document.querySelector('[role=dialog]')
+    const input = dialog.querySelector('input')
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    set.call(input, 'Nova'); input.dispatchEvent(new Event('input', { bubbles: true }))
+    const custom = [...dialog.querySelectorAll('button')].find(b => b.innerText.trim() === 'Custom')
+    if (custom) custom.click()
+    await new Promise(r => setTimeout(r, 200))
+    const title = [...dialog.querySelectorAll('input')].find(i => /Release manager/.test(i.placeholder))
+    if (title) { set.call(title, 'Release manager'); title.dispatchEvent(new Event('input', { bubbles: true })) }
+    const own = dialog.querySelector('[role=switch][aria-label="Own branch"]')
+    if (own) own.click()
+    await new Promise(r => setTimeout(r, 200))
+    return 'custom=' + !!custom + ' title=' + !!title + ' own=' + (own ? own.getAttribute('aria-checked') : 'no switch') + ' · ' + (dialog.querySelector('.lc-field--switch')?.innerText.replace(/\\s+/g, ' ').slice(0, 120) ?? '')
+  })()`))
+
+  await capture('create the teammate', () => evaluate(`(async () => {
+    const dialog = document.querySelector('[role=dialog]')
+    const create = [...dialog.querySelectorAll('button')].find(b => b.innerText.trim() === 'Create teammate')
+    if (!create || create.disabled) return 'create disabled'
+    create.click()
+    await new Promise(r => setTimeout(r, 800))
+    return document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
+  })()`))
+
+  await capture('pick Nova and choose the free OpenCode route', () => evaluate(`(async () => {
+    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Nova')
+    if (!who) return 'no Nova row'
+    who.click()
     await new Promise(r => setTimeout(r, 400))
     const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
-    if (!control) return 'no route control'
-    // The walk relay-smoke uses: type into the picker's search box, then
-    // read group headers and rows as SIBLINGS of the list. Session 1 asked
-    // for any element containing the model name and got nothing, so it ran
-    // on Codex (out of quota) without saying so.
+    control.click()
     let target
-    for (let attempt = 0; attempt < 90 && !target; attempt += 1) {
+    for (let attempt = 0; attempt < 60 && !target; attempt += 1) {
       const picker = document.querySelector('.lc-picker')
       if (!picker) { control.click(); await new Promise(r => setTimeout(r, 500)); continue }
-      const input = picker.querySelector('.lc-picker__input')
+      const box = picker.querySelector('.lc-picker__input')
       const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-      // The row reads the model's DISPLAY name, "Composer 2.5" with a space;
-      // the id with the hyphen is what the ledger records. Session 2 matched
-      // the id and found nothing.
-      setInput.call(input, 'composer 2.5')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      setInput.call(box, ${JSON.stringify(FREE_MODEL)})
+      box.dispatchEvent(new Event('input', { bubbles: true }))
       await new Promise(r => setTimeout(r, 500))
       let group = ''
       for (const node of picker.querySelector('.lc-picker__list').children) {
         const header = node.querySelector('.lc-picker__group')
         if (header) group = header.innerText
         const row = node.querySelector('.lc-picker__row')
-        const label = row ? row.innerText.trim().toLowerCase() : ''
-        if (row && !row.disabled && /cursor/i.test(group) && label.startsWith('composer 2.5')) { target = row; break }
+        if (row && !row.disabled && /opencode/i.test(group) && /muse.?spark.?1\\.3/i.test(row.innerText)) { target = row; break }
       }
       if (!target) await new Promise(r => setTimeout(r, 500))
     }
-    if (!target) return 'composer-2.5 not offered'
+    if (!target) return 'free model not offered; rows: ' + [...document.querySelectorAll('.lc-picker__row')].map(r => r.innerText).slice(0, 5).join(' | ')
     target.click()
-    await new Promise(r => setTimeout(r, 300))
-    if (document.querySelector('.lc-picker')) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    await new Promise(r => setTimeout(r, 200))
-    return document.querySelector('.lc-control[aria-haspopup=listbox]').innerText
-  })()`)
-  await snap('route-picked', `route control reads: ${String(picked)}`)
-  // A session on the wrong runtime is a different session: session 1 ran on
-  // Codex, out of quota, and every later screenshot was of that failure.
-  // Read the CONTROL, not the picker's verdict: the first guard matched the
-  // words "composer-2.5 not offered" and let a Codex session through.
-  if (!/cursor/i.test(String(picked)) || /not offered/.test(String(picked))) throw new Error(`route is not Cursor / composer-2.5: ${String(picked)}`)
+    await new Promise(r => setTimeout(r, 400))
+    return [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).join(' · ')
+  })()`))
 
-  const type = async (text) => evaluate(`(async () => {
+  await capture('send a first message and wait', () => evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    setter.call(field, ${JSON.stringify(text)})
+    setter.call(field, 'Read README.md and tell me in one sentence what this project is. Then, using your file tool, add a line to README.md saying "Nova was here".')
     field.dispatchEvent(new Event('input', { bubbles: true }))
-    await new Promise(r => setTimeout(r, 200))
-    return field.value.length
-  })()`)
-  const submit = async () => evaluate(`(async () => {
-    const button = document.querySelector('button[aria-label="Start mission"]')
-    if (!button || button.disabled) return 'start disabled'
-    button.click()
-    await new Promise(r => setTimeout(r, 150))
-    return document.querySelector('form.command-dock textarea').value
-  })()`)
-  const settle = async (seconds) => evaluate(`(async () => {
-    for (let i = 0; i < ${String(seconds * 2)}; i += 1) {
-      if (!document.querySelector('button[aria-label^="Stop the running"]')) return true
-      await new Promise(r => setTimeout(r, 500))
+    for (let i = 0; i < 120; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      const button = document.querySelector('button[aria-label="Start mission"]')
+      if (button && !button.disabled) { button.click(); break }
     }
-    return false
-  })()`)
-
-  await type('Read status.ts and tell me in two sentences what it exports. Do not change anything.')
-  await snap('typed', 'instruction typed, not sent')
-  const left = await submit()
-  await snap('sent', `composer right after Start: ${JSON.stringify(left)}`)
-  await sleep(1500)
-  await snap('one-second-in', 'what a person sees a moment after sending')
-  const done1 = await settle(240)
-  await snap('first-answer', `settled: ${String(done1)}`)
-
-  await type('Now list every file in this folder, one per line.')
-  await submit()
-  await sleep(1500)
-  await snap('follow-up-sent', 'second turn under way')
-  const done2 = await settle(240)
-  await snap('follow-up-answer', `settled: ${String(done2)}`)
-
-  // The row menu, the way a person finds it.
-  await evaluate(`(async () => {
-    const row = document.querySelector('.lc-teammate__mission')
-    if (!row) return 'no row'
-    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 260 }))
-    await new Promise(r => setTimeout(r, 300))
-    return document.querySelector('[role=menu]') ? 'menu open' : 'no menu'
-  })()`)
-  await snap('row-menu', 'right-click on the conversation row')
-  await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true")
-
-  // Every screen.
-  for (const [title, name] of [['All missions (Ctrl 1)', 'missions-screen'], ['Team (Ctrl 2)', 'team-screen'], ['Settings (Ctrl 3)', 'settings-screen']]) {
-    const opened = await evaluate(`(async () => {
-      const button = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === ${JSON.stringify(title)})
-      if (!button) return 'no button ' + ${JSON.stringify(title)}
-      button.click()
+    for (let i = 0; i < 720; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      return 'opened'
-    })()`)
-    await snap(name, String(opened))
-  }
-  // Back to the work, then the inspector if there is one.
-  await evaluate(`(async () => {
-    const button = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Settings (Ctrl 3)')
-    button && button.click()
-    await new Promise(r => setTimeout(r, 300))
-    const row = document.querySelector('.lc-row')
-    row && row.click()
-    await new Promise(r => setTimeout(r, 500))
-    return true
-  })()`)
-  await snap('back-to-thread', 'clicked the conversation row from the sidebar')
+      if (!document.querySelector('button[aria-label^="Stop the running"]')) break
+    }
+    await new Promise(r => setTimeout(r, 800))
+    return document.querySelector('.lc-thread, main')?.innerText.replace(/\\s+/g, ' ').slice(-400) ?? ''
+  })()`))
 
-  await writeFile(join(OUT, 'console.txt'), consoleErrors.join('\n') + '\n', 'utf8')
-  await writeFile(join(OUT, 'app-stdio.txt'), appOutput.join(''), 'utf8')
-  say(`console errors/warnings: ${String(consoleErrors.length)}`)
-  say(`output in ${OUT}`)
+  await capture('open the activity fold', () => evaluate(`(async () => {
+    const fold = document.querySelector('.lc-activity')
+    if (!fold) return 'no activity fold'
+    fold.click()
+    await new Promise(r => setTimeout(r, 300))
+    return [...document.querySelectorAll('.lc-filerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()).join(' | ').slice(0, 300)
+  })()`))
+
+  await capture('go home from the logo', () => evaluate(`(async () => {
+    document.querySelector('.lc-brand__lockup').click()
+    await new Promise(r => setTimeout(r, 400))
+    return document.querySelector('.lc-runtimepanel') ? 'home screen' : 'not home: ' + document.body.innerText.replace(/\\s+/g, ' ').slice(0, 120)
+  })()`))
+
+  await capture('open Memory with Ctrl 5', () => evaluate(`(async () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '5', ctrlKey: true, bubbles: true }))
+    await new Promise(r => setTimeout(r, 600))
+    return document.querySelector('.lc-screen__title')?.innerText + ' · ' + (document.querySelector('.lc-screen__meta')?.innerText ?? '')
+  })()`))
+
+  await capture('open Rooms with Ctrl 4', () => evaluate(`(async () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '4', ctrlKey: true, bubbles: true }))
+    await new Promise(r => setTimeout(r, 600))
+    return document.querySelector('.lc-screen__title')?.innerText + ' · ' + (document.querySelector('.lc-screen__meta')?.innerText ?? '')
+  })()`))
+
+  await capture('open Settings from the rail', () => evaluate(`(async () => {
+    document.querySelector('button[title="Settings (Ctrl 3)"]').click()
+    await new Promise(r => setTimeout(r, 800))
+    const headings = [...document.querySelectorAll('.lc-settings__heading')].map(h => h.innerText)
+    const tags = [...document.querySelectorAll('.lc-policyrow .lc-tag')].map(t => t.textContent.trim() + ': ' + (t.parentElement?.querySelector('.lc-settings__note')?.innerText.replace(/\\s+/g, ' ').slice(0, 90) ?? ''))
+    return headings.join(' / ') + ' || ' + tags.join(' || ')
+  })()`))
+
+  await capture('Team screen, then edit Nova', () => evaluate(`(async () => {
+    document.querySelector('button[title="Team (Ctrl 2)"]').click()
+    await new Promise(r => setTimeout(r, 600))
+    const edit = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Edit')
+    if (!edit) return 'no Edit on the Team screen: ' + document.body.innerText.replace(/\\s+/g, ' ').slice(0, 160)
+    edit.click()
+    await new Promise(r => setTimeout(r, 500))
+    const dialog = document.querySelector('[role=dialog]')
+    return dialog ? 'edit dialog: own=' + dialog.querySelector('[role=switch][aria-label="Own branch"]')?.getAttribute('aria-checked') + ' title=' + ([...dialog.querySelectorAll('input')].find(i => /Release manager/.test(i.placeholder))?.value ?? '?') : 'no dialog'
+  })()`))
+
+  await capture('cancel the edit and read the sidebar', () => evaluate(`(async () => {
+    const dialog = document.querySelector('[role=dialog]')
+    const cancel = dialog && [...dialog.querySelectorAll('button')].find(b => b.innerText.trim() === 'Cancel')
+    if (cancel) cancel.click()
+    await new Promise(r => setTimeout(r, 400))
+    return document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 240)
+  })()`))
+
+  const branch = await git(['branch', '--list', 'locust/*'], workspace).catch(() => '')
+  const mainReadme = await (await import('node:fs/promises')).readFile(join(workspace, 'README.md'), 'utf8')
+  record.push({ step: step + 1, title: 'disk after the session', note: `branches: ${branch.trim().replace(/\s+/g, ' ')} · main README unchanged: ${String(!/Nova was here/.test(mainReadme))}`, errors: [] })
+} catch (error) {
+  record.push({ step: step + 1, title: 'session aborted', note: error instanceof Error ? error.message : String(error), errors: [] })
 } finally {
+  const lines = [
+    `# User session ${stamp}`,
+    '',
+    'Build: whatever `pnpm build` last wrote to out/. Route: OpenCode free model. Folder: a scratch git repository with README.md and LOCUST.md.',
+    '',
+    '| # | Step | What was seen | Renderer errors |',
+    '|---|---|---|---|',
+    ...record.map((entry) => `| ${String(entry.step)} | ${entry.title} | ${String(entry.note).replace(/\|/g, '/').slice(0, 220)} | ${entry.errors.length === 0 ? '0' : entry.errors.join('; ').slice(0, 120)} |`),
+    '',
+    '## Judgement',
+    '',
+    '(filled in after reading the captures)',
+    ''
+  ]
+  await writeFile(join(OUT, 'SESSION.md'), lines.join('\n'), 'utf8')
+  say(`\nrecord: ${OUT}`)
   try { child.kill() } catch { /* gone */ }
   await sleep(1500)
-  if (KEEP) {
-    say(`profile kept at ${profile}; workspace at ${workspace}`)
-  } else {
+  if (KEEP) say(`profile kept at ${profile}; workspace at ${workspace}`)
+  else {
     await rm(profile, { recursive: true, force: true }).catch(() => undefined)
     await rm(workspace, { recursive: true, force: true }).catch(() => undefined)
   }

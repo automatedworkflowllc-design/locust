@@ -205,13 +205,17 @@ try {
     const list = document.querySelector('.lc-picker__list')
     return JSON.stringify({
       rows: list.querySelectorAll('.lc-picker__row').length,
-      more: list.querySelectorAll('.lc-picker__more').length
+      more: list.querySelectorAll('.lc-picker__more').length,
+      moreText: [...list.querySelectorAll('.lc-picker__more')].map(n => n.innerText).join(' | ')
     })
   })()`)
   const searchState = JSON.parse(searched)
   say(`       "a": ${searchState.rows} rows, ${searchState.more} cap lines`)
   check('a search shows more than the cap', searchState.rows > LIMIT, searched)
-  check('and states no cap of its own', searchState.more === 0, searched)
+  // Since 0.21.5 the search cap is WIDER (12 per group), not gone: a one-letter
+  // search may still hold rows back, and every held-back row is counted in one
+  // line. What is refused is a silent cut.
+  check('and any rows held back are counted, never silently cut', searchState.more <= 1 && (searchState.more === 0 || /[0-9]+ more match/.test(searchState.moreText ?? '')), searched)
 } finally {
   child.kill()
   await sleep(500)

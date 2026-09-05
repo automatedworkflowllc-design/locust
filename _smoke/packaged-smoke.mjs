@@ -149,7 +149,8 @@ try {
   const shell = JSON.parse(ready)
   say(`       ${shell.body ?? ''}`.slice(0, 200))
   check('discovery finished', !/never finished/.test(shell.placeholder), shell.placeholder)
-  check('a runtime is reported as usable', /READY|Ready/.test(shell.body ?? ''), (shell.body ?? '').slice(0, 160))
+  // READY needs no tag once its dot is green (panel A), so the word is not on the home screen; the rail footer's count is.
+  check('a runtime is reported as usable', /[1-9][0-9]* runtimes? connected/.test(shell.body ?? '') || /READY|Ready/.test(shell.body ?? ''), (shell.body ?? '').slice(0, 160))
   // Both, by name: "not found" for an installed CLI is the bug this pins.
   // Whitespace is normalised in Node, never inside the injected string: a
   // `\s` written into a template literal collapses to `s` and would quietly
