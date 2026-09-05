@@ -205,6 +205,11 @@ describe('nothing is live unless discovery proved it', () => {
       .toBe('SIGN IN')
     expect(routeRowStatus(runtime({ ready: false, status: 'offline' }), 'live', false).detail)
       .toMatch(/could not be reached/)
+    // Installed but not answering is CHECKING, not UNAVAILABLE: the shell
+    // asks again, and only a runtime that is not on the machine is missing.
+    expect(routeRowStatus(runtime({ ready: false, status: 'probe-failed' }), 'live', false).tag).toBe('CHECKING')
+    expect(routeRowStatus(runtime({ ready: false, status: 'offline' }), 'live', false).tag).toBe('CHECKING')
+    expect(routeRowStatus(runtime({ ready: false, status: 'probe-failed' }), 'live', false).selectable).toBe(false)
   })
 
   it('counts only usable runtimes as connected', () => {

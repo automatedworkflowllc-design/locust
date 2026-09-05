@@ -27,6 +27,8 @@ export type RouteTag =
   | 'PREVIEW'
   | 'SIGN IN'
   | 'UNAVAILABLE'
+  /** Installed, but its probe did not answer in time; discovery asks again. */
+  | 'CHECKING'
   | 'API'
   | 'LOCAL'
   | 'PLANNED'
@@ -164,16 +166,20 @@ function baseRouteRowStatus(
     }
   }
   if (!runtimeIsUsable(runtime)) {
+    // Installed but not answering is a moment, not a verdict: Claude Code's
+    // first version probe can outlast the 5 s window on a cold start, and
+    // Colin's launch screen said UNAVAILABLE for a runtime that was fine a
+    // minute later (2026-09-05). The shell asks again; the tag says so.
     const reason =
       runtime.status === 'offline'
         ? 'could not be reached'
         : runtime.status === 'probe-failed'
-          ? 'did not answer its version probe'
+          ? 'did not answer its version probe in time'
           : 'is not ready'
     return {
-      tag: 'UNAVAILABLE',
+      tag: 'CHECKING',
       selectable: false,
-      detail: `${runtime.displayName} ${reason}.`
+      detail: `${runtime.displayName} ${reason}. Locust asks again shortly.`
     }
   }
   // Ready, and real, but on a surface nobody promised: selectable, and said.

@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.27.5 — 2026-09-05
+
+- **A runtime slow to answer reads CHECKING, not UNAVAILABLE.** Discovery
+  ran once at launch, so a runtime whose first probe took too long (Claude
+  Code on a cold start) stayed marked unavailable all session. Now an
+  installed runtime that did not answer in time is tagged CHECKING, Locust
+  asks again three times fifteen seconds apart, and once more whenever the
+  window comes back into focus, so a sign-in done elsewhere shows without a
+  relaunch. UNAVAILABLE is kept for a runtime that is not on the machine.
+
 ## 0.27.4 — 2026-09-05
 
 - **The home screen, tightened after a design review.** The count says how

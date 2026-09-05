@@ -392,6 +392,10 @@ function missionTitle(prompt: string): string {
   return trimmed.length > 44 ? `${trimmed.slice(0, 44).trimEnd()}…` : trimmed
 }
 
+/** Discovery is asked again while a runtime is still CHECKING, and on focus after this gap. */
+const RUNTIME_RECHECK_MS = 15_000
+const RUNTIME_RECHECK_MIN_GAP_MS = 10_000
+
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
   // Declared HERE, right under its state, not a thousand lines down: a
@@ -907,6 +911,37 @@ export default function App(): ReactElement {
       .catch(() => {
         if (active) setRuntimeState({ phase: 'error' })
       })
+    // Discovery ran once at launch and never again, so a runtime slow on
+    // its first probe stayed UNAVAILABLE for the whole session (Colin,
+    // 2026-09-05). Ask again while any runtime is still CHECKING -- three
+    // times, fifteen seconds apart, past the host's ten-second cache -- and
+    // once more whenever the window comes back into focus, so a sign-in
+    // done elsewhere shows without a relaunch.
+    let retries = 0
+    let lastAsked = Date.now()
+    const askAgain = (): void => {
+      if (!active) return
+      lastAsked = Date.now()
+      void bridge
+        .getLocalRuntimes()
+        .then((response) => {
+          if (!active || !response.ok) return
+          setRuntimeState({ phase: 'ready', runtimes: response.data.runtimes })
+          const stillChecking = response.data.runtimes.some(
+            (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
+          )
+          if (stillChecking && retries < 3) {
+            retries += 1
+            setTimeout(askAgain, RUNTIME_RECHECK_MS)
+          }
+        })
+        .catch(() => undefined)
+    }
+    const firstRecheck = setTimeout(askAgain, RUNTIME_RECHECK_MS)
+    const onFocus = (): void => {
+      if (Date.now() - lastAsked >= RUNTIME_RECHECK_MIN_GAP_MS) askAgain()
+    }
+    window.addEventListener('focus', onFocus)
 
     void bridge
       .readWorkspaceSettings()
@@ -1017,6 +1052,8 @@ export default function App(): ReactElement {
 
     return () => {
       active = false
+      clearTimeout(firstRecheck)
+      window.removeEventListener('focus', onFocus)
       removeMissionListener()
       removeApprovalListener()
       stopUpdates()

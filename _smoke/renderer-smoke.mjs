@@ -139,7 +139,9 @@ try {
       // READY tag. Word-bounded so ALREADY cannot satisfy it. The escapes are
       // doubled because this regex lives inside a template literal, where a
       // single backslash-b is a backspace character.
-      if (/\\bREADY\\b/.test(document.body.innerText)) return true
+      if (document.querySelector('.lc-runtimecell.is-ready')) return true
+      // READY needs no tag once its dot is green, so the row class is the signal; the rail footer is the fallback.
+      if (/[1-9][0-9]* runtimes? connected/.test(document.body.innerText)) return true
       await new Promise(r => setTimeout(r, 250))
     }
     return false
