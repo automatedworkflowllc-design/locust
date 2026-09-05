@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.25.0 — 2026-09-05
+
+- **Rooms tell you when something happened while you were away.** A teammate
+  moving the board, or the last teammate answering a post, shows a desktop
+  notification -- only when Locust is not the window in front. Changes to
+  one room are gathered for two minutes and said once, newest last, so three
+  teammates finishing together are one thing to read, not three.
+
 ## 0.24.0 — 2026-09-05
 
 - **Tasks in a room.** Every room has a board: a task is a line of text, an
