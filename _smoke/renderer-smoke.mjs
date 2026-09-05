@@ -241,7 +241,15 @@ try {
   check('the mission reads as complete', /· completed ·/.test(finished))
   check('the screen does not report a failed or interrupted run',
     !/interrupted|· failed ·/.test(finished))
-  check('the run was labelled read-only', /read-only/.test(finished))
+  // The header states the sandbox the run ACTUALLY had, and the composer's
+  // default mode is Accept edits, so it says so. This asserted `read-only`
+  // from the days when the app ran one fixed read-only route, and had been
+  // failing on a correct app ever since (Codex sweep, 2026-09-05).
+  check(
+    'the run was labelled with the containment it actually had',
+    /may edit the workspace/.test(finished) && !/read-only/.test(finished),
+    /may edit the workspace/.test(finished) ? 'may edit the workspace' : 'neither phrase on screen'
+  )
 
   say(`       ...${finished.trim().slice(-240)}`)
 

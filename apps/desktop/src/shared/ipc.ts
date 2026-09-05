@@ -332,7 +332,14 @@ export interface CodexMissionError {
  * These are three different bargains, not three intensities, so the composer
  * states the consequence of each rather than only its name.
  */
-export type MissionMode = 'ask' | 'accept-edits' | 'approve-each'
+/**
+ * What a mission may do. `plan` is the fourth because planning IS a
+ * permission stance, not a switch beside one: it can only ever be chosen
+ * where the sandbox already refuses writes, so a separate toggle asked the
+ * same question twice in two shapes and could disagree with the answer next
+ * to it (design pass, 2026-09-05).
+ */
+export type MissionMode = 'ask' | 'accept-edits' | 'approve-each' | 'plan'
 
 /**
  * A model the active runtime actually reports, with the reasoning efforts IT
@@ -427,12 +434,6 @@ export interface CodexMissionStartRequest {
    * cannot be resumed is refused rather than silently started blank.
    */
   readonly followUpOf?: string
-  /**
-   * Plan first: the runtime answers with the steps it WOULD take and changes
-   * nothing. Honoured only where the sandbox is already read-only, so a plan
-   * run cannot be a promise the containment does not keep.
-   */
-  readonly plan?: boolean
 }
 
 /**

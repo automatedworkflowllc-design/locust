@@ -203,7 +203,14 @@ try {
 
   say('3. CONTROL: Atlas cannot be handed a second mission while working')
   const atlasBusy = await cdp.eval(typeInto('a second mission for Atlas'))
-  check('the composer says Atlas is still working', /Atlas is still working/.test(atlasBusy), atlasBusy)
+  // 0.20.0 changed what a busy composer says, and it is now the stronger
+  // claim: not "you cannot", but "this waits and goes next". The control the
+  // step exists for is unchanged and asserted below -- no START button.
+  check(
+    'the composer says what happens to a message typed while Atlas works',
+    /goes to Atlas when this finishes/.test(atlasBusy),
+    atlasBusy
+  )
   const sendDisabled = await cdp.eval(`(document.querySelector('form.command-dock .send-button') || {}).disabled === true || document.querySelector('form.command-dock .send-button').getAttribute('aria-label') !== 'Start mission'`)
   check('and offers no start control for it', sendDisabled === true)
   await cdp.eval(typeInto(''))
@@ -225,7 +232,10 @@ try {
   check('the title bar counts two running missions', /2 running/.test(bothState.running), bothState.running)
   const atlasRow = bothState.rows.find((row) => row.name.startsWith('Atlas'))
   const wrenRow = bothState.rows.find((row) => row.name.startsWith('Wren'))
-  check('the sidebar shows Atlas working', /working/.test(atlasRow?.meta ?? ''), atlasRow?.meta)
+  // `working` and `thinking` are both live states; 0.18.x split them so a
+  // bobbing face could not sit beside dots that mean waiting. Either proves
+  // the row is showing a live run, which is what this step is about.
+  check('the sidebar shows Atlas live', /working|thinking/.test(atlasRow?.meta ?? ''), atlasRow?.meta)
   check('the sidebar files a mission under each teammate', (atlasRow?.missions.length ?? 0) >= 1 && (wrenRow?.missions.length ?? 0) >= 1,
     JSON.stringify(bothState.rows))
   check('Wren\u2019s thread is on screen', bothState.bubble.trim() === WREN_PROMPT, bothState.bubble.slice(0, 60))

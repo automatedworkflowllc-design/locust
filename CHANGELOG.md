@@ -6,6 +6,29 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.21.0 — 2026-09-05
+
+- **You can scroll a long conversation again.** The thread used a layout rule
+  that pushes content out of the top of a scrolling box, and an overflowed
+  top cannot be scrolled to — so past about a screenful, everything above the
+  newest work was unreachable. It now uses spacing that collapses when there
+  is no room to spare, so the scroll always starts at the first message.
+- **Delete removes the whole conversation.** A sidebar row stands for every
+  turn of one conversation, but Delete removed only its last turn, so the row
+  stayed on screen and the menu read as doing nothing.
+- **Plan is a permission mode, not a switch beside one.** It could only ever
+  be on together with a read-only mode, so the composer was asking the same
+  question twice in two shapes and the two could disagree. Plan now sits in
+  the mode menu with the others and states its consequence there: answers
+  with the steps it would take, and changes nothing. It is offered exactly
+  where read-only containment is real, and withheld with the runtime's own
+  reason where it is not. "Build this plan" is an ordinary mode switch now
+  rather than a hidden state change.
+- Each message on an exchange card can open the run it reached, so a
+  teammate's reply is reachable from the conversation that asked rather than
+  by scrolling the sidebar. Offered only where the record shows something
+  received it.
+
 ## 0.20.1 — 2026-09-05
 
 Three things Colin found in an evening of real use.

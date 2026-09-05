@@ -37,6 +37,11 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
     consequence: 'May edit files inside this workspace folder, and nowhere else.'
   },
   {
+    mode: 'plan',
+    name: 'Plan',
+    consequence: 'Answers with the steps it would take, and changes nothing.'
+  },
+  {
     mode: 'approve-each',
     name: 'Approve each action',
     consequence: 'Stops and asks before every command or file change.'
@@ -96,9 +101,6 @@ export interface ComposerProps {
   readonly onSendQueued: () => void
   /** The queued message belongs to a conversation that is NOT the one on screen. */
   readonly queuedElsewhere: boolean
-  /** Plan first: the run answers with the steps it would take and changes nothing. */
-  readonly planFirst: boolean
-  readonly onPlanFirstChange: (planFirst: boolean) => void
 }
 
 /**
@@ -143,9 +145,7 @@ export function Composer({
   onQueue,
   onUnqueue,
   onSendQueued,
-  queuedElsewhere,
-  planFirst,
-  onPlanFirstChange
+  queuedElsewhere
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
   const [modeOpen, setModeOpen] = useState(false)
@@ -375,32 +375,6 @@ export function Composer({
                   {MODES.find((option) => option.mode === effectiveMode)?.name ?? 'Ask'}
                 </button>
               </span>
-              {/*
-                * Plan first. Offered only where the sandbox already refuses
-                * writes, because a plan that could edit the workspace is a
-                * promise the app cannot keep -- so in Accept edits the
-                * control says why rather than sitting there doing nothing.
-                */}
-              <button
-                type="button"
-                className={`lc-control lc-plan${planFirst && effectiveMode !== 'accept-edits' ? ' is-on' : ''}`}
-                aria-pressed={planFirst && effectiveMode !== 'accept-edits'}
-                disabled={running || effectiveMode === 'accept-edits'}
-                title={
-                  effectiveMode !== 'accept-edits'
-                    ? 'Answer with the steps it would take, and change nothing'
-                    : // "Switch to Ask" is bad advice where Ask cannot be
-                      // chosen at all. On Cursor for Windows the sandbox
-                      // that would hold a run read-only does not exist, so
-                      // the honest line is the runtime's own reason
-                      // (steering smoke, 2026-09-05).
-                      (modeUnavailableReason('ask', route.runtime, platform)
-                        ?? 'Plan first needs a mode that changes nothing — switch to Ask')
-                }
-                onClick={() => onPlanFirstChange(!planFirst)}
-              >
-                Plan first
-              </button>
               <button type="button" className="lc-control" disabled title="Attachments and slash commands are not built yet">
                 <Icon name="plus" size={14} />
               </button>

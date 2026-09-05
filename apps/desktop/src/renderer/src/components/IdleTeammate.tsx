@@ -19,6 +19,8 @@ export function modeSentence(mode: MissionMode): string {
       return 'Every change waits for your approval before it lands.'
     case 'accept-edits':
       return 'Accept edits is on, so it may change files here; switch to Ask below to keep it read-only.'
+    case 'plan':
+      return 'In Plan mode it answers with the steps it would take and changes nothing.'
   }
 }
 

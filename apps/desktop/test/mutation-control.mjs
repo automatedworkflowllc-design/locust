@@ -70,10 +70,17 @@ const MUTATIONS = [
   },
   {
     file: MISSIONS,
-    name: 'plan first is honoured even in a mode that can write',
-    from: "        if (plan === true && sandbox === 'read-only') {",
-    to: '        if (plan === true) {',
-    expect: 'plans first when asked, and only where the sandbox already refuses writes'
+    name: 'the plan mode is given a sandbox that can write',
+    from: "      const sandbox: MissionSandbox = mode === 'accept-edits' ? 'workspace-write' : 'read-only'",
+    to: "      const sandbox: MissionSandbox = mode === 'accept-edits' || mode === 'plan' ? 'workspace-write' : 'read-only'",
+    expect: 'plans in the plan MODE, and only where the sandbox already refuses writes'
+  },
+  {
+    file: STATUS,
+    name: 'Plan is offered on a route that cannot be held read-only',
+    from: "  if (mode === 'plan') return modeRunsOn('ask', runtime, platform)",
+    to: "  if (mode === 'plan') return true",
+    expect: 'withholds Plan wherever read-only is not real, for the same reason as Ask'
   },
   {
     file: STEERING,

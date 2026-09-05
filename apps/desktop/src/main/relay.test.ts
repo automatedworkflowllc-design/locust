@@ -188,7 +188,15 @@ describe('relaying a share', () => {
     await relay.onShared(sharing(), [message(BOOTY)])
     // Booty's run answers Wren, which is the whole point; nothing to report.
     await relay.onShared(
-      { runId: 'run_booty', missionId: 'mission_1', peer: bootyPeer, relay: { hop: 1, lastMissionOf: {} } },
+      {
+        runId: 'run_booty',
+        missionId: 'mission_1',
+        peer: bootyPeer,
+        relay: { hop: 1, lastMissionOf: {} },
+        runtime: 'claude',
+        sandbox: 'read-only',
+        model: 'sonnet'
+      },
       [message(WREN)]
     )
     await relay.onRunEnded({ missionId: 'mission_1', peer: bootyPeer, relay: { hop: 1, lastMissionOf: {} } })

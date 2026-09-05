@@ -431,7 +431,15 @@ export default function App(): ReactElement {
           confirmLabel: 'Delete for good?',
           danger: true,
           ...(live ? { disabledReason: 'This mission is still running. Stop it first.' } : {}),
-          onSelect: () => deleteMissionById(missionId)
+          // Every turn the row stands for. A sidebar row is a CONVERSATION --
+          // `collapseConversations` folds its turns into one line titled by
+          // the first -- so deleting the id under the cursor removed only the
+          // last turn and left the row on screen, which reads as the menu
+          // doing nothing at all (Colin, 2026-09-05).
+          onSelect: () => {
+            const row = sidebarMissionsRef.current.find((entry) => entry.missionId === missionId)
+            for (const turn of row?.memberIds ?? [missionId]) deleteMissionById(turn)
+          }
         }
       ]
     })
@@ -514,12 +522,6 @@ export default function App(): ReactElement {
    * the one on screen, it waits and says so rather than guessing.
    */
   const [queued, setQueued] = useState<{ readonly key: string; readonly text: string }>()
-  /**
-   * Plan first: the next mission answers with the steps it would take and
-   * changes nothing. Sent only with a mode whose sandbox already refuses
-   * writes, and the host checks that again rather than trusting this.
-   */
-  const [planFirst, setPlanFirst] = useState(false)
   /** The save/edit dialog, open on a draft taken from a conversation or on a routine already saved. */
   const [routineDialog, setRoutineDialog] = useState<{
     readonly teammateId: string
@@ -934,7 +936,9 @@ export default function App(): ReactElement {
       ...(teammateId === undefined ? {} : { teammateId }),
       ...(earlierTurns.length === 0 ? {} : { earlierTurns }),
       ...(coldStart ? { coldStart: true } : {}),
-      ...(planFirst && (modeOverride ?? mode) !== 'accept-edits' ? { plan: true } : {})
+      // Plan is a mode now, so the run remembers what it was asked to be
+      // rather than a switch that sat beside the mode and could disagree.
+      ...((modeOverride ?? mode) === 'plan' ? { plan: true } : {})
     }
     setRuns((current) => withNewRun(current, key, starting))
     setShownKey(key)
@@ -961,10 +965,6 @@ export default function App(): ReactElement {
         model: chosenModelId(models, route.model, swarmEffortFor(models, route.model, swarm, effort, route.runtime)),
         ...(teammateId === undefined ? {} : { teammateId }),
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
-        // Plan first only where the mode already refuses writes. The host
-        // checks this again; sending it with an editing mode would be asking
-        // for a promise neither side can keep.
-        ...(planFirst && (modeOverride ?? mode) !== 'accept-edits' ? { plan: true } : {}),
         // Only sent when the chosen model advertised it; the composer cannot
         // offer an effort the catalog did not report for that model.
         // Swarm overrides the picked effort with the model's maximum, and the
@@ -1873,10 +1873,9 @@ export default function App(): ReactElement {
                   && liveRun.prompt.trim().length > 0
                   && modeRunsOn('accept-edits', liveRun.data.runtime, build?.platform)
                     ? () => {
+                        // An ordinary mode switch now, named on the band
+                        // above the button before it is pressed.
                         setMode('accept-edits')
-                        // Building is the doing turn: plan-first would ask
-                        // for a second plan of the plan.
-                        setPlanFirst(false)
                         void startMission(liveRun.prompt, 'accept-edits')
                       }
                     : undefined
@@ -2003,8 +2002,6 @@ export default function App(): ReactElement {
               if (key !== undefined) setQueued({ key, text })
             }}
             onUnqueue={() => setQueued(undefined)}
-            planFirst={planFirst}
-            onPlanFirstChange={setPlanFirst}
             onSendQueued={() => {
               const text = queued?.text
               setQueued(undefined)

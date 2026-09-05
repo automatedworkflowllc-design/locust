@@ -88,7 +88,11 @@ export function isTeammateRoute(value: unknown): value is TeammateRoute {
     && typeof record.model === 'string'
     && record.model.length > 0
     && record.model.length <= 200
-    && (record.mode === 'ask' || record.mode === 'accept-edits' || record.mode === 'approve-each')
+    // `plan` is a mode like the others, so a teammate last started in it
+    // records that honestly. Refusing it here would not stop the mode -- it
+    // would only make `rememberRoute` fail silently and leave a stale one on
+    // the roster, which is the worse of the two.
+    && (record.mode === 'ask' || record.mode === 'accept-edits' || record.mode === 'approve-each' || record.mode === 'plan')
   )
 }
 

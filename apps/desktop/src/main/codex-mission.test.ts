@@ -1286,30 +1286,31 @@ describe('the workroom around a mission', () => {
     expect(response.data.peerDeliveryFailed).toBe(false)
   })
 
-  it('plans first when asked, and only where the sandbox already refuses writes', async () => {
+  it('plans in the plan MODE, and only where the sandbox already refuses writes', async () => {
     const { workroom } = fakeWorkroom()
     const planning = peerService({ run: transcript('Here is the plan.'), workroom })
     const planned = await planning.service.start(
       'Add retries to the fetch helper.',
       'codex',
-      'ask',
+      'plan',
       {},
       () => undefined,
       undefined,
-      PEER,
-      undefined,
-      undefined,
-      undefined,
-      true
+      PEER
     )
     expect(planned.ok).toBe(true)
+    // The invariant Plan-as-a-mode rests on: choosing it CANNOT leave the run
+    // able to write. The sandbox is what the runtime is actually launched
+    // with, so it is asserted here rather than trusted from the mode name.
+    expect(planned.ok && planned.data.sandbox).toBe('read-only')
     const withPlan = planning.start.mock.calls[0]?.[1] as string
     expect(withPlan.startsWith('Add retries to the fetch helper.')).toBe(true)
     expect(withPlan).toContain('PLAN FIRST')
     expect(withPlan).toContain('numbered steps')
 
-    // Accept edits CAN change the workspace, so a plan section there would be
-    // a promise the containment does not keep: it is refused, not trusted.
+    // Accept edits CAN change the workspace. Plan is a mode now, so the two
+    // cannot be chosen together at all -- and the host still checks the
+    // sandbox rather than trusting the mode name it was handed.
     const editing = peerService({ run: transcript('Done.'), workroom })
     const edited = await editing.service.start(
       'Add retries to the fetch helper.',
@@ -1318,16 +1319,12 @@ describe('the workroom around a mission', () => {
       {},
       () => undefined,
       undefined,
-      PEER,
-      undefined,
-      undefined,
-      undefined,
-      true
+      PEER
     )
     expect(edited.ok).toBe(true)
     expect(editing.start.mock.calls[0]?.[1] as string).not.toContain('PLAN FIRST')
 
-    // And a read-only run that did NOT ask to plan is unchanged.
+    // And an ordinary read-only run is unchanged.
     const plain = peerService({ run: transcript('Done.'), workroom })
     await plain.service.start('Add retries to the fetch helper.', 'codex', 'ask', {}, () => undefined, undefined, PEER)
     expect(plain.start.mock.calls[0]?.[1] as string).not.toContain('PLAN FIRST')

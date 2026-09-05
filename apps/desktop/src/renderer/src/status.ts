@@ -498,6 +498,10 @@ export function modeRunsOn(
   platform?: string
 ): boolean {
   if (mode === 'approve-each') return runtime === 'codex'
+  // Plan is available exactly where read-only containment is real. A plan
+  // that could edit the workspace is a promise the app cannot keep, and the
+  // Cursor/Windows reason below already says so in its last clause.
+  if (mode === 'plan') return modeRunsOn('ask', runtime, platform)
   // Antigravity's agent runs its own tools under its own policy; the host
   // has no handle that holds it read-only, so only the mode that says so is
   // offered.
@@ -529,11 +533,12 @@ export function modeLabel(mode: MissionMode | undefined): string {
   if (mode === 'accept-edits') return 'accept edits'
   if (mode === 'approve-each') return 'approve each action'
   if (mode === 'ask') return 'ask · read-only'
+  if (mode === 'plan') return 'plan · read-only'
   return 'not set yet'
 }
 
 export function modesFor(runtime: MissionRuntimeId, platform?: string): readonly MissionMode[] {
-  return (['ask', 'accept-edits', 'approve-each'] as const).filter((mode) =>
+  return (['ask', 'plan', 'accept-edits', 'approve-each'] as const).filter((mode) =>
     modeRunsOn(mode, runtime, platform)
   )
 }

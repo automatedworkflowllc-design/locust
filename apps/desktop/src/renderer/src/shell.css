@@ -4003,15 +4003,29 @@ textarea {
 }
 
 /* --- 2. Short threads sit on the composer -----------------------------
- * Adds to .lc-thread. A conversation grows upward out of the box you type
- * in; top-aligning it left a ~70px void between the last card and the
- * composer, so the receipt hung in mid-air. Long threads are unaffected --
- * the column already overflows and scrolls.
+ * A conversation grows upward out of the box you type in; top-aligning it
+ * left a ~70px void between the last card and the composer, so the receipt
+ * hung in mid-air.
+ *
+ * This was `justify-content: flex-end`, and "long threads are unaffected"
+ * was wrong. On a scrolling flex column that property overflows the content
+ * out of the TOP, and an overflowed top is not scrollable: past about a
+ * screenful, everything above the newest work became permanently
+ * unreachable. Colin, 2026-09-05, on a long Codex run: "no ability to scroll
+ * on mouse through messages, just keeps going down and cant scroll up."
+ *
+ * `margin-top: auto` on the first child does the same job honestly -- it
+ * eats the spare room when the thread is short and collapses to nothing when
+ * there is none, so the scroll region always starts at the first message.
  */
 .lc-thread {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
+}
+
+.lc-thread > *:first-child {
+  margin-top: auto;
 }
 
 /* The column must not stretch to fill the flex line, or its own 22px gaps
