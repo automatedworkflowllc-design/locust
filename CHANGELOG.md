@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.24.0 — 2026-09-05
+
+- **Tasks in a room.** Every room has a board: a task is a line of text, an
+  owner, a state (open, in hand, done) and the conversation that last moved
+  it. Add, assign, finish, reopen or remove tasks from the room. Teammates
+  move the board themselves by ending a reply with a task block -- they are
+  told the board and the block with every post -- and the room says what
+  they did.
+
 ## 0.23.0 — 2026-09-05
 
 - **Rooms.** Make a room out of some teammates (Ctrl 4, or the Rooms section
