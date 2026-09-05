@@ -104,7 +104,15 @@ export async function startDrive({ name, port, workspace, seed, env = {}, keep =
     socket.send(JSON.stringify({ id: next, method, params }))
   })
   const evaluate = async (expression) => {
-    const message = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+    let message = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+    // Right after launch the page can still be finishing its first
+    // navigation, and an evaluate that lands in the old context dies with
+    // "Execution context was destroyed". Seen at the first step of several
+    // smokes on 2026-09-05; the app itself never reloads. One retry.
+    if (/Execution context was destroyed/.test(String(message?.error?.message ?? ''))) {
+      await sleep(1500)
+      message = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+    }
     const thrown = message?.result?.exceptionDetails
     if (thrown !== undefined) say(`  eval threw: ${thrown.exception?.description ?? ''}`.slice(0, 200))
     return message?.result?.result?.value

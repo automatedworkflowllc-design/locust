@@ -367,29 +367,38 @@ export function createRelay(options: RelayOptions): Relay {
 
         const decision = decideRelay({ enabled, hop, recipientName: message.to.name, cap })
         if (!decision.start) {
-          // Off is the default and needs no announcement; a cap that fired
-          // does, because the person is watching an exchange stop.
-          if (enabled) notice(decision.reason)
+          // Every message that goes nowhere is said, off included: replies
+          // are on by default now, so off is a choice the person made and
+          // may have forgotten -- and a share with no answer and no word
+          // was the one thing a drive could not explain (2026-09-05).
+          notice(decision.reason)
           continue
         }
 
-        const recipient = await options.peerContextFor(recipientId)
-        if (recipient === undefined) {
-          notice(`${message.to.name} is no longer on the roster; nothing was started.`)
-          continue
+        try {
+          const recipient = await options.peerContextFor(recipientId)
+          if (recipient === undefined) {
+            notice(`${message.to.name} is no longer on the roster; nothing was started.`)
+            continue
+          }
+          const origin: RelayOrigin = {
+            hop: decision.hop,
+            lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
+          }
+          const result = await startFor({
+            recipient,
+            prompt: relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop }),
+            from: mission,
+            origin,
+            notice
+          })
+          if (result !== undefined) started.push({ teammateId: recipientId, name: recipient.self.name, missionId: result.missionId })
+        } catch (error) {
+          // Whatever failed between the decision and the start, the thread
+          // says so. The service that called us swallows anything thrown
+          // here, which is how a failure became silence.
+          notice(`${message.to.name} could not reply on their own: ${error instanceof Error ? error.message : String(error)} The message waits for their next run.`)
         }
-        const origin: RelayOrigin = {
-          hop: decision.hop,
-          lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
-        }
-        const result = await startFor({
-          recipient,
-          prompt: relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop }),
-          from: mission,
-          origin,
-          notice
-        })
-        if (result !== undefined) started.push({ teammateId: recipientId, name: recipient.self.name, missionId: result.missionId })
       }
 
       // Writing to several teammates at once opens a meeting: their answers

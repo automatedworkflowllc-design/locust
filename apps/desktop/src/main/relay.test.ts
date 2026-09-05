@@ -38,14 +38,14 @@ function sharing(overrides: Partial<SharingMission> = {}): SharingMission {
   }
 }
 
-function harness(options: { enabled?: boolean; startResult?: CodexMissionStartResponse; booty?: MissionPeerContext } = {}) {
+function harness(options: { enabled?: boolean; startResult?: CodexMissionStartResponse; booty?: MissionPeerContext; peerContextFor?: RelayOptions['peerContextFor'] } = {}) {
   const starts: Parameters<RelayOptions['start']>[0][] = []
   const owners: [string, string][] = []
   const notices: CodexMissionUpdate[] = []
   const relay = createRelay({
     enabled: async () => options.enabled ?? true,
-    peerContextFor: async (id) =>
-      id === BOOTY.teammateId ? (options.booty ?? bootyPeer) : id === WREN.teammateId ? wrenPeer : undefined,
+    peerContextFor: options.peerContextFor ?? (async (id) =>
+      id === BOOTY.teammateId ? (options.booty ?? bootyPeer) : id === WREN.teammateId ? wrenPeer : undefined),
     start: async (input) => {
       starts.push(input)
       return (
@@ -147,11 +147,20 @@ describe('the brief a relayed run is started with', () => {
 })
 
 describe('relaying a share', () => {
-  it('starts nothing when off, and stays quiet about it', async () => {
+  it('starts nothing when off, and says so in the thread', async () => {
     const { relay, starts, notices } = harness({ enabled: false })
     await relay.onShared(sharing(), [message(BOOTY)])
     expect(starts).toHaveLength(0)
-    expect(notices).toHaveLength(0)
+    expect(notices).toHaveLength(1)
+    expect((notices[0] as { message?: string }).message).toMatch(/switched off in Settings/)
+  })
+
+  it('turns a failure between the decision and the start into a notice, never silence', async () => {
+    const { relay, starts, notices } = harness({ peerContextFor: async () => { throw new Error('the roster could not be read.') } })
+    await relay.onShared(sharing(), [message(BOOTY)])
+    expect(starts).toHaveLength(0)
+    expect(notices).toHaveLength(1)
+    expect((notices[0] as { message?: string }).message).toMatch(/Booty could not reply on their own: the roster could not be read/)
   })
 
   it("starts the recipient's run on the recipient's OWN route, owned by the recipient", async () => {

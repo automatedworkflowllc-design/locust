@@ -106,9 +106,22 @@ describe('what the team remembers', () => {
 
   it('is bounded', async () => {
     const memories = await store()
-    for (let i = 0; i < MAX_MEMORIES; i += 1) {
-      await memories.add({ text: `memory ${String(i)}`, scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })
-    }
+    // Seeded on disk in one write rather than added one by one: 400
+    // write-and-rename cycles took longer than the 5 s test budget whenever
+    // the disk was busy, and the bound is a property of the file's length,
+    // not of how it got that long.
+    const full = Array.from({ length: MAX_MEMORIES }, (_, i) => ({
+      memoryId: `mem_seed${String(i)}`,
+      text: `memory ${String(i)}`,
+      scope: 'workspace',
+      ...SHOP,
+      by: WREN,
+      createdAt: NOW,
+      status: 'kept',
+      enabled: true
+    }))
+    await writeFile(join(root, 'memories.json'), JSON.stringify({ schemaVersion: 1, memories: full }), 'utf8')
+    expect((await memories.list()).length).toBe(MAX_MEMORIES)
     await expect(memories.add({ text: 'one more', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })).rejects.toThrow(/at most/)
   })
 })
