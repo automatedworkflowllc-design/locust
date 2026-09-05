@@ -746,6 +746,7 @@ export type CodexMissionUpdate =
   | {
       readonly kind: 'room-changed'
       readonly roomId: string
+      readonly roomName: string
       readonly message: string
     }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */

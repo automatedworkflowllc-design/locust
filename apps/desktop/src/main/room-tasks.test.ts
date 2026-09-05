@@ -75,7 +75,7 @@ describe('when a room mission ends', () => {
     })
     expect((applied[0] as { ops: unknown[] }).ops).toHaveLength(2)
     expect(notices).toHaveLength(1)
-    expect(notices[0]).toMatchObject({ kind: 'room-changed', roomId: 'room_release' })
+    expect(notices[0]).toMatchObject({ kind: 'room-changed', roomId: 'room_release', roomName: 'Release' })
     expect(notices[0]?.kind === 'room-changed' ? notices[0].message : '').toContain('Wren did claim')
   })
 
@@ -92,5 +92,38 @@ describe('when a room mission ends', () => {
     const missing = harness(undefined)
     await missing.tasks.onRunEnded({ missionId: 'mission_w' })
     expect(missing.applied).toHaveLength(0)
+  })
+})
+
+describe('when the last teammate in a room answers', () => {
+  function answered(phaseOfOther: string | undefined) {
+    const notices: CodexMissionUpdate[] = []
+    const tasks = createRoomTasks({
+      rooms: { list: async () => [room()], applyTaskOps: async () => ({ changed: [], refused: [] }) },
+      ledger: {
+        getMission: async (missionId) => {
+          if (missionId === 'mission_w') return replied('All done here.')
+          if (missionId === 'mission_b' && phaseOfOther !== undefined) return { ...replied('x'), phase: phaseOfOther } as never
+          return undefined
+        }
+      },
+      teammates: { list: async () => [WREN, BOOTY] },
+      notify: (update) => notices.push(update)
+    })
+    return { tasks, notices }
+  }
+
+  it('says so once the others have ended on the record', async () => {
+    const { tasks, notices } = answered('completed')
+    await tasks.onRunEnded({ missionId: 'mission_w' })
+    expect(notices).toEqual([{ kind: 'room-changed', roomId: 'room_release', roomName: 'Release', message: 'Everyone in Release has answered.' }])
+  })
+
+  it('does not while another is still going, interrupted, or missing', async () => {
+    for (const phase of ['interrupted', undefined]) {
+      const { tasks, notices } = answered(phase)
+      await tasks.onRunEnded({ missionId: 'mission_w' })
+      expect(notices).toEqual([])
+    }
   })
 })

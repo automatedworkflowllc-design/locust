@@ -666,7 +666,19 @@ if (!ownsSingleInstanceLock) {
       phaseOf: async (missionId) => (await missionLedger.getMission(missionId))?.phase,
       notify: sendToWindow
     })
-    roomTasks = createRoomTasks({ rooms, ledger: missionLedger, teammates, notify: sendToWindow })
+    roomTasks = createRoomTasks({
+      rooms,
+      ledger: missionLedger,
+      teammates,
+      notify: (update) => {
+        sendToWindow(update)
+        // Also to the desk, when the person is elsewhere: gathered per room
+        // so three teammates finishing together are one toast, not three.
+        if (update.kind === 'room-changed') {
+          attention.roomChanged({ roomId: update.roomId, roomName: update.roomName, message: update.message })
+        }
+      }
+    })
 
     ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event) => {
       const owner = BrowserWindow.fromWebContents(event.sender)

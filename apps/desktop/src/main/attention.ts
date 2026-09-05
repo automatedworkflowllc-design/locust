@@ -38,15 +38,83 @@ export function approvalNotificationText(
   return { title, body: `${request.summary} · the run is paused until you answer.` }
 }
 
-export function createAttention(surface: AttentionSurface): {
+/**
+ * How long a room's changes are gathered before one toast says them all.
+ *
+ * The spec's bar (docs/FEATURES-FROM-VISION-2026-09-05.md, #2): a room of
+ * three working unattended for ten minutes must produce a readable set of
+ * toasts, not a storm. Three teammates each moving the board at the end of
+ * a run can land inside the same few seconds; one toast per change would be
+ * three toasts saying one thing. So changes to a room are held for this
+ * long and said once, newest last, three lines at most.
+ *
+ * MEASURED 2026-09-05 with the test below: at twenty seconds, three
+ * teammates ending runs thirty seconds apart produced twenty toasts in ten
+ * minutes -- two a minute, which is the storm. Two minutes gathers the
+ * same ten minutes into five, each saying three or four changes, and a
+ * person who has stepped away is not worse off for hearing about a board
+ * two minutes late. The window that is in front hears nothing either way.
+ */
+export const ROOM_TOAST_WINDOW_MS = 120_000
+export const ROOM_TOAST_LINES = 3
+
+export interface AttentionTimers {
+  readonly schedule: (task: () => void, ms: number) => unknown
+  readonly clear: (handle: unknown) => void
+}
+
+export function roomNotificationText(
+  roomName: string,
+  messages: readonly string[]
+): { readonly title: string; readonly body: string } {
+  const shown = messages.slice(-ROOM_TOAST_LINES)
+  const hidden = messages.length - shown.length
+  return {
+    title: messages.length === 1 ? roomName : `${roomName} · ${String(messages.length)} changes`,
+    body: (hidden > 0 ? [`… and ${String(hidden)} more`, ...shown] : shown).join('\n')
+  }
+}
+
+export function createAttention(
+  surface: AttentionSurface,
+  timers: AttentionTimers = { schedule: (task, ms) => setTimeout(task, ms), clear: (handle) => clearTimeout(handle as NodeJS.Timeout) }
+): {
   approvalArrived(request: Pick<MissionApprovalRequest, 'kind' | 'summary'>, teammateName: string | undefined): boolean
+  /**
+   * A room's board or thread moved. Gathered per room and said once per
+   * window; nothing while the window has the person's attention, because
+   * the room screen already says it.
+   */
+  roomChanged(input: { readonly roomId: string; readonly roomName: string; readonly message: string }): void
+  /** Test seam: what is waiting to be said. */
+  pending(): ReadonlyMap<string, readonly string[]>
 } {
+  const held = new Map<string, { readonly roomName: string; readonly messages: string[]; readonly handle: unknown }>()
+  const flush = (roomId: string): void => {
+    const entry = held.get(roomId)
+    held.delete(roomId)
+    if (entry === undefined || entry.messages.length === 0) return
+    if (!shouldNotify({ focused: surface.focused(), supported: surface.supported() })) return
+    surface.notify({ ...roomNotificationText(entry.roomName, entry.messages), onClick: () => surface.focusWindow() })
+  }
   return {
     approvalArrived(request, teammateName) {
       if (!shouldNotify({ focused: surface.focused(), supported: surface.supported() })) return false
       const text = approvalNotificationText(request, teammateName)
       surface.notify({ ...text, onClick: () => surface.focusWindow() })
       return true
+    },
+    roomChanged(input) {
+      const entry = held.get(input.roomId)
+      if (entry !== undefined) {
+        entry.messages.push(input.message)
+        return
+      }
+      const handle = timers.schedule(() => flush(input.roomId), ROOM_TOAST_WINDOW_MS)
+      held.set(input.roomId, { roomName: input.roomName, messages: [input.message], handle })
+    },
+    pending() {
+      return new Map([...held.entries()].map(([roomId, entry]) => [roomId, [...entry.messages]]))
     }
   }
 }

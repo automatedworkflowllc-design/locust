@@ -53,9 +53,12 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
       }
       const found = roomMissionOf(rooms, mission.missionId)
       if (found === undefined) return
+      const say = (message: string): void =>
+        options.notify({ kind: 'room-changed', roomId: found.room.roomId, roomName: found.room.name, message })
 
       // The reply, rebuilt from the record the same way a share is.
       let text: string | undefined
+      let post = found.room.posts.find((entry) => Object.values(entry.missions).includes(mission.missionId))
       try {
         const recovered = await options.ledger.getMission(mission.missionId)
         if (recovered === undefined) return
@@ -65,6 +68,32 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
       } catch {
         return
       }
+
+      // Everyone in the room has answered this post: the one moment a
+      // person waiting on a room most wants to hear about. Decided from
+      // the record, not from memory of who was started.
+      if (post !== undefined) {
+        let allDone = true
+        for (const id of Object.values(post.missions)) {
+          if (id === mission.missionId) continue
+          try {
+            const other = await options.ledger.getMission(id)
+            // Answered means ENDED on the record: completed, failed or
+            // cancelled. Interrupted, missing, or a phase the record does
+            // not state is not an answer, however the fixture reads.
+            if (other === undefined || (other.phase !== 'completed' && other.phase !== 'failed' && other.phase !== 'cancelled')) {
+              allDone = false
+              break
+            }
+          } catch {
+            allDone = false
+            break
+          }
+        }
+        if (allDone && Object.keys(post.missions).length > 1) say(`Everyone in ${found.room.name} has answered.`)
+      }
+      post = undefined
+
       if (text === undefined) return
       const ops = parseTaskBlocks(text)
       if (ops.length === 0) return
@@ -84,11 +113,7 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
         roster.map((entry) => ({ teammateId: entry.teammateId, name: entry.name }))
       )
       if (result.changed.length === 0 && result.refused.length === 0) return
-      options.notify({
-        kind: 'room-changed',
-        roomId: found.room.roomId,
-        message: [...result.changed, ...result.refused].join(' ')
-      })
+      say([...result.changed, ...result.refused].join(' '))
     }
   }
 }
