@@ -8,6 +8,7 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
+import { stripMemoryBlocks } from '../../shared/memory.js'
 import { parseDecision, stripDecisionBlocks } from '../../shared/decision.js'
 import type { DecisionRequest } from '../../shared/decision.js'
 
@@ -641,7 +642,7 @@ export function buildThread(
   for (const message of assistantMessages(events)) {
     // A share block is shown in the peer card, attributed and labelled; left
     // in the bubble it would present the same claim twice, once unlabelled.
-    const text = stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(message.text)))
+    const text = stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(message.text))))
     if (text.length === 0) continue
     items.push({
       key: `msg_${message.itemId}`,

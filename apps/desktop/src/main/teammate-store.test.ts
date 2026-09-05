@@ -284,16 +284,16 @@ describe('workspace settings', () => {
       expect((await teammates.readSettings()).relay).toBe(true)
     }
     await teammates.writeSettings({ swarm: false, relay: false })
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6 })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto' })
   })
 
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6 })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto' })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 6 })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 6, memoryMode: 'auto' })
   })
 
   it('only a literal true turns it on', async () => {
@@ -301,7 +301,7 @@ describe('workspace settings', () => {
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
       await teammates.writeSettings({ swarm: value, relay: false })
-      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6 })
+      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto' })
     }
   })
 
@@ -314,7 +314,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6 })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto' })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 
@@ -391,5 +391,18 @@ describe('editing a teammate', () => {
       teammates.update({ teammateId: created.teammateId, name: 'X', hue: 'lime', role: 'Custom', avatar: { headwear: 99 } })
     ).rejects.toThrow('avatar is invalid')
     expect(await teammates.list()).toEqual([created])
+  })
+})
+
+describe('memory mode', () => {
+  it('defaults to keeping memory and telling, keeps ask or off, and reads anything else as the default', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'locust-teammates-'))
+    roots.push(root)
+    const teammates = createTeammateStore({ rootDirectory: root })
+    expect((await teammates.readSettings()).memoryMode).toBe('auto')
+    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'ask' })).memoryMode).toBe('ask')
+    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'off' })).memoryMode).toBe('off')
+    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'sometimes' } as never)).memoryMode).toBe('auto')
+    expect((await createTeammateStore({ rootDirectory: root }).readSettings()).memoryMode).toBe('auto')
   })
 })

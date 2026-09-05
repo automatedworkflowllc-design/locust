@@ -99,25 +99,34 @@ export function createTranscriptTracker(): TranscriptTracker {
   }
 }
 
+/** What the team remembers, worded for a runtime; undefined when memory is off. */
+export interface MemoryBriefing {
+  section(peer: MissionPeerContext): Promise<string | undefined>
+}
+
 export function createPeerExchange(options: {
   readonly workroom: Workroom
   readonly ledger: MissionLedger
+  readonly memory?: MemoryBriefing
 }): PeerExchange {
   return {
     async prepare(prompt, peer) {
+      // Memory that cannot be read is left out, never a refusal to run.
+      const memory = options.memory === undefined ? undefined : await options.memory.section(peer).catch(() => undefined)
       try {
         const unread = await options.workroom.unread(peer.self.teammateId, MAX_INBOUND_MESSAGES)
         const composed = composeRuntimePrompt({
           prompt,
           peer,
           inbound: unread.messages,
-          remaining: unread.remaining
+          remaining: unread.remaining,
+          ...(memory === undefined ? {} : { memory })
         })
         return { runtimePrompt: composed.prompt, delivered: composed.delivered, failed: false }
       } catch {
         // The roster trailer still goes: the run can share even when it could
         // not be shown what was waiting.
-        const composed = composeRuntimePrompt({ prompt, peer, inbound: [], remaining: 0 })
+        const composed = composeRuntimePrompt({ prompt, peer, inbound: [], remaining: 0, ...(memory === undefined ? {} : { memory }) })
         return { runtimePrompt: composed.prompt, delivered: [], failed: true }
       }
     },

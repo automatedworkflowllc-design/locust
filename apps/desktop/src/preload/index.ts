@@ -34,7 +34,12 @@ import {
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
-  TEAMMATE_UPDATE_CHANNEL
+  TEAMMATE_UPDATE_CHANNEL,
+  MEMORY_LIST_CHANNEL,
+  MEMORY_ADD_CHANNEL,
+  MEMORY_UPDATE_CHANNEL,
+  MEMORY_REMOVE_CHANNEL,
+  MEMORY_CLEAR_CHANNEL
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
@@ -75,7 +80,11 @@ import type {
   RoutineListResponse,
   RoutineMutationResponse,
   RoutineRunResponse,
-  RoutineUpdateRequest
+  RoutineUpdateRequest,
+  MemoryAddRequest,
+  MemoryClearRequest,
+  MemoryListResponse,
+  MemoryUpdateRequest
 } from '../shared/ipc.js'
 
 export type {
@@ -166,6 +175,11 @@ const desktopApi: DesktopApi = {
   removeRoom: (roomId: string) => ipcRenderer.invoke(ROOM_REMOVE_CHANNEL, roomId) as Promise<RoomMutationResponse>,
   postToRoom: (request: RoomPostRequest) => ipcRenderer.invoke(ROOM_POST_CHANNEL, request) as Promise<RoomPostResponse>,
   updateRoomTask: (request: RoomTaskRequest) => ipcRenderer.invoke(ROOM_TASK_CHANNEL, request) as Promise<RoomTaskResponse>,
+  listMemories: () => ipcRenderer.invoke(MEMORY_LIST_CHANNEL) as Promise<MemoryListResponse>,
+  addMemory: (request: MemoryAddRequest) => ipcRenderer.invoke(MEMORY_ADD_CHANNEL, request) as Promise<MemoryListResponse>,
+  updateMemory: (request: MemoryUpdateRequest) => ipcRenderer.invoke(MEMORY_UPDATE_CHANNEL, request) as Promise<MemoryListResponse>,
+  removeMemory: (memoryId: string) => ipcRenderer.invoke(MEMORY_REMOVE_CHANNEL, memoryId) as Promise<MemoryListResponse>,
+  clearMemories: (request: MemoryClearRequest) => ipcRenderer.invoke(MEMORY_CLEAR_CHANNEL, request) as Promise<MemoryListResponse>,
   writeWorkspaceSettings: (settings: WorkspaceSettings) =>
     ipcRenderer.invoke(WORKSPACE_SETTINGS_WRITE_CHANNEL, settings) as Promise<WorkspaceSettings>,
   decideMissionApproval: (answer: MissionApprovalAnswer) =>

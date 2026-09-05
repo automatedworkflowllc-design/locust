@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.27.0 — 2026-09-05
+
+- **Your team remembers.** Teammates keep a shared memory per project
+  folder, plus a smaller set marked everywhere -- the way Claude Code and
+  Cursor do, managed from Locust. A teammate writes one by ending a reply
+  with it; every teammate in the folder reads what is kept, with who wrote
+  it and where. The Memory screen (Ctrl 5, or the row at the top of the
+  sidebar) lists every memory with who, where, and the conversation it came
+  from: edit, switch off, remove, or write one yourself. Settings chooses
+  what happens when a teammate writes a memory: keep it and say so in the
+  conversation, ask you first, or off. Nothing leaves this machine.
+
 ## 0.26.1 — 2026-09-05
 
 - **Editing a schedule keeps what you set.** Pressing the choice a routine

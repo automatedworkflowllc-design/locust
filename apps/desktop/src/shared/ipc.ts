@@ -4,6 +4,55 @@ import type { AvatarSpec } from './avatar.js'
 
 import type { RoutineSchedule } from './routine-schedule.js'
 export type { RoutineSchedule } from './routine-schedule.js'
+import type { MemoryScope } from './memory.js'
+export type { MemoryScope } from './memory.js'
+
+/**
+ * How a teammate's memory is treated: kept at once and shown (the Claude
+ * Code way), shown first and kept on a yes (the Cursor way), or not at all.
+ */
+export type MemoryMode = 'auto' | 'ask' | 'off'
+export const DEFAULT_MEMORY_MODE: MemoryMode = 'auto'
+
+/** One thing the team remembers, with who wrote it, where, and from what. */
+export interface PublicMemory {
+  readonly memoryId: string
+  readonly text: string
+  readonly scope: MemoryScope
+  /** The folder it was written in (`ws_` id); a global memory still records where it came from. */
+  readonly workspaceId: string
+  readonly workspaceName: string
+  readonly by: { readonly teammateId?: string; readonly name: string }
+  readonly missionId?: string
+  readonly createdAt: string
+  /** `proposed` waits for the person; only `kept` is briefed. */
+  readonly status: 'kept' | 'proposed'
+  readonly enabled: boolean
+}
+
+export interface MemoryAddRequest {
+  readonly text: string
+  readonly scope: MemoryScope
+}
+
+export interface MemoryUpdateRequest {
+  readonly memoryId: string
+  readonly text?: string
+  readonly enabled?: boolean
+  /** Keep a proposed memory. */
+  readonly keep?: boolean
+}
+
+export interface MemoryClearRequest {
+  readonly scope: 'workspace' | 'all'
+}
+
+export type MemoryListResponse =
+  | {
+      readonly ok: true
+      readonly data: { readonly memories: readonly PublicMemory[]; readonly workspaceId: string; readonly workspaceName: string }
+    }
+  | { readonly ok: false; readonly error: { readonly code: 'MEMORY_REJECTED'; readonly message: string } }
 
 export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
 export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
@@ -140,6 +189,11 @@ export const ROOM_CREATE_CHANNEL = 'rooms:create'
 export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
 export const ROOM_POST_CHANNEL = 'rooms:post'
 export const ROOM_TASK_CHANNEL = 'rooms:task'
+export const MEMORY_LIST_CHANNEL = 'memory:list'
+export const MEMORY_ADD_CHANNEL = 'memory:add'
+export const MEMORY_UPDATE_CHANNEL = 'memory:update'
+export const MEMORY_REMOVE_CHANNEL = 'memory:remove'
+export const MEMORY_CLEAR_CHANNEL = 'memory:clear'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
@@ -514,6 +568,8 @@ export interface WorkspaceSettings {
    * Bounded 1..12 by the host; anything else reads as the default.
    */
   readonly relayHopCap: number
+  /** What happens to a memory a teammate writes. Absent or malformed reads as the default. */
+  readonly memoryMode: MemoryMode
 }
 
 export const DEFAULT_RELAY_HOP_CAP = 6
@@ -761,6 +817,14 @@ export type CodexMissionUpdate =
       readonly roomName: string
       readonly message: string
     }
+  /** A teammate's reply changed the team's memory; the Memory screen and sidebar re-read it. */
+  | {
+      readonly kind: 'memory-changed'
+      readonly by: string
+      readonly kept: readonly string[]
+      readonly proposed: readonly string[]
+      readonly forgotten: readonly string[]
+    }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */
   | {
       readonly kind: 'relay-notice'
@@ -923,6 +987,11 @@ export interface DesktopApi {
   removeRoom(roomId: string): Promise<RoomMutationResponse>
   postToRoom(request: RoomPostRequest): Promise<RoomPostResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
+  listMemories(): Promise<MemoryListResponse>
+  addMemory(request: MemoryAddRequest): Promise<MemoryListResponse>
+  updateMemory(request: MemoryUpdateRequest): Promise<MemoryListResponse>
+  removeMemory(memoryId: string): Promise<MemoryListResponse>
+  clearMemories(request: MemoryClearRequest): Promise<MemoryListResponse>
   writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void

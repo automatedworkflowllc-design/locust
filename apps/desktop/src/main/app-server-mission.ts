@@ -19,6 +19,7 @@ import type {
   PublicPeerMessage
 } from '../shared/ipc.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
+import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
@@ -55,6 +56,8 @@ export interface AppServerMissionOptions {
   readonly emitUpdate?: (update: CodexMissionUpdate) => void
   /** The teammate channel. Without it, missions here belong to nobody's exchange. */
   readonly workroom?: Workroom
+  /** What the team remembers, briefed to every teammate mission. */
+  readonly memory?: MemoryBriefing
   readonly createId?: () => string
   readonly now?: () => Date
 }
@@ -197,7 +200,7 @@ export function createAppServerMissionService(
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined
       ? undefined
-      : createPeerExchange({ workroom: options.workroom, ledger: options.ledger })
+      : createPeerExchange({ workroom: options.workroom, ledger: options.ledger, ...(options.memory === undefined ? {} : { memory: options.memory }) })
   const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.self.teammateId ?? NOBODY
 
   const persistAndEmit = async (run: LiveRun, events: readonly unknown[]): Promise<void> => {

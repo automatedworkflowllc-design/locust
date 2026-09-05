@@ -4,8 +4,8 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import { isAvatarSpec, seedAvatar } from '../shared/avatar.js'
-import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings } from '../shared/ipc.js'
-import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP } from '../shared/ipc.js'
+import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode } from '../shared/ipc.js'
+import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
 
 /**
@@ -79,7 +79,11 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE }
+
+function parsedMemoryMode(value: unknown): MemoryMode {
+  return value === 'auto' || value === 'ask' || value === 'off' ? value : DEFAULT_MEMORY_MODE
+}
 
 /** A cap from disk or from the window: an integer inside the bounds, or the default. */
 function parsedHopCap(value: unknown): number {
@@ -225,7 +229,10 @@ function parsedFile(text: string): StoredFile {
       : true,
     relayHopCap: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedHopCap((rawSettings as Record<string, unknown>).relayHopCap)
-      : DEFAULT_RELAY_HOP_CAP
+      : DEFAULT_RELAY_HOP_CAP,
+    memoryMode: typeof rawSettings === 'object' && rawSettings !== null
+      ? parsedMemoryMode((rawSettings as Record<string, unknown>).memoryMode)
+      : DEFAULT_MEMORY_MODE
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, settings }
@@ -420,7 +427,10 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             : true,
           relayHopCap: typeof settings === 'object' && settings !== null
             ? parsedHopCap((settings as Record<string, unknown>).relayHopCap)
-            : DEFAULT_RELAY_HOP_CAP
+            : DEFAULT_RELAY_HOP_CAP,
+          memoryMode: typeof settings === 'object' && settings !== null
+            ? parsedMemoryMode((settings as Record<string, unknown>).memoryMode)
+            : DEFAULT_MEMORY_MODE
         }
         const file = await read()
         await write({ ...file, settings: next })

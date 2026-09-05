@@ -12,6 +12,7 @@ import { createAgentApi, projectIdFor, transcriptPathFor } from './antigravity-h
 import type { AgentApi, AntigravityHost } from './antigravity-host.js'
 import { runtimeThreadIdOf } from './codex-mission.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
+import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
@@ -45,6 +46,8 @@ export interface AntigravityMissionOptions {
   readonly workspacePath: string
   readonly ledger: MissionLedger
   readonly workroom?: Workroom
+  /** What the team remembers, briefed to every teammate mission. */
+  readonly memory?: MemoryBriefing
   readonly probe: () => Promise<AntigravityHost | undefined>
   readonly emitEvent: (runId: string, missionId: string, event: unknown) => void
   readonly emitUpdate?: (update: CodexMissionUpdate) => void
@@ -107,7 +110,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
   const pollMs = options.pollMs ?? 1_000
   const idleTimeoutMs = options.idleTimeoutMs ?? ANTIGRAVITY_IDLE_TIMEOUT_MS
   const peerExchange: PeerExchange | undefined =
-    options.workroom === undefined ? undefined : createPeerExchange({ workroom: options.workroom, ledger: options.ledger })
+    options.workroom === undefined ? undefined : createPeerExchange({ workroom: options.workroom, ledger: options.ledger, ...(options.memory === undefined ? {} : { memory: options.memory }) })
   const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.self.teammateId ?? NOBODY
 
   interface LiveRun {

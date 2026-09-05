@@ -1423,6 +1423,142 @@ textarea {
   gap: var(--lc-space-1);
 }
 
+/* Memory. A list of rows: a switch, the text with who/where/when under it,
+   and the actions. A proposed one waits with Keep / Forget; a switched-off
+   one dims. The sidebar row borrows the room row's shape. */
+.lc-memorylist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-memory {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-3);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-memory.is-off .lc-memory__text {
+  color: var(--lc-text-muted);
+  text-decoration: line-through;
+}
+
+.lc-memory.is-proposed {
+  border-style: dashed;
+}
+
+.lc-memory__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+}
+
+.lc-memory__text {
+  margin: 0;
+  color: var(--lc-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lc-memory__meta {
+  margin: 0;
+  color: var(--lc-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.lc-memory__author {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-1);
+}
+
+.lc-memory__actions {
+  display: inline-flex;
+  gap: var(--lc-space-1);
+  flex: 0 0 auto;
+}
+
+.lc-memory__edit {
+  width: 100%;
+  resize: vertical;
+}
+
+.lc-memory__switch {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 16px;
+  margin-top: 3px;
+  padding: 2px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: 999px;
+  background: var(--lc-bg-control);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lc-memory__switch.is-on {
+  background: var(--lc-lime);
+  border-color: var(--lc-lime);
+}
+
+.lc-memory__switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lc-memory__knob {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--lc-text-primary);
+  transition: transform 120ms ease;
+}
+
+.lc-memory__switch.is-on .lc-memory__knob {
+  transform: translateX(12px);
+  background: var(--lc-bg-raised);
+}
+
+.lc-memory__notice {
+  margin: 0 0 var(--lc-space-3);
+}
+
+.lc-memoryform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-memoryform__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lc-space-2);
+}
+
+.lc-linkbutton {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--lc-lime);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.lc-memoryrow.has-waiting .lc-row__meta {
+  color: var(--lc-lime);
+}
+
 /* A routine's schedule: the three-way choice, then the one detail the
    choice needs (hours, or a time). The card shows the rule and the next
    run on its own line so the name stays a name. */

@@ -34,6 +34,7 @@ import { composeHandoffPrompt } from './handoff.js'
 import { changedPaths, observedEditEvents, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
+import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { planSection } from './workroom-briefing.js'
@@ -160,6 +161,8 @@ interface CodexMissionServiceOptions {
   readonly ledger: MissionLedger
   /** The teammate channel. Optional: a service without one runs missions that belong to nobody. */
   readonly workroom?: Workroom
+  /** What the team remembers, briefed to every teammate mission. */
+  readonly memory?: MemoryBriefing
   /**
    * Called after a completed run posted messages to teammates, with what it
    * posted. Whatever this does -- a relay starting the recipient's run --
@@ -316,7 +319,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined
       ? undefined
-      : createPeerExchange({ workroom: options.workroom, ledger: options.ledger })
+      : createPeerExchange({ workroom: options.workroom, ledger: options.ledger, ...(options.memory === undefined ? {} : { memory: options.memory }) })
 
   const clearActive = (candidate: ActiveCodexMission): void => {
     if (active.get(candidate.runId) === candidate) active.delete(candidate.runId)

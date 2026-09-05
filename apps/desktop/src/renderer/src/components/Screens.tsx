@@ -9,7 +9,8 @@ import type {
   PublicRoutine,
   PublicRuntimeStatus,
   PublicStorageReport,
-  PublicTeammate
+  PublicTeammate,
+  MemoryMode
 } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import {
@@ -27,7 +28,7 @@ import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
-export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'rooms'
+export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory'
 
 function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
   return (
@@ -584,6 +585,10 @@ export function SettingsScreen({
   onRelayChange,
   relayHopCap,
   onRelayHopCapChange,
+  memoryMode,
+  onMemoryModeChange,
+  memoryCount,
+  onOpenMemory,
   onPreviewPrune,
   onPrune
 }: {
@@ -608,6 +613,11 @@ export function SettingsScreen({
   /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
   readonly relayHopCap: number
   readonly onRelayHopCapChange: (cap: number) => void
+  /** What happens to a memory a teammate writes. */
+  readonly memoryMode: MemoryMode
+  readonly onMemoryModeChange: (mode: MemoryMode) => void
+  readonly memoryCount: number
+  readonly onOpenMemory: () => void
   readonly onPreviewPrune: (days: number) => Promise<MissionPruneResponse>
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
@@ -758,6 +768,47 @@ export function SettingsScreen({
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">What your team remembers</h2>
+          <p className="lc-settings__lede">
+            Teammates keep a shared memory per folder, plus a smaller set marked everywhere -- the way
+            Claude Code and Cursor do, managed from here. A teammate writes one by ending a reply with
+            it; every teammate in the folder reads what is kept. Each memory says who wrote it, where,
+            and from which conversation, and you can edit, switch off, or remove any of them.
+          </p>
+          <div className="lc-settings__row">
+            <span className="lc-settings__note">When a teammate writes a memory</span>
+            <div className="lc-segmented" role="radiogroup" aria-label="When a teammate writes a memory">
+              {(
+                [
+                  ['auto', 'Keep and tell me'],
+                  ['ask', 'Ask me first'],
+                  ['off', 'Off']
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={memoryMode === value}
+                  className={`lc-button${memoryMode === value ? ' is-active' : ''}`}
+                  onClick={() => onMemoryModeChange(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="lc-policyrow">
+            <button type="button" className="lc-ghostbutton" onClick={onOpenMemory}>
+              Open memory
+            </button>
+            <span className="lc-settings__note">
+              {memoryCount === 0 ? 'Nothing remembered yet.' : `${String(memoryCount)} ${memoryCount === 1 ? 'memory' : 'memories'} kept.`} Ctrl 5.
+            </span>
           </div>
         </section>
 

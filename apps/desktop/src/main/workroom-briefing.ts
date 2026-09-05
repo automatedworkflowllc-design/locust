@@ -46,6 +46,8 @@ export interface RuntimePromptInput {
   readonly inbound: readonly WorkroomMessage[]
   /** How many more are waiting beyond `inbound`. */
   readonly remaining: number
+  /** What the team remembers, already worded for the runtime; absent when memory is off. */
+  readonly memory?: string
 }
 
 export interface RuntimePrompt {
@@ -159,6 +161,7 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
   const assemble = (): string => {
     const sections = [input.prompt]
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))
+    if (input.memory !== undefined) sections.push(input.memory)
     if (trailer !== undefined) sections.push(trailer)
     sections.push(askSection())
     return sections.join('\n\n')

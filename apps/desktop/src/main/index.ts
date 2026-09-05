@@ -30,6 +30,11 @@ import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
 import { taskSection } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
+import { createMemoryStore } from './memory-store.js'
+import { createMemoryReader } from './memory-reader.js'
+import type { MemoryReader } from './memory-reader.js'
+import type { MemoryBriefing } from './peer-exchange.js'
+import { memorySection } from '../shared/memory.js'
 
 /** Scheduled routines are checked once a minute; the first check waits for runtime discovery. */
 const ROUTINE_TICK_MS = 60_000
@@ -41,7 +46,7 @@ import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createRelay } from './relay.js'
 import { createAttention } from './attention.js'
-import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace } from './workspace.js'
+import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
@@ -69,10 +74,16 @@ import {
   ROUTINE_UPDATE_CHANNEL,
   ROUTINE_REMOVE_CHANNEL,
   ROUTINE_RUN_CHANNEL,
+  MEMORY_LIST_CHANNEL,
+  MEMORY_ADD_CHANNEL,
+  MEMORY_UPDATE_CHANNEL,
+  MEMORY_REMOVE_CHANNEL,
+  MEMORY_CLEAR_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
+  DEFAULT_MEMORY_MODE,
   ROOM_LIST_CHANNEL,
   ROOM_CREATE_CHANNEL,
   ROOM_REMOVE_CHANNEL,
@@ -371,12 +382,38 @@ if (!ownsSingleInstanceLock) {
     })
     // Its own directory: the ledger treats every `.jsonl` in ITS directory as
     // a mission, and the channel is not one.
+    // Team memory: kept per folder in the app's own data, briefed to every
+    // teammate mission, written by a reply's memory block. Colin's call
+    // (2026-09-05): the shared memory Claude Code and Cursor keep, managed
+    // from the app -- so every memory names who, where and from what.
+    const memories = createMemoryStore({ rootDirectory: app.getPath('userData') })
+    const memoryWorkspaceId = workspaceChosen ? workspaceIdFor(workspacePath) : 'ws_none'
+    const memoryWorkspaceName = workspaceChosen ? basename(workspacePath) || workspacePath : 'no folder'
+    const memoryBriefing: MemoryBriefing = {
+      section: async (peer) => {
+        const settings = await teammates.readSettings()
+        if (settings.memoryMode === 'off' || !workspaceChosen) return undefined
+        const listed = await memories.briefed(memoryWorkspaceId)
+        return memorySection({
+          selfName: peer.self.name,
+          workspaceName: memoryWorkspaceName,
+          memories: listed.map((memory) => ({
+            text: memory.text,
+            scope: memory.scope,
+            by: memory.by.name,
+            where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined
+          })),
+          askFirst: settings.memoryMode === 'ask'
+        })
+      }
+    }
     const workroom = createFileWorkroom({
       rootDirectory: join(app.getPath('userData'), 'workroom')
     })
     // Bound late: the relay starts runs through the service that calls it.
     let relay: Relay | undefined
     let routineRunner: RoutineRunner | undefined
+    let memoryReader: MemoryReader | undefined
     // Bound late for the same reason: it reads the ledger the service writes.
     let roomTasks: RoomTasks | undefined
     const codexMissions = createCodexMissionService({
@@ -385,6 +422,7 @@ if (!ownsSingleInstanceLock) {
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,
       workroom,
+      memory: memoryBriefing,
       onShared: async (mission, posted) => {
         await relay?.onShared(mission, posted)
       },
@@ -392,6 +430,7 @@ if (!ownsSingleInstanceLock) {
         await relay?.onRunEnded(mission)
         await routineRunner?.onRunEnded(mission)
         await roomTasks?.onRunEnded(mission)
+        await memoryReader?.onRunEnded(mission)
       }
     })
     // The approval transport. It only runs for the mode that asked for it, so
@@ -423,6 +462,7 @@ if (!ownsSingleInstanceLock) {
       workspacePath,
       ledger: missionLedger,
       workroom,
+      memory: memoryBriefing,
       probe: () => antigravityProbe.probe(),
       emitEvent: (runId, missionId, event) => {
         const target = approvalWindow
@@ -438,6 +478,7 @@ if (!ownsSingleInstanceLock) {
         await relay?.onRunEnded(mission)
         await routineRunner?.onRunEnded(mission)
         await roomTasks?.onRunEnded(mission)
+        await memoryReader?.onRunEnded(mission)
       }
     })
     const sendToWindow = (update: CodexMissionUpdate): void => {
@@ -509,7 +550,8 @@ if (!ownsSingleInstanceLock) {
           target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
         }
       },
-      workroom
+      workroom,
+      memory: memoryBriefing
     })
 
     ipcMain.handle(MODEL_CATALOG_CHANNEL, async (event) => {
@@ -692,6 +734,13 @@ if (!ownsSingleInstanceLock) {
       clearTimeout(firstRoutineTick)
       clearInterval(routineTicks)
     })
+    memoryReader = createMemoryReader({
+      memories,
+      ledger: missionLedger,
+      teammates,
+      workspaceName: memoryWorkspaceName,
+      notify: sendToWindow
+    })
     roomTasks = createRoomTasks({
       rooms,
       ledger: missionLedger,
@@ -737,12 +786,12 @@ if (!ownsSingleInstanceLock) {
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
 
     ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE } as const
       try {
         return await teammates.readSettings()
       } catch {
         // An unreadable switch reads as its default: swarm off, replies on.
-        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP } as const
+        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE } as const
       }
     })
 
@@ -790,11 +839,11 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE } as const
       try {
         return await teammates.writeSettings(settings)
       } catch {
-        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP } as const
+        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE } as const
       }
     })
 
@@ -1076,6 +1125,66 @@ if (!ownsSingleInstanceLock) {
       if (typeof routineId !== 'string' || routineRunner === undefined) return routineRejected('That routine could not be started.')
       if (!workspaceChosen) return routineRejected(NO_WORKSPACE_MESSAGE)
       return routineRunner.run(routineId)
+    })
+
+    // Memory. Every answer carries the whole list so the screen never
+    // shows a state the file does not hold.
+    const memoryRejected = (message: string) => ({ ok: false, error: { code: 'MEMORY_REJECTED', message } }) as const
+    const memoryList = async () =>
+      ({ ok: true, data: { memories: await memories.list(), workspaceId: memoryWorkspaceId, workspaceName: memoryWorkspaceName } }) as const
+    ipcMain.handle(MEMORY_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return memoryRejected('Memory could not be read.')
+      try {
+        return await memoryList()
+      } catch {
+        return memoryRejected('Memory could not be read.')
+      }
+    })
+    ipcMain.handle(MEMORY_ADD_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return memoryRejected('The memory could not be kept.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await memories.add({
+          text: input.text,
+          scope: input.scope,
+          workspaceId: memoryWorkspaceId,
+          workspaceName: memoryWorkspaceName,
+          by: { name: 'you' },
+          status: 'kept'
+        })
+        return await memoryList()
+      } catch (error) {
+        return memoryRejected(error instanceof Error ? error.message : 'The memory could not be kept.')
+      }
+    })
+    ipcMain.handle(MEMORY_UPDATE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return memoryRejected('The memory could not be changed.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await memories.update({ memoryId: input.memoryId, text: input.text, enabled: input.enabled, keep: input.keep })
+        return await memoryList()
+      } catch (error) {
+        return memoryRejected(error instanceof Error ? error.message : 'The memory could not be changed.')
+      }
+    })
+    ipcMain.handle(MEMORY_REMOVE_CHANNEL, async (event, memoryId: unknown) => {
+      if (!fromOwnWindow(event)) return memoryRejected('The memory could not be removed.')
+      try {
+        await memories.remove(memoryId)
+        return await memoryList()
+      } catch {
+        return memoryRejected('The memory could not be removed.')
+      }
+    })
+    ipcMain.handle(MEMORY_CLEAR_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return memoryRejected('Memory could not be cleared.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await memories.clear(input.scope === 'all' ? {} : { workspaceId: memoryWorkspaceId })
+        return await memoryList()
+      } catch {
+        return memoryRejected('Memory could not be cleared.')
+      }
     })
 
     ipcMain.handle(MISSION_HISTORY_CHANNEL, async (event) => {

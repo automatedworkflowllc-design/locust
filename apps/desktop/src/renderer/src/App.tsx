@@ -24,16 +24,23 @@ import type {
   TeammateHue,
   TeammateRole,
   TeammateRoute, PublicRoom, RoomTaskRequest,
-  RoutineSchedule
+  RoutineSchedule,
+  MemoryListResponse,
+  MemoryMode,
+  MemoryScope,
+  MemoryUpdateRequest,
+  PublicMemory
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
 import { queuedVerdict } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
+import { MemoryScreen } from './components/MemoryScreen.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
-import { DEFAULT_RELAY_HOP_CAP } from '../../shared/ipc.js'
+import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
+import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
 import { Composer } from './components/Composer.js'
@@ -208,6 +215,8 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'mission-started') return live
   // A room's board moving is the room's business, not this run's.
   if (update.kind === 'room-changed') return live
+  // Memory moving is the Memory screen's business, not this run's.
+  if (update.kind === 'memory-changed') return live
 
   const events = [...live.events, update.event].slice(-500)
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
@@ -608,6 +617,11 @@ export default function App(): ReactElement {
   const [rooms, setRooms] = useState<readonly PublicRoom[]>([])
   const [currentRoomId, setCurrentRoomId] = useState<string>()
   const [roomNotice, setRoomNotice] = useState<string>()
+  /** What the team remembers, as the host last listed it. */
+  const [memories, setMemories] = useState<readonly PublicMemory[]>([])
+  const [memoryWorkspace, setMemoryWorkspace] = useState<{ readonly id: string; readonly name: string }>({ id: '', name: '' })
+  const [memoryMode, setMemoryMode] = useState<MemoryMode>(DEFAULT_MEMORY_MODE)
+  const [memoryNotice, setMemoryNotice] = useState<string>()
   /**
    * What a person typed while a mission was running, waiting to go as the
    * next turn. Kept against the RUN it was typed at, not the teammate, so it
@@ -803,6 +817,15 @@ export default function App(): ReactElement {
         setRoomNotice(update.message)
         return
       }
+      if (update.kind === 'memory-changed') {
+        refreshMemories()
+        const said: string[] = []
+        if (update.kept.length > 0) said.push(`${update.by} remembered ${update.kept.map((text) => `"${text}"`).join('; ')}`)
+        if (update.proposed.length > 0) said.push(`${update.by} wants to remember ${update.proposed.map((text) => `"${text}"`).join('; ')}`)
+        if (update.forgotten.length > 0) said.push(`${update.by} forgot ${update.forgotten.map((text) => `"${text}"`).join('; ')}`)
+        setMemoryNotice(said.join('. '))
+        return
+      }
       if (update.kind === 'mission-started') {
         // A teammate replying on their own. The host started it; the renderer
         // adopts it exactly as it adopts a run it asked for, so the sidebar
@@ -892,6 +915,7 @@ export default function App(): ReactElement {
           setSwarm(settings.swarm === true)
           setRelay(settings.relay === true)
           setRelayHopCap(settings.relayHopCap)
+          setMemoryMode(settings.memoryMode)
         }
       })
       .catch(() => undefined)
@@ -936,6 +960,16 @@ export default function App(): ReactElement {
       })
       .catch(() => {
         // Rooms are optional in the same way.
+      })
+
+    void bridge
+      .listMemories()
+      .then((response) => {
+        if (!active) return
+        adoptMemories(response)
+      })
+      .catch(() => {
+        // Memory is optional in the same way.
       })
 
     void bridge
@@ -1022,6 +1056,7 @@ export default function App(): ReactElement {
       // one way into Settings that still showed the launch reading.
       if (event.key === '3') { event.preventDefault(); refreshStorage(); setScreen('settings') }
       if (event.key === '4') { event.preventDefault(); setScreen('rooms') }
+      if (event.key === '5') { event.preventDefault(); setScreen('memory') }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -1129,7 +1164,7 @@ export default function App(): ReactElement {
       // The words, not the blocks: what a reply shared, asked or moved on the
       // board is shown by those surfaces. The room smoke's first live run
       // drew a raw task block inside the card (2026-09-05).
-      const last = raw === undefined ? undefined : stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw)))
+      const last = raw === undefined ? undefined : stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw))))
       const phase = live !== undefined ? live.phase : recorded?.phase ?? 'unknown'
       const runtime = live?.data?.runtime ?? recorded?.runtime ?? 'codex'
       const model = live?.data?.model ?? recorded?.model ?? 'account-default'
@@ -1152,6 +1187,44 @@ export default function App(): ReactElement {
         if (response.ok) setRooms(response.data.rooms)
       })
       .catch(() => undefined)
+  }
+
+  /** Every memory answer carries the whole list; adopt it, or hand back the refusal. */
+  const adoptMemories = (response: MemoryListResponse): string | undefined => {
+    if (!response.ok) return response.error.message
+    setMemories(response.data.memories)
+    setMemoryWorkspace({ id: response.data.workspaceId, name: response.data.workspaceName })
+    return undefined
+  }
+  useEffect(() => {
+    if (screen === 'memory') refreshMemories()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen])
+  const refreshMemories = (): void => {
+    void window.desktop
+      ?.listMemories()
+      .then(adoptMemories)
+      .catch(() => undefined)
+  }
+  const memoryCall = async (call: Promise<MemoryListResponse> | undefined): Promise<string | undefined> => {
+    if (call === undefined) return 'Memory is not available here.'
+    try {
+      return adoptMemories(await call)
+    } catch {
+      return 'Memory could not be changed.'
+    }
+  }
+  const addMemory = (text: string, scope: MemoryScope): Promise<string | undefined> => memoryCall(window.desktop?.addMemory({ text, scope }))
+  const updateMemory = (request: MemoryUpdateRequest): Promise<string | undefined> => memoryCall(window.desktop?.updateMemory(request))
+  const removeMemory = (memoryId: string): Promise<string | undefined> => memoryCall(window.desktop?.removeMemory(memoryId))
+  const clearMemories = (scope: 'workspace' | 'all'): Promise<string | undefined> => memoryCall(window.desktop?.clearMemories({ scope }))
+  const changeMemoryMode = (next: MemoryMode): void => {
+    const before = memoryMode
+    setMemoryMode(next)
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next })
+      .then((settings) => setMemoryMode(settings.memoryMode))
+      .catch(() => setMemoryMode(before))
   }
 
   const createRoom = async (name: string, teammateIds: readonly string[]): Promise<string | undefined> => {
@@ -2059,6 +2132,9 @@ export default function App(): ReactElement {
             setCurrentRoomId(undefined)
             setScreen('rooms')
           }}
+          memoryCount={memories.filter((memory) => memory.status === 'kept').length}
+          memoryWaiting={memories.filter((memory) => memory.status === 'proposed').length}
+          onOpenMemory={() => setScreen('memory')}
           pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
           liveActivity={liveActivityByOwner}
           recentlyDone={recentlyDone}
@@ -2129,6 +2205,24 @@ export default function App(): ReactElement {
               }}
               onRemove={removeTeammate}
             />
+          ) : screen === 'memory' ? (
+            <MemoryScreen
+              memories={memories}
+              workspaceId={memoryWorkspace.id}
+              workspaceName={memoryWorkspace.name}
+              teammates={teammates}
+              mode={memoryMode}
+              onModeChange={changeMemoryMode}
+              onAdd={addMemory}
+              onUpdate={updateMemory}
+              onRemove={removeMemory}
+              onClear={clearMemories}
+              onOpenMission={(missionId) => {
+                setScreen('workroom')
+                setShownKey(missionId)
+              }}
+              notice={memoryNotice}
+            />
           ) : screen === 'rooms' ? (
             <RoomScreen
               rooms={rooms}
@@ -2161,17 +2255,21 @@ export default function App(): ReactElement {
               onInstallUpdate={installUpdate}
               relay={relay}
               relayHopCap={relayHopCap}
+              memoryMode={memoryMode}
+              onMemoryModeChange={changeMemoryMode}
+              memoryCount={memories.filter((memory) => memory.status === 'kept').length}
+              onOpenMemory={() => setScreen('memory')}
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode })
                   .then((settings) => setRelayHopCap(settings.relayHopCap))
                   .catch(() => undefined)
               }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -2421,7 +2519,15 @@ export default function App(): ReactElement {
                   self: missionOwner,
                   teammates,
                   messages: liveRun.peerMessages ?? [],
-                  notices: liveRun.peerNotices ?? []
+                  // What this conversation taught the team is read from the
+                  // memory list, not from a notice that would be gone once
+                  // the thread is drawn from the record.
+                  notices: [
+                    ...(liveRun.peerNotices ?? []),
+                    ...memories
+                      .filter((memory) => memory.missionId !== undefined && memory.missionId === liveRun.data?.missionId)
+                      .map((memory) => `${memory.by.name} ${memory.status === 'proposed' ? 'wants to remember' : 'remembered'}: "${memory.text}"`)
+                  ]
                 }}
                 startedAt={
                   liveRun.restoredMission === undefined
@@ -2504,7 +2610,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}
@@ -2566,6 +2672,7 @@ export default function App(): ReactElement {
               },
               { id: 'go-missions', group: 'Go to', label: 'Missions', hint: 'Ctrl 1', run: () => setScreen('missions') },
               { id: 'go-rooms', group: 'Go to', label: 'Rooms', hint: 'Ctrl 4', run: () => setScreen('rooms') },
+              { id: 'go-memory', group: 'Go to', label: 'Memory', hint: 'Ctrl 5', run: () => setScreen('memory') },
               {
                 id: 'go-teammates',
                 group: 'Go to',

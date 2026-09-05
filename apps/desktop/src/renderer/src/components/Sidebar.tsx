@@ -84,7 +84,10 @@ export function Sidebar({
   rooms,
   currentRoomId,
   onOpenRoom,
-  onOpenRooms
+  onOpenRooms,
+  memoryCount,
+  memoryWaiting,
+  onOpenMemory
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
@@ -119,6 +122,10 @@ export function Sidebar({
   readonly currentRoomId: string | undefined
   readonly onOpenRoom: (roomId: string) => void
   readonly onOpenRooms: () => void
+  /** Memories kept, and ones a teammate proposed that wait for the person. */
+  readonly memoryCount: number
+  readonly memoryWaiting: number
+  readonly onOpenMemory: () => void
 }): ReactElement {
   const [query, setQuery] = useState('')
   const connected = connectedRuntimeCount(runtimes)
@@ -190,6 +197,27 @@ export function Sidebar({
             </button>
           </>
         )}
+        {/*
+          * Memory is one row, always drawn: it is the way in to what the team
+          * remembers, and a proposed memory waiting for the person is said
+          * here so it is not missed.
+          */}
+        <div className="lc-sectionlabel">Memory</div>
+        <button
+          type="button"
+          className={`lc-row lc-row--button lc-roomrow lc-memoryrow${memoryWaiting > 0 ? ' has-waiting' : ''}`}
+          onClick={onOpenMemory}
+          title="What your team remembers (Ctrl 5)"
+        >
+          <Icon name="spark" size={14} />
+          <span className="lc-row__text">
+            <span className="lc-row__name">What the team remembers</span>
+            <span className="lc-row__meta">
+              {memoryCount === 0 ? 'nothing yet' : `${String(memoryCount)} kept`}
+              {memoryWaiting > 0 ? ` · ${String(memoryWaiting)} waiting for you` : ''}
+            </span>
+          </span>
+        </button>
         {teammates.length > 0 && <div className="lc-sectionlabel">Teammates</div>}
         {teammates.map((teammate) => {
           const owned = missions.filter(
