@@ -78,6 +78,47 @@ describe('teammate store', () => {
     expect(list.map((entry) => entry.teammateId)).toEqual([good.teammateId])
   })
 
+  it('says so when it drops a record, rather than dropping it in silence', async () => {
+    const { root, store: teammates } = await store()
+    await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    const path = join(root, 'teammates.json')
+    const file = JSON.parse(await readFile(path, 'utf8'))
+    // A role this store does not accept. Exactly what a hand-edited roster,
+    // or a test harness seeding one, gets wrong first.
+    file.teammates.push({ teammateId: 'tm_gem', name: 'Gem', hue: 'clay', role: 'Scout', createdAt: '2026-09-05T05:00:00.000Z' })
+    await writeFile(path, JSON.stringify(file), 'utf8')
+
+    const said: string[] = []
+    const warn = console.warn
+    console.warn = (message: unknown) => said.push(String(message))
+    try {
+      await createTeammateStore({ rootDirectory: root }).list()
+    } finally {
+      console.warn = warn
+    }
+
+    // Dropping is right; dropping WITHOUT SAYING cost an hour of chasing a
+    // threading defect that did not exist (2026-09-06).
+    expect(said.some((line) => /dropped 1 teammate record/.test(line))).toBe(true)
+  })
+
+  it('says nothing when every record parses', async () => {
+    const { root, store: teammates } = await store()
+    await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+
+    const said: string[] = []
+    const warn = console.warn
+    console.warn = (message: unknown) => said.push(String(message))
+    try {
+      await createTeammateStore({ rootDirectory: root }).list()
+    } finally {
+      console.warn = warn
+    }
+
+    // The negative control: a warning that always fires says nothing at all.
+    expect(said).toEqual([])
+  })
+
   it('treats a file from an unknown schema as empty rather than guessing', async () => {
     const { root } = await store()
     await writeFile(

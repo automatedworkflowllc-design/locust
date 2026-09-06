@@ -2111,6 +2111,67 @@ describe('what a run changed on disk that it never said', () => {
     expect(observed[1]?.sequence).toBe(appended[completedAt]!.sequence + 2)
   })
 
+  it('claims nothing from the tree when another writing run shared the folder', async () => {
+    // Three teammates started at once in one folder, each writing one file.
+    // Every run's card then read "3 files, +124" -- the sum of all three --
+    // because the observation compares the whole working tree and cannot see
+    // who wrote what (drive, 2026-09-06).
+    const appended: NormalizedRuntimeEvent[] = []
+    const ledger = fakeLedger({ appendEvents: async (_id, events) => { appended.push(...events) } })
+    // Both runs start on a clean tree; both end looking at the same changed
+    // file. Which of them wrote it is exactly what cannot be known.
+    let looks = 0
+    const observeDisk = vi.fn(async () => {
+      looks += 1
+      const map = new Map<string, string>()
+      if (looks > 2) map.set('src/notes.ts', ' M')
+      return map
+    })
+    const runtimeRecords = () => records([
+      { type: 'thread.started', thread_id: 'thread-live' },
+      { type: 'turn.started' },
+      { type: 'item.started', item: { id: 'i1', type: 'command_execution', command: 'cat README.md' } },
+      { type: 'item.completed', item: { id: 'i1', type: 'command_execution', command: 'cat README.md', exit_code: 0 } },
+      { type: 'turn.completed', usage: { output_tokens: 2 } }
+    ])
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: runtimeRecords(),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, ledger, { observeDisk })
+
+    // Two teammates, because the service allows one live run per teammate
+    // and counts "nobody" as one of them. The first draft of this test gave
+    // neither a teammate, so the second start was refused, only one run ever
+    // happened, and it passed with the fix REMOVED -- a green that could not
+    // have gone red. Both start before either finishes: that is the point.
+    const wren = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }
+    const gem = { self: { teammateId: 'tm_gem', name: 'Gem', role: 'Research & Briefs' }, others: [] }
+    const first = await service.start('write one poem', 'codex', 'accept-edits', {}, () => undefined, undefined, wren)
+    const second = await service.start('write another poem', 'codex', 'accept-edits', {}, () => undefined, undefined, gem)
+    // Both really started, or there is no concurrency here to test.
+    expect([first.ok, second.ok]).toEqual([true, true])
+    scheduled[0]?.()
+    scheduled[1]?.()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    const observed = appended.filter((event) => (event.payload as { status?: string } | undefined)?.status === 'observed on disk')
+    expect(observed).toHaveLength(0)
+
+    // The negative control, and it matters: "no observed rows" is also what a
+    // broken harness produces. One run alone, same records, same snapshots --
+    // this one MUST still get its row, or the assertion above proves nothing.
+    const soloAppended: NormalizedRuntimeEvent[] = []
+    const soloLedger = fakeLedger({ appendEvents: async (_id, events) => { soloAppended.push(...events) } })
+    const solo = scheduledService({ start }, soloLedger, { observeDisk: snapshots('', ` M src/notes.ts${NUL}`) })
+    await solo.service.start('write one poem', 'codex', 'accept-edits', {}, () => undefined)
+    solo.scheduled[0]?.()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(
+      soloAppended.filter((event) => (event.payload as { status?: string } | undefined)?.status === 'observed on disk').length
+    ).toBeGreaterThan(0)
+  })
+
   it('does not repeat a file the runtime already named, and never looks on a read-only run', async () => {
     const appended: NormalizedRuntimeEvent[] = []
     const ledger = fakeLedger({ appendEvents: async (_id, events) => { appended.push(...events) } })

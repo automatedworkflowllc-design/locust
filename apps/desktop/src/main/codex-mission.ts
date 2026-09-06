@@ -88,6 +88,20 @@ interface ActiveCodexMission {
   readonly diskBefore: WorkspaceSnapshot | undefined
   /** Where the run happened: the teammate's worktree, or the folder. */
   readonly cwd: string
+  /**
+   * Set when another writing run shared this folder while this one was live.
+   *
+   * The disk observation below is a before/after comparison of the WHOLE
+   * working tree, so it cannot tell one run's writes from another's. Three
+   * teammates started at once in one folder each wrote a file, and each run's
+   * activity card then claimed all three and the sum of their lines -- "3
+   * files, +124" for a single forty-line poem (drive, 2026-09-06). The tree
+   * is shared on purpose; the attribution is what has to give way.
+   *
+   * Marked on BOTH runs the moment they overlap, because by the time either
+   * finishes the other may be gone and the overlap invisible.
+   */
+  sharedTree: boolean
   /** The last event sequence persisted, so a synthetic event can follow it. */
   lastSequence: number
   /** Every event persisted, so the observation can tell reported edits from unreported ones. */
@@ -424,7 +438,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     // the record's own account comes first and the observation reads as what
     // it is -- the host looking at the tree afterwards. Best effort: an
     // observation that cannot be made or stored costs the run nothing.
-    if (mission.diskBefore !== undefined) {
+    // Not when another run was writing in the same folder. The runtime's own
+    // events still stand -- those name their own tools -- but an observation
+    // of a tree two runs were editing names nothing, and a receipt that
+    // credits this teammate with another's files is worse than no receipt.
+    if (mission.diskBefore !== undefined && !mission.sharedTree) {
       try {
         const diskAfter = await (options.observeDisk ?? snapshotWorkspace)(mission.cwd)
         if (diskAfter !== undefined) {
@@ -1026,10 +1044,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           relay,
           diskBefore,
           cwd: runCwd,
+          sharedTree: false,
           lastSequence: 0,
           persisted: []
         }
         active.set(runId, mission)
+        // Whoever else is writing in this same folder right now: neither of
+        // us can be credited with what the tree looks like afterwards.
+        if (mission.diskBefore !== undefined) {
+          for (const other of active.values()) {
+            if (other.runId === runId || other.cwd !== runCwd || other.diskBefore === undefined) continue
+            other.sharedTree = true
+            mission.sharedTree = true
+          }
+        }
         scheduleConsume(mission)
 
         // Marked delivered only now that the run is live, so a start that

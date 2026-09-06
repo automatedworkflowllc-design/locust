@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.36.2 — 2026-09-06
+
+- **Teammates working at the same time no longer take credit for each other's
+  files.** Start three teammates in one folder and each activity card counted
+  every file all three had changed: a teammate that wrote a single forty-line
+  file reported three files and a hundred and twenty-four lines. The host was
+  comparing the whole folder before and after each run, which is how it catches
+  an edit a model makes quietly and never mentions, and it cannot tell whose
+  edit it is when two are working at once. Now it says nothing rather than
+  something wrong, and what each model reports about its own work is unchanged.
+
+- **A teammate that cannot be read from the roster file says so** in the log
+  instead of simply not appearing.
+
 ## 0.36.1 — 2026-09-06
 
 - **"Install and restart" restarts.** It never did: installing on quit is

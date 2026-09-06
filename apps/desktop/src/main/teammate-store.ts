@@ -197,6 +197,7 @@ function parsedFile(text: string): StoredFile {
   if (record.schemaVersion !== SCHEMA_VERSION) return empty
 
   const teammates: PublicTeammate[] = []
+  let dropped = 0
   if (Array.isArray(record.teammates)) {
     for (const entry of record.teammates.slice(0, MAX_TEAMMATES)) {
       const teammate = parsedTeammate(entry)
@@ -204,9 +205,17 @@ function parsedFile(text: string): StoredFile {
       // stays usable, which is the behaviour a user can actually recover from.
       if (teammate !== undefined && !teammates.some((held) => held.teammateId === teammate.teammateId)) {
         teammates.push(teammate)
+      } else {
+        dropped += 1
       }
     }
   }
+  // Dropping quietly is right for the app -- one bad record must not cost
+  // someone their roster -- but it should not be SILENT. A drive seeded two
+  // teammates with roles this store does not accept, both vanished without a
+  // word, and the resulting capture read like a message-threading defect for
+  // an hour (2026-09-06). Say it once; the roster still loads either way.
+  if (dropped > 0) console.warn(`Roster file: dropped ${String(dropped)} teammate record(s) that did not parse.`)
 
   const owners: Record<string, string> = {}
   if (typeof record.missionOwners === 'object' && record.missionOwners !== null) {

@@ -13,7 +13,7 @@
     "dev": "pnpm --filter @teammate/desktop dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --no-bail test",
     "check": "pnpm build && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
