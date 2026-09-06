@@ -151,7 +151,9 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
           key: `helper_${String(entries.length)}`,
           // The target is what the helper was asked; without one, say so.
           description: detail.tool !== undefined && detail.tool !== detail.name ? detail.name : subagentVerb(detail.tool),
-          ...(detail.status === undefined || detail.status === 'error' ? {} : { subagentType: detail.status }),
+          // Claude Code's launcher carries the subagent's type in status;
+          // Codex's carries the call's lifecycle word, which is not a type.
+          ...(detail.status === undefined || /^(error|completed|failed|in_progress|started|cancelled)$/i.test(detail.status) ? {} : { subagentType: detail.status }),
           ...(detail.output === undefined ? {} : { summary: detail.output }),
           settled: detail.settled,
           failed: detail.failed === true
