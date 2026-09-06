@@ -19,7 +19,14 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 14 as const
+/**
+ * What a person asked a run to do, as opposed to what it was allowed. Named
+ * here rather than imported from the app: the ledger is read by things that
+ * are not the app, and a record's vocabulary should not move when a UI does.
+ */
+export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
+
+export const MISSION_LEDGER_SCHEMA_VERSION = 15 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -93,6 +100,15 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 14 as const
  * the ledger says a person did not ask for this run, and a v12 reader would
  * refuse a starter it does not know rather than mislabel it.
  *
+ * v14 -> v15 adds `mode`. The record has always said what a run was ALLOWED
+ * (`sandbox`) and never what was ASKED FOR, and those are not the same
+ * question: `ask` and `plan` are both read-only, so a plan reopened after a
+ * restart came back as an ordinary read-only run -- its "Build this plan"
+ * offer gone, and in its place a sentence about the change being only in the
+ * reply, which is the wrong thing to say about a plan (QA, 2026-09-06). A
+ * v14 reader shown a v15 file would drop the mode and be wrong in exactly
+ * that way, quietly, so the number moves.
+ *
  * v13 -> v14 widens `sandbox` again, to `full-access`: the Auto mode a person
  * switches on for themselves, in which a run is not confined to the workspace
  * folder. Exactly the reason the number moved from 2 to 3, one step further --
@@ -102,13 +118,13 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 14 as const
  * could touch the whole machine as one confined to a folder. The permission a
  * run had is the last thing a record may be vague about.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11 || value === 12 || value === 13 || value === 14
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11 || value === 12 || value === 13 || value === 14 || value === 15
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -159,6 +175,12 @@ export interface MissionLedgerMetadata {
   readonly cliVersion: string | null
   readonly workspaceId: string
   readonly sandbox: MissionSandbox
+  /**
+   * What was asked for, as opposed to what it was allowed. Absent on every
+   * mission written before v15, which is why every reader treats it as
+   * unknown rather than as a default.
+   */
+  readonly mode?: MissionRecordedMode
   readonly executionPolicyVersion: 1
   readonly createdAt: string
   /**
@@ -518,6 +540,16 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
   if (metadata.cliVersion !== null) requireText(metadata.cliVersion, 'cliVersion', 256)
   requireSafeId(metadata.workspaceId, 'workspaceId')
   if (
+    metadata.mode !== undefined
+    && metadata.mode !== 'ask'
+    && metadata.mode !== 'plan'
+    && metadata.mode !== 'accept-edits'
+    && metadata.mode !== 'approve-each'
+    && metadata.mode !== 'auto'
+  ) {
+    throw new Error('Mission mode is invalid')
+  }
+  if (
     (metadata.sandbox !== 'read-only'
       && metadata.sandbox !== 'workspace-write'
       && metadata.sandbox !== 'full-access')
@@ -671,6 +703,10 @@ function parsedMetadata(
     return undefined
   }
   // And no writer before v13 knew the routine starter.
+
+  if (schemaVersion < 15 && candidate.mode !== undefined) {
+    return undefined
+  }
   if (schemaVersion < 14 && candidate.sandbox === 'full-access') {
     return undefined
   }

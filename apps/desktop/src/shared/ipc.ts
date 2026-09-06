@@ -977,6 +977,8 @@ export interface PublicRecoveredMission {
   readonly hostFailureMessage?: string
   readonly integrityIssueCount: number
   readonly sandbox: 'read-only' | 'workspace-write' | 'full-access'
+  /** What was asked for. Absent on missions recorded before schema 15. */
+  readonly mode?: MissionMode
   readonly checkpoints: readonly PublicMissionCheckpoint[]
   /** Workroom messages this mission received or posted, in ledger order. */
   readonly peerMessages: readonly PublicPeerMessage[]

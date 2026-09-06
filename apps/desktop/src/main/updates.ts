@@ -49,7 +49,14 @@ export interface UpdateServiceOptions {
   /** Missions running right now; an install waits for them. */
   readonly liveMissionCount: () => number
   /** Begin the app's own shutdown; the updater installs on the quit that follows. */
-  readonly requestQuit: () => void
+  /**
+   * Ask the app to quit. The optional finaliser runs INSTEAD of the last
+   * `app.quit()`, once the ledger has been flushed -- which is the only
+   * moment `quitAndInstall` can be called without the shutdown handler
+   * cancelling it, and the only way the installer is asked to start the app
+   * again afterwards.
+   */
+  readonly requestQuit: (finalise?: () => void) => void
   readonly onStateChange?: (state: AppUpdateState) => void
 }
 
@@ -163,11 +170,22 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
           }
         }
       }
-      // Ask the app to quit. The shutdown handler flushes the ledger and
-      // quits for real; the updater then installs on that quit, because
-      // autoInstallOnAppQuit is on. quitAndInstall() alone was cancelled by
-      // that very handler.
-      options.requestQuit()
+      // Ask the app to quit, and hand it what to do once the ledger is
+      // flushed. `autoInstallOnAppQuit` alone DID install -- and never came
+      // back, because installing on quit is silent and starts nothing
+      // (Colin, 2026-09-06: "the restart after update and restart has never
+      // worked"). `quitAndInstall(isSilent, isForceRunAfter)` is the call
+      // that relaunches, and it could not be made earlier: from outside the
+      // shutdown it was cancelled by the very handler that flushes. Run as
+      // the finaliser, it is the last thing the app does.
+      //
+      // `autoInstallOnAppQuit` stays on as the backstop: if the finaliser
+      // never runs -- a crash mid-flush, a quit from somewhere else -- the
+      // update still installs, exactly as it did before. What changes is
+      // that the ordinary path now starts the app again afterwards.
+      options.requestQuit(() => {
+        options.updater.quitAndInstall(true, true)
+      })
       return { ok: true, data: state }
     }
   }

@@ -335,7 +335,14 @@ function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
     ...(error === undefined ? {} : { error }),
     restored: true,
     restoredMission: mission,
-    peerMessages: mission.peerMessages
+    peerMessages: mission.peerMessages,
+    // A plan is a plan after a restart too. The ledger records what a run was
+    // ALLOWED, and `ask` and `plan` are both read-only -- so until the mode
+    // was recorded (schema 15) a reopened plan lost its "Build this plan"
+    // offer and was told instead that its change was only in the reply, which
+    // is the wrong thing to say about a plan (QA, 2026-09-06). A mission
+    // recorded before 15 carries no mode and keeps the old behaviour.
+    ...(mission.mode === 'plan' ? { plan: true } : {})
   }
 }
 

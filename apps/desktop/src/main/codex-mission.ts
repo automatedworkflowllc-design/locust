@@ -876,6 +876,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             cliVersion: chosen.version?.version ?? null,
             workspaceId,
             sandbox: effectiveSandbox,
+            // What was ASKED for, beside what it was allowed. `ask` and
+            // `plan` are both read-only, so without this a plan reopened
+            // after a restart came back as an ordinary read-only run and
+            // lost its "Build this plan" offer (QA, 2026-09-06).
+            mode,
             executionPolicyVersion: 1,
             createdAt,
             ...(continuation === undefined

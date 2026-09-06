@@ -1365,7 +1365,12 @@ if (!ownsSingleInstanceLock) {
       supported: app.isPackaged,
       liveMissionCount: () =>
         codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
-      requestQuit: () => app.quit(),
+      requestQuit: (finalise) => {
+        // Held for the shutdown handler: an installer can only be launched
+        // once the ledger is safely on disk.
+        quitFinaliser = finalise
+        app.quit()
+      },
       onStateChange: (state) => {
         for (const target of BrowserWindow.getAllWindows()) {
           if (!target.isDestroyed()) target.webContents.send(APP_UPDATE_STATE_CHANNEL, state)
@@ -1524,8 +1529,20 @@ if (!ownsSingleInstanceLock) {
       // through as itself and refused further in if the workspace has it
       // switched off -- one check, on the path every run takes, rather than
       // one here and another the relay could walk around.
+      // `plan` travels as itself. It used to collapse into `ask` here, which
+      // was harmless for PERMISSION -- both are read-only, and the sandbox is
+      // decided from this same value -- but it meant the host, and therefore
+      // the record, never knew a plan had been asked for. A plan reopened
+      // after a restart came back as an ordinary read-only run and lost its
+      // "Build this plan" offer (QA, 2026-09-06). Recording the mode was not
+      // enough on its own: the word was already gone by the time anything
+      // wrote it down, which is what a live drive found and the unit tests
+      // could not.
       const mode =
-        payload.mode === 'accept-edits' || payload.mode === 'approve-each' || payload.mode === 'auto'
+        payload.mode === 'accept-edits'
+        || payload.mode === 'approve-each'
+        || payload.mode === 'auto'
+        || payload.mode === 'plan'
           ? payload.mode
           : 'ask'
       // Same shape as the mode: an unrecognized runtime falls back to Codex
@@ -1826,6 +1843,12 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
+/**
+ * What to do instead of the final `app.quit()`, when something asked for the
+ * quit in order to do it. Today that is the updater: an installer can only be
+ * launched once the ledger is safely on disk.
+ */
+let quitFinaliser: (() => void) | undefined
 let shutdownStarted = false
 let shutdownComplete = false
 if (ownsSingleInstanceLock) {
@@ -1842,7 +1865,12 @@ if (ownsSingleInstanceLock) {
       await ledgerForShutdown?.flush()
       await workroomForShutdown?.flush()
       shutdownComplete = true
-      app.quit()
+      // Whoever asked for the quit gets the last word: the updater installs
+      // and starts the app again. Anything else is an ordinary quit.
+      const finalise = quitFinaliser
+      quitFinaliser = undefined
+      if (finalise !== undefined) finalise()
+      else app.quit()
     })().catch((error: unknown) => {
       console.error('Failed to flush the local mission ledger during shutdown', error)
       app.exit(1)

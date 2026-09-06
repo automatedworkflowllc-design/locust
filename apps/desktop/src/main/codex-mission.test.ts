@@ -239,6 +239,34 @@ describe('Codex mission service', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  it('records that a plan was a plan, while still holding it read-only', async () => {
+    // Two facts that have to hold together. `plan` and `ask` are both
+    // read-only, which is why the mode used to collapse into `ask` on its way
+    // in -- harmless for permission, and it meant the record never knew a
+    // plan had been asked for, so a plan reopened after a restart lost its
+    // "Build this plan" offer (QA, 2026-09-06).
+    let created: { readonly sandbox?: string; readonly mode?: string } | undefined
+    const start = (() => {
+      throw new Error('stop here')
+    }) as unknown as RuntimeProcessRunner['start']
+    const ledger = fakeLedger({
+      createMission: async (metadata: { readonly sandbox?: string; readonly mode?: string }) => {
+        created = metadata
+        return undefined as never
+      }
+    })
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: { start },
+      ledger
+    })
+
+    await service.start('Plan how you would add a LICENSE file.', 'codex', 'plan', {}, () => undefined)
+    expect(created?.mode).toBe('plan')
+    expect(created?.sandbox).toBe('read-only')
+  })
+
   it('refuses an Auto mission when the workspace has Auto switched off, and records nothing', async () => {
     // The renderer does not offer Auto with the switch off, but a window left
     // open across a change of mind, or a routine recorded while it was on,

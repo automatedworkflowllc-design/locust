@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.36.1 — 2026-09-06
+
+- **"Install and restart" restarts.** It never did: installing on quit is
+  silent and starts nothing, and the call that relaunches could not be
+  made while the app was still flushing its record. The installer now runs
+  as the last act of that shutdown, with the flag that starts the app
+  again (Colin: "the restart after update and restart has never worked").
+- **A plan is still a plan after a restart.** Reopening one lost its
+  "Build this plan" offer and told you instead that the change was only in
+  the reply, which is the wrong thing to say about a plan. The record now
+  keeps which mode was asked for, beside what the run was allowed.
+
 ## 0.36.0 — 2026-09-06
 
 A sidebar you can fold, a place for automations, and eight fixes from an

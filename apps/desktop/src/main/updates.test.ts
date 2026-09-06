@@ -5,11 +5,11 @@ import type { UpdaterLike } from './updates.js'
 
 function fakeUpdater(overrides: Partial<UpdaterLike> = {}): UpdaterLike & {
   readonly listeners: Map<string, (payload?: unknown) => void>
-  readonly installs: number[]
+  readonly installs: { readonly isSilent?: boolean; readonly isForceRunAfter?: boolean }[]
   readonly quits: number[]
 } {
   const listeners = new Map<string, (payload?: unknown) => void>()
-  const installs: number[] = []
+  const installs: { readonly isSilent?: boolean; readonly isForceRunAfter?: boolean }[] = []
   const quits: number[] = []
   return {
     listeners,
@@ -19,8 +19,8 @@ function fakeUpdater(overrides: Partial<UpdaterLike> = {}): UpdaterLike & {
     autoInstallOnAppQuit: true,
     checkForUpdates: async () => null,
     downloadUpdate: async () => undefined,
-    quitAndInstall: () => {
-      installs.push(1)
+    quitAndInstall: (isSilent?: boolean, isForceRunAfter?: boolean) => {
+      installs.push({ isSilent, isForceRunAfter })
     },
     on(event: string, listener: (payload?: unknown) => void) {
       listeners.set(event, listener)
@@ -75,23 +75,35 @@ describe('what the app does about a new version', () => {
   })
 
   it('installs by asking the app to quit, so the shutdown flush runs first and the updater installs on the real quit', () => {
+    let finaliser: (() => void) | undefined
     const updater = fakeUpdater()
     const service = createUpdateService({
       updater,
       currentVersion: '0.5.0',
       supported: true,
       liveMissionCount: () => 0,
-      requestQuit: () => {
+      requestQuit: (onFlushed) => {
         updater.quits.push(1)
+        finaliser = onFlushed
       }
     })
     updater.listeners.get('update-downloaded')?.()
 
     expect(service.install()).toMatchObject({ ok: true })
-    // Never quitAndInstall(): the app's own shutdown handler cancels that
-    // quit to flush the ledger, and the install was cancelled with it.
+    // It asks for a quit and hands over what to do at the END of it. Calling
+    // quitAndInstall() straight away was cancelled by the app's own shutdown
+    // handler, which prevents the first quit to flush the ledger -- so
+    // nothing has installed yet at this point.
     expect(updater.installs).toHaveLength(0)
     expect(updater.quits).toHaveLength(1)
+    expect(finaliser).toBeDefined()
+
+    // Once the ledger is flushed, the shutdown runs it -- and THIS is the
+    // call that starts the app again afterwards. Installing on quit alone
+    // was silent and started nothing (Colin, 2026-09-06: "the restart after
+    // update and restart has never worked").
+    finaliser?.()
+    expect(updater.installs).toEqual([{ isSilent: true, isForceRunAfter: true }])
   })
 
   it('refuses to install what it has not downloaded', () => {

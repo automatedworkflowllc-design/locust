@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(14)
-    expect(header.schemaVersion).toBe(14)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(15)
+    expect(header.schemaVersion).toBe(15)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -469,6 +469,67 @@ describe('ledger schema versions', () => {
     ).rejects.toThrow()
   })
 
+  it('round-trips the mode a run was asked for, beside what it was allowed', async () => {
+    // The record has always said what a run was ALLOWED and never what was
+    // ASKED FOR, and they are not the same question: `ask` and `plan` are
+    // both read-only, so a plan reopened after a restart came back as an
+    // ordinary read-only run (QA, 2026-09-06).
+    const root = await temporaryRoot()
+    await createFileMissionLedger({ rootDirectory: root }).createMission(
+      v1Metadata({ sandbox: 'read-only', mode: 'plan' }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.mode).toBe('plan')
+    expect(recovered?.metadata.sandbox).toBe('read-only')
+  })
+
+  it('reads a mission with no mode as one, rather than inventing a default', async () => {
+    // Every mission written before 15 is in this position, and guessing `ask`
+    // would put a word in the record that nobody chose.
+    const root = await temporaryRoot()
+    await createFileMissionLedger({ rootDirectory: root }).createMission(
+      v1Metadata({ sandbox: 'read-only' }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.mode).toBeUndefined()
+  })
+
+  it('refuses a mode in a file written before version 15', async () => {
+    // A v14 reader would drop it and be wrong about what the run was for,
+    // quietly -- the same reason every earlier widening moved the number.
+    const root = await temporaryRoot()
+    const metadata = v1Metadata({ sandbox: 'read-only', mode: 'plan' })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 14,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}
+`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
+  it('refuses a mode that is not one of the five', async () => {
+    const root = await temporaryRoot()
+    await expect(
+      createFileMissionLedger({ rootDirectory: root }).createMission(
+        v1Metadata({ mode: 'whatever' }) as unknown as MissionLedgerMetadata
+      )
+    ).rejects.toThrow(/mode/i)
+  })
+
   it('round-trips a full-access mission at the current version', async () => {
     // The Auto mode a person switches on: a run that was not confined to the
     // workspace folder. The permission a run had is the last thing a record
@@ -664,7 +725,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 15,
+        schemaVersion: 16,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

@@ -129,6 +129,11 @@ export function publicRecoveredMission(
     resolvedRouteId: mission.metadata.resolvedRouteId,
     cliVersion: mission.metadata.cliVersion,
     sandbox: mission.metadata.sandbox,
+    // What was ASKED for, beside what it was allowed. Without it a reopened
+    // plan is indistinguishable from an ordinary read-only run -- the ledger
+    // gained the field and the projection did not pass it on, which is the
+    // half a unit test cannot see and a drive can (2026-09-06).
+    ...(mission.metadata.mode === undefined ? {} : { mode: mission.metadata.mode }),
     createdAt: mission.metadata.createdAt,
     lastUpdatedAt: mission.lastUpdatedAt,
     phase: mission.phase,
