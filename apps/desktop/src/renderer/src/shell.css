@@ -3836,6 +3836,94 @@ textarea {
   color: var(--lc-text-label);
 }
 
+/* Swarm, at the head of the thing it is about. It was a chip beside the
+   effort chip in the composer, and it DISABLED that chip to hold it at the
+   model maximum -- two controls that were one setting (design review,
+   2026-09-06). */
+.lc-picker__swarm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--lc-border-hairline);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-picker__swarm:hover {
+  background: var(--lc-hover-surface);
+  color: var(--lc-text-primary);
+}
+
+.lc-picker__swarm img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.55;
+}
+
+.lc-picker__swarm.is-on {
+  color: var(--lc-text-primary);
+}
+
+.lc-picker__swarm.is-on img {
+  opacity: 1;
+}
+
+.lc-picker__swarmtext {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lc-picker__swarmhint {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Effort, under the model it belongs to and only under the chosen one. */
+.lc-picker__efforts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px 9px 34px;
+}
+
+.lc-picker__effort {
+  padding: 3px 9px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-mono-label);
+  cursor: pointer;
+}
+
+.lc-picker__effort:hover {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-border-hover);
+}
+
+.lc-picker__effort.is-on {
+  color: var(--lc-lime-text);
+  border-color: var(--lc-lime-border);
+}
+
+.lc-picker__effortheld {
+  padding: 3px 0;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
+}
+
 .lc-picker__list {
   max-height: 330px;
   overflow-y: auto;

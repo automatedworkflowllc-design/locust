@@ -1,0 +1,160 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { classifyInstallFailure, createRuntimeInstaller, installedButNotFound } from './runtime-installer.js'
+
+/**
+ * What a person sees when the install button does not work.
+ *
+ * The happy path is one line of npm output and a green dot. Everything below
+ * is the rest of it, which is most of the design: a person who cannot read an
+ * npm trace still has to know what happened and what to do, and the command
+ * has to stay reachable so they -- or someone helping them -- can run it by
+ * hand.
+ */
+
+const runner = (result: { code: number | null; output: string }, lines: readonly string[] = []) =>
+  vi.fn(async (_command: string, _args: readonly string[], onLine: (line: string) => void) => {
+    for (const line of lines) onLine(line)
+    return result
+  })
+
+describe('running the install the screen showed', () => {
+  it('runs exactly the command the person read, not a reconstruction of it', async () => {
+    // The line on screen and the argv spawned here come from one place. If
+    // they could drift, the app would be showing one thing and doing another.
+    const run = runner({ code: 0, output: 'added 213 packages' })
+    const installer = createRuntimeInstaller({ run, nowInstalled: async () => true })
+    await installer.install({ runtime: 'opencode', onLine: () => undefined })
+    expect(run).toHaveBeenCalledWith('npm', ['install', '-g', 'opencode-ai'], expect.any(Function))
+  })
+
+  it('hands every line npm prints to the screen as it arrives', async () => {
+    const seen: string[] = []
+    const installer = createRuntimeInstaller({
+      run: runner({ code: 0, output: '' }, ['npm warn deprecated x', 'added 213 packages in 12s']),
+      nowInstalled: async () => true
+    })
+    await installer.install({ runtime: 'opencode', onLine: ({ line }) => seen.push(line) })
+    expect(seen).toEqual(['npm warn deprecated x', 'added 213 packages in 12s'])
+  })
+
+  it('refuses a second install while one is running', async () => {
+    // One at a time, so a single output line belongs to a single install.
+    let release: () => void = () => undefined
+    const installer = createRuntimeInstaller({
+      run: vi.fn(async () => {
+        await new Promise<void>((resolve) => { release = resolve })
+        return { code: 0, output: '' }
+      }),
+      nowInstalled: async () => true
+    })
+    const first = installer.install({ runtime: 'opencode', onLine: () => undefined })
+    expect(installer.busy()).toBe(true)
+    const second = await installer.install({ runtime: 'claude', onLine: () => undefined })
+    expect(second.ok).toBe(false)
+    if (!second.ok) expect(second.what).toContain('already running')
+    release()
+    await first
+    expect(installer.busy()).toBe(false)
+  })
+
+  it('will not offer to install something that does not come from a package manager', async () => {
+    const installer = createRuntimeInstaller({ run: runner({ code: 0, output: '' }) })
+    const outcome = await installer.install({ runtime: 'cursor', onLine: () => undefined })
+    expect(outcome.ok).toBe(false)
+  })
+})
+
+describe('a clean exit is not the same as something to run', () => {
+  it('says so when npm succeeded and the command still is not there', async () => {
+    // The half-written install. Detected by asking the machine again, not
+    // guessed at -- which is the only reason it can be reported at all.
+    const installer = createRuntimeInstaller({
+      run: runner({ code: 0, output: 'added 1 package' }),
+      nowInstalled: async () => false
+    })
+    const outcome = await installer.install({ runtime: 'opencode', onLine: () => undefined })
+    expect(outcome.ok).toBe(false)
+    if (!outcome.ok) {
+      expect(outcome.what).toContain('still cannot find')
+      // Restarting is the action here, not running the command again.
+      expect(outcome.restart).toBe(true)
+    }
+  })
+
+  it('reports success when the command really is there afterwards', async () => {
+    // The control: without it, "not found" above is satisfied by an installer
+    // that never reports success at all.
+    const installer = createRuntimeInstaller({
+      run: runner({ code: 0, output: 'added 1 package' }),
+      nowInstalled: async () => true
+    })
+    expect(await installer.install({ runtime: 'opencode', onLine: () => undefined })).toEqual({ ok: true })
+  })
+})
+
+describe('the six ways an install fails, each said in a person’s words', () => {
+  const classify = (output: string) =>
+    classifyInstallFailure({
+      packageName: 'opencode-ai',
+      displayName: 'OpenCode',
+      code: 1,
+      output,
+      seconds: 9
+    })
+
+  it('no network', () => {
+    expect(classify('npm error code ENOTFOUND\nnpm error getaddrinfo ENOTFOUND registry.npmjs.org').what).toContain(
+      'could not reach the registry'
+    )
+  })
+
+  it('a proxy refusing, which also looks like a network failure and is not', () => {
+    // Deliberately ordered ahead of the network case: a proxy failure usually
+    // matches both, and naming the proxy is the more useful of the two.
+    const seen = classify('npm error tunneling socket could not be established, statusCode=407\nECONNRESET')
+    expect(seen.ok).toBe(false)
+    if (!seen.ok) {
+      expect(seen.what).toContain('refused the connection')
+      expect(seen.next).toContain('proxy')
+    }
+  })
+
+  it('permissions', () => {
+    expect(classify('npm error code EACCES\nnpm error syscall mkdir').what).toContain('global folder')
+  })
+
+  it('the package itself', () => {
+    const seen = classify('npm error code E404\nnpm error 404 Not Found')
+    if (!seen.ok) expect(seen.what).toContain('opencode-ai')
+  })
+
+  it('anything else, with the elapsed time rather than a guess at the cause', () => {
+    const seen = classify('npm error something nobody has seen before')
+    if (!seen.ok) {
+      expect(seen.what).toContain('9s')
+      expect(seen.next).toContain('output')
+    }
+  })
+
+  it('and the one that is not npm’s fault at all', () => {
+    const seen = installedButNotFound('OpenCode')
+    if (!seen.ok) {
+      expect(seen.what).toContain('OpenCode installed')
+      expect(seen.restart).toBe(true)
+    }
+  })
+
+  it('every failure says both what happened and what to do', () => {
+    // The control for the whole table: a classifier that returned a blank
+    // second sentence would pass every case above.
+    for (const output of ['ENOTFOUND', '407 proxy', 'EACCES', 'E404', 'who knows']) {
+      const seen = classify(output)
+      expect(seen.ok).toBe(false)
+      if (!seen.ok) {
+        expect(seen.what.length).toBeGreaterThan(10)
+        expect(seen.next.length).toBeGreaterThan(10)
+      }
+    }
+  })
+})

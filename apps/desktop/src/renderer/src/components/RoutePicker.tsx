@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import mark from '../assets/locust-mark.svg'
 import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
@@ -13,6 +14,8 @@ export interface RouteChoice {
 }
 
 interface RouteRow {
+  /** The levels this model reports, for the chosen row's effort control. */
+  readonly efforts?: readonly string[]
   readonly key: string
   readonly group: string
   readonly runtime: MissionRuntimeId
@@ -70,10 +73,13 @@ function buildRows(
             return {
               model: model.id,
               label: model.displayName,
-              detail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`
+              detail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`,
+              // Carried so the chosen row can offer them; the detail line
+              // above still NAMES them for every row.
+              efforts: model.supportedEfforts
             }
           })
-        : [{ model: 'account-default', label: 'account-default', detail: status.detail }]
+        : [{ model: 'account-default', label: 'account-default', detail: status.detail, efforts: [] }]
 
     for (const entry of entries) {
       const isActive = runtime.id === active.runtime && entry.model === active.model
@@ -84,6 +90,12 @@ function buildRows(
         model: entry.model,
         label: entry.label,
         detail: entry.detail,
+        // Carried explicitly: this object is rebuilt field by field, so a
+        // property added to the entry above is dropped here unless it is
+        // named -- which is exactly what happened first (drive, 2026-09-06:
+        // the row's own detail said "5 effort levels" while the control
+        // under it drew none).
+        efforts: entry.efforts,
         tag: routeRowTag(status, isActive),
         selectable: status.selectable
       })
@@ -106,7 +118,12 @@ export function RoutePicker({
   onSelect,
   onClose,
   notice,
-  limitedRuntimes
+  limitedRuntimes,
+  effort,
+  onEffortChange,
+  swarm,
+  onSwarmChange,
+  swarmEffort
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -125,6 +142,24 @@ export function RoutePicker({
    * moving a live run, so the difference has to be stated, not implied.
    */
   readonly notice?: string
+  /**
+   * Effort and swarm live here now, not on the composer.
+   *
+   * Effort is a property of the ROUTE, not a peer of it: on most routes the
+   * old chip read "effort · fixed" -- a control whose value is "there is no
+   * value here" -- while the picker was already listing each model's levels
+   * in its detail line. And swarm DISABLED effort to hold it at the model
+   * maximum, so two adjacent chips in the composer were one setting, with one
+   * silently switching the other off (design review, 2026-09-06).
+   *
+   * Together they take the composer from seven controls to four.
+   */
+  readonly effort: string | undefined
+  readonly onEffortChange: (effort: string | undefined) => void
+  readonly swarm: boolean
+  readonly onSwarmChange: (swarm: boolean) => void
+  /** The maximum level swarm would hold every mission at, when one is known. */
+  readonly swarmEffort: string | undefined
 }): ReactElement {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -176,6 +211,25 @@ export function RoutePicker({
         />
       </div>
       {notice !== undefined && <div className="lc-picker__notice">{notice}</div>}
+      {/*
+        * Swarm is a statement about how every mission runs, so it sits with
+        * the thing it is about rather than beside it. The mark stays as the
+        * glyph.
+        */}
+      {swarmEffort !== undefined && (
+        <button
+          type="button"
+          className={`lc-picker__swarm${swarm ? ' is-on' : ''}`}
+          aria-pressed={swarm}
+          onClick={() => onSwarmChange(!swarm)}
+        >
+          <img src={mark} alt="" aria-hidden="true" />
+          <span className="lc-picker__swarmtext">
+            Run every mission at its model maximum
+            <span className="lc-picker__swarmhint lc-mono">{swarm ? `on · ${swarmEffort}` : 'off'}</span>
+          </span>
+        </button>
+      )}
       <div className="lc-picker__list">
         {shown.map((row, index) => {
           const header = row.group === lastGroup ? undefined : row.group
@@ -245,6 +299,38 @@ export function RoutePicker({
                 </span>
                 )}
               </button>
+              {/*
+                * Effort, under the model it belongs to, and ONLY under the one
+                * currently chosen. It used to be a chip in the composer that
+                * read "effort · fixed" on most routes -- a control announcing
+                * it had nothing to say -- while this list was already
+                * printing each model's levels in the line above.
+                *
+                * Drawn only where there are levels to choose between: a
+                * runtime that reports none needs no row, which is the same
+                * rule the composer's chip failed to follow.
+                */}
+              {isActive && !recent && row.efforts !== undefined && row.efforts.length > 0 && (
+                <div className="lc-picker__efforts" role="group" aria-label="Reasoning effort">
+                  {swarm ? (
+                    <span className="lc-picker__effortheld lc-mono">
+                      held at {swarmEffort} by swarm
+                    </span>
+                  ) : (
+                    row.efforts.map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        className={`lc-picker__effort lc-mono${effort === level ? ' is-on' : ''}`}
+                        aria-pressed={effort === level}
+                        onClick={() => onEffortChange(effort === level ? undefined : level)}
+                      >
+                        {level}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
               {hidden > 0 && (
                 <p className="lc-picker__more lc-mono">
                   {hidden} more {hidden === 1 ? 'model' : 'models'} {needle.length > 0 ? 'match · keep typing' : '· type to search them'}

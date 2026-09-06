@@ -18,7 +18,6 @@ import {
   modeUnavailableReason,
   runtimeIsUsable
 } from '../status.js'
-import mark from '../assets/locust-mark.svg'
 import { ContextRing } from './ContextRing.js'
 import { Icon } from './Icon.js'
 import { RoutePicker } from './RoutePicker.js'
@@ -196,7 +195,6 @@ export function Composer({
   }
   const [modeOpen, setModeOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [effortOpen, setEffortOpen] = useState(false)
 
   // A mode the chosen route cannot run is not the mode a mission would start
   // in, so it is not the mode the control shows either. Switching route used
@@ -326,7 +324,6 @@ export function Composer({
   // to highest, so the maximum is the last one THIS model reported -- not a
   // fixed name that some models do not have.
   const swarmEffort = supportedEfforts[supportedEfforts.length - 1]
-  const effectiveEffort = swarm ? swarmEffort : effort
 
   // While a mission runs, the control states what IT is on. Otherwise it
   // states what the next mission will use -- which is what the person just
@@ -547,9 +544,17 @@ export function Composer({
                 <Icon name="folder" size={13} />
                 <span className="lc-control__folder">{workspaceName ?? 'No folder'}</span>
               </button>
-              <button type="button" className="lc-control" disabled title="Attachments and slash commands are not built yet">
-                <Icon name="plus" size={14} />
-              </button>
+              {/*
+                * The `+` is gone until attachments ship.
+                *
+                * It was permanently disabled, titled "not built yet", on the
+                * most-visited surface in the app -- and it is the one control
+                * a new person presses first, because every other chat app has
+                * one. That breaks this app's own rule about never drawing a
+                * control for a capability that does not exist. A dead plus
+                * costs more than a missing one (design review, 2026-09-06).
+                * It comes back as the real thing when B40 lands.
+                */}
             </div>
             <div className="lc-composer__group">
               <span className="lc-control__anchor">
@@ -561,6 +566,11 @@ export function Composer({
                     resolvedModels={resolvedModels}
                     recentRoutes={recentRoutes}
                     active={running ? activeChoice : route}
+                    effort={effort}
+                    onEffortChange={onEffortChange}
+                    swarm={swarm}
+                    onSwarmChange={onSwarmChange}
+                    swarmEffort={swarmEffort}
                     onSelect={(choice) => {
                       setPickerOpen(false)
                       if (handoff !== 'available') {
@@ -608,66 +618,6 @@ export function Composer({
                 </button>
               </span>
               {context !== undefined && <ContextRing reading={context} />}
-              <span className="lc-control__anchor">
-                {effortOpen && supportedEfforts.length > 0 && (
-                  <div className="lc-menu lc-menu--right" role="menu" aria-label="Reasoning effort">
-                    {supportedEfforts.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={effort === option}
-                        className="lc-menu__item"
-                        onClick={() => {
-                          onEffortChange(option)
-                          setEffortOpen(false)
-                        }}
-                      >
-                        <span className="lc-menu__text">
-                          <span className="lc-menu__name">{option}</span>
-                        </span>
-                        {effort === option && <Icon name="check" size={13} />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="lc-control lc-control--boxed"
-                  aria-haspopup="menu"
-                  aria-expanded={effortOpen}
-                  disabled={running || supportedEfforts.length === 0 || swarm}
-                  title={
-                    supportedEfforts.length === 0
-                      ? 'This route does not report reasoning effort, so none is sent.'
-                      : swarm
-                        ? 'Swarm mode is holding this at the model maximum.'
-                        : 'Reasoning effort'
-                  }
-                  onClick={() => setEffortOpen(!effortOpen)}
-                >
-                  <span className="lc-control__mono">
-                    {supportedEfforts.length === 0 ? 'effort · fixed' : `effort · ${effectiveEffort ?? 'default'}`}
-                  </span>
-                </button>
-              </span>
-              <button
-                type="button"
-                className={`lc-swarm${swarm ? ' is-on' : ''}`}
-                aria-pressed={swarm}
-                aria-label="Swarm mode"
-                disabled={running || swarmEffort === undefined}
-                title={
-                  swarmEffort === undefined
-                    ? 'Swarm needs a model that reports effort levels.'
-                    : swarm
-                      ? `Swarm on — every mission runs at ${swarmEffort}`
-                      : 'Swarm: run every mission at its model maximum'
-                }
-                onClick={() => onSwarmChange(!swarm)}
-              >
-                <img src={mark} alt="" aria-hidden="true" />
-              </button>
             </div>
           </div>
         </form>
