@@ -6,6 +6,7 @@ import {
   limitKindFor,
   resetsAtIso,
   summarizeInit,
+  usageWindowText,
 } from "../src/claude-events.js";
 import type { RuntimeProcessCompletion } from "../src/process-runner.js";
 
@@ -485,5 +486,21 @@ describe("the signals Claude Code gives a person about what is happening (measur
     expect(failed[0]).toMatchObject({ type: "step.failed", payload: { itemId: "subagent:t2" } });
     const result = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_2", is_error: true, content: "boom" }] } }));
     expect(result[0]).toMatchObject({ type: "tool.failed", payload: { status: "error", output: "no such file" } });
+  });
+});
+
+describe("a still-allowed rate limit is a usage window", () => {
+  it("words the windows, fullest first, with when they reset", () => {
+    expect(usageWindowText({ five_hour: { utilization: 0.35, resetsAt: 1788660600 }, seven_day: { utilization: 0.5, resetsAt: 1788764400 } })).toMatch(/^7-day window 50% used · resets .+ · 5-hour window 35% used · resets .+$/);
+    expect(usageWindowText({})).toBeUndefined();
+    expect(usageWindowText("no")).toBeUndefined();
+  });
+
+  it("becomes a usage_window diagnostic, not a limit, while the status is allowed", () => {
+    const n = normalizer();
+    const events = n.accept(record({ type: "rate_limit_event", rate_limit_info: { status: "allowed", rateLimitType: "five_hour", resetsAt: 1788660600, unifiedWindows: { five_hour: { utilization: 0.35, resetsAt: 1788660600 } } } }));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "adapter.diagnostic", payload: { code: "claude.usage_window", level: "info", terminal: false } });
+    expect((events[0]!.payload as { message: string }).message).toMatch(/5-hour window 35% used/);
   });
 });

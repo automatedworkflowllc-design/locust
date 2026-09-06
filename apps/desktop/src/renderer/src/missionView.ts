@@ -219,6 +219,20 @@ export function defaultOpenEntry(entries: readonly ActivityEntry[]): string | un
 }
 
 /** `14:44`, in the host's own timezone. */
+/**
+ * A usage window as the runtime worded it, with its ISO reset instants
+ * turned into local clock times: "5-hour window 67% used · resets 10:10 PM".
+ * The ledger keeps the instant; a person reads a time.
+ */
+export function usageWindowLabel(said: string): string {
+  return said.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, (iso) => {
+    const at = new Date(iso)
+    if (Number.isNaN(at.getTime())) return iso
+    const sameDay = at.toDateString() === new Date().toDateString()
+    return sameDay ? clockTime(iso) : `${at.toLocaleDateString(undefined, { weekday: 'short' })} ${clockTime(iso)}`
+  })
+}
+
 export function clockTime(iso: string): string {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return '--:--'
@@ -696,6 +710,8 @@ export function buildThread(
         // The adapters already separate these: a `*.runtime_error` is the run
         // in trouble, an item diagnostic is the provider talking about one
         // item. Only the former is worth interrupting an empty thread for.
+        // A usage window is state the host keeps, not a line in the thread.
+        if (/\.usage_window$/.test(event.payload.code)) break
         if (!workBegan && !/\.(runtime_error|notification)$/.test(event.payload.code)) break
         // Said once. A quota failure arrives as a limit event AND as the
         // runtime's error line carrying the same sentence; user session 1

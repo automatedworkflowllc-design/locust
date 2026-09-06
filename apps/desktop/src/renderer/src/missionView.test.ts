@@ -24,6 +24,7 @@ import {
   railLabel,
   recentlyUsedRoutes,
   relativePath,
+  usageWindowLabel,
   relayedTitle,
   resolvedModelNames,
   resumableSessionOf,
@@ -1507,5 +1508,14 @@ describe("the host's disk observation of a path the runtime named", () => {
     expect(notes[0]?.patch?.added).toBe(2)
     expect(details.some((detail) => /other\.txt/.test(detail.name))).toBe(true)
     expect(activity?.type === 'activity' && activity.summary).toBe('Edited 2 files')
+  })
+})
+
+describe('a usage window, as a person reads it', () => {
+  it('turns ISO reset instants into clock times and leaves the words alone', () => {
+    const label = usageWindowLabel('5-hour window 67% used · resets 2026-09-06T02:10:00.000Z · 7-day window 53% used')
+    expect(label).not.toContain('2026-09-06T')
+    expect(label).toMatch(/^5-hour window 67% used · resets .+ · 7-day window 53% used$/)
+    expect(usageWindowLabel('nothing to convert')).toBe('nothing to convert')
   })
 })

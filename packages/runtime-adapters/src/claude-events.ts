@@ -150,6 +150,26 @@ export function limitKindFor(status: unknown): "quota-exhausted" | "temporary-ra
   return "quota-exhausted";
 }
 
+/**
+ * "5-hour window 35% used · resets 7:30 PM", from Claude Code's
+ * `unifiedWindows` ({five_hour: {utilization, resetsAt}, seven_day: ...}).
+ * The fuller window leads; both are named when both are known.
+ */
+export function usageWindowText(windows: unknown): string | undefined {
+  if (!isObject(windows)) return undefined;
+  const parts: { label: string; used: number; resets: string | undefined }[] = [];
+  for (const [key, value] of Object.entries(windows)) {
+    if (!isObject(value) || typeof value.utilization !== "number" || !Number.isFinite(value.utilization)) continue;
+    const label = key === "five_hour" ? "5-hour window" : key === "seven_day" ? "7-day window" : `${key} window`;
+    parts.push({ label, used: Math.round(value.utilization * 100), resets: resetsAtIso(value.resetsAt) });
+  }
+  if (parts.length === 0) return undefined;
+  parts.sort((a, b) => b.used - a.used);
+  return parts
+    .map((part) => `${part.label} ${String(part.used)}% used${part.resets === undefined ? "" : ` · resets ${part.resets}`}`)
+    .join(" · ");
+}
+
 /** `resetsAt` is epoch SECONDS, not milliseconds. */
 export function resetsAtIso(value: unknown): string | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
@@ -234,8 +254,23 @@ export function createClaudeEventNormalizer(
     if (type === "rate_limit_event") {
       const info = isObject(parsed.rate_limit_info) ? parsed.rate_limit_info : {};
       const kind = limitKindFor(info.status);
-      // Nothing to say: the request was allowed, so this is a usage snapshot.
-      if (kind === undefined) return [];
+      if (kind === undefined) {
+        // Allowed, with the windows' utilisation: what Claude Code's own
+        // status line shows ("35% of the 5-hour window"). Not a thread item;
+        // the host keeps the latest per runtime for the route chip and
+        // Settings (MEASURED 2026-09-05; parity table row).
+        const window = usageWindowText(info.unifiedWindows);
+        if (window === undefined) return [];
+        return [
+          emit("adapter.diagnostic", {
+            code: "claude.usage_window",
+            level: "info",
+            terminal: false,
+            message: window,
+            evidence,
+          }),
+        ];
+      }
       const resets = resetsAtIso(info.resetsAt);
       const window = stringValue(info.rateLimitType) ?? "window";
       const status = stringValue(info.status) ?? "unknown";

@@ -87,6 +87,26 @@ export function limitedRuntimesFrom(missions: readonly RecoveredMission[]): Reco
   return limited
 }
 
+/**
+ * The latest still-allowed rate-limit reading per runtime, from the ledger,
+ * so a reload does not forget what the route chip said. A limit that hit
+ * (`route.limit_detected`) is the other map; this one is the number before it.
+ */
+export function usageWindowsFrom(missions: readonly RecoveredMission[]): Record<string, string> {
+  const latest = new Map<string, { readonly at: string; readonly said: string }>()
+  for (const mission of missions) {
+    for (const event of mission.events) {
+      if (event.type !== 'adapter.diagnostic' || !/\.usage_window$/.test(event.payload.code)) continue
+      const runtime = event.sourceAdapter
+      const current = latest.get(runtime)
+      if (current === undefined || event.occurredAt > current.at) latest.set(runtime, { at: event.occurredAt, said: event.payload.message })
+    }
+  }
+  const windows: Record<string, string> = {}
+  for (const [runtime, entry] of latest) windows[runtime] = entry.said
+  return windows
+}
+
 export function publicRecoveredMission(
   mission: RecoveredMission,
   workroomMessages: ReadonlyMap<string, WorkroomMessage> = new Map()
@@ -209,7 +229,8 @@ export async function readMissionHistory(
         ),
         currentWorkspaceId: workspaceIdFor(workspacePath),
         issueCount: snapshot.issues.length,
-        limitedRuntimes: limitedRuntimesFrom(snapshot.missions)
+        limitedRuntimes: limitedRuntimesFrom(snapshot.missions),
+        usageWindows: usageWindowsFrom(snapshot.missions)
       }
     }
   } catch {

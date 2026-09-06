@@ -1,7 +1,7 @@
 import type { MissionLedger, RecoveredMission, WorkroomMessage } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it, vi } from 'vitest'
-import { deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, withinByteBudget, readMissionHistory } from './mission-history.js'
+import { deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 
@@ -391,5 +391,21 @@ describe('which runtimes the record still holds at their limit', () => {
     }
     const response = await readMissionHistory(stub)
     expect(response.ok && response.data.limitedRuntimes).toEqual({ codex: 'You have hit your usage limit.' })
+  })
+})
+
+describe('the latest usage window per runtime, from the ledger', () => {
+  const windowEvent = (runtime: 'claude' | 'codex', at: string, said: string) => ({
+    id: `w-${at}`, runId: 'run_1', missionId: 'mission_1', sequence: 1, occurredAt: at, sourceAdapter: runtime,
+    type: 'adapter.diagnostic', payload: { code: `${runtime}.usage_window`, level: 'info', terminal: false, message: said, evidence: { redacted: true } }
+  }) as never
+
+  it('keeps the newest reading per runtime and ignores everything else', () => {
+    const missions = [
+      recovered({ events: [windowEvent('claude', '2026-09-05T10:00:00.000Z', '5-hour window 20% used'), windowEvent('claude', '2026-09-05T11:00:00.000Z', '5-hour window 35% used')] }),
+      recovered({ events: [windowEvent('codex', '2026-09-05T09:00:00.000Z', 'primary 10% used')] })
+    ]
+    expect(usageWindowsFrom(missions)).toEqual({ claude: '5-hour window 35% used', codex: 'primary 10% used' })
+    expect(usageWindowsFrom([recovered({ events: [] })])).toEqual({})
   })
 })

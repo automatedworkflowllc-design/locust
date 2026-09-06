@@ -1004,6 +1004,8 @@ export type MissionHistoryResponse =
          * into READY with no successful run in between.
          */
         readonly limitedRuntimes: Readonly<Record<string, string>>
+        /** The latest still-allowed rate-limit reading per runtime ("5-hour window 35% used · resets …"). */
+        readonly usageWindows: Readonly<Record<string, string>>
       }
     }
   | {

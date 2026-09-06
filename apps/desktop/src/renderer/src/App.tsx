@@ -677,6 +677,8 @@ export default function App(): ReactElement {
   // purpose: the limit is on the provider's clock, and a note that outlived
   // it would be the false claim in the other direction.
   const [limitedRuntimes, setLimitedRuntimes] = useState<ReadonlyMap<string, string>>(new Map())
+  /** The latest still-allowed rate-limit reading per runtime, by words. */
+  const [usageWindows, setUsageWindows] = useState<ReadonlyMap<string, string>>(new Map())
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
@@ -791,6 +793,8 @@ export default function App(): ReactElement {
    */
   const seedLimitsFrom = (response: Awaited<ReturnType<NonNullable<typeof window.desktop>['getMissionHistory']>>): void => {
     if (!response.ok) return
+    const windows = Object.entries(response.data.usageWindows ?? {})
+    if (windows.length > 0) setUsageWindows((current) => { const next = new Map(current); for (const [runtime, said] of windows) if (!next.has(runtime)) next.set(runtime, said); return next })
     const remembered = Object.entries(response.data.limitedRuntimes)
     if (remembered.length === 0) return
     setLimitedRuntimes((current) => {
@@ -835,6 +839,10 @@ export default function App(): ReactElement {
       // glance. Both are moments, so both clear themselves.
       if (update.kind === 'event') {
         const runtime = update.event.sourceAdapter
+        if (update.event.type === 'adapter.diagnostic' && /\.usage_window$/.test(update.event.payload.code)) {
+          const said = update.event.payload.message
+          setUsageWindows((current) => (current.get(runtime) === said ? current : new Map(current).set(runtime, said)))
+        }
         if (update.event.type === 'route.limit_detected' && update.event.payload.kind === 'quota-exhausted') {
           const said = update.event.payload.message
           setLimitedRuntimes((current) => (current.get(runtime) === said ? current : new Map(current).set(runtime, said)))
@@ -2390,6 +2398,7 @@ export default function App(): ReactElement {
               onChooseFolder={chooseWorkspace}
               runtimes={runtimes}
               limitedRuntimes={limitedRuntimes}
+              usageWindows={usageWindows}
               runtimeSetup={runtimeSetup}
               workspaceBrief={workspaceBrief}
               worktrees={worktrees}
@@ -2723,6 +2732,7 @@ export default function App(): ReactElement {
             onChooseFolder={chooseWorkspace}
             runtimes={runtimes}
             limitedRuntimes={limitedRuntimes}
+              usageWindows={usageWindows}
             discoveryPhase={runtimeState.phase}
             running={running}
             cancelling={liveRun?.phase === 'cancelling'}

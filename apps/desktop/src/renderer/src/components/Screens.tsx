@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usageWindowLabel } from '../missionView.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type {
@@ -617,6 +618,7 @@ function RuntimeSetupLine({ setup }: { readonly setup: PublicRuntimeSetup }): Re
 export function SettingsScreen({
   runtimes,
   limitedRuntimes,
+  usageWindows,
   runtimeSetup,
   workspaceBrief,
   worktrees,
@@ -645,6 +647,8 @@ export function SettingsScreen({
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
+  /** The latest still-allowed rate-limit reading per runtime, in words. */
+  readonly usageWindows?: ReadonlyMap<string, string>
   /** Each runtime's own MCP servers and hooks, by runtime id; undefined until read. */
   readonly runtimeSetup: Readonly<Record<string, PublicRuntimeSetup>> | undefined
   /** The folder's LOCUST.md as last read: null when none, undefined until the host has answered. */
@@ -793,6 +797,7 @@ export function SettingsScreen({
                     </div>
                     {/* "Signed in on this machine" is said once, in the lede; a row only speaks when its state is not the ordinary one. */}
                     {status.tag !== 'READY' && <div className="lc-runtimerow__detail">{status.detail}</div>}
+                    {usageWindows?.get(runtime.id) !== undefined && <div className="lc-runtimerow__detail">{usageWindowLabel(usageWindows.get(runtime.id)!)}</div>}
                     {runtimeSetup?.[runtime.id] !== undefined && <RuntimeSetupLine setup={runtimeSetup[runtime.id]!} />}
                   </div>
                   <span

@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.33.2 — 2026-09-06
+
+- **How much of the account's window a run has used.** Claude Code reports
+  it while a run is still allowed ("5-hour window 35% used · resets 7:30
+  PM"); Locust used to show a limit only once hit. The reading now sits in
+  the route chip's tooltip and on the runtime's row in Settings, kept
+  across a reload from the record.
+
 ## 0.33.1 — 2026-09-06
 
 - **Codex's subagents show, and stay shown.** Codex records them as

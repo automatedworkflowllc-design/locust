@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usageWindowLabel } from '../missionView.js'
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
 
 import type {
@@ -52,6 +53,8 @@ export interface ComposerProps {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
+  /** The latest still-allowed rate-limit reading per runtime, for the route chip's tooltip. */
+  readonly usageWindows?: ReadonlyMap<string, string>
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
   readonly running: boolean
   readonly cancelling: boolean
@@ -133,6 +136,7 @@ export function Composer({
   onChooseFolder,
   runtimes,
   limitedRuntimes,
+  usageWindows,
   discoveryPhase,
   running,
   cancelling,
@@ -496,7 +500,7 @@ export function Composer({
                 <button
                   type="button"
                   className="lc-control lc-control--boxed"
-                  title={handoffTitle(handoff)}
+                  title={[handoffTitle(handoff), usageWindows?.get(route.runtime) === undefined ? undefined : usageWindowLabel(usageWindows.get(route.runtime)!)].filter((part) => part !== undefined && part.length > 0).join('\n')}
                   onClick={() => {
                     onOpenRoutePicker()
                     setPickerOpen(!pickerOpen)

@@ -60,6 +60,17 @@ try {
     return summary + ' || ' + [...document.querySelectorAll('.lc-filerow')].map(r => (r.classList.contains('is-helper') ? '[helper] ' : '') + r.innerText.replace(/\\s+/g, ' ').trim()).join(' | ').slice(0, 400)
   })()`))
   await drive.capture('the header and the last words', () => drive.evaluate(`(document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? '') + ' || ' + (document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-240) ?? '')`))
+  await drive.capture('the route chip tooltip and the Settings row: the usage window', () => drive.evaluate(`(async () => {
+    const chip = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+    const tooltip = chip?.title ?? 'no chip'
+    document.querySelector('button[title="Settings (Ctrl 3)"]').click()
+    await new Promise(r => setTimeout(r, 900))
+    const heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => /Runtimes/.test(h.textContent))
+    heading?.scrollIntoView({ block: 'start' })
+    await new Promise(r => setTimeout(r, 300))
+    const row = [...document.querySelectorAll('.lc-runtimerow')].find(r => /Claude Code/.test(r.innerText))
+    return 'chip title: ' + tooltip.replace(/\\s+/g, ' ') + ' || Claude row: ' + (row?.innerText.replace(/\\s+/g, ' ').slice(0, 220) ?? 'none')
+  })()`))
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
