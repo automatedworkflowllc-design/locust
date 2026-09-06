@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -151,6 +151,7 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
   const checkpoints = mission.checkpoints ?? []
   const last = checkpoints.at(-1)
   const unsettled = last?.unsettledActions ?? []
+  const [open, setOpen] = useState(false)
   return (
     <div className={`lc-card is-terminal is-${view.tone === 'blue' ? 'blue' : view.tone === 'red' ? 'red' : 'amber'}`}>
       <div className="lc-card__head">
@@ -160,6 +161,42 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
         </span>
         <span className="lc-rail__meta">restored from local ledger</span>
       </div>
+      {/*
+        * Summarised, not spread out. It is the app's proof of durability and
+        * it should exist; it should not be OPEN, because nobody reads "Events:
+        * 41 recorded" twice (design review, 2026-09-06). Same gesture as the
+        * activity fold, so there is one way to open a detail in this app
+        * rather than two.
+        *
+        * Two things stay outside the disclosure: the verification word, and
+        * the unverified count when it is not zero. An action that started and
+        * never reported an outcome is the one row here a person needs without
+        * asking for it.
+        */}
+      <button
+        type="button"
+        className="lc-receipt__summary"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="lc-mono lc-receipt__line">
+          {mission.runtime} {mission.cliVersion ?? ''} / {mission.model}
+          <span className="lc-separator">·</span>
+          {checkpoints.length === 0 ? 'no checkpoints' : `${String(checkpoints.length)} checkpoints`}
+          <span className="lc-separator">·</span>
+          <span className={verification === 'verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</span>
+          {unsettled.length > 0 && (
+            <>
+              <span className="lc-separator">·</span>
+              <span className="lc-tone-amber">
+                {unsettled.length === 1 ? '1 unverified' : `${String(unsettled.length)} unverified`}
+              </span>
+            </>
+          )}
+        </span>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={12} />
+      </button>
+      {open && (
       <dl className="lc-receipt">
         <dt>Runtime</dt>
         <dd className="lc-mono">
@@ -192,6 +229,7 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
         <dt>Ledger</dt>
         <dd className={verification === 'verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
       </dl>
+      )}
     </div>
   )
 }

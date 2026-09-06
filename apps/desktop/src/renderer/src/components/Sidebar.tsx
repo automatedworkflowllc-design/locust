@@ -340,23 +340,40 @@ export function Sidebar({
                     * shell from the live runs, so it disappears when the work
                     * does rather than being cleared by hand.
                     */}
-                  {routineStepByTeammate[teammate.teammateId] !== undefined && (
-                    <span className="lc-row__route lc-mono" title={routineStepByTeammate[teammate.teammateId]!.name}>
-                      {routineStepLabel(routineStepByTeammate[teammate.teammateId]!)}
-                    </span>
-                  )}
                   {teammate.route !== undefined && (
                     // Which model this teammate IS. People pit models against
                     // each other on purpose, and that only reads if each row
-                    // says who is who without opening a thread.
+                    // says who is who without opening a thread. This line
+                    // earns its place; the two below it were one line's worth
+                    // of fact spread over two.
                     <span className="lc-row__route lc-mono" title="The route this teammate last ran on; replies on their own run here">
                       {runtimeDisplayName(teammate.route.runtime)} / {teammate.route.model}
                     </span>
                   )}
-                  {teammate.worktree === true && (
-                    <span className="lc-row__route lc-mono" title="Works on its own branch, in its own worktree of the folder">
-                      on {branchNameFor(teammate.name)}
+                  {/*
+                    * ONE situational line, never two.
+                    *
+                    * The routine step and the worktree branch answer the same
+                    * question -- where and how is this teammate working right
+                    * now -- and the row was drawing both, so a teammate on its
+                    * own branch replaying a routine stacked five lines in a
+                    * 268px rail. Four teammates made it a wall of mono
+                    * (design review, 2026-09-06).
+                    *
+                    * The routine step wins while one is running, because it is
+                    * the thing that is changing; the branch is a standing
+                    * fact and comes back when the routine finishes.
+                    */}
+                  {routineStepByTeammate[teammate.teammateId] !== undefined ? (
+                    <span className="lc-row__route lc-mono" title={routineStepByTeammate[teammate.teammateId]!.name}>
+                      {routineStepLabel(routineStepByTeammate[teammate.teammateId]!)}
                     </span>
+                  ) : (
+                    teammate.worktree === true && (
+                      <span className="lc-row__route lc-mono" title="Works on its own branch, in its own worktree of the folder">
+                        on {branchNameFor(teammate.name)}
+                      </span>
+                    )
                   )}
                 </span>
               </button>

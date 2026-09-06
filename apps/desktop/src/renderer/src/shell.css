@@ -1195,6 +1195,38 @@ textarea {
 /* The live step card carries no bar: the working teammate's own face is the
    motion, in the header and the sidebar. */
 
+/* The receipt at rest: one line, and the same disclosure gesture the
+   activity fold uses. It is the app-s proof of durability and it should
+   exist; it should not be open, because nobody reads -Events: 41 recorded-
+   twice (design review, 2026-09-06). */
+.lc-receipt__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-receipt__summary:hover {
+  color: var(--lc-text-primary);
+}
+
+.lc-receipt__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--lc-text-mono-caption);
+}
+
 .lc-receipt {
   display: grid;
   grid-template-columns: max-content 1fr;
