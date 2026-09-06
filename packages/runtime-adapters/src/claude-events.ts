@@ -170,6 +170,9 @@ export function createClaudeEventNormalizer(
 
   /** Text buffers per content block index, so a replace can be recognised. */
   const openTools = new Map<string, { name: string; target?: string }>();
+  /** A subagent's type and one-line summary, by the Agent tool call that started it. */
+  const subagentKinds = new Map<string, string>();
+  const subagentSummaries = new Map<string, string>();
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
   let finalized = false;
@@ -261,6 +264,67 @@ export function createClaudeEventNormalizer(
           }),
         ];
       }
+      // MEASURED 2026-09-05 off a live `--output-format stream-json` run of
+      // Claude Code 2.1.261: the system channel also carries
+      //   notification  -- "Stop hook error occurred · ctrl+o to see",
+      //                    priority "immediate": the runtime telling the
+      //                    person something about its own setup;
+      //   task_started / task_progress / task_updated / task_notification
+      //                 -- a subagent's life: its type, what it is doing,
+      //                    its last tool, and its one-line summary at the end;
+      //   status        -- "requesting" and the like;
+      //   thinking_tokens -- an estimate, no words.
+      // Colin, 2026-09-05: the different notices Claude Code and Codex give
+      // are what a person uses to know what is happening; none is cut.
+      if (subtype === "notification") {
+        const text = stringValue(parsed.text);
+        if (text === undefined) return [];
+        const immediate = stringValue(parsed.priority) === "immediate";
+        return [
+          emit("adapter.diagnostic", {
+            code: "claude.notification",
+            level: immediate ? "warning" : "info",
+            terminal: false,
+            message: boundedMessageText(text.replace(/\s*·\s*ctrl\+o to see\s*$/i, "")),
+            evidence,
+          }),
+        ];
+      }
+      if (subtype === "task_started" || subtype === "task_progress") {
+        const taskId = identityValue(parsed.task_id) ?? "task";
+        const kind = stringValue(parsed.subagent_type);
+        const doing = stringValue(parsed.description);
+        const tool = stringValue(parsed.last_tool_name);
+        const words = [kind, doing, tool === undefined ? undefined : `last tool ${tool}`].filter((part): part is string => part !== undefined);
+        const toolUseId = identityValue(parsed.tool_use_id);
+        if (toolUseId !== undefined && kind !== undefined) subagentKinds.set(toolUseId, kind);
+        return [
+          emit("step.started", {
+            stepKind: "item",
+            itemId: `subagent:${taskId}`,
+            itemType: "subagent",
+            ...(words.length === 0 ? {} : { message: boundedMessageText(words.join(" · ")) }),
+            evidence,
+          }),
+        ];
+      }
+      if (subtype === "task_notification") {
+        const taskId = identityValue(parsed.task_id) ?? "task";
+        const toolUseId = identityValue(parsed.tool_use_id);
+        const summary = stringValue(parsed.summary);
+        if (toolUseId !== undefined && summary !== undefined) subagentSummaries.set(toolUseId, summary);
+        const status = stringValue(parsed.status);
+        return [
+          emit(status === "failed" ? "step.failed" : "step.completed", {
+            stepKind: "item",
+            itemId: `subagent:${taskId}`,
+            itemType: "subagent",
+            ...(status === undefined ? {} : { status }),
+            evidence,
+          }),
+        ];
+      }
+      if (subtype === "task_updated" || subtype === "thinking_tokens") return [];
       return [
         emit("step.started", {
           stepKind: "turn",
@@ -362,15 +426,21 @@ export function createClaudeEventNormalizer(
         const open = openTools.get(itemId);
         openTools.delete(itemId);
         const failed = block.is_error === true;
+        const subagentKind = subagentKinds.get(itemId);
+        const subagentSummary = subagentSummaries.get(itemId);
+        subagentKinds.delete(itemId);
+        subagentSummaries.delete(itemId);
         events.push(
           emit(failed ? "tool.failed" : "tool.completed", {
             itemId,
             toolKind: "tool_use",
             name: open?.name ?? "tool",
-            // What it acted on, so the row can say more than the tool's name.
             ...(open?.target === undefined ? {} : { command: open.target }),
             phase: "completed",
-            ...(failed ? { status: "error" } : {}),
+            ...(failed ? { status: "error" } : subagentKind === undefined ? {} : { status: subagentKind }),
+            // What the subagent came back with, in its own words: the row
+            // reads "reported back · 3" instead of only "reported back".
+            ...(subagentSummary === undefined ? {} : { output: boundedMessageText(subagentSummary) }),
             evidence,
           }),
         );

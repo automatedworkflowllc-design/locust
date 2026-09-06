@@ -101,7 +101,8 @@ try {
       if (document.querySelector('.lc-runtimerow__setup')) break
     }
     return JSON.stringify([...document.querySelectorAll('.lc-runtimerow')].map(r => ({
-      name: r.querySelector('.lc-runtimerow__name')?.innerText,
+      // The name's first text node: since 0.32.0 the version sits beside it in a span.
+      name: r.querySelector('.lc-runtimerow__name')?.childNodes[0]?.textContent?.trim(),
       setup: r.querySelector('.lc-runtimerow__setup')?.innerText ?? null,
       title: r.querySelector('.lc-runtimerow__setup')?.getAttribute('title') ?? null
     })))
@@ -115,7 +116,7 @@ try {
   check('Codex CLI shows its MCP servers from the TOML headers', codex !== undefined && codexServers.every((s) => String(codex.setup).includes(s)), String(codex?.setup))
   check('and its notify hook', !codexNotify || /notify \(1\)/.test(String(codex?.setup)), String(codex?.setup))
   const quiet = rows.filter((r) => ['Cursor Agent', 'OpenCode', 'Copilot CLI'].includes(r.name))
-  check('a runtime with nothing configured says so in words', quiet.length > 0 && quiet.every((r) => r.setup === 'No MCP servers or hooks configured' || /MCP:|Hooks:/.test(String(r.setup))), JSON.stringify(quiet.map((r) => [r.name, r.setup])))
+  check('a runtime with nothing configured says so in words', quiet.length > 0 && quiet.every((r) => r.setup !== null && (/No MCP servers(, hooks, skills or agents| or hooks) configured/.test(String(r.setup)) || /MCP:|Hooks:|Skills:|Agents:/.test(String(r.setup)))), JSON.stringify(quiet.map((r) => [r.name, r.setup])))
   const planned = rows.filter((r) => ['Gemini CLI', 'OmniRoute', 'Antigravity'].includes(r.name))
   check('planned and hub runtimes carry no setup line', planned.every((r) => r.setup === null), JSON.stringify(planned.map((r) => [r.name, r.setup])))
   check('no command lines or secrets anywhere on the screen', !/SECRET|--token|\.exe/i.test(await evaluate(`document.querySelector('.lc-runtimelist').innerText`)))

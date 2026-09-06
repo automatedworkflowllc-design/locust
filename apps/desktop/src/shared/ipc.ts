@@ -56,6 +56,9 @@ export interface MemoryClearRequest {
 export interface PublicRuntimeSetup {
   readonly mcpServers: readonly string[]
   readonly hooks: readonly string[]
+  /** Skills and agents the runtime can reach for, by name; Claude Code today. */
+  readonly skills: readonly string[]
+  readonly agents: readonly string[]
   readonly sources: readonly string[]
   readonly unreadable: readonly string[]
 }

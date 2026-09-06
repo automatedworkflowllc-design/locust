@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -30,16 +30,41 @@ export interface RuntimeSetupOptions {
   readonly homeDirectory?: string
   /** Test seam. */
   readonly read?: (path: string) => Promise<string>
+  /** Test seam: the entries of a directory, names only. */
+  readonly list?: (directory: string) => Promise<readonly string[]>
 }
 
 interface Found {
   readonly mcpServers: string[]
   readonly hooks: string[]
+  readonly skills: string[]
+  readonly agents: string[]
   readonly sources: string[]
   readonly unreadable: string[]
 }
 
-const fresh = (): Found => ({ mcpServers: [], hooks: [], sources: [], unreadable: [] })
+const fresh = (): Found => ({ mcpServers: [], hooks: [], skills: [], agents: [], sources: [], unreadable: [] })
+
+/**
+ * The names in a directory a runtime keeps its skills or agents in: one
+ * folder per skill (with a SKILL.md), one .md per agent. Absent is nothing;
+ * unreadable is said. Claude Code's own init record lists the same names
+ * (MEASURED 2026-09-05), which is how this list is known to be the one it
+ * would show.
+ */
+async function names(directory: string, options: RuntimeSetupOptions, found: Found, kind: 'folders' | 'markdown'): Promise<readonly string[]> {
+  try {
+    const entries = await (options.list ?? (async (dir: string) => (await readdir(dir, { withFileTypes: true })).map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))))(directory)
+    found.sources.push(directory)
+    return entries
+      .filter((entry) => (kind === 'folders' ? entry.endsWith('/') : /\.md$/i.test(entry)))
+      .map((entry) => entry.replace(/\/$/, '').replace(/\.md$/i, ''))
+      .filter((entry) => !entry.startsWith('.'))
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') found.unreadable.push(directory)
+    return []
+  }
+}
 
 function addNames(into: string[], names: readonly string[]): void {
   for (const name of names) {
@@ -130,6 +155,14 @@ async function claude(options: RuntimeSetupOptions, home: string, ws: string | u
     const projectMcp = await readJson(join(ws, '.mcp.json'), options, found)
     addNames(found.mcpServers, keysOf(projectMcp?.mcpServers))
   }
+  // Skills and agents: what a teammate on Claude Code can reach for, by
+  // name, from the user's own folders and the project's.
+  addNames(found.skills, await names(join(home, '.claude', 'skills'), options, found, 'folders'))
+  addNames(found.agents, await names(join(home, '.claude', 'agents'), options, found, 'markdown'))
+  if (ws !== undefined) {
+    addNames(found.skills, await names(join(ws, '.claude', 'skills'), options, found, 'folders'))
+    addNames(found.agents, await names(join(ws, '.claude', 'agents'), options, found, 'markdown'))
+  }
   return found
 }
 
@@ -185,6 +218,6 @@ export async function readRuntimeSetup(options: RuntimeSetupOptions): Promise<Re
     ['copilot', await copilot(options, home)]
   ]
   return Object.fromEntries(
-    entries.map(([id, found]) => [id, { mcpServers: found.mcpServers, hooks: found.hooks, sources: found.sources, unreadable: found.unreadable }])
+    entries.map(([id, found]) => [id, { mcpServers: found.mcpServers, hooks: found.hooks, skills: found.skills, agents: found.agents, sources: found.sources, unreadable: found.unreadable }])
   )
 }

@@ -593,12 +593,19 @@ function More({ children }: { readonly children: ReactNode }): ReactElement {
   )
 }
 
+/** The first few names and a count for the rest, so a long list stays one line. */
+function fewNames(names: readonly string[], limit = 5): string {
+  return names.length <= limit ? names.join(', ') : `${names.slice(0, limit).join(', ')} +${String(names.length - limit)}`
+}
+
 function RuntimeSetupLine({ setup }: { readonly setup: PublicRuntimeSetup }): ReactElement {
   const parts: string[] = []
   if (setup.mcpServers.length > 0) parts.push(`MCP: ${setup.mcpServers.join(', ')}`)
   if (setup.hooks.length > 0) parts.push(`Hooks: ${setup.hooks.join(', ')}`)
+  if (setup.skills.length > 0) parts.push(`Skills: ${fewNames(setup.skills)}`)
+  if (setup.agents.length > 0) parts.push(`Agents: ${fewNames(setup.agents)}`)
   if (setup.unreadable.length > 0) parts.push(`${String(setup.unreadable.length)} config file${setup.unreadable.length === 1 ? '' : 's'} could not be read`)
-  const text = parts.length === 0 ? 'No MCP servers or hooks configured' : parts.join(' · ')
+  const text = parts.length === 0 ? 'No MCP servers, hooks, skills or agents configured' : parts.join(' · ')
   const title = [...setup.sources.map((path) => `read: ${path}`), ...setup.unreadable.map((path) => `unreadable: ${path}`)].join('\n')
   return (
     <div className="lc-runtimerow__detail lc-runtimerow__setup" title={title.length === 0 ? 'No configuration files found' : title}>

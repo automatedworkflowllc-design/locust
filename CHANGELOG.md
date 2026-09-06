@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.33.0 — 2026-09-05
+
+Signal parity with Claude Code, measured from its own stream
+(docs/SIGNAL-PARITY-2026-09-05.md has the table).
+
+- **What a subagent is doing, as it happens.** The sidebar says "subagent
+  working", the working line says which kind and what it is doing right
+  now ("Explore · Reading README.md · last tool Read"), and when it reports
+  back its row reads "Explore subagent · reported back · 3".
+- **Claude Code's own notifications reach the thread.** A hook that failed
+  ("Stop hook error occurred") is said where the run is, as a warning.
+- **Settings lists a runtime's skills and agents** beside its MCP servers
+  and hooks, by name, from the same folders the runtime reads.
+
 ## 0.32.3 — 2026-09-05
 
 - **The activity fold shows the diff on Codex CLI.** That route names the

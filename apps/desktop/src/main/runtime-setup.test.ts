@@ -100,6 +100,6 @@ describe("what each runtime has set up for itself", () => {
     expect(setup.claude?.hooks).toEqual([])
     expect(setup.claude?.unreadable.map((p) => p.replace(/\\/g, '/'))).toEqual(['C:/Users/colin/.claude/settings.json'])
     expect(setup.cursor?.unreadable.map((p) => p.replace(/\\/g, '/'))).toEqual(['C:/Users/colin/.cursor/mcp.json'])
-    expect(setup.codex).toEqual({ mcpServers: [], hooks: [], sources: [], unreadable: [] })
+    expect(setup.codex).toEqual({ mcpServers: [], hooks: [], skills: [], agents: [], sources: [], unreadable: [] })
   })
 })

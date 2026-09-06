@@ -86,9 +86,9 @@ export function ActivityCard({
                 <div className="lc-filerow is-static is-helper">
                   <Icon name="users" size={14} />
                   <span className="lc-filerow__path">{entry.description}</span>
-                  <span className="lc-filerow__status">subagent</span>
-                  <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : 'is-running'}`}>
-                    {!entry.settled ? 'working on it' : entry.failed ? 'failed' : 'reported back'}
+                  <span className="lc-filerow__status">{entry.subagentType === undefined ? 'subagent' : `${entry.subagentType} subagent`}</span>
+                  <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : 'is-running'}`} title={entry.summary}>
+                    {!entry.settled ? 'working on it' : entry.failed ? 'failed' : entry.summary === undefined ? 'reported back' : `reported back · ${entry.summary.length > 60 ? `${entry.summary.slice(0, 57)}…` : entry.summary}`}
                   </span>
                 </div>
               ) : entry.kind === 'shell' ? (

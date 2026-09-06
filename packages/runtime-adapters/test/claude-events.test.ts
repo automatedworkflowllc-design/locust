@@ -451,3 +451,39 @@ describe("what the run cost, as Claude Code priced it", () => {
     expect((done?.payload as { usage?: unknown }).usage).toBeUndefined();
   });
 });
+
+describe("the signals Claude Code gives a person about what is happening (measured 2026-09-05)", () => {
+  it("passes a notification through as a diagnostic, immediate ones as warnings, without the ctrl+o hint", () => {
+    const n = normalizer();
+    const events = n.accept(record({ type: "system", subtype: "notification", key: "stop-hook-error", text: "Stop hook error occurred · ctrl+o to see", priority: "immediate" }));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "adapter.diagnostic", payload: { code: "claude.notification", level: "warning", message: "Stop hook error occurred", terminal: false } });
+    const quiet = n.accept(record({ type: "system", subtype: "notification", text: "Plugins updated", priority: "normal" }));
+    expect(quiet[0]).toMatchObject({ payload: { level: "info", message: "Plugins updated" } });
+  });
+
+  it("follows a subagent's life as steps, and hands its type and summary to the Agent call that started it", () => {
+    const n = normalizer();
+    n.accept(record({ type: "system", subtype: "init", session_id: "s1" }));
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_1", name: "Agent" } } }));
+    const started = n.accept(record({ type: "system", subtype: "task_started", task_id: "t1", tool_use_id: "toolu_1", description: "Count README.md lines", subagent_type: "Explore", task_type: "local_agent" }));
+    expect(started[0]).toMatchObject({ type: "step.started", payload: { stepKind: "item", itemId: "subagent:t1", itemType: "subagent", message: "Explore · Count README.md lines" } });
+    const progress = n.accept(record({ type: "system", subtype: "task_progress", task_id: "t1", tool_use_id: "toolu_1", description: "Reading README.md", subagent_type: "Explore", last_tool_name: "Read", usage: { total_tokens: 4092, tool_uses: 1 } }));
+    expect(progress[0]).toMatchObject({ type: "step.started", payload: { itemId: "subagent:t1", message: "Explore · Reading README.md · last tool Read" } });
+    expect(n.accept(record({ type: "system", subtype: "task_updated", task_id: "t1", patch: { status: "completed" } }))).toEqual([]);
+    expect(n.accept(record({ type: "system", subtype: "thinking_tokens", estimated_tokens: 50, estimated_tokens_delta: 50 }))).toEqual([]);
+    const done = n.accept(record({ type: "system", subtype: "task_notification", task_id: "t1", tool_use_id: "toolu_1", status: "completed", summary: "3", usage: { total_tokens: 6787, tool_uses: 1 } }));
+    expect(done[0]).toMatchObject({ type: "step.completed", payload: { stepKind: "item", itemId: "subagent:t1", status: "completed" } });
+    const result = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_1", content: "3" }] } }));
+    expect(result[0]).toMatchObject({ type: "tool.completed", payload: { itemId: "toolu_1", name: "Agent", status: "Explore", output: "3" } });
+  });
+
+  it("marks a subagent that failed as a failed step, and the launcher's failure stays the runtime's word", () => {
+    const n = normalizer();
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_2", name: "Agent" } } }));
+    const failed = n.accept(record({ type: "system", subtype: "task_notification", task_id: "t2", tool_use_id: "toolu_2", status: "failed", summary: "no such file" }));
+    expect(failed[0]).toMatchObject({ type: "step.failed", payload: { itemId: "subagent:t2" } });
+    const result = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_2", is_error: true, content: "boom" }] } }));
+    expect(result[0]).toMatchObject({ type: "tool.failed", payload: { status: "error", output: "no such file" } });
+  });
+});

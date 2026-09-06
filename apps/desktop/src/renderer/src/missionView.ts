@@ -37,6 +37,10 @@ export interface ActivityDetail {
   readonly exitCode?: number
   /** The change the tool made, when the runtime reported one. */
   readonly patch?: ToolPatch
+  /** The runtime's own status word for the call; a subagent's type, for its launcher. */
+  readonly status?: string
+  /** What the tool returned, when the runtime reported it in words; a subagent's summary. */
+  readonly output?: string
 }
 
 /**
@@ -72,6 +76,10 @@ export type ActivityEntry =
        * was asked and whether it reported back (Colin, 2026-09-05).
        */
       readonly kind: 'helper'
+      /** The subagent's type when the runtime said (Claude Code's Explore, general-purpose, ...). */
+      readonly subagentType?: string
+      /** Its one-line summary when it reported back. */
+      readonly summary?: string
       readonly key: string
       readonly description: string
       readonly settled: boolean
@@ -143,6 +151,8 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
           key: `helper_${String(entries.length)}`,
           // The target is what the helper was asked; without one, say so.
           description: detail.tool !== undefined && detail.tool !== detail.name ? detail.name : 'a subagent, unnamed',
+          ...(detail.status === undefined || detail.status === 'error' ? {} : { subagentType: detail.status }),
+          ...(detail.output === undefined ? {} : { summary: detail.output }),
           settled: detail.settled,
           failed: detail.failed === true
         })
@@ -592,6 +602,8 @@ export function buildThread(
               settled: true,
               failed: event.type === 'tool.failed',
               ...(event.payload.exitCode === undefined ? {} : { exitCode: event.payload.exitCode }),
+              ...(event.payload.status === undefined ? {} : { status: event.payload.status }),
+              ...(typeof event.payload.output === 'string' ? { output: event.payload.output } : {}),
               // A completion that carries a patch also names what it touched:
               // the row's kind follows the evidence, not the tool's name.
               ...(patch === undefined ? {} : { patch, kind: 'edit' }),
@@ -662,7 +674,7 @@ export function buildThread(
         // The adapters already separate these: a `*.runtime_error` is the run
         // in trouble, an item diagnostic is the provider talking about one
         // item. Only the former is worth interrupting an empty thread for.
-        if (!workBegan && !/\.runtime_error$/.test(event.payload.code)) break
+        if (!workBegan && !/\.(runtime_error|notification)$/.test(event.payload.code)) break
         // Said once. A quota failure arrives as a limit event AND as the
         // runtime's error line carrying the same sentence; user session 1
         // (2026-09-05) showed "You've hit your usage limit..." three times in
