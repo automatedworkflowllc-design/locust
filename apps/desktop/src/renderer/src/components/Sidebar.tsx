@@ -390,23 +390,27 @@ export function Sidebar({
         </SidebarSection>
 
         {/*
-          Always drawn, empty or not: a section that disappears takes the
-          fact that it exists with it. Colin, 2026-09-06, about Automations
-          and true of all three -- "if no automations dont remove, just have
-          it as a holder, we want the user to know its possible even if none
-          are setup".
+          "Missions", not "Other missions". The old label drew a distinction
+          that only makes sense from inside the code -- these are the ones no
+          teammate owns -- and Colin read it the way anyone would: "just have
+          it say missions lol, why other missions?"
+
+          Drawn only when it holds something, which is the answer to his next
+          question: are these two redundant? Not in content -- every
+          conversation appears exactly once, under its teammate or here, and
+          all of them stay on the sidebar either way. But once a person has
+          teammates almost nothing is unowned, so this stood as a heading
+          reading 0 for good. Automations keeps its empty holder because an
+          empty Automations teaches what the app can do; an empty Missions
+          teaches nothing.
         */}
+        {shownUnowned.length > 0 && (
         <SidebarSection
-          label={teammates.length > 0 ? 'Other missions' : 'Missions'}
+          label="Missions"
           count={shownUnowned.length}
           open={openSections.missions}
           onToggle={() => setOpenSections((current) => ({ ...current, missions: !current.missions }))}
         >
-          {shownUnowned.length === 0 && (
-            <p className="lc-sidebar__empty lc-row__meta">
-              {teammates.length > 0 ? 'Every mission belongs to a teammate.' : 'No missions yet.'}
-            </p>
-          )}
           <>
             {shownUnowned.map((mission) => {
               const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
@@ -438,6 +442,7 @@ export function Sidebar({
             })}
           </>
         </SidebarSection>
+        )}
 
         <SidebarSection
           label="Automations"
