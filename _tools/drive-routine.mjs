@@ -18,7 +18,7 @@ import { FREE_ROUTE, say, scratchRepository, sleep, startDrive } from './drive-l
 const workspace = await scratchRepository('locust-drive-routine-ws-')
 const seed = {
   schemaVersion: 1,
-  teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-05T05:00:00.000Z', route: { ...FREE_ROUTE, mode: 'ask' } }],
+  teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', worktree: true, createdAt: '2026-09-05T05:00:00.000Z', route: { ...FREE_ROUTE, mode: 'ask' } }],
   missionOwners: {},
   settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off' }
 }
@@ -93,6 +93,29 @@ try {
 
   drive = await startDrive({ name: 'routine', port: 9297, workspace, profilePath: handoff.profile, outPath: handoff.out, stepFrom: handoff.step })
   await drive.capture('reopened five hours later: nothing pressed', () => drive.ready())
+  await drive.capture('the sidebar while a routine runs on a teammate with a branch', () => drive.evaluate(`(async () => {
+    // The routine step and the worktree branch answer the same question --
+    // where and how is this teammate working right now -- and the row used to
+    // draw BOTH, which is what stacked five lines in a 268px rail (design
+    // review, 2026-09-06). While a routine runs the step wins, because it is
+    // the thing that is changing.
+    // Wait for the routine to actually be running: read too early and the
+    // teammate is idle, the step has not appeared, and the drive measures the
+    // uninteresting case.
+    let text = ''
+    for (let i = 0; i < 120; i += 1) {
+      await new Promise(r => setTimeout(r, 500))
+      const found = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
+      text = found?.innerText ?? ''
+      if (/routine · step/.test(text)) break
+    }
+    const lines = text.split(String.fromCharCode(10)).map(t => t.trim()).filter(t => t.length > 0)
+    return 'lines: ' + lines.length
+      + ' || routine step shown: ' + /routine · step/.test(text)
+      + ' || branch shown: ' + /on locust\\//.test(text)
+      + ' || [' + lines.join(' / ') + ']'
+  })()`))
+
   await drive.capture('the routine starts a run by itself', () => drive.evaluate(`(async () => {
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 500))
