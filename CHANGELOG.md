@@ -6,6 +6,39 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.0 — 2026-09-06
+
+- **Locust installs a coding agent for you.** Open it on a machine with none,
+  and each one now has an Install button beside it instead of a command to copy
+  into a terminal you have to find. OpenCode leads the list and is the only one
+  with a filled button, because it is the only one that needs no account at all
+  — one install and there is a working teammate.
+
+- **It shows the line it is about to run, before it runs it**, and while it
+  works it shows npm's own last line and how long it has been going. There is
+  no progress bar, because npm does not report anything that honestly becomes
+  one.
+
+- **When an install fails it says what happened and what to do** — no network,
+  a proxy, permissions, a name that has moved, or something nobody has seen
+  before — and the command stays on screen so you, or someone helping you, can
+  run it by hand. If npm finishes cleanly and the command still is not there,
+  it says that too and offers a restart.
+
+- **Cursor Agent and Antigravity are not packages**, so their button opens
+  their own page instead. Same size, same place, one different word.
+
+- **Signing in has no button and will not get one.** It happens in a browser
+  or with a device code, and a button that opened a terminal and left you in it
+  would be worse than the line telling you what to type. The row shows the
+  command, and Locust notices on its own when it is done.
+
+- **The composer lost three controls it did not need**: a `+` that was
+  permanently disabled, an effort chip that read "effort · fixed" on most
+  routes, and a swarm toggle that switched the effort chip off. Effort now sits
+  under the model it belongs to in the route picker, and swarm is that picker's
+  own switch.
+
 ## 0.37.1 — 2026-09-06
 
 Three corrections, two of them to fixes from earlier the same day.
