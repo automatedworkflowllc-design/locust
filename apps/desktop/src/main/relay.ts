@@ -240,6 +240,12 @@ export function createRelay(options: RelayOptions): Relay {
     // Their own route, so each teammate stays the model a person made
     // them. Only a teammate who has never run borrows the sender's.
     const own = recipient.self.route
+    // A borrowed route never borrows the sender's PERMISSION beyond editing
+    // the workspace: a sender on Auto lends `ask`, not the run of the whole
+    // machine. Conservative on purpose -- the recipient never chose Auto --
+    // and the notice below now says which mode was lent, because a person
+    // whose sender could edit anything and whose reply could not write at
+    // all had no way to find out why (QA, 2026-09-06).
     const route = own ?? {
       runtime: from.runtime,
       model: from.model ?? 'account-default',
@@ -247,7 +253,9 @@ export function createRelay(options: RelayOptions): Relay {
     }
     if (own === undefined) {
       input.notice(
-        `${recipient.self.name} has not run on a route of their own yet, so this reply runs on ${from.peer.self.name}'s ${runtimeDisplayName(route.runtime)} / ${route.model}. Message ${recipient.self.name} once on the route they should keep.`
+        `${recipient.self.name} has not run on a route of their own yet, so this reply runs on ${from.peer.self.name}'s ${runtimeDisplayName(route.runtime)} / ${route.model}, ${
+          route.mode === 'accept-edits' ? 'and may edit this folder' : 'read-only'
+        }. Message ${recipient.self.name} once on the route they should keep.`
       )
     }
     let response: CodexMissionStartResponse

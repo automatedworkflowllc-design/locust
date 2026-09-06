@@ -11,6 +11,7 @@ import {
   assistantMessages,
   buildSignalRail,
   buildThread,
+  editToolName,
   cancellationSummary,
   conversationTurns,
   decisionStanding,
@@ -182,6 +183,34 @@ describe('when a mission says it began', () => {
   })
 })
 
+describe('which tool names mean a file was touched (0.35.2 QA)', () => {
+  it('does not count a to-do list or a sub-agent writer as a file', () => {
+    // OpenCode's `todowrite` is the model's own to-do list and is offered
+    // even to read-only runs; Copilot's `write_agent` starts a helper. Both
+    // matched a bare `write` and the fold reported a changed file on a run
+    // that changed nothing.
+    expect(editToolName('todowrite')).toBe(false)
+    expect(editToolName('write_agent')).toBe(false)
+    expect(editToolName('todoread')).toBe(false)
+  })
+
+  it('counts a removal, which Cursor calls delete', () => {
+    // The same mistake from the other side: a run that deleted a file
+    // reported a tool call and no file.
+    expect(editToolName('delete')).toBe(true)
+    expect(editToolName('deleteFile')).toBe(true)
+  })
+
+  it('still counts the ordinary ones', () => {
+    for (const name of ['write', 'Write', 'edit', 'apply_patch', 'file_change', 'create_file', 'rename']) {
+      expect(editToolName(name)).toBe(true)
+    }
+    for (const name of ['read', 'grep', 'glob', 'shell', 'web_search']) {
+      expect(editToolName(name)).toBe(false)
+    }
+  })
+})
+
 describe('what the fold counts as a changed file (0.35.0 QA)', () => {
   // Ported from the 0.35.0 targeted QA's own regression file. Three of its
   // four cases failed on 0.35.1; each is paired here with the control that
@@ -246,10 +275,42 @@ describe('the words a person typed, across a route switch (0.35.0 QA)', () => {
     const first = mission({ missionId: 'first', prompt: 'Create a module and test it' })
     const next = mission({
       missionId: 'next',
-      prompt: 'Another agent started this task.\nThe person now asks:\n\nRun its tests without editing.',
+      prompt: 'Another agent started this task.\n\nThe person now asks:\n\nRun its tests without editing.',
       continuesFrom: { missionId: 'first', checkpointEpoch: 1, reason: 'route-switch' }
     })
     expect(typedPrompt(next, new Map([['first', first], ['next', next]]))).toBe('Run its tests without editing.')
+  })
+
+  it("leaves a person's own words alone, even when they contain the marker", () => {
+    // Someone working on this codebase types the sentence, and the mission
+    // was titled with whatever followed it (QA, 2026-09-06). A mission a
+    // person typed is their words already, whatever it happens to contain.
+    const typed = mission({
+      missionId: 'typed',
+      prompt: 'Rename the string "The person now asks:" in handoff.ts and update both readers.'
+    })
+    expect(typedPrompt(typed, new Map([['typed', typed]]))).toBe(
+      'Rename the string "The person now asks:" in handoff.ts and update both readers.'
+    )
+  })
+
+  it('does not read the marker out of a briefing that quotes the original task', () => {
+    // A rescue quotes the task it is continuing. When the task itself held
+    // the sentence, the match landed inside the quote and the briefing's own
+    // sections were shown as the person's words.
+    const first = mission({
+      missionId: 'first',
+      prompt: 'Rename the string "The person now asks:" in handoff.ts and update both readers.'
+    })
+    const rescue = mission({
+      missionId: 'rescue',
+      prompt:
+        'Another agent started this task:\n\nRename the string "The person now asks:" in handoff.ts and update both readers.\n\nThese actions reported finishing before the stop: none.',
+      continuesFrom: { missionId: 'first', checkpointEpoch: 1, reason: 'route-switch' }
+    })
+    expect(typedPrompt(rescue, new Map([['first', first], ['rescue', rescue]]))).toBe(
+      'Rename the string "The person now asks:" in handoff.ts and update both readers.'
+    )
   })
 
   it('still shows the original words when the switch carried no new instruction', () => {
@@ -1683,5 +1744,39 @@ describe('utilisation, in the words of the spec', () => {
     expect(usagePercent(said)).toBe(67)
     expect(usageWindowSentence(said)).toMatch(/^67% of the 5-hour window used, resets .+ · 53% of the 7-day window, resets .+$/)
     expect(usagePercent('nothing')).toBeUndefined()
+  })
+})
+
+describe('the model an alias turned out to mean (0.35.2)', () => {
+  // Colin, 2026-09-06: "in model list they are just listed as sonnet, fable,
+  // and opus". The picker had always been willing to show the real name; it
+  // was reading the START record, which for Claude Code repeats the alias it
+  // was given, so it never learned one however many runs had happened.
+  const mission = (fields: Record<string, unknown>) =>
+    ({ peerMessages: [], createdAt: '2026-09-06T05:00:00.000Z', ...fields }) as never
+
+  const completed = (resolvedModel?: string) => ({
+    type: 'run.completed',
+    occurredAt: '2026-09-06T05:00:09.000Z',
+    payload: { ...(resolvedModel === undefined ? {} : { resolvedModel }) }
+  })
+
+  it('learns it from the result, which is the only record that states it', () => {
+    const names = resolvedModelNames([
+      mission({
+        missionId: 'm1',
+        runtime: 'claude',
+        model: 'sonnet',
+        events: [completed('claude-sonnet-5')]
+      })
+    ])
+    expect(names.get('claude:sonnet')).toBe('claude-sonnet-5')
+  })
+
+  it('learns nothing from a run that never named one', () => {
+    const names = resolvedModelNames([
+      mission({ missionId: 'm1', runtime: 'claude', model: 'sonnet', events: [completed()] })
+    ])
+    expect(names.get('claude:sonnet')).toBeUndefined()
   })
 })

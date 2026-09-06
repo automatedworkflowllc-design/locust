@@ -66,6 +66,22 @@ try {
   await drive.capture('Booty on Cursor: one sentence about README', () => drive.evaluate(sendAndWaitScript('Read README.md and tell me in one sentence what this project is. Do not edit anything.')))
   await drive.capture("Booty's activity fold and header", () => drive.evaluate(fold))
   await drive.capture('the sidebar: each teammate keeps the route it ran on', () => drive.evaluate(`document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 300)`))
+  await drive.capture('the picker after a run: what the alias turned out to mean', () => drive.evaluate(`(async () => {
+    // Claude Code takes an alias and resolves it to whichever model is newest
+    // in that family; only its RESULT states the real one. Before 0.35.2 the
+    // picker read the start record, which repeats the alias, so it never
+    // learned a name however many runs had happened.
+    const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+    control.click()
+    await new Promise(r => setTimeout(r, 700))
+    const rows = [...document.querySelectorAll('.lc-picker__row, .lc-picker li, [role=option]')]
+      .map(r => r.innerText.replace(/[ \\t\\n]+/g, ' ').trim())
+      .filter(t => /sonnet|composer/i.test(t))
+      .slice(0, 4)
+    control.click()
+    return 'picker rows: ' + rows.join(' || ')
+  })()`))
+
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {

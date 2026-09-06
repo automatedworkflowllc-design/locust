@@ -2352,12 +2352,16 @@ textarea {
   gap: var(--lc-space-1);
   margin-top: 9px;
   padding: 0 var(--lc-space-1);
-  /* A long model id (`gpt-5.6-luna`) plus mode, effort and swarm can outrun
-     the row. Wrapping keeps every control reachable instead of pushing the
-     last of them past the edge; the composer's own `flex: 0 0 auto` above is
-     what makes the extra line take space rather than be cut off. */
-  flex-wrap: wrap;
-  row-gap: var(--lc-space-1);
+  /*
+   * The row does not wrap. It used to, on the reasoning that a wrapped
+   * control is better than a cut-off one -- but the composer is capped at
+   * the thread's 760px whatever the window does, so a long folder name or
+   * model id dropped the route and effort chips onto a second line at ANY
+   * window width, which reads as the bar breaking (QA, 2026-09-06, measured:
+   * about 808px of controls into 760). Truncating the two names that can be
+   * arbitrarily long is what makes the row fit, so nothing needs to move.
+   */
+  flex-wrap: nowrap;
 }
 
 .lc-composer__group {
@@ -2439,7 +2443,12 @@ textarea {
    by; the chip's tooltip carries the whole path either way. */
 .lc-control__folder {
   display: inline-block;
-  max-width: 26ch;
+  /*
+   * 26ch was still 255px, which the measurement above shows the row cannot
+   * afford. Colin, 2026-09-06: "lets just only allow folder text to be a
+   * certain length, to avoid this issue again."
+   */
+  max-width: 18ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2453,9 +2462,16 @@ textarea {
    below"). The name gives way instead; the chip's tooltip carries it whole,
    and the row's `flex-wrap` stays as the backstop for a genuinely narrow
    window. */
+/* Both names shrink before anything else does. Without `min-width: 0` a
+   flex item refuses to go below its content, and the caps above never bite. */
+.lc-control--folder,
+.lc-control--boxed {
+  min-width: 0;
+}
+
 .lc-control__model {
   display: inline-block;
-  max-width: 22ch;
+  max-width: 18ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -232,6 +232,20 @@ describe('relaying a share', () => {
     const said = notices.find((update) => update.kind === 'relay-notice')
     expect(said?.kind === 'relay-notice' ? said.message : '').toContain('has not run on a route of their own')
     expect(said?.kind === 'relay-notice' ? said.message : '').toContain('Cursor Agent / composer-2.5')
+    // And what it may DO on that route. A sender on Auto lends `ask`, never
+    // the run of the whole machine, and a person whose reply came back
+    // read-only had no way to find out why (QA, 2026-09-06).
+    expect(said?.kind === 'relay-notice' ? said.message : '').toContain('may edit this folder')
+  })
+
+  it("says read-only when that is what the sender's route lends", async () => {
+    // The case the QA named: a sender on full-access lends `ask`, so the
+    // reply cannot write at all, and the notice has to say so.
+    const { relay, starts, notices } = harness({ booty: newBootyPeer })
+    await relay.onShared(sharing({ sandbox: 'full-access' }), [message(BOOTY)])
+    expect(starts[0]).toMatchObject({ mode: 'ask' })
+    const said = notices.find((update) => update.kind === 'relay-notice')
+    expect(said?.kind === 'relay-notice' ? said.message : '').toContain('read-only')
   })
 
   it('a read-only sender gets a read-only reply when the recipient has no route', async () => {

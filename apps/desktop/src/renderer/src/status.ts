@@ -608,9 +608,18 @@ export function sandboxPhrase(sandbox: 'read-only' | 'workspace-write' | 'full-a
 export function ownerToSelect(
   missionId: string,
   owners: Readonly<Record<string, string>>,
-  current: string | undefined
+  current: string | undefined,
+  /**
+   * The owner the run itself carries, which is what the HEADER prefers. The
+   * two read from different places and agreed everywhere anyone could trace,
+   * because every path that sets one writes the other -- except the window
+   * where a run has started and the host has not recorded it yet (QA,
+   * 2026-09-06, source-reviewed). Taking the same first answer here closes
+   * the window instead of relying on the two staying in step.
+   */
+  fromRun?: string
 ): string | undefined {
-  return owners[missionId] ?? current
+  return fromRun ?? owners[missionId] ?? current
 }
 
 /**

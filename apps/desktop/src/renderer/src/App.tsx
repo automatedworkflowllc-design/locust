@@ -228,6 +228,8 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'room-changed') return live
   // Memory moving is the Memory screen's business, not this run's.
   if (update.kind === 'memory-changed') return live
+  // A scheduled routine that would not start has no run to belong to.
+  if (update.kind === 'routine-blocked') return live
 
   const events = [...live.events, update.event].slice(-500)
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
@@ -637,6 +639,12 @@ export default function App(): ReactElement {
   const [memoryWorkspace, setMemoryWorkspace] = useState<{ readonly id: string; readonly name: string }>({ id: '', name: '' })
   const [memoryMode, setMemoryMode] = useState<MemoryMode>(DEFAULT_MEMORY_MODE)
   const [memoryNotice, setMemoryNotice] = useState<string>()
+  /**
+   * The last scheduled routine that would not start, and why. Kept until it
+   * is read: a routine that stops happening on a schedule is exactly the
+   * thing a person is not watching for.
+   */
+  const [automationNotice, setAutomationNotice] = useState<string>()
   /** Each runtime's own MCP servers and hooks, read once at boot and again when Settings opens. */
   const [runtimeSetup, setRuntimeSetup] = useState<Readonly<Record<string, PublicRuntimeSetup>>>()
   const [workspaceBrief, setWorkspaceBrief] = useState<PublicWorkspaceBrief | null>()
@@ -894,6 +902,15 @@ export default function App(): ReactElement {
         if (update.proposed.length > 0) said.push(`${update.by} wants to remember ${update.proposed.map((text) => `"${text}"`).join('; ')}`)
         if (update.forgotten.length > 0) said.push(`${update.by} forgot ${update.forgotten.map((text) => `"${text}"`).join('; ')}`)
         setMemoryNotice(said.join('. '))
+        return
+      }
+      if (update.kind === 'routine-blocked') {
+        // A scheduled routine that would not start. It has no run, so it is
+        // its own branch rather than a run's update, and it is kept until a
+        // person reads it -- nobody is watching a schedule fire.
+        setAutomationNotice(
+          `${update.name} did not start: ${update.message} Trying again at ${new Date(update.retryAt).toLocaleTimeString()}.`
+        )
         return
       }
       if (update.kind === 'mission-started') {
@@ -2040,8 +2057,14 @@ export default function App(): ReactElement {
     // Whoever the mission belongs to is who the composer now addresses. Done
     // here rather than in each caller, because the sidebar, the Missions list
     // and a teammate's message in an exchange all arrive through this one
-    // function and had disagreed about it.
-    setSelectedTeammateId((current) => ownerToSelect(missionId, missionOwnersRef.current, current))
+    // function and had disagreed about it. The run's own answer comes first,
+    // which is what the header uses, so the two cannot disagree while a run
+    // is waiting to be recorded.
+    const runHere =
+      runs.get(missionId) ?? [...runs.values()].find((run) => run.data?.missionId === missionId)
+    setSelectedTeammateId((current) =>
+      ownerToSelect(missionId, missionOwnersRef.current, current, runHere?.teammateId)
+    )
     // A run that is still starting is listed under its pending key.
     if (runs.has(missionId)) {
       setShownKey(missionId)
@@ -2397,10 +2420,12 @@ export default function App(): ReactElement {
               onUpdate={updateMemory}
               onRemove={removeMemory}
               onClear={clearMemories}
-              onOpenMission={(missionId) => {
-                setScreen('workroom')
-                setShownKey(missionId)
-              }}
+              // `openMission`, like every other opener. This had its own two
+              // lines, and `setShownKey` wants a RUN key -- `runs` is keyed by
+              // `run_...` -- so a `mission_...` id matched nothing and the
+              // workroom drew its empty home screen with the previous teammate
+              // still lit. Reproduced live by an outside QA, 2026-09-06.
+              onOpenMission={openMission}
               notice={memoryNotice}
             />
           ) : screen === 'automations' ? (
@@ -2412,6 +2437,8 @@ export default function App(): ReactElement {
               onEditRoutine={editRoutine}
               onRemoveRoutine={removeRoutine}
               onOpenTeammates={() => setScreen('teammates')}
+              notice={automationNotice}
+              onDismissNotice={() => setAutomationNotice(undefined)}
             />
           ) : screen === 'rooms' ? (
             <RoomScreen

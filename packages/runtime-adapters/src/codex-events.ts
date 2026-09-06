@@ -152,6 +152,15 @@ interface ProcessEvidence {
 interface RunCompletedPayload {
   readonly runtimeThreadId?: string;
   readonly usage?: RedactedJsonValue;
+  /**
+   * The model this run turned out to be, when the runtime named it and the
+   * caller asked for something less specific. Claude Code takes an alias --
+   * `sonnet`, `opus`, `fable` -- and resolves it to whichever model is
+   * newest in that family; its result then states the real one. Absent
+   * everywhere else, and absent when a run used more than one model, since
+   * there is no single answer then.
+   */
+  readonly resolvedModel?: string;
   readonly process: ProcessEvidence;
 }
 

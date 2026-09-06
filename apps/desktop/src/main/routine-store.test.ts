@@ -89,8 +89,29 @@ describe('the routine store', () => {
   })
 
   it('is bounded', async () => {
-    const store = createRoutineStore({ rootDirectory: await root() })
-    for (let index = 0; index < MAX_ROUTINES; index += 1) await store.create(fresh({ name: `r${String(index)}` }))
+    // Seeded on disk in ONE write rather than created one by one: 64
+    // write-and-rename cycles outran the test budget whenever the disk was
+    // busy, and the bound is a property of the file's length, not of how it
+    // got that long. The same fix the memory and room stores already carry;
+    // this was the third of the three to flake (2026-09-06).
+    const rootDirectory = await root()
+    const seeded = Array.from({ length: MAX_ROUTINES }, (_, index) => ({
+      routineId: `rt_seed${String(index)}`,
+      name: `r${String(index)}`,
+      teammateId: 'tm_wren',
+      route: ROUTE,
+      steps: ['Read status.ts and summarise it.'],
+      learnedFrom: ['mission_1'],
+      createdAt: '2026-09-05T00:00:00.000Z',
+      runs: 0
+    }))
+    await writeFile(
+      join(rootDirectory, 'routines.json'),
+      JSON.stringify({ schemaVersion: 1, routines: seeded }),
+      'utf8'
+    )
+    const store = createRoutineStore({ rootDirectory })
+    expect(await store.list()).toHaveLength(MAX_ROUTINES)
     await expect(store.create(fresh())).rejects.toThrow(/Too many/)
   })
 

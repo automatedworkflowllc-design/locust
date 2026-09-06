@@ -879,6 +879,17 @@ describe('who the composer addresses when a conversation is opened', () => {
     expect(ownerToSelect('mission_booty', owners, 'tm_wren')).toBe('tm_booty')
   })
 
+  it("prefers the run's own owner, which is what the header uses", () => {
+    // The header reads `run.teammateId ?? missionOwners[id]`; this used to
+    // read only the second. They agreed everywhere anyone could trace, except
+    // while a run has started and the host has not recorded it yet -- the
+    // exact window that produced the 0.35.0 bug (QA, 2026-09-06).
+    expect(ownerToSelect('mission_new', {}, 'tm_wren', 'tm_booty')).toBe('tm_booty')
+    // It is the first answer, not an override of a recorded one it disagrees
+    // with: no such case exists, and if one appears the run is the fresher.
+    expect(ownerToSelect('mission_booty', { mission_booty: 'tm_booty' }, 'tm_wren', undefined)).toBe('tm_booty')
+  })
+
   it('keeps the current selection for a conversation nobody owns', () => {
     // An unowned raw conversation is a real state; blanking the composer
     // would be a second wrong answer rather than a fix for the first.

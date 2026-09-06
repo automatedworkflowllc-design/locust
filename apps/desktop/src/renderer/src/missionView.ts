@@ -662,8 +662,48 @@ function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started
   }
   // A runtime's own sub-agent: Claude Code's `Task`, OpenCode's `task`.
   if (SUBAGENT_TOOL.test(name)) return 'helper'
-  if (/file|patch|write|edit/i.test(name)) return 'edit'
-  return 'tool'
+  return editToolName(name) ? 'edit' : 'tool'
+}
+
+/**
+ * Whether a tool name means "this touched a file".
+ *
+ * Matching `write` anywhere caught two tools that never touch one: OpenCode's
+ * `todowrite`, the model's own to-do list -- offered even to read-only runs --
+ * and Copilot's `write_agent`. Each names no path and carries no diff, so the
+ * fold counted a changed file on a run that changed nothing (QA, 2026-09-06).
+ * Missing `delete` was the same mistake from the other side: Cursor names a
+ * removal `delete`, and a run that deleted a file reported a tool call and no
+ * file.
+ *
+ * So the words are matched as whole words rather than as substrings, and the
+ * list is the vocabulary the adapters actually produce.
+ */
+const EDIT_TOOL_WORDS = new Set([
+  'file',
+  'files',
+  'patch',
+  'write',
+  'edit',
+  'delete',
+  'remove',
+  'create',
+  'move',
+  'rename'
+])
+const NOT_EDIT_TOOLS = /^(todowrite|todoread|todo_write|todo_read|write_agent|writeagent)$/i
+
+export function editToolName(name: string): boolean {
+  const trimmed = name.trim()
+  if (trimmed.length === 0) return false
+  if (NOT_EDIT_TOOLS.test(trimmed)) return false
+  // Split on separators AND on camelCase, so `deleteFile`, `delete_file` and
+  // `DeleteFile` all read as the two words they are -- and `todowrite`, which
+  // is one word, reads as one and matches nothing.
+  return trimmed
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z]+/)
+    .some((word) => EDIT_TOOL_WORDS.has(word.toLowerCase()))
 }
 
 /**
@@ -1395,11 +1435,24 @@ export function resolvedModelNames(
 ): ReadonlyMap<string, string> {
   const byRoute = new Map<string, { readonly at: number; readonly name: string }>()
   for (const mission of missions) {
+    // The runtime's own word, in either place it says it. Claude Code's
+    // START record repeats the alias it was given -- `sonnet` for `sonnet`,
+    // which teaches nothing -- and it is the RESULT that states the model
+    // the alias turned out to mean. Reading only the start is why the picker
+    // showed three bare aliases however many runs a person had done (Colin,
+    // 2026-09-06: "in model list they are just listed as sonnet, fable, and
+    // opus").
+    const settled = mission.events.find((event) => event.type === 'run.completed')
+    const resolved =
+      settled?.type === 'run.completed' ? settled.payload.resolvedModel : undefined
     const started = mission.events.find((event) => event.type === 'run.started')
-    if (started === undefined || started.type !== 'run.started') continue
-    const raw = started.payload.evidence.raw
-    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) continue
-    const name = (raw as Record<string, unknown>).model
+    if (resolved === undefined && (started === undefined || started.type !== 'run.started')) continue
+    const raw = started?.type === 'run.started' ? started.payload.evidence.raw : undefined
+    const fromStart =
+      typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>).model
+        : undefined
+    const name = resolved ?? fromStart
     // Only a real, different name is worth showing: `fable -> fable` teaches
     // nothing, and a blank teaches less.
     if (typeof name !== 'string' || name.length === 0 || name === mission.model) continue
@@ -1599,10 +1652,24 @@ export function resumableSessionOf(
  */
 export const HANDOFF_INSTRUCTION_MARKER = 'The person now asks:'
 
+/**
+ * The host writes the marker as a section of its own: a blank line, the
+ * sentence, then a blank line, then the words. Matching the bare sentence
+ * anywhere in any prompt found it inside a person's OWN typing -- someone
+ * working on this very file typed `Rename the string "The person now asks:"
+ * in handoff.ts` and the mission was titled `" in handoff.ts`, and a rescue
+ * briefing that QUOTES the original task matched inside the quote and showed
+ * the briefing as the person's words (QA, 2026-09-06).
+ *
+ * So the anchor is the section shape, not the sentence, and it is only ever
+ * looked for in a continuation the host actually wrote.
+ */
+const HANDOFF_INSTRUCTION_SECTION = `\n\n${HANDOFF_INSTRUCTION_MARKER}\n\n`
+
 export function handoffInstruction(prompt: string): string | undefined {
-  const at = prompt.lastIndexOf(HANDOFF_INSTRUCTION_MARKER)
+  const at = prompt.lastIndexOf(HANDOFF_INSTRUCTION_SECTION)
   if (at === -1) return undefined
-  const asked = prompt.slice(at + HANDOFF_INSTRUCTION_MARKER.length).trim()
+  const asked = prompt.slice(at + HANDOFF_INSTRUCTION_SECTION.length).trim()
   return asked.length === 0 ? undefined : asked
 }
 
@@ -1614,9 +1681,11 @@ export function typedPrompt(
   for (let hops = 0; hops < 32; hops += 1) {
     const relayed = relayedTitle(current)
     if (relayed !== undefined) return relayed
+    // Only where the host wrote the prompt. A mission a PERSON typed is their
+    // words already, whatever sentences it happens to contain.
+    if (current.continuesFrom?.reason !== 'route-switch') return current.prompt
     const asked = handoffInstruction(current.prompt)
     if (asked !== undefined) return asked
-    if (current.continuesFrom?.reason !== 'route-switch') return current.prompt
     const prior = byId.get(current.continuesFrom.missionId)
     if (prior === undefined) return current.prompt
     current = prior

@@ -203,6 +203,7 @@ export function createClaudeEventNormalizer(
   // `input_tokens` / `output_tokens`. Only the numbers travel; the record's
   // model-usage table names the account's models and stays behind.
   let completedUsage: Record<string, number> | undefined;
+  let resolvedModel: string | undefined;
   /**
    * The block the assistant's text is actually streaming into.
    *
@@ -511,6 +512,17 @@ export function createClaudeEventNormalizer(
       // denominator -- so it is kept, and no runtime that does not report one
       // gets a percentage invented for it.
       if (isObject(parsed.modelUsage)) {
+        // MEASURED 2026-09-06: each entry is keyed by the real model id and
+        // states `canonicalModel` as well. One entry means one model ran and
+        // the alias has an answer; several means the run moved between them,
+        // and naming one of them would be picking a favourite.
+        const entries = Object.entries(parsed.modelUsage);
+        if (entries.length === 1) {
+          const [key, only] = entries[0]!;
+          const canonical = isObject(only) ? only.canonicalModel : undefined;
+          const named = typeof canonical === "string" && canonical.length > 0 ? canonical : key;
+          if (named.length > 0) resolvedModel = named;
+        }
         let widest: number | undefined;
         for (const entry of Object.values(parsed.modelUsage)) {
           if (!isObject(entry)) continue;
@@ -646,6 +658,7 @@ export function createClaudeEventNormalizer(
         emit("run.completed", {
           ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
           ...(completedUsage === undefined ? {} : { usage: completedUsage }),
+          ...(resolvedModel === undefined ? {} : { resolvedModel }),
           process,
         }),
       ];

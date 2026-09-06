@@ -425,6 +425,44 @@ describe("tool pairing and terminal state", () => {
 });
 
 describe("what the run cost, as Claude Code priced it", () => {
+  it("names the model an alias turned out to mean", () => {
+    // Claude Code takes `sonnet` and resolves it to whichever model is
+    // newest in that family. Its START record repeats the alias, so only the
+    // result can say what actually ran.
+    const claude = normalizer();
+    claude.accept(
+      record({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        usage: { input_tokens: 10, output_tokens: 47 },
+        modelUsage: { "claude-sonnet-5": { canonicalModel: "claude-sonnet-5", contextWindow: 1000000 } },
+      }),
+    );
+    const [done] = claude.finish(completion({ exitCode: 0 }));
+    expect((done?.payload as { resolvedModel?: string }).resolvedModel).toBe("claude-sonnet-5");
+  });
+
+  it("names none when a run used more than one model", () => {
+    // There is no single answer then, and picking one would be picking a
+    // favourite.
+    const claude = normalizer();
+    claude.accept(
+      record({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        usage: { input_tokens: 10, output_tokens: 47 },
+        modelUsage: {
+          "claude-sonnet-5": { canonicalModel: "claude-sonnet-5" },
+          "claude-haiku-4-5-20251001": { canonicalModel: "claude-haiku-4-5-20251001" },
+        },
+      }),
+    );
+    const [done] = claude.finish(completion({ exitCode: 0 }));
+    expect((done?.payload as { resolvedModel?: string }).resolvedModel).toBeUndefined();
+  });
+
   it("carries the model's own context window, so a reading has a real denominator", () => {
     // MEASURED 2026-09-06: `modelUsage` states `contextWindow` per model --
     // 1,000,000 for claude-sonnet-5. It is the only denominator the app will

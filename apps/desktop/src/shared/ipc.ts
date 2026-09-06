@@ -921,6 +921,21 @@ export type CodexMissionUpdate =
       readonly missionId: string
       readonly message: string
     }
+  | {
+      /**
+       * A scheduled routine that would not start. It has no run and no
+       * mission -- nothing was created -- so it cannot travel as a run's
+       * notice, which is why it went unsaid: the runner held it off for an
+       * hour and tried again, silently, for as long as the refusal lasted
+       * (QA, 2026-09-06; `index.ts` already had a comment admitting it).
+       */
+      readonly kind: 'routine-blocked'
+      readonly routineId: string
+      readonly name: string
+      readonly message: string
+      /** When it will be tried again, so the notice can say so. */
+      readonly retryAt: string
+    }
 
 /**
  * A checkpoint as the renderer may see it. Deliberately narrower than the

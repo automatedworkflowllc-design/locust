@@ -243,7 +243,18 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         if (response.ok) {
           started.push(routine.routineId)
         } else {
-          heldOff.set(routine.routineId, now.getTime() + SCHEDULE_HOLD_OFF_MS)
+          const retryAt = now.getTime() + SCHEDULE_HOLD_OFF_MS
+          heldOff.set(routine.routineId, retryAt)
+          // Said, not just recorded. A scheduled routine is the one kind of
+          // run nobody is watching start, so a refusal nobody is told about
+          // is a routine that has quietly stopped happening.
+          options.notify({
+            kind: 'routine-blocked',
+            routineId: routine.routineId,
+            name: routine.name,
+            message: response.error.message,
+            retryAt: new Date(retryAt).toISOString()
+          })
         }
       }
       return started

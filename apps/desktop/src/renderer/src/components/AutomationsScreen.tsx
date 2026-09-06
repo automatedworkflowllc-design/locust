@@ -28,7 +28,9 @@ export function AutomationsScreen({
   onRunRoutine,
   onEditRoutine,
   onRemoveRoutine,
-  onOpenTeammates
+  onOpenTeammates,
+  notice,
+  onDismissNotice
 }: {
   readonly routines: readonly PublicRoutine[]
   readonly teammates: readonly PublicTeammate[]
@@ -40,6 +42,9 @@ export function AutomationsScreen({
   readonly onEditRoutine: (routine: PublicRoutine) => void
   readonly onRemoveRoutine: (routineId: string) => void
   readonly onOpenTeammates: () => void
+  /** The last scheduled routine that would not start, and why. */
+  readonly notice: string | undefined
+  readonly onDismissNotice: () => void
 }): ReactElement {
   const now = new Date()
   // Scheduled first: those are the ones that happen without anybody here,
@@ -66,6 +71,15 @@ export function AutomationsScreen({
               }`}
         </p>
       </header>
+
+      {notice !== undefined && (
+        <p className="lc-claim lc-claim--hint lc-tone-amber">
+          {notice}{' '}
+          <button type="button" className="lc-ghostbutton" onClick={onDismissNotice}>
+            Dismiss
+          </button>
+        </p>
+      )}
 
       {routines.length === 0 ? (
         <div className="lc-empty">

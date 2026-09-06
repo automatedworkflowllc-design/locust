@@ -297,4 +297,44 @@ describe('a routine that runs on its own', () => {
       expect(await h.tick(at)).toEqual([])
     }
   })
+
+  // --- a scheduled start that is refused (0.35.2 QA) ---
+    // The runner held it off for an hour and tried again, silently, for as long
+    // as the refusal lasted -- Auto revoked after the routine was saved, a
+    // runtime signed out, anything. A scheduled run is the one nobody watches
+    // start, so a refusal nobody is told about is a routine that has quietly
+    // stopped happening. `index.ts` already carried a comment admitting it.
+
+    /** One due routine, on a runner whose every start is refused. */
+    const scheduledFailing = () =>
+      scheduled({
+        startFails: true,
+        routines: [
+          routine({
+            routineId: 'rt_due',
+            teammateId: 'tm_a',
+            schedule: { kind: 'every', hours: 2 },
+            createdAt: '2026-09-05T09:00:00.000Z'
+          })
+        ]
+      })
+
+    it('tells the window, names the routine, and says when it will try again', async () => {
+      const h = scheduledFailing()
+      await h.tick(NOON)
+      const blocked = h.updates.filter((update) => update.kind === 'routine-blocked')
+      expect(blocked).toHaveLength(1)
+      const only = blocked[0]
+      if (only?.kind !== 'routine-blocked') throw new Error('not a routine-blocked update')
+      expect(only.name).toBe('Nightly tidy')
+      expect(only.message).toContain('no runtime')
+      expect(Date.parse(only.retryAt)).toBeGreaterThan(NOON.getTime())
+    })
+
+    it('says it once per attempt, not once per tick, because the hold-off holds', async () => {
+      const h = scheduledFailing()
+      await h.tick(NOON)
+      await h.tick(new Date(NOON.getTime() + 60_000))
+      expect(h.updates.filter((update) => update.kind === 'routine-blocked')).toHaveLength(1)
+    })
 })
