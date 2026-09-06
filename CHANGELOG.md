@@ -6,6 +6,33 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.37.1 — 2026-09-06
+
+Three corrections, two of them to fixes from earlier the same day.
+
+- **A teammate replying to another is no longer told the folder was shared.**
+  When one teammate passes work to another, the second was told "another
+  teammate was working in this folder at the same time, so what changed on
+  disk cannot be told apart" -- about a run that had already finished. Its own
+  work then counted for nothing. Two runs share a folder when both are
+  running in it, which is now what gets asked.
+
+- **Teammates on their own branch are told so even in a folder with no
+  LOCUST.md.** The sentence that stopped those runs dying was riding along
+  with the project's own instructions, so a folder without an instructions
+  file never got it -- which is every folder, for someone who has just
+  installed the app. The team's memory also stopped naming the main folder to
+  a teammate that is not standing in it.
+
+- **A run stopped by the folder boundary says which folder.** It used to say
+  "OpenCode ended without a step that reported it had stopped", which
+  describes the silence rather than the cause.
+
+- **A room teammate that repeats the example no longer files it as work.**
+  Every teammate in a room is shown an example of how to update the task
+  board, and repeating that example back put its placeholder text on the
+  board as a real task.
+
 ## 0.37.0 — 2026-09-06
 
 - **Install the runtime Locust asked you to install, and it just works.** It
