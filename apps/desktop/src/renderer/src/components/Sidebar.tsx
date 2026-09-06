@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 
-import type { PublicRecoveredMission, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
+import type { PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
@@ -76,6 +76,48 @@ function isShown(mission: SidebarMission, selectedMissionId: string | undefined)
  * put fictional colleagues beside a live mission, which is the one thing the
  * design spec forbids -- so the region is simply absent until it is real.
  */
+/**
+ * A sidebar group that folds.
+ *
+ * Colin, 2026-09-06: *"make them all collapsible dropdowns to give the user
+ * more space"*. The heading keeps the same label type it always had -- this
+ * adds the chevron and the count, not a new look -- and it is a real button,
+ * so the whole row is the target rather than a caret a person has to hit.
+ *
+ * An empty group still draws: *"if no automations dont remove, just have it
+ * as a holder, we want the user to know its possible even if none are setup"*.
+ * A count of zero is information; a missing section is not.
+ */
+function SidebarSection({
+  label,
+  count,
+  open,
+  onToggle,
+  children
+}: {
+  readonly label: string
+  readonly count: number
+  readonly open: boolean
+  readonly onToggle: () => void
+  readonly children?: ReactNode
+}): ReactElement {
+  return (
+    <>
+      <button
+        type="button"
+        className={`lc-sectionlabel lc-sectionlabel--fold${open ? ' is-open' : ''}`}
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={11} />
+        <span>{label}</span>
+        <span className="lc-sectionlabel__count">{String(count)}</span>
+      </button>
+      {open && children}
+    </>
+  )
+}
+
 export function Sidebar({
   runtimes,
   missions,
@@ -98,9 +140,11 @@ export function Sidebar({
   onOpenMissions,
   onOpenTeammates,
   rooms,
+  routines,
   currentRoomId,
   onOpenRoom,
   onOpenRooms,
+  onOpenAutomations,
   onHome
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
@@ -133,13 +177,19 @@ export function Sidebar({
   readonly onOpenTeammates: () => void
   /** Rooms a person can write to at once; the one open now is highlighted. */
   readonly rooms: readonly PublicRoom[]
+  /** Saved routines, listed under Automations. */
+  readonly routines: readonly PublicRoutine[]
   readonly currentRoomId: string | undefined
   readonly onOpenRoom: (roomId: string) => void
   readonly onOpenRooms: () => void
+  readonly onOpenAutomations: () => void
   /** Back to the home screen: nothing picked, nothing open. */
   readonly onHome: () => void
 }): ReactElement {
   const [query, setQuery] = useState('')
+  // Which groups are open. All three start open, which is how the sidebar
+  // has always read; folding is for making room, not a new default.
+  const [openSections, setOpenSections] = useState({ teammates: true, missions: true, automations: true })
   const connected = connectedRuntimeCount(runtimes)
   const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
   const shownUnowned = missionsMatching(unowned, query)
@@ -210,7 +260,12 @@ export function Sidebar({
             </button>
           </>
         )}
-        {teammates.length > 0 && <div className="lc-sectionlabel">Teammates</div>}
+        <SidebarSection
+          label="Teammates"
+          count={teammates.length}
+          open={openSections.teammates}
+          onToggle={() => setOpenSections((current) => ({ ...current, teammates: !current.teammates }))}
+        >
         {teammates.map((teammate) => {
           const owned = missions.filter(
             (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
@@ -331,11 +386,28 @@ export function Sidebar({
               )}
             </div>
           )
-        })}
+          })}
+        </SidebarSection>
 
-        {shownUnowned.length > 0 && (
+        {/*
+          Always drawn, empty or not: a section that disappears takes the
+          fact that it exists with it. Colin, 2026-09-06, about Automations
+          and true of all three -- "if no automations dont remove, just have
+          it as a holder, we want the user to know its possible even if none
+          are setup".
+        */}
+        <SidebarSection
+          label={teammates.length > 0 ? 'Other missions' : 'Missions'}
+          count={shownUnowned.length}
+          open={openSections.missions}
+          onToggle={() => setOpenSections((current) => ({ ...current, missions: !current.missions }))}
+        >
+          {shownUnowned.length === 0 && (
+            <p className="lc-sidebar__empty lc-row__meta">
+              {teammates.length > 0 ? 'Every mission belongs to a teammate.' : 'No missions yet.'}
+            </p>
+          )}
           <>
-            <div className="lc-sectionlabel">{teammates.length > 0 ? 'Other missions' : 'Missions'}</div>
             {shownUnowned.map((mission) => {
               const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
               return (
@@ -365,7 +437,47 @@ export function Sidebar({
               )
             })}
           </>
-        )}
+        </SidebarSection>
+
+        <SidebarSection
+          label="Automations"
+          count={routines.length}
+          open={openSections.automations}
+          onToggle={() => setOpenSections((current) => ({ ...current, automations: !current.automations }))}
+        >
+          {routines.length === 0 ? (
+            <button
+              type="button"
+              className="lc-row lc-row--button lc-roomrow lc-roomrow--new"
+              onClick={onOpenAutomations}
+              title="What automations are"
+            >
+              <Icon name="clock" size={12} />
+              <span className="lc-row__text">
+                <span className="lc-row__meta">Nothing saved yet</span>
+              </span>
+            </button>
+          ) : (
+            routines.map((routine) => (
+              <button
+                key={routine.routineId}
+                type="button"
+                className="lc-row lc-row--button"
+                title={`Open Automations · ${routine.name}`}
+                onClick={onOpenAutomations}
+              >
+                <Icon name="clock" size={14} />
+                <span className="lc-row__text">
+                  <span className="lc-row__name">{routine.name}</span>
+                  <span className="lc-row__meta">
+                    {String(routine.steps.length)} step{routine.steps.length === 1 ? '' : 's'}
+                    {routine.schedule === undefined ? '' : ' · scheduled'}
+                  </span>
+                </span>
+              </button>
+            ))
+          )}
+        </SidebarSection>
 
         {/*
           Only one empty state, and only when it is true: no missions at all.
@@ -382,9 +494,16 @@ export function Sidebar({
           <p className="lc-sidebar__empty lc-row__meta">No missions match that.</p>
         )}
 
+        {/*
+          The folding Missions section above carries its own one-liner, so
+          this no longer draws a heading of its own -- with both, an empty
+          sidebar showed "Missions" twice (seen in the settings drive,
+          2026-09-06). What it still owns is the sentence that tells a first
+          person what to do, which depends on the composer being on screen
+          and on whether a teammate is picked.
+        */}
         {missions.length === 0 && (
           <>
-            <div className="lc-sectionlabel">Missions</div>
             <p className="lc-sidebar__empty lc-row__meta">
               {/*
                 * "below" means the composer, which only the workroom has. On

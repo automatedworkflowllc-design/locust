@@ -32,7 +32,7 @@ import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
-export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory'
+export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
 function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
   return (
@@ -862,27 +862,30 @@ export function SettingsScreen({
               including outside the folder.
             </p>
             <p>
-              It exists because some work genuinely lives in more than one place. It is off until you turn
-              it on, it is checked again each time a run starts -- switching it off here stops the next run,
-              including one a teammate or a routine was about to start -- and it is never the mode a
-              malformed or missing choice falls back to.
+              It exists because some work genuinely lives in more than one place. Auto is always in the
+              composer's permission menu and picking it there is what switches it on, so this is the same
+              decision seen from the other side: what is on now, and the way to take it back. It is checked
+              again each time a run starts -- switching it off here stops the next run, including one a
+              teammate or a routine was about to start -- and it is never the mode a malformed or missing
+              choice falls back to.
             </p>
           </More>
           <div className="lc-settingrows">
             <div className="lc-settingrow">
               <span className="lc-settings__note">
                 {autoMode
-                  ? 'Auto can be picked in the composer. A run in it may change files anywhere on this machine.'
-                  : 'Auto is not offered in the composer.'}
+                  ? 'On. A run in Auto may change files anywhere on this machine.'
+                  : 'Off. Picking Auto in the composer switches it back on.'}
               </span>
               <button
                 type="button"
-                className={`lc-button${autoMode ? ' is-active' : ''}`}
+                className={`lc-switch${autoMode ? ' is-on' : ''}`}
                 role="switch"
                 aria-checked={autoMode}
+                aria-label={autoMode ? 'Switch this off' : 'Switch this on'}
                 onClick={() => onAutoModeChange(!autoMode)}
               >
-                {autoMode ? 'On' : 'Off'}
+                <span className="lc-switch__knob" />
               </button>
             </div>
           </div>
@@ -913,12 +916,13 @@ export function SettingsScreen({
               </span>
               <button
                 type="button"
-                className={`lc-button${relay ? ' is-active' : ''}`}
+                className={`lc-switch${relay ? ' is-on' : ''}`}
                 role="switch"
                 aria-checked={relay}
+                aria-label={relay ? 'Switch this off' : 'Switch this on'}
                 onClick={() => onRelayChange(!relay)}
               >
-                {relay ? 'On' : 'Off'}
+                <span className="lc-switch__knob" />
               </button>
             </div>
             {/*

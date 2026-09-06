@@ -39,6 +39,7 @@ import { routineDraft } from './routines.js'
 import { queuedVerdict } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
+import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
@@ -1850,6 +1851,24 @@ export default function App(): ReactElement {
       .catch(() => setRoutineDialog({ ...dialog, busy: false, error: 'That routine could not be saved.' }))
   }
 
+  /**
+   * Open a saved routine for editing. Shared by the roster card and the
+   * Automations screen: two copies of this had already started to drift in
+   * the same file.
+   */
+  const editRoutine = (routine: PublicRoutine): void => {
+    setRoutineDialog({
+      teammateId: routine.teammateId,
+      routineId: routine.routineId,
+      name: routine.name,
+      steps: routine.steps,
+      learnedFrom: routine.learnedFrom,
+      truncated: false,
+      ...(routine.schedule === undefined ? {} : { schedule: routine.schedule }),
+      busy: false
+    })
+  }
+
   const runRoutine = (routineId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -2273,6 +2292,8 @@ export default function App(): ReactElement {
         )}
         <Sidebar
           runtimes={runtimes}
+          routines={routines}
+          onOpenAutomations={() => setScreen('automations')}
           missions={sidebarMissions}
           teammates={teammates}
           routineStepByTeammate={routineStepByTeammate}
@@ -2353,18 +2374,7 @@ export default function App(): ReactElement {
               routineStepByTeammate={routineStepByTeammate}
               onRunRoutine={runRoutine}
               onRemoveRoutine={removeRoutine}
-              onEditRoutine={(routine) =>
-                setRoutineDialog({
-                  teammateId: routine.teammateId,
-                  routineId: routine.routineId,
-                  name: routine.name,
-                  steps: routine.steps,
-                  learnedFrom: routine.learnedFrom,
-                  truncated: false,
-                  ...(routine.schedule === undefined ? {} : { schedule: routine.schedule }),
-                  busy: false
-                })
-              }
+              onEditRoutine={editRoutine}
               onNewTeammate={() => {
                 setTeammateError(undefined)
                 setNewTeammateOpen(true)
@@ -2392,6 +2402,16 @@ export default function App(): ReactElement {
                 setShownKey(missionId)
               }}
               notice={memoryNotice}
+            />
+          ) : screen === 'automations' ? (
+            <AutomationsScreen
+              routines={routines}
+              teammates={teammates}
+              routineStepByTeammate={routineStepByTeammate}
+              onRunRoutine={runRoutine}
+              onEditRoutine={editRoutine}
+              onRemoveRoutine={removeRoutine}
+              onOpenTeammates={() => setScreen('teammates')}
             />
           ) : screen === 'rooms' ? (
             <RoomScreen

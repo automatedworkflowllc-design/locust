@@ -1502,6 +1502,50 @@ textarea {
   resize: vertical;
 }
 
+/*
+ * A yes-or-no switch. The Memory screen has had one since it shipped; the
+ * Settings screen said "On"/"Off" in a button instead, so the same question
+ * had two shapes on two screens (Colin, 2026-09-06: "anything that is a
+ * simple on or off just use something similar to this"). One class now, in
+ * the palette the settings cards already use.
+ */
+.lc-switch {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 20px;
+  padding: 2px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: 999px;
+  background: var(--lc-bg-control);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.lc-switch.is-on {
+  background: var(--lc-lime);
+  border-color: var(--lc-lime);
+}
+
+.lc-switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lc-switch__knob {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--lc-text-muted);
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+.lc-switch.is-on .lc-switch__knob {
+  transform: translateX(14px);
+  background: var(--lc-bg-raised);
+}
+
 .lc-memory__switch {
   flex: 0 0 auto;
   width: 28px;
@@ -5326,4 +5370,35 @@ textarea {
 
 .lc-peer__open:hover {
   color: var(--lc-text-primary);
+}
+
+/*
+ * A sidebar group heading that folds. Same label type as before -- this adds
+ * the chevron and the count, not a new look (Colin, 2026-09-06: "make them
+ * all collapsible dropdowns to give the user more space").
+ */
+.lc-sectionlabel--fold {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+  color: var(--lc-text-label);
+}
+
+.lc-sectionlabel--fold:hover {
+  color: var(--lc-text-secondary);
+}
+
+.lc-sectionlabel__count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-text-faint);
 }
