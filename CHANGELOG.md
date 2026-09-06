@@ -6,6 +6,33 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.1 — 2026-09-06
+
+A design pass over the conversation column, which had grown nineteen different
+kinds of object where Claude Code has three. Nothing is removed; several
+things stop being their own box.
+
+- **A plan now sits inside the activity fold**, as its first rows, instead of
+  in a card above it. A plan is the clearest statement of what a run did, so
+  it belongs with the rest of what it did. A run that answers with steps and
+  touches nothing keeps its plan where it was.
+
+- **What a conversation taught the team** is a note now rather than a bordered
+  card. It already happened and it asks nothing of you.
+
+- **The mission id is said once.** It sat at the top of the thread and in the
+  header band above it, thirty pixels apart. The start time was only in the
+  thread, so that stays.
+
+- **The durable receipt is one line** — runtime, model, checkpoints, verified —
+  with the full table behind the same disclosure the activity fold uses.
+  Nobody reads "Events: 41 recorded" twice. An unverified action still shows
+  without opening anything.
+
+- **A teammate's row in the sidebar stops stacking five lines.** The routine
+  step and the branch answer the same question, so one line shows whichever
+  applies: the step while a routine runs, the branch otherwise.
+
 ## 0.38.0 — 2026-09-06
 
 - **Locust installs a coding agent for you.** Open it on a machine with none,
