@@ -67,7 +67,7 @@ textarea {
 .lc-titlebar__title {
   grid-column: 2;
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   justify-self: center;
   white-space: nowrap;
@@ -216,7 +216,7 @@ textarea {
   border-radius: var(--lc-radius-button);
   background: var(--lc-bg-raised-2);
   border: 1px solid var(--lc-border-hairline);
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
   transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
 }
 
@@ -229,12 +229,12 @@ textarea {
   background: transparent;
   outline: none;
   width: 100%;
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-primary);
 }
 
 .lc-search input::placeholder {
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-sectionlabel {
@@ -243,7 +243,7 @@ textarea {
   font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-sidebar__scroll {
@@ -297,7 +297,7 @@ textarea {
 }
 
 .lc-row__meta {
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -327,7 +327,7 @@ textarea {
   border: 1px solid var(--lc-blue-border);
   border-radius: var(--lc-radius-card);
   background: var(--lc-blue-tint);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-secondary);
 }
 
@@ -454,14 +454,14 @@ textarea {
 }
 
 .lc-workroom__role {
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   margin-left: var(--lc-space-4);
 }
 
 .lc-workroom__mission {
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -478,7 +478,7 @@ textarea {
   border-radius: var(--lc-radius-control);
   background: var(--lc-bg-control);
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   cursor: pointer;
   transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
 }
@@ -536,7 +536,7 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-bubble {
@@ -586,7 +586,7 @@ textarea {
   border-radius: var(--lc-radius-card);
   overflow-x: auto;
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   line-height: 1.55;
   color: var(--lc-text-secondary);
 }
@@ -646,7 +646,7 @@ textarea {
 .lc-resume__note {
   margin: 0;
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   text-wrap: pretty;
 }
 
@@ -655,7 +655,7 @@ textarea {
   margin: 0;
   padding-left: var(--lc-space-6);
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-caption, 12px);
+  font-size: var(--lc-text-description);
 }
 
 .lc-resume__actions {
@@ -667,7 +667,7 @@ textarea {
 
 .lc-resume__caution {
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-caption, 12px);
+  font-size: var(--lc-text-description);
   flex: 1;
   min-width: 0;
 }
@@ -687,7 +687,7 @@ textarea {
   padding: var(--lc-space-5);
   border: 1px solid var(--lc-border-card);
   border-radius: var(--lc-radius-card);
-  background: var(--lc-surface-raised, transparent);
+  background: transparent;
 }
 
 .lc-decision__head {
@@ -709,7 +709,7 @@ textarea {
 .lc-decision__question {
   margin: 0;
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   text-wrap: pretty;
 }
 
@@ -762,7 +762,7 @@ textarea {
 
 .lc-decision__note {
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-caption, 12px);
+  font-size: var(--lc-text-description);
 }
 
 .lc-decision__foot {
@@ -780,7 +780,7 @@ textarea {
   border: 1px solid var(--lc-border-card);
   border-radius: var(--lc-radius-card);
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
 }
 
 .lc-rerun span {
@@ -850,7 +850,7 @@ textarea {
 
 .lc-card__body {
   padding: 0 var(--lc-space-5) var(--lc-space-5);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-secondary);
 }
 
@@ -910,7 +910,7 @@ textarea {
   border-radius: var(--lc-radius-card);
   background: var(--lc-bg-raised);
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   cursor: pointer;
   text-align: left;
 }
@@ -953,7 +953,7 @@ textarea {
   border: 0;
   background: transparent;
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   text-align: left;
   cursor: pointer;
@@ -987,7 +987,7 @@ textarea {
   flex: none;
   font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-filerow__status.is-large {
@@ -1025,7 +1025,7 @@ textarea {
  */
 .lc-diff {
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   line-height: 1.85;
   background: var(--lc-diff-surface);
   border-top: 1px solid var(--lc-border-hairline);
@@ -1200,7 +1200,7 @@ textarea {
   grid-template-columns: max-content 1fr;
   gap: var(--lc-space-3) var(--lc-space-6);
   padding: 0 var(--lc-space-5) var(--lc-space-5);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
 }
 
 .lc-receipt dt {
@@ -1208,7 +1208,7 @@ textarea {
   font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
   padding-top: 2px;
 }
 
@@ -1335,7 +1335,7 @@ textarea {
 }
 
 .lc-folder__label {
-  font-size: var(--lc-text-label);
+  font-size: var(--lc-text-muted);
   color: var(--lc-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1377,7 +1377,7 @@ textarea {
   max-width: var(--lc-thread-max-width);
   padding: var(--lc-space-2) var(--lc-space-4);
   border-bottom: 1px solid var(--lc-border-hairline);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-secondary);
 }
 
@@ -1960,7 +1960,7 @@ textarea {
   align-items: center;
   gap: var(--lc-space-2);
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
 }
 
 .lc-task__actions,
@@ -2075,7 +2075,7 @@ textarea {
 .lc-empty p {
   margin: 0;
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   text-wrap: pretty;
 }
 
@@ -2303,7 +2303,7 @@ textarea {
   border: 1px solid var(--lc-red-border);
   background: var(--lc-red-tint);
   color: var(--lc-red-text);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
 }
 
 .lc-composer form {
@@ -2347,7 +2347,7 @@ textarea {
 }
 
 .lc-composer textarea::placeholder {
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-send {
@@ -2609,7 +2609,7 @@ textarea {
 
 .lc-inspector__empty {
   margin: 0;
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   text-wrap: pretty;
 }
@@ -2659,7 +2659,7 @@ textarea {
 }
 
 .lc-rail__name {
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-primary);
   overflow-wrap: anywhere;
 }
@@ -2694,7 +2694,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
 }
 
 .lc-permissions__row {
@@ -2777,7 +2777,7 @@ textarea {
   display: flex;
   align-items: flex-start;
   gap: var(--lc-space-4);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
@@ -2922,7 +2922,7 @@ textarea {
 }
 
 .lc-dialog__sub {
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
 
@@ -2969,7 +2969,7 @@ textarea {
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-input {
@@ -3071,7 +3071,7 @@ textarea {
 .lc-summarycard__text {
   flex: 1;
   min-width: 0;
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-secondary);
 }
 
@@ -3090,7 +3090,7 @@ textarea {
 
 .lc-dialog__error {
   margin: 0;
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-red-text);
 }
 
@@ -3263,7 +3263,7 @@ textarea {
 }
 
 .lc-screen__meta {
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
 
@@ -3279,7 +3279,7 @@ textarea {
   border-radius: var(--lc-radius-control);
   border: 1px solid transparent;
   background: transparent;
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   cursor: pointer;
 }
@@ -3335,14 +3335,14 @@ textarea {
 }
 
 .lc-missionrow__owner {
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-control-fg);
 }
 
 .lc-missionrow__route,
 .lc-missionrow__stats,
 .lc-missionrow__cost {
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -3408,7 +3408,7 @@ textarea {
 }
 
 .lc-rostercard__role {
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
@@ -3424,12 +3424,12 @@ textarea {
   font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-rostercard__facts dd {
   margin: 0;
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-secondary);
 }
 
@@ -3463,7 +3463,7 @@ textarea {
 
 .lc-settings__lede {
   margin: 0 0 var(--lc-space-5);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   text-wrap: pretty;
 }
@@ -3496,7 +3496,7 @@ textarea {
 }
 .lc-trace__seg:first-child {
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-secondary);
   white-space: nowrap;
 }
@@ -3570,7 +3570,7 @@ textarea {
 
 .lc-settings__more {
   margin: 0 0 var(--lc-space-5);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 .lc-settings__more > summary {
@@ -3579,7 +3579,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--lc-text-label);
+  font-size: var(--lc-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--lc-text-muted);
@@ -3651,7 +3651,7 @@ textarea {
 }
 
 .lc-settings__note {
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-secondary);
   text-wrap: pretty;
 }
@@ -3692,7 +3692,7 @@ textarea {
 }
 
 .lc-palette__input::placeholder {
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-palette__list {
@@ -3707,7 +3707,7 @@ textarea {
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-palette__item {
@@ -3833,7 +3833,7 @@ textarea {
 }
 
 .lc-picker__input::placeholder {
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 /* Swarm, at the head of the thing it is about. It was a chip beside the
@@ -3936,7 +3936,7 @@ textarea {
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-picker__more {
@@ -3944,7 +3944,7 @@ textarea {
   padding: 2px var(--lc-space-4) var(--lc-space-2) 30px;
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label-wide);
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-picker__row {
@@ -4157,7 +4157,7 @@ textarea {
   border: 1px solid var(--lc-border-card);
   background: var(--lc-bg-raised);
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   text-align: left;
   cursor: pointer;
   text-wrap: pretty;
@@ -4223,7 +4223,7 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 /* The receiving runtime is where the reader's attention should land. */
@@ -4232,7 +4232,7 @@ textarea {
 }
 
 .lc-handoff__arrow {
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-handoff__note {
@@ -4242,7 +4242,7 @@ textarea {
 }
 
 .lc-handoff__time {
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 /*
@@ -4277,7 +4277,7 @@ textarea {
   border: none;
   background: transparent;
   font: inherit;
-  font-size: var(--lc-text-caption, 12px);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   cursor: pointer;
   transition: background 140ms ease, color 140ms ease;
@@ -4501,7 +4501,7 @@ textarea {
 
 .lc-shuffle {
   margin-left: auto;
-  font-size: var(--lc-text-caption, 12px);
+  font-size: var(--lc-text-description);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4534,7 +4534,7 @@ textarea {
   border-radius: var(--lc-radius-control);
   background: transparent;
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
   text-align: left;
   cursor: pointer;
 }
@@ -4562,7 +4562,7 @@ textarea {
   background: transparent;
   color: var(--lc-text-secondary, #a8adab);
   font: inherit;
-  font-size: var(--lc-text-caption, 12px);
+  font-size: var(--lc-text-description);
   padding: 4px 10px;
   border-radius: var(--lc-radius-button, 7px);
   cursor: pointer;
@@ -4598,7 +4598,7 @@ textarea {
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4760,7 +4760,7 @@ textarea {
   border-radius: var(--lc-radius-button);
   overflow-x: auto;
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   line-height: 1.6;
   color: var(--lc-text-secondary);
 }
@@ -4857,7 +4857,7 @@ textarea {
   border-left: 2px solid var(--lc-green-border);
   border-radius: 0;
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-secondary-size);
+  font-size: var(--lc-text-description);
 }
 
 .lc-rerun span {
@@ -4976,7 +4976,7 @@ textarea {
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-rostercard__stat dd {
@@ -5006,13 +5006,13 @@ textarea {
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-rostercard__cost dd {
   margin: 0;
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-provenance);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-primary);
   overflow-wrap: anywhere;
 }
@@ -5041,7 +5041,7 @@ textarea {
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-rostercard__mission {
@@ -5524,7 +5524,7 @@ textarea {
 .lc-peer__bubble.is-link:hover,
 .lc-peer__bubble.is-link:focus-visible {
   border-color: rgba(255, 255, 255, 0.18);
-  background: var(--lc-bg-bubble-peer-hover, #262a2b);
+  background: var(--lc-hover-surface-strong);
 }
 
 .lc-peer__open {
@@ -5560,7 +5560,7 @@ textarea {
   font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
-  color: var(--lc-text-label);
+  color: var(--lc-text-muted);
 }
 
 .lc-sectionlabel--fold:hover {

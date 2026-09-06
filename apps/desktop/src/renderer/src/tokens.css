@@ -67,7 +67,7 @@
   --lc-overlay-scrim: rgba(8, 10, 10, 0.55);
 
   /* --- Text ------------------------------------------------------------
-   * `--lc-text-muted` and `--lc-text-label` are the AA floor for anything
+   * `--lc-text-muted` is the AA floor for anything
    * readable. `--lc-text-faint` is for NON-TEXT only (icon strokes, the `/`
    * separator glyph, hairline marks) -- it measures 4.2-4.4:1 and fails AA on
    * copy. The two annotation grays from the spec are deliberately absent:
@@ -79,7 +79,6 @@
   --lc-text-control-fg: #a8adab;
   --lc-text-secondary: #c7c3bc;
   --lc-text-muted: #8b9190;
-  --lc-text-label: #8b9190;
   --lc-text-faint: #7a807f;
 
   /* --- Semantics -------------------------------------------------------
@@ -179,9 +178,26 @@
   --lc-text-teammate-name: 14.5px;
   --lc-text-body: 13.5px;
   --lc-text-control: 13px;
-  --lc-text-secondary-size: 12.5px;
   --lc-text-description: 12px;
-  --lc-text-mono-provenance: 11.5px;
+
+  /*
+   * Retired 2026-09-06, design review: three steps nobody could see.
+   *
+   *   --lc-text-label (#8b9190)          -> --lc-text-muted, the same value
+   *   --lc-text-mono-provenance (11.5px) -> --lc-text-mono-caption (11px)
+   *   --lc-text-secondary-size (12.5px)  -> --lc-text-description (12px)
+   *
+   * The first was two names for one colour, which makes every call site a
+   * coin flip and means a future change to "labels" silently moves body copy.
+   * The other two were half-pixel steps inside a scale: imperceptible on
+   * their own, but every component still had to choose, and the choice was
+   * arbitrary in about half the places they appeared. Inconsistent meta
+   * sizing between adjacent rows is what makes a dense screen read as busy
+   * rather than dense.
+   *
+   * Two mono sizes remain (11 machine meta, 10.5 uppercase labels) and three
+   * text sizes (13.5 body, 13 control, 12 supporting).
+   */
   --lc-text-mono-caption: 11px;
   --lc-text-mono-label: 10.5px;
 
