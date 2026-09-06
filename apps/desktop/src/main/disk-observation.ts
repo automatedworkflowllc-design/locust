@@ -260,6 +260,48 @@ async function diffTexts(
   }
 }
 
+/**
+ * One notice for a run that shared its folder with another run.
+ *
+ * The observation above cannot attribute a change when two runs are writing
+ * at once, so it is skipped -- but staying silent is its own kind of wrong.
+ * A run really did change files, and a receipt reading "5 tool calls" and
+ * nothing else invites the reader to conclude nothing was written (drive,
+ * 2026-09-06). So the folder's change is reported as the folder's, counted
+ * against nobody, and said in the one place that already exists for things
+ * the host noticed rather than the runtime.
+ */
+export function sharedTreeNotice(input: {
+  readonly runId: string
+  readonly missionId: string
+  readonly sourceAdapter: NormalizedRuntimeEvent['sourceAdapter']
+  readonly nextSequence: number
+  readonly at: string
+  /** Everything that differs in the folder, whoever wrote it. */
+  readonly paths: readonly string[]
+}): NormalizedRuntimeEvent {
+  const count = input.paths.length
+  return {
+    runId: input.runId,
+    missionId: input.missionId,
+    occurredAt: input.at,
+    sourceAdapter: input.sourceAdapter,
+    id: `${input.runId}:disk:shared:${String(input.nextSequence)}`,
+    sequence: input.nextSequence,
+    type: 'adapter.diagnostic',
+    payload: {
+      level: 'info',
+      code: 'host.shared_workspace',
+      message:
+        `Another teammate was working in this folder at the same time, so what changed on disk cannot be told apart. `
+        + `${String(count)} ${count === 1 ? 'file' : 'files'} in the folder ${count === 1 ? 'is' : 'are'} different from before this run; `
+        + (count === 1 ? `it is not counted as this run's work.` : `none of them are counted as this run's work.`),
+      terminal: false,
+      evidence: { redacted: true as const }
+    }
+  } as NormalizedRuntimeEvent
+}
+
 export function observedEditEvents(input: {
   readonly runId: string
   readonly missionId: string

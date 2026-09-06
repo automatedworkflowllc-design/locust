@@ -2158,6 +2158,16 @@ describe('what a run changed on disk that it never said', () => {
     const observed = appended.filter((event) => (event.payload as { status?: string } | undefined)?.status === 'observed on disk')
     expect(observed).toHaveLength(0)
 
+    // Silence would be its own lie: a run really did change something, and a
+    // card reading only "5 tool calls" invites the reader to think nothing
+    // was written. The folder change is reported as the folder is.
+    const notices = appended.filter((event) => event.type === 'adapter.diagnostic' && (event.payload as { code?: string }).code === 'host.shared_workspace')
+    expect(notices).toHaveLength(2)
+    expect((notices[0]?.payload as { message?: string }).message).toMatch(/Another teammate was working in this folder/)
+    expect((notices[0]?.payload as { message?: string }).message).toMatch(/1 file in the folder is different/)
+    // One file, so it must read "it is not counted", never "none of them are".
+    expect((notices[0]?.payload as { message?: string }).message).toMatch(/it is not counted as this run's work/)
+
     // The negative control, and it matters: "no observed rows" is also what a
     // broken harness produces. One run alone, same records, same snapshots --
     // this one MUST still get its row, or the assertion above proves nothing.

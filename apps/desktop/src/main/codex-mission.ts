@@ -31,7 +31,7 @@ import type {
   MissionMode
 } from '../shared/ipc.js'
 import { composeHandoffPrompt } from './handoff.js'
-import { changedPaths, observedEditEvents, observedPatches, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
+import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
 import type { ToolPatch } from '@teammate/runtime-adapters'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
@@ -438,14 +438,32 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     // the record's own account comes first and the observation reads as what
     // it is -- the host looking at the tree afterwards. Best effort: an
     // observation that cannot be made or stored costs the run nothing.
-    // Not when another run was writing in the same folder. The runtime's own
-    // events still stand -- those name their own tools -- but an observation
-    // of a tree two runs were editing names nothing, and a receipt that
-    // credits this teammate with another's files is worse than no receipt.
-    if (mission.diskBefore !== undefined && !mission.sharedTree) {
+    // The runtime's own events always stand -- those name their own tools.
+    // What follows is the HOST's reading of the folder, and when another run
+    // was writing in it the reading names nobody: it is reported as the
+    // folder's change rather than attached to this teammate as files.
+    if (mission.diskBefore !== undefined) {
       try {
         const diskAfter = await (options.observeDisk ?? snapshotWorkspace)(mission.cwd)
-        if (diskAfter !== undefined) {
+        if (diskAfter !== undefined && mission.sharedTree) {
+          const changed = changedPaths(mission.diskBefore, diskAfter)
+          if (changed.length > 0) {
+            await persistAndEmit(
+              mission,
+              options.ledger,
+              [
+                sharedTreeNotice({
+                  runId: mission.runId,
+                  missionId: mission.missionId,
+                  sourceAdapter: mission.runtime,
+                  nextSequence: mission.lastSequence + 1,
+                  at: now().toISOString(),
+                  paths: changed
+                })
+              ] as ReturnType<CodexEventNormalizer['accept']>
+            )
+          }
+        } else if (diskAfter !== undefined) {
           // Every path that changed, with the change read off the disk. A
           // path the runtime named keeps its own row and gets the patch
           // attached; one it never named gets a row of its own.

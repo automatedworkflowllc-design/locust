@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.36.3 — 2026-09-06
+
+- **A shared folder now says it is shared.** 0.36.2 stopped a teammate taking
+  credit for another's files, and went too quiet doing it: a run that had just
+  edited a file could show five tool calls and no file at all. It now says what
+  it honestly knows -- "another teammate was working in this folder at the same
+  time, so what changed on disk cannot be told apart" -- and names how many
+  files in the folder are different, counted against nobody. What each model
+  reports about its own work is still counted as its own.
+
 ## 0.36.2 — 2026-09-06
 
 - **Teammates working at the same time no longer take credit for each other's
