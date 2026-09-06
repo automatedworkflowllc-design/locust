@@ -2912,7 +2912,6 @@ export default function App(): ReactElement {
                 {...(liveRun.data?.sandbox === undefined ? {} : { sandbox: liveRun.data.sandbox })}
                 events={liveRun.events}
                 running={running}
-                missionId={liveRun.data?.missionId}
                 restoredMission={liveRun.restored === true ? liveRun.restoredMission : undefined}
                 error={liveRun.error}
                 errorIsPersistence={liveRun.errorIsPersistence === true}

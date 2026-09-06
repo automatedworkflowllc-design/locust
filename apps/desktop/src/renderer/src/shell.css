@@ -935,6 +935,16 @@ textarea {
   margin-left: auto;
 }
 
+/* The plan, as the fold-s first rows. A plan is the clearest statement of
+   what a run did, so it is the fold-s content rather than a card above it
+   (design review, 2026-09-06). Divided from the tool rows below it, not
+   boxed. */
+.lc-activity__plan {
+  padding-bottom: var(--lc-space-4);
+  margin-bottom: var(--lc-space-4);
+  border-bottom: 1px solid var(--lc-border-hairline);
+}
+
 .lc-activity__list {
   border-top: 1px solid var(--lc-border-hairline);
 }
@@ -1630,6 +1640,14 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--lc-space-2);
+}
+
+/* The note register: a left rule, no border, no fill. What this conversation
+   taught the team already happened and asks nothing of anyone, so it is not a
+   card (design review, 2026-09-06). */
+.lc-memorycard {
+  padding-left: var(--lc-space-4);
+  border-left: 2px solid var(--lc-border-card);
 }
 
 .lc-memorycard__list {

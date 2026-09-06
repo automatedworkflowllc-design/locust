@@ -342,6 +342,8 @@ export type ThreadItem =
   | {
       readonly key: string
       readonly type: 'activity'
+      /** The plan this run stated, drawn as the fold's first rows. */
+      readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
       readonly summary: string
       /** The trace line, as segments, so its tones stay addressable (SURFACES-0.22 §1). */
       readonly trace: readonly TraceSegment[]
@@ -911,14 +913,21 @@ export function buildThread(
     }
   }
 
-  if (plan.length > 0) {
-    items.push({
-      key: 'plan',
-      type: 'plan',
-      steps: plan,
-      doneCount: plan.filter((step) => step.state === 'done').length
-    })
-  }
+  // The plan goes INSIDE the fold, as its first rows.
+  //
+  // A plan is the clearest possible statement of what the run DID -- it is
+  // the fold's own content, not a separate object above it. Drawn as its own
+  // card it put a second species on the screen for almost every Codex run,
+  // saying the same kind of thing the fold below it says (design review,
+  // 2026-09-06).
+  //
+  // It only rides along when there IS a fold. A plan with no activity behind
+  // it -- a read-only run that answered with steps and touched nothing -- is
+  // still the only account of that turn, and it keeps its own item rather
+  // than vanishing.
+  const planSteps = plan.length > 0
+    ? { steps: plan, doneCount: plan.filter((step) => step.state === 'done').length }
+    : undefined
 
   if (activity.length > 0) {
     items.push({
@@ -928,7 +937,15 @@ export function buildThread(
       trace: activityTrace(activity, events, traceOutcome(events, options.running)),
       finished: !options.running,
       details: activity,
+      ...(planSteps === undefined ? {} : { plan: planSteps }),
       reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
+    })
+  } else if (planSteps !== undefined) {
+    items.push({
+      key: 'plan',
+      type: 'plan',
+      steps: planSteps.steps,
+      doneCount: planSteps.doneCount
     })
   }
 

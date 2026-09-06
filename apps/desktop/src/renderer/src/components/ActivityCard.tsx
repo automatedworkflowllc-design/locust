@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { activityCounts, activityEntries, defaultOpenEntry, relativePath } from '../missionView.js'
-import type { TraceSegment, ActivityDetail, ActivityEntry } from '../missionView.js'
+import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 
@@ -24,7 +24,8 @@ export function ActivityCard({
   runtimeName,
   trace,
   finished = false,
-  workspacePath
+  workspacePath,
+  plan
 }: {
   readonly summary: string
   /** The trace line; when absent the summary string is drawn (older callers). */
@@ -35,6 +36,15 @@ export function ActivityCard({
   readonly runtimeName: string | undefined
   /** The folder this mission ran in, so paths read the way a person writes them. */
   readonly workspacePath: string | undefined
+  /**
+   * The plan this run stated, drawn as the fold's FIRST rows.
+   *
+   * A plan is the clearest possible statement of what the run did, so it is
+   * the fold's own content rather than a card sitting above it -- which is
+   * what it used to be, on almost every Codex run (design review,
+   * 2026-09-06).
+   */
+  readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
 }): ReactElement {
   const [open, setOpen] = useState(false)
   const entries = activityEntries(details)
@@ -76,6 +86,23 @@ export function ActivityCard({
       </button>
       {open && (
         <div className="lc-activity__list">
+          {plan !== undefined && (
+            <div className="lc-activity__plan">
+              <div className="lc-rail__meta lc-mono">
+                PLAN · {plan.doneCount} of {plan.steps.length} done
+              </div>
+              <ul className="lc-plan">
+                {plan.steps.map((step, index) => (
+                  <li key={`${String(index)}-${step.text}`} className={`lc-plan__step is-${step.state}`}>
+                    <span className="lc-plan__marker" aria-hidden="true">
+                      {step.state === 'done' ? <Icon name="check" size={11} /> : <span className="lc-dot" />}
+                    </span>
+                    <span>{step.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {entries.map((entry) => (
             <Fragment key={entry.key}>
               {entry.kind === 'file' ? (

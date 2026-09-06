@@ -36,7 +36,14 @@ export function MemoryCard({ lines }: { readonly lines: readonly MemoryCardLine[
   const [open, setOpen] = useState(false)
   if (lines.length === 0) return null
   return (
-    <div className="lc-card lc-memorycard">
+    // A note, not a card.
+    //
+    // "What this conversation taught the team" is a fact about something that
+    // has already happened, and it needs nothing from anybody -- which is the
+    // definition of the note register in this thread, not the card one. Cards
+    // are for things that block you or things that are terminal (design
+    // review, 2026-09-06). The disclosure stays; only the border goes.
+    <div className="lc-memorycard">
       <button type="button" className="lc-activity" onClick={() => setOpen(!open)} aria-expanded={open}>
         <Icon name="spark" size={14} />
         <span>{memoryCardSummary(lines)}</span>

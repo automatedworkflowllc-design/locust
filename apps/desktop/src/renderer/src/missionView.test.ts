@@ -326,6 +326,45 @@ describe('the words a person typed, across a route switch (0.35.0 QA)', () => {
   })
 })
 
+describe('a plan is what the run did, not a thing above what it did', () => {
+  // The thread had nineteen visual species against Claude Code's three, and
+  // no rule saying what earns a card -- so each new fact arrived as a new
+  // widget. A plan is the clearest possible statement of what a run DID, so
+  // it belongs in the fold rather than in a card above it, which is a card
+  // off almost every Codex run (design review, 2026-09-06).
+  const steps = { plan: [{ step: 'Read the file', status: 'completed' }, { step: 'Edit it', status: 'in_progress' }] }
+
+  it('rides on the fold when the run also did something', () => {
+    const thread = buildThread(
+      [
+        event('plan.updated', steps),
+        event('tool.started', { itemId: 'i1', name: 'edit', command: 'src/notes.ts' }),
+        event('tool.completed', { itemId: 'i1', name: 'edit', command: 'src/notes.ts', status: 'ok' }),
+        event('run.completed', {})
+      ],
+      { running: false, latestTurn: true, spokeToPeers: false }
+    )
+    // One object, not two: the fold carries the plan.
+    expect(thread.some((item) => item.type === 'plan')).toBe(false)
+    const fold = thread.find((item) => item.type === 'activity')
+    expect(fold).toBeDefined()
+    expect(fold?.type === 'activity' ? fold.plan?.steps.length : undefined).toBe(2)
+    expect(fold?.type === 'activity' ? fold.plan?.doneCount : undefined).toBe(1)
+  })
+
+  it('keeps its own item when the run did nothing else', () => {
+    // The control, and it is a real state: a read-only run that answers with
+    // steps and touches nothing has no fold to ride on, and a plan that
+    // vanished would leave the turn with no account at all.
+    const thread = buildThread(
+      [event('plan.updated', steps), event('run.completed', {})],
+      { running: false, latestTurn: true, spokeToPeers: false }
+    )
+    expect(thread.some((item) => item.type === 'plan')).toBe(true)
+    expect(thread.some((item) => item.type === 'activity')).toBe(false)
+  })
+})
+
 describe('a turn whose whole answer was a message to a teammate', () => {
   // Those messages are drawn beside the thread, not inside it, so from in
   // here the turn looked like one that said nothing -- and the warning landed

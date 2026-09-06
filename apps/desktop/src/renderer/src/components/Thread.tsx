@@ -82,6 +82,7 @@ function ThreadItems({
               details={item.details}
               runtimeName={item.reportedBy === undefined ? undefined : runtimeDisplayName(item.reportedBy)}
               workspacePath={workspacePath}
+              {...(item.plan === undefined ? {} : { plan: item.plan })}
             />
           )
         }
@@ -283,7 +284,6 @@ export interface ThreadProps {
   }[]
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean
-  readonly missionId: string | undefined
   readonly restoredMission: PublicRecoveredMission | undefined
   readonly error: string | undefined
   readonly errorIsPersistence: boolean
@@ -342,7 +342,6 @@ export function Thread({
   workspacePath,
   events,
   running,
-  missionId,
   restoredMission,
   error,
   errorIsPersistence,
@@ -408,11 +407,19 @@ export function Thread({
   return (
     <div className="lc-thread">
       <div className="lc-thread__column">
-        {missionId !== undefined && (
-          <div className="lc-thread__marker lc-mono">
-            Mission · {shortMissionId(missionId)}
-            {startedAt !== undefined && ` · started ${startedAt}`}
-          </div>
+        {/*
+          * The mission id is PROVENANCE, and provenance lives on the workroom
+          * header band where the 0.20 pass put it -- the header already reads
+          * "Mission · 78243d5d · <model> · restored from the local ledger".
+          * Drawing it here as well said the same thing twice, thirty pixels
+          * apart (design review, 2026-09-06).
+          *
+          * The START TIME is not on the header, so it stays. What is left is
+          * a time marker, which the thread already has a species for, rather
+          * than a species of its own.
+          */}
+        {startedAt !== undefined && (
+          <div className="lc-thread__marker lc-mono">Started {startedAt}</div>
         )}
 
         {/*
