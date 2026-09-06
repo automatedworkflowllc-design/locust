@@ -31,6 +31,7 @@ import { costLine, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
+import { installCommand } from '../../../shared/runtime-install.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
@@ -599,6 +600,47 @@ function fewNames(names: readonly string[], limit = 5): string {
   return names.length <= limit ? names.join(', ') : `${names.slice(0, limit).join(', ')} +${String(names.length - limit)}`
 }
 
+/**
+ * The one line a person has to run, with a button that copies it.
+ *
+ * Shown only for a runtime Locust cannot find. Locust does not run this for
+ * them: installing software on someone's machine on their behalf is a
+ * different promise from running the agents they already chose, and the app
+ * has no business making it without being asked. Copying is one click; the
+ * terminal is theirs.
+ */
+function InstallCommand({ command }: { readonly command: string }): ReactElement {
+  const [copied, setCopied] = useState(false)
+  const copy = (): void => {
+    const done = (): void => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1_600)
+    }
+    // `navigator.clipboard` is the right call and is not always available to a
+    // packaged page; the textarea is what works everywhere else.
+    navigator.clipboard?.writeText(command).then(done).catch(() => {
+      const field = document.createElement('textarea')
+      field.value = command
+      document.body.appendChild(field)
+      field.select()
+      try {
+        document.execCommand('copy')
+        done()
+      } finally {
+        field.remove()
+      }
+    })
+  }
+  return (
+    <div className="lc-installline">
+      <code className="lc-installline__command lc-mono">{command}</code>
+      <button type="button" className="lc-installline__copy" onClick={copy}>
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  )
+}
+
 function RuntimeSetupLine({ setup }: { readonly setup: PublicRuntimeSetup }): ReactElement {
   const parts: string[] = []
   if (setup.mcpServers.length > 0) parts.push(`MCP: ${setup.mcpServers.join(', ')}`)
@@ -783,6 +825,21 @@ export function SettingsScreen({
           <p className="lc-settings__lede">
             Each runtime uses the account already signed in on this machine. Locust adds nothing of its own.
           </p>
+          {/*
+            Only when NOTHING is installed, which is what someone who has just
+            installed Locust and nothing else is looking at. The list is
+            ordered for people who already have these; a fresh machine reads
+            "Codex CLI" first and is told it needs a ChatGPT account, which
+            makes the app look like it costs money to open. One of them needs
+            no account at all, and that is the sentence that belongs here.
+          */}
+          {runtimes.length > 0 && !runtimes.some((runtime) => runtime.installed) && (
+            <p className="lc-settings__lede lc-settings__lede--start">
+              None of these are on this machine yet. The quickest start is <b>OpenCode</b>: one command, no
+              account, and its free model runs as soon as it is installed. The others below are worth adding
+              when you want a stronger model, and each needs its own sign-in.
+            </p>
+          )}
           <More>
             <p>
               Locust never pools subscriptions or proxies your requests. Under each runtime is what it has
@@ -806,6 +863,9 @@ export function SettingsScreen({
                       <div className={`lc-runtimerow__detail lc-runtimerow__usage${(usagePercent(usageWindows.get(runtime.id)!) ?? 0) >= 80 ? ' lc-tone-amber' : ''}`}>
                         {usageWindowSentence(usageWindows.get(runtime.id)!)}
                       </div>
+                    )}
+                    {status.tag === 'NOT INSTALLED' && installCommand(runtime.id) !== undefined && (
+                      <InstallCommand command={installCommand(runtime.id)!} />
                     )}
                     {runtimeSetup?.[runtime.id] !== undefined && <RuntimeSetupLine setup={runtimeSetup[runtime.id]!} />}
                   </div>

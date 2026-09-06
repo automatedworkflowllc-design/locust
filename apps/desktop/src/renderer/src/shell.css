@@ -2207,6 +2207,55 @@ textarea {
   font-weight: 500;
 }
 
+/* The install line under a runtime Locust cannot find: the command, and a
+   button that copies it. Quiet by default -- it is instruction, not status. */
+/* Said only on a machine with nothing installed: the one path that needs no
+   account. Marked out from the lede above it without becoming a banner. */
+.lc-settings__lede--start {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--lc-border-strong);
+  color: var(--lc-text-primary);
+}
+
+.lc-installline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  min-width: 0;
+}
+
+.lc-installline__command {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: 6px;
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-description);
+}
+
+.lc-installline__copy {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-installline__copy:hover {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-border-strong);
+}
+
 .lc-runtimerow__detail {
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);

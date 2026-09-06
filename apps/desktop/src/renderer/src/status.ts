@@ -1,3 +1,4 @@
+import { installSentence } from '../../shared/runtime-install.js'
 import { faceLabel, teammateActivity } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 import type { MissionMode, PublicModel, PublicRecoveredMission, PublicRuntimeStatus } from '../../shared/ipc.js'
@@ -156,7 +157,12 @@ function baseRouteRowStatus(
     return {
       tag: 'NOT INSTALLED',
       selectable: false,
-      detail: `${runtime.displayName} was not found on this machine. Install it and sign in; Locust finds it on its own.`
+      // "Install it and sign in" is true and it is a dead end: it names the
+      // problem and leaves the person to go and find the answer, which is the
+      // wall anyone opening Locust for the first time hits before they have
+      // seen it do anything. This says which package, and what signing in
+      // takes -- or that nothing does.
+      detail: installSentence(runtime.id, runtime.displayName)
     }
   }
   if (runtime.status === 'auth-required' || runtime.auth === 'unauthenticated') {

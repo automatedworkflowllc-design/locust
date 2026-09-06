@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.36.5 — 2026-09-06
+
+- **A runtime Locust cannot find now tells you how to get it.** It used to say
+  only "Claude Code was not found on this machine. Install it and sign in" --
+  true, and a dead end that sends you off to search. Each one now shows the
+  exact line to run, with a button that copies it, and says what signing in
+  takes afterwards. The two that do not install from a package manager link to
+  their own page rather than to a command line invented for them.
+
+- **And on a machine with none of them, it says which one to start with.**
+  OpenCode needs no account at all -- one command and its free model runs --
+  so that is the sentence at the top of the list, instead of leaving you to
+  read down a list that opens with one wanting a paid subscription.
+
 ## 0.36.4 — 2026-09-06
 
 - **Teammates on their own branch actually finish now.** Giving each teammate
