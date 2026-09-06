@@ -4,6 +4,7 @@ import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
 import { connectedRuntimeCount, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
+import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts } from '../../../shared/runtime-install.js'
 
 /**
  * First run, and the empty state generally.
@@ -20,13 +21,30 @@ import { connectedRuntimeCount, integrationOf, routeRowStatus, runtimeIsUsable }
  * needs no tag once its dot is green, so only the exception is tagged --
  * which is the reference's own rule, applied to more exceptions than it drew.
  */
+/** The line a person runs once to sign in, when the runtime needs an account. */
+function signInCommand(runtime: string): string | undefined {
+  const facts = runtimeInstallFacts(runtime)
+  return facts?.signIn === undefined ? undefined : `run ${facts.signIn}`
+}
+
+/** Where a runtime that is not a package comes from. */
+function vendorUrl(runtime: string): string | undefined {
+  const facts = runtimeInstallFacts(runtime)
+  return facts !== undefined && facts.install.kind === 'vendor' ? facts.install.url : undefined
+}
+
 export function FirstLaunch({
   runtimes,
   limitedRuntimes,
   discoveryPhase,
   workspacePath,
   teammateCount,
-  onChooseFolder
+  onChooseFolder,
+  onInstall,
+  installing,
+  installLine,
+  installFailure,
+  npmMissing = false
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -36,6 +54,16 @@ export function FirstLaunch({
   readonly workspacePath: string | undefined
   readonly teammateCount: number
   readonly onChooseFolder: () => void
+  /** Run the install for a runtime. Absent means the panel offers none. */
+  readonly onInstall?: (runtime: string) => void
+  /** The runtime being installed right now; every other button waits on it. */
+  readonly installing?: string
+  /** The last line npm printed, with how long it has been going. */
+  readonly installLine?: string
+  /** What went wrong, and what to do about it. */
+  readonly installFailure?: { readonly what: string; readonly next: string; readonly restart?: boolean }
+  /** Node is not on this machine, so four of the five cannot install at all. */
+  readonly npmMissing?: boolean
 }): ReactElement {
   // Signed-in first, exceptions last -- the reference's own order, and the
   // one that reads: a person scanning this wants "what can I use" before
@@ -59,9 +87,18 @@ export function FirstLaunch({
   // A planned runtime cannot be connected by anyone, so it is not in the
   // count's denominator and not in the panel: it is named once, under it
   // (design review, 2026-09-05: "a progress meter the user can't complete").
-  const shown = rows.filter((row) => integrationOf(row.runtime.id) !== 'planned')
-  const planned = rows.filter((row) => integrationOf(row.runtime.id) === 'planned').map((row) => row.runtime.displayName)
   const connected = connectedRuntimeCount(runtimes)
+  const shownAll = rows.filter((row) => integrationOf(row.runtime.id) !== 'planned')
+  // On a machine with nothing connected, the row that is a complete answer
+  // leads. Once anything works, rank() already puts connected first and this
+  // steps out of the way.
+  const shown =
+    connected === 0
+      ? [...shownAll].sort((left, right) =>
+          left.runtime.id === FREE_START_RUNTIME ? -1 : right.runtime.id === FREE_START_RUNTIME ? 1 : 0
+        )
+      : shownAll
+  const planned = rows.filter((row) => integrationOf(row.runtime.id) === 'planned').map((row) => row.runtime.displayName)
   const anyReady = discoveryPhase === 'ready' && connected > 0
   void teammateCount
   // A build stamp with a commit hash is a fact for a changelog, not a
@@ -137,17 +174,64 @@ export function FirstLaunch({
           <div className="lc-runtimepanel">
             {shown.map(({ runtime, status, connected: usable }) => {
               const settled = usable
+              // The one runtime that is a complete answer on its own -- no
+              // account, no sign-in, a free model -- leads and spans both
+              // columns, but only while nothing is connected. The moment
+              // anything works this is a status panel again and the emphasis
+              // would be selling to someone who has already bought.
+              const onRamp = !settled && connected === 0 && runtime.id === FREE_START_RUNTIME
               return (
-                <div className={`lc-runtimecell${settled ? ' is-ready' : ''}`} key={runtime.id}>
+                <div
+                  className={`lc-runtimecell${settled ? ' is-ready' : ''}${onRamp ? ' is-onramp' : ''}`}
+                  key={runtime.id}
+                >
                   <span className={`lc-runtimecell__dot${settled ? ' is-green' : status.tag === 'SIGN IN' ? ' is-red' : ' is-muted'}`} />
                   <span className="lc-runtimecell__name" title={status.detail}>
                     {runtime.displayName}
                   </span>
+                  {!settled && connected === 0 && runtime.id === FREE_START_RUNTIME && (
+                    <span className="lc-runtimecell__free">no account needed</span>
+                  )}
                   {/* READY needs no tag once the dot is green; every other
                     * state does, connected or not -- EXPERIMENTAL is the
                     * caveat on a runtime that IS connected. */}
                   {status.tag === 'READY' || status.tag === 'ACTIVE' ? (
                     <span className="lc-runtimecell__version">{shortVersion(runtime.version)}</span>
+                  ) : installing === runtime.id ? (
+                    // Keeps its box rather than becoming a spinner, so the row
+                    // does not resize while npm talks.
+                    <span className="lc-runtimecell__tag">Installing…</span>
+                  ) : signInCommand(runtime.id) !== undefined && status.tag === 'SIGN IN' ? (
+                    // Installed and signed out: the last wall, and the one
+                    // thing no button can climb. Signing in is a browser
+                    // handshake or a device code; a button that opened a
+                    // terminal and walked away would be worse than the
+                    // sentence telling them what to type. Locust notices when
+                    // it is done on its own -- discovery re-runs and the dot
+                    // goes green.
+                    <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
+                  ) : installCommand(runtime.id) !== undefined && onInstall !== undefined ? (
+                    <button
+                      type="button"
+                      className={`lc-runtimecell__install${runtime.id === FREE_START_RUNTIME ? ' is-primary' : ''}`}
+                      disabled={installing !== undefined || npmMissing}
+                      title={
+                        npmMissing
+                          ? 'Node.js is not on this machine, and this installs through npm.'
+                          : installing !== undefined
+                            ? `Waiting for the ${installing} install to finish`
+                            : installSentence(runtime.id, runtime.displayName)
+                      }
+                      onClick={() => onInstall(runtime.id)}
+                    >
+                      Install
+                    </button>
+                  ) : vendorUrl(runtime.id) !== undefined ? (
+                    // Not a package, and not second-class either: the same
+                    // slot, the same box, one different word.
+                    <a className="lc-runtimecell__install" href={vendorUrl(runtime.id)} target="_blank" rel="noreferrer">
+                      Get it ↗
+                    </a>
                   ) : (
                     <span className="lc-runtimecell__tag">{status.tag}</span>
                   )}
@@ -155,6 +239,33 @@ export function FirstLaunch({
               )
             })}
           </div>
+        )}
+
+        {/*
+          * ONE line under the panel, because only one install ever runs.
+          *
+          * At rest it is the command that would run, said before anything
+          * happens rather than after -- an app that is about to run
+          * `npm install -g` shows the line unprompted. While an install runs
+          * it carries npm's last line, which is what makes forty seconds look
+          * alive without turning the screen into a terminal. There is no
+          * progress bar: npm reports nothing that honestly becomes a
+          * percentage, so the screen shows the number it actually has.
+          */}
+        {discoveryPhase === 'ready' && connected === 0 && npmMissing && (
+          <p className="lc-installnote lc-tone-amber">
+            Node.js is not on this machine. Four of these five install through npm, which comes with it.{' '}
+            <a href="https://nodejs.org" target="_blank" rel="noreferrer">Get Node.js ↗</a>
+          </p>
+        )}
+        {installFailure !== undefined && (
+          <div className="lc-installnote lc-installnote--failed" role="alert">
+            <div className="lc-installnote__what">{installFailure.what}</div>
+            <div className="lc-installnote__next">{installFailure.next}</div>
+          </div>
+        )}
+        {installLine !== undefined && installFailure === undefined && (
+          <p className="lc-installnote lc-mono">{installLine}</p>
         )}
 
         {/*

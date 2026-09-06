@@ -30,9 +30,7 @@ import { installCommand, runtimeInstallFacts } from '../shared/runtime-install.j
  */
 
 /** How an install ended, in the shape the screen draws. */
-export type InstallOutcome =
-  | { readonly ok: true }
-  | {
+export interface InstallFailure {
       readonly ok: false
       /** One sentence: what happened. */
       readonly what: string
@@ -40,7 +38,9 @@ export type InstallOutcome =
       readonly next: string
       /** Whether restarting Locust is the action, rather than re-running. */
       readonly restart?: boolean
-    }
+}
+
+export type InstallOutcome = { readonly ok: true } | InstallFailure
 
 export interface InstallProgress {
   /** The last line npm printed, already trimmed. */
@@ -92,7 +92,7 @@ export function classifyInstallFailure(input: {
   readonly code: number | null
   readonly output: string
   readonly seconds: number
-}): InstallOutcome {
+}): InstallFailure {
   const { output } = input
   if (PROXY.test(output)) {
     return {
@@ -130,7 +130,7 @@ export function classifyInstallFailure(input: {
 }
 
 /** The one case that is not an error at all until the machine is asked again. */
-export function installedButNotFound(displayName: string): InstallOutcome {
+export function installedButNotFound(displayName: string): InstallFailure {
   return {
     ok: false,
     what: `${displayName} installed, but Locust still cannot find the command.`,

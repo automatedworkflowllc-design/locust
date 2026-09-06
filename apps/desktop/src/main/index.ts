@@ -57,6 +57,7 @@ import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
+import { createRuntimeInstaller } from './runtime-installer.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
@@ -74,6 +75,8 @@ import {
   MISSION_STORAGE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
+  RUNTIME_INSTALL_CHANNEL,
+  RUNTIME_INSTALL_PROGRESS_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
@@ -643,6 +646,16 @@ if (!ownsSingleInstanceLock) {
       }
     }
 
+    // Installing is its own service: one at a time, and it asks discovery
+    // again after a clean exit rather than trusting npm's exit code alone.
+    const runtimeInstaller = createRuntimeInstaller({
+      nowInstalled: async (runtime) => {
+        discoveryCache = undefined
+        const found = await discoverForWork()
+        return found.some((entry) => entry.id === runtime && entry.availability === 'available')
+      }
+    })
+
     const modelCatalog = createModelCatalog({
       discover: discoverForWork,
       spawn: spawnAppServer
@@ -683,6 +696,31 @@ if (!ownsSingleInstanceLock) {
       },
       workroom,
       memory: memoryBriefing
+    })
+
+    /**
+     * Install a runtime, streaming npm's output to the window that asked.
+     *
+     * The installer runs one at a time and refuses a second; the exact
+     * command it spawns is the same string the screen showed, so the app
+     * cannot display one thing and run another. After a clean exit the
+     * discovery cache is dropped and the machine is asked again -- which is
+     * how "npm said fine but there is still nothing to run" is DETECTED
+     * rather than guessed at.
+     */
+    ipcMain.handle(RUNTIME_INSTALL_CHANNEL, async (event, runtime: unknown) => {
+      if (!fromOwnWindow(event) || typeof runtime !== 'string') {
+        return { ok: false, what: 'That runtime cannot be installed from here.', next: 'Use the command shown.' } as const
+      }
+      const target = BrowserWindow.fromWebContents(event.sender)
+      return runtimeInstaller.install({
+        runtime,
+        onLine: ({ line }) => {
+          if (target !== null && !target.isDestroyed()) {
+            target.webContents.send(RUNTIME_INSTALL_PROGRESS_CHANNEL, { runtime, line })
+          }
+        }
+      })
     })
 
     ipcMain.handle(MODEL_CATALOG_CHANNEL, async (event) => {

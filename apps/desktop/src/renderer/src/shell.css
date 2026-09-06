@@ -2021,7 +2021,11 @@ textarea {
      "5 of 8 runtimes signed in under your own accounts · details" wrapped
      with the affordance alone on the second line, which read as a stray
      word rather than a control (measured on screen, 2026-09-05). */
-  max-width: 520px;
+  /* 640, not 520: a two-column runtime panel with an action slot in every
+     cell does not fit in the old width (FIRST-RUN-INSTALL-DESIGN, 2026-09-06;
+     the design said 420 and the file said 520 -- both too narrow). The mark
+     card, claim lines and folder card all still centre in it. */
+  max-width: 640px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2085,6 +2089,99 @@ textarea {
    quieter (Colin, 2026-09-05: "this way of showing the models also helps the
    stacking issue"). The last cell in an odd-length list spans both columns
    so the panel never ends on a half-empty row with a stray divider. */
+/* The action slot: one per cell, one shape, and the same box whether it
+   installs a package or opens a vendor's page. Cursor is not a package and is
+   not second-class either -- same slot, same size, one different word. */
+/* The on-ramp cell: the one runtime that is a complete answer on its own.
+   It spans both columns and sits raised, and it is the only place on this
+   screen with a lime border -- the recommendation expressed as emphasis on
+   the row that does the thing, rather than as a second card above the panel
+   naming the same runtime twice (FIRST-RUN-INSTALL-DESIGN, 2026-09-06).
+   Drawn only while nothing is connected; the moment something works this is
+   a status panel again. */
+.lc-runtimecell.is-onramp {
+  grid-column: 1 / -1;
+  /* Four columns, not three: this cell carries a fourth child -- the three
+     words that are the whole argument -- and on the inherited three-column
+     grid the button wrapped onto a second line under the name. */
+  grid-template-columns: 8px minmax(0, 1fr) auto auto;
+  background: var(--lc-bg-raised);
+  border: 1px solid var(--lc-lime-border);
+  border-radius: var(--lc-radius-card);
+}
+
+/* Three words in the slot the other cells use for a version or a tag. That
+   phrase is the whole argument. */
+.lc-runtimecell__free {
+  color: var(--lc-green-text);
+  font-size: var(--lc-text-description);
+  white-space: nowrap;
+}
+
+.lc-runtimecell__install {
+  padding: 4px 12px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-control);
+  color: var(--lc-text-control-fg);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lc-runtimecell__install:hover:not(:disabled) {
+  border-color: var(--lc-border-hover);
+  color: var(--lc-text-primary);
+}
+
+.lc-runtimecell__install:disabled {
+  color: var(--lc-text-muted);
+  cursor: default;
+}
+
+/* The one runtime that is a complete answer on its own gets the screen's only
+   filled button. The recommendation is emphasis on the row that does the
+   thing, not a second card above the panel saying the same name twice. */
+.lc-runtimecell__install.is-primary {
+  border-color: var(--lc-lime-border);
+  color: var(--lc-lime-text);
+}
+
+/* Installed and signed out: the command, not a button. Signing in is a
+   browser handshake or a device code, and Locust cannot drive either. */
+.lc-runtimecell__signin {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
+  white-space: nowrap;
+}
+
+/* The one shared line under the panel: the command at rest, npm's last line
+   with an elapsed count while it runs, the failure when there is one. */
+.lc-installnote {
+  margin: 10px 0 0;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}
+
+.lc-installnote--failed {
+  padding: 9px 12px;
+  border: 1px solid var(--lc-red-border);
+  border-radius: var(--lc-radius-card);
+  text-align: left;
+}
+
+.lc-installnote__what {
+  color: var(--lc-text-primary);
+}
+
+.lc-installnote__next {
+  margin-top: 3px;
+  color: var(--lc-text-muted);
+}
+
 .lc-runtimepanel {
   width: 100%;
   display: grid;

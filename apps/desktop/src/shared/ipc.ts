@@ -231,6 +231,35 @@ export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
 export const ROUTINE_REMOVE_CHANNEL = 'routines:remove'
 export const ROUTINE_RUN_CHANNEL = 'routines:run'
 export const MODEL_CATALOG_CHANNEL = 'models:list'
+
+/**
+ * Installing a runtime the person asked for, from inside the app.
+ *
+ * Colin, 2026-09-06: "why would you not want to give the user the ability to
+ * click something to get what they would need to make it work". The app shows
+ * the exact command before it runs it, runs one at a time, and streams npm's
+ * own output back so a slow install does not look like a frozen one.
+ */
+export const RUNTIME_INSTALL_CHANNEL = 'runtime:install'
+/** npm's output, line by line, while an install runs. */
+export const RUNTIME_INSTALL_PROGRESS_CHANNEL = 'runtime:install-progress'
+
+export interface RuntimeInstallProgress {
+  readonly runtime: string
+  readonly line: string
+}
+
+export type RuntimeInstallResponse =
+  | { readonly ok: true }
+  | {
+      readonly ok: false
+      /** One sentence: what happened. */
+      readonly what: string
+      /** One sentence: what to do about it. */
+      readonly next: string
+      /** Whether restarting Locust is the action, rather than running it again. */
+      readonly restart?: boolean
+    }
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
@@ -1087,6 +1116,10 @@ export interface DesktopApi {
   runRoutine(routineId: string): Promise<RoutineRunResponse>
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */
   listModels(): Promise<ModelCatalogResponse>
+  /** Run the install the screen showed, for a runtime that comes from npm. */
+  installRuntime(runtime: string): Promise<RuntimeInstallResponse>
+  /** npm output while an install runs. Returns the unsubscribe. */
+  onRuntimeInstallProgress(listener: (progress: RuntimeInstallProgress) => void): () => void
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>

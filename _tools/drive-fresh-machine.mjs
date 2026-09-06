@@ -48,11 +48,19 @@ const drive = await startDrive({
 })
 
 try {
-  await drive.capture('launch with no coding agent installed', async () => {
+  await drive.capture('launch with no coding agent installed: what the panel offers', async () => {
     await drive.ready()
     return drive.evaluate(`(() => {
       const foot = document.querySelector('.lc-sidebar')?.innerText.replace(/[ ]+/g, ' ') ?? ''
-      return 'sidebar tail: ' + foot.slice(-140)
+      const panel = document.querySelector('.lc-runtimepanel')
+      const slots = [...document.querySelectorAll('.lc-runtimecell__install')]
+      const note = document.querySelector('.lc-installnote')
+      return 'panel: ' + (panel === null ? 'ABSENT' : 'present')
+        + ' || action slots: ' + slots.length
+        + ' || ' + slots.map(b => (b.innerText.trim() || 'link') + (b.disabled ? ' [disabled]' : '')).join(' | ')
+        + ' || primary: ' + (document.querySelector('.lc-runtimecell__install.is-primary') === null ? 'none' : 'yes')
+        + ' || note: ' + (note === null ? 'none' : note.innerText.replace(/[ ]+/g, ' ').slice(0, 90))
+        + ' || sidebar: ' + foot.slice(-40)
     })()`)
   })
 

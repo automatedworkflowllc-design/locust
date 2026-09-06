@@ -16,6 +16,8 @@ import {
   MISSION_DELETE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
+  RUNTIME_INSTALL_CHANNEL,
+  RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
@@ -89,7 +91,9 @@ import type {
   MemoryListResponse,
   MemoryUpdateRequest,
   RuntimeSetupResponse,
-  WorktreeListResponse
+  WorktreeListResponse,
+  RuntimeInstallProgress,
+  RuntimeInstallResponse
 } from '../shared/ipc.js'
 
 export type {
@@ -172,6 +176,16 @@ const desktopApi: DesktopApi = {
   resumeMission: (request: MissionResumeRequest) =>
     ipcRenderer.invoke(MISSION_RESUME_CHANNEL, request) as Promise<MissionHandoffResponse>,
   listModels: () => ipcRenderer.invoke(MODEL_CATALOG_CHANNEL) as Promise<ModelCatalogResponse>,
+  /** Run `npm install -g <package>` for a runtime, watching npm's own output. */
+  installRuntime: (runtime: string) =>
+    ipcRenderer.invoke(RUNTIME_INSTALL_CHANNEL, runtime) as Promise<RuntimeInstallResponse>,
+  onRuntimeInstallProgress: (listener: (progress: RuntimeInstallProgress) => void) => {
+    const handler = (_event: unknown, progress: RuntimeInstallProgress): void => listener(progress)
+    ipcRenderer.on(RUNTIME_INSTALL_PROGRESS_CHANNEL, handler)
+    return () => {
+      ipcRenderer.removeListener(RUNTIME_INSTALL_PROGRESS_CHANNEL, handler)
+    }
+  },
   readWorkspaceSettings: () =>
     ipcRenderer.invoke(WORKSPACE_SETTINGS_READ_CHANNEL) as Promise<WorkspaceSettings>,
   chooseWorkspace: () => ipcRenderer.invoke(WORKSPACE_CHOOSE_CHANNEL) as Promise<WorkspaceChooseResponse>,

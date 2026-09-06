@@ -730,6 +730,70 @@ export default function App(): ReactElement {
    * change it back would be worse than the original defect.
    */
   const routeChosen = useRef(false)
+  /**
+   * Installing a runtime from inside the app.
+   *
+   * One at a time -- the host refuses a second, and the panel disables every
+   * other button while one runs -- so a single output line belongs to a
+   * single install and nobody loses track of whose error is whose.
+   */
+  const [installing, setInstalling] = useState<string>()
+  const [installLine, setInstallLine] = useState<string>()
+  const [installFailure, setInstallFailure] = useState<{
+    readonly what: string
+    readonly next: string
+    readonly restart?: boolean
+  }>()
+  const installStartedAt = useRef(0)
+  const [installElapsed, setInstallElapsed] = useState(0)
+
+  useEffect(() => {
+    const bridge = window.desktop
+    if (!bridge) return
+    return bridge.onRuntimeInstallProgress(({ line }) => {
+      setInstallLine(line)
+    })
+  }, [])
+
+  // The elapsed count, which is the honest substitute for a progress bar: npm
+  // reports nothing that can become a percentage, so the screen shows the one
+  // number it actually has.
+  useEffect(() => {
+    if (installing === undefined) return
+    const tick = window.setInterval(() => {
+      setInstallElapsed(Math.max(1, Math.round((Date.now() - installStartedAt.current) / 1000)))
+    }, 1000)
+    return () => window.clearInterval(tick)
+  }, [installing])
+
+  const installRuntime = (runtime: string): void => {
+    const bridge = window.desktop
+    if (!bridge || installing !== undefined) return
+    setInstallFailure(undefined)
+    setInstallLine(undefined)
+    setInstalling(runtime)
+    installStartedAt.current = Date.now()
+    setInstallElapsed(0)
+    void bridge
+      .installRuntime(runtime)
+      .then((response) => {
+        setInstalling(undefined)
+        if (response.ok) {
+          // Nothing announces success: the row becomes the ready state on the
+          // next discovery, which is already re-asked on a timer.
+          setInstallLine(undefined)
+          return
+        }
+        setInstallFailure({ what: response.what, next: response.next, ...(response.restart === true ? { restart: true } : {}) })
+      })
+      .catch(() => {
+        setInstalling(undefined)
+        setInstallFailure({
+          what: 'The install could not be started.',
+          next: 'Run the command shown in Settings from a terminal.'
+        })
+      })
+  }
   // Not only at launch: the focus re-probe is what finds a runtime installed
   // mid-session, and that is exactly when this matters -- the person has just
   // come back from installing it.
@@ -2628,6 +2692,14 @@ export default function App(): ReactElement {
                 workspacePath={workspacePath}
                 teammateCount={teammates.length}
                 onChooseFolder={chooseWorkspace}
+                onInstall={installRuntime}
+                installing={installing}
+                installLine={
+                  installing === undefined
+                    ? undefined
+                    : `${String(installElapsed)}s · ${installLine ?? 'starting npm…'}`
+                }
+                installFailure={installFailure}
               />
             )
           ) : (
