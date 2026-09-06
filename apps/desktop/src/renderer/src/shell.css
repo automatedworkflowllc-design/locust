@@ -2380,6 +2380,14 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* The context ring sits in the controls row beside the route chip. */
+.lc-contextring {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  cursor: default;
+}
+
 /* A folder name is no shorter than a model id -- a scratch workspace is
    `locust-drive-relay-ws-j4Nz3T` -- and it broke the same row the same way
    (Colin, 2026-09-06: "maybe got to auto shorten file text as well"). Wider

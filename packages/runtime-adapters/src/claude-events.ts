@@ -490,10 +490,36 @@ export function createClaudeEventNormalizer(
         usage.usd = parsed.total_cost_usd;
       }
       if (isObject(parsed.usage)) {
-        for (const [from, to] of [["input_tokens", "inputTokens"], ["output_tokens", "outputTokens"]] as const) {
+        // The cache counts belong here too: a resumed turn sends almost
+        // nothing new and reads the rest from cache, so `input_tokens` alone
+        // says a long conversation is using nothing. What occupies the
+        // window is the whole prompt, cached or not.
+        for (const [from, to] of [
+          ["input_tokens", "inputTokens"],
+          ["output_tokens", "outputTokens"],
+          ["cache_read_input_tokens", "cacheReadTokens"],
+          ["cache_creation_input_tokens", "cacheWriteTokens"],
+        ] as const) {
           const held = parsed.usage[from];
           if (typeof held === "number" && Number.isFinite(held)) usage[to] = held;
         }
+      }
+      // MEASURED 2026-09-06: Claude Code's result carries `modelUsage`, and
+      // each entry states the model's real `contextWindow` (1,000,000 for
+      // claude-sonnet-5) and `maxOutputTokens`. That is what makes a "how
+      // full is the context" reading a measurement rather than a guess at a
+      // denominator -- so it is kept, and no runtime that does not report one
+      // gets a percentage invented for it.
+      if (isObject(parsed.modelUsage)) {
+        let widest: number | undefined;
+        for (const entry of Object.values(parsed.modelUsage)) {
+          if (!isObject(entry)) continue;
+          const window = entry.contextWindow;
+          if (typeof window === "number" && Number.isFinite(window) && window > 0) {
+            widest = widest === undefined ? window : Math.max(widest, window);
+          }
+        }
+        if (widest !== undefined) usage.contextWindow = widest;
       }
       if (Object.keys(usage).length > 0) completedUsage = usage;
       const isError = parsed.is_error === true;

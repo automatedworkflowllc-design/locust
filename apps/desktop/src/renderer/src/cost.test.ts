@@ -1,7 +1,7 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it } from 'vitest'
 
-import { conversationCost, costLine, runCostOf, sumCosts } from './cost.js'
+import { contextReading, contextSentence, conversationCost, costLine, latestContext, runCostOf, sumCosts } from './cost.js'
 
 function completed(usage: unknown): NormalizedRuntimeEvent {
   return {
@@ -55,7 +55,7 @@ describe('what a conversation has cost so far', () => {
 
 describe('what a run cost, off its receipt', () => {
   it('reads token counts in either spelling', () => {
-    expect(runCostOf([completed({ inputTokens: 19428, outputTokens: 161, cacheReadTokens: 16256 })])).toEqual({ inputTokens: 19428, outputTokens: 161 })
+    expect(runCostOf([completed({ inputTokens: 19428, outputTokens: 161, cacheReadTokens: 16256 })])).toEqual({ inputTokens: 19428, outputTokens: 161, cacheReadTokens: 16256 })
     expect(runCostOf([completed({ input_tokens: 10, output_tokens: 47 })])).toEqual({ inputTokens: 10, outputTokens: 47 })
   })
 
@@ -96,5 +96,46 @@ describe('adding costs up', () => {
       premiumRequests: 2
     })
     expect(sumCosts([undefined, undefined])).toBeUndefined()
+  })
+})
+
+describe('how full the context is', () => {
+  // MEASURED 2026-09-06: Claude Code's result carries `modelUsage`, whose
+  // entries state the model's real `contextWindow` (1,000,000 for
+  // claude-sonnet-5). That reported number is the only denominator used.
+  it('counts the whole prompt, cached or not, against the reported window', () => {
+    const reading = contextReading({
+      inputTokens: 2,
+      outputTokens: 5,
+      cacheReadTokens: 23997,
+      cacheWriteTokens: 15080,
+      contextWindow: 1_000_000
+    })
+    expect(reading).toEqual({ usedTokens: 39079, windowTokens: 1_000_000, percent: 4 })
+  })
+
+  it('says nothing at all when the runtime did not report a window', () => {
+    // Every runtime but Claude Code is in this position today, and a ring
+    // drawn against a guessed denominator would be a number the app made up
+    // about the person's own quota.
+    expect(contextReading({ inputTokens: 40_000, outputTokens: 100 })).toBeUndefined()
+    expect(contextReading(undefined)).toBeUndefined()
+    expect(contextReading({ contextWindow: 200_000 })).toBeUndefined()
+  })
+
+  it('takes the newest turn that reported one, never the sum of the turns', () => {
+    // The window holds ONE prompt. Summing turns would report a five-turn
+    // conversation as five times as full as it is.
+    const turn = (used: number) => ({
+      events: [completed({ inputTokens: used, contextWindow: 200_000 })]
+    })
+    expect(latestContext([turn(10_000), turn(20_000)], turn(30_000).events)?.usedTokens).toBe(30_000)
+    // A live turn has reported nothing yet; the one before it still answers.
+    expect(latestContext([turn(10_000), turn(20_000)], [])?.usedTokens).toBe(20_000)
+  })
+
+  it('says it in the words the tooltip uses', () => {
+    const reading = contextReading({ inputTokens: 39_079, contextWindow: 1_000_000 })
+    expect(contextSentence(reading!)).toMatch(/^Context: .* of .* used, 4%$/)
   })
 })

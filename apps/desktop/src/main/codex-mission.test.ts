@@ -283,6 +283,41 @@ describe('Codex mission service', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  it('refuses the NEXT Auto run once the switch is taken back, on the same service', async () => {
+    // The 0.35.0 targeted QA asked for exactly this and could not test it:
+    // "same-session mode changes and revocation before scheduled/relayed
+    // starts". A relay hop and a routine step both start through this
+    // service without a window in the loop, so the switch has to be read as
+    // each run starts rather than once when the service is built.
+    let allowed = true
+    const started: string[] = []
+    const start = ((spec: { readonly args: readonly string[] }) => {
+      started.push(spec.args.join(' '))
+      throw new Error('stop here')
+    }) as unknown as RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: { start },
+      ledger: fakeLedger(),
+      autoModeAllowed: async () => allowed
+    })
+
+    await service.start('First, while it is on.', 'codex', 'auto', {}, () => undefined)
+    expect(started).toHaveLength(1)
+    expect(started[0]).toContain('--sandbox danger-full-access')
+
+    // The person switches it off in Settings. Nothing else changes.
+    allowed = false
+
+    await expect(service.start('Second, after taking it back.', 'codex', 'auto', {}, () => undefined)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'RUNTIME_START_FAILED' }
+    })
+    // Not merely refused: nothing was launched, so nothing can have run wide.
+    expect(started).toHaveLength(1)
+  })
+
   it('runs an Auto mission on the widest sandbox once the workspace allows it', async () => {
     // The argv is what this case is about, so the spec is captured and the
     // spawn is stopped right after it.

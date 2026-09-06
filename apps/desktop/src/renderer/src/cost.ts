@@ -19,6 +19,15 @@ export interface RunCost {
   readonly usd?: number
   /** Copilot's own unit: premium requests spent from the plan's allowance. */
   readonly premiumRequests?: number
+  /**
+   * What the last turn's prompt occupied, cached or not, and how big the
+   * model says its window is. Both come from the runtime -- Claude Code's
+   * result states `contextWindow` per model -- so a reading exists only
+   * where one was reported, and no denominator is ever assumed.
+   */
+  readonly cacheReadTokens?: number
+  readonly cacheWriteTokens?: number
+  readonly contextWindow?: number
 }
 
 function count(value: unknown): number | undefined {
@@ -36,7 +45,10 @@ export function runCostOf(events: readonly NormalizedRuntimeEvent[]): RunCost | 
     ...(count(record.inputTokens ?? record.input_tokens) === undefined ? {} : { inputTokens: count(record.inputTokens ?? record.input_tokens) }),
     ...(count(record.outputTokens ?? record.output_tokens) === undefined ? {} : { outputTokens: count(record.outputTokens ?? record.output_tokens) }),
     ...(count(record.usd ?? record.totalCostUsd ?? record.total_cost_usd) === undefined ? {} : { usd: count(record.usd ?? record.totalCostUsd ?? record.total_cost_usd) }),
-    ...(count(record.premiumRequests) === undefined ? {} : { premiumRequests: count(record.premiumRequests) })
+    ...(count(record.premiumRequests) === undefined ? {} : { premiumRequests: count(record.premiumRequests) }),
+    ...(count(record.cacheReadTokens) === undefined ? {} : { cacheReadTokens: count(record.cacheReadTokens) }),
+    ...(count(record.cacheWriteTokens) === undefined ? {} : { cacheWriteTokens: count(record.cacheWriteTokens) }),
+    ...(count(record.contextWindow) === undefined ? {} : { contextWindow: count(record.contextWindow) })
   }
   return Object.keys(cost).length === 0 ? undefined : cost
 }
@@ -99,4 +111,61 @@ export function sumCosts(costs: readonly (RunCost | undefined)[]): RunCost | und
     }
   }
   return total
+}
+
+/**
+ * How full the model's context is, when the runtime said how big it is.
+ *
+ * The occupied part is the whole prompt the last turn sent -- what was
+ * written fresh, what was written to cache, and what was read back from it.
+ * A resumed turn sends almost nothing new and reads the rest from cache, so
+ * `inputTokens` alone would report a nearly-full conversation as empty.
+ *
+ * Returns nothing at all where no window was reported. Every other runtime
+ * is in that position today, and a ring drawn against a guessed denominator
+ * would be a number the app made up about the person's own quota.
+ */
+export interface ContextReading {
+  readonly usedTokens: number
+  readonly windowTokens: number
+  /** 0-100, rounded, and never above 100. */
+  readonly percent: number
+}
+
+/**
+ * The newest turn that reported a context reading.
+ *
+ * NOT the conversation's summed cost: tokens add up across turns, but the
+ * window holds one prompt. Summing them would report a five-turn chat as
+ * five times as full as it is. So this walks back from the latest turn and
+ * takes the first reading it finds -- the live turn once it has settled,
+ * otherwise the one before it.
+ */
+export function latestContext(
+  earlierTurns: readonly { readonly events: readonly NormalizedRuntimeEvent[] }[],
+  events: readonly NormalizedRuntimeEvent[]
+): ContextReading | undefined {
+  const newestFirst = [events, ...[...earlierTurns].reverse().map((turn) => turn.events)]
+  for (const turn of newestFirst) {
+    const reading = contextReading(runCostOf(turn))
+    if (reading !== undefined) return reading
+  }
+  return undefined
+}
+
+export function contextReading(cost: RunCost | undefined): ContextReading | undefined {
+  const windowTokens = cost?.contextWindow
+  if (cost === undefined || windowTokens === undefined || windowTokens <= 0) return undefined
+  const usedTokens = (cost.inputTokens ?? 0) + (cost.cacheReadTokens ?? 0) + (cost.cacheWriteTokens ?? 0)
+  if (usedTokens <= 0) return undefined
+  return {
+    usedTokens,
+    windowTokens,
+    percent: Math.min(100, Math.round((usedTokens / windowTokens) * 100))
+  }
+}
+
+/** The reading in the words the tooltip uses. */
+export function contextSentence(reading: ContextReading): string {
+  return `Context: ${tokens(reading.usedTokens)} of ${tokens(reading.windowTokens)} used, ${String(reading.percent)}%`
 }

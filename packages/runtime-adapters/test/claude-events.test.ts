@@ -425,6 +425,43 @@ describe("tool pairing and terminal state", () => {
 });
 
 describe("what the run cost, as Claude Code priced it", () => {
+  it("carries the model's own context window, so a reading has a real denominator", () => {
+    // MEASURED 2026-09-06: `modelUsage` states `contextWindow` per model --
+    // 1,000,000 for claude-sonnet-5. It is the only denominator the app will
+    // use; a runtime that reports none gets no percentage invented for it.
+    const claude = normalizer();
+    claude.accept(
+      record({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        usage: { input_tokens: 2, output_tokens: 5, cache_read_input_tokens: 23997, cache_creation_input_tokens: 15080 },
+        modelUsage: { "claude-sonnet-5": { contextWindow: 1000000, maxOutputTokens: 64000 } },
+      }),
+    );
+    const [done] = claude.finish(completion({ exitCode: 0 }));
+    const usage = (done?.payload as { usage?: Record<string, number> }).usage;
+    expect(usage?.contextWindow).toBe(1000000);
+    expect(usage?.cacheReadTokens).toBe(23997);
+    expect(usage?.cacheWriteTokens).toBe(15080);
+  });
+
+  it("reports no window when the result names none", () => {
+    const claude = normalizer();
+    claude.accept(
+      record({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        usage: { input_tokens: 10, output_tokens: 47 },
+        modelUsage: { "some-model": { costUSD: 0.01 } },
+      }),
+    );
+    const [done] = claude.finish(completion({ exitCode: 0 }));
+    const usage = (done?.payload as { usage?: Record<string, number> }).usage;
+    expect(usage?.contextWindow).toBeUndefined();
+  });
+
   it("carries the dollar figure and the token counts from the result record onto the receipt", () => {
     const claude = normalizer();
     claude.accept(
@@ -440,7 +477,10 @@ describe("what the run cost, as Claude Code priced it", () => {
     const [done] = claude.finish(completion({ exitCode: 0 }));
     expect(done?.type).toBe("run.completed");
     const usage = (done?.payload as { usage?: Record<string, number> }).usage;
-    expect(usage).toEqual({ usd: 0.0297808, inputTokens: 10, outputTokens: 47 });
+    // The cache count travels too: a resumed turn sends almost nothing new
+    // and reads the rest from cache, so input alone would say a long
+    // conversation is occupying nothing.
+    expect(usage).toEqual({ usd: 0.0297808, inputTokens: 10, outputTokens: 47, cacheReadTokens: 17648 });
     // The per-model table names the account's models; it does not travel.
     expect(JSON.stringify(done)).not.toContain("modelUsage");
   });

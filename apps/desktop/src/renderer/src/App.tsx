@@ -83,7 +83,7 @@ import {
   stitchedHandoff,
   typedPrompt, assistantMessages } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
-import { conversationCost, costLine } from './cost.js'
+import { conversationCost, costLine, latestContext } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
 import { collapseConversations, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
@@ -1901,6 +1901,13 @@ export default function App(): ReactElement {
     liveRun === undefined
       ? undefined
       : costLine(conversationCost(liveRun.earlierTurns ?? [], liveRun.events))
+  /**
+   * How full the model's context is, from the newest turn that reported it.
+   * Not the conversation's summed tokens: the window holds one prompt, so
+   * adding turns together would say a five-turn chat is five times as full.
+   */
+  const shownContext =
+    liveRun === undefined ? undefined : latestContext(liveRun.earlierTurns ?? [], liveRun.events)
   const runningCount = [...runs.values()].filter(liveRunIsActive).length
 
   /**
@@ -2769,6 +2776,7 @@ export default function App(): ReactElement {
             }
             onModeChange={setMode}
             autoMode={autoMode}
+            {...(shownContext === undefined ? {} : { context: shownContext })}
             onEnableAutoMode={() => {
               // Picking Auto in the composer IS the person switching it on.
               // Written through the host like any other settings change, so

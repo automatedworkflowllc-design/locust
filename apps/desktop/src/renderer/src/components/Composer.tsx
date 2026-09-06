@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ContextReading } from '../cost.js'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
 
@@ -18,6 +19,7 @@ import {
   runtimeIsUsable
 } from '../status.js'
 import mark from '../assets/locust-mark.svg'
+import { ContextRing } from './ContextRing.js'
 import { Icon } from './Icon.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
@@ -67,6 +69,8 @@ export interface ComposerProps {
   readonly error: string | undefined
   readonly mode: MissionMode
   readonly onModeChange: (mode: MissionMode) => void
+  /** How full the model's context is, when the runtime reported its size. */
+  readonly context?: ContextReading
   /** Whether this workspace has Auto switched on. Picking Auto here switches it on. */
   readonly autoMode?: boolean
   /** Turn Auto on for the workspace, because the person just chose it. */
@@ -154,6 +158,7 @@ export function Composer({
   mode,
   onModeChange,
   autoMode,
+  context,
   onEnableAutoMode,
   route,
   onRouteChange,
@@ -554,6 +559,7 @@ export function Composer({
                   <span className="lc-control__mono lc-control__model">{modelLabel}</span>
                 </button>
               </span>
+              {context !== undefined && <ContextRing reading={context} />}
               <span className="lc-control__anchor">
                 {effortOpen && supportedEfforts.length > 0 && (
                   <div className="lc-menu lc-menu--right" role="menu" aria-label="Reasoning effort">
