@@ -779,6 +779,60 @@ describe("OpenCode and Copilot CLI commands", () => {
     });
   });
 
+  it("lets a worktree run reach the repository it belongs to, and only that", () => {
+    // A worktree's `.git` is a file pointing at the parent repository, so a
+    // run inside one reaches out of its own folder by necessity. OpenCode
+    // auto-rejects a directory outside its own AND the rejection ends the
+    // run: three teammates on worktrees lost between one and three of their
+    // runs to it (drive, 2026-09-06), reproduced from a shell with
+    // `permission requested: external_directory (<parent>\*); auto-rejecting`.
+    const worktree = createOpenCodeRunCommand(openCode, {
+      workspacePath: "C:\\work\\shop\\.locust\\worktrees\\tm_wren",
+      sandbox: "workspace-write",
+      prompt: PROMPT,
+      repositoryRoot: "C:\\work\\shop",
+    });
+    expect(JSON.parse(worktree.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+        // `.git` and nothing else. Granting the whole parent folder DID let all
+      // three teammates finish -- and one of them then wrote its file into the
+      // shared folder as well as its own worktree, which is exactly what a
+      // worktree exists to prevent. A worktree needs the parent's `.git`,
+      // because its own is a file pointing there; it does not need the
+      // parent's working tree. Keys and values read off OpenCode's own config
+      // schema, not guessed.
+      permission: { external_directory: { "C:\\work\\shop\\.git\\*": "allow" } },
+    });
+
+    // A read-only worktree run still needs the parent AND still may not write.
+    // These used to be written into the same environment variable, where the
+    // second would simply have replaced the first.
+    const readOnly = createOpenCodeRunCommand(openCode, {
+      workspacePath: "C:\\work\\shop\\.locust\\worktrees\\tm_wren",
+      sandbox: "read-only",
+      prompt: PROMPT,
+      repositoryRoot: "C:\\work\\shop",
+    });
+    expect(JSON.parse(readOnly.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      permission: {
+        edit: "deny",
+        write: "deny",
+        bash: "deny",
+        patch: "deny",
+        external_directory: { "C:\\work\\shop\\.git\\*": "allow" },
+      },
+    });
+
+    // And a run in the folder itself asks for nothing extra -- the negative
+    // control, without which every assertion above passes on a builder that
+    // simply always allows.
+    const inPlace = createOpenCodeRunCommand(openCode, {
+      workspacePath: "C:\\work\\shop",
+      sandbox: "workspace-write",
+      prompt: PROMPT,
+    });
+    expect(inPlace.env?.OPENCODE_CONFIG_CONTENT).toBeUndefined();
+  });
+
   it("lets a workspace-write OpenCode mission edit, and carries no permission config at all", () => {
     const spec = createOpenCodeRunCommand(openCode, {
       workspacePath,

@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.36.4 — 2026-09-06
+
+- **Teammates on their own branch actually finish now.** Giving each teammate
+  its own worktree is how you stop several of them colliding in one folder, and
+  it was the least reliable way to run them: with three going at once, six of
+  nine runs died with nothing but "the run could not continue". A teammate was
+  being told its instructions belonged to the main folder, which is not the
+  folder it works in, so it went looking -- and OpenCode ends a run that asks
+  for a directory outside its own. A teammate on a branch is now told what is
+  true for it: this is the project, you have your own copy, work inside it. Nine
+  runs since, none lost, and nothing written outside anyone's own copy.
+
 ## 0.36.3 — 2026-09-06
 
 - **A shared folder now says it is shared.** 0.36.2 stopped a teammate taking

@@ -65,10 +65,24 @@ export async function readWorkspaceBrief(
   return boundedBrief(raw)
 }
 
-/** What a mission is told, before anything else: the folder's own instructions, quoted whole. */
-export function briefSection(brief: WorkspaceBrief, workspaceName: string): string {
+/**
+ * What a mission is told, before anything else: the folder's own instructions,
+ * quoted whole.
+ *
+ * `workspaceName` is absent for a teammate running in its own worktree, and
+ * that is not a cosmetic difference. Naming a folder the run is NOT standing
+ * in invites the model to go and find it: worktree runs were seen asking for
+ * the parent folder, and OpenCode auto-rejects a directory outside its own
+ * AND ends the run on the rejection -- between one and three of three
+ * teammates lost their whole run to it (drive, 2026-09-06). So a worktree
+ * teammate is told what is true for it instead: this is the project, you have
+ * your own copy, stay in it.
+ */
+export function briefSection(brief: WorkspaceBrief, workspaceName: string | undefined): string {
   return [
-    `Instructions for the folder "${workspaceName}", from its ${WORKSPACE_BRIEF_FILE}. Every teammate on every runtime is given these; follow them as you would your own instruction file.`,
+    workspaceName === undefined
+      ? `Instructions for this project, from its ${WORKSPACE_BRIEF_FILE}. Every teammate on every runtime is given these; follow them as you would your own instruction file. Your missions run in your own copy of the project, so work only inside the folder you were started in.`
+      : `Instructions for the folder "${workspaceName}", from its ${WORKSPACE_BRIEF_FILE}. Every teammate on every runtime is given these; follow them as you would your own instruction file.`,
     brief.text,
     ...(brief.truncated ? [`(${WORKSPACE_BRIEF_FILE} is longer than ${String(MAX_BRIEF_LINES)} lines; the rest was not loaded.)`] : [])
   ].join('\n')

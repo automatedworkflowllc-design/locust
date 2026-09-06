@@ -827,6 +827,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               workspacePath: runCwd,
               sandbox: effectiveSandbox,
               prompt: promptText,
+              // Only when this run is in a worktree, which is exactly when
+              // the folder it stands in is not the repository it belongs to.
+              ...(runCwd === options.workspacePath ? {} : { repositoryRoot: options.workspacePath }),
               ...choice
             })
           }

@@ -320,6 +320,19 @@ export type { MissionSandbox } from "./types.js";
 
 export interface RuntimeCommandOptions {
   readonly workspacePath: string;
+  /**
+   * The repository this run's folder is a WORKTREE of, when it is one.
+   *
+   * A worktree's `.git` is a file pointing back at the parent repository, so
+   * nothing inside it is self-contained: git reaches out, and so does a model
+   * told the project is a folder it is not standing in. OpenCode auto-rejects
+   * a request for a directory outside its own, and that rejection ENDS the
+   * run -- three teammates on worktrees lost between one and three of their
+   * runs to it, with nothing to show but "the run could not continue"
+   * (drive, 2026-09-06). Naming the parent here is not an escalation: it is
+   * the folder the person pointed the app at.
+   */
+  readonly repositoryRoot?: string;
   readonly model?: string;
   /** A reasoning effort the runtime reported supporting for that model. */
   readonly effort?: string;
@@ -688,6 +701,31 @@ export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
 });
 
 /**
+ * What OpenCode is told about the repository a worktree belongs to.
+ *
+ * `permission.external_directory` takes "ask" | "allow" | "deny", or a map of
+ * path patterns to those -- read off OpenCode's own config schema
+ * (`opencode.ai/config.json`, `$defs/PermissionConfig`), version 1.18.27,
+ * 2026-09-06, rather than guessed.
+ *
+ * It grants the repository's `.git` and NOTHING ELSE. The first version of
+ * this granted the whole parent folder, all three teammates then finished --
+ * and one of them wrote its file into the shared folder as well as its own
+ * worktree, which is precisely what a worktree exists to prevent (drive,
+ * 2026-09-06). A worktree needs the parent's `.git` because its own `.git` is
+ * a file pointing there; it does not need the parent's working tree, and
+ * being able to reach it is the whole bug.
+ */
+export function opencodeWorktreeConfig(repositoryRoot: string, readOnly: boolean): string {
+  return JSON.stringify({
+    permission: {
+      ...(readOnly ? { edit: "deny", write: "deny", bash: "deny", patch: "deny" } : {}),
+      external_directory: { [`${repositoryRoot}\\.git\\*`]: "allow" },
+    },
+  });
+}
+
+/**
  * OpenCode in its non-interactive `run` mode.
  *
  * The prompt goes in ARGV, not on stdin. Measured: the positional prompt is
@@ -721,12 +759,20 @@ export function createOpenCodeRunCommand(
     args.push("--auto");
   }
   args.push(requireText(options.prompt ?? "", "Prompt"));
+  const readOnly = sandboxArgument(options.sandbox) === "read-only";
+  // A worktree run needs its parent repository; a read-only one still needs
+  // the denials. When both apply the config carries both, because the two
+  // used to be written into the same environment variable and the second
+  // would simply have replaced the first.
+  const config = options.repositoryRoot !== undefined
+    ? opencodeWorktreeConfig(options.repositoryRoot, readOnly)
+    : readOnly
+      ? OPENCODE_READ_ONLY_CONFIG
+      : undefined;
   return baseSpec("opencode", executable, options.workspacePath, args, {
     stdin: "none",
     sandbox: sandboxArgument(options.sandbox),
-    ...(sandboxArgument(options.sandbox) === "read-only"
-      ? { env: { OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG } }
-      : {}),
+    ...(config === undefined ? {} : { env: { OPENCODE_CONFIG_CONTENT: config } }),
   });
 }
 

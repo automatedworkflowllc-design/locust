@@ -488,7 +488,9 @@ if (!ownsSingleInstanceLock) {
         if (!workspaceChosen) return undefined
         const sections: string[] = []
         const brief = await readWorkspaceBrief(workspacePath).catch(() => undefined)
-        if (brief !== undefined) sections.push(briefSection(brief, memoryWorkspaceName))
+        // A teammate with a worktree is not standing in the folder that
+        // name belongs to, and saying otherwise sends it looking.
+        if (brief !== undefined) sections.push(briefSection(brief, peer.cwd === undefined ? memoryWorkspaceName : undefined))
         const settings = await teammates.readSettings()
         if (settings.memoryMode !== 'off') sections.push(await memoryPart(peer))
         return sections.length === 0 ? undefined : sections.join('\n\n')
