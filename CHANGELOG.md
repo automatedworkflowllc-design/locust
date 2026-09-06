@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.2 — 2026-09-06
+
+Two things found by pressing the Install button for the first time.
+
+- **An install that worked no longer looks like nothing happened.** The
+  package landed, the command was on disk, and the screen still said no
+  runtime was connected and still offered to install it. It notices
+  immediately now.
+
+- **A machine without Node is told so, before it is offered a button.** Four
+  of the five runtimes install through npm, so without it those buttons cannot
+  work — and pressing one used to report that npm had stopped with an error,
+  which blamed the command for not existing. The panel now says Node is
+  missing and links to it instead.
+
+- **A failed install keeps the command on screen**, with a button to copy it,
+  so it can be run by hand or passed to someone who can read it.
+
 ## 0.38.1 — 2026-09-06
 
 A design pass over the conversation column, which had grown nineteen different

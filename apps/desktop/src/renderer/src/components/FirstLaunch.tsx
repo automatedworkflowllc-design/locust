@@ -61,7 +61,13 @@ export function FirstLaunch({
   /** The last line npm printed, with how long it has been going. */
   readonly installLine?: string
   /** What went wrong, and what to do about it. */
-  readonly installFailure?: { readonly what: string; readonly next: string; readonly restart?: boolean }
+  readonly installFailure?: {
+    readonly what: string
+    readonly next: string
+    readonly restart?: boolean
+    /** The line the app would have run, kept reachable however it went wrong. */
+    readonly command?: string
+  }
   /** Node is not on this machine, so four of the five cannot install at all. */
   readonly npmMissing?: boolean
 }): ReactElement {
@@ -262,6 +268,26 @@ export function FirstLaunch({
           <div className="lc-installnote lc-installnote--failed" role="alert">
             <div className="lc-installnote__what">{installFailure.what}</div>
             <div className="lc-installnote__next">{installFailure.next}</div>
+            {/*
+              * THE COMMAND NEVER DISAPPEARS. It stops being the only option;
+              * on a failure it is the option that works, because a person who
+              * cannot read an npm trace can paste that line to someone who
+              * can (FIRST-RUN-INSTALL-DESIGN, 2026-09-06).
+              */}
+            {installFailure.command !== undefined && (
+              <div className="lc-installnote__command">
+                <code className="lc-mono">{installFailure.command}</code>
+                <button
+                  type="button"
+                  className="lc-runtimecell__install"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(installFailure.command ?? '').catch(() => undefined)
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+            )}
           </div>
         )}
         {installLine !== undefined && installFailure === undefined && (

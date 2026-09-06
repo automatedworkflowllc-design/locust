@@ -29,6 +29,11 @@ interface RuntimeDiscoveryServiceOptions {
   readonly probe: () => Promise<readonly RuntimeDiscovery[]>
   readonly now?: () => Date
   readonly cacheTtlMs?: number
+  /**
+   * Whether npm can be run. Absent means "assume it is there", which is what
+   * every existing caller and test expects; the app wires it for real.
+   */
+  readonly npmPresent?: () => Promise<boolean>
 }
 
 function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
@@ -98,11 +103,12 @@ export function createRuntimeDiscoveryService(
       if (inFlight) return inFlight
 
       inFlight = options.probe()
-        .then((runtimes): RuntimeDiscoveryResponse => ({
+        .then(async (runtimes): Promise<RuntimeDiscoveryResponse> => ({
           ok: true,
           data: {
             checkedAt: now().toISOString(),
-            runtimes: runtimes.map(publicStatus)
+            runtimes: runtimes.map(publicStatus),
+            npmPresent: options.npmPresent === undefined ? true : await options.npmPresent()
           }
         }))
         .catch(() => discoveryFailed())

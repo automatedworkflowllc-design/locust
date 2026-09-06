@@ -2223,6 +2223,28 @@ textarea {
   text-align: left;
 }
 
+/* The command, still reachable after a failure. It stops being the only
+   option; on a failure it is the option that works. */
+.lc-installnote__command {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lc-installnote__command code {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-description);
+}
+
 .lc-installnote__what {
   color: var(--lc-text-primary);
 }

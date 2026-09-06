@@ -547,6 +547,18 @@ export type RuntimeDiscoveryResponse =
       readonly data: {
         readonly checkedAt: string
         readonly runtimes: readonly PublicRuntimeStatus[]
+        /**
+         * Whether npm can be run at all.
+         *
+         * Four of the five runtimes install through it, so its absence is a
+         * PRECONDITION, not a failure: a button that cannot work is worse
+         * than the truth. This was designed, built into the screen, and then
+         * never computed -- so the state could not occur, and a machine
+         * without Node got "npm stopped with an error after 1s" from the
+         * command the app had just offered to run for it (drive, 2026-09-06,
+         * pressing the button for the first time).
+         */
+        readonly npmPresent?: boolean
       }
     }
   | {

@@ -171,8 +171,32 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
   return running
 }
 
+/**
+ * Can npm be run from here?
+ *
+ * Asked once and remembered: it is a fact about the machine, and asking on
+ * every discovery sweep would spawn a child process every ten seconds for an
+ * answer that changes when someone installs Node, not between ticks. The
+ * remembered answer is dropped whenever an install finishes, which is the one
+ * moment it can have changed under us.
+ */
+let npmSeen: boolean | undefined
+const npmPresent = async (): Promise<boolean> => {
+  if (npmSeen !== undefined) return npmSeen
+  npmSeen = await new Promise<boolean>((resolve) => {
+    // `shell: true` because Windows will not spawn npm.cmd otherwise, and
+    // `--version` because it is the cheapest thing npm will answer.
+    const probe = spawn('npm', ['--version'], { shell: true, windowsHide: true })
+    const settle = (found: boolean): void => resolve(found)
+    probe.on('error', () => settle(false))
+    probe.on('close', (code) => settle(code === 0))
+  })
+  return npmSeen
+}
+
 const runtimeDiscovery = createRuntimeDiscoveryService({
-  probe: discoverForWork
+  probe: discoverForWork,
+  npmPresent
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
@@ -713,6 +737,9 @@ if (!ownsSingleInstanceLock) {
         return { ok: false, what: 'That runtime cannot be installed from here.', next: 'Use the command shown.' } as const
       }
       const target = BrowserWindow.fromWebContents(event.sender)
+      // Whatever this install does, it may have been the thing that put npm
+      // on the machine -- or proved it is not there.
+      npmSeen = undefined
       return runtimeInstaller.install({
         runtime,
         onLine: ({ line }) => {

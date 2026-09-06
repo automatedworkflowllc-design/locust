@@ -86,6 +86,7 @@ import {
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
+import { installCommand } from '../../shared/runtime-install.js'
 import { collapseConversations, defaultRoute, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
@@ -186,7 +187,7 @@ interface LiveRunState {
 
 type RuntimeDiscoveryState =
   | { readonly phase: 'loading' }
-  | { readonly phase: 'ready'; readonly runtimes: readonly PublicRuntimeStatus[] }
+  | { readonly phase: 'ready'; readonly runtimes: readonly PublicRuntimeStatus[]; readonly npmPresent?: boolean }
   | { readonly phase: 'error' }
 
 type RunMap = ReadonlyMap<string, LiveRunState>
@@ -743,8 +744,21 @@ export default function App(): ReactElement {
     readonly what: string
     readonly next: string
     readonly restart?: boolean
+    readonly command?: string
   }>()
   const installStartedAt = useRef(0)
+  /**
+   * Ask discovery again, from outside the effect that owns it.
+   *
+   * Main drops its cache and re-probes the moment an install exits cleanly --
+   * that is how "npm said fine but there is nothing to run" is detected. The
+   * RENDERER was never told, so a successful install left the row saying
+   * "Install", the sidebar saying "0 runtimes connected", and the composer
+   * still pointed at a runtime that was not there. Pressing the button for
+   * the first time is what showed it: `opencode.cmd` on disk, and the app
+   * insisting nothing had happened (drive, 2026-09-06).
+   */
+  const askDiscoveryAgain = useRef<() => void>(() => undefined)
   const [installElapsed, setInstallElapsed] = useState(0)
 
   useEffect(() => {
@@ -779,12 +793,20 @@ export default function App(): ReactElement {
       .then((response) => {
         setInstalling(undefined)
         if (response.ok) {
-          // Nothing announces success: the row becomes the ready state on the
-          // next discovery, which is already re-asked on a timer.
+          // Nothing announces success -- the row simply becomes the ready
+          // state. But it has to be ASKED: main re-probes on its side, and
+          // without this the renderer waits for a timer or a focus event
+          // while the screen says nothing was installed.
           setInstallLine(undefined)
+          askDiscoveryAgain.current()
           return
         }
-        setInstallFailure({ what: response.what, next: response.next, ...(response.restart === true ? { restart: true } : {}) })
+        setInstallFailure({
+          what: response.what,
+          next: response.next,
+          ...(response.restart === true ? { restart: true } : {}),
+          ...(installCommand(runtime) === undefined ? {} : { command: installCommand(runtime)! })
+        })
       })
       .catch(() => {
         setInstalling(undefined)
@@ -1148,7 +1170,7 @@ export default function App(): ReactElement {
       .getLocalRuntimes()
       .then((response) => {
         if (!active) return
-        setRuntimeState(response.ok ? { phase: 'ready', runtimes: response.data.runtimes } : { phase: 'error' })
+        setRuntimeState(response.ok ? { phase: 'ready', runtimes: response.data.runtimes, npmPresent: response.data.npmPresent } : { phase: 'error' })
       })
       .catch(() => {
         if (active) setRuntimeState({ phase: 'error' })
@@ -1168,7 +1190,7 @@ export default function App(): ReactElement {
         .getLocalRuntimes()
         .then((response) => {
           if (!active || !response.ok) return
-          setRuntimeState({ phase: 'ready', runtimes: response.data.runtimes })
+          setRuntimeState({ phase: 'ready', runtimes: response.data.runtimes, npmPresent: response.data.npmPresent })
           const stillChecking = response.data.runtimes.some(
             (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
           )
@@ -1183,6 +1205,8 @@ export default function App(): ReactElement {
     const onFocus = (): void => {
       if (Date.now() - lastAsked >= RUNTIME_RECHECK_MIN_GAP_MS) askAgain()
     }
+    // So an install can ask for a fresh answer the moment it finishes.
+    askDiscoveryAgain.current = askAgain
     window.addEventListener('focus', onFocus)
 
     void bridge
@@ -2700,6 +2724,7 @@ export default function App(): ReactElement {
                     : `${String(installElapsed)}s · ${installLine ?? 'starting npm…'}`
                 }
                 installFailure={installFailure}
+                npmMissing={runtimeState.phase === 'ready' && runtimeState.npmPresent === false}
               />
             )
           ) : (
