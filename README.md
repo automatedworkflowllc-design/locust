@@ -9,7 +9,7 @@
 
 ---
 
-**Locust** puts Codex CLI and Claude Code side by side under one roof. You give
+**Locust** puts Claude, Codex, Cursor, Gemini  and many more models side by side under one roof. You give
 a teammate a mission; it runs on your machine, under your own provider
 accounts, in a read-only sandbox unless you say otherwise. Every event is
 written to an append-only local ledger before it reaches the screen, so what
