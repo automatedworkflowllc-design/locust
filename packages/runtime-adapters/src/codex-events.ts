@@ -257,11 +257,16 @@ const SAFETY_PATTERNS = [
   /\bcontent policy\b/i,
 ] as const;
 
+// `collab_tool_call` is Codex's subagent machinery: `spawn_agent` with a
+// prompt, then wait/send/close on the agents it made. MEASURED 2026-09-06
+// off Colin's own ledger: as an unknown item type it became a step, which
+// left the fold empty and the sidebar silent about two agents that ran.
 const TOOL_ITEM_TYPES = new Set([
   "command_execution",
   "file_change",
   "mcp_tool_call",
   "web_search",
+  "collab_tool_call",
 ]);
 
 export function isObject(value: unknown): value is JsonObject {
@@ -430,6 +435,9 @@ function failureKind(message: string | undefined): CodexRunFailureKind {
 
 function toolName(item: JsonObject, itemType: string): string {
   if (itemType === "command_execution") return "shell";
+  // Named so the thread reads every collab call as a subagent row: spawn,
+  // wait, send_input, close. The verb after the colon is the runtime's.
+  if (itemType === "collab_tool_call") return `subagent:${identityValue(item.tool) ?? "spawn_agent"}`;
   if (itemType === "web_search") return "web_search";
   if (itemType === "file_change") return "file_change";
   const server = identityValue(item.server) ?? identityValue(item.server_name);
@@ -660,7 +668,8 @@ export function createCodexEventNormalizer(
           .map((change) => (isObject(change) ? stringValue(change.path) : undefined))
           .filter((path): path is string => path !== undefined)
       : [];
-    const command = stringValue(item.command) ?? (changedPaths.length > 0 ? changedPaths.join("\n") : undefined);
+    // A subagent call names its ask, not a path.
+    const command = stringValue(item.command) ?? stringValue(item.prompt) ?? (changedPaths.length > 0 ? changedPaths.join("\n") : undefined);
     const status = identityValue(item.status);
     const exitCode = numberValue(item.exit_code) ?? numberValue(item.exitCode);
     const rawOutput = item.aggregated_output ?? item.output ?? item.result;

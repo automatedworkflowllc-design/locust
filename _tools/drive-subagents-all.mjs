@@ -20,7 +20,8 @@ const drive = await startDrive({
   seed: {
     schemaVersion: 1,
     teammates: [
-      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: T0, route: { runtime: 'codex', model: 'account-default', mode: 'ask' } },
+      // gpt-5.6-sol: the model Colin's own session spawned subagents on (2026-09-06).
+      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: T0, route: { runtime: 'codex', model: 'gpt-5.6-sol', mode: 'ask' } },
       { teammateId: 'tm_booty', name: 'Booty', hue: 'blue', role: 'Custom', roleTitle: 'Reviewer', createdAt: T0 },
       { teammateId: 'tm_gem', name: 'Gem', hue: 'violet', role: 'Custom', roleTitle: 'Scout', createdAt: T0, route: { ...FREE_ROUTE, mode: 'ask' } }
     ],

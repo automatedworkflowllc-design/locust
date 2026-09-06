@@ -131,7 +131,7 @@ try {
   // look wrong when it was right, which is the harness measuring itself.
   const claimed = Number(/([0-9]+) runtimes? connected/.exec(seen.connected)?.[1] ?? '-1')
   const runnable = (seen.body.match(/READY|ACTIVE|EXPERIMENTAL/g) ?? []).length
-  say(`       tags: ${JSON.stringify(seen.body.match(/READY|ACTIVE|EXPERIMENTAL|PLANNED|UNAVAILABLE|SIGN IN|PREVIEW/g) ?? [])}`)
+  say(`       tags: ${JSON.stringify(seen.body.match(/READY|ACTIVE|EXPERIMENTAL|NOT INSTALLED|PLANNED|UNAVAILABLE|SIGN IN|PREVIEW/g) ?? [])}`)
   check(
     'the connected count equals the runtimes that can actually run one',
     claimed === runnable,
@@ -145,7 +145,7 @@ try {
   // Every runtime shown carries a state and a reason for it -- READY with a
   // version, PLANNED for one not built, UNAVAILABLE with what went wrong. The
   // rule being guarded is that no runtime is listed with no explanation.
-  const states = (seen.body.match(/READY|PLANNED|UNAVAILABLE/g) ?? []).length
+  const states = (seen.body.match(/READY|PLANNED|UNAVAILABLE|NOT INSTALLED/g) ?? []).length
   check('every runtime shown carries a state', states >= 4, `${String(states)} states listed`)
   check(
     'a runtime it could not probe says so rather than reading as ready',

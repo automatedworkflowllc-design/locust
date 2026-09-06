@@ -6,6 +6,28 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.33.1 — 2026-09-06
+
+- **Codex's subagents show, and stay shown.** Codex records them as
+  `collab_tool_call` items, which Locust filed as steps, so a run that
+  spawned two agents showed nothing in the fold once they were done. They
+  are tool rows now: "spawn_agent" with the ask, settled when the agent
+  reports; the sidebar says "subagent working" while one runs.
+- **Copilot CLI's reasoning no longer floods the thread.** Copilot 1.0.83
+  streams reasoning in pieces, and each piece became an "Unhandled Copilot
+  record" line. One Thinking step per reasoning now, and its tool rows
+  name the file or pattern they acted on.
+- **The taskbar shows Locust's icon on the installed app.** The packaged
+  window takes the executable's own icon instead of a path inside the
+  archive.
+- **A machine with nothing installed says what to do.** Runtimes read
+  NOT INSTALLED instead of UNAVAILABLE, the home screen names the agents
+  Locust runs and says they appear on their own once installed and signed
+  in, and the composer says the same.
+- **Locust no longer vanishes on an unexpected error.** The main process
+  writes it to locust-errors.log in its data folder, says so in a dialog,
+  and carries on.
+
 ## 0.33.0 — 2026-09-05
 
 Signal parity with Claude Code, measured from its own stream

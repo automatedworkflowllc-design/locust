@@ -16,7 +16,7 @@ import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-s
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -119,7 +119,11 @@ import type {
 } from '../shared/ipc.js'
 
 const probeRunner = createNodeProbeRunner()
-const executableLocator = createPathExecutableLocator()
+// `LOCUST_HIDE_RUNTIMES=1` is a test seam: the first-run drive needs a
+// machine with nothing installed, and this one has everything.
+const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
+  ? { find: async () => undefined }
+  : createPathExecutableLocator()
 // Antigravity has no CLI probe: its readiness is whether the app is open,
 // which the host checks itself and merges into the same sweep.
 const antigravityProbe = createAntigravityHostProbe()
@@ -271,7 +275,11 @@ const createWindow = (
     // The 512, not the 256 beside it. Windows scales the window and taskbar
     // icon from whatever it is handed, so handing it the smaller file made it
     // downsample from a downsample. Found by the design pass, 2026-09-04.
-    icon: join(__dirname, '../../resources/icon-512.png'),
+    // Packaged: the executable carries the mark (electron-builder embeds
+    // resources/icon.ico) and Windows takes the window's icon from it when
+    // none is handed over. Handing a path inside the archive gave Colin's
+    // taskbar Electron's own icon (2026-09-06). Development keeps the PNG.
+    ...(app.isPackaged ? {} : { icon: join(__dirname, '../../resources/icon-512.png') }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       sandbox: true,
@@ -326,6 +334,38 @@ const createWindow = (
     void window.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+/**
+ * The last thing that must never be silent. An exception nobody caught in
+ * the main process used to close the app with no word at all: a beta user
+ * would see Locust vanish and not know whether their records survived.
+ * They do -- the ledger is append-only and flushed on every write -- so the
+ * dialog says so, names the log, and the app goes on unless it cannot.
+ */
+const errorLog = (): string => join(app.getPath('userData'), 'locust-errors.log')
+let toldAboutTrouble = false
+const noteTrouble = (label: string, error: unknown): void => {
+  const detail = error instanceof Error ? `${error.stack ?? error.message}` : String(error)
+  const line = `${new Date().toISOString()} ${label}: ${detail}\n`
+  try {
+    mkdirSync(app.getPath('userData'), { recursive: true })
+    appendFileSync(errorLog(), line, 'utf8')
+  } catch {
+    // Nowhere to write; the dialog still says what happened.
+  }
+  if (toldAboutTrouble) return
+  toldAboutTrouble = true
+  try {
+    dialog.showErrorBox(
+      'Locust hit a problem',
+      `Something went wrong inside Locust. Your mission records are safe on disk.\n\n${detail.split('\n')[0] ?? ''}\n\nDetails were written to ${errorLog()}.`
+    )
+  } catch {
+    // Before the app is ready a dialog cannot show; the log has it.
+  }
+}
+process.on('uncaughtException', (error) => noteTrouble('uncaughtException', error))
+process.on('unhandledRejection', (reason) => noteTrouble('unhandledRejection', reason))
 
 if (!ownsSingleInstanceLock) {
   app.quit()

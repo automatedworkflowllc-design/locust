@@ -97,7 +97,7 @@ export function faceLabel(activity: FaceActivity): string {
 export type LiveActivity = 'thinking' | 'working' | 'delegating' | 'responding' | 'idle'
 
 /** A runtime's own subagent launcher: Claude Code's Agent (Task before 2.x), OpenCode's task. */
-export const SUBAGENT_TOOL = /^(task|agent|subagent)$/i
+export const SUBAGENT_TOOL = /^(task|agent|subagent|spawn_agent|subagent:\w+)$/i
 
 /**
  * Which of the three live states a run is in, from its event stream alone.

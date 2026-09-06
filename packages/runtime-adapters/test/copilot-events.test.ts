@@ -406,3 +406,39 @@ describe("a view is not a change", () => {
     expect(view).toBeDefined();
   });
 });
+
+describe("Copilot CLI 1.0.83's stream, measured 2026-09-06", () => {
+  let seq = 0
+  const rec = (value: unknown) => ({ sequence: ++seq, raw: JSON.stringify(value) })
+  const fresh = () => createCopilotEventNormalizer({ runId: "run_1", missionId: "mission_1", cliVersion: "1.0.83", now: () => new Date("2026-09-06T00:00:00.000Z") })
+
+  it("opens one reasoning step on the first delta, closes it on the block, and says nothing per delta", () => {
+    const n = fresh()
+    const first = n.accept(rec({ type: "assistant.reasoning_delta", data: { reasoningId: "r1", deltaContent: "**Reading" } }))
+    expect(first.map((e) => e.type)).toEqual(["step.started"])
+    expect(n.accept(rec({ type: "assistant.reasoning_delta", data: { reasoningId: "r1", deltaContent: " README" } }))).toEqual([])
+    expect(n.accept(rec({ type: "assistant.reasoning_delta", data: { reasoningId: "r1", deltaContent: " file**" } }))).toEqual([])
+    const closed = n.accept(rec({ type: "assistant.reasoning", data: { reasoningId: "r1", content: "**Reading README file**" } }))
+    expect(closed.map((e) => e.type)).toEqual(["step.completed"])
+    expect(JSON.stringify([...first, ...closed])).not.toContain("r1")
+  })
+
+  it("stays quiet on the stream's bookkeeping and says an unknown type once", () => {
+    const n = fresh()
+    for (const type of ["assistant.tool_call_delta", "model.call_start", "model.call_finished", "assistant.message_start", "assistant.idle"]) {
+      expect(n.accept(rec({ type, data: {} }))).toEqual([])
+    }
+    const once = n.accept(rec({ type: "assistant.something_new", data: {} }))
+    expect(once).toHaveLength(1)
+    expect(once[0]).toMatchObject({ type: "adapter.diagnostic", payload: { code: "copilot.unknown_event" } })
+    expect(n.accept(rec({ type: "assistant.something_new", data: {} }))).toEqual([])
+  })
+
+  it("names what view, glob and grep acted on", () => {
+    const n = fresh()
+    const view = n.accept(rec({ type: "tool.execution_start", data: { toolCallId: "c1", toolName: "view", arguments: { path: "README.md" } } }))
+    expect(view[0]).toMatchObject({ type: "tool.started", payload: { command: "README.md" } })
+    const glob = n.accept(rec({ type: "tool.execution_start", data: { toolCallId: "c2", toolName: "glob", arguments: { pattern: "**/*.md" } } }))
+    expect(glob[0]).toMatchObject({ payload: { command: "**/*.md" } })
+  })
+})

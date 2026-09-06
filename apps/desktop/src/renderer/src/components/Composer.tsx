@@ -216,7 +216,7 @@ export function Composer({
           ? 'Checking local runtimes…'
           : discoveryPhase === 'error'
             ? 'Runtime discovery is unavailable…'
-            : 'Sign in to a local runtime to start a mission…'
+            : 'Install a coding agent and sign in to start a mission…'
 
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()

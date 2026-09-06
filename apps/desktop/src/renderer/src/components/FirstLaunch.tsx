@@ -92,6 +92,17 @@ export function FirstLaunch({
           <br />
           nothing pooled, proxied, or sent anywhere you have not connected
         </p>
+        {/*
+          * A fresh machine: six tags and no next step read as a wall (first-run
+          * drive, 2026-09-06). One sentence says what Locust runs and what to do.
+          */}
+        {discoveryPhase === 'ready' && connected === 0 && (
+          <p className="lc-claim lc-claim--hint">
+            Locust runs the coding agents you install and sign in to — Claude Code, Codex CLI, Cursor Agent, OpenCode, Copilot CLI.
+            <br />
+            Install one, sign in, and it appears here on its own.
+          </p>
+        )}
 
         {/*
           * The folder card itself lives in Settings and on the composer's own

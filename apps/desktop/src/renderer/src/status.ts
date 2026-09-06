@@ -26,6 +26,7 @@ export type RouteTag =
   | 'AT LIMIT'
   | 'PREVIEW'
   | 'SIGN IN'
+  | 'NOT INSTALLED'
   | 'UNAVAILABLE'
   /** Installed, but its probe did not answer in time; discovery asks again. */
   | 'CHECKING'
@@ -153,9 +154,9 @@ function baseRouteRowStatus(
   }
   if (!runtime.installed) {
     return {
-      tag: 'UNAVAILABLE',
+      tag: 'NOT INSTALLED',
       selectable: false,
-      detail: `${runtime.displayName} was not found on this machine.`
+      detail: `${runtime.displayName} was not found on this machine. Install it and sign in; Locust finds it on its own.`
     }
   }
   if (runtime.status === 'auth-required' || runtime.auth === 'unauthenticated') {

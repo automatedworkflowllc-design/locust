@@ -200,7 +200,7 @@ describe('nothing is live unless discovery proved it', () => {
 
   it('separates sign-in from missing and from broken', () => {
     expect(routeRowStatus(runtime({ installed: false, ready: false, status: 'not-installed' }), 'live', false).tag)
-      .toBe('UNAVAILABLE')
+      .toBe('NOT INSTALLED')
     expect(routeRowStatus(runtime({ ready: false, status: 'auth-required', auth: 'unauthenticated' }), 'live', false).tag)
       .toBe('SIGN IN')
     expect(routeRowStatus(runtime({ ready: false, status: 'offline' }), 'live', false).detail)
@@ -502,7 +502,7 @@ describe('the tag on the route you are set to', () => {
     // found anything. The row used to read lime ACTIVE directly above the
     // sentence "Codex CLI was not found on this machine."
     const missing = routeRowStatus(runtime({ installed: false, ready: false, status: 'not-installed' }), 'live', true)
-    expect(routeRowTag(missing, true)).toBe('UNAVAILABLE')
+    expect(routeRowTag(missing, true)).toBe('NOT INSTALLED')
     const signedOut = routeRowStatus(runtime({ ready: false, status: 'auth-required', auth: 'unauthenticated' }), 'live', true)
     expect(routeRowTag(signedOut, true)).toBe('SIGN IN')
   })

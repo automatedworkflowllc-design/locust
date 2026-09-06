@@ -475,3 +475,14 @@ describe("a file_change names its files", () => {
     expect((done?.payload as { command?: string }).command).toBe("/w/README.md" + nl + "/w/src/prices.ts");
   });
 });
+
+describe("Codex's own subagents, as Colin's ledger recorded them (2026-09-06)", () => {
+  it("draws spawn_agent as a tool call named by its tool, carrying the prompt, settled on completion", () => {
+    const n = createCodexEventNormalizer({ runId: "run_1", missionId: "mission_1", now: () => new Date("2026-09-06T00:00:00.000Z") });
+    const item = { id: "item_1", type: "collab_tool_call", tool: "spawn_agent", sender_thread_id: "t0", receiver_thread_ids: [], prompt: "Check the latest Alphabet stock price.", agents_states: {}, status: "in_progress" };
+    const started = n.accept({ sequence: 1, raw: JSON.stringify({ type: "item.started", item }) });
+    expect(started[0]).toMatchObject({ type: "tool.started", payload: { itemId: "item_1", toolKind: "collab_tool_call", name: "subagent:spawn_agent", command: "Check the latest Alphabet stock price." } });
+    const done = n.accept({ sequence: 2, raw: JSON.stringify({ type: "item.completed", item: { ...item, receiver_thread_ids: ["t1"], agents_states: { t1: "completed" }, status: "completed" } }) });
+    expect(done[0]).toMatchObject({ type: "tool.completed", payload: { itemId: "item_1", name: "subagent:spawn_agent", status: "completed" } });
+  });
+});

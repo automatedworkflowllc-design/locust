@@ -3333,6 +3333,11 @@ textarea {
 
 /* Settings, tidied (2026-09-05): one line under a heading, the manual folded
    under it, groups in one card with divider rows, controls in aligned rows. */
+.lc-claim--hint {
+  margin-top: var(--lc-space-3);
+  color: var(--lc-text-secondary);
+}
+
 .lc-settings__more {
   margin: 0 0 var(--lc-space-5);
   font-size: var(--lc-text-secondary-size);

@@ -150,7 +150,7 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
           kind: 'helper',
           key: `helper_${String(entries.length)}`,
           // The target is what the helper was asked; without one, say so.
-          description: detail.tool !== undefined && detail.tool !== detail.name ? detail.name : 'a subagent, unnamed',
+          description: detail.tool !== undefined && detail.tool !== detail.name ? detail.name : subagentVerb(detail.tool),
           ...(detail.status === undefined || detail.status === 'error' ? {} : { subagentType: detail.status }),
           ...(detail.output === undefined ? {} : { summary: detail.output }),
           settled: detail.settled,
@@ -485,6 +485,26 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
   if (helpers > 0) parts.push(`asked ${pluralize(helpers, 'subagent')}`)
   if (other > 0) parts.push(`${pluralize(other, 'tool call')}`)
   return parts.length === 0 ? 'No tool activity' : parts.join(' · ')
+}
+
+/**
+ * What a subagent call without an ask of its own was doing. Codex's collab
+ * tools arrive as `subagent:<verb>`; only spawn carries a prompt (2026-09-06).
+ */
+function subagentVerb(tool: string | undefined): string {
+  const verb = tool === undefined ? undefined : /^subagent:(\w+)$/i.exec(tool)?.[1]
+  switch (verb) {
+    case 'wait':
+    case 'wait_agent':
+      return 'waiting for a subagent to report'
+    case 'send_input':
+      return 'a message to a subagent'
+    case 'close_agent':
+    case 'close':
+      return 'closing a subagent'
+    default:
+      return 'a subagent, unnamed'
+  }
 }
 
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {

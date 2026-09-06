@@ -207,7 +207,14 @@ export function copilotUsage(value: unknown): RedactedJsonValue | undefined {
 export function copilotToolCommand(argumentsValue: unknown): string | undefined {
   if (typeof argumentsValue === "string") return stringValue(argumentsValue);
   if (!isObject(argumentsValue)) return undefined;
-  return stringValue(argumentsValue.command) ?? stringValue(argumentsValue.description);
+  // MEASURED 2026-09-06 off `--output-format json`: glob {pattern}, view
+  // {path}, grep {pattern, path}, bash {command}, edit/create {path}. The
+  // fold read "view done" twice with no file until path and pattern counted.
+  return stringValue(argumentsValue.command)
+    ?? stringValue(argumentsValue.path)
+    ?? stringValue(argumentsValue.file_path)
+    ?? stringValue(argumentsValue.pattern)
+    ?? stringValue(argumentsValue.description);
 }
 
 /**
@@ -245,6 +252,30 @@ export function createCopilotEventNormalizer(
   const now = context.now ?? (() => new Date());
 
   const openTools = new Map<string, { kind: string; command?: string }>();
+
+  const openReasoning = new Set<string>();
+
+  // The raw reasoning id is an opaque blob; the step id is its ordinal.
+
+  const reasoningOrdinals = new Map<string, string>();
+
+  const reasoningKey = (raw: unknown): string => {
+
+    const key = typeof raw === "string" && raw.length > 0 ? raw : "reasoning";
+
+    const known = reasoningOrdinals.get(key);
+
+    if (known !== undefined) return known;
+
+    const next = String(reasoningOrdinals.size + 1);
+
+    reasoningOrdinals.set(key, next);
+
+    return next;
+
+  };
+
+  const unknownTypes = new Set<string>();
   // The host's id stands until the CLI prints its own in the terminal record.
   let runtimeThreadId: string | undefined = context.sessionId === undefined
     ? undefined
@@ -343,13 +374,37 @@ export function createCopilotEventNormalizer(
       return [emit("step.completed", { stepKind: "turn", itemId: turnId, evidence })];
     }
 
+    // MEASURED 2026-09-06, Copilot CLI 1.0.83: reasoning streams as
+    // `assistant.reasoning_delta` (77 of them in a one-sentence run) before
+    // the whole `assistant.reasoning` block. Each delta used to become an
+    // "Unhandled Copilot record" line in the thread. One step per reasoning
+    // id, opened on the first delta, closed by the block.
+    if (type === "assistant.reasoning_delta") {
+      const reasoningId = reasoningKey(data.reasoningId);
+      if (openReasoning.has(reasoningId)) return [];
+      openReasoning.add(reasoningId);
+      return [emit("step.started", { stepKind: "reasoning", itemId: `reasoning_${reasoningId}`, evidence })];
+    }
     if (type === "assistant.reasoning") {
-      // Its content was empty in every capture and its id is an encrypted
-      // blob, so there is nothing to show but the fact that it happened.
+      const reasoningId = reasoningKey(data.reasoningId);
+      const wasOpen = openReasoning.delete(reasoningId);
       return [
-        emit("step.started", { stepKind: "reasoning", evidence }),
-        emit("step.completed", { stepKind: "reasoning", evidence }),
+        ...(wasOpen ? [] : [emit("step.started", { stepKind: "reasoning", itemId: `reasoning_${reasoningId}`, evidence })]),
+        emit("step.completed", { stepKind: "reasoning", itemId: `reasoning_${reasoningId}`, evidence }),
       ];
+    }
+    // Streams and bookkeeping with nothing a person needs from them: the
+    // tool call's arguments arriving in pieces (the start record carries them
+    // whole), the model call's own start and finish, the message's first
+    // frame, and the idle beat between turns.
+    if (
+      type === "assistant.tool_call_delta"
+      || type === "model.call_start"
+      || type === "model.call_finished"
+      || type === "assistant.message_start"
+      || type === "assistant.idle"
+    ) {
+      return [];
     }
 
     if (type === "assistant.message_delta") {
@@ -464,6 +519,10 @@ export function createCopilotEventNormalizer(
       return [];
     }
 
+    // Once per type: a record type this build does not know is worth one
+    // line in the signal rail, not one per record.
+    if (unknownTypes.has(type)) return [];
+    unknownTypes.add(type);
     return [
       diagnostic("info", "copilot.unknown_event", `Unhandled Copilot record: ${type}`, evidence),
     ];
