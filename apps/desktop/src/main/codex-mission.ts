@@ -102,6 +102,24 @@ interface ActiveCodexMission {
    * finishes the other may be gone and the overlap invisible.
    */
   sharedTree: boolean
+  /**
+   * Whether this run's PROCESS has exited.
+   *
+   * Distinct from being out of `active`, and the distinction is the whole of
+   * a defect the 0.36.2 shared-folder mark shipped with. A finished run stays
+   * in `active` for a long time after its process is gone: through its own
+   * disk observation, through its share to the workroom, and through the
+   * relay's `onShared` -- which STARTS the recipient's run and is awaited
+   * before `clearActive`. So every relayed reply found the sender still
+   * "active", both were marked as sharing the folder, and the reply's own
+   * edit was then counted against nobody, about a process that had already
+   * exited (QA, 2026-09-06). The same happened to any run a person started
+   * while a finished run's `git status` was still being taken.
+   *
+   * Two runs share a folder when both are RUNNING in it. This is how that
+   * question gets asked.
+   */
+  settled: boolean
   /** The last event sequence persisted, so a synthetic event can follow it. */
   lastSequence: number
   /** Every event persisted, so the observation can tell reported edits from unreported ones. */
@@ -412,10 +430,15 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     try {
       completion = await mission.process.completion
     } catch {
+      mission.settled = true
       await persistTransportFailure(mission, options.ledger, now().toISOString())
       clearActive(mission)
       return
     }
+    // From here the process is gone. Everything below -- the terminal events,
+    // the disk observation, the share, the relay -- is bookkeeping, and a run
+    // started during any of it is not running alongside this one.
+    mission.settled = true
 
     let terminalEvents: ReturnType<CodexEventNormalizer['finish']>
     try {
@@ -1066,6 +1089,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           diskBefore,
           cwd: runCwd,
           sharedTree: false,
+          settled: false,
           lastSequence: 0,
           persisted: []
         }
@@ -1075,6 +1099,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         if (mission.diskBefore !== undefined) {
           for (const other of active.values()) {
             if (other.runId === runId || other.cwd !== runCwd || other.diskBefore === undefined) continue
+            // Still in `active` is not the same as still running. A run whose
+            // process has exited is not sharing anything with this one, and
+            // treating it as though it were is what put the notice on every
+            // relayed reply.
+            if (other.settled) continue
             other.sharedTree = true
             mission.sharedTree = true
           }

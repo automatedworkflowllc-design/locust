@@ -21,13 +21,22 @@
 // A pass here is what makes "give concurrent teammates worktrees" honest
 // advice rather than a guess.
 
-import { readdir } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const WORDS = { Wren: 'ALMANAC', Booty: 'BRAMBLE', Gem: 'CINDER' }
 const workspace = await scratchRepository('locust-drive-worktree-ws-')
+// A DEFAULT INSTALL, which is what 0.36.4's evidence did not have.
+//
+// Those nine clean runs were driven on a scratch repository -- which writes a
+// LOCUST.md -- with memory off. The sentence that did the work lived inside
+// the workspace brief, and the brief is only sent when a LOCUST.md exists; and
+// memory, on by default, named the parent folder at a teammate standing in a
+// worktree. So the fix was measured under conditions the person receiving it
+// will not have (QA, 2026-09-06). This removes both.
+await rm(join(workspace, 'LOCUST.md'), { force: true })
 
 const drive = await startDrive({
   name: 'worktree-concurrent',
@@ -41,7 +50,7 @@ const drive = await startDrive({
       { teammateId: 'tm_gem', name: 'Gem', hue: 'clay', role: 'Research & Briefs', worktree: true, createdAt: '2026-09-05T05:00:02.000Z' }
     ],
     missionOwners: {},
-    settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
+    settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'auto', autoMode: false }
   }
 })
 

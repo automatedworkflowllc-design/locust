@@ -306,6 +306,26 @@ export function createOpenCodeEventNormalizer(
     },
 
     finish(completion: RuntimeProcessCompletion): readonly NormalizedRuntimeEvent[] {
+      // The one line that names why a run stopped, which nothing read.
+      //
+      // When OpenCode is asked for a directory outside the one it may use, it
+      // prints `permission requested: external_directory (<path>);
+      // auto-rejecting` on stderr and the process ENDS -- with no step saying
+      // it stopped. The person was then told "OpenCode ended without a step
+      // that reported it had stopped", which describes the stream rather than
+      // the cause, and is the exact sentence 0.36.4 set out to stop people
+      // seeing. Measured against opencode-ai 1.18.29 in a real worktree, five
+      // runs (QA, 2026-09-06); the run ends this way whenever the model lists
+      // the parent folder before writing.
+      //
+      // 0.36.5 makes the refusal survivable in the ordinary case by stating
+      // `external_directory: "deny"`. This is for when a run ends on one
+      // anyway: say which folder, and that it was outside what the run may
+      // use.
+      const refused = /permission requested:\s*external_directory\s*\(([^)]*)\)/i.exec(
+        completion.stderr ?? "",
+      );
+      const refusedPath = refused?.[1]?.trim().replace(/[\\/]\*$/, "");
       if (finalized) return [];
       finalized = true;
       const process = processEvidence(completion);
@@ -320,9 +340,11 @@ export function createOpenCodeEventNormalizer(
         return [
           emit("run.failed", {
             kind: "process-failed",
-            message: sawStop
-              ? `OpenCode exited with code ${String(completion.exitCode)}.`
-              : "OpenCode ended without a step that reported it had stopped.",
+            message: refusedPath !== undefined && refusedPath.length > 0
+              ? `OpenCode asked for ${refusedPath}, which is outside the folder this run may use, and stopped.`
+              : sawStop
+                ? `OpenCode exited with code ${String(completion.exitCode)}.`
+                : "OpenCode ended without a step that reported it had stopped.",
             ...thread,
             runtimeTerminal: sawStop ? "completed" : "missing",
             process,

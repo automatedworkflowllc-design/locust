@@ -66,6 +66,18 @@ export async function readWorkspaceBrief(
 }
 
 /**
+ * What a teammate on its own branch is told about where it is standing.
+ *
+ * The same fact `briefSection` states when it has a brief to attach it to.
+ * Said separately because a folder with no LOCUST.md has no brief -- and that
+ * is the ordinary case for someone who has just installed the app, which is
+ * exactly who the worktree fix was for.
+ */
+export function worktreeSection(): string {
+  return 'Your missions run in your own copy of this project, so work only inside the folder you were started in.'
+}
+
+/**
  * What a mission is told, before anything else: the folder's own instructions,
  * quoted whole.
  *

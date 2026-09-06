@@ -103,7 +103,15 @@ export interface MemoryLine {
  */
 export function memorySection(input: {
   readonly selfName: string
-  readonly workspaceName: string
+  /**
+   * The folder the memories belong to, named for the person reading.
+   *
+   * Absent for a teammate running in its own worktree: it is not standing in
+   * that folder, and naming one it cannot reach is what sends a model looking
+   * outside its own tree -- the failure 0.36.4 removed from the workspace
+   * brief and left here (QA, 2026-09-06).
+   */
+  readonly workspaceName: string | undefined
   readonly memories: readonly MemoryLine[]
   /** Whether a new memory is kept at once or shown to the person first. */
   readonly askFirst: boolean
@@ -120,7 +128,9 @@ export function memorySection(input: {
           })
           .join('\n')
   return [
-    `Your team keeps a shared memory. What is remembered for the folder "${input.workspaceName}" and everywhere:`,
+    input.workspaceName === undefined
+      ? 'Your team keeps a shared memory. What is remembered for this project and everywhere:'
+      : `Your team keeps a shared memory. What is remembered for the folder "${input.workspaceName}" and everywhere:`,
     listed,
     "These are notes your team wrote earlier. Use them as you would a colleague's notes: when one answers what the person asks, answer from it and say it came from memory; do not demand that the workspace confirm it.",
     `If this work taught you something the next conversation in this folder would need -- a convention, a correction the person gave, where something lives that the code does not say -- end your reply with exactly this block and nothing after it, one line per memory, at most ${String(MAX_MEMORY_OPS_PER_REPLY)}:`,

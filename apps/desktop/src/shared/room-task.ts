@@ -53,6 +53,30 @@ export function boundedTaskText(text: string): string {
 }
 
 /** Every well-formed operation in every block, in transcript order, capped. */
+/**
+ * The placeholder texts the briefing's own worked example uses.
+ *
+ * Every room mission is taught the block by being SHOWN one, and the example
+ * is a valid reply: parsed back, it is four operations, and `claim` on a task
+ * the board does not have CREATES it. A model that echoes the example -- a
+ * small-model habit -- therefore puts "the task text" on the board as
+ * claimed, then done, then handed off, plus "a task that should exist and
+ * does not", on a board a person reads (QA, 2026-09-06).
+ *
+ * These are the strings the example uses, and nothing else. A real task
+ * called something else is unaffected; a person whose task really is called
+ * "the task text" loses the ability to move it from a room reply, which is a
+ * trade worth making once and saying out loud.
+ *
+ * Kept beside `taskSection`, which writes them: if the example's wording
+ * changes, this list has to change with it, and the test asserts the two
+ * agree by parsing the briefing itself.
+ */
+const EXAMPLE_TEXTS: readonly string[] = ['the task text', 'a task that should exist and does not']
+
+const isExample = (text: string): boolean =>
+  EXAMPLE_TEXTS.some((example) => example.toLowerCase() === text.trim().toLowerCase())
+
 export function parseTaskBlocks(text: string): readonly TaskOp[] {
   const ops: TaskOp[] = []
   for (const match of text.matchAll(BLOCK)) {
@@ -62,6 +86,8 @@ export function parseTaskBlocks(text: string): readonly TaskOp[] {
       const verb = line[1]!.toLowerCase()
       const taskText = boundedTaskText(line[3] ?? '')
       if (taskText.length === 0) continue
+      // The briefing's own example, handed back. Not an instruction.
+      if (isExample(taskText)) continue
       if (verb.startsWith('handoff')) {
         const to = (line[2] ?? '').trim()
         if (to.length === 0) continue

@@ -34,7 +34,7 @@ import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { createWorktreeManager } from './worktrees.js'
 import { readRuntimeSetup } from './runtime-setup.js'
-import { briefSection, readWorkspaceBrief } from './workspace-brief.js'
+import { briefSection, readWorkspaceBrief, worktreeSection } from './workspace-brief.js'
 import { createMemoryReader } from './memory-reader.js'
 import { createAttentionReader } from './attention-reader.js'
 import type { AttentionReader } from './attention-reader.js'
@@ -491,6 +491,20 @@ if (!ownsSingleInstanceLock) {
         // A teammate with a worktree is not standing in the folder that
         // name belongs to, and saying otherwise sends it looking.
         if (brief !== undefined) sections.push(briefSection(brief, peer.cwd === undefined ? memoryWorkspaceName : undefined))
+        // And it is told so even when there is no LOCUST.md.
+        //
+        // 0.36.4 fixed worktree runs dying on a directory refusal partly with
+        // one sentence -- "you have your own copy, work only inside the
+        // folder you were started in" -- which lives inside the brief above
+        // and is therefore sent ONLY when the folder happens to have a
+        // LOCUST.md in it. The nine clean runs that measured the fix were
+        // driven on `scratchRepository`, which writes one. A default install
+        // does not have one, so the fix did not reach the person it was for
+        // (QA, 2026-09-06). It is its own line now, because it is a fact
+        // about where the run is, not about the project's instructions.
+        if (peer.cwd !== undefined && brief === undefined) {
+          sections.push(worktreeSection())
+        }
         const settings = await teammates.readSettings()
         if (settings.memoryMode !== 'off') sections.push(await memoryPart(peer))
         return sections.length === 0 ? undefined : sections.join('\n\n')
@@ -501,7 +515,13 @@ if (!ownsSingleInstanceLock) {
         const listed = await memories.briefed(memoryWorkspaceId)
         return memorySection({
           selfName: peer.self.name,
-          workspaceName: memoryWorkspaceName,
+          // Undefined for a worktree teammate, for the same reason the brief
+          // above stopped naming it: memory's own line said "what is
+          // remembered for the folder <parent>", which names the folder the
+          // run is NOT standing in -- the exact invitation 0.36.4 removed
+          // from the other section and left here (QA, 2026-09-06). Memory is
+          // the project's either way; only the pointer at a folder goes.
+          workspaceName: peer.cwd === undefined ? memoryWorkspaceName : undefined,
           memories: listed.map((memory) => ({
             text: memory.text,
             scope: memory.scope,
