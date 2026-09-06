@@ -2677,7 +2677,15 @@ export default function App(): ReactElement {
                   </button>
                 </div>
               </header>
-              {exchange !== undefined && (
+              {/*
+                * Only while something is actually running. It carries a live
+                * budget and a Stop control, and neither means anything once
+                * the exchange is over -- after which it is a permanent header
+                * on a conversation that has finished (Colin, 2026-09-06:
+                * "dont have that exchange thing always up there, we want less
+                * clutter"). What it said is still in the thread and the record.
+                */}
+              {exchange !== undefined && exchange.liveRunIds.length > 0 && (
                 <ExchangeStrip
                   exchange={exchange}
                   cap={relayHopCap}

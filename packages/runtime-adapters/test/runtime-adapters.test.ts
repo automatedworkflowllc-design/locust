@@ -174,7 +174,7 @@ describe("the Auto mode a person switches on", () => {
     expect(copilot.args.join(" ")).not.toContain("--deny-tool");
   });
 
-  it("gives OpenCode --auto, and drops the read-only permission config", () => {
+  it("gives OpenCode --auto, and drops the read-only denials while still stating confinement", () => {
     const opencode = createOpenCodeRunCommand(nativeExecutable, {
       workspacePath,
       sandbox: "full-access",
@@ -182,7 +182,15 @@ describe("the Auto mode a person switches on", () => {
       model: "provider/model",
     });
     expect(opencode.args).toContain("--auto");
-    expect(opencode.env?.OPENCODE_CONFIG_CONTENT).toBeUndefined();
+    // The read-only denials are gone, which is what Auto means.
+    const config = JSON.parse(opencode.env?.OPENCODE_CONFIG_CONTENT ?? "{}");
+    expect(config.permission?.edit).toBeUndefined();
+    expect(config.permission?.write).toBeUndefined();
+    // What remains is not a restriction on where an Auto run may go -- Auto
+    // has already answered that -- it is the difference between a refusal the
+    // run survives and one that ends it. Left unstated, OpenCode's default
+    // auto-rejects and the process ends without saying it stopped.
+    expect(config.permission?.external_directory).toBe("deny");
   });
 
   it("unlocks those two arguments only for a full-access run", () => {
@@ -775,7 +783,14 @@ describe("OpenCode and Copilot CLI commands", () => {
     // not offered at all.
     expect(spec.env).toEqual({ OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG });
     expect(JSON.parse(OPENCODE_READ_ONLY_CONFIG)).toEqual({
-      permission: { edit: "deny", write: "deny", bash: "deny", patch: "deny" },
+      permission: {
+        edit: "deny",
+        write: "deny",
+        bash: "deny",
+        patch: "deny",
+        // Stated, not left to the default: an unstated refusal ends the run.
+        external_directory: "deny",
+      },
     });
   });
 
@@ -800,7 +815,15 @@ describe("OpenCode and Copilot CLI commands", () => {
       // because its own is a file pointing there; it does not need the
       // parent's working tree. Keys and values read off OpenCode's own config
       // schema, not guessed.
-      permission: { external_directory: { "C:\\work\\shop\\.git\\*": "allow" } },
+      permission: {
+        external_directory: {
+          "C:\\work\\shop\\.git\\*": "allow",
+          // Everything else refused BY NAME. Without the catch-all the rest
+          // falls to OpenCode's default, which does not refuse -- it ends the
+          // run.
+          "*": "deny",
+        },
+      },
     });
 
     // A read-only worktree run still needs the parent AND still may not write.
@@ -818,7 +841,7 @@ describe("OpenCode and Copilot CLI commands", () => {
         write: "deny",
         bash: "deny",
         patch: "deny",
-        external_directory: { "C:\\work\\shop\\.git\\*": "allow" },
+        external_directory: { "C:\\work\\shop\\.git\\*": "allow", "*": "deny" },
       },
     });
 
@@ -830,10 +853,17 @@ describe("OpenCode and Copilot CLI commands", () => {
       sandbox: "workspace-write",
       prompt: PROMPT,
     });
-    expect(inPlace.env?.OPENCODE_CONFIG_CONTENT).toBeUndefined();
+    // It carries the plain confinement every run now carries, and -- the part
+    // that matters -- NO allow entry of any kind. Asserting "no config at all"
+    // used to serve this purpose and no longer can, but the control's job is
+    // unchanged: prove the parent grant is not handed out unconditionally.
+    expect(JSON.parse(inPlace.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      permission: { external_directory: "deny" },
+    });
+    expect(inPlace.env?.OPENCODE_CONFIG_CONTENT).not.toContain("allow");
   });
 
-  it("lets a workspace-write OpenCode mission edit, and carries no permission config at all", () => {
+  it("lets a workspace-write OpenCode mission edit, and states its confinement rather than assuming it", () => {
     const spec = createOpenCodeRunCommand(openCode, {
       workspacePath,
       sandbox: "workspace-write",
@@ -841,7 +871,19 @@ describe("OpenCode and Copilot CLI commands", () => {
       resumeThreadId: "ses_1",
       prompt: PROMPT,
     });
-    expect(spec.env).toBeUndefined();
+    // This used to carry no config at all, and that is what a person's run
+    // died of: with nothing stated, a look outside the folder is met by
+    // OpenCode's default, which prints "permission requested:
+    // external_directory (...); auto-rejecting" and ENDS the process without
+    // a step saying it stopped. Colin hit it on 2026-09-06 asking a teammate
+    // to message its teammates; the model went looking around the filesystem
+    // and the run died with a red card and no answer. Measured over three
+    // runs of one prompt: unstated -> run never reached its own end; "deny"
+    // -> refused cleanly, the model said so, the run finished.
+    expect(JSON.parse(spec.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      permission: { external_directory: "deny" },
+    });
+    // Confinement is stated; nothing about editing inside the folder changed.
     expect(spec.args).toEqual(["run", "--format", "json", "-m", "opencode/big-pickle", "-s", "ses_1", PROMPT]);
     // `--auto` buys nothing: measured, `run` edits files without it.
     expect(spec.args).not.toContain("--auto");

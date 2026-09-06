@@ -1768,7 +1768,17 @@ export function turnPromptLine(turn: {
   // had; it is theirs to see, even though the host pressed go. A room post
   // is the person's own words too, said to several at once.
   if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room') return turn.prompt
-  return relayedTitle({ startedBy: turn.startedBy, peerMessages: turn.peerMessages ?? [] })
+  // A relayed turn's prompt IS the message that started it, and the thread
+  // already draws that message as a peer card, in time, before the work. The
+  // bubble therefore repeated a teammate's words verbatim -- and drew them in
+  // the person's own bubble style, which reads as the person having said it
+  // (Colin, 2026-09-06). The card is the better of the two: it names who sent
+  // it and opens their run. So the bubble stands down whenever the card is
+  // there, and only speaks when it would otherwise be the sole account of what
+  // started the turn.
+  const relayed = relayedTitle({ startedBy: turn.startedBy, peerMessages: turn.peerMessages ?? [] })
+  const drawnAsACard = (turn.peerMessages ?? []).some((message) => message.direction === 'received')
+  return drawnAsACard ? undefined : relayed
 }
 
 export function relayedTitle(mission: {

@@ -659,13 +659,25 @@ describe('thread composition', () => {
       text: "Day's going well on my side.",
       at: '2026-09-05T00:00:00.000Z'
     }
+    // The message IS drawn -- as a peer card, in time, before the work -- so
+    // the bubble stands down rather than repeating it in the person's own
+    // bubble style, which read as the person having said it (Colin,
+    // 2026-09-06, on seeing a teammate's poem in his own bubble).
     expect(
       turnPromptLine({ prompt: briefing, startedBy: { kind: 'relay', hop: 2 }, peerMessages: [received] })
-    ).toBe("Wren asked: Day's going well on my side.")
+    ).toBeUndefined()
 
-    // The record no longer holds the message: draw NOTHING rather than the
-    // briefing. The peer card beside it still says who wrote to whom.
+    // The record no longer holds the message: still nothing, and for the same
+    // reason it has always been nothing here -- the briefing is the host's
+    // words, never the person's.
     expect(turnPromptLine({ prompt: briefing, startedBy: { kind: 'relay', hop: 2 }, peerMessages: [] })).toBeUndefined()
+
+    // The point of the whole case, and the thing that must never regress: in
+    // NEITHER state does the host's briefing reach the screen.
+    for (const messages of [[received], []]) {
+      const line = turnPromptLine({ prompt: briefing, startedBy: { kind: 'relay', hop: 2 }, peerMessages: messages })
+      expect(line ?? '').not.toContain('locust-share')
+    }
     expect(turnPromptLine({ prompt: 'resumed briefing', startedBy: { kind: 'resume', epoch: 2 } })).toBeUndefined()
 
     // A person's words are theirs, and so are a routine's steps -- they were

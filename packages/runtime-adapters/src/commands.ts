@@ -697,7 +697,10 @@ export const COPILOT_MODEL_HINTS: RuntimeModelHints = {
  * anything upholds, so it is never what a read-only mission rests on.
  */
 export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
-  permission: { edit: "deny", write: "deny", bash: "deny", patch: "deny" },
+  // `external_directory` is stated for the same reason it is stated below:
+  // left to the default, a look outside the folder ends the run rather than
+  // being refused.
+  permission: { edit: "deny", write: "deny", bash: "deny", patch: "deny", external_directory: "deny" },
 });
 
 /**
@@ -720,10 +723,36 @@ export function opencodeWorktreeConfig(repositoryRoot: string, readOnly: boolean
   return JSON.stringify({
     permission: {
       ...(readOnly ? { edit: "deny", write: "deny", bash: "deny", patch: "deny" } : {}),
-      external_directory: { [`${repositoryRoot}\\.git\\*`]: "allow" },
+      external_directory: { [`${repositoryRoot}\\.git\\*`]: "allow", "*": "deny" },
     },
   });
 }
+
+/**
+ * Being told no must not end the run.
+ *
+ * With no permission config at all -- which is what every ordinary OpenCode
+ * mission got -- a request for a directory outside the workspace is answered
+ * by OpenCode's default: it prints `permission requested: external_directory
+ * (...); auto-rejecting` and the process ENDS without a step that says it
+ * stopped. The person is left with a red card and no answer, for a run that
+ * merely looked somewhere it was not allowed.
+ *
+ * MEASURED 2026-09-06, three runs of the same prompt asking a run to list a
+ * directory outside its workspace:
+ *
+ *   no config            -- auto-rejected, run never reached its own end
+ *   external_directory   -- refused cleanly, model SAID it could not, and the
+ *     : "deny"              run finished normally
+ *   external_directory   -- allowed, which is not what a workspace-write run
+ *     : "allow"             should get
+ *
+ * So the denial is stated rather than left to the default. The run is
+ * confined exactly as before; what changes is that it comes back.
+ */
+export const OPENCODE_CONFINED_CONFIG = JSON.stringify({
+  permission: { external_directory: "deny" },
+});
 
 /**
  * OpenCode in its non-interactive `run` mode.
@@ -768,7 +797,7 @@ export function createOpenCodeRunCommand(
     ? opencodeWorktreeConfig(options.repositoryRoot, readOnly)
     : readOnly
       ? OPENCODE_READ_ONLY_CONFIG
-      : undefined;
+      : OPENCODE_CONFINED_CONFIG;
   return baseSpec("opencode", executable, options.workspacePath, args, {
     stdin: "none",
     sandbox: sandboxArgument(options.sandbox),
