@@ -181,6 +181,15 @@ interface CodexMissionServiceOptions {
   readonly createId?: () => string
   readonly now?: () => Date
   readonly schedule?: (task: () => void) => void
+  /**
+   * Whether the workspace has Auto switched on. Asked here rather than at the
+   * window's edge because every way a run can start -- a person, a relay hop,
+   * a saved routine -- passes through this service, and a mode that lets a
+   * runtime write anywhere on the machine should be checked on the path it
+   * actually takes. Absent means off: a caller that does not wire it cannot
+   * get Auto by omission.
+   */
+  readonly autoModeAllowed?: () => Promise<boolean>
 }
 
 function error(
@@ -521,7 +530,21 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       // Read-only unless the renderer explicitly asked for edits. The host
       // decides the sandbox from this one value; the renderer never passes a
       // sandbox string of its own.
-      const sandbox: MissionSandbox = mode === 'accept-edits' ? 'workspace-write' : 'read-only'
+      //
+      // Auto is checked against the workspace switch here, not taken on the
+      // caller's word. A window left open across a change of mind, or a
+      // routine recorded while Auto was on, would otherwise carry the widest
+      // sandbox into a workspace that has since said no. Refused rather than
+      // quietly narrowed: a person who chose Auto and silently got the folder
+      // back would only find out from a run that could not do its job.
+      if (mode === 'auto' && !(await (options.autoModeAllowed ?? (async () => false))())) {
+        return error(
+          'RUNTIME_START_FAILED',
+          'Auto mode is switched off for this workspace. Turn it on in Settings to let a run work outside the workspace folder. Nothing was recorded.'
+        ) as CodexMissionStartResponse
+      }
+      const sandbox: MissionSandbox =
+        mode === 'auto' ? 'full-access' : mode === 'accept-edits' ? 'workspace-write' : 'read-only'
       let resolveStartOperation!: () => void
       const startOperation = new Promise<void>((resolve) => {
         resolveStartOperation = resolve

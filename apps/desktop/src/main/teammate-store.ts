@@ -79,7 +79,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false }
 
 function parsedMemoryMode(value: unknown): MemoryMode {
   return value === 'auto' || value === 'ask' || value === 'off' ? value : DEFAULT_MEMORY_MODE
@@ -104,7 +104,7 @@ export function isTeammateRoute(value: unknown): value is TeammateRoute {
     // records that honestly. Refusing it here would not stop the mode -- it
     // would only make `rememberRoute` fail silently and leave a stale one on
     // the roster, which is the worse of the two.
-    && (record.mode === 'ask' || record.mode === 'accept-edits' || record.mode === 'approve-each' || record.mode === 'plan')
+    && (record.mode === 'ask' || record.mode === 'accept-edits' || record.mode === 'approve-each' || record.mode === 'plan' || record.mode === 'auto')
   )
 }
 
@@ -234,7 +234,12 @@ function parsedFile(text: string): StoredFile {
       : DEFAULT_RELAY_HOP_CAP,
     memoryMode: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedMemoryMode((rawSettings as Record<string, unknown>).memoryMode)
-      : DEFAULT_MEMORY_MODE
+      : DEFAULT_MEMORY_MODE,
+    // Only a literal true switches Auto on. Absent, malformed, or a file from
+    // an older version all read as off, which is the answer nobody regrets.
+    autoMode: typeof rawSettings === 'object' && rawSettings !== null
+      ? (rawSettings as Record<string, unknown>).autoMode === true
+      : false
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, settings }
@@ -434,7 +439,12 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             : DEFAULT_RELAY_HOP_CAP,
           memoryMode: typeof settings === 'object' && settings !== null
             ? parsedMemoryMode((settings as Record<string, unknown>).memoryMode)
-            : DEFAULT_MEMORY_MODE
+            : DEFAULT_MEMORY_MODE,
+          // The widest setting in the file, and the one a malformed message
+          // must never be able to turn on.
+          autoMode: typeof settings === 'object' && settings !== null
+            ? (settings as Record<string, unknown>).autoMode === true
+            : false
         }
         const file = await read()
         await write({ ...file, settings: next })

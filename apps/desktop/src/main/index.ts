@@ -521,6 +521,10 @@ if (!ownsSingleInstanceLock) {
     let roomTasks: RoomTasks | undefined
     const codexMissions = createCodexMissionService({
       workspacePath,
+      // Asked at the moment a run starts, never cached: switching Auto off in
+      // Settings has to reach the next run, including one a relay or a saved
+      // routine is about to start.
+      autoModeAllowed: async () => (await teammates.readSettings()).autoMode === true,
       discover: discoverForWork,
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,
@@ -919,12 +923,12 @@ if (!ownsSingleInstanceLock) {
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
 
     ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false } as const
       try {
         return await teammates.readSettings()
       } catch {
         // An unreadable switch reads as its default: swarm off, replies on.
-        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE } as const
+        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false } as const
       }
     })
 
@@ -972,11 +976,11 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false } as const
       try {
         return await teammates.writeSettings(settings)
       } catch {
-        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE } as const
+        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false } as const
       }
     })
 
@@ -1516,9 +1520,14 @@ if (!ownsSingleInstanceLock) {
       const payload = (typeof request === 'object' && request !== null ? request : {}) as Partial<CodexMissionStartRequest>
       const prompt = payload.prompt
       // Anything but an explicit accept-edits is read-only. A malformed or
-      // missing mode must never widen what a run may touch.
+      // missing mode must never widen what a run may touch. `auto` is passed
+      // through as itself and refused further in if the workspace has it
+      // switched off -- one check, on the path every run takes, rather than
+      // one here and another the relay could walk around.
       const mode =
-        payload.mode === 'accept-edits' || payload.mode === 'approve-each' ? payload.mode : 'ask'
+        payload.mode === 'accept-edits' || payload.mode === 'approve-each' || payload.mode === 'auto'
+          ? payload.mode
+          : 'ask'
       // Same shape as the mode: an unrecognized runtime falls back to Codex
       // rather than being passed through to discovery as-is.
       const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'

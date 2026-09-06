@@ -6,6 +6,51 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.35.0 — 2026-09-06
+
+- **Auto mode: a run that is not confined to the workspace folder.** Off
+  until you switch it on in Settings, and then offered in the composer
+  beside the others, saying what it does in amber: "Runs without asking
+  and may change files anywhere on this machine, not only this folder."
+  Every other mode still refuses a write outside the folder. The switch
+  is checked again each time a run starts, so turning it off stops the
+  next one -- including one a teammate or a saved routine was about to
+  start -- and the mission's record says `auto · whole machine` rather
+  than leaving a reader to guess what that run was allowed.
+
+  What each runtime is actually given, measured off its own `--help`:
+  Claude Code `--permission-mode bypassPermissions` (and only in Auto,
+  without `--restricted`: the CLI refuses those two together), Codex CLI
+  `--sandbox danger-full-access`, Cursor Agent `--force`, Copilot CLI
+  `--allow-all-paths`, OpenCode `--auto`. Nothing else is unlocked: the
+  wider flags each of them offers, and the ones that would send the work
+  somewhere else, stay refused in every mode.
+
+  The record keeps up: the mission ledger moves to schema 14 so a run that
+  was not confined to its folder is written as exactly that. An older
+  reader refuses such a mission rather than drawing it as one that stayed
+  in the folder, which is the same rule that moved the number when writing
+  was first allowed at all.
+
+- **Antigravity runs end when the answer arrives.** A model that reasons
+  and answers in the same step never looked finished, so the run stayed
+  live and the composer kept its stop button until the idle timeout
+  (Colin: "antigravity models with stop button stuck after its done with
+  output"). Found by replaying his own stuck transcript.
+
+- **The app icon is the designer's own.** The "portrait, soft fade"
+  candidate: the wings run edge to edge, the antennae break the top, and
+  the abdomen fades out at the bottom so the crop ends in air. Its five
+  supplied sizes are used as drawn and only the three Windows also wants
+  are scaled; nothing is re-rendered from an SVG, which is how a
+  differently-framed picture got shipped in the first place.
+
+- **No disclaimer under a teammate's message.** The "treated as claims"
+  footer is gone with the tag that went in 0.34.1 (Colin: "teammates are
+  AI, no one else adds disclaimers with their models in chat like that,
+  why clutter?"). Every message is still attributed and still opens the
+  conversation it reached.
+
 ## 0.34.1 — 2026-09-06
 
 - **Cursor Agent with an effort picked ran again.** Cursor carries the

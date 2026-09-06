@@ -171,6 +171,16 @@ export interface RuntimeDiscovery {
 }
 
 /** A future runner may bind the prompt to stdin; this package does not execute it. */
+/**
+ * How much a mission may touch. Declared here, beside the spec that carries
+ * it, because the spec is what actually gets spawned: the runner validates
+ * the argv again at that moment, and a spec that did not say what it was
+ * allowed could only be judged by the strictest reading -- which refused a
+ * mission the person had explicitly widened (measured driving Auto mode,
+ * 2026-09-06).
+ */
+export type MissionSandbox = "read-only" | "workspace-write" | "full-access";
+
 export interface RuntimeCommandSpec {
   readonly runtime: MissionRuntimeId;
   readonly executablePath: string;
@@ -184,6 +194,11 @@ export interface RuntimeCommandSpec {
    */
   readonly stdin: "prompt" | "none";
   readonly stdout: "jsonl";
+  /**
+   * What this mission was allowed. Absent reads as `read-only` everywhere it
+   * is judged, so a spec built without one cannot be widened by omission.
+   */
+  readonly sandbox?: MissionSandbox;
   /**
    * Variables this run needs on top of the runner's allowlist. OpenCode has no
    * read-only flag; its permission config arrives this way, so a spec that

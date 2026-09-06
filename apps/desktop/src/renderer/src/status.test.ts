@@ -17,6 +17,7 @@ import {
   capRouteRows,
   modeRunsOn,
   modesFor,
+  sandboxPhrase,
   modeUnavailableReason,
   flagshipRank,
   missionsMatching,
@@ -827,5 +828,42 @@ describe('the route a mission starts on', () => {
   it('sends the effort as itself where the runtime takes it as a flag', () => {
     expect(startRoute(models, 'claude', 'sonnet', 'medium')).toEqual({ model: 'sonnet', effort: 'medium' })
     expect(startRoute(models, 'claude', 'sonnet', undefined)).toEqual({ model: 'sonnet' })
+  })
+})
+
+describe('the Auto mode, which has to be switched on before it is offered', () => {
+  it('is absent from a route\'s modes unless the workspace switched it on', () => {
+    expect(modesFor('codex', 'win32')).not.toContain('auto')
+    expect(modesFor('codex', 'win32', {})).not.toContain('auto')
+    expect(modesFor('codex', 'win32', { autoMode: false })).not.toContain('auto')
+    expect(modesFor('codex', 'win32', { autoMode: true })).toContain('auto')
+  })
+
+  it('is offered on every runtime Locust has a handle on, and not on Antigravity', () => {
+    for (const runtime of ['codex', 'claude', 'cursor', 'opencode', 'copilot'] as const) {
+      expect(modesFor(runtime, 'win32', { autoMode: true })).toContain('auto')
+    }
+    expect(modesFor('antigravity', 'win32', { autoMode: true })).not.toContain('auto')
+    expect(modeUnavailableReason('auto', 'antigravity', 'win32')).toMatch(/own permissions/)
+  })
+
+  it('is never the mode a route falls back to', () => {
+    // The fallback takes the first offered mode, so Auto being last in the
+    // list is what keeps a refused choice from widening into the widest one.
+    expect(modesFor('codex', 'win32', { autoMode: true })[0]).not.toBe('auto')
+    expect(modesFor('cursor', 'win32', { autoMode: true })[0]).not.toBe('auto')
+  })
+
+  it('has its own phrase for what a run was allowed', () => {
+    // "may edit the workspace" on a run that could touch the whole machine
+    // would understate what happened, on the receipt that exists to say it.
+    expect(sandboxPhrase('full-access')).toBe('may edit anything on this machine')
+    expect(sandboxPhrase('workspace-write')).toBe('may edit the workspace')
+    expect(sandboxPhrase('read-only')).toBe('read-only')
+    expect(sandboxPhrase(undefined)).toBe('read-only')
+  })
+
+  it('says what it allowed, not what it was called', () => {
+    expect(modeLabel('auto')).toBe('auto \u00b7 whole machine')
   })
 })

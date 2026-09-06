@@ -19,7 +19,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  * 'account-default' to a free string, so a version-1 reader must not be handed
  * a version-2 file -- which is the entire reason the number moved.
  */
-export const MISSION_LEDGER_SCHEMA_VERSION = 13 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 14 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -92,14 +92,23 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 13 as const
  * (`routineId`, and which `step` this run is). Same rule as relay and resume:
  * the ledger says a person did not ask for this run, and a v12 reader would
  * refuse a starter it does not know rather than mislabel it.
+ *
+ * v13 -> v14 widens `sandbox` again, to `full-access`: the Auto mode a person
+ * switches on for themselves, in which a run is not confined to the workspace
+ * folder. Exactly the reason the number moved from 2 to 3, one step further --
+ * a v13 reader handed such a mission would refuse its header and report the
+ * whole mission unreadable, and the alternative (letting it through under an
+ * older number) would be worse, because that reader would draw a run that
+ * could touch the whole machine as one confined to a folder. The permission a
+ * run had is the last thing a record may be vague about.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11 || value === 12 || value === 13
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11 || value === 12 || value === 13 || value === 14
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -509,7 +518,9 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
   if (metadata.cliVersion !== null) requireText(metadata.cliVersion, 'cliVersion', 256)
   requireSafeId(metadata.workspaceId, 'workspaceId')
   if (
-    (metadata.sandbox !== 'read-only' && metadata.sandbox !== 'workspace-write')
+    (metadata.sandbox !== 'read-only'
+      && metadata.sandbox !== 'workspace-write'
+      && metadata.sandbox !== 'full-access')
     || metadata.executionPolicyVersion !== 1
   ) {
     throw new Error('Mission execution policy is invalid')
@@ -660,6 +671,9 @@ function parsedMetadata(
     return undefined
   }
   // And no writer before v13 knew the routine starter.
+  if (schemaVersion < 14 && candidate.sandbox === 'full-access') {
+    return undefined
+  }
   if (schemaVersion < 13 && candidate.startedBy?.kind === 'routine') {
     return undefined
   }
@@ -677,7 +691,9 @@ function parsedMetadata(
     || typeof candidate.resolvedRouteId !== 'string'
     || !(candidate.cliVersion === null || typeof candidate.cliVersion === 'string')
     || typeof candidate.workspaceId !== 'string'
-    || (candidate.sandbox !== 'read-only' && candidate.sandbox !== 'workspace-write')
+    || (candidate.sandbox !== 'read-only'
+      && candidate.sandbox !== 'workspace-write'
+      && candidate.sandbox !== 'full-access')
     || candidate.executionPolicyVersion !== 1
     || typeof candidate.createdAt !== 'string'
   ) return undefined

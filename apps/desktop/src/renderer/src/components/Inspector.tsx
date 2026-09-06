@@ -41,7 +41,7 @@ export function Inspector({
   const [tab, setTab] = useState<Tab>('Activity')
   // What this run was ACTUALLY allowed to do, read from the start receipt --
   // not from whatever mode the composer happens to show now.
-  const writes = route?.sandbox === 'workspace-write'
+  const writes = route?.sandbox === 'workspace-write' || route?.sandbox === 'full-access'
   const rows = buildSignalRail(events, { running })
 
   return (

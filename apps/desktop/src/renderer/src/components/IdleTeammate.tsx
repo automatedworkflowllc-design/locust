@@ -21,6 +21,8 @@ export function modeSentence(mode: MissionMode): string {
       return 'Accept edits is on, so it may change files here; switch to Ask below to keep it read-only.'
     case 'plan':
       return 'In Plan mode it answers with the steps it would take and changes nothing.'
+    case 'auto':
+      return 'Auto is on: it runs without asking and may change files anywhere on this machine, not only in this folder.'
   }
 }
 

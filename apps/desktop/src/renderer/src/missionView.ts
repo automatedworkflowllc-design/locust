@@ -1228,7 +1228,7 @@ export function peerSnippet(text: string | null, limit = 72): string | undefined
  *                    it states the permission and claims nothing.
  */
 export function decisionStanding(input: {
-  readonly sandbox: 'read-only' | 'workspace-write' | undefined
+  readonly sandbox: 'read-only' | 'workspace-write' | 'full-access' | undefined
   readonly events: readonly NormalizedRuntimeEvent[]
 }): string {
   if (input.sandbox === 'read-only') return 'stopped here · nothing was changed'

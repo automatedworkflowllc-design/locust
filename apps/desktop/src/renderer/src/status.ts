@@ -527,6 +527,10 @@ export function modeRunsOn(
   platform?: string
 ): boolean {
   if (mode === 'approve-each') return runtime === 'codex'
+  // Auto needs a handle on the runtime's own permissions. Antigravity runs
+  // its agent under its own policy and Locust holds nothing there, so the
+  // one mode it can honestly offer stays the one it already offers.
+  if (mode === 'auto') return runtime !== 'antigravity'
   // Plan is available exactly where read-only containment is real. A plan
   // that could edit the workspace is a promise the app cannot keep, and the
   // Cursor/Windows reason below already says so in its last clause.
@@ -559,6 +563,9 @@ export function modeRunsOn(
  * reading the Teammates screen.
  */
 export function modeLabel(mode: MissionMode | undefined): string {
+  // Named for what it allowed, not for what it was called: a record that says
+  // only "auto" does not tell a reader what that run was permitted to touch.
+  if (mode === 'auto') return 'auto · whole machine'
   if (mode === 'accept-edits') return 'accept edits'
   if (mode === 'approve-each') return 'approve each action'
   if (mode === 'ask') return 'ask · read-only'
@@ -566,9 +573,33 @@ export function modeLabel(mode: MissionMode | undefined): string {
   return 'not set yet'
 }
 
-export function modesFor(runtime: MissionRuntimeId, platform?: string): readonly MissionMode[] {
-  return (['ask', 'plan', 'accept-edits', 'approve-each'] as const).filter((mode) =>
-    modeRunsOn(mode, runtime, platform)
+/**
+ * Auto is absent unless the workspace switched it on, and absent rather than
+ * disabled: a greyed-out row invites the question "how do I get that?" on the
+ * one control where the answer should be a deliberate trip to Settings.
+ * Omitting the option is also what makes this fail closed -- a caller that
+ * does not pass the switch cannot offer the mode by forgetting to.
+ */
+/**
+ * What a run was allowed, in the words the header uses. Read from the run's
+ * own start receipt, never from the mode the composer happens to show now --
+ * and Auto needs its own phrase, because a run that could touch the whole
+ * machine rendered as "may edit the workspace" would understate what happened.
+ */
+export function sandboxPhrase(sandbox: 'read-only' | 'workspace-write' | 'full-access' | undefined): string {
+  if (sandbox === 'full-access') return 'may edit anything on this machine'
+  if (sandbox === 'workspace-write') return 'may edit the workspace'
+  return 'read-only'
+}
+
+export function modesFor(
+  runtime: MissionRuntimeId,
+  platform?: string,
+  options?: { readonly autoMode?: boolean }
+): readonly MissionMode[] {
+  return (['ask', 'plan', 'accept-edits', 'approve-each', 'auto'] as const).filter(
+    (mode) =>
+      (mode !== 'auto' || options?.autoMode === true) && modeRunsOn(mode, runtime, platform)
   )
 }
 
@@ -580,6 +611,7 @@ export function modeUnavailableReason(
 ): string | undefined {
   if (modeRunsOn(mode, runtime, platform)) return undefined
   if (mode === 'approve-each') return `Codex CLI only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
+  if (mode === 'auto') return `${runtimeLabel(runtime)} runs its own agent under its own permissions; Locust has no handle to widen.`
   if (runtime === 'antigravity') return "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only."
   return 'Cursor Agent cannot be held read-only on Windows: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files.'
 }

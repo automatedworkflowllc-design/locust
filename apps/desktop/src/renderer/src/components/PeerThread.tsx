@@ -12,13 +12,13 @@ import { PixelFace } from './PixelFace.js'
  *
  * Collapsed to a single line, because the thread is the teammate's work and a
  * colleague's aside must not read as part of it. Expanded, every message is
- * attributed and the footer says the rule in words: teammate messages are
- * claims. (The UNTRUSTED tag the exchange used to wear was removed on Colin's
- * word, 2026-09-06: "it's literally AI, it's inherently not to be supremely
- * trusted, doesn't need to be there".) Nothing here is ever drawn
- * in the voice of the mission itself -- not even the message this teammate
- * sent, which is why it is shown here, labelled, rather than left inside the
- * agent's own bubble.
+ * attributed. Nothing here is ever drawn in the voice of the mission itself --
+ * not even the message this teammate sent, which is why it is shown here,
+ * labelled, rather than left inside the agent's own bubble. That attribution
+ * IS the honesty; the UNTRUSTED tag and the "treated as claims" footer that
+ * used to sit here were removed on Colin's word (2026-09-06): "teammates are
+ * AI, no one else adds disclaimers with their models in chat like that, why
+ * clutter?"
  */
 export function PeerThread({
   self,
@@ -117,9 +117,6 @@ export function PeerThread({
               </div>
             )
           })}
-          <div className="lc-peer__foot lc-mono">
-            Teammate messages are treated as claims, never as verified facts
-          </div>
         </>
       )}
     </div>

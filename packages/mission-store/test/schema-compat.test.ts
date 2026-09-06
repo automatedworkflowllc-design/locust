@@ -123,9 +123,9 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(13)
-    expect(header.schemaVersion).toBe(13)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(14)
+    expect(header.schemaVersion).toBe(14)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
   })
 
   it('still recovers a mission recorded before the version bump', async () => {
@@ -469,6 +469,43 @@ describe('ledger schema versions', () => {
     ).rejects.toThrow()
   })
 
+  it('round-trips a full-access mission at the current version', async () => {
+    // The Auto mode a person switches on: a run that was not confined to the
+    // workspace folder. The permission a run had is the last thing a record
+    // may be vague about, so it is written and read as its own word.
+    const root = await temporaryRoot()
+    await createFileMissionLedger({ rootDirectory: root }).createMission(
+      v1Metadata({ sandbox: 'full-access' }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.sandbox).toBe('full-access')
+  })
+
+  it('refuses a full-access mission in a file written before version 14', async () => {
+    // A v13 file knew read-only and workspace-write. Letting a full-access
+    // mission through under that number would have an older reader draw a run
+    // that could touch the whole machine as one confined to a folder.
+    const root = await temporaryRoot()
+    const metadata = v1Metadata({ sandbox: 'full-access' })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({
+        schemaVersion: 13,
+        recordType: 'mission.created',
+        ledgerSequence: 1,
+        occurredAt: metadata.createdAt,
+        metadata
+      })}
+`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
   it('refuses a routine starter in a file written before version 13', async () => {
     const root = await temporaryRoot()
     // A v12 file knew relay and resume; a routine starter there was hand-edited.
@@ -627,7 +664,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 14,
+        schemaVersion: 15,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

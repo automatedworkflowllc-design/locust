@@ -1,4 +1,4 @@
-import type { RuntimeModelHints, RuntimeModelName } from "./types.js";
+import type { MissionSandbox, RuntimeModelHints, RuntimeModelName } from "./types.js";
 import type {
   ExecutableLaunch,
   MissionRuntimeId,
@@ -82,6 +82,25 @@ export const COPILOT_REQUIRED_FEATURES = [
 export const OMNIROUTE_REQUIRED_FEATURES = [
   "json-health-check",
 ] as const satisfies readonly RuntimeFeature[];
+
+/**
+ * The arguments a `full-access` mission may use, and nothing else may. Each is
+ * the narrowest flag that runtime has for "do not ask, and do not confine this
+ * to one folder", measured off its own `--help`:
+ *
+ * - Cursor Agent `--force` -- "Force allow commands unless explicitly denied".
+ *   Its `--yolo` alias stays forbidden: one door into a mode is enough.
+ * - Copilot CLI `--allow-all-paths` -- "Disable file path verification". Its
+ *   `--allow-all` stays forbidden because that also opens URLs, which is a
+ *   different question than the one the person answered.
+ *
+ * Claude Code and Codex CLI take theirs as a flag VALUE rather than a flag, so
+ * they are unlocked in the loop below instead. OpenCode's `--auto` was never
+ * forbidden. Everything named "dangerously" stays refused in every mode: each
+ * has a narrower flag that does the job, and reaching for the wide one would
+ * be a choice nobody made.
+ */
+const FULL_ACCESS_ARGUMENTS = new Set(["--force", "--allow-all-paths"]);
 
 const FORBIDDEN_ARGUMENTS = new Set([
   "--dangerously-bypass-approvals-and-sandbox",
@@ -193,33 +212,50 @@ export function detectSupportedFeatures(
   return features;
 }
 
-export function assertSafeRuntimeCommand(spec: RuntimeCommandSpec): void {
+/**
+ * The last gate before a runtime is launched. Every builder passes through it,
+ * and it defaults to the strictest reading: called without a sandbox, it
+ * refuses everything it would refuse for a read-only mission, so a caller who
+ * forgets to say cannot accidentally get more.
+ */
+export function assertSafeRuntimeCommand(
+  spec: RuntimeCommandSpec,
+  sandbox?: MissionSandbox,
+): void {
+  // The spec's own word when the caller does not name one: the process runner
+  // validates the argv again at spawn time and has nothing else to go on, and
+  // judging an Auto mission by the strictest reading refused a run the person
+  // had explicitly widened.
+  const full = (sandbox ?? spec.sandbox) === "full-access";
   for (let index = 0; index < spec.args.length; index += 1) {
     const argument = spec.args[index];
     if (argument === undefined) continue;
-    if (FORBIDDEN_ARGUMENTS.has(argument)) {
+    const unlocked = full && FULL_ACCESS_ARGUMENTS.has(argument);
+    if (FORBIDDEN_ARGUMENTS.has(argument) && !unlocked) {
       throw new Error(`Forbidden runtime argument: ${argument}`);
     }
     if (
+      !unlocked &&
       [...FORBIDDEN_ARGUMENTS].some((forbidden) => argument.startsWith(`${forbidden}=`))
     ) {
       throw new Error(`Forbidden runtime argument: ${argument}`);
     }
-    if (argument === "--sandbox=danger-full-access") {
+    if (argument === "--sandbox=danger-full-access" && !full) {
       throw new Error("Forbidden Codex sandbox: danger-full-access");
     }
-    if (argument.toLowerCase() === "--permission-mode=bypasspermissions") {
+    if (argument.toLowerCase() === "--permission-mode=bypasspermissions" && !full) {
       throw new Error("Forbidden Claude permission mode: bypassPermissions");
     }
     if (argument === "--ask-for-approval=never") {
       throw new Error("Forbidden Codex approval mode: never");
     }
-    if (argument === "danger-full-access" && spec.args[index - 1] === "--sandbox") {
+    if (argument === "danger-full-access" && spec.args[index - 1] === "--sandbox" && !full) {
       throw new Error("Forbidden Codex sandbox: danger-full-access");
     }
     if (
       argument.toLowerCase() === "bypasspermissions" &&
-      spec.args[index - 1] === "--permission-mode"
+      spec.args[index - 1] === "--permission-mode" &&
+      !full
     ) {
       throw new Error("Forbidden Claude permission mode: bypassPermissions");
     }
@@ -238,6 +274,8 @@ export function assertSafeRuntimeCommand(spec: RuntimeCommandSpec): void {
 interface SpecTransport {
   /** Omitted means the prompt goes on stdin, which is what most CLIs read. */
   readonly stdin?: "prompt" | "none";
+  /** What the mission was allowed, so the guard can judge the argv it is given. */
+  readonly sandbox?: MissionSandbox;
   readonly env?: Readonly<Record<string, string>>;
 }
 
@@ -255,9 +293,10 @@ function baseSpec(
     cwd: requireText(cwd, "Workspace path"),
     stdin: transport.stdin ?? "prompt",
     stdout: "jsonl",
+    ...(transport.sandbox === undefined ? {} : { sandbox: transport.sandbox }),
     ...(transport.env === undefined ? {} : { env: transport.env }),
   };
-  assertSafeRuntimeCommand(spec);
+  assertSafeRuntimeCommand(spec, transport.sandbox);
   return spec;
 }
 
@@ -266,11 +305,18 @@ function baseSpec(
  * that says nothing gets the safe mode, so write access is only ever something
  * a caller asked for explicitly.
  *
- * `danger-full-access` is deliberately not in this union. It is refused by
- * `assertSafeRuntimeCommand` as well, so removing that check alone would not
- * make it reachable.
+ * `full-access` is the Auto mode a person turns on for themselves (Colin,
+ * 2026-09-06: "there needs to be an auto option ... to allow them to work out
+ * of the workspace folder if desired by the user"). It is not a loophole in
+ * the guard below: it unlocks exactly two arguments and two flag VALUES, each
+ * measured off the runtime's own `--help` on 2026-09-06, and everything else
+ * stays refused -- including the flags that would send a transcript somewhere
+ * else, which are about disclosure rather than reach.
+ *
+ * Declared in `types.ts` beside the spec that carries it, and re-exported here
+ * because this is where callers look for it.
  */
-export type MissionSandbox = "read-only" | "workspace-write";
+export type { MissionSandbox } from "./types.js";
 
 export interface RuntimeCommandOptions {
   readonly workspacePath: string;
@@ -358,10 +404,16 @@ export function parseCursorModelList(text: string): RuntimeModelHints | undefine
 
 function sandboxArgument(sandbox: MissionSandbox | undefined): MissionSandbox {
   if (sandbox === undefined) return "read-only";
-  if (sandbox !== "read-only" && sandbox !== "workspace-write") {
+  if (sandbox !== "read-only" && sandbox !== "workspace-write" && sandbox !== "full-access") {
     throw new Error("Unsupported mission sandbox");
   }
   return sandbox;
+}
+
+/** Codex's own name for the widest policy, which is not the host's name for it. */
+function codexSandboxArgument(sandbox: MissionSandbox | undefined): string {
+  const chosen = sandboxArgument(sandbox);
+  return chosen === "full-access" ? "danger-full-access" : chosen;
 }
 
 export function createCodexExecCommand(
@@ -390,7 +442,7 @@ export function createCodexExecCommand(
   // the approval gate, and a recorded diff of every write. Accepted by both
   // `exec` and `exec resume` (both --help checked on 0.151.0-alpha.7.2).
   const args = options.resumeThreadId === undefined
-    ? ["exec", "--json", "--skip-git-repo-check", "--sandbox", sandboxArgument(options.sandbox), "-C", options.workspacePath]
+    ? ["exec", "--json", "--skip-git-repo-check", "--sandbox", codexSandboxArgument(options.sandbox), "-C", options.workspacePath]
     : [
         "exec",
         "resume",
@@ -398,7 +450,7 @@ export function createCodexExecCommand(
         "--json",
         "--skip-git-repo-check",
         "-c",
-        `sandbox_mode=${sandboxArgument(options.sandbox)}`,
+        `sandbox_mode=${codexSandboxArgument(options.sandbox)}`,
       ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
@@ -409,7 +461,7 @@ export function createCodexExecCommand(
     args.push("-c", `model_reasoning_effort=${requireEffort(options.effort)}`);
   }
   args.push("-");
-  return baseSpec("codex", executable, options.workspacePath, args);
+  return baseSpec("codex", executable, options.workspacePath, args, { sandbox: sandboxArgument(options.sandbox) });
 }
 
 export function createClaudePrintCommand(
@@ -431,9 +483,22 @@ export function createClaudePrintCommand(
   // Now the mode decides. Read-only keeps exactly what it had. Accept edits
   // names the file-editing tools and Bash, so a Claude mission can do the
   // same work a Codex one can -- edit, then run the tests it just changed.
+  // Auto is the person's own choice to let this run work outside the folder
+  // (Colin, 2026-09-06). `acceptEdits` accepts edits INSIDE the working
+  // directory and still stops for anything outside it, which is a stop nobody
+  // can answer in a headless run -- so the mode that matches what was asked
+  // for is `bypassPermissions`, measured off `claude --help` the same day.
+  const auto = sandboxArgument(options.sandbox) === "full-access";
   const editing = sandboxArgument(options.sandbox) !== "read-only";
   const args = [
-    "--restricted",
+    // MEASURED 2026-09-06: `--restricted` and `bypassPermissions` cannot be
+    // combined -- the CLI exits at once with "bypassPermissions not supported
+    // in restricted mode", which the app saw as a run that ended without a
+    // result. So Auto drops it, and that is the honest trade: `--restricted`
+    // is what keeps the person's own Claude settings out of a mission, and
+    // Auto is the mode where they have said to run as themselves, without
+    // asking, anywhere. Every other mode keeps it.
+    ...(auto ? [] : ["--restricted"]),
     "--print",
     "--output-format",
     "stream-json",
@@ -452,7 +517,7 @@ export function createClaudePrintCommand(
     // inherits the tools of the run that asked for it, so a read-only run's
     // helpers read only.
     "--permission-mode",
-    editing ? "acceptEdits" : "default",
+    auto ? "bypassPermissions" : editing ? "acceptEdits" : "default",
     "--tools",
     editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task" : "Read,Glob,Grep,Task",
     "--disallowedTools",
@@ -467,7 +532,7 @@ export function createClaudePrintCommand(
   if (options.resumeThreadId !== undefined) {
     args.push("--resume", requireText(options.resumeThreadId, "Session id"));
   }
-  return baseSpec("claude", executable, options.workspacePath, args);
+  return baseSpec("claude", executable, options.workspacePath, args, { sandbox: sandboxArgument(options.sandbox) });
 }
 
 /**
@@ -518,10 +583,16 @@ export function createCursorPrintCommand(
   if (options.effort !== undefined) {
     throw new Error("Cursor Agent takes no effort level");
   }
+  if (sandboxArgument(options.sandbox) === "full-access") {
+    // "Force allow commands unless explicitly denied" -- cursor-agent --help,
+    // measured 2026-09-06. Its `--yolo` alias does the same thing and stays
+    // forbidden; one door into this mode is enough.
+    args.push("--force");
+  }
   if (options.resumeThreadId !== undefined) {
     args.push("--resume", requireText(options.resumeThreadId, "Session id"));
   }
-  return baseSpec("cursor", executable, options.workspacePath, args);
+  return baseSpec("cursor", executable, options.workspacePath, args, { sandbox: sandboxArgument(options.sandbox) });
 }
 
 /**
@@ -644,9 +715,15 @@ export function createOpenCodeRunCommand(
   if (options.resumeThreadId !== undefined) {
     args.push("-s", requireText(options.resumeThreadId, "Session id"));
   }
+  if (sandboxArgument(options.sandbox) === "full-access") {
+    // "auto-approve permissions that are not explicitly denied" -- opencode
+    // run --help, measured 2026-09-06.
+    args.push("--auto");
+  }
   args.push(requireText(options.prompt ?? "", "Prompt"));
   return baseSpec("opencode", executable, options.workspacePath, args, {
     stdin: "none",
+    sandbox: sandboxArgument(options.sandbox),
     ...(sandboxArgument(options.sandbox) === "read-only"
       ? { env: { OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG } }
       : {}),
@@ -684,6 +761,12 @@ export function createCopilotPromptCommand(
   if (sandboxArgument(options.sandbox) === "read-only") {
     args.push("--deny-tool=write,shell");
   }
+  if (sandboxArgument(options.sandbox) === "full-access") {
+    // "Disable file path verification and allow" access outside the workspace
+    // -- copilot --help, measured 2026-09-06. `--allow-all` would do this and
+    // open every URL as well, which is a different question; it stays refused.
+    args.push("--allow-all-paths");
+  }
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
   }
@@ -697,5 +780,5 @@ export function createCopilotPromptCommand(
   } else if (options.sessionId !== undefined) {
     args.push("--session-id", requireText(options.sessionId, "Session id"));
   }
-  return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "none" });
+  return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "none", sandbox: sandboxArgument(options.sandbox) });
 }

@@ -112,6 +112,141 @@ describe("runtime command specifications", () => {
   });
 });
 
+describe("the Auto mode a person switches on", () => {
+  // Colin, 2026-09-06: "there needs to be an auto option ... to allow them to
+  // work out of the workspace folder if desired by the user". Every flag below
+  // was read off that runtime's own --help the same day; the point of these
+  // cases is that the widening is EXACTLY these flags and nothing near them.
+  const workspacePath = "C:\\work\\repo";
+  const spec = (runtime: string, args: readonly string[]) => ({
+    runtime: runtime as never,
+    executablePath: "C:\\x.exe",
+    args,
+    cwd: workspacePath,
+    stdin: "prompt" as const,
+    stdout: "jsonl" as const,
+  });
+
+  it("gives Claude Code bypassPermissions and the editing tools", () => {
+    const claude = createClaudePrintCommand(
+      { ...nativeExecutable, commandName: "claude" },
+      { workspacePath, sandbox: "full-access" },
+    );
+    expect(claude.args.join(" ")).toContain("--permission-mode bypassPermissions");
+    expect(claude.args.join(" ")).toContain("Edit,Write,NotebookEdit,Bash");
+    // MEASURED 2026-09-06: the CLI refuses the two together -- "bypassPermissions
+    // not supported in restricted mode" -- and exits before it says anything
+    // else, which the app saw as a run that ended without a result. Auto is
+    // the one mode that drops it; every other mode keeps it.
+    expect(claude.args).not.toContain("--restricted");
+    expect(claude.args.join(" ")).toContain("--disallowedTools mcp__*");
+    expect(claude.args).not.toContain("--dangerously-skip-permissions");
+    for (const sandbox of ["read-only", "workspace-write"] as const) {
+      const other = createClaudePrintCommand({ ...nativeExecutable, commandName: "claude" }, { workspacePath, sandbox });
+      expect(other.args).toContain("--restricted");
+    }
+  });
+
+  it("gives Codex danger-full-access, which is its own name for it", () => {
+    const codex = createCodexExecCommand(nativeExecutable, { workspacePath, sandbox: "full-access" });
+    expect(codex.args.join(" ")).toContain("--sandbox danger-full-access");
+    expect(codex.args).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+  });
+
+  it("gives Cursor --force and never its --yolo alias", () => {
+    const cursor = createCursorPrintCommand(nativeExecutable, { workspacePath, sandbox: "full-access" });
+    expect(cursor.args).toContain("--force");
+    expect(cursor.args).not.toContain("--yolo");
+    // The read-only pairing is gone with it: plan mode and the sandbox are
+    // what hold a run back, and this run is not being held back.
+    expect(cursor.args).not.toContain("--sandbox");
+  });
+
+  it("gives Copilot --allow-all-paths and never --allow-all", () => {
+    const copilot = createCopilotPromptCommand(nativeExecutable, {
+      workspacePath,
+      sandbox: "full-access",
+      prompt: "go",
+    });
+    expect(copilot.args).toContain("--allow-all-paths");
+    expect(copilot.args).not.toContain("--allow-all");
+    expect(copilot.args).not.toContain("--allow-all-urls");
+    expect(copilot.args.join(" ")).not.toContain("--deny-tool");
+  });
+
+  it("gives OpenCode --auto, and drops the read-only permission config", () => {
+    const opencode = createOpenCodeRunCommand(nativeExecutable, {
+      workspacePath,
+      sandbox: "full-access",
+      prompt: "go",
+      model: "provider/model",
+    });
+    expect(opencode.args).toContain("--auto");
+    expect(opencode.env?.OPENCODE_CONFIG_CONTENT).toBeUndefined();
+  });
+
+  it("unlocks those two arguments only for a full-access run", () => {
+    for (const argument of ["--force", "--allow-all-paths"]) {
+      expect(() => assertSafeRuntimeCommand(spec("cursor", [argument]))).toThrow(/Forbidden/);
+      expect(() => assertSafeRuntimeCommand(spec("cursor", [argument]), "workspace-write")).toThrow(/Forbidden/);
+      expect(() => assertSafeRuntimeCommand(spec("cursor", [argument]), "full-access")).not.toThrow();
+    }
+    // The two that travel as a flag VALUE, in both spellings.
+    for (const args of [["--sandbox", "danger-full-access"], ["--sandbox=danger-full-access"]]) {
+      expect(() => assertSafeRuntimeCommand(spec("codex", args))).toThrow(/danger-full-access/);
+      expect(() => assertSafeRuntimeCommand(spec("codex", args), "full-access")).not.toThrow();
+    }
+    for (const args of [["--permission-mode", "bypassPermissions"], ["--permission-mode=bypassPermissions"]]) {
+      expect(() => assertSafeRuntimeCommand(spec("claude", args))).toThrow(/bypassPermissions/);
+      expect(() => assertSafeRuntimeCommand(spec("claude", args), "full-access")).not.toThrow();
+    }
+  });
+
+  it("still refuses everything else, Auto or not", () => {
+    // Each of these is either wider than what was asked for, or about sending
+    // the work somewhere else -- which no permission mode answers.
+    for (const argument of [
+      "--dangerously-bypass-approvals-and-sandbox",
+      "--dangerously-skip-permissions",
+      "--allow-dangerously-skip-permissions",
+      "--dangerously-bypass-hook-trust",
+      "--full-auto",
+      "--yolo",
+      "-y",
+      "-f",
+      "--ignore-rules",
+      "--allow-all",
+      "--allow-all-urls",
+      "--share",
+      "--remote",
+      "--remote-export",
+    ]) {
+      expect(() => assertSafeRuntimeCommand(spec("codex", [argument]), "full-access")).toThrow(/Forbidden/);
+    }
+    expect(() => assertSafeRuntimeCommand(spec("codex", ["--ask-for-approval", "never"]), "full-access")).toThrow(/never/);
+    expect(() => assertSafeRuntimeCommand(spec("gemini", ["--approval-mode", "yolo"]), "full-access")).toThrow(/yolo/);
+  });
+
+  it("reads an unstated sandbox as the strictest one", () => {
+    // A caller that forgets to say cannot get Auto by omission.
+    expect(() => assertSafeRuntimeCommand(spec("cursor", ["--force"]), undefined)).toThrow(/Forbidden/);
+  });
+
+  it("carries the sandbox on the spec, so the runner can judge what it spawns", () => {
+    // The process runner validates the argv again at spawn time with nothing
+    // but the spec. Without this it judged an Auto mission by the strictest
+    // reading and refused it: "Runtime command failed safety validation",
+    // measured driving the app on 2026-09-06.
+    const cursor = createCursorPrintCommand(nativeExecutable, { workspacePath, sandbox: "full-access" });
+    expect(cursor.sandbox).toBe("full-access");
+    expect(() => assertSafeRuntimeCommand(cursor)).not.toThrow();
+
+    const confined = createCursorPrintCommand(nativeExecutable, { workspacePath, sandbox: "workspace-write" });
+    expect(confined.sandbox).toBe("workspace-write");
+    expect(() => assertSafeRuntimeCommand({ ...confined, args: [...confined.args, "--force"] })).toThrow(/Forbidden/);
+  });
+});
+
 describe("runtime version and executable discovery", () => {
   it("parses prerelease versions returned by installed CLIs", () => {
     expect(parseRuntimeVersion("codex-cli 0.151.0-alpha.7.2")?.version).toBe(

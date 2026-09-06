@@ -57,7 +57,10 @@ import type {
  *   the tool it belongs to, so it is attached to the most recently opened call.
  *   With nothing open there is no honest attachment to make, and a diagnostic
  *   says so rather than a tool call being invented to hang it on.
- * - A `PLANNER_RESPONSE` with `content` and no `tool_calls` is the final answer.
+ * - A `PLANNER_RESPONSE` with `content` and no `tool_calls` is the final answer,
+ *   whether or not it also carries `thinking` -- a model that reasons and
+ *   answers in one step is still answering (measured 2026-09-06; requiring no
+ *   reasoning here is what left a live run's stop button on screen).
  *   That it also means the turn is OVER is a HEURISTIC: it held in both captured
  *   conversations and there is no terminal record of any kind in the file, so
  *   nothing better was available. It is exposed as `latestFinal` rather than
@@ -275,20 +278,36 @@ export function createAntigravityEventNormalizer(
     const calls = Array.isArray(parsed.tool_calls) ? parsed.tool_calls : [];
     const content = stringValue(parsed.content);
 
-    if (thinking === undefined && calls.length === 0) {
-      if (content === undefined) {
-        return [
-          diagnostic(
-            "info",
-            "antigravity.empty_planner_response",
-            "An Antigravity planner line carried neither content, reasoning nor tool calls.",
-            evidence,
-          ),
-        ];
-      }
-      // The completion signal. See the heuristic note at the top of the file.
-      latestFinal = true;
+    if (calls.length === 0 && content === undefined && thinking === undefined) {
       return [
+        diagnostic(
+          "info",
+          "antigravity.empty_planner_response",
+          "An Antigravity planner line carried neither content, reasoning nor tool calls.",
+          evidence,
+        ),
+      ];
+    }
+
+    if (calls.length === 0 && content !== undefined) {
+      // The completion signal. See the heuristic note at the top of the file.
+      //
+      // MEASURED 2026-09-06, on a stuck run of Colin's: this used to require
+      // `thinking === undefined` as well, and a `flash` model that reasons and
+      // answers in the SAME step therefore never looked final. The transcript
+      // ended on a planner answer, the run stayed live until the idle timeout,
+      // and the composer kept its stop button ("antigravity models with stop
+      // button stuck after its done with output"). Both captured conversations
+      // ended on an answer with no reasoning beside it, so no fixture could
+      // have shown this. Reasoning in the same step is still drawn as its own
+      // step; what it is not is a reason to keep waiting.
+      latestFinal = true;
+      const events: NormalizedRuntimeEvent[] = [];
+      if (thinking !== undefined) {
+        events.push(emit("step.started", { stepKind: "reasoning", evidence }));
+        events.push(emit("step.completed", { stepKind: "reasoning", evidence }));
+      }
+      events.push(
         emit("message.delta", {
           itemId: `msg_${String(stepIndex)}`,
           operation: "replace",
@@ -296,7 +315,8 @@ export function createAntigravityEventNormalizer(
           final: true,
           evidence,
         }),
-      ];
+      );
+      return events;
     }
 
     latestFinal = false;

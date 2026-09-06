@@ -4139,12 +4139,6 @@ textarea {
   font-style: italic;
 }
 
-.lc-peer__foot {
-  align-self: center;
-  font-size: 11px;
-  color: var(--lc-text-muted);
-}
-
 /* A sidebar teammate row is a real button: same box as the row, none of the
    browser's button chrome. */
 .lc-row--button {

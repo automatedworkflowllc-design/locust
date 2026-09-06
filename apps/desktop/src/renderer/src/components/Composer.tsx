@@ -46,6 +46,11 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
     mode: 'approve-each',
     name: 'Approve each action',
     consequence: 'Stops and asks before every command or file change.'
+  },
+  {
+    mode: 'auto',
+    name: 'Auto',
+    consequence: 'Runs without asking and may change files anywhere on this machine, not only this folder.'
   }
 ]
 
@@ -62,6 +67,8 @@ export interface ComposerProps {
   readonly error: string | undefined
   readonly mode: MissionMode
   readonly onModeChange: (mode: MissionMode) => void
+  /** Whether this workspace has switched Auto on; without it the mode is not offered. */
+  readonly autoMode?: boolean
   readonly route: RouteChoice
   readonly onRouteChange: (route: RouteChoice) => void
   readonly models: readonly PublicModel[]
@@ -144,6 +151,7 @@ export function Composer({
   error,
   mode,
   onModeChange,
+  autoMode,
   route,
   onRouteChange,
   models,
@@ -179,7 +187,7 @@ export function Composer({
   // it, and every message was then rejected before it began.
   const effectiveMode: MissionMode = modeRunsOn(mode, route.runtime, platform)
     ? mode
-    : modesFor(route.runtime, platform)[0] ?? 'accept-edits'
+    : modesFor(route.runtime, platform, { autoMode: autoMode === true })[0] ?? 'accept-edits'
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   // The account's window, from the latest reading (SURFACES-0.22 §3): a
   // sentence in the tooltip always; a dot on the chip only from 80%, when a
@@ -407,7 +415,9 @@ export function Composer({
               <span className="lc-control__anchor">
                 {modeOpen && (
                   <div className="lc-menu" role="menu" aria-label="Permission mode">
-                    {MODES.map((option) => {
+                    {MODES.filter(
+                      (option) => option.mode !== 'auto' || autoMode === true
+                    ).map((option) => {
                       const unavailable = modeUnavailableReason(option.mode, route.runtime, platform)
                       return (
                         <button
@@ -425,7 +435,11 @@ export function Composer({
                         >
                           <span className="lc-menu__text">
                             <span className="lc-menu__name">{option.name}</span>
-                            <span className="lc-menu__desc">{unavailable ?? option.consequence}</span>
+                            <span
+                              className={`lc-menu__desc${unavailable === undefined && option.mode === 'auto' ? ' lc-tone-amber' : ''}`}
+                            >
+                              {unavailable ?? option.consequence}
+                            </span>
                           </span>
                           {mode === option.mode && <Icon name="check" size={13} />}
                         </button>

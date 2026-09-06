@@ -85,7 +85,7 @@ import {
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
-import { collapseConversations, listedAsMission, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, listedAsMission, modeRunsOn, modesFor, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -685,6 +685,16 @@ export default function App(): ReactElement {
   const [models, setModels] = useState<readonly PublicModel[]>([])
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
+  // Off until the workspace says otherwise, and re-read from the host rather
+  // than remembered: this is the switch that decides whether a mode which can
+  // write anywhere on the machine is offered at all.
+  const [autoMode, setAutoMode] = useState(false)
+
+  // Switching Auto off takes it away from a window that was sitting on it,
+  // rather than leaving a choice the host would refuse at the next send.
+  useEffect(() => {
+    if (!autoMode && mode === 'auto') setMode('accept-edits')
+  }, [autoMode, mode])
   const [relay, setRelay] = useState(true)
   /** The autonomy budget: automatic replies one exchange may use. */
   const [relayHopCap, setRelayHopCap] = useState(DEFAULT_RELAY_HOP_CAP)
@@ -1005,6 +1015,7 @@ export default function App(): ReactElement {
         if (active) {
           setSwarm(settings.swarm === true)
           setRelay(settings.relay === true)
+          setAutoMode(settings.autoMode === true)
           setRelayHopCap(settings.relayHopCap)
           setMemoryMode(settings.memoryMode)
         }
@@ -1344,7 +1355,7 @@ export default function App(): ReactElement {
     const before = memoryMode
     setMemoryMode(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next, autoMode })
       .then((settings) => setMemoryMode(settings.memoryMode))
       .catch(() => setMemoryMode(before))
   }
@@ -1499,7 +1510,7 @@ export default function App(): ReactElement {
         // in, and sending it anyway is how every message came back refused.
         mode: modeRunsOn(modeOverride ?? mode, route.runtime, build?.platform)
           ? modeOverride ?? mode
-          : modesFor(route.runtime, build?.platform)[0] ?? 'accept-edits',
+          : modesFor(route.runtime, build?.platform, { autoMode })[0] ?? 'accept-edits',
         runtime: route.runtime,
         // The concrete model. When a runtime encodes effort in the id, the
         // chosen effort names a different model, and sending the family's
@@ -2406,6 +2417,14 @@ export default function App(): ReactElement {
               onCheckUpdate={checkUpdate}
               onInstallUpdate={installUpdate}
               relay={relay}
+              autoMode={autoMode}
+              onAutoModeChange={(next) => {
+                setAutoMode(next)
+                void window.desktop
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: next })
+                  .then((settings) => setAutoMode(settings.autoMode === true))
+                  .catch(() => setAutoMode(!next))
+              }}
               relayHopCap={relayHopCap}
               memoryMode={memoryMode}
               onMemoryModeChange={changeMemoryMode}
@@ -2415,14 +2434,14 @@ export default function App(): ReactElement {
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode, autoMode })
                   .then((settings) => setRelayHopCap(settings.relayHopCap))
                   .catch(() => undefined)
               }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode, autoMode })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -2526,7 +2545,7 @@ export default function App(): ReactElement {
                               : liveRun.restored === true
                                 ? 'restored from the local ledger'
                                 : liveRun.phase
-                          } · ${liveRun.data.sandbox === 'workspace-write' ? 'may edit the workspace' : 'read-only'}${
+                          } · ${sandboxPhrase(liveRun.data.sandbox)}${
                             // What the conversation has actually cost, while it
                             // is still going. Silence when no turn reported a
                             // number -- never a zero, which would read as free.
@@ -2740,9 +2759,10 @@ export default function App(): ReactElement {
             mode={
               modeRunsOn(mode, route.runtime, build?.platform)
                 ? mode
-                : modesFor(route.runtime, build?.platform)[0] ?? mode
+                : modesFor(route.runtime, build?.platform, { autoMode })[0] ?? mode
             }
             onModeChange={setMode}
+            autoMode={autoMode}
             route={route}
             onRouteChange={(next) => {
               setRoute(next)
@@ -2763,7 +2783,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}

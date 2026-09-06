@@ -634,6 +634,8 @@ export function SettingsScreen({
   onInstallUpdate,
   relay,
   onRelayChange,
+  autoMode,
+  onAutoModeChange,
   relayHopCap,
   onRelayHopCapChange,
   memoryMode,
@@ -672,6 +674,9 @@ export function SettingsScreen({
   /** Whether teammates start runs to answer each other. */
   readonly relay: boolean
   readonly onRelayChange: (relay: boolean) => void
+  /** Whether the Auto permission mode may be chosen at all. */
+  readonly autoMode: boolean
+  readonly onAutoModeChange: (autoMode: boolean) => void
   /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
   readonly relayHopCap: number
   readonly onRelayHopCapChange: (cap: number) => void
@@ -840,6 +845,47 @@ export function SettingsScreen({
             </p>
           </More>
           <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Auto mode</h2>
+          <p className="lc-settings__lede">
+            {autoMode
+              ? 'On. A mission started in Auto runs without asking and is not confined to the workspace folder.'
+              : 'Off. Missions may edit files inside the workspace folder and nowhere else.'}
+          </p>
+          <More>
+            <p>
+              Every other mode confines a run to the folder you chose for it, and a runtime that wants to
+              touch anything outside it is refused. Auto is the mode that does not: a run started in Auto
+              goes ahead without asking and may read and change files anywhere this computer lets you,
+              including outside the folder.
+            </p>
+            <p>
+              It exists because some work genuinely lives in more than one place. It is off until you turn
+              it on, it is checked again each time a run starts -- switching it off here stops the next run,
+              including one a teammate or a routine was about to start -- and it is never the mode a
+              malformed or missing choice falls back to.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                {autoMode
+                  ? 'Auto can be picked in the composer. A run in it may change files anywhere on this machine.'
+                  : 'Auto is not offered in the composer.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-button${autoMode ? ' is-active' : ''}`}
+                role="switch"
+                aria-checked={autoMode}
+                onClick={() => onAutoModeChange(!autoMode)}
+              >
+                {autoMode ? 'On' : 'Off'}
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="lc-settings__section">

@@ -579,8 +579,16 @@ export interface CodexMissionError {
  * where the sandbox already refuses writes, so a separate toggle asked the
  * same question twice in two shapes and could disagree with the answer next
  * to it (design pass, 2026-09-05).
+ *
+ * `auto` is the fifth, and the only one that has to be switched on before it
+ * can be chosen (Colin, 2026-09-06: "there needs to be an auto option ... to
+ * allow them to work out of the workspace folder if desired by the user").
+ * It runs without asking and is not confined to the workspace folder, which
+ * is the one bargain in this list the app cannot take back on the person's
+ * behalf -- so the host refuses it unless `WorkspaceSettings.autoMode` is on,
+ * whatever the renderer sends.
  */
-export type MissionMode = 'ask' | 'accept-edits' | 'approve-each' | 'plan'
+export type MissionMode = 'ask' | 'accept-edits' | 'approve-each' | 'plan' | 'auto'
 
 /**
  * A model the active runtime actually reports, with the reasoning efforts IT
@@ -631,6 +639,13 @@ export interface WorkspaceSettings {
   readonly relayHopCap: number
   /** What happens to a memory a teammate writes. Absent or malformed reads as the default. */
   readonly memoryMode: MemoryMode
+  /**
+   * Whether the Auto mode may be chosen at all. Off until a person turns it
+   * on, and the host checks it again when a run starts -- a mode that lets a
+   * runtime change files anywhere on the machine is not something a stale
+   * window or a saved routine gets to decide.
+   */
+  readonly autoMode: boolean
 }
 
 export const DEFAULT_RELAY_HOP_CAP = 6
@@ -719,7 +734,7 @@ export interface MissionRouteSummary {
    * What the run was actually allowed to do. Carried here so the UI states the
    * real posture of THIS run rather than whatever mode the composer shows now.
    */
-  readonly sandbox: 'read-only' | 'workspace-write'
+  readonly sandbox: 'read-only' | 'workspace-write' | 'full-access'
 }
 
 /**
@@ -946,7 +961,7 @@ export interface PublicRecoveredMission {
   readonly eventsTruncated: boolean
   readonly hostFailureMessage?: string
   readonly integrityIssueCount: number
-  readonly sandbox: 'read-only' | 'workspace-write'
+  readonly sandbox: 'read-only' | 'workspace-write' | 'full-access'
   readonly checkpoints: readonly PublicMissionCheckpoint[]
   /** Workroom messages this mission received or posted, in ledger order. */
   readonly peerMessages: readonly PublicPeerMessage[]

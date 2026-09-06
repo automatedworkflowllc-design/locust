@@ -202,6 +202,52 @@ describe("re-reading a transcript the host has already read", () => {
   });
 });
 
+describe("a planner answer that carries the model's reasoning beside it", () => {
+  // Colin's own stuck run, 2026-09-06: Antigravity on `flash` ended the turn
+  // with one line carrying BOTH `thinking` and `content` and no tool calls.
+  // The completion heuristic required no reasoning, so nothing ever looked
+  // final, the host kept polling, and the composer kept its stop button until
+  // the idle timeout. Neither captured conversation has a line of this shape.
+  const answerWithReasoning = JSON.stringify({
+    step_index: 7,
+    source: "MODEL",
+    type: "PLANNER_RESPONSE",
+    status: "DONE",
+    created_at: "2026-09-06T03:02:28Z",
+    thinking: "**Defining the answer**",
+    content: "Locust is a desktop app.",
+  });
+
+  it("is the end of the turn, and the reasoning is still its own step", () => {
+    const antigravity = normalizer();
+    const events = antigravity.accept({ sequence: 1, raw: answerWithReasoning });
+    expect(events.map((event) => event.type)).toEqual([
+      "step.started",
+      "step.completed",
+      "message.delta",
+    ]);
+    expect(payload<{ text: string }>(events[2]).text).toBe("Locust is a desktop app.");
+    expect(antigravity.latestFinal).toBe(true);
+  });
+
+  it("does not end the turn on reasoning with no answer", () => {
+    const antigravity = normalizer();
+    const events = antigravity.accept({
+      sequence: 1,
+      raw: JSON.stringify({
+        step_index: 7,
+        source: "MODEL",
+        type: "PLANNER_RESPONSE",
+        status: "DONE",
+        created_at: "2026-09-06T03:02:28Z",
+        thinking: "**Still working**",
+      }),
+    });
+    expect(events.map((event) => event.type)).toEqual(["step.started", "step.completed"]);
+    expect(antigravity.latestFinal).toBe(false);
+  });
+});
+
 describe("a step the transcript has not finished writing", () => {
   // Not in either capture: every line captured was already DONE. Built by
   // hand, in the shape the captures establish.

@@ -239,6 +239,72 @@ describe('Codex mission service', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  it('refuses an Auto mission when the workspace has Auto switched off, and records nothing', async () => {
+    // The renderer does not offer Auto with the switch off, but a window left
+    // open across a change of mind, or a routine recorded while it was on,
+    // both send the mode anyway. The switch is what decides, and it is asked
+    // on the path every run takes.
+    const start = vi.fn() satisfies RuntimeProcessRunner['start']
+    const ledger = fakeLedger()
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: { start },
+      ledger,
+      autoModeAllowed: async () => false
+    })
+
+    await expect(service.start('Tidy my whole machine.', 'codex', 'auto', {}, () => undefined)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'RUNTIME_START_FAILED',
+        message:
+          'Auto mode is switched off for this workspace. Turn it on in Settings to let a run work outside the workspace folder. Nothing was recorded.'
+      }
+    })
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('refuses an Auto mission when nobody wired the switch at all', async () => {
+    // Absent means off. A caller that forgets to pass the seam cannot get the
+    // widest sandbox by omission.
+    const start = vi.fn() satisfies RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: { start },
+      ledger: fakeLedger()
+    })
+
+    await expect(service.start('Tidy my whole machine.', 'codex', 'auto', {}, () => undefined)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'RUNTIME_START_FAILED' }
+    })
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('runs an Auto mission on the widest sandbox once the workspace allows it', async () => {
+    // The argv is what this case is about, so the spec is captured and the
+    // spawn is stopped right after it.
+    let launched: { readonly args: readonly string[]; readonly sandbox?: string } | undefined
+    const start = ((spec: { readonly args: readonly string[]; readonly sandbox?: string }) => {
+      launched = spec
+      throw new Error('stop here')
+    }) as unknown as RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: { start },
+      ledger: fakeLedger(),
+      autoModeAllowed: async () => true
+    })
+
+    await service.start('Tidy my whole machine.', 'codex', 'auto', {}, () => undefined)
+    expect(launched?.args.join(' ')).toContain('--sandbox danger-full-access')
+    // And the spec says so itself, which is what the runner re-reads at spawn.
+    expect(launched?.sandbox).toBe('full-access')
+  })
+
   it('returns an actionable generic error when Codex is not ready', async () => {
     const start = vi.fn() satisfies RuntimeProcessRunner['start']
     const service = createCodexMissionService({

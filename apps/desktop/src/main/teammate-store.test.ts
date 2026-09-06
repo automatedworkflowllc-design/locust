@@ -284,16 +284,16 @@ describe('workspace settings', () => {
       expect((await teammates.readSettings()).relay).toBe(true)
     }
     await teammates.writeSettings({ swarm: false, relay: false })
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto' })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto', autoMode: false })
   })
 
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto' })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 6, memoryMode: 'auto' })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false })
   })
 
   it('only a literal true turns it on', async () => {
@@ -301,7 +301,7 @@ describe('workspace settings', () => {
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
       await teammates.writeSettings({ swarm: value, relay: false })
-      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto' })
+      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto', autoMode: false })
     }
   })
 
@@ -314,7 +314,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto' })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 

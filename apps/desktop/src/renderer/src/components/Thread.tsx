@@ -233,7 +233,7 @@ export interface ThreadProps {
    * could edit files, which is the one claim on the card that must not be
    * loose. Caught on screen 2026-09-05, not by a test.
    */
-  readonly sandbox?: 'read-only' | 'workspace-write'
+  readonly sandbox?: 'read-only' | 'workspace-write' | 'full-access'
   readonly earlierTurns: readonly {
     readonly missionId: string
     readonly prompt: string
