@@ -541,7 +541,17 @@ export function durationText(ms: number): string {
 export function activityTrace(
   details: readonly ActivityDetail[],
   events: readonly NormalizedRuntimeEvent[],
-  outcome: TraceOutcome
+  outcome: TraceOutcome,
+  /**
+   * The plan riding on this fold, when there is one.
+   *
+   * The reference draws the summary as `41s · 3 of 3 steps · asked 1
+   * subagent · 6 tool calls · 3 files`, so the plan's progress is part of
+   * what the line says the run did -- not just rows hidden inside it. Reading
+   * the prose alone got the plan INTO the fold and left this out
+   * (`Locust UI Review 2026-09-06.dc.html`, looked at properly 2026-09-06).
+   */
+  plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
 ): readonly TraceSegment[] {
   const segments: TraceSegment[] = []
   const times = events.map((event) => Date.parse(event.occurredAt)).filter((t) => Number.isFinite(t))
@@ -601,6 +611,14 @@ export function activityTrace(
     }
   }
   if (thought >= 1000) segments.push({ key: 'thought', text: `thought ${durationText(thought)}` })
+  // Before the subagents and the tool calls: the plan is the shape of the
+  // work, and the rest is how it was carried out.
+  if (plan !== undefined && plan.steps.length > 0) {
+    segments.push({
+      key: 'steps',
+      text: `${String(plan.doneCount)} of ${String(plan.steps.length)} steps`
+    })
+  }
 
   if (helpers.length > 0) {
     let text = `asked ${pluralize(helpers.length, 'subagent')}`
@@ -934,7 +952,7 @@ export function buildThread(
       key: 'activity',
       type: 'activity',
       summary: activitySummary(activity),
-      trace: activityTrace(activity, events, traceOutcome(events, options.running)),
+      trace: activityTrace(activity, events, traceOutcome(events, options.running), planSteps),
       finished: !options.running,
       details: activity,
       ...(planSteps === undefined ? {} : { plan: planSteps }),

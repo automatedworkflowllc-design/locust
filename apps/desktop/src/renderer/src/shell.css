@@ -2687,6 +2687,11 @@ textarea {
   min-width: 0;
 }
 
+/* The effort level, riding on the route chip as `· high`. */
+.lc-control__effort {
+  color: var(--lc-text-muted);
+}
+
 .lc-control__model {
   display: inline-block;
   max-width: 18ch;
@@ -4009,19 +4014,20 @@ textarea {
    effort chip in the composer, and it DISABLED that chip to hold it at the
    model maximum -- two controls that were one setting (design review,
    2026-09-06). */
+/* A pill beside the search, not a row across the picker. The reference draws
+   it small and to the right; it is one setting, not a section. */
 .lc-picker__swarm {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 12px;
-  border: 0;
-  border-bottom: 1px solid var(--lc-border-hairline);
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: 999px;
   background: transparent;
   color: var(--lc-text-muted);
   font: inherit;
-  font-size: var(--lc-text-description);
-  text-align: left;
+  font-size: var(--lc-text-mono-label);
   cursor: pointer;
 }
 
@@ -4037,7 +4043,9 @@ textarea {
 }
 
 .lc-picker__swarm.is-on {
-  color: var(--lc-text-primary);
+  color: var(--lc-lime-text);
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint-strong);
 }
 
 .lc-picker__swarm.is-on img {
@@ -4527,15 +4535,24 @@ textarea {
   margin-bottom: 4px;
 }
 
+/* A teammate talking to a teammate is WORDS, and words in this thread are a
+   bubble -- the same bubble. It had its own geometry: 10px/13px padding
+   against the thread's spacing tokens, a 9px radius against the card radius,
+   a hard 13px against 13.5px body, its own line-height and a border nothing
+   else has. Five ways of being slightly different from the thing it is,
+   which is what makes a column read as a feed of unrelated widgets rather
+   than a conversation (design review, 2026-09-06).
+
+   What stays different is what IS different: it sits left rather than right,
+   and it carries the sender's name above it. Attribution is a label, not a
+   species. */
 .lc-peer__bubble {
-  padding: 10px 13px;
-  border-radius: 9px;
-  background: var(--lc-bg-bubble-peer, #202324);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  font-size: 13px;
-  line-height: 1.55;
+  padding: var(--lc-space-5) var(--lc-space-6);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-bubble-peer);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 
 .lc-peer__bubble.is-missing {

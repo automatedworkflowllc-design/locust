@@ -615,6 +615,20 @@ export function Composer({
                   {runtimeLabel}
                   <span className="lc-separator">/</span>
                   <span className="lc-control__mono lc-control__model">{modelLabel}</span>
+                  {/*
+                    * The effort level rides HERE, not on a chip of its own.
+                    * "Effort is a property of the route, not a peer of it" --
+                    * and the reference draws it exactly like this, as
+                    * `Codex CLI / gpt-5.6 · high`. Absent when the route
+                    * reports no levels, which is the whole reason the old
+                    * chip had to say "effort · fixed" on most routes.
+                    */}
+                  {effort !== undefined && (
+                    <>
+                      <span className="lc-separator">·</span>
+                      <span className="lc-control__mono lc-control__effort">{effort}</span>
+                    </>
+                  )}
                 </button>
               </span>
               {context !== undefined && <ContextRing reading={context} />}

@@ -6,6 +6,25 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.3 — 2026-09-06
+
+The rest of the design pass, matched to what was actually drawn rather than to
+the description of it.
+
+- **The reasoning effort rides on the route chip** — `Codex CLI / gpt-5.6 ·
+  high` — instead of sitting in the picker as a row of its own. It is a
+  property of the route, so it reads as part of it.
+
+- **Swarm is a pill beside the picker’s search**, not a band across the top of
+  the list. It is one setting, not a section.
+
+- **The activity fold counts the plan’s steps** in its own summary line:
+  `41s · 3 of 3 steps · asked 1 subagent · 6 tool calls · 3 files`.
+
+- **A teammate’s message to a teammate is drawn as the same bubble** as
+  everything else said in the thread, rather than one with its own size,
+  padding, corner and border. Who sent it is a label above it.
+
 ## 0.38.2 — 2026-09-06
 
 Two things found by pressing the Install button for the first time.

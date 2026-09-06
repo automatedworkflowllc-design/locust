@@ -209,27 +209,27 @@ export function RoutePicker({
           aria-label="Search runtimes and models"
           autoComplete="off"
         />
+        {/*
+          * Swarm, as a pill beside the search rather than a row of its own.
+          * It is a statement about how every mission runs, so it sits with
+          * the thing it is about -- and the reference draws it small and to
+          * the right, not full width (`Locust UI Review 2026-09-06.dc.html`).
+          * The mark stays as its glyph.
+          */}
+        {swarmEffort !== undefined && (
+          <button
+            type="button"
+            className={`lc-picker__swarm${swarm ? ' is-on' : ''}`}
+            aria-pressed={swarm}
+            title={swarm ? `Every mission runs at ${swarmEffort}` : 'Run every mission at its model maximum'}
+            onClick={() => onSwarmChange(!swarm)}
+          >
+            <img src={mark} alt="" aria-hidden="true" />
+            Swarm
+          </button>
+        )}
       </div>
       {notice !== undefined && <div className="lc-picker__notice">{notice}</div>}
-      {/*
-        * Swarm is a statement about how every mission runs, so it sits with
-        * the thing it is about rather than beside it. The mark stays as the
-        * glyph.
-        */}
-      {swarmEffort !== undefined && (
-        <button
-          type="button"
-          className={`lc-picker__swarm${swarm ? ' is-on' : ''}`}
-          aria-pressed={swarm}
-          onClick={() => onSwarmChange(!swarm)}
-        >
-          <img src={mark} alt="" aria-hidden="true" />
-          <span className="lc-picker__swarmtext">
-            Run every mission at its model maximum
-            <span className="lc-picker__swarmhint lc-mono">{swarm ? `on · ${swarmEffort}` : 'off'}</span>
-          </span>
-        </button>
-      )}
       <div className="lc-picker__list">
         {shown.map((row, index) => {
           const header = row.group === lastGroup ? undefined : row.group
