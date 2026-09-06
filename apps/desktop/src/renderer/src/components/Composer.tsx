@@ -9,7 +9,7 @@ import type {
   PublicModel,
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
-import { hostCanRunMission, runtimeDisplayName } from '../../../shared/runtimes.js'
+import { hostCanRunMission, isMissionRuntime, runtimeDisplayName } from '../../../shared/runtimes.js'
 import {
   handoffAvailability,
   handoffTitle,
@@ -185,6 +185,15 @@ export function Composer({
   queuedElsewhere
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
+  /** Why the last press of Enter did nothing. Cleared as soon as one lands. */
+  const [refusal, setRefusal] = useState<string>()
+  const type = (next: string): void => {
+    setValue(next)
+    // The refusal was about the press, not about the text. Typing again is
+    // the person trying something; leaving the old sentence up implies it
+    // still applies.
+    if (refusal !== undefined) setRefusal(undefined)
+  }
   const [modeOpen, setModeOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [effortOpen, setEffortOpen] = useState(false)
@@ -211,6 +220,13 @@ export function Composer({
         : usageWindowSentence(usageReading)
   const usagePressing = usagePercentNow !== undefined && usagePercentNow >= 80
   const selectedReady = selected !== undefined && runtimeIsUsable(selected)
+  // A runtime that could run this message even though the route does not
+  // point at it. Only consulted when the selected one cannot.
+  const readyElsewhere = selectedReady
+    ? undefined
+    : runtimes.find(
+        (runtime) => runtimeIsUsable(runtime) && isMissionRuntime(runtime.id) && hostCanRunMission(runtime.id)
+      )
   // A runtime can own a mission once the host can read its events. Readiness
   // still comes from discovery, so a route that is installed but signed out
   // cannot be started.
@@ -249,7 +265,16 @@ export function Composer({
           ? 'Checking local runtimes…'
           : discoveryPhase === 'error'
             ? 'Runtime discovery is unavailable…'
-            : 'Install a coding agent and sign in to start a mission…'
+            : // Something on this machine CAN run; it just is not the route
+              // this box is pointing at. Telling the person to install a
+              // coding agent when they have just installed one -- and been
+              // told by Settings to -- is the wall the whole first run hits
+              // (QA, 2026-09-06, reproduced live). The route normally moves
+              // itself; this covers the case where the person has chosen one
+              // deliberately and it has since stopped being usable.
+              readyElsewhere !== undefined
+              ? `${readyElsewhere.displayName} is ready — switch the route to it…`
+              : 'Install a coding agent and sign in to start a mission…'
 
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()
@@ -260,7 +285,20 @@ export function Composer({
       setValue('')
       return
     }
-    if (!canStart) return
+    if (!canStart) {
+      // Silence here is the single worst thing this box can do: the person
+      // types, presses Enter, and the app neither sends nor explains. It cost
+      // the whole first run in the QA pass. Every refusal now names itself.
+      setRefusal(
+        !routeCanRun
+          ? `The ${selected?.displayName ?? 'selected'} adapter is not finished, so a mission cannot start on it. Switch the route.`
+          : readyElsewhere !== undefined
+            ? `This message would go to ${selected?.displayName ?? 'the selected runtime'}, which is not ready. ${readyElsewhere.displayName} is — switch the route to it.`
+            : 'No runtime on this machine can run a mission yet. Settings lists what to install.'
+      )
+      return
+    }
+    setRefusal(undefined)
     // Cleared NOW, not when the host answers. The turn is already on screen as
     // a bubble the instant it is sent, so waiting for the round trip left the
     // same sentence in two places for the whole "Starting..." window and read
@@ -321,6 +359,16 @@ export function Composer({
             {error}
           </div>
         )}
+        {/*
+          * Why the last Enter did nothing. Same surface as the host's own
+          * errors: one place the box speaks, rather than a second voice.
+          */}
+        {refusal !== undefined && (
+          <div className="lc-notice" role="status" aria-live="polite">
+            <Icon name="shield" size={13} />
+            {refusal}
+          </div>
+        )}
         {queued !== undefined && (
           <div className="lc-queued" role="status" aria-live="polite">
             <span className="lc-queued__label lc-mono">NEXT</span>
@@ -376,7 +424,7 @@ export function Composer({
           <div className="lc-composer__box">
             <textarea
               value={value}
-              onChange={(changeEvent) => setValue(changeEvent.target.value)}
+              onChange={(changeEvent) => type(changeEvent.target.value)}
               onKeyDown={keyDown}
               placeholder={placeholder}
               aria-label="Mission instruction"

@@ -1,4 +1,5 @@
-import { installSentence } from '../../shared/runtime-install.js'
+import { FREE_START_RUNTIME, installSentence } from '../../shared/runtime-install.js'
+import { hostCanRunMission, isMissionRuntime } from '../../shared/runtimes.js'
 import { faceLabel, teammateActivity } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 import type { MissionMode, PublicModel, PublicRecoveredMission, PublicRuntimeStatus } from '../../shared/ipc.js'
@@ -89,6 +90,47 @@ export interface RouteRowStatus {
  * The one function that may say a runtime is usable. `ready` comes from a
  * probe that actually ran; `status` distinguishes why a runtime is not.
  */
+/**
+ * The route a mission starts on when nobody has chosen one.
+ *
+ * `codex/account-default` was hard-coded in three places -- the composer's
+ * seeded route, a room post for a teammate with no route of its own, and the
+ * relay's borrowed route -- and nothing ever moved any of them. So a person
+ * who installed the runtime the app told them to install still had a composer
+ * pointing at Codex, which was not on their machine: the box read "Install a
+ * coding agent and sign in to start a mission…", Enter did nothing, and no
+ * part of the screen said why (QA, 2026-09-06, reproduced live). Their first
+ * room post would have refused every teammate for the same reason.
+ *
+ * Preference order, and each part is deliberate:
+ *
+ * 1. A runtime that can actually run right now. A default naming something
+ *    absent is the whole defect.
+ * 2. Among those, the one that needs no account -- OpenCode -- because on a
+ *    fresh machine it is the only one that is a complete answer, and the
+ *    first-run screen already recommends it by name.
+ * 3. Failing everything, Codex, which is what this was before and is at least
+ *    a stable answer for a machine mid-probe.
+ *
+ * The MODEL is left as `account-default` here on purpose: which model to
+ * prefer is the catalogue's business, not discovery's, and the picker is what
+ * knows a free one exists.
+ */
+export function defaultRoute(runtimes: readonly PublicRuntimeStatus[]): {
+  readonly runtime: MissionRuntimeId
+  readonly model: string
+} {
+  // `hostCanRunMission` takes a mission runtime; the settings list carries a
+  // wider set of ids (omniroute chooses a route rather than being one), so the
+  // narrowing happens here rather than at every call site.
+  const usable = runtimes.filter(
+    (runtime) => runtimeIsUsable(runtime) && isMissionRuntime(runtime.id) && hostCanRunMission(runtime.id)
+  )
+  const free = usable.find((runtime) => runtime.id === FREE_START_RUNTIME)
+  const chosen = free ?? usable[0]
+  return { runtime: (chosen?.id as MissionRuntimeId | undefined) ?? 'codex', model: 'account-default' }
+}
+
 export function runtimeIsUsable(runtime: PublicRuntimeStatus): boolean {
   return runtime.ready && runtime.status === 'ready'
 }
@@ -109,6 +151,16 @@ export function runtimeIsUsable(runtime: PublicRuntimeStatus): boolean {
  * 2026-09-05).
  */
 export const SIGNED_IN_DETAIL = 'Signed in on this machine, using your own account.'
+
+/**
+ * What a runtime says when it is ready WITHOUT an account.
+ *
+ * One runtime is in this state and it is the important one: OpenCode's free
+ * model runs with no sign-in, which is the entire on-ramp for a person who
+ * has just installed the app. Saying "signed in, using your own account"
+ * about it is both false and discouraging in the same breath.
+ */
+export const NO_ACCOUNT_DETAIL = 'Ready. Its free model needs no account.'
 
 export function routeRowTag(status: RouteRowStatus, isActive: boolean): RouteTag {
   // AT LIMIT outranks ACTIVE: the active route being the one that just
@@ -208,7 +260,7 @@ function baseRouteRowStatus(
   return {
     tag: isActive ? 'ACTIVE' : 'READY',
     selectable: true,
-    detail: SIGNED_IN_DETAIL
+    detail: runtime.auth === 'not-applicable' ? NO_ACCOUNT_DETAIL : SIGNED_IN_DETAIL
   }
 }
 

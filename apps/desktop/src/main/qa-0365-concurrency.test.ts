@@ -7,7 +7,8 @@ import type {
   RuntimeProcessRun,
   RuntimeProcessRunner
 } from '@teammate/runtime-adapters'
-import type { MissionLedger, NormalizedRuntimeEvent } from '@teammate/mission-store'
+import type { MissionLedger } from '@teammate/mission-store'
+import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { createCodexMissionService } from './codex-mission.js'
 
 /**

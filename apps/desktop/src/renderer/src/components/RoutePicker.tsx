@@ -57,10 +57,20 @@ function buildRows(
             // The name the runtime itself reported the last time a mission ran
             // on this route. Absent until one has, which is the honest state.
             const name = resolved.get(`${runtime.id}:${model.id}`)
+            const measured = name === undefined ? efforts : `${name} · ${efforts}`
+            // What the CATALOGUE said about this model, first. For OpenCode's
+            // free models that is "Free · no sign-in", which its own comment
+            // calls the whole reason the runtime is here -- and it reached
+            // nobody, because a row's detail was built from the effort count
+            // and the resolved name alone. A person with no account read
+            // eleven names and could not tell which cost nothing (QA,
+            // 2026-09-06). Effort levels still follow it; they are the more
+            // technical half and the less urgent one.
+            const described = model.description
             return {
               model: model.id,
               label: model.displayName,
-              detail: name === undefined ? efforts : `${name} · ${efforts}`
+              detail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`
             }
           })
         : [{ model: 'account-default', label: 'account-default', detail: status.detail }]

@@ -31,7 +31,7 @@ import { costLine, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
-import { installCommand } from '../../../shared/runtime-install.js'
+import { FREE_START_RUNTIME, installCommand } from '../../../shared/runtime-install.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
@@ -848,7 +848,20 @@ export function SettingsScreen({
             </p>
           </More>
           <div className="lc-runtimelist lc-settingcard">
-            {runtimes.map((runtime) => {
+            {/*
+              * On a machine with nothing installed the lede says the quickest
+              * start is OpenCode and the list under it opened with Codex,
+              * Claude, Cursor, Copilot -- OpenCode fifth (QA, 2026-09-06). The
+              * sentence and the list disagreed about where to look. Once
+              * anything IS installed the existing order stands: connected
+              * first, which is what a person with a working setup wants.
+              */}
+            {(runtimes.some((runtime) => runtime.installed)
+              ? runtimes
+              : [...runtimes].sort((left, right) =>
+                  left.id === FREE_START_RUNTIME ? -1 : right.id === FREE_START_RUNTIME ? 1 : 0
+                )
+            ).map((runtime) => {
               const status = routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id))
               return (
                 <div className="lc-runtimerow" key={runtime.id}>

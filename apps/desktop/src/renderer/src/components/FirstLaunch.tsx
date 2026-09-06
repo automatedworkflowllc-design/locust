@@ -98,9 +98,17 @@ export function FirstLaunch({
           */}
         {discoveryPhase === 'ready' && connected === 0 && (
           <p className="lc-claim lc-claim--hint">
-            Locust runs the coding agents you install and sign in to — Claude Code, Codex CLI, Cursor Agent, OpenCode, Copilot CLI.
+            {/*
+              * The names came off: the panel below lists them WITH their
+              * state, which a sentence cannot. And the second line stopped
+              * being generic advice -- "install one, sign in" is wrong about
+              * the one path that needs no sign-in, which is the only path a
+              * person with nothing installed can complete today
+              * (FIRST-RUN-INSTALL-DESIGN, 2026-09-06).
+              */}
+            Locust runs the coding agents you install and sign in to.
             <br />
-            Install one, sign in, and it appears here on its own.
+            OpenCode needs no account — one install and you have a working teammate.
           </p>
         )}
 

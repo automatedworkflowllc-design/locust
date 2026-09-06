@@ -86,7 +86,7 @@ import {
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
-import { collapseConversations, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultRoute, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -719,9 +719,73 @@ export default function App(): ReactElement {
   /** The latest still-allowed rate-limit reading per runtime, by words. */
   const [usageWindows, setUsageWindows] = useState<ReadonlyMap<string, string>>(new Map())
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
+  /**
+   * Whether the route on screen is the person's own choice.
+   *
+   * Until they pick one it is a guess, and a guess that names a runtime this
+   * machine does not have is the wall the whole first run hits: install
+   * exactly what the app told you to, come back, type, press Enter, nothing
+   * (QA, 2026-09-06). So an unchosen route follows discovery. A CHOSEN one
+   * never moves on its own -- picking Codex deliberately and watching the app
+   * change it back would be worse than the original defect.
+   */
+  const routeChosen = useRef(false)
+  // Not only at launch: the focus re-probe is what finds a runtime installed
+  // mid-session, and that is exactly when this matters -- the person has just
+  // come back from installing it.
+  useEffect(() => {
+    if (runtimeState.phase !== 'ready' || routeChosen.current) return
+    const selected = runtimes.find((runtime) => runtime.id === route.runtime)
+    if (selected !== undefined && runtimeIsUsable(selected)) return
+    const next = defaultRoute(runtimes)
+    if (next.runtime === route.runtime) return
+    setRoute(next)
+  }, [runtimeState.phase, runtimes, route.runtime])
+  // Keyed on WHICH runtimes are usable, not on the array identity: discovery
+  // re-runs every few seconds and hands back a new array each time, and
+  // re-reading the catalogue on every sweep would be a request per tick.
+  const usableKey = runtimes.filter((runtime) => runtimeIsUsable(runtime)).map((runtime) => runtime.id).join(',')
+  useEffect(() => {
+    if (runtimeState.phase !== 'ready') return
+    readModels()
+  }, [runtimeState.phase, usableKey])
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
   const [models, setModels] = useState<readonly PublicModel[]>([])
+  /**
+   * Re-read the model catalogue when the runtimes change, and when the picker
+   * is opened.
+   *
+   * It used to be read ONCE, at mount, and never again. The catalogue is
+   * built from discovery -- `claudeModelsFrom` returns nothing at all unless
+   * Claude's readiness is already `ready` -- and readiness is a probe that
+   * finishes whenever it finishes. So if that single read landed before the
+   * probe did, the picker offered Claude one row, `account-default`, for the
+   * rest of the session, and only a relaunch fixed it. Colin, 2026-09-06:
+   * "the claude models aren't showing up anymore, it just says claude account
+   * default." Intermittent by timing, which is why it reads as "anymore".
+   *
+   * The same shape hid OpenCode's models from anyone who installed it
+   * mid-session (QA, 2026-09-06): eleven models on the machine, one row in
+   * the picker.
+   *
+   * Main already re-sweeps discovery every ten seconds and serves the
+   * catalogue from that sweep, so this asks a question that is cheap and
+   * already answered.
+   */
+  const readModels = (): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .listModels()
+      .then((response) => {
+        if (response.ok) setModels(response.data.models)
+      })
+      .catch(() => {
+        // Optional, as it always was: without it the picker offers the
+        // account default, which is what a run is launched with anyway.
+      })
+  }
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
   // Off until the workspace says otherwise, and re-read from the host rather
@@ -2875,6 +2939,9 @@ export default function App(): ReactElement {
             }}
             route={route}
             onRouteChange={(next) => {
+              // From here on this route is theirs, and discovery stops
+              // moving it.
+              routeChosen.current = true
               setRoute(next)
               // Effort belongs to a model. Carrying it across a model switch
               // could send a level the new model never advertised.
@@ -2899,12 +2966,16 @@ export default function App(): ReactElement {
             }}
             error={
               noRuntimeReady && runtimeState.phase === 'ready'
-                ? 'No runtime is signed in. Locust runs on the CLIs already on this machine; sign in to one and it appears here.'
+                ? 'No runtime can run a mission yet. Locust runs the coding-agent CLIs on this machine — Settings shows what to install, and OpenCode needs no account.'
                 : undefined
             }
             onStart={startMission}
             onCancel={cancelMission}
-            onOpenRoutePicker={() => undefined}
+            onOpenRoutePicker={() => {
+              // Opening the picker is the moment the list matters most, and
+              // the cheapest moment to be sure it is current.
+              readModels()
+            }}
             onHandOff={(choice) => { void handOffMission(choice) }}
             handingOff={handingOff}
             teammateName={pickedTeammate?.name}

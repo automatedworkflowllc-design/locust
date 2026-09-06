@@ -19,7 +19,8 @@
 // is whether a person can get from "nothing works" to "one teammate works"
 // without leaving the app to go and search.
 
-import { mkdtemp } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { mkdtemp, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -79,6 +80,72 @@ try {
       + ' | says no sign-in needed: ' + /no account and no sign-in/.test(text)
       + ' | cursor sent to its own page: ' + /cursor.com\\/cli/.test(text)
   })()`))
+  // ------------------------------------------------------------------
+  // The half nobody had driven: do what the app just told the person to do,
+  // then come back and try to use it. The QA pass did this by hand on Linux
+  // and found that the composer still said "Install a coding agent…", Enter
+  // did nothing, and nothing said why.
+  //
+  // The install goes into `<emptyHome>/npm`, which is where the app's own
+  // path locator probes (`%APPDATA%\\npm`) -- and APPDATA is pointed at
+  // `emptyHome` for this drive. So this is the real discovery path, not a
+  // PATH trick.
+  // ------------------------------------------------------------------
+  await drive.capture('run the line Settings gave, for real', async () => {
+    const prefix = join(emptyHome, 'npm')
+    // shell: true because Windows will not spawn a .cmd otherwise -- without
+    // it this returns status null and an empty stderr, which looks exactly
+    // like the install failing silently.
+    const done = spawnSync('npm', ['install', '-g', '--prefix', prefix, 'opencode-ai'], {
+      encoding: 'utf8',
+      timeout: 8 * 60_000,
+      shell: true
+    })
+    if (done.error !== undefined) throw new Error('could not run npm: ' + String(done.error.message))
+    const landed = await readdir(prefix).catch(() => [])
+    if (done.status !== 0) {
+      throw new Error(`npm install failed (${String(done.status)}): ${(done.stderr ?? '').slice(-300)}`)
+    }
+    return `npm exited ${String(done.status)} · ${prefix} now holds: ${landed.join(', ') || 'nothing'}`
+  })
+
+  await drive.capture('come back to the window: does it notice on its own', () => drive.evaluate(`(async () => {
+    // What a person does: click back into the app. The host re-probes on
+    // focus, and nothing here relaunches it.
+    window.dispatchEvent(new Event('focus'))
+    for (let i = 0; i < 60; i += 1) {
+      await new Promise(r => setTimeout(r, 1000))
+      const foot = document.querySelector('.lc-sidebar')?.innerText ?? ''
+      if (/1 runtime connected/.test(foot) || /runtimes connected/.test(foot) === false) {
+        if (/1 runtime connected/.test(foot)) return 'noticed after ' + String(i + 1) + 's: ' + foot.slice(-40).replace(/[ ]+/g, ' ')
+      }
+    }
+    const foot = document.querySelector('.lc-sidebar')?.innerText.slice(-60) ?? ''
+    return 'still not noticed after 60s · foot: ' + foot.replace(/[ ]+/g, ' ')
+  })()`))
+
+  await drive.capture('THE QUESTION: can they now type and send', () => drive.evaluate(`(async () => {
+    // Back to where a person types. Step 3 left the app on Settings, which
+    // has no composer -- and "no composer" reads as the defect rather than as
+    // the drive standing in the wrong room.
+    // The Missions LIST has no composer either -- it is a list. The composer
+    // lives where a person writes to a teammate.
+    ;[...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click()
+    await new Promise(r => setTimeout(r, 1200))
+    const field = document.querySelector('form.command-dock textarea')
+    const placeholder = field?.getAttribute('placeholder') ?? 'no composer'
+    const chip = [...document.querySelectorAll('.lc-control')].map(b => b.innerText.replace(/[ ]+/g, ' ')).find(t => /OpenCode|Codex/.test(t)) ?? 'no route chip'
+    return 'placeholder: ' + placeholder + ' || chip: ' + chip.split(String.fromCharCode(10)).join(' ')
+  })()`))
+
+  await drive.capture('and does a message actually run', async () => {
+    const { sendAndWaitScript } = await import('./drive-lib.mjs')
+    await drive.evaluate(sendAndWaitScript('Reply with exactly the word ARRIVED and nothing else.', { waitSeconds: 300 }))
+    return drive.evaluate(`(() => {
+      const thread = document.querySelector('.lc-thread')?.innerText ?? ''
+      return 'reply contains ARRIVED: ' + /ARRIVED/.test(thread) + ' || thread ends: ' + thread.replace(/[ ]+/g, ' ').slice(-120)
+    })()`)
+  })
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {

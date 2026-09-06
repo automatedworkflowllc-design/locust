@@ -6,6 +6,37 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.37.0 — 2026-09-06
+
+- **Install the runtime Locust asked you to install, and it just works.** It
+  did not before. The composer was pointed at Codex CLI from the moment the
+  app opened and never moved, so someone who installed OpenCode -- because
+  Settings told them to -- came back to a box still reading "Install a coding
+  agent and sign in to start a mission", pressed Enter, and got nothing at
+  all. The route now follows what is actually on the machine, preferring the
+  one that needs no account; a route you pick yourself is never moved for you.
+
+- **A message that cannot be sent says why.** Pressing Enter used to do
+  nothing, silently, whenever the route could not run. That is the worst thing
+  a first run can do.
+
+- **The model list keeps up.** It was read once when the app opened, so a
+  runtime whose check finished a moment later showed a single "account
+  default" row for the rest of the session -- Claude's Sonnet, Opus and Fable
+  simply missing, and every OpenCode model too. It is re-read when the
+  runtimes change and when you open the picker.
+
+- **The picker says which models are free.** OpenCode's free ones were listed
+  by name with nothing to distinguish them from the paid ones.
+
+- **A runtime that needs no account is no longer described as signed in.**
+  OpenCode said "Signed in on this machine, using your own account" to people
+  who had never signed in to anything.
+
+- **The first screen and Settings stop asking for a sign-in that is not
+  needed**, and on a machine with nothing installed the list leads with the
+  one that needs no account instead of burying it fifth.
+
 ## 0.36.5 — 2026-09-06
 
 - **A runtime Locust cannot find now tells you how to get it.** It used to say

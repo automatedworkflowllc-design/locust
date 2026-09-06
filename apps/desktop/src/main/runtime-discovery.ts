@@ -33,7 +33,17 @@ interface RuntimeDiscoveryServiceOptions {
 
 function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
   const installed = runtime.availability === 'available'
-  const auth: RuntimeAuthState = runtime.id === 'omniroute'
+  // "Ready" does not always mean "signed in". OpenCode's readiness probe is
+  // `opencode models`, which answers happily with no account at all -- and on
+  // the machine every drive in this repo runs on, `opencode auth list`
+  // reports ZERO credentials while Settings said "Signed in on this machine,
+  // using your own account" (QA, 2026-09-06, reproduced live). That is an
+  // invented sign-in, and it contradicts the one thing the first-run screen
+  // is built around: this runtime's free model needs no account.
+  //
+  // `not-applicable` is what the type already carries for a runtime whose
+  // readiness is not a statement about an account.
+  const auth: RuntimeAuthState = runtime.id === 'omniroute' || runtime.id === 'opencode'
     ? 'not-applicable'
     : runtime.readiness === 'ready'
       ? 'authenticated'

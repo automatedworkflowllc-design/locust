@@ -39,7 +39,7 @@ const runtime = (
   version: usable ? '1.18.27' : null,
   auth: usable ? 'authenticated' : 'unknown',
   ready: usable,
-  status: usable ? 'ready' : 'missing'
+  status: usable ? 'ready' : 'not-installed'
 })
 
 /** Every prop the composer needs, with nothing in it that decides this case. */
@@ -78,8 +78,8 @@ const props = (over: Partial<ComposerProps>): ComposerProps => ({
   onQueue: () => undefined,
   onUnqueue: () => undefined,
   onSendQueued: () => undefined,
-  queuedElsewhere: undefined,
   continuationNote: undefined,
+  queuedElsewhere: false,
   ...over
 })
 
