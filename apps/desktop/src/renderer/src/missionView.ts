@@ -686,6 +686,15 @@ export interface MissionThreadOptions {
    */
   readonly awaitingDecision?: boolean
   /**
+   * Whether this turn wrote to a teammate. Those messages are drawn beside
+   * the thread rather than inside it, so a turn whose whole output was a
+   * message to a colleague looked, from in here, like a turn that said
+   * nothing -- and got told so, in a warning sitting directly above the
+   * message it had just sent (Colin, 2026-09-06: "the this turn ended with a
+   * reply intended?").
+   */
+  readonly spokeToPeers?: boolean
+  /**
    * True for the turn at the END of the conversation. A question a runtime
    * asked is only answerable there: on an earlier turn the answer already
    * exists -- it is the next turn's prompt, visible a few lines below -- and
@@ -949,7 +958,9 @@ export function buildThread(
   // read -- a turn that did work says so through its activity card, and a
   // failure has its own card already.
   if (!options.running && events.some((event) => event.type === 'run.completed')) {
-    const saidSomething = items.some((item) => item.type === 'agent-message' || item.type === 'activity')
+    const saidSomething =
+      options.spokeToPeers === true
+      || items.some((item) => item.type === 'agent-message' || item.type === 'activity')
     if (!saidSomething) {
       items.push({
         key: 'silent_turn',

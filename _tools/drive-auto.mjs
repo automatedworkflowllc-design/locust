@@ -28,7 +28,7 @@ const target = join(outside, 'auto-proof.txt').replace(/\\/g, '/')
 
 const drive = await startDrive({
   name: 'auto',
-  port: 9304,
+  port: 9310,
   workspace,
   seed: {
     schemaVersion: 1,

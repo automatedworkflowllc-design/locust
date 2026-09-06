@@ -11,7 +11,7 @@ import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive 
 const workspace = await scratchRepository('locust-drive-cursor-effort-ws-')
 const drive = await startDrive({
   name: 'cursor-effort',
-  port: 9303,
+  port: 9309,
   workspace,
   seed: {
     schemaVersion: 1,

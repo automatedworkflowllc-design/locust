@@ -58,7 +58,20 @@ export function PeerThread({
   const faceOf = (teammateId: string, profile: PublicTeammate | undefined): AvatarSpec =>
     profile?.avatar ?? seedAvatar(teammateId.length > 0 ? teammateId : 'unknown')
   const count = messages.length
-  const label = `${count} message${count === 1 ? '' : 's'} with`
+  // Direction, not just a count. "1 message with Booty" left the reader to
+  // find out who sent it from the row underneath, which is why that row was
+  // repeating the pill (Colin, 2026-09-06: "lots of clutter"). One message
+  // says which way it went; a back-and-forth says how many there were.
+  const onlyFrom =
+    messages.every((message) => message.from.teammateId === messages[0]?.from.teammateId)
+      ? messages[0]?.from.teammateId
+      : undefined
+  const label =
+    onlyFrom === undefined
+      ? `${count} message${count === 1 ? '' : 's'} with`
+      : onlyFrom === self?.teammateId
+        ? `${count} message${count === 1 ? '' : 's'} to`
+        : `${count} message${count === 1 ? '' : 's'} from`
   // What the exchange was about, for the times it stays collapsed. A count
   // alone says one happened and nothing about what it said.
   const snippet = open ? undefined : peerSnippet(messages[0]?.text ?? null)
@@ -92,7 +105,11 @@ export function PeerThread({
               <div key={message.messageId} className="lc-peer__message">
                 <PixelFace hue={hue} avatar={faceOf(message.from.teammateId, author)} size={20} />
                 <div className="lc-peer__body">
-                  <div className={`lc-peer__author is-${hue}`}>{message.from.name}</div>
+                  {/* The pill above already names the sender when every
+                    * message came from one side, which is the ordinary case. */}
+                  {onlyFrom === undefined && (
+                    <div className={`lc-peer__author is-${hue}`}>{message.from.name}</div>
+                  )}
                   {/*
                     * The message itself is the way to the conversation it
                     * reached. A separate underlined "open the run this

@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.35.1 — 2026-09-06
+
+- **A turn that wrote to a teammate is not a silent turn.** "This turn
+  ended without a reply" was appearing directly above the message the
+  turn had just sent: those messages are drawn beside the thread rather
+  than in it, so the check never saw them (Colin: "the this turn ended
+  with a reply intended?"). A turn that genuinely wrote nothing still
+  says so.
+- **The exchange pill says which way the message went.** "1 message to
+  Booty" or "1 message from Booty" instead of "with", and the row
+  underneath no longer repeats the sender the pill just named.
+
 ## 0.35.0 — 2026-09-06
 
 - **Auto mode: a run that is not confined to the workspace folder.** Off

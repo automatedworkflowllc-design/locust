@@ -181,6 +181,25 @@ describe('when a mission says it began', () => {
   })
 })
 
+describe('a turn whose whole answer was a message to a teammate', () => {
+  // Those messages are drawn beside the thread, not inside it, so from in
+  // here the turn looked like one that said nothing -- and the warning landed
+  // directly above the message it had just sent (Colin, 2026-09-06: "the this
+  // turn ended with a reply intended?").
+  const finished = [event('run.completed', {})]
+
+  it('is not reported as a turn that said nothing', () => {
+    const thread = buildThread(finished, { running: false, latestTurn: true, spokeToPeers: true })
+    expect(thread.some((item) => item.type === 'diagnostic')).toBe(false)
+  })
+
+  it('still says so when the runtime really wrote nothing at all', () => {
+    const thread = buildThread(finished, { running: false, latestTurn: true, spokeToPeers: false })
+    const said = thread.find((item) => item.type === 'diagnostic')
+    expect(said?.type === 'diagnostic' && said.message).toMatch(/ended without a reply/)
+  })
+})
+
 describe('a row a runtime names only when the tool finishes', () => {
   it('takes the target from the completion when the start had none', () => {
     // Claude streams a tool's input after the call opens, so the row read
