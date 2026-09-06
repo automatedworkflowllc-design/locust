@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { activityCounts, activityEntries, defaultOpenEntry, relativePath } from '../missionView.js'
-import type { ActivityDetail, ActivityEntry } from '../missionView.js'
+import type { TraceSegment, ActivityDetail, ActivityEntry } from '../missionView.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 
@@ -22,9 +22,15 @@ export function ActivityCard({
   summary,
   details,
   runtimeName,
+  trace,
+  finished = false,
   workspacePath
 }: {
   readonly summary: string
+  /** The trace line; when absent the summary string is drawn (older callers). */
+  readonly trace?: readonly TraceSegment[]
+  /** True once the turn is over: an unsettled subagent then reads "did not report". */
+  readonly finished?: boolean
   readonly details: readonly ActivityDetail[]
   readonly runtimeName: string | undefined
   /** The folder this mission ran in, so paths read the way a person writes them. */
@@ -47,7 +53,17 @@ export function ActivityCard({
     <div className="lc-card">
       <button type="button" className="lc-activity" onClick={() => setOpen(!open)} aria-expanded={open}>
         <Icon name="diff" size={14} />
-        <span>{summary}</span>
+        {trace === undefined || trace.length === 0 ? (
+          <span>{summary}</span>
+        ) : (
+          <span className="lc-trace">
+            {trace.map((seg) => (
+              <span className={`lc-trace__seg${seg.tone === undefined ? '' : ` is-${seg.tone}`}`} key={seg.key}>
+                {seg.text}
+              </span>
+            ))}
+          </span>
+        )}
         {anyPatch && (
           <span className="lc-activity__counts lc-mono">
             <span className="lc-diff__addmark">+{counts.added}</span>
@@ -87,8 +103,12 @@ export function ActivityCard({
                   <Icon name="users" size={14} />
                   <span className="lc-filerow__path">{entry.description}</span>
                   <span className="lc-filerow__status">{entry.subagentType === undefined ? 'subagent' : `${entry.subagentType} subagent`}</span>
-                  <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : 'is-running'}`} title={entry.summary}>
-                    {!entry.settled ? 'working on it' : entry.failed ? 'failed' : entry.summary === undefined ? 'reported back' : `reported back · ${entry.summary.length > 60 ? `${entry.summary.slice(0, 57)}…` : entry.summary}`}
+                  {/* Four states, not three: a helper the run ended without settling is not working on it -- it did not report (SURFACES-0.22 §2). Amber, not red: nothing said it failed. */}
+                  <span
+                    className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : finished ? 'is-stalled' : 'is-running'}`}
+                    {...(entry.summary === undefined ? {} : { title: entry.summary })}
+                  >
+                    {!entry.settled ? (finished ? 'did not report' : 'working on it') : entry.failed ? 'failed' : entry.summary === undefined ? 'reported back' : `reported back · ${entry.summary}`}
                   </span>
                 </div>
               ) : entry.kind === 'shell' ? (

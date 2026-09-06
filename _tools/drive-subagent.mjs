@@ -36,20 +36,32 @@ try {
     })()`)
     return route + ' || mode: ' + mode
   })
-  await drive.capture('ask for a subagent, and watch the sidebar while it runs', async () => {
+  await drive.capture('ask for a subagent; the picture is taken the moment the sidebar says a subagent is working', async () => {
     await drive.evaluate(sendAndWaitScript('Use a subagent (your Task tool) to count the lines in README.md and report the number to you. Then reply with one sentence giving that number. Do not edit anything.', { settle: false }))
     return drive.evaluate(`(async () => {
       const seen = []
       for (let i = 0; i < 240; i += 1) {
-        await new Promise(r => setTimeout(r, 500))
+        await new Promise(r => setTimeout(r, 250))
         const wren = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
-        const line = wren ? wren.innerText.replace(/\\s+/g, ' ').slice(0, 90) : ''
+        const line = wren ? wren.innerText.replace(/\\s+/g, ' ').slice(0, 60) : ''
         if (seen[seen.length - 1] !== line) seen.push(line)
-        if (i > 6 && !document.querySelector('button[aria-label^="Stop the running"]')) break
+        if (/subagent working/.test(line)) return 'sidebar until now: ' + seen.join(' -> ') + ' || glyph: ' + (wren.querySelector('.lc-teammate__delegating') ? 'drawn' : 'MISSING')
+        if (i > 6 && !document.querySelector('button[aria-label^="Stop the running"]')) return 'never said subagent working: ' + seen.join(' -> ')
       }
-      return 'sidebar over time: ' + seen.join(' -> ')
+      return 'timed out: ' + seen.join(' -> ')
     })()`)
   })
+  await drive.capture('the sidebar until the run settles', () => drive.evaluate(`(async () => {
+    const seen = []
+    for (let i = 0; i < 240; i += 1) {
+      await new Promise(r => setTimeout(r, 500))
+      const wren = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
+      const line = wren ? wren.innerText.replace(/\\s+/g, ' ').slice(0, 60) : ''
+      if (seen[seen.length - 1] !== line) seen.push(line)
+      if (i > 2 && !document.querySelector('button[aria-label^="Stop the running"]')) break
+    }
+    return 'sidebar over time: ' + seen.join(' -> ')
+  })()`))
   await drive.capture('the reply, and the activity fold opened', () => drive.evaluate(`(async () => {
     await new Promise(r => setTimeout(r, 800))
     const fold = document.querySelector('.lc-activity')

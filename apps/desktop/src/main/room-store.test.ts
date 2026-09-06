@@ -53,13 +53,22 @@ describe('a room', () => {
     // A teammate whose run could not start is simply absent from the post.
     expect(read?.posts[1]?.missions).toEqual({ tm_wren: 'mission_w2' })
 
-    for (let index = 0; index < MAX_ROOM_POSTS; index += 1) {
-      await rooms.addPost(room.roomId, { text: `post ${String(index)}`, missions: {} })
+    // The file is filled to the cap in one write (two hundred separate
+    // write-and-rename cycles time out on a busy disk), then one more is added.
+    const path = join(root, 'rooms.json')
+    const file = JSON.parse(await readFile(path, 'utf8')) as { rooms: { posts: unknown[] }[] }
+    for (let index = 0; index < MAX_ROOM_POSTS - 2; index += 1) {
+      file.rooms[0]?.posts.push({ postId: `post_seed${String(index)}`, text: `post ${String(index)}`, at: NOW, missions: {} })
     }
-    const full = await rooms.get(room.roomId)
+    await writeFile(path, JSON.stringify(file))
+    const reopened = createRoomStore({ rootDirectory: root, now: () => new Date(NOW), createId: () => 'last' })
+    expect((await reopened.get(room.roomId))?.posts).toHaveLength(MAX_ROOM_POSTS)
+    await reopened.addPost(room.roomId, { text: 'post 198', missions: {} })
+    const full = await reopened.get(room.roomId)
     expect(full?.posts).toHaveLength(MAX_ROOM_POSTS)
-    // 202 posts were made; the oldest two fell off, so the first kept is the third made.
-    expect(full?.posts[0]?.text).toBe('post 0')
+    // 201 posts were made; the oldest fell off, so the first kept is the second made.
+    expect(full?.posts[0]?.text).toBe('And the version?')
+    expect(full?.posts[MAX_ROOM_POSTS - 1]?.text).toBe('post 198')
   })
 
   it('refuses an empty post, a post to a room that is gone, and malformed mission ids', async () => {

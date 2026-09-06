@@ -77,6 +77,8 @@ function ThreadItems({
             <ActivityCard
               key={item.key}
               summary={item.summary}
+              trace={item.trace}
+              finished={item.finished}
               details={item.details}
               runtimeName={item.reportedBy === undefined ? undefined : runtimeDisplayName(item.reportedBy)}
               workspacePath={workspacePath}

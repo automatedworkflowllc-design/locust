@@ -6,6 +6,28 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.34.0 — 2026-09-06
+
+The design agent's SURFACES-0.22 spec, built as written.
+
+- **The fold's one line is now a trace.** "41s · thought 12s · asked 1
+  subagent · 3 tool calls · 2 files" replaces "3 tool calls". The parts a
+  person should notice are amber: a subagent that did not report or
+  failed, a refused tool. A run that failed or was stopped reads "stopped
+  at 41s", and a stopped run that changed nothing says so.
+- **A subagent that never reported.** The helper row used to say "working
+  on it" forever once the run had ended without the subagent's report; it
+  now reads "did not report". The row names the subagent's kind ("Explore
+  subagent") and carries its summary in full.
+- **Subagent at work, in the sidebar.** A small mark sits beside "subagent
+  working" on the teammate's card, so a glance down the list shows who is
+  delegating.
+- **How much of the window is used, in words.** "67% of the 5-hour window
+  used, resets 10:10 PM · 53% of the 7-day window, resets Mon 3:00 AM" on
+  the Claude Code row in Settings and in the route chip's tooltip. From
+  80% the chip carries an amber dot and the tooltip adds "Long runs may
+  be cut short."; at 100%, "This window's limit is used up."
+
 ## 0.33.2 — 2026-09-06
 
 - **How much of the account's window a run has used.** Claude Code reports

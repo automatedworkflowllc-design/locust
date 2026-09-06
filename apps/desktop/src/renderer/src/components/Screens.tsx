@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { usageWindowLabel } from '../missionView.js'
+import { usagePercent, usageWindowSentence } from '../missionView.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type {
@@ -797,7 +797,11 @@ export function SettingsScreen({
                     </div>
                     {/* "Signed in on this machine" is said once, in the lede; a row only speaks when its state is not the ordinary one. */}
                     {status.tag !== 'READY' && <div className="lc-runtimerow__detail">{status.detail}</div>}
-                    {usageWindows?.get(runtime.id) !== undefined && <div className="lc-runtimerow__detail">{usageWindowLabel(usageWindows.get(runtime.id)!)}</div>}
+                    {usageWindows?.get(runtime.id) !== undefined && (
+                      <div className={`lc-runtimerow__detail lc-runtimerow__usage${(usagePercent(usageWindows.get(runtime.id)!) ?? 0) >= 80 ? ' lc-tone-amber' : ''}`}>
+                        {usageWindowSentence(usageWindows.get(runtime.id)!)}
+                      </div>
+                    )}
                     {runtimeSetup?.[runtime.id] !== undefined && <RuntimeSetupLine setup={runtimeSetup[runtime.id]!} />}
                   </div>
                   <span

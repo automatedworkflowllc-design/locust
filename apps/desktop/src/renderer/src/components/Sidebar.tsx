@@ -21,6 +21,21 @@ import { PixelFace } from './PixelFace.js'
 import { Icon } from './Icon.js'
 import { routineStepLabel } from '../routines.js'
 
+/**
+ * A teammate's sidebar line is "<role> · <state>". When the state is the
+ * news ("subagent working"), the role is the part allowed to be cut short.
+ */
+export function labelRole(label: string): string {
+  const at = label.lastIndexOf(' · ')
+  return at === -1 ? '' : label.slice(0, at)
+}
+
+export function labelState(label: string): string {
+  const at = label.lastIndexOf(' · ')
+  return at === -1 ? label : ' · ' + label.slice(at + 3)
+}
+
+
 export interface SidebarMission {
   /**
    * Who the mission belongs to, when the shell knows before the host has
@@ -251,9 +266,20 @@ export function Sidebar({
                     {teammate.name}
                     {status.pulse && <span className={`lc-dot is-pulsing lc-tone-${status.tone} lc-namedot`} />}
                   </span>
-                  <span className={`lc-row__meta lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
-                    {status.label}
-                  </span>
+                  {status.activity === 'delegating' ? (
+                    // "subagent working" is the news; the role gives way to it
+                    // when the line is short, instead of the other way round.
+                    <span className={`lc-row__meta is-delegating lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
+                      {/* One glyph app-wide for "there is another agent in this" -- the same one the helper row uses. */}
+                      <span className="lc-teammate__delegating" aria-hidden="true">
+                        <Icon name="users" size={11} />
+                      </span>
+                      <span className="lc-row__metarole">{labelRole(status.label)}</span>
+                      <span className="lc-row__metastate">{labelState(status.label)}</span>
+                    </span>
+                  ) : (
+                    <span className={`lc-row__meta lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>{status.label}</span>
+                  )}
                   {/*
                     * Which step of which routine is running. Derived in the
                     * shell from the live runs, so it disappears when the work

@@ -25,6 +25,11 @@ import {
   recentlyUsedRoutes,
   relativePath,
   usageWindowLabel,
+  usageWindowSentence,
+  usagePercent,
+  activityTrace,
+  durationText,
+  traceOutcome,
   relayedTitle,
   resolvedModelNames,
   resumableSessionOf,
@@ -1517,5 +1522,63 @@ describe('a usage window, as a person reads it', () => {
     expect(label).not.toContain('2026-09-06T')
     expect(label).toMatch(/^5-hour window 67% used · resets .+ · 7-day window 53% used$/)
     expect(usageWindowLabel('nothing to convert')).toBe('nothing to convert')
+  })
+})
+
+describe('the trace line for a finished turn (SURFACES-0.22)', () => {
+  const at = (s: number) => new Date(1_700_000_000_000 + s * 1000).toISOString()
+  const base = { runId: 'run_1', missionId: 'mission_1', sourceAdapter: 'claude' as const }
+  const ev = (seq: number, type: string, payload: Record<string, unknown>, s: number) => ({ ...base, id: `e${String(seq)}`, sequence: seq, occurredAt: at(s), type, payload: { evidence: { redacted: true }, ...payload } }) as never
+  const joined = (segments: readonly { text: string }[]) => segments.map((seg) => seg.text).join(' · ')
+
+  it('leads with the duration and ends with the exceptions; a zero segment is absent', () => {
+    const events = [
+      ev(1, 'run.started', { runtimeThreadId: 't' }, 0),
+      ev(2, 'step.started', { stepKind: 'reasoning', itemId: 'r1' }, 1),
+      ev(3, 'step.completed', { stepKind: 'reasoning', itemId: 'r1' }, 8),
+      ev(4, 'tool.started', { itemId: 'a', toolKind: 'tool_use', name: 'Agent', command: 'Count lines', phase: 'started' }, 9),
+      ev(5, 'tool.completed', { itemId: 'a', toolKind: 'tool_use', name: 'Agent', command: 'Count lines', phase: 'completed', status: 'Explore', output: '3' }, 20),
+      ev(6, 'tool.started', { itemId: 'b', toolKind: 'tool_use', name: 'Read', command: 'README.md', phase: 'started' }, 21),
+      ev(7, 'tool.completed', { itemId: 'b', toolKind: 'tool_use', name: 'Read', command: 'README.md', phase: 'completed' }, 22),
+      ev(8, 'adapter.diagnostic', { code: 'claude.notification', level: 'warning', terminal: false, message: 'Stop hook error occurred' }, 40),
+      ev(9, 'run.completed', { runtimeThreadId: 't', process: {} }, 41)
+    ]
+    const thread = buildThread(events, { running: false })
+    const activity = thread.find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    const segments = activityTrace(details, events, traceOutcome(events, false))
+    expect(joined(segments)).toBe('41s · thought 7s · asked 1 subagent · 1 tool call · 1 notice')
+    expect(segments.find((seg) => seg.key === 'subagents')?.tone).toBeUndefined()
+  })
+
+  it('says a subagent did not report, in amber, only once the turn is over', () => {
+    const events = [
+      ev(1, 'run.started', { runtimeThreadId: 't' }, 0),
+      ev(2, 'tool.started', { itemId: 'a', toolKind: 'tool_use', name: 'Agent', command: 'Search', phase: 'started' }, 1),
+      ev(3, 'run.cancelled', { process: {} }, 30)
+    ]
+    const live = buildThread(events.slice(0, 2), { running: true })
+    const liveDetails = live.find((item) => item.type === 'activity')
+    expect(joined(activityTrace(liveDetails?.type === 'activity' ? liveDetails.details : [], events.slice(0, 2), 'running'))).toBe('1s · asked 1 subagent')
+    const over = buildThread(events, { running: false })
+    const details = over.find((item) => item.type === 'activity')
+    const segments = activityTrace(details?.type === 'activity' ? details.details : [], events, traceOutcome(events, false))
+    expect(joined(segments)).toBe('stopped at 30s · nothing was changed · asked 1 subagent · it did not report')
+    expect(segments.find((seg) => seg.key === 'subagents')?.tone).toBe('amber')
+  })
+
+  it('has the duration as its floor, and words a stop honestly', () => {
+    expect(joined(activityTrace([], [ev(1, 'run.started', { runtimeThreadId: 't' }, 0), ev(2, 'run.completed', { runtimeThreadId: 't', process: {} }, 275)], 'completed'))).toBe('4m 35s')
+    expect(durationText(3_960_000)).toBe('1h 06m')
+    expect(traceOutcome([ev(1, 'run.failed', { message: 'x' }, 0)], false)).toBe('failed')
+  })
+})
+
+describe('utilisation, in the words of the spec', () => {
+  it('reads the fullest window and words the sentence', () => {
+    const said = '5-hour window 67% used · resets 2026-09-06T02:10:00.000Z · 7-day window 53% used · resets 2026-09-07T07:00:00.000Z'
+    expect(usagePercent(said)).toBe(67)
+    expect(usageWindowSentence(said)).toMatch(/^67% of the 5-hour window used, resets .+ · 53% of the 7-day window, resets .+$/)
+    expect(usagePercent('nothing')).toBeUndefined()
   })
 })

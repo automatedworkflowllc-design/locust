@@ -233,6 +233,24 @@ export function usageWindowLabel(said: string): string {
   })
 }
 
+/** The fullest window's percentage in a usage-window reading, or undefined. */
+export function usagePercent(said: string): number | undefined {
+  const found = [...said.matchAll(/(\d{1,3})% used/g)].map((match) => Number(match[1]))
+  return found.length === 0 ? undefined : Math.max(...found)
+}
+
+/**
+ * The reading in the spec's words: "67% of the 5-hour window used, resets
+ * 10:10 PM · 53% of the 7-day window, resets Sun 3:00 AM" (SURFACES-0.22 §3).
+ */
+export function usageWindowSentence(said: string): string {
+  const parts = [...usageWindowLabel(said).matchAll(/([^·]+?) window (\d{1,3})% used(?: · resets ([^·]+?))?(?= · |$)/g)]
+  if (parts.length === 0) return usageWindowLabel(said)
+  return parts
+    .map((match, index) => `${match[2]}% of the ${match[1].trim()} window${index === 0 ? ' used' : ''}${match[3] === undefined ? '' : `, resets ${match[3].trim()}`}`)
+    .join(' · ')
+}
+
 export function clockTime(iso: string): string {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return '--:--'
@@ -325,6 +343,10 @@ export type ThreadItem =
       readonly key: string
       readonly type: 'activity'
       readonly summary: string
+      /** The trace line, as segments, so its tones stay addressable (SURFACES-0.22 §1). */
+      readonly trace: readonly TraceSegment[]
+      /** True once the turn is over: an unsettled subagent then "did not report". */
+      readonly finished: boolean
       readonly details: readonly ActivityDetail[]
       /**
        * Which runtime reported this work, so a row with no recorded change
@@ -481,6 +503,94 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   // already says which branch the teammate is on.
   const stripped = inside.replace(WORKTREE_PATH_PREFIX, '')
   return stripped.length === 0 ? inside : stripped
+}
+
+export interface TraceSegment {
+  readonly key: string
+  readonly text: string
+  readonly tone?: 'amber' | 'muted'
+}
+
+export type TraceOutcome = 'running' | 'completed' | 'failed' | 'cancelled'
+
+/** How the turn ended, off its own events. */
+export function traceOutcome(events: readonly NormalizedRuntimeEvent[], running: boolean): TraceOutcome {
+  if (events.some((event) => event.type === 'run.failed')) return 'failed'
+  if (events.some((event) => event.type === 'run.cancelled')) return 'cancelled'
+  return running ? 'running' : 'completed'
+}
+
+/** "41s", "4m 20s", "1h 06m". */
+export function durationText(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000))
+  if (seconds < 60) return `${String(seconds)}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${String(minutes)}m ${String(seconds % 60).padStart(2, '0')}s`
+  const hours = Math.floor(minutes / 60)
+  return `${String(hours)}h ${String(minutes % 60).padStart(2, '0')}m`
+}
+
+/**
+ * What a finished turn did, as one line a person reads coming back to the
+ * laptop: duration, delegation, work, exceptions -- outermost fact to
+ * innermost (SURFACES-0.22 §1). A segment that is zero is absent; the floor
+ * is the duration alone, so the line never disappears.
+ */
+export function activityTrace(
+  details: readonly ActivityDetail[],
+  events: readonly NormalizedRuntimeEvent[],
+  outcome: TraceOutcome
+): readonly TraceSegment[] {
+  const segments: TraceSegment[] = []
+  const times = events.map((event) => Date.parse(event.occurredAt)).filter((t) => Number.isFinite(t))
+  const elapsed = times.length >= 2 ? Math.max(...times) - Math.min(...times) : 0
+  const duration = durationText(elapsed)
+  const finished = outcome !== 'running'
+  const entries = activityEntries(details)
+  const files = entries.filter((entry) => entry.kind === 'file' || entry.kind === 'unreported').length
+  const helpers = entries.filter((entry) => entry.kind === 'helper')
+  const helpersFailed = helpers.filter((entry) => entry.failed).length
+  const helpersSilent = finished ? helpers.filter((entry) => !entry.settled && !entry.failed).length : 0
+  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit').length
+    + details.filter((detail) => detail.kind === 'edit' && detail.failed === true).length
+  const diagnostics = events.filter(
+    (event): event is Extract<NormalizedRuntimeEvent, { type: 'adapter.diagnostic' }> => event.type === 'adapter.diagnostic' && !/\.usage_window$/.test(event.payload.code)
+  )
+  const refused = diagnostics.filter((event) => /denied|refus|permission/i.test(event.payload.code) || /not permitted|refused/i.test(event.payload.message)).length
+  const notices = diagnostics.length - refused
+
+  if (outcome === 'failed' || outcome === 'cancelled') {
+    segments.push({ key: 'duration', text: `stopped at ${duration}` })
+    if (outcome === 'cancelled' && files === 0) segments.push({ key: 'nothing', text: 'nothing was changed', tone: 'muted' })
+  } else {
+    segments.push({ key: 'duration', text: duration })
+  }
+
+  // Thought only when reasoning spans exist; most runtimes never report one.
+  let thought = 0
+  const openReasoning = new Map<string, number>()
+  for (const event of events) {
+    if (event.type === 'step.started' && event.payload.stepKind === 'reasoning') openReasoning.set(event.payload.itemId ?? 'reasoning', Date.parse(event.occurredAt))
+    if ((event.type === 'step.completed' || event.type === 'step.failed') && event.payload.stepKind === 'reasoning') {
+      const key = event.payload.itemId ?? 'reasoning'
+      const began = openReasoning.get(key)
+      if (began !== undefined) { thought += Math.max(0, Date.parse(event.occurredAt) - began); openReasoning.delete(key) }
+    }
+  }
+  if (thought >= 1000) segments.push({ key: 'thought', text: `thought ${durationText(thought)}` })
+
+  if (helpers.length > 0) {
+    let text = `asked ${pluralize(helpers.length, 'subagent')}`
+    let tone: TraceSegment['tone']
+    if (helpersFailed > 0) { text += helpers.length === 1 ? ' · it failed' : ` · ${String(helpersFailed)} failed`; tone = 'amber' }
+    else if (helpersSilent > 0) { text += helpers.length === 1 ? ' · it did not report' : ` · ${String(helpersSilent)} did not report`; tone = 'amber' }
+    segments.push({ key: 'subagents', text, ...(tone === undefined ? {} : { tone }) })
+  }
+  if (calls > 0) segments.push({ key: 'calls', text: pluralize(calls, 'tool call') })
+  if (files > 0 && !(outcome === 'cancelled' && files === 0)) segments.push({ key: 'files', text: pluralize(files, 'file') })
+  if (refused > 0) segments.push({ key: 'refused', text: `${String(refused)} refused`, tone: 'amber' })
+  if (notices > 0) segments.push({ key: 'notices', text: pluralize(notices, 'notice') })
+  return segments
 }
 
 export function activitySummary(details: readonly ActivityDetail[]): string {
@@ -745,6 +855,8 @@ export function buildThread(
       key: 'activity',
       type: 'activity',
       summary: activitySummary(activity),
+      trace: activityTrace(activity, events, traceOutcome(events, options.running)),
+      finished: !options.running,
       details: activity,
       reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
     })

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { usageWindowLabel } from '../missionView.js'
+import { usagePercent, usageWindowSentence } from '../missionView.js'
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
 
 import type {
@@ -181,6 +181,19 @@ export function Composer({
     ? mode
     : modesFor(route.runtime, platform)[0] ?? 'accept-edits'
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
+  // The account's window, from the latest reading (SURFACES-0.22 §3): a
+  // sentence in the tooltip always; a dot on the chip only from 80%, when a
+  // long run might not finish.
+  const usageReading = usageWindows?.get(route.runtime)
+  const usagePercentNow = usageReading === undefined ? undefined : usagePercent(usageReading)
+  const usageSentence = usageReading === undefined
+    ? undefined
+    : usagePercentNow !== undefined && usagePercentNow >= 100
+      ? `${usageWindowSentence(usageReading)}. This window's limit is used up.`
+      : usagePercentNow !== undefined && usagePercentNow >= 80
+        ? `${usageWindowSentence(usageReading)}. Long runs may be cut short.`
+        : usageWindowSentence(usageReading)
+  const usagePressing = usagePercentNow !== undefined && usagePercentNow >= 80
   const selectedReady = selected !== undefined && runtimeIsUsable(selected)
   // A runtime can own a mission once the host can read its events. Readiness
   // still comes from discovery, so a route that is installed but signed out
@@ -499,8 +512,8 @@ export function Composer({
                 */}
                 <button
                   type="button"
-                  className="lc-control lc-control--boxed"
-                  title={[handoffTitle(handoff), usageWindows?.get(route.runtime) === undefined ? undefined : usageWindowLabel(usageWindows.get(route.runtime)!)].filter((part) => part !== undefined && part.length > 0).join('\n')}
+                  className={`lc-control lc-control--boxed${usagePressing ? ' is-pressing' : ''}`}
+                  title={[handoffTitle(handoff), usageSentence].filter((part) => part !== undefined && part.length > 0).join('\n')}
                   onClick={() => {
                     onOpenRoutePicker()
                     setPickerOpen(!pickerOpen)

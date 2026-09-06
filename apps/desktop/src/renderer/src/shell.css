@@ -3333,6 +3333,89 @@ textarea {
 
 /* Settings, tidied (2026-09-05): one line under a heading, the manual folded
    under it, groups in one card with divider rows, controls in aligned rows. */
+/* The trace line (SURFACES-0.22 §1): the fold's summary as segments. */
+.lc-trace {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: var(--lc-space-3);
+  overflow: hidden;
+}
+.lc-trace__seg + .lc-trace__seg::before {
+  content: '·';
+  margin-right: var(--lc-space-3);
+  color: var(--lc-text-muted);
+}
+.lc-trace__seg:first-child {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-provenance);
+  color: var(--lc-text-secondary);
+  white-space: nowrap;
+}
+.lc-trace__seg {
+  white-space: nowrap;
+  color: var(--lc-text-muted);
+}
+.lc-trace__seg.is-amber { color: var(--lc-amber-text); }
+.lc-trace__seg:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The subagent row's result is the flexible column (§2). */
+.lc-filerow.is-helper .lc-filerow__result {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.lc-filerow__result.is-stalled { color: var(--lc-amber-text); }
+
+/* The sidebar's mark for a teammate waiting on its own subagent (§2). */
+.lc-teammate__delegating {
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--lc-space-2);
+  color: var(--lc-text-muted);
+}
+
+/* The route chip from 80% of the account's window (§3): a dot, not a fill. */
+.lc-row__meta.is-delegating {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.lc-row__metarole {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-row__metastate {
+  flex: none;
+  white-space: pre;
+}
+
+/* Declared after .lc-runtimerow__detail on purpose: same specificity, later wins. */
+.lc-runtimerow__usage.lc-tone-amber {
+  color: var(--lc-amber-text);
+}
+
+.lc-control.is-pressing::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--lc-amber);
+}
+
 .lc-claim--hint {
   margin-top: var(--lc-space-3);
   color: var(--lc-text-secondary);
