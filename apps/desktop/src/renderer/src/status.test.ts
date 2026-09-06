@@ -32,6 +32,8 @@ import {
   shortMissionId,
   teammateStatusView, ROUTE_SEARCH_GROUP_LIMIT } from './status.js'
 import type { RouteTag } from './status.js'
+import { startRoute } from './status.js'
+import type { PublicModel } from '../../shared/ipc.js'
 
 function runtime(overrides: Partial<PublicRuntimeStatus> = {}): PublicRuntimeStatus {
   return {
@@ -798,5 +800,32 @@ describe("the words for what a teammate does", () => {
     expect(roleLabelOf({ role: 'Custom' })).toBe('Custom')
     expect(roleLabelOf({ role: 'Custom', roleTitle: '   ' })).toBe('Custom')
     expect(roleLabelOf({ role: 'Docs & QA', roleTitle: 'ignored' })).toBe('Docs & QA')
+  })
+})
+
+describe('the route a mission starts on', () => {
+  const models: readonly PublicModel[] = [
+    {
+      id: 'cursor-grok-4.6-high-fast',
+      runtime: 'cursor',
+      displayName: 'cursor-grok-4.6',
+      description: '',
+      supportedEfforts: ['low', 'high', 'high-fast'],
+      variants: { low: 'cursor-grok-4.6-low', high: 'cursor-grok-4.6-high', 'high-fast': 'cursor-grok-4.6-high-fast' }
+    },
+    { id: 'sonnet', runtime: 'claude', displayName: 'Sonnet', description: '', supportedEfforts: ['low', 'medium', 'high'] }
+  ]
+
+  it('turns an effort into the variant it names and sends no effort beside it', () => {
+    expect(startRoute(models, 'cursor', 'cursor-grok-4.6-high-fast', 'low')).toEqual({ model: 'cursor-grok-4.6-low' })
+  })
+
+  it('drops an effort the variants do not name rather than refuse the run', () => {
+    expect(startRoute(models, 'cursor', 'cursor-grok-4.6-high-fast', 'medium')).toEqual({ model: 'cursor-grok-4.6-high-fast' })
+  })
+
+  it('sends the effort as itself where the runtime takes it as a flag', () => {
+    expect(startRoute(models, 'claude', 'sonnet', 'medium')).toEqual({ model: 'sonnet', effort: 'medium' })
+    expect(startRoute(models, 'claude', 'sonnet', undefined)).toEqual({ model: 'sonnet' })
   })
 })

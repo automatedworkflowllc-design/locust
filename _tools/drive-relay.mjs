@@ -108,6 +108,16 @@ try {
     await new Promise(r => setTimeout(r, 300))
     return document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-260) ?? ''
   })()`))
+  await drive.capture("click Booty's message: it should open Booty's conversation, and no underlined link remains", () => drive.evaluate(`(async () => {
+    const links = document.querySelectorAll('.lc-peer__open').length
+    const bubble = document.querySelector('.lc-peer__bubble.is-link')
+    if (!bubble) return 'no clickable message; underlined links: ' + links
+    const title = bubble.getAttribute('title')
+    bubble.click()
+    await new Promise(r => setTimeout(r, 900))
+    const header = document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 120) ?? 'no header'
+    return 'underlined links: ' + links + ' || title: ' + title + ' || after click, header: ' + header
+  })()`))
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {

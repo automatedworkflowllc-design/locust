@@ -35,6 +35,12 @@ files:
   # the taskbar (Colin, 2026-09-05: "app icon is showing as electron app").
   - resources/icon-512.png
 
+# Copied beside app.asar, into process.resourcesPath: the window icon has to
+# be a real file on disk, not a path inside the archive (2026-09-06).
+extraResources:
+  - from: resources/icon.ico
+    to: icon.ico
+
 # Never ship the caller's mission ledger, smoke profiles, or source maps.
 asar: true
 

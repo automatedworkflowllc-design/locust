@@ -85,7 +85,7 @@ import {
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
-import { collapseConversations, listedAsMission, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView } from './status.js'
+import { collapseConversations, listedAsMission, modeRunsOn, modesFor, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -1504,16 +1504,15 @@ export default function App(): ReactElement {
         // The concrete model. When a runtime encodes effort in the id, the
         // chosen effort names a different model, and sending the family's
         // default with an effort beside it would run the wrong one.
-        model: chosenModelId(models, route.model, swarmEffortFor(models, route.model, swarm, effort, route.runtime)),
-        ...(teammateId === undefined ? {} : { teammateId }),
-        ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
         // Only sent when the chosen model advertised it; the composer cannot
-        // offer an effort the catalog did not report for that model.
-        // Swarm overrides the picked effort with the model's maximum, and the
+        // offer an effort the catalog did not report for that model. Swarm
+        // overrides the picked effort with the model's maximum, and the
         // composer shows that -- so what is sent must match what is shown.
-        ...(swarmEffortFor(models, route.model, swarm, effort, route.runtime) === undefined
-          ? {}
-          : { effort: swarmEffortFor(models, route.model, swarm, effort, route.runtime)! })
+        // Where the effort lives inside the model id, it is sent as the id
+        // alone (startRoute).
+        ...startRoute(models, route.runtime, route.model, swarmEffortFor(models, route.model, swarm, effort, route.runtime)),
+        ...(teammateId === undefined ? {} : { teammateId }),
+        ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId })
       })
       if (!response.ok) {
         setRuns((current) =>
@@ -1649,10 +1648,7 @@ export default function App(): ReactElement {
         runId,
         runtime: choice.runtime,
         mode,
-        model: choice.model,
-        ...(swarmEffortFor(models, choice.model, swarm, effort, choice.runtime) === undefined
-          ? {}
-          : { effort: swarmEffortFor(models, choice.model, swarm, effort, choice.runtime)! })
+        ...startRoute(models, choice.runtime, choice.model, swarmEffortFor(models, choice.model, swarm, effort, choice.runtime))
       })
 
       if (!response.ok) {

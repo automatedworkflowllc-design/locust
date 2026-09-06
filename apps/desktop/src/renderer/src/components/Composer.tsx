@@ -282,7 +282,11 @@ export function Composer({
   const shownModel = running ? activeRoute?.model ?? route.model : route.model
   const shownRuntimeStatus = runtimes.find((runtime) => runtime.id === shownRuntime)
   const runtimeLabel = shownRuntimeStatus?.displayName ?? runtimeDisplayName(shownRuntime)
-  const modelLabel = shownModel
+  // A family known only through its effort variants is listed under its
+  // family name; showing the stand-in variant's id ("cursor-grok-4.6-high-fast")
+  // beside "effort · low" read as two different answers (2026-09-06).
+  const shownEntry = models.find((model) => model.runtime === shownRuntime && model.id === shownModel)
+  const modelLabel = shownEntry?.variants !== undefined ? shownEntry.displayName : shownModel
   // What the RUNNING mission is actually on, which is not always what the
   // composer's next-run route says. A handoff has to be measured against the
   // live run, or picking "the same" route would still stop it.

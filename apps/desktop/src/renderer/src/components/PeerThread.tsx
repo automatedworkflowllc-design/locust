@@ -12,8 +12,10 @@ import { PixelFace } from './PixelFace.js'
  *
  * Collapsed to a single line, because the thread is the teammate's work and a
  * colleague's aside must not read as part of it. Expanded, every message is
- * attributed, the whole exchange wears an UNTRUSTED tag, and the footer says
- * the rule in words: teammate messages are claims. Nothing here is ever drawn
+ * attributed and the footer says the rule in words: teammate messages are
+ * claims. (The UNTRUSTED tag the exchange used to wear was removed on Colin's
+ * word, 2026-09-06: "it's literally AI, it's inherently not to be supremely
+ * trusted, doesn't need to be there".) Nothing here is ever drawn
  * in the voice of the mission itself -- not even the message this teammate
  * sent, which is why it is shown here, labelled, rather than left inside the
  * agent's own bubble.
@@ -79,16 +81,7 @@ export function PeerThread({
         <span>{label}</span>
         <PixelFace hue={peerHue} avatar={faceOf(peer.teammateId, peerProfile)} size={16} />
         <span className={`lc-peer__name is-${peerHue}`}>{peer.name}</span>
-        {open ? (
-          <>
-            <span className="lc-peer__dot" aria-hidden="true">
-              ·
-            </span>
-            <span className="lc-peer__tag lc-mono">UNTRUSTED</span>
-          </>
-        ) : (
-          snippet !== undefined && <span className="lc-peer__snippet">{snippet}</span>
-        )}
+        {!open && snippet !== undefined && <span className="lc-peer__snippet">{snippet}</span>}
       </button>
       {open && (
         <>
@@ -100,17 +93,25 @@ export function PeerThread({
                 <PixelFace hue={hue} avatar={faceOf(message.from.teammateId, author)} size={20} />
                 <div className="lc-peer__body">
                   <div className={`lc-peer__author is-${hue}`}>{message.from.name}</div>
-                  <div className={`lc-peer__bubble${message.text === null ? ' is-missing' : ''}`}>
-                    {message.text ?? 'This message is no longer in the workroom.'}
-                  </div>
-                  {onOpenPeerRun(message.messageId) !== undefined && (
+                  {/*
+                    * The message itself is the way to the conversation it
+                    * reached. A separate underlined "open the run this
+                    * reached" under every message was clutter (Colin,
+                    * 2026-09-06: "just feels clunky and isn't really needed").
+                    */}
+                  {onOpenPeerRun(message.messageId) !== undefined ? (
                     <button
                       type="button"
-                      className="lc-peer__open lc-mono"
+                      className={`lc-peer__bubble is-link${message.text === null ? ' is-missing' : ''}`}
+                      title="Open the conversation this message reached"
                       onClick={onOpenPeerRun(message.messageId)}
                     >
-                      open the run this reached
+                      {message.text ?? 'This message is no longer in the workroom.'}
                     </button>
+                  ) : (
+                    <div className={`lc-peer__bubble${message.text === null ? ' is-missing' : ''}`}>
+                      {message.text ?? 'This message is no longer in the workroom.'}
+                    </div>
                   )}
                 </div>
               </div>

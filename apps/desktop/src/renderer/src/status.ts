@@ -1,6 +1,6 @@
 import { faceLabel, teammateActivity } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
-import type { MissionMode, PublicRecoveredMission, PublicRuntimeStatus } from '../../shared/ipc.js'
+import type { MissionMode, PublicModel, PublicRecoveredMission, PublicRuntimeStatus } from '../../shared/ipc.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
 /**
@@ -820,4 +820,31 @@ export function collapseConversations<
       turns: members.length
     }
   })
+}
+
+/**
+ * The model and effort a mission is actually started with.
+ *
+ * Some runtimes take an effort as a flag. Cursor encodes it in the model id
+ * instead and lists every combination as its own model; the catalog folds
+ * those into one row with `variants`, so the chosen effort has to be turned
+ * back into the id it names -- and then NOT sent beside it. Sending both put
+ * "cursor-grok-4.6-high-fast" and "medium" in front of a builder that refuses
+ * any effort for Cursor, and every Cursor run with an effort picked failed
+ * with "cannot be started with the options chosen" (Colin, 2026-09-06).
+ */
+export function startRoute(
+  models: readonly PublicModel[],
+  runtime: MissionRuntimeId,
+  modelId: string,
+  effort: string | undefined
+): { readonly model: string; readonly effort?: string } {
+  if (effort === undefined) return { model: modelId }
+  const model = models.find((entry) => entry.runtime === runtime && entry.id === modelId)
+  const variant = model?.variants?.[effort]
+  if (variant !== undefined) return { model: variant }
+  // A model with variants and no variant for this effort: the effort names
+  // nothing this runtime can honour, so it is dropped rather than refused.
+  if (model?.variants !== undefined) return { model: modelId }
+  return { model: modelId, effort }
 }

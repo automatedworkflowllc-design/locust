@@ -1,7 +1,8 @@
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from './window-size.js'
+import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, screen, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, screen, session, shell } from 'electron'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -16,7 +17,7 @@ import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-s
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -275,11 +276,16 @@ const createWindow = (
     // The 512, not the 256 beside it. Windows scales the window and taskbar
     // icon from whatever it is handed, so handing it the smaller file made it
     // downsample from a downsample. Found by the design pass, 2026-09-04.
-    // Packaged: the executable carries the mark (electron-builder embeds
-    // resources/icon.ico) and Windows takes the window's icon from it when
-    // none is handed over. Handing a path inside the archive gave Colin's
-    // taskbar Electron's own icon (2026-09-06). Development keeps the PNG.
-    ...(app.isPackaged ? {} : { icon: join(__dirname, '../../resources/icon-512.png') }),
+    // Packaged: the .ico copied BESIDE the archive (electron-builder.yml,
+    // extraResources), never a path inside it. Two wrong turns, both seen on
+    // Colin's taskbar as Electron's own emblem: 0.32.0 handed a PNG inside
+    // app.asar, which Windows cannot make a window icon from; 0.33.1 handed
+    // nothing, assuming Windows would take the executable's icon -- it does
+    // for shortcuts, not for a running window (2026-09-06: "it's literally
+    // showing the electron emblem"). Development keeps the PNG.
+    icon: app.isPackaged
+      ? join(process.resourcesPath, 'icon.ico')
+      : join(__dirname, '../../resources/icon-512.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       sandbox: true,
@@ -379,8 +385,26 @@ if (!ownsSingleInstanceLock) {
 
   void app.whenReady().then(() => {
     nativeTheme.themeSource = 'dark'
-    // Windows shows a notification only for an app it can name.
-    if (process.platform === 'win32') app.setAppUserModelId('com.automatedworkflow.locust')
+    // Windows shows a notification only for an app it can name. Development
+    // runs get an id of their own: a dev electron.exe once left a Start-menu
+    // shortcut carrying the installed app's id, and Windows drew Electron's
+    // atom on every Locust window from then on (see stale-shortcut.ts).
+    if (process.platform === 'win32') {
+      app.setAppUserModelId(app.isPackaged ? APP_USER_MODEL_ID : DEVELOPMENT_APP_USER_MODEL_ID)
+      if (app.isPackaged) {
+        const removed = sweepStaleElectronShortcuts({
+          candidates: [join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Electron.lnk')],
+          appId: APP_USER_MODEL_ID,
+          readShortcut: (path) => {
+            if (!existsSync(path)) return undefined
+            const link = shell.readShortcutLink(path)
+            return { target: link.target, ...(link.appUserModelId === undefined ? {} : { appUserModelId: link.appUserModelId }) }
+          },
+          remove: (path) => unlinkSync(path)
+        })
+        for (const path of removed) console.warn(`Removed a stale Electron shortcut that carried Locust's app id: ${path}`)
+      }
+    }
 
     // The renderer is untrusted: it gets no device or web-platform permissions,
     // and packaged builds get no network egress at all (the dev server needs

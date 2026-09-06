@@ -5264,6 +5264,23 @@ textarea {
 
 /* "Open the run this reached" on an exchange message. Quiet: it is a way
    through to another conversation, not an action on this one. */
+/* A teammate's message that leads to the conversation it reached. */
+.lc-peer__bubble.is-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.lc-peer__bubble.is-link:hover,
+.lc-peer__bubble.is-link:focus-visible {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--lc-bg-bubble-peer-hover, #262a2b);
+}
+
 .lc-peer__open {
   margin-top: 0.3rem;
   padding: 0;

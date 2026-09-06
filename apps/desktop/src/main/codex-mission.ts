@@ -805,10 +805,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         }
         try {
           command = buildCommand(prompt)
-        } catch {
+        } catch (cause) {
+          // The builder's own sentence is the reason; one line for every
+          // reason hid "Cursor Agent takes no effort level" for a day.
+          const why = cause instanceof Error && cause.message.length > 0 ? ` ${cause.message}.` : ''
           return error(
             'RUNTIME_START_FAILED',
-            'That runtime cannot be started with the options chosen. Nothing was recorded.'
+            `That runtime cannot be started with the options chosen.${why} Nothing was recorded.`
           ) as CodexMissionStartResponse
         }
 

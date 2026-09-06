@@ -6,6 +6,34 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.34.1 — 2026-09-06
+
+- **Cursor Agent with an effort picked ran again.** Cursor carries the
+  effort inside the model id; Locust sent that id and the effort beside
+  it, and every Cursor run with an effort chosen failed with "cannot be
+  started with the options chosen" (Colin, on grok 4.6). The effort now
+  travels as the id alone.
+- **The failure names its reason.** "That runtime cannot be started with
+  the options chosen. Cursor Agent takes no effort level. Nothing was
+  recorded." instead of the first sentence alone.
+- **A teammate's message is the way to its conversation.** The underlined
+  "open the run this reached" under every relayed message is gone; the
+  message itself opens the conversation it reached (Colin: "just feels
+  clunky and isn't really needed").
+- **No UNTRUSTED tag on an exchange.** Colin: "it's literally AI, it's
+  inherently not to be supremely trusted, doesn't need to be there." The
+  footer still says teammate messages are claims.
+- **The app icon is Locust's again.** Colin: "it's literally showing the
+  electron emblem, and it worked prior." The window had carried the right
+  icon all along; Windows was drawing the taskbar icon from a Start-menu
+  shortcut named "Electron" that a development run had left behind with
+  the installed app's id, pointing at a bare electron.exe. Development
+  runs now use an id of their own, and a packaged start removes such a
+  shortcut if one exists. Also: the packaged window is handed a real
+  `.ico` beside the archive rather than a path inside it, and the icon
+  is the designer's dark tile -- the bare white mark on a transparent
+  ground was invisible on a light taskbar.
+
 ## 0.34.0 — 2026-09-06
 
 The design agent's SURFACES-0.22 spec, built as written.
