@@ -115,8 +115,15 @@ try {
     const title = bubble.getAttribute('title')
     bubble.click()
     await new Promise(r => setTimeout(r, 900))
-    const header = document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 120) ?? 'no header'
-    return 'underlined links: ' + links + ' || title: ' + title + ' || after click, header: ' + header
+    const header = document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 60) ?? 'no header'
+    // The three surfaces that disagreed after this click: the header, the
+    // composer's placeholder, and which teammate card is lit (0.35.0 QA).
+    const placeholder = document.querySelector('form.command-dock textarea')?.getAttribute('placeholder') ?? 'no composer'
+    const lit = [...document.querySelectorAll('.lc-teammate')].find(r => r.querySelector('[aria-current="true"]'))
+    const litName = lit ? lit.innerText.replace(/\\s+/g, ' ').trim().split(' ')[0] : 'none'
+    // The three that disagreed lead, because the record's table truncates.
+    return 'composer: ' + placeholder + ' || teammate lit: ' + litName + ' || header: ' + header
+      + ' || underlined links: ' + links + ' || title: ' + title
   })()`))
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

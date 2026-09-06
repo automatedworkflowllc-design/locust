@@ -592,14 +592,42 @@ export function sandboxPhrase(sandbox: 'read-only' | 'workspace-write' | 'full-a
   return 'read-only'
 }
 
-export function modesFor(
-  runtime: MissionRuntimeId,
-  platform?: string,
-  options?: { readonly autoMode?: boolean }
-): readonly MissionMode[] {
-  return (['ask', 'plan', 'accept-edits', 'approve-each', 'auto'] as const).filter(
-    (mode) =>
-      (mode !== 'auto' || options?.autoMode === true) && modeRunsOn(mode, runtime, platform)
+/**
+ * Who the composer should address once a conversation is opened.
+ *
+ * Opening a mission used to change the thread and leave the selection alone,
+ * so clicking a teammate's message in an exchange showed THEIR run under a
+ * header with their name while the composer still said "Message Wren..." and
+ * Wren's card stayed lit -- three surfaces, two answers, on the one control
+ * whose whole job is saying where the next message goes (0.35.0 targeted QA).
+ *
+ * A mission with no recorded owner keeps the current selection rather than
+ * clearing it: an unowned raw conversation is a real state, and blanking the
+ * composer would be a second wrong answer instead of the first.
+ */
+export function ownerToSelect(
+  missionId: string,
+  owners: Readonly<Record<string, string>>,
+  current: string | undefined
+): string | undefined {
+  return owners[missionId] ?? current
+}
+
+/**
+ * Every mode a route can run, Auto included.
+ *
+ * Auto was briefly hidden until the workspace switch was on, so choosing it
+ * meant a trip to Settings first. Colin, 2026-09-06: "always allow auto to be
+ * chosen from the permission dropdown, we want the user experience to be
+ * fluid." So it is always offered, and picking it turns the switch on -- the
+ * menu item IS the switch, with its consequence stated beside it in amber.
+ * Settings keeps the same switch for seeing the state and taking it back, and
+ * the host still asks the switch as each run starts, so nothing here is what
+ * finally decides whether a run gets it.
+ */
+export function modesFor(runtime: MissionRuntimeId, platform?: string): readonly MissionMode[] {
+  return (['ask', 'plan', 'accept-edits', 'approve-each', 'auto'] as const).filter((mode) =>
+    modeRunsOn(mode, runtime, platform)
   )
 }
 

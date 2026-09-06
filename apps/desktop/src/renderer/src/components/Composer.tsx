@@ -67,8 +67,10 @@ export interface ComposerProps {
   readonly error: string | undefined
   readonly mode: MissionMode
   readonly onModeChange: (mode: MissionMode) => void
-  /** Whether this workspace has switched Auto on; without it the mode is not offered. */
+  /** Whether this workspace has Auto switched on. Picking Auto here switches it on. */
   readonly autoMode?: boolean
+  /** Turn Auto on for the workspace, because the person just chose it. */
+  readonly onEnableAutoMode?: () => void
   readonly route: RouteChoice
   readonly onRouteChange: (route: RouteChoice) => void
   readonly models: readonly PublicModel[]
@@ -152,6 +154,7 @@ export function Composer({
   mode,
   onModeChange,
   autoMode,
+  onEnableAutoMode,
   route,
   onRouteChange,
   models,
@@ -187,7 +190,7 @@ export function Composer({
   // it, and every message was then rejected before it began.
   const effectiveMode: MissionMode = modeRunsOn(mode, route.runtime, platform)
     ? mode
-    : modesFor(route.runtime, platform, { autoMode: autoMode === true })[0] ?? 'accept-edits'
+    : modesFor(route.runtime, platform)[0] ?? 'accept-edits'
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   // The account's window, from the latest reading (SURFACES-0.22 §3): a
   // sentence in the tooltip always; a dot on the chip only from 80%, when a
@@ -415,9 +418,7 @@ export function Composer({
               <span className="lc-control__anchor">
                 {modeOpen && (
                   <div className="lc-menu" role="menu" aria-label="Permission mode">
-                    {MODES.filter(
-                      (option) => option.mode !== 'auto' || autoMode === true
-                    ).map((option) => {
+                    {MODES.map((option) => {
                       const unavailable = modeUnavailableReason(option.mode, route.runtime, platform)
                       return (
                         <button
@@ -429,6 +430,11 @@ export function Composer({
                           disabled={unavailable !== undefined}
                           title={unavailable}
                           onClick={() => {
+                            // Choosing Auto is what turns it on. Settings shows
+                            // the same state and takes it back; this is that
+                            // decision made where it is needed, rather than a
+                            // trip to another screen before the mode works.
+                            if (option.mode === 'auto' && autoMode !== true) onEnableAutoMode?.()
                             onModeChange(option.mode)
                             setModeOpen(false)
                           }}
@@ -486,7 +492,7 @@ export function Composer({
                 onClick={onChooseFolder}
               >
                 <Icon name="folder" size={13} />
-                {workspaceName ?? 'No folder'}
+                <span className="lc-control__folder">{workspaceName ?? 'No folder'}</span>
               </button>
               <button type="button" className="lc-control" disabled title="Attachments and slash commands are not built yet">
                 <Icon name="plus" size={14} />
@@ -531,7 +537,9 @@ export function Composer({
                 <button
                   type="button"
                   className={`lc-control lc-control--boxed${usagePressing ? ' is-pressing' : ''}`}
-                  title={[handoffTitle(handoff), usageSentence].filter((part) => part !== undefined && part.length > 0).join('\n')}
+                  title={[`${runtimeLabel} / ${modelLabel}`, handoffTitle(handoff), usageSentence]
+                    .filter((part) => part !== undefined && part.length > 0)
+                    .join('\n')}
                   onClick={() => {
                     onOpenRoutePicker()
                     setPickerOpen(!pickerOpen)
@@ -543,7 +551,7 @@ export function Composer({
                   <span className={`lc-dot ${selectedReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
                   {runtimeLabel}
                   <span className="lc-separator">/</span>
-                  <span className="lc-control__mono">{modelLabel}</span>
+                  <span className="lc-control__mono lc-control__model">{modelLabel}</span>
                 </button>
               </span>
               <span className="lc-control__anchor">

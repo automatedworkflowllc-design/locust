@@ -85,7 +85,7 @@ import {
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
-import { collapseConversations, listedAsMission, modeRunsOn, modesFor, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -1510,7 +1510,7 @@ export default function App(): ReactElement {
         // in, and sending it anyway is how every message came back refused.
         mode: modeRunsOn(modeOverride ?? mode, route.runtime, build?.platform)
           ? modeOverride ?? mode
-          : modesFor(route.runtime, build?.platform, { autoMode })[0] ?? 'accept-edits',
+          : modesFor(route.runtime, build?.platform)[0] ?? 'accept-edits',
         runtime: route.runtime,
         // The concrete model. When a runtime encodes effort in the id, the
         // chosen effort names a different model, and sending the family's
@@ -2011,6 +2011,11 @@ export default function App(): ReactElement {
     // the list, with no thread and no composer (QA pass, 2026-09-05). The
     // screen change belongs to the action, not to each caller.
     setScreen('workroom')
+    // Whoever the mission belongs to is who the composer now addresses. Done
+    // here rather than in each caller, because the sidebar, the Missions list
+    // and a teammate's message in an exchange all arrive through this one
+    // function and had disagreed about it.
+    setSelectedTeammateId((current) => ownerToSelect(missionId, missionOwnersRef.current, current))
     // A run that is still starting is listed under its pending key.
     if (runs.has(missionId)) {
       setShownKey(missionId)
@@ -2026,6 +2031,7 @@ export default function App(): ReactElement {
     const mission = historyById.get(missionId)
     if (mission === undefined) return
     const reopened = reopenedRun(mission, historyById)
+    setSelectedTeammateId((current) => ownerToSelect(missionId, missionOwnersRef.current, current))
     setRuns((current) => withNewRun(current, mission.runId, reopened))
     setShownKey(mission.runId)
     followRouteOf(reopened)
@@ -2759,10 +2765,21 @@ export default function App(): ReactElement {
             mode={
               modeRunsOn(mode, route.runtime, build?.platform)
                 ? mode
-                : modesFor(route.runtime, build?.platform, { autoMode })[0] ?? mode
+                : modesFor(route.runtime, build?.platform)[0] ?? mode
             }
             onModeChange={setMode}
             autoMode={autoMode}
+            onEnableAutoMode={() => {
+              // Picking Auto in the composer IS the person switching it on.
+              // Written through the host like any other settings change, so
+              // the next run -- and a relay hop or a routine step -- reads the
+              // same answer the composer just showed.
+              setAutoMode(true)
+              void window.desktop
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: true })
+                .then((settings) => setAutoMode(settings.autoMode === true))
+                .catch(() => setAutoMode(false))
+            }}
             route={route}
             onRouteChange={(next) => {
               setRoute(next)

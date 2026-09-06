@@ -6,6 +6,36 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.35.2 — 2026-09-06
+
+From a targeted QA pass on 0.35.0, and one thing Colin saw on the bar.
+
+- **The composer addresses whoever owns the conversation you opened.**
+  Clicking a teammate's message in an exchange opened their run under a
+  header with their name, while the composer still said "Message Wren…"
+  and Wren's card stayed lit. Three surfaces, two answers, on the one
+  control whose job is saying where the next message goes.
+- **"2 files" over one file.** The fold counted rows, so the same file
+  edited twice was two files. It counts distinct paths now.
+- **A refused write is not a changed file.** It was being counted as one,
+  and counted again as a refusal.
+- **A handoff shows the words you actually typed.** When a route switch
+  carries a new instruction, the thread was reaching past it to the
+  sentence that opened the conversation. A rescue with nothing new still
+  shows the original.
+- **Auto is always in the permission menu.** It used to be absent until
+  you switched it on in Settings, so choosing it meant going somewhere
+  else first (Colin: "always allow auto to be chosen from the permission
+  dropdown, we want the user experience to be fluid"). Picking it is what
+  switches it on. Settings still shows the state and takes it back, and
+  the app still asks that switch as each run starts.
+- **A long name no longer breaks the controls row.** OpenCode's free
+  model is `opencode/muse-spark-1.3-contributor-free` and a scratch folder
+  is not much shorter; the row wrapped to a second line to fit either one
+  (Colin: "so long in txt it collapses below", then "maybe got to auto
+  shorten file text as well"). The name gives way instead, and each chip's
+  tooltip carries the whole thing.
+
 ## 0.35.1 — 2026-09-06
 
 - **A turn that wrote to a teammate is not a silent turn.** "This turn

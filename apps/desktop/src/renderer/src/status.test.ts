@@ -17,6 +17,7 @@ import {
   capRouteRows,
   modeRunsOn,
   modesFor,
+  ownerToSelect,
   sandboxPhrase,
   modeUnavailableReason,
   flagshipRank,
@@ -567,17 +568,17 @@ describe('a route whose read-only mode is not real here', () => {
     // that never started leaves no conversation to reply to, which read as
     // "it starts a new chat every time".
     expect(modeRunsOn('ask', 'cursor', 'win32')).toBe(false)
-    expect(modesFor('cursor', 'win32')).toEqual(['accept-edits'])
+    expect(modesFor('cursor', 'win32')).toEqual(['accept-edits', 'auto'])
   })
 
   it('offers it where the sandbox exists', () => {
     expect(modeRunsOn('ask', 'cursor', 'darwin')).toBe(true)
-    expect(modesFor('cursor', 'darwin')).toEqual(['ask', 'plan', 'accept-edits'])
+    expect(modesFor('cursor', 'darwin')).toEqual(['ask', 'plan', 'accept-edits', 'auto'])
   })
 
   it('leaves the other runtimes alone on every platform', () => {
-    expect(modesFor('codex', 'win32')).toEqual(['ask', 'plan', 'accept-edits', 'approve-each'])
-    expect(modesFor('claude', 'win32')).toEqual(['ask', 'plan', 'accept-edits'])
+    expect(modesFor('codex', 'win32')).toEqual(['ask', 'plan', 'accept-edits', 'approve-each', 'auto'])
+    expect(modesFor('claude', 'win32')).toEqual(['ask', 'plan', 'accept-edits', 'auto'])
   })
 
   it('withholds Plan wherever read-only is not real, for the same reason as Ask', () => {
@@ -586,7 +587,7 @@ describe('a route whose read-only mode is not real here', () => {
     // read-only mode asks the same question twice and can disagree with the
     // answer next to it. So Plan is offered exactly where Ask is.
     expect(modeRunsOn('plan', 'cursor', 'win32')).toBe(false)
-    expect(modesFor('cursor', 'win32')).toEqual(['accept-edits'])
+    expect(modesFor('cursor', 'win32')).toEqual(['accept-edits', 'auto'])
     expect(modeRunsOn('plan', 'cursor', 'darwin')).toBe(true)
     expect(modeRunsOn('plan', 'antigravity')).toBe(false)
     // And it reads as what it is on a roster card.
@@ -832,26 +833,26 @@ describe('the route a mission starts on', () => {
 })
 
 describe('the Auto mode, which has to be switched on before it is offered', () => {
-  it('is absent from a route\'s modes unless the workspace switched it on', () => {
-    expect(modesFor('codex', 'win32')).not.toContain('auto')
-    expect(modesFor('codex', 'win32', {})).not.toContain('auto')
-    expect(modesFor('codex', 'win32', { autoMode: false })).not.toContain('auto')
-    expect(modesFor('codex', 'win32', { autoMode: true })).toContain('auto')
+  it('is always offered, whatever the workspace switch says', () => {
+    // Colin, 2026-09-06: "always allow auto to be chosen from the permission
+    // dropdown, we want the user experience to be fluid." Picking it is what
+    // turns the switch on; the host still asks the switch as a run starts.
+    expect(modesFor('codex', 'win32')).toContain('auto')
   })
 
   it('is offered on every runtime Locust has a handle on, and not on Antigravity', () => {
     for (const runtime of ['codex', 'claude', 'cursor', 'opencode', 'copilot'] as const) {
-      expect(modesFor(runtime, 'win32', { autoMode: true })).toContain('auto')
+      expect(modesFor(runtime, 'win32')).toContain('auto')
     }
-    expect(modesFor('antigravity', 'win32', { autoMode: true })).not.toContain('auto')
+    expect(modesFor('antigravity', 'win32')).not.toContain('auto')
     expect(modeUnavailableReason('auto', 'antigravity', 'win32')).toMatch(/own permissions/)
   })
 
   it('is never the mode a route falls back to', () => {
     // The fallback takes the first offered mode, so Auto being last in the
     // list is what keeps a refused choice from widening into the widest one.
-    expect(modesFor('codex', 'win32', { autoMode: true })[0]).not.toBe('auto')
-    expect(modesFor('cursor', 'win32', { autoMode: true })[0]).not.toBe('auto')
+    expect(modesFor('codex', 'win32')[0]).not.toBe('auto')
+    expect(modesFor('cursor', 'win32')[0]).not.toBe('auto')
   })
 
   it('has its own phrase for what a run was allowed', () => {
@@ -865,5 +866,23 @@ describe('the Auto mode, which has to be switched on before it is offered', () =
 
   it('says what it allowed, not what it was called', () => {
     expect(modeLabel('auto')).toBe('auto \u00b7 whole machine')
+  })
+})
+
+describe('who the composer addresses when a conversation is opened', () => {
+  const owners = { mission_booty: 'tm_booty', mission_wren: 'tm_wren' }
+
+  it("follows the mission's owner, so the header and the composer agree", () => {
+    // Clicking Booty's message in an exchange opened Booty's run under a
+    // header naming Booty, while the composer still said "Message Wren..."
+    // and Wren's card stayed lit (0.35.0 targeted QA).
+    expect(ownerToSelect('mission_booty', owners, 'tm_wren')).toBe('tm_booty')
+  })
+
+  it('keeps the current selection for a conversation nobody owns', () => {
+    // An unowned raw conversation is a real state; blanking the composer
+    // would be a second wrong answer rather than a fix for the first.
+    expect(ownerToSelect('mission_nobody', owners, 'tm_wren')).toBe('tm_wren')
+    expect(ownerToSelect('mission_nobody', owners, undefined)).toBeUndefined()
   })
 })

@@ -547,7 +547,28 @@ export function activityTrace(
   const duration = durationText(elapsed)
   const finished = outcome !== 'running'
   const entries = activityEntries(details)
-  const files = entries.filter((entry) => entry.kind === 'file' || entry.kind === 'unreported').length
+  // How many FILES this run changed, which is not how many rows the card
+  // drew. Two corrections from the 0.35.0 targeted QA:
+  //
+  // - The same path edited twice is one file. The card is right to draw both
+  //   rows -- they are two things the runtime did -- but "2 files" over one
+  //   file is a claim about the workspace, and it is false.
+  // - A refused write changed nothing. It is already counted among the calls
+  //   below and said again as "N refused", so counting it here was both a
+  //   double count and the wrong noun.
+  // Windows paths are case-insensitive and runtimes disagree about separators
+  // and a leading `./`; the same file must key the same way whichever one
+  // reported it.
+  const pathKey = (path: string): string =>
+    path.replace(/[\\/]+/g, '/').replace(/^\.\//, '').toLowerCase()
+  const changedPaths = new Set<string>()
+  for (const entry of entries) {
+    // A parsed diff is a change that landed, by definition -- it is the change.
+    if (entry.kind === 'file') changedPaths.add(pathKey(entry.file.path))
+    // An edit the runtime named but did not diff counts only if it succeeded.
+    else if (entry.kind === 'unreported' && entry.failed !== true) changedPaths.add(pathKey(entry.name))
+  }
+  const files = changedPaths.size
   const helpers = entries.filter((entry) => entry.kind === 'helper')
   const helpersFailed = helpers.filter((entry) => entry.failed).length
   const helpersSilent = finished ? helpers.filter((entry) => !entry.settled && !entry.failed).length : 0
@@ -1561,6 +1582,30 @@ export function resumableSessionOf(
  * So this walks back through route switches only, and stops at the first
  * mission whose prompt was written by a person.
  */
+/**
+ * The person's own next words inside a handoff briefing, if it carries any.
+ *
+ * A route switch is usually a rescue -- nobody typed anything, and the walk
+ * back below is what finds the words that started the conversation. But a
+ * handoff can also be a REPLY, and `main/handoff.ts` puts those words in a
+ * section of their own, last, under this exact sentence. Walking past it
+ * showed the person the task they opened with and never the instruction the
+ * run was actually started for (0.35.0 targeted QA).
+ *
+ * Matched on the host's own string, which this app writes and owns -- not on
+ * something a runtime said. It is still a seam: the honest home for this is a
+ * field on `continuesFrom`, which needs a ledger version, and until that
+ * exists a mission recorded before it would have nothing to read anyway.
+ */
+export const HANDOFF_INSTRUCTION_MARKER = 'The person now asks:'
+
+export function handoffInstruction(prompt: string): string | undefined {
+  const at = prompt.lastIndexOf(HANDOFF_INSTRUCTION_MARKER)
+  if (at === -1) return undefined
+  const asked = prompt.slice(at + HANDOFF_INSTRUCTION_MARKER.length).trim()
+  return asked.length === 0 ? undefined : asked
+}
+
 export function typedPrompt(
   mission: PublicRecoveredMission,
   byId: ReadonlyMap<string, PublicRecoveredMission>
@@ -1569,6 +1614,8 @@ export function typedPrompt(
   for (let hops = 0; hops < 32; hops += 1) {
     const relayed = relayedTitle(current)
     if (relayed !== undefined) return relayed
+    const asked = handoffInstruction(current.prompt)
+    if (asked !== undefined) return asked
     if (current.continuesFrom?.reason !== 'route-switch') return current.prompt
     const prior = byId.get(current.continuesFrom.missionId)
     if (prior === undefined) return current.prompt

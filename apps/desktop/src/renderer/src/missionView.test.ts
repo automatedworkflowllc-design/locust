@@ -1,3 +1,4 @@
+import type { ActivityDetail } from './missionView.js'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
@@ -178,6 +179,89 @@ describe('when a mission says it began', () => {
 
   it('says nothing for a timestamp it cannot read', () => {
     expect(startedLabel('not a date', now)).toBeUndefined()
+  })
+})
+
+describe('what the fold counts as a changed file (0.35.0 QA)', () => {
+  // Ported from the 0.35.0 targeted QA's own regression file. Three of its
+  // four cases failed on 0.35.1; each is paired here with the control that
+  // stops the fix from being "always answer one".
+  const patchFor = (path: string) => ({
+    text: `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n@@ -1 +1 @@\n-draft\n+final\n`,
+    added: 1,
+    removed: 1,
+    truncated: false
+  })
+  const filesText = (details: readonly ActivityDetail[]): string | undefined =>
+    activityTrace(details, [], 'completed').find((segment) => segment.key === 'files')?.text
+
+  it('counts one Copilot multiline patch as one changed file', () => {
+    expect(
+      filesText([
+        {
+          kind: 'edit',
+          name: '*** Begin Patch\n*** Update File: notes.ts\n@@\n-draft\n+final\n*** End Patch',
+          settled: true,
+          patch: patchFor('notes.ts')
+        }
+      ])
+    ).toBe('1 file')
+  })
+
+  it('counts two edits to the same path once', () => {
+    const detail: ActivityDetail = { kind: 'edit', name: 'notes.ts', settled: true, patch: patchFor('notes.ts') }
+    expect(filesText([detail, detail])).toBe('1 file')
+  })
+
+  it('still counts two edits to two paths as two', () => {
+    expect(
+      filesText([
+        { kind: 'edit', name: 'notes.ts', settled: true, patch: patchFor('notes.ts') },
+        { kind: 'edit', name: 'other.ts', settled: true, patch: patchFor('other.ts') }
+      ])
+    ).toBe('2 files')
+  })
+
+  it('does not count a refused write as a changed file', () => {
+    expect(filesText([{ kind: 'edit', name: 'blocked.txt', settled: true, failed: true }])).toBeUndefined()
+  })
+
+  it('still counts the writes that landed beside a refused one', () => {
+    expect(
+      filesText([
+        { kind: 'edit', name: 'blocked.txt', settled: true, failed: true },
+        { kind: 'edit', name: 'notes.ts', settled: true, patch: patchFor('notes.ts') }
+      ])
+    ).toBe('1 file')
+  })
+})
+
+describe('the words a person typed, across a route switch (0.35.0 QA)', () => {
+  const mission = (fields: Record<string, unknown>): PublicRecoveredMission =>
+    ({ peerMessages: [], ...fields }) as unknown as PublicRecoveredMission
+
+  it('keeps the new instruction a handoff was started for', () => {
+    // `main/handoff.ts` appends the person's next words LAST, as its own
+    // section; walking back past it showed the original task instead.
+    const first = mission({ missionId: 'first', prompt: 'Create a module and test it' })
+    const next = mission({
+      missionId: 'next',
+      prompt: 'Another agent started this task.\nThe person now asks:\n\nRun its tests without editing.',
+      continuesFrom: { missionId: 'first', checkpointEpoch: 1, reason: 'route-switch' }
+    })
+    expect(typedPrompt(next, new Map([['first', first], ['next', next]]))).toBe('Run its tests without editing.')
+  })
+
+  it('still shows the original words when the switch carried no new instruction', () => {
+    // The rescue case: a route switch with nothing new to say must not start
+    // showing the host's briefing, which is what this walk-back exists for.
+    const first = mission({ missionId: 'first', prompt: 'Create a module and test it' })
+    const next = mission({
+      missionId: 'next',
+      prompt: 'Another agent started this task. Continue from its checkpoint.',
+      continuesFrom: { missionId: 'first', checkpointEpoch: 1, reason: 'route-switch' }
+    })
+    expect(typedPrompt(next, new Map([['first', first], ['next', next]]))).toBe('Create a module and test it')
   })
 })
 

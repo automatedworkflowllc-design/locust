@@ -5,10 +5,14 @@
 // Colin, 2026-09-06: "there needs to be an 'auto' option if possible for some
 // models to allow them to work out of the workspace folder if desired by the
 // user". The claim this drive has to settle is not that a flag is in the argv
-// -- the unit tests own that -- but that a person can turn it on, pick it, and
-// have a run write a file OUTSIDE the workspace folder, which every other mode
-// refuses. So the proof is a file on disk in a directory the mission was never
-// given, and the control is the same prompt with the switch off.
+// -- the unit tests own that -- but that a person can pick it and have a run
+// write a file OUTSIDE the workspace folder, which every other mode refuses.
+// So the proof is a file on disk in a directory the mission was never given,
+// and the control is the same prompt under Accept edits.
+//
+// Since 0.35.2 Auto is ALWAYS in the menu and picking it is what switches it
+// on (Colin: "we want the user experience to be fluid"), so this also checks
+// that Settings still shows the state and can take it back.
 //
 // Spends two short runs on Claude Code / sonnet: the one runtime measured to
 // take a "write here" instruction literally in both directions.
@@ -68,7 +72,7 @@ const modeMenuScript = `(async () => {
 })()`
 
 try {
-  await drive.capture('launch, and the mode menu with Auto switched off', async () => {
+  await drive.capture('launch: Auto is in the menu even with the workspace switch off', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren').click(); await new Promise(r => setTimeout(r, 500)) })()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))
@@ -88,7 +92,7 @@ try {
       (await drive.evaluate(`(document.querySelector('.lc-thread')?.innerText.replace(/[ \\t\\n]+/g, ' ').slice(-220) ?? '')`))
   })
 
-  await drive.capture('Settings: the Auto mode section, switched on', () => drive.evaluate(`(async () => {
+  await drive.capture('Settings still owns the switch, and still says what it permits', () => drive.evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
     await new Promise(r => setTimeout(r, 900))
     const heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => /Auto mode/.test(h.textContent))
@@ -103,7 +107,7 @@ try {
     return 'before: ' + before + ' || after: ' + section.innerText.replace(/[ \\t\\n]+/g, ' ').slice(0, 200)
   })()`))
 
-  await drive.capture('Vale, who has no history: Auto is offered now, and picked', async () => {
+  await drive.capture('Vale, who has no history: Auto picked from the menu', async () => {
     await drive.evaluate(`(async () => {
       document.querySelector('button[title="All missions (Ctrl 1)"]')?.click()
       await new Promise(r => setTimeout(r, 500))
@@ -135,7 +139,7 @@ try {
 
   await drive.capture('the header records what the run was allowed', () => drive.evaluate(`(document.querySelector('.lc-workroom__header')?.innerText.replace(/[ \\t\\n]+/g, ' ').slice(0, 200) ?? '')`))
 
-  await drive.capture('switched off again: Auto leaves the menu and the composer moves off it', () => drive.evaluate(`(async () => {
+  await drive.capture('switched off in Settings: the composer moves off Auto, and Auto stays offered', () => drive.evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
     await new Promise(r => setTimeout(r, 900))
     const heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => /Auto mode/.test(h.textContent))

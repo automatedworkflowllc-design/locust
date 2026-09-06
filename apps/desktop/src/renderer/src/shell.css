@@ -2380,6 +2380,36 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* A folder name is no shorter than a model id -- a scratch workspace is
+   `locust-drive-relay-ws-j4Nz3T` -- and it broke the same row the same way
+   (Colin, 2026-09-06: "maybe got to auto shorten file text as well"). Wider
+   than the model's allowance because a folder name is what a person navigates
+   by; the chip's tooltip carries the whole path either way. */
+.lc-control__folder {
+  display: inline-block;
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* A model id can be far longer than the chip that names it -- OpenCode's free
+   one is `opencode/muse-spark-1.3-contributor-free` -- and the controls row
+   was wrapping to a second line to fit it, which reads as the bar breaking
+   rather than as a long name (Colin, 2026-09-06: "so long in txt it collapses
+   below"). The name gives way instead; the chip's tooltip carries it whole,
+   and the row's `flex-wrap` stays as the backstop for a genuinely narrow
+   window. */
+.lc-control__model {
+  display: inline-block;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 .lc-separator {
   color: var(--lc-text-faint);
 }
