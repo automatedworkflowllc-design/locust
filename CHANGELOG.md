@@ -6,6 +6,43 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.36.0 — 2026-09-06
+
+A sidebar you can fold, a place for automations, and eight fixes from an
+outside review.
+
+- **The sidebar folds.** Teammates and Automations are sections with a
+  count and a chevron, and the whole heading is the button. Missions
+  appears when there are conversations no teammate owns, and says just
+  "Missions". Every conversation is still one click away under its
+  teammate.
+- **Automations.** Every routine in one place, scheduled ones first,
+  with its teammate, steps, runs and next run. The section stays on the
+  sidebar even when it is empty, so the capability is visible before you
+  have used it.
+- **Settings toggles are switches**, the same control the Memory screen
+  has always had.
+- **How full the model's context is**, as a small ring beside the route.
+  Hovering says it in words. It is drawn only where the runtime reports
+  its own window size, so nothing is measured against a guess.
+- **Real model names.** Claude Code takes an alias -- sonnet, opus,
+  fable -- and only its result says which model that meant. The picker
+  now learns from there, so a route reads "Sonnet · claude-sonnet-5"
+  after its first run.
+
+Fixed, from a review that ran the app rather than reading it:
+
+- **Memory's "Open the conversation" opened nothing**, every time.
+- **A handoff could take its title from your own words** when they
+  happened to contain a sentence the app writes into its briefings.
+- **The activity fold counted the wrong things.** A model's own to-do
+  list counted as a changed file; a deleted file counted as none.
+- **A scheduled routine that could not start failed silently** and kept
+  failing. It now says which one, why, and when it will try again.
+- **A long name no longer wraps the controls row** at any window size.
+- **A borrowed route says what it may do.** A teammate replying on
+  someone else's route never inherits Auto, and now says so.
+
 ## 0.35.2 — 2026-09-06
 
 From a targeted QA pass on 0.35.0, and one thing Colin saw on the bar.
