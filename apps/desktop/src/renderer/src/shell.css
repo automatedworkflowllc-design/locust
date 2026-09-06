@@ -4534,6 +4534,23 @@ textarea {
   background: var(--lc-bg-selected);
 }
 
+.lc-context__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* The reason a thing cannot be done, under the thing. Muted and small: it is
+   an explanation, not a second control. */
+.lc-context__why {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  white-space: normal;
+  max-width: 30ch;
+  line-height: 1.35;
+}
+
 .lc-context__item:disabled {
   color: var(--lc-text-muted);
   cursor: default;

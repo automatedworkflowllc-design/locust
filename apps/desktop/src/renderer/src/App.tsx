@@ -507,6 +507,23 @@ export default function App(): ReactElement {
     const live = [...runsRef.current.values()].some(
       (run) => liveRunIsActive(run) && run.data?.missionId === missionId
     )
+    // A run that is still STARTING has no mission id -- the host has not
+    // answered with one -- so the sidebar lists it under its PENDING KEY
+    // instead, deliberately, "so the teammate reads as working from the first
+    // moment". Right-clicking that row and pressing Delete therefore sent a
+    // key like `pending:3` to the host, which answered, correctly and
+    // uselessly, "That mission does not exist" -- in a strip at the bottom of
+    // the screen, far from the menu that was clicked. It read as the menu
+    // doing nothing at all: Colin's third report of delete not working
+    // (2026-09-06), reproduced by `_tools/drive-mission-menu.mjs` pressing it
+    // and watching the row stay put.
+    //
+    // There is nothing to delete or hand over yet, so neither is offered, and
+    // the row says which of the two it is rather than failing afterwards.
+    const stillStarting = missionId.startsWith('pending:')
+    const notYet = stillStarting
+      ? 'This conversation is still starting. It can be changed once its first receipt lands.'
+      : undefined
     const title = sidebarMissionsRef.current.find((row) => row.missionId === missionId)?.title ?? 'Mission'
     setRowMenuArmed(undefined)
     setRowMenu({
@@ -523,7 +540,7 @@ export default function App(): ReactElement {
           .slice(0, 6)
           .map((teammate) => ({
             label: `Assign to ${teammate.name}`,
-            disabledReason: live ? 'Wait for the run to finish before handing it over.' : undefined,
+            disabledReason: notYet ?? (live ? 'Wait for the run to finish before handing it over.' : undefined),
             onSelect: () => assignMissionTo(missionId, teammate.teammateId)
           })),
         ...(teammatesRef.current.length > 6
@@ -540,7 +557,9 @@ export default function App(): ReactElement {
           // Only where there is something to replay: a conversation whose
           // turns were all written by the host has no words of the person's
           // in it, and one still running has not finished the work yet.
-          ...(live
+          ...(notYet !== undefined
+            ? { disabledReason: notYet }
+            : live
             ? { disabledReason: 'This mission is still running. It can be saved when it finishes.' }
             : routineDraftFor(missionId) === undefined
               ? { disabledReason: 'Nothing here was typed by you, so there are no steps to replay.' }
@@ -551,7 +570,11 @@ export default function App(): ReactElement {
           label: 'Delete',
           confirmLabel: 'Delete for good?',
           danger: true,
-          ...(live ? { disabledReason: 'This mission is still running. Stop it first.' } : {}),
+          ...(notYet !== undefined
+            ? { disabledReason: notYet }
+            : live
+              ? { disabledReason: 'This mission is still running. Stop it first.' }
+              : {}),
           // Every turn the row stands for. A sidebar row is a CONVERSATION --
           // `collapseConversations` folds its turns into one line titled by
           // the first -- so deleting the id under the cursor removed only the

@@ -98,7 +98,15 @@ export function ContextMenu({
               onClose()
             }}
           >
-            {armed ? item.confirmLabel : item.label}
+            <span className="lc-context__label">{armed ? item.confirmLabel : item.label}</span>
+            {/*
+              * Said out loud, not left in a tooltip. A greyed item whose
+              * reason only appears on hover is indistinguishable from a
+              * broken one -- which is exactly how it was reported.
+              */}
+            {item.disabledReason !== undefined && (
+              <span className="lc-context__why">{item.disabledReason}</span>
+            )}
           </button>
         )
       })}

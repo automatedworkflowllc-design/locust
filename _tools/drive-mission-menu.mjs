@@ -72,15 +72,20 @@ try {
   })
 
   await drive.capture('press Assign to Gem, and see whether the owner moves', () => drive.evaluate(`(async () => {
-    const before = [...document.querySelectorAll('.lc-teammate')].map(r => r.innerText.split(String.fromCharCode(10))[0]).join(',')
-    const assign = [...document.querySelectorAll('.lc-context__item')].find(b => /^Assign to Gem/.test(b.innerText.trim()))
-    if (assign === undefined) return 'NO ASSIGN ITEM IN THE MENU'
+    const rowsUnder = (name) => {
+      const card = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + name).test(r.innerText.trim()))
+      return card === null || card === undefined ? 0 : card.querySelectorAll('.lc-teammate__mission').length
+    }
+    const assign = [...document.querySelectorAll('.lc-context__item')].find(b => /^Assign to /.test(b.innerText.trim()))
+    if (assign === undefined) return 'NO ASSIGN ITEM AT ALL IN THE MENU'
     if (assign.disabled) return 'ASSIGN IS DISABLED: ' + (assign.title || 'no reason given')
+    const target = assign.innerText.trim().replace(/^Assign to /, '')
+    const before = rowsUnder(target)
     assign.click()
-    await new Promise(r => setTimeout(r, 1200))
-    const gemRow = [...document.querySelectorAll('.lc-teammate')].find(r => /^Gem/.test(r.innerText.trim()))
-    const gemHasIt = /READY|Reply with exactly/i.test(gemRow?.innerText ?? '')
-    return 'clicked. teammates before: ' + before + ' || Gem now shows the conversation: ' + gemHasIt
+    await new Promise(r => setTimeout(r, 1500))
+    const after = rowsUnder(target)
+    return 'pressed "' + assign.innerText.trim() + '" · conversations under ' + target + ': '
+      + before + ' -> ' + after + (after > before ? ' (MOVED)' : ' (DID NOT MOVE)')
   })()`))
 
   await drive.capture('right-click again and press Delete, twice for the confirm', () => drive.evaluate(`(async () => {
@@ -103,6 +108,65 @@ try {
     await new Promise(r => setTimeout(r, 1200))
     const rowsAfter = document.querySelectorAll('.lc-teammate__mission, .lc-row:not(.lc-row--button)').length
     return 'rows ' + rowsBefore + ' -> ' + rowsAfter + (rowsAfter < rowsBefore ? ' (deleted)' : ' (NOTHING WAS DELETED)')
+  })()`))
+  // The state Colin was actually in. His title bar read "1 running" while he
+  // was trying, and Assign and Delete are exactly the pair that carries a
+  // `disabledReason` when a run is live. Both work above, on a FINISHED
+  // conversation -- so this is the step that decides whether "isn't working"
+  // means broken or means silently disabled.
+  await drive.capture('right-click WHILE a run is going', async () => {
+    const { pickRouteScript } = await import('./drive-lib.mjs')
+    await drive.evaluate(`(async () => {
+      [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click()
+      await new Promise(r => setTimeout(r, 600))
+    })()`)
+    await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
+    // Long enough to still be running when the menu is opened, and sent
+    // WITHOUT waiting for it.
+    await drive.evaluate(`(async () => {
+      const field = document.querySelector('form.command-dock textarea')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+      setter.call(field, 'Write a 60-line poem about locusts into a file named LONG.txt, then reply with DONE.')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(r => setTimeout(r, 200))
+      field.form.requestSubmit()
+      await new Promise(r => setTimeout(r, 3000))
+      return 'sent'
+    })()`)
+    return drive.evaluate(`(async () => {
+      const running = [...document.querySelectorAll('.lc-teammate')].some(r => !/idle/.test(r.innerText))
+      const row = document.querySelector('.lc-teammate__mission, .lc-row:not(.lc-row--button)')
+      if (row === null) return 'no conversation row while running'
+      const box = row.getBoundingClientRect()
+      row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: Math.round(box.left + 20), clientY: Math.round(box.top + 10) }))
+      await new Promise(r => setTimeout(r, 600))
+      const items = [...document.querySelectorAll('.lc-context__item')]
+      if (items.length === 0) return 'a run is going and the menu did not open at all'
+      return 'something running: ' + running + ' || '
+        + items.map(b => b.innerText.trim() + (b.disabled ? ' [DISABLED, reason only in a tooltip: "' + (b.title || 'none given') + '"]' : '')).join(' | ')
+    })()`)
+  })
+
+  // The menu let both through while the run was live, so the only question
+  // left is what pressing them DOES. A control that is offered and then does
+  // nothing is exactly what "isn't working" describes.
+  await drive.capture('press Delete on a conversation that is still running', () => drive.evaluate(`(async () => {
+    const count = () => document.querySelectorAll('.lc-teammate__mission, .lc-row:not(.lc-row--button)').length
+    const del = [...document.querySelectorAll('.lc-context__item')].find(b => /^Delete/.test(b.innerText.trim()))
+    if (del === undefined) return 'no Delete item -- the menu may have closed'
+    if (del.disabled) return 'Delete IS disabled while running: ' + (del.title || 'no reason given')
+    const before = count()
+    del.click()
+    await new Promise(r => setTimeout(r, 400))
+    const armed = [...document.querySelectorAll('.lc-context__item')].find(b => /Delete for good/.test(b.innerText))
+    if (armed === undefined) return 'first press did not arm the confirm'
+    armed.click()
+    await new Promise(r => setTimeout(r, 2500))
+    const after = count()
+    const stillRunning = [...document.querySelectorAll('.lc-teammate')].some(r => !/idle/.test(r.innerText))
+    return 'rows ' + before + ' -> ' + after
+      + (after < before ? ' (deleted)' : ' (STILL THERE -- pressed and nothing happened)')
+      + ' · a run is still going: ' + stillRunning
   })()`))
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
