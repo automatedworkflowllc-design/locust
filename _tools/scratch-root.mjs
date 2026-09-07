@@ -36,9 +36,9 @@
 // root that depends on which runtime you picked is the kind of thing that is
 // true until someone changes a route.
 
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, sep } from 'node:path'
+import { join } from 'node:path'
 
 /**
  * Outside AppData, and outside the repository.
@@ -104,3 +104,38 @@ if (hidden !== undefined) {
       `     not allowed to. Set LOCUST_SCRATCH to a path outside that rule.\n`
   )
 }
+
+/**
+ * Throw away scratch left by earlier runs.
+ *
+ * Moving off tmpdir() lost something that was never noticed: Windows clears
+ * its temp folder, and nothing clears this one. Drives delete their profile
+ * and deliberately KEEP their workspace, so a folder in the user's Documents
+ * would otherwise grow one directory per run forever.
+ *
+ * Two days, so a run being inspected this morning is still there this
+ * afternoon, and only entries this harness made: the prefix is required, the
+ * entry must be a directory, and it must sit directly in the root. Anything
+ * a person put here by hand is not touched.
+ */
+function pruneOldScratch(days = 2) {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+  let entries
+  try {
+    entries = readdirSync(SCRATCH_ROOT, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith('locust-')) continue
+    const path = join(SCRATCH_ROOT, entry.name)
+    try {
+      if (statSync(path).mtimeMs > cutoff) continue
+      rmSync(path, { recursive: true, force: true })
+    } catch {
+      // In use, or gone already. Neither is worth interrupting a run for.
+    }
+  }
+}
+
+pruneOldScratch()
