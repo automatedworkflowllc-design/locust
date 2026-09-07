@@ -644,8 +644,16 @@ export function createClaudeEventNormalizer(
         return [
           emit("run.failed", {
             kind: "process-failed",
-            message:
-              sawResult
+            // The host stopped this, not the runtime: a single line of
+            // output went past the 256 KB cap in process-runner.ts and the
+            // process was killed. Checked FIRST because nothing the runtime
+            // said afterwards describes it better, and because saying
+            // "ended without a terminal result record" for a kill we
+            // performed is the vaguest possible account of the one thing we
+            // know for certain.
+            message: completion.outputLimitExceeded
+              ? "Claude Code sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
+              : sawResult
                 ? `Claude Code exited with code ${String(completion.exitCode)}.`
                 : "Claude Code ended without a terminal result record.",
             ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),

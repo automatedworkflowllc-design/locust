@@ -582,3 +582,23 @@ describe("a still-allowed rate limit is a usage window", () => {
     expect((events[0]!.payload as { message: string }).message).toMatch(/5-hour window 35% used/);
   });
 });
+
+describe("a run the host stopped for output volume", () => {
+  // Locust caps a single line of runtime output at 256 KB and kills the
+  // process past it. Codex has said so since 0.38.4; the other adapters share
+  // the same runner and the same cap and said nothing, so an outside tester
+  // forcing a huge output concluded "Locust did not name a 256 KB cap"
+  // (2026-09-07). Saying "ended without a terminal result record" for a kill
+  // we performed is the vaguest possible account of the one thing we know.
+  it("says so instead of reporting a missing result record", () => {
+    const target = normalizer();
+    const events = target.finish(
+      completion({ exitCode: null, signal: "SIGINT", outputLimitExceeded: true }),
+    );
+    const failed = events.find((entry) => entry.type === "run.failed")?.payload as
+      | { readonly message: string }
+      | undefined;
+    expect(failed?.message).toContain("larger than Locust accepts");
+    expect(failed?.message).not.toContain("without a terminal result record");
+  });
+});
