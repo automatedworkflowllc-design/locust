@@ -22,6 +22,13 @@ const PROBE_TIMEOUT_MS = 20_000
 /** How long a successful read stays good. Models change on release, not hourly. */
 const CACHE_MS = 10 * 60 * 1000
 const MAX_MODELS = 40
+/**
+ * The route a fresh profile starts on, before any model is chosen.
+ *
+ * Stated here rather than imported: the main process does not reach into
+ * the renderer, and this id is protocol-level either way.
+ */
+const ACCOUNT_DEFAULT_MODEL = 'account-default'
 
 export interface ModelCatalogOptions {
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
@@ -66,6 +73,42 @@ export function parseModels(result: unknown): readonly PublicModel[] {
     })
   }
   return models
+}
+
+/**
+ * The account default, as a row you can actually select.
+ *
+ * It is the route a fresh profile starts on, and it was the only route in the
+ * app that named a model no list contained -- so the picker drew no ACTIVE row
+ * for it, and the effort levels, which hang off that row, had nowhere to go.
+ *
+ * The levels offered are the ones EVERY listed model agrees on. An
+ * intersection rather than a union, because the account decides which model
+ * answers, and a level only some of them accept would be a control that
+ * silently does nothing. Effort itself is safe to offer here: it travels as
+ * `-c model_reasoning_effort=...`, not with `--model`.
+ *
+ * Undefined when nothing was listed -- then there is no honest claim to make
+ * about what the account supports, and the picker is right to stay quiet.
+ */
+export function accountDefaultModel(
+  models: readonly PublicModel[]
+): PublicModel | undefined {
+  const listed = models.filter((model) => model.id !== ACCOUNT_DEFAULT_MODEL)
+  if (listed.length === 0) return undefined
+  const shared = listed
+    .map((model) => model.supportedEfforts)
+    .reduce<readonly string[]>(
+      (kept, efforts) => kept.filter((effort) => efforts.includes(effort)),
+      listed[0]?.supportedEfforts ?? []
+    )
+  return {
+    id: ACCOUNT_DEFAULT_MODEL,
+    runtime: 'codex',
+    displayName: 'Account default',
+    description: 'Whatever model your account uses. The effort levels below apply to all of them.',
+    supportedEfforts: shared
+  }
 }
 
 /**
@@ -271,7 +314,16 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       await client.request('initialize', { clientInfo: { name: 'locust', version: '0.1.0' } })
       client.notify('initialized')
       const result = await client.request('model/list', {})
-      const models = [...parseModels(result), ...advertisedModels]
+      const codexModels = parseModels(result)
+      // The route a fresh profile starts on gets a row of its own, first,
+      // so the picker has something to mark ACTIVE and the effort levels
+      // have somewhere to hang.
+      const accountDefault = accountDefaultModel(codexModels)
+      const models = [
+        ...(accountDefault === undefined ? [] : [accountDefault]),
+        ...codexModels,
+        ...advertisedModels
+      ]
       if (models.length === 0) {
         return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'No models were reported.' } }
       }

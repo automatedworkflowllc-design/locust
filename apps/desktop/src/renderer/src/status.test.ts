@@ -897,3 +897,38 @@ describe('who the composer addresses when a conversation is opened', () => {
     expect(ownerToSelect('mission_nobody', owners, undefined)).toBeUndefined()
   })
 })
+
+describe('the route you are on sorts first in its group', () => {
+  // "account-default" is neither recently used nor a flagship name, so it fell
+  // into the bottom band -- below six models and behind a "1 more model · type
+  // to search them" line -- which is where a new person's own route was
+  // hiding. The row the composer points at is the last thing that should need
+  // finding.
+  const row = (key: string, tag?: string): { key: string; group: string; model: string; tag?: string } => ({
+    key,
+    group: 'CODEX CLI',
+    model: key,
+    ...(tag === undefined ? {} : { tag })
+  })
+
+  it('puts the active row above flagships and everything else', () => {
+    const ordered = orderRouteRows(
+      [row('gpt-6-astra'), row('gpt-5.6-sol'), row('account-default', 'ACTIVE')],
+      []
+    )
+    expect(ordered[0]?.key).toBe('account-default')
+  })
+
+  it('still beats a recently used row, because it is the one in use now', () => {
+    const ordered = orderRouteRows(
+      [row('gpt-5.6-sol'), row('account-default', 'ACTIVE')],
+      ['gpt-5.6-sol']
+    )
+    expect(ordered[0]?.key).toBe('account-default')
+  })
+
+  it('leaves the order alone when nothing is active', () => {
+    const ordered = orderRouteRows([row('gpt-6-astra'), row('gpt-5.6-sol')], ['gpt-5.6-sol'])
+    expect(ordered[0]?.key).toBe('gpt-5.6-sol')
+  })
+})

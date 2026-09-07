@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 
+import type { PublicModel } from '../shared/ipc.js'
+
 import {
+  accountDefaultModel,
   claudeModelsFrom,
   createModelCatalog,
   cursorModelsFrom,
@@ -119,7 +122,10 @@ describe('the catalog probe', () => {
     const response = await catalog.read()
 
     expect(response.ok).toBe(true)
-    expect(response.ok && response.data.models).toHaveLength(2)
+    // Two from the protocol, plus the account-default row the picker needs
+    // in order to have an ACTIVE row for the route a fresh profile is on.
+    expect(response.ok && response.data.models).toHaveLength(3)
+    expect(response.ok && response.data.models[0]?.id).toBe('account-default')
     // This probe exists to answer one question; leaving a server running would
     // be a background process the user never asked for.
     expect(server.killCount()).toBeGreaterThan(0)
@@ -279,5 +285,51 @@ describe('Claude models from what its CLI advertised', () => {
     expect(response.ok).toBe(true)
     if (!response.ok) return
     expect(response.data.models.map((model) => `${model.runtime}:${model.id}`)).toEqual(['claude:opus'])
+  })
+})
+
+describe('the account default is a row you can select', () => {
+  // It is the route a fresh profile starts on, and it was the only route in
+  // the app naming a model no list contained -- so the picker drew no ACTIVE
+  // row, and the effort chips that hang off that row had nowhere to attach.
+  // With the composer's effort chip removed in the same design pass, a new
+  // person had no way to choose effort at all.
+  const model = (id: string, supportedEfforts: readonly string[]): PublicModel => ({
+    id,
+    runtime: 'codex',
+    displayName: id,
+    description: '',
+    supportedEfforts
+  })
+
+  it('offers only the levels every listed model agrees on', () => {
+    // A union would draw a control that silently does nothing whenever the
+    // account resolves to a model that does not accept the level.
+    expect(
+      accountDefaultModel([
+        model('gpt-6-astra', ['low', 'medium', 'high', 'ultra']),
+        model('gpt-5.6-sol', ['low', 'medium', 'high']),
+        model('gpt-5.4-mini', ['low', 'high'])
+      ])?.supportedEfforts
+    ).toEqual(['low', 'high'])
+  })
+
+  it('reports none rather than guessing when the models share nothing', () => {
+    expect(
+      accountDefaultModel([model('a', ['low']), model('b', ['high'])])?.supportedEfforts
+    ).toEqual([])
+  })
+
+  it('stays quiet when nothing was listed: there is no honest claim to make', () => {
+    expect(accountDefaultModel([])).toBeUndefined()
+  })
+
+  it('never counts a previous account-default row as evidence about itself', () => {
+    expect(accountDefaultModel([model('account-default', ['low', 'high'])])).toBeUndefined()
+  })
+
+  it('is named for what it is, and sits under codex', () => {
+    const row = accountDefaultModel([model('gpt-5.6-sol', ['low'])])
+    expect(row).toMatchObject({ id: 'account-default', runtime: 'codex', displayName: 'Account default' })
   })
 })

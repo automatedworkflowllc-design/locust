@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.5 — 2026-09-07
+
+Effort on the route you actually start on. 0.38.4 put the control back but
+only on routes that name a model; this is the one that fixes a fresh install.
+
+- **The account default is a row you can select.** It is the route a new
+  profile starts on, and it was the only route in the app naming a model no
+  list contained -- so the picker had no ACTIVE row for it, and the effort
+  levels, which sit under that row, had nothing to attach to. It now appears
+  as **Account default**, carrying the levels every model on your account
+  agrees on. An intersection, not a union: a level only some models accept
+  would be a control that silently does nothing.
+- **The route you are on is the first row in its group.** It sorted by the
+  same rules as everything else, so a route that is neither recently used nor
+  a famous name sank below six models and behind a "1 more model · type to
+  search them" line. The row the composer points at should never need finding.
+
 ## 0.38.4 — 2026-09-07
 
 The effort control, which 0.38.1 removed and did not replace.

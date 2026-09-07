@@ -823,7 +823,14 @@ export function recentRouteRows<TRow extends { readonly key: string; readonly gr
   return picked
 }
 
-export function orderRouteRows<TRow extends { readonly key: string; readonly group: string; readonly model?: string }>(
+export function orderRouteRows<
+  TRow extends {
+    readonly key: string
+    readonly group: string
+    readonly model?: string
+    readonly tag?: string
+  }
+>(
   rows: readonly TRow[],
   recent: readonly string[]
 ): readonly TRow[] {
@@ -831,6 +838,12 @@ export function orderRouteRows<TRow extends { readonly key: string; readonly gro
   const groups: string[] = []
   for (const row of rows) if (!groups.includes(row.group)) groups.push(row.group)
   const score = (row: TRow): number => {
+    // The route you are ON sorts first in its group. It used to sort by the
+    // same rules as everything else, so "account-default" -- not recently
+    // used and not a flagship name -- fell into the bottom band, below six
+    // models and behind a "1 more model · type to search them" line. The row
+    // the composer is pointing at is the last thing that should need finding.
+    if (row.tag === 'ACTIVE') return -1
     const used = rank.get(row.key)
     if (used !== undefined) return used
     const flagship = flagshipRank(row.model ?? row.key)
