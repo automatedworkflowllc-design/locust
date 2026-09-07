@@ -340,11 +340,21 @@ export function createOpenCodeEventNormalizer(
         return [
           emit("run.failed", {
             kind: "process-failed",
+            // Order matters. The confined-workspace refusal stays first: it
+            // names the path the run wanted and could not have, which tells a
+            // person more about their own mission than the cap does. The cap
+            // comes next, because past that point the HOST ended the run and
+            // nothing the runtime said afterwards describes it better --
+            // saying "ended without a step that reported it had stopped" for
+            // a kill we performed is the vaguest possible account of the one
+            // thing we know for certain.
             message: refusedPath !== undefined && refusedPath.length > 0
               ? `OpenCode asked for ${refusedPath}, which is outside the folder this run may use, and stopped.`
-              : sawStop
-                ? `OpenCode exited with code ${String(completion.exitCode)}.`
-                : "OpenCode ended without a step that reported it had stopped.",
+              : completion.outputLimitExceeded
+                ? "OpenCode sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
+                : sawStop
+                  ? `OpenCode exited with code ${String(completion.exitCode)}.`
+                  : "OpenCode ended without a step that reported it had stopped.",
             ...thread,
             runtimeTerminal: sawStop ? "completed" : "missing",
             process,

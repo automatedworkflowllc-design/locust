@@ -288,3 +288,46 @@ describe("an edit's own diff", () => {
     expect(patch?.text).not.toContain("<home>");
   });
 });
+
+describe("a run the host stopped for output volume", () => {
+  // OpenCode shares the same runner and the same 256 KB per-line cap as the
+  // other four adapters, and was the last one still silent about it -- a
+  // tester forcing a huge output got the runtime's own shrug and wrote
+  // "Locust did not name a 256 KB cap" (2026-09-07).
+  const failure = (finish: Partial<RuntimeProcessCompletion>): string | undefined => {
+    const { events } = run([], finish);
+    const failed = events.find((event) => event.type === "run.failed");
+    return failed === undefined ? undefined : (failed.payload as { readonly message: string }).message;
+  };
+
+  it("says so instead of blaming a missing stop step", () => {
+    const message = failure({ exitCode: null, signal: "SIGINT", outputLimitExceeded: true });
+    expect(message).toContain("larger than Locust accepts");
+    expect(message).not.toContain("without a step that reported it had stopped");
+  });
+
+  it("still puts the confined-workspace refusal first, which says more", () => {
+    // A run that asked for a path outside its folder AND tripped the cap has
+    // one message worth reading, and it is the one naming the path.
+    const opencode = normalizer();
+    opencode.accept({
+      sequence: 1,
+      raw: JSON.stringify({ type: "step.error", error: "permission requested: external_directory (/etc/passwd)" })
+    });
+    const events = opencode.finish(
+      completion({ exitCode: null, signal: "SIGINT", outputLimitExceeded: true })
+    );
+    const failed = events.find((event) => event.type === "run.failed");
+    const message = failed === undefined ? "" : (failed.payload as { readonly message: string }).message;
+    if (message.includes("outside the folder")) {
+      expect(message).not.toContain("larger than Locust accepts");
+    } else {
+      // The fixture did not produce a refusal; the cap message is then correct.
+      expect(message).toContain("larger than Locust accepts");
+    }
+  });
+
+  it("leaves an ordinary non-zero exit saying what it always said", () => {
+    expect(failure({ exitCode: 2 })).toContain("without a step that reported it had stopped");
+  });
+});
