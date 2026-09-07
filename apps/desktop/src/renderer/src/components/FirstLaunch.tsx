@@ -222,7 +222,11 @@ export function FirstLaunch({
                     // green dot (Colin, 2026-09-07: "antigravity listed as
                     // get it, pretty sure we have it"). A row cannot say
                     // connected and not-installed at the same time.
-                    runtime.version === undefined ? (
+                    runtime.version === undefined || runtime.version === null ? (
+                      // `version` is `string | null`, so `=== undefined` alone
+                      // never fired and a connected runtime with no version
+                      // drew an empty slot instead of its caveat -- on
+                      // Antigravity, the runtime this branch exists for.
                       <span className="lc-runtimecell__tag">{status.tag}</span>
                     ) : (
                       <span className="lc-runtimecell__version">{shortVersion(runtime.version)}</span>
@@ -240,6 +244,13 @@ export function FirstLaunch({
                     // it is done on its own -- discovery re-runs and the dot
                     // goes green.
                     <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
+                  ) : runtime.installed ? (
+                    // Installed, but not answering yet. CHECKING is a moment,
+                    // not a verdict -- Claude Code's first probe can outlast
+                    // the window on a cold start -- and offering to install
+                    // what is already installed is the contradiction 0.38.6
+                    // fixed for connected runtimes and missed for this one.
+                    <span className="lc-runtimecell__tag">{status.tag}</span>
                   ) : installCommand(runtime.id) !== undefined && onInstall !== undefined ? (
                     <button
                       type="button"

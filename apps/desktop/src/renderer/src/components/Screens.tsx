@@ -689,6 +689,8 @@ export function SettingsScreen({
   relay,
   onRelayChange,
   autoMode,
+  swarm,
+  onSwarmChange,
   onAutoModeChange,
   relayHopCap,
   onRelayHopCapChange,
@@ -730,6 +732,9 @@ export function SettingsScreen({
   readonly onRelayChange: (relay: boolean) => void
   /** Whether the Auto permission mode may be chosen at all. */
   readonly autoMode: boolean
+  /** Workspace-wide: every mission at its model's maximum effort. */
+  readonly swarm: boolean
+  readonly onSwarmChange: (swarm: boolean) => void
   readonly onAutoModeChange: (autoMode: boolean) => void
   /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
   readonly relayHopCap: number
@@ -933,6 +938,44 @@ export function SettingsScreen({
         </section>
 
         <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Swarm</h2>
+          <p className="lc-settings__lede">
+            {swarm
+              ? 'On. Every mission runs at its model\u2019s maximum effort.'
+              : 'Off. Each mission runs at the effort its route is set to.'}
+          </p>
+          <More>
+            <p>
+              Swarm is a statement about every mission rather than about one of them: while it is on, each
+              run is given the highest effort the model it lands on reports, and the effort control says who
+              is holding it. A model that reports no levels is unaffected -- there is nothing to raise.
+            </p>
+            <p>
+              The mark on the composer is the same switch seen from the other side. It is the glance; this
+              is the record, and the way to take it back from a screen that has no composer on it -- which
+              is every screen but the workroom, and the workroom itself while a mission is running.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                {swarm
+                  ? 'On. Every mission runs at its model\u2019s maximum.'
+                  : 'Off. The mark on the composer switches it back on.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-switch${swarm ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={swarm}
+                aria-label={swarm ? 'Switch this off' : 'Switch this on'}
+                onClick={() => onSwarmChange(!swarm)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+          </div>
+
           <h2 className="lc-settings__heading">Auto mode</h2>
           <p className="lc-settings__lede">
             {autoMode

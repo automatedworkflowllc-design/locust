@@ -399,26 +399,6 @@ export function swarmEffortFor(
   return chosen ?? defaultEffort(supported)
 }
 
-/**
- * Which model a mission actually starts on.
- *
- * Some runtimes take an effort as a flag; Cursor encodes it in the model id
- * instead, and lists every combination as its own model. The picker shows one
- * row per model and lets the effort control choose among them, so the effort
- * has to be turned back into the id it names -- sending the family's default
- * with an effort beside it would quietly run a different model than the one
- * on screen.
- */
-export function chosenModelId(
-  models: readonly PublicModel[],
-  modelId: string,
-  effort: string | undefined
-): string {
-  if (effort === undefined) return modelId
-  const variants = models.find((model) => model.id === modelId)?.variants
-  return variants?.[effort] ?? modelId
-}
-
 function missionTitle(prompt: string): string {
   const trimmed = prompt.trim().split('\n')[0] ?? prompt
   return trimmed.length > 44 ? `${trimmed.slice(0, 44).trimEnd()}…` : trimmed
@@ -2708,6 +2688,16 @@ export default function App(): ReactElement {
               onCheckUpdate={checkUpdate}
               onInstallUpdate={installUpdate}
               relay={relay}
+              swarm={swarm}
+              onSwarmChange={(next) => {
+                // The same write the composer mark performs: optimistic, then
+                // reconciled with what the store actually saved.
+                setSwarm(next)
+                void window.desktop
+                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode })
+                  .then((settings) => setSwarm(settings.swarm === true))
+                  .catch(() => setSwarm(!next))
+              }}
               autoMode={autoMode}
               onAutoModeChange={(next) => {
                 setAutoMode(next)
@@ -3179,6 +3169,24 @@ export default function App(): ReactElement {
                 group: 'Go to',
                 label: 'Workroom',
                 run: () => setScreen('workroom')
+              },
+              {
+                id: 'toggle-swarm',
+                group: 'Workspace',
+                label: swarm ? 'Turn swarm off' : 'Turn swarm on',
+                hint: 'every mission at its model maximum',
+                run: () => {
+                  // Same write as the composer mark, which is the only other
+                  // way in -- and it only exists on the workroom, and is
+                  // disabled while a mission runs. A workspace-wide setting
+                  // needs one way in from anywhere.
+                  const next = !swarm
+                  setSwarm(next)
+                  void window.desktop
+                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode })
+                    .then((settings) => setSwarm(settings.swarm === true))
+                    .catch(() => setSwarm(!next))
+                }
               },
               { id: 'go-missions', group: 'Go to', label: 'Missions', hint: 'Ctrl 1', run: () => setScreen('missions') },
               { id: 'go-rooms', group: 'Go to', label: 'Rooms', hint: 'Ctrl 4', run: () => setScreen('rooms') },

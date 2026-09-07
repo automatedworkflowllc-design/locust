@@ -13,8 +13,6 @@ export interface RouteChoice {
 }
 
 interface RouteRow {
-  /** The levels this model reports, for the chosen row's effort control. */
-  readonly efforts?: readonly string[]
   readonly key: string
   readonly group: string
   readonly runtime: MissionRuntimeId
@@ -75,7 +73,6 @@ function buildRows(
               detail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`,
               // Carried so the chosen row can offer them; the detail line
               // above still NAMES them for every row.
-              efforts: model.supportedEfforts
             }
           })
         : // The catalogue could not be read for this runtime, so there is one
@@ -83,7 +80,7 @@ function buildRows(
           // the catalogue labels it -- a person reading a lowercase
           // `account-default` on the only ACTIVE row is reading a placeholder
           // that leaked (outside review, 2026-09-07).
-          [{ model: 'account-default', label: 'Account default', detail: status.detail, efforts: [] }]
+          [{ model: 'account-default', label: 'Account default', detail: status.detail }]
 
     for (const entry of entries) {
       const isActive = runtime.id === active.runtime && entry.model === active.model
@@ -99,7 +96,6 @@ function buildRows(
         // named -- which is exactly what happened first (drive, 2026-09-06:
         // the row's own detail said "5 effort levels" while the control
         // under it drew none).
-        efforts: entry.efforts,
         tag: routeRowTag(status, isActive),
         selectable: status.selectable
       })
