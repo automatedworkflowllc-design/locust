@@ -104,6 +104,27 @@ try {
       ? 'STILL WRONG: a packaged build calls itself a development build'
       : 'the packaged build does not call itself a development build'
   )
+
+  // Finding 8: "Cold-start composer shows Codex CLI / account-default while
+  // the page is selling OpenCode." Read on a profile that has never chosen a
+  // route, so this is the default and not something remembered.
+  const route = await evaluate(`(async () => {
+    // Back out of Settings to the composer.
+    const back = [...document.querySelectorAll('button')].find((b) => /^(back|close|done)$/i.test((b.innerText ?? '').trim()))
+    if (back) back.click()
+    for (let i = 0; i < 30; i += 1) {
+      await new Promise((r) => setTimeout(r, 500))
+      const chip = document.querySelector('button[aria-haspopup=listbox]')
+      if (chip) return chip.innerText.split(String.fromCharCode(10)).map((t) => t.trim()).filter(Boolean).join(' ')
+      // A fresh profile may still be on first launch, which has no composer
+      // at all -- say which screen this is rather than reporting a bare
+      // absence as if the control were missing.
+      const heading = document.querySelector('h1, h2')
+      if (i === 29) return 'no route control; screen reads: ' + (heading ? heading.innerText.trim() : '(no heading)')
+    }
+    return 'no route control on screen'
+  })()`)
+  say(`cold-start route: ${JSON.stringify(route)}`)
   socket.close()
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
