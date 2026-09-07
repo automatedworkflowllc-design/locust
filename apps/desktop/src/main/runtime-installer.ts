@@ -38,6 +38,15 @@ export interface InstallFailure {
       readonly next: string
       /** Whether restarting Locust is the action, rather than re-running. */
       readonly restart?: boolean
+      /**
+       * The command to show, when it is NOT the one that just failed.
+       *
+       * A permission failure is the case this exists for: re-running the same
+       * `npm install -g` in a terminal fails identically, because the global
+       * prefix is what is unwritable. Left undefined, the screen keeps showing
+       * the command Locust ran, which is right for every other failure.
+       */
+      readonly command?: string
 }
 
 export type InstallOutcome = { readonly ok: true } | InstallFailure
@@ -92,6 +101,8 @@ export function classifyInstallFailure(input: {
   readonly code: number | null
   readonly output: string
   readonly seconds: number
+  /** Which shell the remedy has to be typed into. Defaults to this machine. */
+  readonly platform?: NodeJS.Platform
 }): InstallFailure {
   const { output } = input
   if (PROXY.test(output)) {
@@ -109,10 +120,17 @@ export function classifyInstallFailure(input: {
     }
   }
   if (PERMISSION.test(output)) {
+    // Point npm at a folder this user owns, then install. Re-running the
+    // failed command with more determination does not help: the global
+    // prefix is the thing that is unwritable, and an administrator shell
+    // would install it somewhere this user's PATH does not look anyway.
+    const windows = (input.platform ?? process.platform) === 'win32'
+    const prefix = windows ? '%LOCALAPPDATA%\\npm-global' : '~/.npm-global'
     return {
       ok: false,
       what: 'npm could not write to its global folder.',
-      next: 'Run the command below in a terminal with permission to install global packages.'
+      next: `Point npm at a folder you own and install again. Add ${prefix}${windows ? '' : '/bin'} to your PATH afterwards so Locust can find it.`,
+      command: `npm config set prefix "${prefix}"\nnpm install -g ${input.packageName}`
     }
   }
   if (PACKAGE.test(output)) {

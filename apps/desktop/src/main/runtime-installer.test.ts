@@ -158,3 +158,52 @@ describe('the six ways an install fails, each said in a person’s words', () =>
     }
   })
 })
+
+describe('a permission failure offers the remedy, not a re-run of itself', () => {
+  // The screen used to say "Run the command below in a terminal with
+  // permission to install global packages" and show `npm install -g <pkg>` --
+  // which fails identically in a terminal, because the problem is not the
+  // terminal, it is that npm's global prefix is not writable by this user. A
+  // first outside tester got out only by knowing to set a prefix themselves:
+  // "A new user who does not already know npm prefixes is stuck" (2026-09-07).
+  const eacces = (platform: NodeJS.Platform) =>
+    classifyInstallFailure({
+      packageName: 'opencode-ai',
+      displayName: 'OpenCode',
+      code: 243,
+      output: 'npm ERR! code EACCES\nnpm ERR! syscall mkdir',
+      seconds: 3,
+      platform
+    })
+
+  it('sets a prefix the user owns, then installs', () => {
+    const failure = eacces('linux')
+    expect(failure.command).toContain('npm config set prefix')
+    expect(failure.command).toContain('~/.npm-global')
+    expect(failure.command).toContain('npm install -g opencode-ai')
+  })
+
+  it('uses a Windows-shaped path on Windows', () => {
+    expect(eacces('win32').command).toContain('%LOCALAPPDATA%')
+  })
+
+  it('says to put it on PATH, because installing is only half of it', () => {
+    expect(eacces('linux').next).toMatch(/PATH/)
+  })
+
+  it('no longer tells them to re-run the thing that just failed', () => {
+    expect(eacces('linux').next).not.toMatch(/terminal with permission/i)
+  })
+
+  it('leaves every other failure showing the command Locust ran', () => {
+    const offline = classifyInstallFailure({
+      packageName: 'opencode-ai',
+      displayName: 'OpenCode',
+      code: 1,
+      output: 'npm ERR! network request to https://registry.npmjs.org failed, reason: getaddrinfo ENOTFOUND',
+      seconds: 2,
+      platform: 'linux'
+    })
+    expect(offline.command).toBeUndefined()
+  })
+})

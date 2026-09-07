@@ -259,6 +259,13 @@ export type RuntimeInstallResponse =
       readonly next: string
       /** Whether restarting Locust is the action, rather than running it again. */
       readonly restart?: boolean
+      /**
+       * The command to show INSTEAD of the one Locust ran, when the remedy is
+       * a different command. A permission failure is the case: re-running the
+       * same `npm install -g` fails identically, because the global prefix is
+       * what is unwritable.
+       */
+      readonly command?: string
     }
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'

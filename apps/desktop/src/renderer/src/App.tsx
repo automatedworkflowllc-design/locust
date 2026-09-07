@@ -815,7 +815,14 @@ export default function App(): ReactElement {
           what: response.what,
           next: response.next,
           ...(response.restart === true ? { restart: true } : {}),
-          ...(installCommand(runtime) === undefined ? {} : { command: installCommand(runtime)! })
+          // The failure's own command wins when it has one: a permission
+          // failure's remedy is not the command that just failed, and showing
+          // that one again is what left a first tester stuck (2026-09-07).
+          ...(response.command !== undefined
+            ? { command: response.command }
+            : installCommand(runtime) === undefined
+              ? {}
+              : { command: installCommand(runtime)! })
         })
       })
       .catch(() => {
