@@ -86,6 +86,7 @@ export function matchesFilter(
  * shipped as a dead control.
  */
 export function MissionsScreen({
+  workspaceId,
   missions,
   teammates,
   missionOwners,
@@ -94,6 +95,8 @@ export function MissionsScreen({
   onOpen
 }: {
   readonly missions: readonly PublicRecoveredMission[]
+  /** The folder this window is open on, so the header can say how many are its own. */
+  readonly workspaceId: string | undefined
   readonly teammates: readonly PublicTeammate[]
   readonly missionOwners: Readonly<Record<string, string>>
   /** The missions the host is running now; the ledger cannot know this. */
@@ -110,6 +113,15 @@ export function MissionsScreen({
   const [filter, setFilter] = useState<Filter>('All')
   const shown = missions.filter((mission) => matchesFilter(mission, filter, runningMissionIds))
   const withIssues = missions.filter((mission) => mission.integrityIssueCount > 0).length
+  // This screen is the whole ledger; the sidebar is only the folder you are
+  // in. Both are right and neither said so, so a tester counted 3 in one and
+  // 5 in the other and could not tell which to believe (2026-09-07). Said
+  // only when the two actually differ -- in one folder there is nothing to
+  // reconcile and the extra clause would be noise.
+  const elsewhere =
+    workspaceId === undefined
+      ? 0
+      : missions.filter((mission) => mission.workspaceId !== workspaceId).length
   // What the shown missions cost, in whatever units their receipts carry.
   // Runtimes that report nothing contribute nothing, and are counted as such
   // rather than as free.
@@ -121,7 +133,7 @@ export function MissionsScreen({
     <div className="lc-screen">
       <ScreenHeader
         title="Missions"
-        meta={`${missions.length} local · ${
+        meta={`${missions.length} local${elsewhere === 0 ? '' : `, ${missions.length - elsewhere} in this folder`} · ${
           withIssues === 0 ? 'ledger verified' : `${withIssues} with an incomplete receipt`
         }${total === undefined ? '' : ` · ${total} across ${priced} priced`}`}
       />

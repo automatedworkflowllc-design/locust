@@ -2587,6 +2587,7 @@ export default function App(): ReactElement {
           {screen === 'missions' ? (
             <MissionsScreen
               missions={history}
+              workspaceId={workspaceId}
               runningMissionIds={
                 new Set(
                   [...runs.values()]
