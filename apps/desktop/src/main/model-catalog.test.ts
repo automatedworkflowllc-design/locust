@@ -6,6 +6,7 @@ import type { PublicModel } from '../shared/ipc.js'
 
 import {
   accountDefaultModel,
+  withAccountDefaults,
   claudeModelsFrom,
   createModelCatalog,
   cursorModelsFrom,
@@ -284,7 +285,13 @@ describe('Claude models from what its CLI advertised', () => {
     const response = await catalog.read()
     expect(response.ok).toBe(true)
     if (!response.ok) return
-    expect(response.data.models.map((model) => `${model.runtime}:${model.id}`)).toEqual(['claude:opus'])
+    // Claude gets its own account-default row now, the way Codex always had
+    // one: `defaultRoute` can stamp `account-default` on whichever runtime is
+    // usable, and each one needs a row of its own to be the ACTIVE one.
+    expect(response.data.models.map((model) => `${model.runtime}:${model.id}`)).toEqual([
+      'claude:account-default',
+      'claude:opus'
+    ])
   })
 })
 
@@ -331,5 +338,54 @@ describe('the account default is a row you can select', () => {
   it('is named for what it is, and sits under codex', () => {
     const row = accountDefaultModel([model('gpt-5.6-sol', ['low'])])
     expect(row).toMatchObject({ id: 'account-default', runtime: 'codex', displayName: 'Account default' })
+  })
+})
+
+describe('every runtime that lists models gets an Account default row', () => {
+  // `account-default` is not a Codex idea -- codex-mission.ts calls it "the
+  // shell's word for send no --model" and every runtime honours it that way.
+  // Building the row for Codex alone meant that once discovery preferred
+  // OpenCode on a fresh machine, the route a new person landed on had no row
+  // again: a lowercase placeholder, no ACTIVE row, no effort. Caught by an
+  // independent review as an edge case (2026-09-07) and made the default case
+  // by the cold-start fix the same night.
+  const model = (
+    runtime: PublicModel['runtime'],
+    id: string,
+    supportedEfforts: readonly string[] = []
+  ): PublicModel => ({ id, runtime, displayName: id, description: '', supportedEfforts })
+
+  it('gives each runtime its own row, in front of that runtime’s models', () => {
+    const withDefaults = withAccountDefaults([
+      model('codex', 'gpt-5.6-sol', ['low', 'high']),
+      model('opencode', 'big-pickle'),
+      model('claude', 'sonnet', ['low', 'high'])
+    ])
+    expect(withDefaults.filter((row) => row.id === 'account-default').map((row) => row.runtime).sort()).toEqual([
+      'claude',
+      'codex',
+      'opencode'
+    ])
+  })
+
+  it('carries each runtime’s own intersection, not a shared one', () => {
+    const withDefaults = withAccountDefaults([
+      model('codex', 'a', ['low', 'medium', 'high']),
+      model('codex', 'b', ['low', 'high']),
+      model('claude', 'c', ['xhigh'])
+    ])
+    const forRuntime = (runtime: string): readonly string[] =>
+      withDefaults.find((row) => row.id === 'account-default' && row.runtime === runtime)?.supportedEfforts ?? []
+    expect(forRuntime('codex')).toEqual(['low', 'high'])
+    expect(forRuntime('claude')).toEqual(['xhigh'])
+  })
+
+  it('adds nothing for a runtime that listed nothing', () => {
+    expect(withAccountDefaults([]).length).toBe(0)
+  })
+
+  it('never stacks a second default on a list that already has one', () => {
+    const once = withAccountDefaults([model('codex', 'a', ['low'])])
+    expect(withAccountDefaults(once).filter((row) => row.id === 'account-default').length).toBe(1)
   })
 })

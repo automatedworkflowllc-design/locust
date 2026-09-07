@@ -86,12 +86,12 @@ try {
 
   // The exact needle the diff smoke types, then the variants that tell us
   // whether it is the dot, the space, or the cap line that loses the row.
-  for (const needle of ['composer 2.5', 'composer', 'composer 2 5', 'omposer 2.5']) {
+  for (const needle of ['account default']) {
     await drive.capture(`search: ${needle}`, () => drive.evaluate(searchReport(needle)))
   }
 
-  await drive.capture('and can it actually be picked', () =>
-    drive.evaluate(pickRouteScript({ group: '/cursor/i', search: 'composer 2.5', row: '/^composer 2.5/i' }))
+  await drive.capture('and Cursor’s can actually be picked', () =>
+    drive.evaluate(pickRouteScript({ group: '/cursor/i', search: 'account default', row: '/account default/i' }))
   )
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

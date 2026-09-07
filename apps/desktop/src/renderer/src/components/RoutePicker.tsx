@@ -78,7 +78,12 @@ function buildRows(
               efforts: model.supportedEfforts
             }
           })
-        : [{ model: 'account-default', label: 'account-default', detail: status.detail, efforts: [] }]
+        : // The catalogue could not be read for this runtime, so there is one
+          // row and it is the account's own default. It is labelled the way
+          // the catalogue labels it -- a person reading a lowercase
+          // `account-default` on the only ACTIVE row is reading a placeholder
+          // that leaked (outside review, 2026-09-07).
+          [{ model: 'account-default', label: 'Account default', detail: status.detail, efforts: [] }]
 
     for (const entry of entries) {
       const isActive = runtime.id === active.runtime && entry.model === active.model

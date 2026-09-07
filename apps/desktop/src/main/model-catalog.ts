@@ -1,5 +1,5 @@
 import { createAppServerClient } from '@teammate/runtime-adapters'
-import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
+import type { MissionRuntimeId, RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 import type { PublicModel, ModelCatalogResponse } from '../shared/ipc.js'
 import type { AppServerProcess } from './app-server-mission.js'
@@ -76,25 +76,42 @@ export function parseModels(result: unknown): readonly PublicModel[] {
 }
 
 /**
- * The account default, as a row you can actually select.
+ * The account default, as a row you can actually select, for one runtime.
  *
  * It is the route a fresh profile starts on, and it was the only route in the
  * app that named a model no list contained -- so the picker drew no ACTIVE row
  * for it, and the effort levels, which hang off that row, had nowhere to go.
  *
- * The levels offered are the ones EVERY listed model agrees on. An
- * intersection rather than a union, because the account decides which model
- * answers, and a level only some of them accept would be a control that
- * silently does nothing. Effort itself is safe to offer here: it travels as
- * `-c model_reasoning_effort=...`, not with `--model`.
+ * Built PER RUNTIME. `account-default` is not a Codex idea: codex-mission.ts
+ * calls it "the shell's word for send no --model", and every runtime honours
+ * it that way. Building it for Codex alone meant that once discovery started
+ * preferring OpenCode on a fresh machine, the route a new person landed on
+ * had no row again -- the same defect one runtime to the left.
  *
- * Undefined when nothing was listed -- then there is no honest claim to make
- * about what the account supports, and the picker is right to stay quiet.
+ * The levels offered are the ones EVERY listed model of that runtime agrees
+ * on. An intersection rather than a union, because the account decides which
+ * model answers, and a level only some of them accept would be a control that
+ * silently does nothing. Effort itself is safe to offer here: it travels
+ * separately from the model on every runtime that takes one.
+ *
+ * Undefined when that runtime listed nothing -- then there is no honest claim
+ * to make about what the account supports, and the picker is right to stay
+ * quiet.
+ *
+ * The intersection is also what keeps this SAFE on the runtimes whose command
+ * builders refuse an effort outright ("Cursor Agent takes no effort level",
+ * and the same for Gemini, OpenCode and Copilot). Each of those is a runtime
+ * whose models report no levels, so the intersection is empty, so no chip is
+ * drawn and nothing is sent. A union would have offered a level on the very
+ * runtimes that throw on one.
  */
 export function accountDefaultModel(
-  models: readonly PublicModel[]
+  models: readonly PublicModel[],
+  runtime: MissionRuntimeId = 'codex'
 ): PublicModel | undefined {
-  const listed = models.filter((model) => model.id !== ACCOUNT_DEFAULT_MODEL)
+  const listed = models.filter(
+    (model) => model.runtime === runtime && model.id !== ACCOUNT_DEFAULT_MODEL
+  )
   if (listed.length === 0) return undefined
   const shared = listed
     .map((model) => model.supportedEfforts)
@@ -104,11 +121,33 @@ export function accountDefaultModel(
     )
   return {
     id: ACCOUNT_DEFAULT_MODEL,
-    runtime: 'codex',
+    runtime,
     displayName: 'Account default',
     description: 'Whatever model your account uses. The effort levels below apply to all of them.',
     supportedEfforts: shared
   }
+}
+
+/**
+ * Every runtime's account-default row, in front of the models they belong to.
+ *
+ * One per runtime that listed anything, because `defaultRoute` can stamp
+ * `account-default` on any of them and each one needs a row of its own to be
+ * the ACTIVE one.
+ */
+export function withAccountDefaults(models: readonly PublicModel[]): readonly PublicModel[] {
+  // Idempotent: a runtime that already carries its row is left alone. Two
+  // call sites reach this (the probe, and the early return when Codex is not
+  // ready), and a list that went through both would otherwise show the same
+  // "Account default" twice.
+  const already = new Set(
+    models.filter((model) => model.id === ACCOUNT_DEFAULT_MODEL).map((model) => model.runtime)
+  )
+  const defaults = [...new Set(models.map((model) => model.runtime))]
+    .filter((runtime) => !already.has(runtime))
+    .map((runtime) => accountDefaultModel(models, runtime))
+    .filter((row): row is PublicModel => row !== undefined)
+  return [...defaults, ...models]
 }
 
 /**
@@ -292,7 +331,7 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
     const codex = runtimes.find((entry) => entry.id === 'codex')
     if (codex?.readiness !== 'ready' || codex.executable === undefined) {
       return advertisedModels.length > 0
-        ? { ok: true, data: { models: advertisedModels } }
+        ? { ok: true, data: { models: withAccountDefaults(advertisedModels) } }
         : { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }
     }
 
@@ -314,23 +353,17 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       await client.request('initialize', { clientInfo: { name: 'locust', version: '0.1.0' } })
       client.notify('initialized')
       const result = await client.request('model/list', {})
-      const codexModels = parseModels(result)
-      // The route a fresh profile starts on gets a row of its own, first,
-      // so the picker has something to mark ACTIVE and the effort levels
-      // have somewhere to hang.
-      const accountDefault = accountDefaultModel(codexModels)
-      const models = [
-        ...(accountDefault === undefined ? [] : [accountDefault]),
-        ...codexModels,
-        ...advertisedModels
-      ]
+      // The route a fresh profile starts on gets a row of its own, for every
+      // runtime, so the picker has something to mark ACTIVE and the effort
+      // levels have somewhere to hang whichever runtime discovery settled on.
+      const models = withAccountDefaults([...parseModels(result), ...advertisedModels])
       if (models.length === 0) {
         return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'No models were reported.' } }
       }
       return { ok: true, data: { models } }
     } catch {
       return advertisedModels.length > 0
-        ? { ok: true, data: { models: advertisedModels } }
+        ? { ok: true, data: { models: withAccountDefaults(advertisedModels) } }
         : {
             ok: false,
             error: { code: 'MODELS_UNAVAILABLE', message: 'The model list could not be read.' }
