@@ -237,7 +237,22 @@ try {
   const records = names.length === 1 ? (await readFile(join(LEDGER_DIR, names[0]), 'utf8')).split('\n').filter((l) => l).map((l) => JSON.parse(l)) : []
   const header = records[0]?.metadata
   check('one mission ledger exists', names.length === 1, `ledgers: ${names.length}`)
-  check(`it records runtime cursor and model ${MODEL}`, header?.runtime === 'cursor' && header?.model === MODEL, JSON.stringify({ runtime: header?.runtime, model: header?.model }))
+  // Cursor lists `composer-2.5` and `composer-2.5-fast` as separate models,
+  // and the picker folds a family into one row with `fast` beside it. So the
+  // id that gets recorded depends on that control, and pinning the plain id
+  // failed on a run that was correct: picked Composer 2.5 with fast on, ran
+  // and recorded `composer-2.5-fast` (2026-09-07).
+  //
+  // The check worth having is not which variant ran -- it is that the record
+  // agrees with what the controls said. A recorded model the person could not
+  // have read off the screen is the defect this is looking for.
+  const wantsFast = (chosenState.controls ?? []).some((text) => text.trim().toLowerCase() === 'fast')
+  const expected = wantsFast ? `${MODEL}-fast` : MODEL
+  check(
+    `it records runtime cursor and the model the controls showed (${expected})`,
+    header?.runtime === 'cursor' && header?.model === expected,
+    JSON.stringify({ runtime: header?.runtime, model: header?.model, controls: chosenState.controls })
+  )
   const events = records.filter((r) => r.recordType === 'mission.event').map((r) => r.event)
   check('every event is signed by the Cursor normalizer', events.length > 0 && events.every((e) => e?.sourceAdapter === 'cursor'), `events: ${events.length}`)
   check('a run.completed receipt with the session id', events.some((e) => e?.type === 'run.completed' && typeof e.runtimeThreadId === 'string' && e.runtimeThreadId.length > 0))

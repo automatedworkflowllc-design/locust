@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import { swarmEffortFor } from './App.js'
 import {
+  effortIsInModelId,
   modelLabelFor,
   defaultRoute,
   defaultEffort,
@@ -1065,5 +1066,44 @@ describe('a model id read beside the runtime that serves it', () => {
 
   it('leaves a leading slash alone rather than eating the id', () => {
     expect(modelLabelFor('opencode', '/weird')).toBe('/weird')
+  })
+})
+
+describe('an effort that lives inside the model id', () => {
+  // Cursor lists every effort as its own model and its builder refuses a
+  // separate effort. A routine taught on Cursor stored BOTH -- `{model:
+  // "composer-2.5-fast", effort: "fast"}` -- and threw on every replay,
+  // measured 2026-09-07 in routine-smoke: 2 ledgers where 3 were expected,
+  // because step 1 never opened a mission.
+  const cursorFamily = {
+    runtime: 'cursor',
+    id: 'composer-2.5',
+    displayName: 'Composer 2.5',
+    supportedEfforts: ['fast'],
+    variants: { fast: 'composer-2.5-fast' }
+  } as unknown as PublicModel
+  const codexModel = {
+    runtime: 'codex',
+    id: 'gpt-5.6',
+    displayName: 'GPT-5.6',
+    supportedEfforts: ['low', 'high']
+  } as unknown as PublicModel
+
+  it('is recognised through the family id', () => {
+    expect(effortIsInModelId([cursorFamily, codexModel], 'cursor', 'composer-2.5')).toBe(true)
+  })
+
+  it('is recognised through the variant id a run actually resolves to', () => {
+    // The stored route carries the RESOLVED id, which is not a row of its own.
+    expect(effortIsInModelId([cursorFamily, codexModel], 'cursor', 'composer-2.5-fast')).toBe(true)
+  })
+
+  it('is not claimed for a runtime that takes the effort beside the model', () => {
+    // Codex must still store and send its level -- that is the whole feature.
+    expect(effortIsInModelId([cursorFamily, codexModel], 'codex', 'gpt-5.6')).toBe(false)
+  })
+
+  it('is not claimed for a model nothing in the catalog folds', () => {
+    expect(effortIsInModelId([codexModel], 'cursor', 'composer-2.5-fast')).toBe(false)
   })
 })

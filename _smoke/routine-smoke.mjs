@@ -274,7 +274,29 @@ try {
   const replayed = all.filter((h) => h.startedBy?.kind === 'routine')
   check('both replayed runs are recorded as the routine, step 1 then 2', replayed.length === 2 && replayed.some((h) => h.startedBy.step === 1) && replayed.some((h) => h.startedBy.step === 2), JSON.stringify(replayed.map((h) => h.startedBy)))
   check('both name the same routine', new Set(replayed.map((h) => h.startedBy?.routineId)).size === 1)
-  check('both ran on the teammate route the routine was learned on', replayed.every((h) => h.runtime === 'cursor' && h.model === 'composer-2.5'), JSON.stringify(replayed.map((h) => [h.runtime, h.model])))
+  // Against the route the routine actually STORED, not a constant. The
+  // constant said `composer-2.5` and the run resolved to `composer-2.5-fast`,
+  // which is correct -- Cursor lists both, the picker folds them into one row
+  // with `fast` beside it, and the id that runs is the variant. A hardcoded
+  // id turns that into a failure and, worse, would pass while a routine
+  // quietly replayed on something other than what it was taught with.
+  const stored = JSON.parse(await readFile(join(profile, 'routines.json'), 'utf8').catch(() => '{}'))
+  const storedRoute = stored.routines?.[0]?.route
+  check('the routine stored a route at all', storedRoute !== undefined, JSON.stringify(stored.routines?.length ?? 0))
+  check(
+    'both ran on the teammate route the routine was learned on',
+    storedRoute !== undefined && replayed.every((h) => h.runtime === storedRoute.runtime && h.model === storedRoute.model),
+    JSON.stringify({ storedRoute, ran: replayed.map((h) => [h.runtime, h.model]) })
+  )
+  // A route that carries an effort its runtime refuses is why step 1 never
+  // opened a mission at all before 2026-09-07: Cursor's builder throws on any
+  // effort, and the stored route had `{model: "composer-2.5-fast", effort:
+  // "fast"}` -- the level already inside the id, and again beside it.
+  check(
+    'and it stored no effort the runtime would refuse',
+    storedRoute !== undefined && (storedRoute.effort === undefined || !String(storedRoute.model).endsWith(`-${String(storedRoute.effort)}`)),
+    JSON.stringify(storedRoute)
+  )
   const second = replayed.find((h) => h.startedBy?.step === 2)
   const first = replayed.find((h) => h.startedBy?.step === 1)
   check('step 2 continues step 1, so the replay is one conversation', second?.continuesFrom?.missionId === first?.missionId, JSON.stringify({ follows: second?.continuesFrom?.missionId, first: first?.missionId }))

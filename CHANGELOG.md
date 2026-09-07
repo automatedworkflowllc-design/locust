@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.3 — 2026-09-07
+
+- **A routine taught on Cursor replays again.** Saving one recorded the
+  reasoning level beside the model, and Cursor keeps its levels *inside* the
+  model id and refuses one passed separately — so a routine taught on Cursor
+  threw the moment it replayed and never opened a mission. It had been that
+  way since 0.43.0. The level is now stored only where it would actually be
+  sent, so a routine on Codex or Claude Code still replays at the level it was
+  taught with. A routine saved on Cursor by 0.43.0, 0.43.1 or 0.43.2 still
+  carries the bad route: save it again and it will run.
+
 ## 0.43.2 — 2026-09-07
 
 - **The next thing you type no longer goes missing.** Typing a second line

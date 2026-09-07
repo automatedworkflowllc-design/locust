@@ -88,7 +88,7 @@ import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -2066,16 +2066,28 @@ export default function App(): ReactElement {
       // The effort comes from the composer, because missions do not record
       // theirs -- so there is no level to recover from the conversation being
       // taught, and the one on screen is the level the next run would use.
-      // Undefined on a route whose model reports no levels, which is exactly
-      // the set of runtimes that refuse an effort.
-      route: {
-        ...(teammate?.route ?? {
+      //
+      // Only where it would actually be SENT as one. The first version of this
+      // stored it whenever the composer had a level, on the reading that a
+      // model reporting no levels is exactly a runtime that refuses an effort.
+      // That reading is wrong: Cursor reports levels AND refuses the argument,
+      // because its levels live inside the model id. So a routine taught on
+      // Cursor stored `{model: "composer-2.5-fast", effort: "fast"}`, and
+      // replaying it put both in front of a builder that throws on the second
+      // -- every routine on Cursor failed to start, silently, from 0.43.0
+      // until routine-smoke caught it.
+      route: (() => {
+        const base = teammate?.route ?? {
           runtime: mission.runtime,
           model: mission.model ?? 'account-default',
-          mode: 'ask'
-        }),
-        ...(effort === undefined ? {} : { effort })
-      },
+          mode: 'ask' as const
+        }
+        const carried =
+          effort === undefined || effortIsInModelId(models, base.runtime, base.model)
+            ? undefined
+            : effort
+        return { ...base, ...(carried === undefined ? {} : { effort: carried }) }
+      })(),
       busy: false
     })
   }

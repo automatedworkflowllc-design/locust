@@ -1054,6 +1054,35 @@ export function collapseConversations<
  * any effort for Cursor, and every Cursor run with an effort picked failed
  * with "cannot be started with the options chosen" (Colin, 2026-09-06).
  */
+/**
+ * Whether this route's effort is already inside its model id.
+ *
+ * Cursor lists every effort as its own model (`cursor-grok-4.6-high-fast`,
+ * `composer-2.5-fast`) and its command builder refuses a separate effort
+ * outright. `startRoute` handles that for a mission the person starts. A
+ * routine stores its route instead, and storing an effort beside an id that
+ * already carries one put both in front of that builder: every routine taught
+ * on Cursor threw on replay and never opened a mission (measured 2026-09-07,
+ * `routine-smoke`, stored route
+ * `{model: "composer-2.5-fast", effort: "fast"}`).
+ *
+ * Asked of the id rather than of the runtime, because the runtime is not the
+ * thing that decides it -- a family that folds variants does, and the next
+ * runtime to fold them should not need this file edited.
+ */
+export function effortIsInModelId(
+  models: readonly PublicModel[],
+  runtime: MissionRuntimeId,
+  modelId: string
+): boolean {
+  return models.some(
+    (model) =>
+      model.runtime === runtime &&
+      model.variants !== undefined &&
+      (model.id === modelId || Object.values(model.variants).includes(modelId))
+  )
+}
+
 export function startRoute(
   models: readonly PublicModel[],
   runtime: MissionRuntimeId,
