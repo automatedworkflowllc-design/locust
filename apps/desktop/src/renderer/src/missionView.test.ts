@@ -1938,3 +1938,98 @@ describe('an earlier turn says it changed nothing too', () => {
     expect(traceOf({ running: false, mayEdit: false })).not.toContain('no files changed')
   })
 })
+
+describe('the same file spelled two ways is one file', () => {
+  // A first outside tester, on OpenCode: "Alpha UI: 3s · 1 tool call · 2 files
+  // · +2 −0. Git: one line in one file." A single append counted twice.
+  //
+  // pathKey folds separators and case but not absolute-vs-relative, and a
+  // runtime that reports one edit as `README.md` and another as
+  // `/home/you/proj/README.md` is describing the same file both times.
+  const patchFor = (path: string) => ({
+    text: `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n@@ -1 +1,2 @@\n a\n+ALPHA-TOUCHED\n`,
+    added: 1,
+    removed: 0,
+    truncated: false
+  })
+  const WORKSPACE = '/home/you/locust-sample'
+  const filesOf = (details: readonly ActivityDetail[]): string | undefined =>
+    activityTrace(details, [], 'completed', undefined, undefined, WORKSPACE).find(
+      (segment) => segment.key === 'files'
+    )?.text
+
+  it('counts a relative and an absolute spelling as one', () => {
+    expect(
+      filesOf([
+        { kind: 'edit', name: 'README.md', settled: true, patch: patchFor('README.md') },
+        {
+          kind: 'edit',
+          name: '/home/you/locust-sample/README.md',
+          settled: true,
+          patch: patchFor('/home/you/locust-sample/README.md')
+        }
+      ])
+    ).toBe('1 file')
+  })
+
+  it('counts one edit reported twice as one', () => {
+    // MEASURED, OpenCode, one append to one file: the fold drew
+    // `notes.md MODIFIED +1 -0` twice, the summary said `1 file +2 -0`, and
+    // git said `1 0 notes.md`.
+    const twice = [
+      { kind: 'edit' as const, name: 'notes.md', settled: true, patch: patchFor('notes.md') },
+      { kind: 'edit' as const, name: 'notes.md', settled: true, patch: patchFor('notes.md') }
+    ]
+    expect(filesOf(twice)).toBe('1 file')
+    expect(activityCounts(twice)).toEqual({ added: 1, removed: 0 })
+    expect(activityEntries(twice).filter((entry) => entry.kind === 'file')).toHaveLength(1)
+  })
+
+  it('counts one edit reported relatively and absolutely as one', () => {
+    // The measured shape: OpenCode restated the same append with the other
+    // path spelling, the fold drew `notes.md MODIFIED +1 -0` twice, and the
+    // line said `1 file +2 -0` against git's `1 0 notes.md`.
+    const bothWays = [
+      { kind: 'edit' as const, name: 'notes.md', settled: true, patch: patchFor('notes.md') },
+      {
+        kind: 'edit' as const,
+        name: `${WORKSPACE}/notes.md`,
+        settled: true,
+        patch: patchFor(`${WORKSPACE}/notes.md`)
+      }
+    ]
+    expect(filesOf(bothWays)).toBe('1 file')
+    expect(activityCounts(bothWays, WORKSPACE)).toEqual({ added: 1, removed: 0 })
+    expect(activityEntries(bothWays, WORKSPACE).filter((entry) => entry.kind === 'file')).toHaveLength(1)
+  })
+
+  it('still counts two real edits to one file as two', () => {
+    // The second edit is diffed against a file the first already changed, so
+    // its rows differ -- both are real work and both are drawn.
+    const two = [
+      { kind: 'edit' as const, name: 'notes.md', settled: true, patch: patchFor('notes.md') },
+      {
+        kind: 'edit' as const,
+        name: 'notes.md',
+        settled: true,
+        patch: {
+          text: 'diff --git a/notes.md b/notes.md\n--- a/notes.md\n+++ b/notes.md\n@@ -9 +9,2 @@\n c\n+BETA-TOUCHED\n',
+          added: 1,
+          removed: 0,
+          truncated: false
+        }
+      }
+    ]
+    expect(activityCounts(two)).toEqual({ added: 2, removed: 0 })
+    expect(activityEntries(two).filter((entry) => entry.kind === 'file')).toHaveLength(2)
+  })
+
+  it('still counts two genuinely different files as two', () => {
+    expect(
+      filesOf([
+        { kind: 'edit', name: 'README.md', settled: true, patch: patchFor('README.md') },
+        { kind: 'edit', name: 'notes.md', settled: true, patch: patchFor('notes.md') }
+      ])
+    ).toBe('2 files')
+  })
+})

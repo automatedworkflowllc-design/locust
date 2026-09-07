@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.1 — 2026-09-07
+
+- **One file changed once is counted once.** A one-line append could report as
+  `2 files · +2 −0` when git said one line in one file: some runtimes restate
+  the same edit with the other spelling of the path, once relative to the
+  folder and once absolute, and both the count and the file list took those
+  for two changes. They are folded now, on the path as the list draws it. Two
+  genuine edits to one file still count as two.
+
 ## 0.43.0 — 2026-09-07
 
 - **A routine replays at the effort it was taught with.** Saving one records

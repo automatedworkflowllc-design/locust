@@ -47,8 +47,8 @@ export function ActivityCard({
   readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
 }): ReactElement {
   const [open, setOpen] = useState(false)
-  const entries = activityEntries(details)
-  const counts = activityCounts(details)
+  const entries = activityEntries(details, workspacePath)
+  const counts = activityCounts(details, workspacePath)
   const anyPatch = entries.some((entry) => entry.kind === 'file')
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const initiallyOpen = defaultOpenEntry(entries)

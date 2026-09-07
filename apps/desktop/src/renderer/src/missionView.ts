@@ -101,8 +101,31 @@ export type ActivityEntry =
  * counts are summed from, so the card's total and the diffs beneath it are
  * two views of one array and cannot disagree.
  */
-export function activityEntries(details: readonly ActivityDetail[]): readonly ActivityEntry[] {
+export function activityEntries(
+  details: readonly ActivityDetail[],
+  /** The folder this ran in, so one file reported two ways is one row. */
+  workspacePath?: string
+): readonly ActivityEntry[] {
   const entries: ActivityEntry[] = []
+  // An edit some runtimes report twice is still one edit.
+  //
+  // MEASURED 2026-09-07, OpenCode, one append to one file: the fold drew
+  // `notes.md MODIFIED +1 -0` TWICE, the line above said `1 file +2 -0`, and
+  // git said `1 0 notes.md` -- one line, in one file, appearing once in the
+  // file on disk. A first outside tester reported the same shape as
+  // `2 files / +2 -0` against a one-line change.
+  //
+  // The key is the file's PATH AS DRAWN plus every hunk and row, so this only
+  // ever folds a restatement of one change. The path has to go through
+  // `relativePath` first for the same reason the count does: measured across
+  // six runs of the same one-line append, OpenCode reported the edit twice on
+  // two of them, once relatively and once absolutely, and a raw-path key saw
+  // two files where the fold drew the same row twice.
+  //
+  // Two real edits to one file cannot collide: the second is diffed against a
+  // file the first already changed, so its rows differ -- and when they do,
+  // both are drawn and both are counted, which is correct.
+  const seenFiles = new Set<string>()
   details.forEach((detail, index) => {
     const failed = detail.failed === true
     if (detail.kind === 'shell') {
@@ -171,6 +194,12 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
       return
     }
     files.forEach((file, fileIndex) => {
+      const signature = JSON.stringify({
+        ...file,
+        path: relativePath(file.path, workspacePath).replace(/[\\/]+/g, '/').toLowerCase()
+      })
+      if (seenFiles.has(signature)) return
+      seenFiles.add(signature)
       const counts = fileCounts(file)
       entries.push({
         kind: 'file',
@@ -197,10 +226,10 @@ export function activityEntries(details: readonly ActivityDetail[]): readonly Ac
  * header: if a patch was cut short, the header would promise lines the diff
  * below cannot show.
  */
-export function activityCounts(details: readonly ActivityDetail[]): DiffCounts {
+export function activityCounts(details: readonly ActivityDetail[], workspacePath?: string): DiffCounts {
   let added = 0
   let removed = 0
-  for (const entry of activityEntries(details)) {
+  for (const entry of activityEntries(details, workspacePath)) {
     if (entry.kind !== 'file') continue
     added += entry.counts.added
     removed += entry.counts.removed
@@ -596,14 +625,29 @@ export function activityTrace(
    * problem. It is the person who asked for an edit who needs this, and for
    * them the plain fact is enough.
    */
-  mayEdit?: boolean
+  mayEdit?: boolean,
+  /**
+   * The folder this conversation is open in, so the count can tell one file
+   * from two.
+   *
+   * A first outside tester, on OpenCode: "Alpha UI: 3s / 1 tool call / 2
+   * files / +2 -0. Git: one line in one file." One append, counted twice --
+   * because a runtime is free to report the same file relatively on one call
+   * and absolutely on the next, and to the key below those were two files.
+   *
+   * `relativePath` already folds absolute-into-workspace, the worktree
+   * prefix and Cursor's mirror, and the file ROWS have been drawn through it
+   * since 0.38.8. The count never was. Same function on both now, so what
+   * the fold lists and what the line counts cannot disagree.
+   */
+  workspacePath?: string
 ): readonly TraceSegment[] {
   const segments: TraceSegment[] = []
   const times = events.map((event) => Date.parse(event.occurredAt)).filter((t) => Number.isFinite(t))
   const elapsed = times.length >= 2 ? Math.max(...times) - Math.min(...times) : 0
   const duration = durationText(elapsed)
   const finished = outcome !== 'running'
-  const entries = activityEntries(details)
+  const entries = activityEntries(details, workspacePath)
   // How many FILES this run changed, which is not how many rows the card
   // drew. Two corrections from the 0.35.0 targeted QA:
   //
@@ -616,8 +660,11 @@ export function activityTrace(
   // Windows paths are case-insensitive and runtimes disagree about separators
   // and a leading `./`; the same file must key the same way whichever one
   // reported it.
+  // Through `relativePath` first, because `README.md` and
+  // `/home/you/proj/README.md` are one file and only the workspace root
+  // knows that.
   const pathKey = (path: string): string =>
-    path.replace(/[\\/]+/g, '/').replace(/^\.\//, '').toLowerCase()
+    relativePath(path, workspacePath).replace(/[\\/]+/g, '/').replace(/^\.\//, '').toLowerCase()
   const changedPaths = new Set<string>()
   for (const entry of entries) {
     // A parsed diff is a change that landed, by definition -- it is the change.
@@ -817,6 +864,11 @@ export interface MissionThreadOptions {
   /** Whether the run was allowed to change files; see activityTrace. */
   readonly mayEdit?: boolean
   /**
+   * The folder the conversation is open in. The file COUNT needs it for the
+   * same reason each file ROW does -- see activityTrace.
+   */
+  readonly workspacePath?: string
+  /**
    * Whether this turn wrote to a teammate. Those messages are drawn beside
    * the thread rather than inside it, so a turn whose whole output was a
    * message to a colleague looked, from in here, like a turn that said
@@ -1007,7 +1059,8 @@ export function buildThread(
         events,
         traceOutcome(events, options.running),
         planSteps,
-        options.mayEdit
+        options.mayEdit,
+        options.workspacePath
       ),
       finished: !options.running,
       details: activity,
