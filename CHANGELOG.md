@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.41.1 — 2026-09-07
+
+- **Swarm is in Settings.** Its only control was the mark on the composer,
+  which exists on the workroom alone and is disabled while a mission runs — so
+  a workspace-wide setting could not be reached from any other screen, or
+  turned off while anything was running. The mark is the glance; Settings is
+  the record.
+- **A runtime that is already installed stops offering to install itself.**
+  One whose version probe has not answered yet was tagged CHECKING and fell
+  through to the Install button — or to `Get it ↗` for Cursor and Antigravity.
+- **A connected runtime with no version shows its status instead of nothing.**
+  The check was written against `undefined` where the value is `null`, so it
+  never fired and the slot came out blank — on Antigravity, whose version can
+  genuinely be absent.
+
 ## 0.41.0 — 2026-09-07
 
 The two things that stopped a stranger, from the full-scope plan.
