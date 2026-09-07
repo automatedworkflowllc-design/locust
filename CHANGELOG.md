@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.41.0 — 2026-09-07
+
+The two things that stopped a stranger, from the full-scope plan.
+
+- **A fresh install lands on a route that exists.** `account-default` means
+  "use whatever your account uses", and every runtime honours it — but only
+  Codex had a row for it, so once a new machine started preferring OpenCode
+  you landed on a lowercase placeholder with no effort control and nothing
+  marked as your current route. Every runtime has its own **Account default**
+  row now.
+- **The install screen shows its work.** The command is shown while it runs
+  rather than only after it fails, and `Show output` opens onto everything npm
+  said — on the live line and on the failure, where the last lines are usually
+  the cause.
+
 ## 0.40.1 — 2026-09-07
 
 Three more from the outside tester's report.
