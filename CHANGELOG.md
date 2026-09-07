@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.41.3 — 2026-09-07
+
+- **A conversation shows that it has a menu.** Saving a routine needed a
+  right-click, and nothing said so — which is why the feature looked missing
+  even after the Automations screen started naming the gesture. Hover a
+  conversation in the sidebar (or tab to it) and the actions are there,
+  `Save as routine` among them.
+
 ## 0.41.2 — 2026-09-07
 
 - **Resuming a mission keeps the effort you set.** It sent the model and
