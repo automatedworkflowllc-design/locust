@@ -1098,7 +1098,10 @@ export default function App(): ReactElement {
         if (update.kept.length > 0) said.push(`${update.by} remembered ${update.kept.map((text) => `"${text}"`).join('; ')}`)
         if (update.proposed.length > 0) said.push(`${update.by} wants to remember ${update.proposed.map((text) => `"${text}"`).join('; ')}`)
         if (update.forgotten.length > 0) said.push(`${update.by} forgot ${update.forgotten.map((text) => `"${text}"`).join('; ')}`)
-        setMemoryNotice(said.join('. '))
+        // All three lists empty says nothing happened worth reporting, and
+        // `[].join('. ')` is '' -- which passes `!== undefined` downstream and
+        // drew an empty paragraph that then also could not be dismissed.
+        setMemoryNotice(said.length === 0 ? undefined : said.join('. '))
         return
       }
       if (update.kind === 'routine-blocked') {
@@ -2626,6 +2629,7 @@ export default function App(): ReactElement {
               // still lit. Reproduced live by an outside QA, 2026-09-06.
               onOpenMission={openMission}
               notice={memoryNotice}
+              onDismissNotice={() => setMemoryNotice(undefined)}
             />
           ) : screen === 'automations' ? (
             <AutomationsScreen

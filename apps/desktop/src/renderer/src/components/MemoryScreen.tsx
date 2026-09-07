@@ -25,7 +25,8 @@ export function MemoryScreen({
   onRemove,
   onClear,
   onOpenMission,
-  notice
+  notice,
+  onDismissNotice
 }: {
   readonly memories: readonly PublicMemory[]
   readonly workspaceId: string
@@ -40,6 +41,12 @@ export function MemoryScreen({
   readonly onOpenMission: (missionId: string) => void
   /** The host's last word about memory, when it had one. */
   readonly notice: string | undefined
+  /**
+   * Clearing it. Without this the sentence stayed for the rest of the session
+   * -- its siblings on the Automations and Rooms screens both have one, and
+   * this is the screen where the person is already acting on what it says.
+   */
+  readonly onDismissNotice: () => void
 }): ReactElement {
   const [draft, setDraft] = useState('')
   const [draftScope, setDraftScope] = useState<MemoryScope>('workspace')
@@ -189,7 +196,14 @@ export function MemoryScreen({
         </span>
       </div>
       <div className="lc-screen__scroll">
-        {notice !== undefined && <p className="lc-settings__note lc-memory__notice">{notice}</p>}
+        {notice !== undefined && notice.length > 0 && (
+          <p className="lc-settings__note lc-memory__notice">
+            {notice}{' '}
+            <button type="button" className="lc-ghostbutton" onClick={onDismissNotice}>
+              Dismiss
+            </button>
+          </p>
+        )}
         {error !== undefined && <p className="lc-dialog__error">{error}</p>}
 
         <section className="lc-settings__section">

@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.39.2 — 2026-09-07
+
+- **An npm permission error now shows the fix.** It used to say "run the
+  command below in a terminal with permission to install global packages" and
+  show the same `npm install -g` that had just failed — which fails the same
+  way, because the unwritable thing is npm's global folder, not the terminal.
+  It now gives `npm config set prefix "<a folder you own>"` and the install,
+  and says to put that folder on your PATH.
+- **A machine with nothing installed no longer claims Codex.** The welcome
+  screen recommends OpenCode while the composer said `Codex CLI /
+  account-default`. They agree now.
+- **The Memory screen's notice can be dismissed.** Once any teammate
+  remembered, proposed or forgot something, that sentence stayed for the rest
+  of the session — including after you acted on it on that very screen. An
+  update where nothing actually changed also drew an empty paragraph.
+
 ## 0.39.1 — 2026-09-07
 
 - **Every runtime names the output cap, not just Codex.** Locust stops a run
