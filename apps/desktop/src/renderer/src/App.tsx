@@ -37,7 +37,7 @@ import type {
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
-import { queuedVerdict } from './steering.js'
+import { queuedVerdict, requeuedTo } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
@@ -1797,6 +1797,11 @@ export default function App(): ReactElement {
       // Follow the run under its real key only if the person is still looking
       // at it; they may have moved to another teammate's thread meanwhile.
       setShownKey((current) => (current === key ? runId : current))
+      // And so does anything queued against it. The temporary key was just
+      // deleted above, so a message typed while the host was still answering
+      // pointed at nothing and was held as "that conversation is no longer
+      // open" -- about the conversation on screen.
+      setQueued((current) => requeuedTo(current, key, runId))
       return true
     } catch {
       setRuns((current) =>
@@ -1950,6 +1955,10 @@ export default function App(): ReactElement {
         return withNewRun(all, newRunId, next)
       })
       setShownKey((shown) => (shown === runId ? newRunId : shown))
+      // A handoff continues the same conversation under another runtime, so
+      // the next thing the person said belongs to it and not to the run that
+      // was handed off.
+      setQueued((current) => requeuedTo(current, runId, newRunId))
     } catch {
       setRuns((all) =>
         withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: 'The handoff request could not be delivered.' }))

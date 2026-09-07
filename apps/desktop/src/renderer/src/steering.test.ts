@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { queuedVerdict } from './steering.js'
+import { queuedVerdict, requeuedTo } from './steering.js'
 
 describe('a message queued while a teammate works', () => {
   it('waits while the run is still going', () => {
@@ -57,5 +57,35 @@ describe('a message queued while a teammate works', () => {
       }
     }
     expect(sends.filter(Boolean)).toHaveLength(1)
+  })
+})
+
+describe('a queued message follows its conversation', () => {
+  // A first outside tester, typing the next line quickly: NEXT went to
+  // "held -- that conversation is no longer open" about the conversation on
+  // screen. A mission is created under a temporary key and moved to the
+  // host's real runId the moment the host answers; `shownKey` followed that
+  // move and the queue did not.
+  it('moves to the real runId when the run is re-keyed', () => {
+    expect(requeuedTo({ key: 'start_1', text: 'and then deploy it' }, 'start_1', 'run_9')).toEqual({
+      key: 'run_9',
+      text: 'and then deploy it'
+    })
+  })
+
+  it('leaves a message queued against another conversation alone', () => {
+    const elsewhere = { key: 'run_other', text: 'and then deploy it' }
+    expect(requeuedTo(elsewhere, 'start_1', 'run_9')).toBe(elsewhere)
+  })
+
+  it('has nothing to move when nothing is queued', () => {
+    expect(requeuedTo(undefined, 'start_1', 'run_9')).toBeUndefined()
+  })
+
+  it('no longer reports the conversation as gone once it has followed', () => {
+    const moved = requeuedTo({ key: 'start_1', text: 'and then deploy it' }, 'start_1', 'run_9')
+    expect(queuedVerdict({ running: true, phase: 'running', onScreen: moved?.key === 'run_9' })).toEqual({
+      kind: 'waiting'
+    })
   })
 })

@@ -48,3 +48,27 @@ export function queuedVerdict(input: {
   if (!input.onScreen) return { kind: 'held', note: 'typed in another conversation — sending puts it here instead' }
   return { kind: 'send' }
 }
+
+/**
+ * Keep a queued message pointed at its conversation when the run is re-keyed.
+ *
+ * A mission is created under a temporary key and moved to the host's real
+ * `runId` the moment the host answers -- and the temporary key is deleted in
+ * the same breath. `shownKey` has always followed that move. The queue did
+ * not, so a message typed in the window between pressing Enter and the host
+ * answering pointed at a key that no longer existed, and the strip said
+ * "held -- that conversation is no longer open" about a conversation that was
+ * on screen. A first outside tester hit it by simply typing the next line
+ * quickly (0.38.7 report, finding 13).
+ *
+ * The same move happens on a handoff, where the conversation continues under
+ * a new runtime and `shownKey` follows it there too.
+ */
+export function requeuedTo<T extends { readonly key: string }>(
+  queued: T | undefined,
+  fromKey: string,
+  toKey: string
+): T | undefined {
+  if (queued === undefined || queued.key !== fromKey) return queued
+  return { ...queued, key: toKey }
+}

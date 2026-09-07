@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.2 — 2026-09-07
+
+- **The next thing you type no longer goes missing.** Typing a second line
+  before a teammate had finished starting could leave it stuck in NEXT under
+  "that conversation is no longer open" -- about the conversation on screen --
+  where it sat until you noticed and sent it by hand. A mission moves to its
+  real id the moment the host answers, and anything queued against it now
+  moves with it. The same applies across a handoff, where the conversation
+  carries on under another runtime.
+
 ## 0.43.1 — 2026-09-07
 
 - **One file changed once is counted once.** A one-line append could report as
