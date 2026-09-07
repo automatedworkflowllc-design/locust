@@ -12,6 +12,10 @@
 // Asserted from the DURABLE RECORD, not the screen: a routine that looks like
 // it ran and left no ledger did not run.
 
+// FIRST: points tmpdir() outside AppData, where `~/.cursorignore` makes
+// every Cursor run blind to the workspace. See _tools/scratch-root.mjs.
+import '../_tools/scratch-root.mjs'
+
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

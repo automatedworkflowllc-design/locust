@@ -9,6 +9,10 @@
 // terminal state and the ledger recorded runtime cursor, model composer-2.5,
 // with a run.completed receipt signed by the Cursor normalizer.
 
+// FIRST: points tmpdir() outside AppData, where `~/.cursorignore` makes
+// every Cursor run blind to the workspace. See _tools/scratch-root.mjs.
+import '../_tools/scratch-root.mjs'
+
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

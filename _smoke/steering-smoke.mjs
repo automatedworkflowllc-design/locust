@@ -12,6 +12,10 @@
 //      take. The thread then offers "Build this plan", and pressing it starts
 //      an accept-edits turn of the same conversation.
 
+// FIRST: points tmpdir() outside AppData, where `~/.cursorignore` makes
+// every Cursor run blind to the workspace. See _tools/scratch-root.mjs.
+import '../_tools/scratch-root.mjs'
+
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

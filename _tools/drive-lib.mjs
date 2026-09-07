@@ -13,6 +13,10 @@
 // port already answers: two drives on one port both bind it, and the second
 // silently drives the first app.
 
+// FIRST, for its side effect: it points tmpdir() outside AppData, which is
+// where `~/.cursorignore` makes every Cursor run blind. See the file.
+import './scratch-root.mjs'
+
 import { spawn, execFile } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

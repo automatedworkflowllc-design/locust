@@ -620,6 +620,18 @@ export function activityTrace(
    * when it is greater than zero. Nothing on screen contradicted the model's
    * own account of itself.
    *
+   * WHY THAT RUN CHANGED NOTHING, found later the same day and recorded
+   * because the original note reads like an accusation: the workspace was
+   * under `AppData`, and `~/.cursorignore` on that machine excludes it, so
+   * Cursor was refused every read and write before it began. Cursor was not
+   * misreporting -- it had been handed a folder it was configured to ignore.
+   * The harness fix is `_tools/scratch-root.mjs`.
+   *
+   * The line still belongs here. A run that finished having changed nothing
+   * is worth saying whatever the reason, and the reason is exactly what the
+   * person cannot see: config, quota, a refusal, or a model that only said
+   * it would. Silence reads as success in all four.
+   *
    * Stated plainly rather than in amber: asking a question in an
    * edit-permitted session changes nothing either, and that is not a
    * problem. It is the person who asked for an edit who needs this, and for

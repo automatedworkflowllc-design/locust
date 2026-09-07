@@ -14,6 +14,10 @@
 //   - the runtime resumed that same session rather than opening a new one,
 //   - and the model actually remembers, which is the part a person sees.
 
+// FIRST: points tmpdir() outside AppData, where `~/.cursorignore` makes
+// every Cursor run blind to the workspace. See _tools/scratch-root.mjs.
+import '../_tools/scratch-root.mjs'
+
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

@@ -15,6 +15,10 @@
 // red. The prompt asks for 6137 x 4 instead: 24548 appears on screen only if a
 // model actually answered. The pre-flight assertion below pins that.
 
+// FIRST: points tmpdir() outside AppData, where `~/.cursorignore` makes
+// every Cursor run blind to the workspace. See _tools/scratch-root.mjs.
+import '../_tools/scratch-root.mjs'
+
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

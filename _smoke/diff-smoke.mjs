@@ -18,6 +18,10 @@
 // code; a unit test proves the functions, this proves what a person sees.
 // Needs a signed-in cursor-agent. Cheap: one short edit on composer-2.5.
 
+// FIRST: points tmpdir() outside AppData, where `~/.cursorignore` makes
+// every Cursor run blind to the workspace. See _tools/scratch-root.mjs.
+import '../_tools/scratch-root.mjs'
+
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
