@@ -31,12 +31,19 @@ const drive = await startDrive({
 
 const OPEN_AUTOMATIONS = `(async () => {
   const flat = (el) => el.innerText.split(/\s+/).join(' ').trim()
-  const tab = [...document.querySelectorAll('button, a')].find((b) => /^Automations$/i.test(flat(b)))
-    ?? [...document.querySelectorAll('.lc-section__title, button')].find((b) => /AUTOMATIONS/i.test(flat(b)))
-  if (tab) tab.click()
+  // The sidebar's Automations section header opens the screen; its title is
+  // the stable handle ("What automations are").
+  const tab = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title') === 'What automations are')
+    ?? [...document.querySelectorAll('button')].find((b) => /AUTOMATIONS/i.test(flat(b)))
+  if (!tab) return 'no way in to the Automations screen'
+  tab.click()
   await new Promise((r) => setTimeout(r, 900))
   const empty = document.querySelector('.lc-empty')
-  return empty ? flat(empty) : 'no empty state on screen'
+  const cli = document.querySelector('.lc-cliartifacts')
+  const rows = [...document.querySelectorAll('.lc-cliartifacts__row')].map(flat)
+  return 'empty state: ' + (empty ? flat(empty).slice(0, 160) : 'none')
+    + ' || CLI section: ' + (cli ? rows.length + ' rows' : 'ABSENT')
+    + (rows.length ? ' >> ' + rows.slice(0, 4).join('  ;;  ') : '')
 })()`
 
 try {

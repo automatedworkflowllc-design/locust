@@ -16,6 +16,7 @@ import {
   MISSION_DELETE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
+  RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL,
@@ -67,6 +68,7 @@ import type {
   MissionDeleteResponse,
   MissionHistoryResponse,
   ModelCatalogResponse,
+  PublicRuntimeArtifact,
   RuntimeDiscoveryResponse,
   WorkspaceSettings,
   WorkspaceChooseResponse,
@@ -112,6 +114,7 @@ export type {
   MissionApprovalRequest,
   MissionMode,
   ModelCatalogResponse,
+  PublicRuntimeArtifact,
   PublicModel,
   WorkspaceSettings,
   WorkspaceChooseResponse,
@@ -176,6 +179,8 @@ const desktopApi: DesktopApi = {
   resumeMission: (request: MissionResumeRequest) =>
     ipcRenderer.invoke(MISSION_RESUME_CHANNEL, request) as Promise<MissionHandoffResponse>,
   listModels: () => ipcRenderer.invoke(MODEL_CATALOG_CHANNEL) as Promise<ModelCatalogResponse>,
+  listRuntimeArtifacts: () =>
+    ipcRenderer.invoke(RUNTIME_ARTIFACTS_CHANNEL) as Promise<readonly PublicRuntimeArtifact[]>,
   /** Run `npm install -g <package>` for a runtime, watching npm's own output. */
   installRuntime: (runtime: string) =>
     ipcRenderer.invoke(RUNTIME_INSTALL_CHANNEL, runtime) as Promise<RuntimeInstallResponse>,

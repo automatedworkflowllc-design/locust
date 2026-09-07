@@ -24,6 +24,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
 import { createModelCatalog } from './model-catalog.js'
+import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { createTeammateStore } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
@@ -75,6 +76,7 @@ import {
   MISSION_STORAGE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
+  RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
@@ -755,6 +757,28 @@ if (!ownsSingleInstanceLock) {
         return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Models could not be read.' } } as const
       }
       return modelCatalog.read()
+    })
+
+    // What the person already set up inside the CLIs themselves. Read-only,
+    // and gated on discovery: a leftover `.claude/agents` from an uninstall
+    // must not read as a working teammate's routine.
+    ipcMain.handle(RUNTIME_ARTIFACTS_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return []
+      try {
+        const runtimes = await discoverForWork()
+        // Signed out still counts as installed: the agents they wrote are on
+        // this machine whether or not the CLI can run right now.
+        const installed = runtimes
+          .filter(
+            (runtime: RuntimeDiscovery) =>
+              runtime.readiness === 'ready' || runtime.readiness === 'authentication-required'
+          )
+          .map((runtime: RuntimeDiscovery) => runtime.id)
+        return await readRuntimeArtifacts({ installed })
+      } catch {
+        // A list nobody can read is an empty list, not a broken screen.
+        return []
+      }
     })
 
     ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL, (event, answer: unknown) => {

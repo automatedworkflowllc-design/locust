@@ -18,6 +18,7 @@ import type {
   MissionApprovalRequest,
   MissionMode,
   PublicModel,
+  PublicRuntimeArtifact,
   PublicPeerMessage,
   PublicRoutine,
   PublicTeammate,
@@ -851,10 +852,21 @@ export default function App(): ReactElement {
   useEffect(() => {
     if (runtimeState.phase !== 'ready') return
     readModels()
+    // Same trigger as the catalogue: both are gated on which runtimes are
+    // actually installed, so both are meaningless until discovery settles and
+    // both want re-reading when that set changes.
+    window.desktop
+      ?.listRuntimeArtifacts()
+      .then((found) => setCliArtifacts(found))
+      .catch(() => setCliArtifacts([]))
   }, [runtimeState.phase, usableKey])
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
   const [models, setModels] = useState<readonly PublicModel[]>([])
+  // What the CLIs already have set up. Read once discovery has settled: the
+  // list is gated on which runtimes are installed, so asking earlier would
+  // report an empty machine.
+  const [cliArtifacts, setCliArtifacts] = useState<readonly PublicRuntimeArtifact[]>([])
   /**
    * Re-read the model catalogue when the runtimes change, and when the picker
    * is opened.
@@ -2641,6 +2653,7 @@ export default function App(): ReactElement {
               onRemoveRoutine={removeRoutine}
               notice={automationNotice}
               onDismissNotice={() => setAutomationNotice(undefined)}
+              cliArtifacts={cliArtifacts}
             />
           ) : screen === 'rooms' ? (
             <RoomScreen

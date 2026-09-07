@@ -231,6 +231,20 @@ export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
 export const ROUTINE_REMOVE_CHANNEL = 'routines:remove'
 export const ROUTINE_RUN_CHANNEL = 'routines:run'
 export const MODEL_CATALOG_CHANNEL = 'models:list'
+/**
+ * What the person set up inside the CLIs themselves -- agents, commands and
+ * automations they wrote for Claude Code, Codex or Cursor. Locust neither
+ * creates nor runs these; it lists them, because a machine with nine of them
+ * on it read "Nothing saved yet" (Colin, 2026-09-07).
+ */
+export const RUNTIME_ARTIFACTS_CHANNEL = 'runtime-artifacts:list'
+export interface PublicRuntimeArtifact {
+  readonly runtime: string
+  readonly kind: 'agent' | 'command' | 'automation'
+  readonly name: string
+  readonly description?: string
+  readonly path: string
+}
 
 /**
  * Installing a runtime the person asked for, from inside the app.
@@ -1135,6 +1149,8 @@ export interface DesktopApi {
   runRoutine(routineId: string): Promise<RoutineRunResponse>
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */
   listModels(): Promise<ModelCatalogResponse>
+  /** Read-only: what the installed CLIs already have set up. */
+  listRuntimeArtifacts(): Promise<readonly PublicRuntimeArtifact[]>
   /** Run the install the screen showed, for a runtime that comes from npm. */
   installRuntime(runtime: string): Promise<RuntimeInstallResponse>
   /** npm output while an install runs. Returns the unsubscribe. */

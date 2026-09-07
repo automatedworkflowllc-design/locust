@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 
-import type { PublicRoutine, PublicTeammate } from '../../../shared/ipc.js'
+import type { PublicRoutine, PublicRuntimeArtifact, PublicTeammate } from '../../../shared/ipc.js'
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { Icon } from './Icon.js'
 import { PixelFace } from './PixelFace.js'
@@ -29,7 +30,8 @@ export function AutomationsScreen({
   onEditRoutine,
   onRemoveRoutine,
   notice,
-  onDismissNotice
+  onDismissNotice,
+  cliArtifacts
 }: {
   readonly routines: readonly PublicRoutine[]
   readonly teammates: readonly PublicTeammate[]
@@ -43,6 +45,14 @@ export function AutomationsScreen({
   /** The last scheduled routine that would not start, and why. */
   readonly notice: string | undefined
   readonly onDismissNotice: () => void
+  /**
+   * What the person set up inside the CLIs themselves. Locust neither made
+   * nor runs these -- it lists them, because a machine with nine agents and
+   * commands on it read "Nothing saved yet" (Colin, 2026-09-07: "It would
+   * just be nice for them to be able to see the routines/automations they've
+   * setup on their models").
+   */
+  readonly cliArtifacts: readonly PublicRuntimeArtifact[]
 }): ReactElement {
   const now = new Date()
   // Scheduled first: those are the ones that happen without anybody here,
@@ -160,6 +170,51 @@ export function AutomationsScreen({
         <Icon name="clock" size={12} /> A scheduled routine runs only while Locust is open, on its teammate&rsquo;s
         own route and permissions.
       </p>
+      {/*
+        * Set up in the CLI, listed here.
+        *
+        * Separate from the routines above and deliberately inert: these are
+        * not Locust's to run, edit or schedule, and a Run button on one would
+        * be a promise the app cannot keep. The path is stated because that is
+        * the answer to the only question this list raises -- where do I change
+        * it.
+        */}
+      {cliArtifacts.length > 0 && (
+        <section className="lc-cliartifacts">
+          <h3 className="lc-section__title">Set up in your CLIs</h3>
+          <p className="lc-cliartifacts__note">
+            Locust did not make these and does not run them. They are what you configured in the coding agents
+            themselves, listed so you can see them in one place.
+          </p>
+          {[...new Set(cliArtifacts.map((entry) => entry.runtime))].map((runtime) => (
+            <div className="lc-cliartifacts__group" key={runtime}>
+              <div className="lc-cliartifacts__runtime lc-mono">{runtimeDisplayName(runtime as never)}</div>
+              {cliArtifacts
+                .filter((entry) => entry.runtime === runtime)
+                .map((entry) => (
+                  <div className="lc-cliartifacts__row" key={`${entry.runtime}/${entry.kind}/${entry.path}`}>
+                    <span className="lc-cliartifacts__kind lc-mono">{entry.kind}</span>
+                    <span className="lc-cliartifacts__name">{entry.name}</span>
+                    {entry.description !== undefined && (
+                      <span className="lc-cliartifacts__desc">{entry.description}</span>
+                    )}
+                    {/*
+                      * The last two segments, not the whole path. A full
+                      * Windows path is far wider than this row and ran off
+                      * the right edge of the window (screenshot, 2026-09-07);
+                      * `agents\gig-scout.md` is the part that answers "where
+                      * do I change it", and the whole thing is on hover.
+                      */}
+                    <span className="lc-cliartifacts__path lc-mono" title={entry.path}>
+                      {entry.path.split(/[\\/]/).slice(-2).join('/')}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          ))}
+        </section>
+      )}
+
     </section>
   )
 }
