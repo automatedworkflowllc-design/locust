@@ -157,11 +157,40 @@ export function installedButNotFound(displayName: string): InstallFailure {
   }
 }
 
+/**
+ * The only shape a token handed to the shell may take.
+ *
+ * `shell: true` below is load-bearing on Windows and cannot go, which makes
+ * this argv the one thing standing between an install and a shell. So the argv
+ * is checked rather than trusted. Today it cannot fail: every token comes from
+ * the constant table in `runtime-install.ts` — `npm install -g @openai/codex`
+ * and three like it — and that is exactly the point. The day a package name
+ * arrives from a config file, a manifest, or a runtime someone typed, this
+ * refuses it instead of pasting it into a command line.
+ *
+ * Allowed: what an npm package or a flag actually needs (`@ / . _ - :`).
+ * Refused: everything a shell reads as syntax — space, quote, `&`, `|`, `;`,
+ * `$`, backtick, redirection, parentheses, newline.
+ */
+const SAFE_ARGUMENT = /^[A-Za-z0-9@/._:-]+$/
+
+/** Whether this token can be handed to a shell without becoming syntax. */
+export function safeToSpawn(token: string): boolean {
+  return SAFE_ARGUMENT.test(token)
+}
+
 function runNpm(
   command: string,
   args: readonly string[],
   onLine: (line: string) => void
 ): Promise<{ readonly code: number | null; readonly output: string }> {
+  const unsafe = [command, ...args].find((token) => !SAFE_ARGUMENT.test(token))
+  if (unsafe !== undefined) {
+    return Promise.resolve({
+      code: null,
+      output: `Locust would not run this install: ${JSON.stringify(unsafe)} contains characters a shell reads as syntax.`
+    })
+  }
   return new Promise((resolve) => {
     // `shell: true` because Windows will not spawn `npm.cmd` otherwise: without
     // it the child exits with a null code and no output, which is

