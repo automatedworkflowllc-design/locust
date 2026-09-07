@@ -193,7 +193,7 @@ try {
     }
     if (!clicked) return JSON.stringify({ started: false, placeholder: field.placeholder })
     let sawRunning = false
-    for (let i = 0; i < 420; i += 1) {
+    for (let i = 0; i < 360; i += 1) {
       await new Promise(r => setTimeout(r, 1000))
       const stop = document.querySelector('button[aria-label^="Stop the running"]')
       if (stop) sawRunning = true

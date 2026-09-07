@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import {
-  ACCOUNT_DEFAULT_MODEL,
-  settledModelFor,
   checkpointLabel,
   collapseConversations,
   listedAsMission,
@@ -897,66 +895,5 @@ describe('who the composer addresses when a conversation is opened', () => {
     // would be a second wrong answer rather than a fix for the first.
     expect(ownerToSelect('mission_nobody', owners, 'tm_wren')).toBe('tm_wren')
     expect(ownerToSelect('mission_nobody', owners, undefined)).toBeUndefined()
-  })
-})
-
-describe('a route nobody chose settles onto a real model', () => {
-  // The starting route names "account-default": real to run, but not a row in
-  // any list. The picker hangs the effort levels on the ACTIVE row, so a route
-  // that matches no row has nowhere to put them -- and the composer's effort
-  // chip was removed in the same design pass. Measured on a fresh profile
-  // 2026-09-07: 0 ACTIVE rows, 0 effort chips, no way to choose effort at all.
-  const model = (
-    runtime: string,
-    id: string,
-    supportedEfforts: readonly string[] = []
-  ): { runtime: string; id: string; supportedEfforts: readonly string[] } => ({
-    runtime,
-    id,
-    supportedEfforts
-  })
-
-  it('prefers a model that reports effort levels, because that is the point', () => {
-    expect(
-      settledModelFor({ runtime: 'codex', model: ACCOUNT_DEFAULT_MODEL }, [
-        model('codex', 'gpt-5.4-mini'),
-        model('codex', 'gpt-5.6-sol', ['low', 'high'])
-      ])
-    ).toBe('gpt-5.6-sol')
-  })
-
-  it('falls back to the first model listed when none report levels', () => {
-    expect(
-      settledModelFor({ runtime: 'opencode', model: ACCOUNT_DEFAULT_MODEL }, [
-        model('opencode', 'big-pickle'),
-        model('opencode', 'nemotron-3-ultra-free')
-      ])
-    ).toBe('big-pickle')
-  })
-
-  it('never reaches into another runtime for one', () => {
-    expect(
-      settledModelFor({ runtime: 'copilot', model: ACCOUNT_DEFAULT_MODEL }, [
-        model('codex', 'gpt-5.6-sol', ['low', 'high'])
-      ])
-    ).toBeUndefined()
-  })
-
-  it('stays put when the runtime lists nothing: vague beats unrunnable', () => {
-    expect(settledModelFor({ runtime: 'codex', model: ACCOUNT_DEFAULT_MODEL }, [])).toBeUndefined()
-  })
-
-  it('leaves a route that already names a real model alone', () => {
-    expect(
-      settledModelFor({ runtime: 'claude', model: 'sonnet' }, [model('claude', 'opus', ['high'])])
-    ).toBeUndefined()
-  })
-
-  it('does not settle onto the placeholder itself', () => {
-    expect(
-      settledModelFor({ runtime: 'codex', model: ACCOUNT_DEFAULT_MODEL }, [
-        model('codex', ACCOUNT_DEFAULT_MODEL)
-      ])
-    ).toBeUndefined()
   })
 })

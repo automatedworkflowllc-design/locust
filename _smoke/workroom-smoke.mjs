@@ -183,7 +183,7 @@ const discoveryDone = `(async () => {
 // stop control alone would pass between submit and the first receipt.
 const waitForCompletion = `(async () => {
   let sawRunning = false
-  for (let i = 0; i < 420; i += 1) {
+  for (let i = 0; i < 360; i += 1) {
     await new Promise(r => setTimeout(r, 1000))
     const stop = document.querySelector('button[aria-label^="Stop the running"]')
     const marker = /completed|failed|cancelled/i.test((document.querySelector('.lc-workroom__header') || document.querySelector('.lc-workroom__mission') || { innerText: '' }).innerText)
@@ -231,11 +231,11 @@ try {
 
   const ready = await cdp.eval(`(async () => {
     for (let i = 0; i < 80; i += 1) {
-      const rows = document.querySelectorAll('.lc-row--button').length
+      const rows = document.querySelectorAll('.lc-row--button[title^="Message "]').length
       if (document.querySelector('form.command-dock textarea') && rows >= 2) return rows
       await new Promise(r => setTimeout(r, 250))
     }
-    return document.querySelectorAll('.lc-row--button').length
+    return document.querySelectorAll('.lc-row--button[title^="Message "]').length
   })()`)
   check('both seeded teammates are in the sidebar', ready === 2, `rows: ${ready}`)
 
@@ -283,7 +283,7 @@ try {
   const cardState1 = JSON.parse(card1)
   cardState1.text = cardState1.text.replace(/\s+/g, ' ').trim()
   check('a peer card appears on Atlas\u2019s thread', cardState1.found === true, cardState1.text)
-  check('it counts one message with Wren', /1 message with\s*Wren/i.test(cardState1.text), cardState1.text)
+  check('it counts one message with Wren, and says which way it went', /1 message (to|from|with)\s*Wren/i.test(cardState1.text), cardState1.text)
 
   const opened1 = await cdp.eval(`(async () => {
     const toggle = document.querySelector('.lc-peer__toggle')
@@ -298,15 +298,33 @@ try {
       text: card.innerText,
       bubble: (card.querySelector('.lc-peer__bubble') || { innerText: '' }).innerText,
       author: (card.querySelector('.lc-peer__author') || { innerText: '' }).innerText,
+      // Drawn INSTEAD of a per-message author when the exchange is one-sided.
+      peerName: (card.querySelector('.lc-peer__name') || { innerText: '' }).innerText,
       agentText: [...document.querySelectorAll('.lc-agentline')].map(n => n.innerText).join('\\n')
     })
   })()`)
   const open1 = JSON.parse(opened1)
   const openText = (open1.text ?? '').replace(/\s+/g, ' ')
   check('the card opens', open1.opened === true && open1.expanded === 'true')
-  check('the open card is tagged UNTRUSTED', /UNTRUSTED/.test(openText), openText)
-  check('the open card states the rule', /claims, never as verified facts/i.test(openText), openText)
-  check('the message is attributed to Atlas', /^Atlas$/.test((open1.author ?? '').trim()), open1.author)
+  // The UNTRUSTED tag and the "treated as claims" footer were REMOVED on
+  // Colin's word (2026-09-06): "teammates are AI, no one else adds
+  // disclaimers with their models in chat like that, why clutter?" What
+  // carries the honesty instead is that you can always tell who said a
+  // thing, and there are two shapes of that:
+  //
+  //   one-sided  the pill names the PEER and the label names the direction,
+  //              so "1 message to Wren" on Atlas's thread is unambiguous
+  //   two-sided  every message carries its own .lc-peer__author
+  //
+  // This card is Atlas's thread talking to Wren, so it is the first shape.
+  const attributed =
+    (open1.author ?? '').trim().length > 0
+    || (/^Wren$/.test((open1.peerName ?? '').trim()) && /1 message (to|from)\s*Wren/i.test(openText))
+  check(
+    'you can tell who said it: the peer is named and the direction is stated',
+    attributed,
+    `author: ${JSON.stringify(open1.author)} peer pill: ${JSON.stringify(open1.peerName)} label: ${openText.slice(0, 60)}`
+  )
   check('the share block is not also inside Atlas\u2019s own bubble', !/locust-share/.test(open1.agentText ?? ''),
     (open1.agentText ?? '').slice(-200))
 
@@ -374,7 +392,7 @@ try {
   check('Wren\u2019s thread shows the exchange as soon as the run starts', earlyState.found === true)
   if (earlyState.found) {
     const t = earlyState.text.replace(/\s+/g, ' ')
-    check('it counts one message with Atlas', /1 message with\s*Atlas/i.test(t), t)
+    check('it counts one message with Atlas, and says which way it went', /1 message (to|from|with)\s*Atlas/i.test(t), t)
     check('the received exchange sits above the work', earlyState.firstAgent === -1 || earlyState.cardIndex < earlyState.firstAgent,
       `card ${earlyState.cardIndex}, first agent item ${earlyState.firstAgent}`)
     check('CONTROL: the person\u2019s bubble is their words alone, not the briefing',
@@ -439,7 +457,7 @@ try {
     const peerText = String(reopenState.peer).replace(/\s+/g, ' ')
     check('the row is clickable once nothing is running', reopenState.disabled === false)
     check('clicking it shows Atlas\u2019s own prompt', reopenState.bubble.trim() === ATLAS_PROMPT, reopenState.bubble.slice(0, 80))
-    check('the reopened thread carries the exchange with Wren', /1 message with\s*Wren/i.test(peerText), peerText)
+    check('the reopened thread carries the exchange with Wren', /1 message (to|from|with)\s*Wren/i.test(peerText), peerText)
   }
 } finally {
   child.kill()

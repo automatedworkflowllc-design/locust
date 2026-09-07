@@ -295,7 +295,7 @@ try {
 
   say('6. when the mission ends, every face is still')
   const done = await cdp.eval(`(async () => {
-    for (let i = 0; i < 420; i += 1) {
+    for (let i = 0; i < 360; i += 1) {
       await new Promise(r => setTimeout(r, 1000))
       if (!document.querySelector('button[aria-label^="Stop the running"]') && document.querySelector('.lc-agentline')) return true
     }

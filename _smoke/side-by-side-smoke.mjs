@@ -267,7 +267,7 @@ try {
 
   say('6. both finish with their own receipts')
   const finished = await cdp.eval(`(async () => {
-    for (let i = 0; i < 480; i += 1) {
+    for (let i = 0; i < 360; i += 1) {
       await new Promise(r => setTimeout(r, 1000))
       const state = JSON.parse(${screenState})
       if (state.running === '') return JSON.stringify({ done: true, waitedMs: i * 1000, rows: state.rows })

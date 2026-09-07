@@ -87,7 +87,7 @@ import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
-import { ACCOUNT_DEFAULT_MODEL, collapseConversations, defaultRoute, listedAsMission, settledModelFor, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultRoute, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -838,20 +838,6 @@ export default function App(): ReactElement {
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
   const [models, setModels] = useState<readonly PublicModel[]>([])
-  // The starting route names "account-default", which is real to run but is
-  // not a row in any list -- so the picker had no ACTIVE row, and the effort
-  // levels that now live under that row had nothing to attach to. Measured on
-  // a fresh profile 2026-09-07: 0 ACTIVE rows, 0 effort chips, and with the
-  // composer's effort chip removed in the same design pass, no way to choose
-  // effort at all. Once the catalogue arrives, settle onto a real model.
-  useEffect(() => {
-    if (routeChosen.current) return
-    const settled = settledModelFor(route, models)
-    if (settled === undefined) return
-    setRoute((current) =>
-      current.model === ACCOUNT_DEFAULT_MODEL ? { ...current, model: settled } : current
-    )
-  }, [models, route])
   /**
    * Re-read the model catalogue when the runtimes change, and when the picker
    * is opened.

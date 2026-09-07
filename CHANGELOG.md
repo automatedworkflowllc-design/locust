@@ -6,6 +6,28 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.4 — 2026-09-07
+
+The effort control, which 0.38.1 removed and did not replace.
+
+- **You can choose reasoning effort again.** 0.38.1 dropped the composer's
+  `effort · fixed` chip, and the chips that replace it -- under the selected
+  model in the route picker -- landed after that build was cut. So the shipped
+  app had the old control gone and the new one absent. Open the route picker
+  and the levels sit under the model you are on; the one you pick rides on the
+  route chip as `Claude Code / sonnet · high`.
+- **Swarm is always there.** It was drawn only when the selected route
+  reported effort levels, so on a route that reports none -- including the one
+  a fresh profile starts on -- the setting vanished from the app entirely
+  rather than moving. It is a pill in the picker's header now, always.
+- **A run stopped for output volume says so.** Locust caps a single line of
+  runtime output at 256 KB and kills the process past it. It used to report
+  "Codex invocation did not complete successfully" -- the words it uses when it
+  has no idea what happened -- while knowing exactly what happened. It now
+  names the cause and suggests narrowing the ask.
+- **The finished-exchange line is still the exchange.** Collapsing it dropped
+  its identity along with its band, so screen readers lost it.
+
 ## 0.38.3 — 2026-09-06
 
 The rest of the design pass, matched to what was actually drawn rather than to
