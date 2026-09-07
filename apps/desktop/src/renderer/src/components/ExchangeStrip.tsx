@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { costLine } from '../cost.js'
@@ -28,8 +29,48 @@ export function ExchangeStrip({
 }): ReactElement {
   const live = exchange.liveRunIds.length > 0
   const cost = costLine(exchange.cost)
+  const [open, setOpen] = useState(false)
+
+  // Over, and not open: one line. Everything the band said is still here --
+  // it is just not a header on a conversation that has finished.
+  if (!live && !open) {
+    return (
+      <button
+        type="button"
+        className="lc-exchange__rest"
+        aria-expanded={false}
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="users" size={12} />
+        <span className="lc-exchange__restline lc-mono">
+          {exchange.participants.map((participant) => participant.name).join(' · ')}
+          <span className="lc-separator">·</span>
+          {String(exchange.hops)} of {String(cap)} automatic {cap === 1 ? 'reply' : 'replies'}
+          {cost !== undefined && (
+            <>
+              <span className="lc-separator">·</span>
+              {cost}
+            </>
+          )}
+        </span>
+        <Icon name="chevron-right" size={12} />
+      </button>
+    )
+  }
+
   return (
     <div className="lc-exchange" role="status" aria-label="Exchange">
+      {!live && (
+        <button
+          type="button"
+          className="lc-exchange__fold"
+          aria-expanded
+          aria-label="Collapse the exchange"
+          onClick={() => setOpen(false)}
+        >
+          <Icon name="chevron-down" size={12} />
+        </button>
+      )}
       <span className="lc-exchange__label">
         <Icon name="users" size={12} />
         Exchange

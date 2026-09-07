@@ -2869,7 +2869,7 @@ export default function App(): ReactElement {
                 * "dont have that exchange thing always up there, we want less
                 * clutter"). What it said is still in the thread and the record.
                 */}
-              {exchange !== undefined && exchange.liveRunIds.length > 0 && (
+              {exchange !== undefined && (
                 <ExchangeStrip
                   exchange={exchange}
                   cap={relayHopCap}

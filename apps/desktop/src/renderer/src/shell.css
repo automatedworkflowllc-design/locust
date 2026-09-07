@@ -1409,6 +1409,47 @@ textarea {
 /* The exchange strip: who is in it, on what, how far into the budget,
    what it cost, and a stop. One line under the header, in the thread's own
    column, so it reads as a fact about the conversation rather than chrome. */
+/* The exchange once it is over: one line, in the same collapsed register the
+   receipt uses. Colin asked for it not to be a permanent header on a finished
+   conversation; the facts it carries -- who was in it, on what, how much of
+   the reply budget, what it cost -- are worth keeping, so they collapse
+   rather than disappear. */
+.lc-exchange__rest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-exchange__rest:hover {
+  color: var(--lc-text-primary);
+}
+
+.lc-exchange__restline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--lc-text-mono-caption);
+}
+
+.lc-exchange__fold {
+  align-self: flex-end;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-muted);
+  cursor: pointer;
+}
+
 .lc-exchange {
   display: flex;
   align-items: center;
