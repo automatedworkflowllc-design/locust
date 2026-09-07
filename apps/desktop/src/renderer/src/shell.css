@@ -3542,6 +3542,52 @@ textarea {
   gap: 3px;
 }
 
+/* A conversation row and the way into its menu. The row is a button, so the
+   affordance sits beside it rather than inside it. */
+.lc-teammate__missionrow {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.lc-teammate__missionrow > .lc-teammate__mission {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Hidden at rest, so a row keeps the shape the design settled on, and shown
+   the moment a pointer or the keyboard reaches it. `Save as routine` lives in
+   this menu and had no visible way in at all -- an outside tester concluded
+   routines did not exist. */
+.lc-teammate__missionmenu {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-teammate__missionrow:hover .lc-teammate__missionmenu,
+.lc-teammate__missionmenu:focus-visible {
+  opacity: 1;
+}
+
+.lc-teammate__missionmenu:hover {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-secondary);
+}
+
 .lc-teammate__mission {
   display: flex;
   align-items: center;

@@ -380,9 +380,9 @@ export function Sidebar({
               {shownOwned.length > 0 && (
                 <div className="lc-teammate__missions">
                   {shownOwned.map((mission) => (
+                    <div className="lc-teammate__missionrow" key={mission.missionId}>
                     <button
                       type="button"
-                      key={mission.missionId}
                       className={`lc-teammate__mission${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
                       onContextMenu={(event) => {
                         event.preventDefault()
@@ -398,6 +398,28 @@ export function Sidebar({
                         <span className="lc-teammate__turns lc-mono">{mission.turns}</span>
                       )}
                     </button>
+                    {/*
+                      * The same menu the right-click opens, with something to
+                      * press. `Save as routine` lives in there and had no
+                      * visible way in at all: a tester concluded routines did
+                      * not exist (2026-09-07). Shown on hover and whenever it
+                      * has focus, so it is reachable by keyboard and does not
+                      * add a permanent object to every row.
+                      */}
+                    <button
+                      type="button"
+                      className="lc-teammate__missionmenu"
+                      aria-label={`Actions for ${mission.title}`}
+                      title="Actions — including Save as routine"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        const box = event.currentTarget.getBoundingClientRect()
+                        onMissionMenu(mission.missionId, { x: box.right, y: box.bottom })
+                      }}
+                    >
+                      <Icon name="dots" size={13} />
+                    </button>
+                    </div>
                   ))}
                 </div>
               )}
