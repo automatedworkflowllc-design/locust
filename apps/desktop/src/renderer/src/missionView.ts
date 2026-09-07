@@ -693,6 +693,24 @@ export function activityTrace(
   const diagnostics = events.filter(
     (event): event is Extract<NormalizedRuntimeEvent, { type: 'adapter.diagnostic' }> => event.type === 'adapter.diagnostic' && !/\.usage_window$/.test(event.payload.code)
   )
+  // `no files changed` is a claim about the workspace, and it must not be made
+  // in the one case where the host has ALREADY said it cannot tell what this
+  // run changed. Two teammates in one folder suppress the git inference and
+  // raise `host.shared_workspace` -- "what changed on disk cannot be told
+  // apart ... it is not counted as this run's work" -- and the line then read
+  // `no files changed - 1 notice` next to that sentence.
+  //
+  // MEASURED 2026-09-07, one teammate on OpenCode and one on Cursor at once:
+  // Wren's card said `no files changed` while `wren-note.txt` sat on disk,
+  // correct, written by that very run. Its runtime reported no edit of its
+  // own and the overlap suppressed the inference, so the app knew nothing --
+  // which is not the same as knowing nothing happened.
+  //
+  // The notice still appears and the fold still carries the whole sentence,
+  // so silence is not what replaces it. What goes is the false half.
+  const cannotAttribute = diagnostics.some(
+    (event) => event.payload.code === 'host.shared_workspace'
+  )
   const refused = diagnostics.filter((event) => /denied|refus|permission/i.test(event.payload.code) || /not permitted|refused/i.test(event.payload.message)).length
   const notices = diagnostics.length - refused
 
@@ -733,7 +751,7 @@ export function activityTrace(
   }
   if (calls > 0) segments.push({ key: 'calls', text: pluralize(calls, 'tool call') })
   if (files > 0 && !(outcome === 'cancelled' && files === 0)) segments.push({ key: 'files', text: pluralize(files, 'file') })
-  else if (files === 0 && outcome === 'completed' && mayEdit === true) {
+  else if (files === 0 && outcome === 'completed' && mayEdit === true && !cannotAttribute) {
     segments.push({ key: 'files', text: 'no files changed' })
   }
   if (refused > 0) segments.push({ key: 'refused', text: `${String(refused)} refused`, tone: 'amber' })

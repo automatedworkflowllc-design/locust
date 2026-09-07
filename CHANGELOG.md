@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.4 — 2026-09-07
+
+- **A card no longer says "no files changed" when it cannot know.** With two
+  teammates working in one folder, the app already says so plainly — "what
+  changed on disk cannot be told apart ... it is not counted as this run's
+  work" — and then, on a run whose own runtime reported no edit, put "no files
+  changed" directly above that sentence. Measured with one teammate on
+  OpenCode and one on Cursor at once: the card said nothing had changed while
+  the file that run had just written sat on disk beside it. Knowing nothing is
+  not the same as knowing nothing happened. A run that genuinely changed
+  nothing still says so.
+
 ## 0.43.3 — 2026-09-07
 
 - **A routine taught on Cursor replays again.** Saving one recorded the

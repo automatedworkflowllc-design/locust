@@ -2033,3 +2033,34 @@ describe('the same file spelled two ways is one file', () => {
     ).toBe('2 files')
   })
 })
+
+describe('"no files changed" is a claim, not a default', () => {
+  // MEASURED 2026-09-07, one teammate on OpenCode and one on Cursor writing in
+  // one folder at once: Wren's card read `25s · 4 tool calls · no files
+  // changed · 1 notice` while wren-note.txt sat on disk, correct, written by
+  // that run. Its runtime reported no edit of its own, and the overlap
+  // suppressed the host's git inference -- so the app knew nothing, which is
+  // not the same as knowing nothing happened.
+  const overlapNotice = {
+    type: 'adapter.diagnostic',
+    occurredAt: '2026-09-07T12:00:00.000Z',
+    payload: {
+      level: 'info',
+      code: 'host.shared_workspace',
+      message: 'Another teammate was working in this folder at the same time.'
+    }
+  } as unknown as NormalizedRuntimeEvent
+  const filesText = (events: readonly NormalizedRuntimeEvent[]): string | undefined =>
+    activityTrace([], events, 'completed', undefined, true).find((segment) => segment.key === 'files')?.text
+
+  it('is withheld when the host has said it cannot tell what changed', () => {
+    expect(filesText([overlapNotice])).toBeUndefined()
+  })
+
+  it('is still said for a lone run that genuinely changed nothing', () => {
+    // The control. This line exists to break the silence that invites someone
+    // to assume a run worked, so suppressing it everywhere would be the worse
+    // bug -- it must only go where a contradicting notice stands beside it.
+    expect(filesText([])).toBe('no files changed')
+  })
+})
