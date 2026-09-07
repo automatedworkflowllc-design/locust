@@ -2639,7 +2639,6 @@ export default function App(): ReactElement {
               onRunRoutine={runRoutine}
               onEditRoutine={editRoutine}
               onRemoveRoutine={removeRoutine}
-              onOpenTeammates={() => setScreen('teammates')}
               notice={automationNotice}
               onDismissNotice={() => setAutomationNotice(undefined)}
             />

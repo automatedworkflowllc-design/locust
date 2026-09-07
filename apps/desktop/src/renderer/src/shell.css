@@ -1304,6 +1304,21 @@ textarea {
 
 /* --- Empty states ------------------------------------------------------ */
 
+/* The second paragraph of an empty state: the gesture, not the pitch. Quieter
+   than the sentence above it, because it is the instruction you come back for
+   rather than the one that explains the idea. */
+.lc-empty__how {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  line-height: 1.6;
+  max-width: 46ch;
+}
+
+.lc-empty__how strong {
+  color: var(--lc-text-secondary);
+  font-weight: 500;
+}
+
 .lc-empty {
   flex: 1;
   display: grid;

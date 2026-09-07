@@ -28,7 +28,6 @@ export function AutomationsScreen({
   onRunRoutine,
   onEditRoutine,
   onRemoveRoutine,
-  onOpenTeammates,
   notice,
   onDismissNotice
 }: {
@@ -41,7 +40,6 @@ export function AutomationsScreen({
   readonly onRunRoutine: (routineId: string) => void
   readonly onEditRoutine: (routine: PublicRoutine) => void
   readonly onRemoveRoutine: (routineId: string) => void
-  readonly onOpenTeammates: () => void
   /** The last scheduled routine that would not start, and why. */
   readonly notice: string | undefined
   readonly onDismissNotice: () => void
@@ -85,11 +83,22 @@ export function AutomationsScreen({
         <div className="lc-empty">
           <p>
             A routine is a conversation a teammate has been taught: the turns you typed, saved so they can be
-            replayed. Finish a conversation worth repeating and save it from that teammate&rsquo;s card.
+            replayed.
           </p>
-          <button type="button" className="lc-button" onClick={onOpenTeammates}>
-            Open the team
-          </button>
+          {/*
+            * Name the GESTURE. This used to say "save it from that teammate's
+            * card" under a button reading "Open the team", and both sent
+            * people to the one screen the control is not on -- an outside
+            * tester followed it exactly, found Edit / Remove on the card, and
+            * filed the whole feature as missing (2026-09-07).
+            *
+            * Right-click is the only way in: the row has no visible
+            * affordance, which is what makes saying so out loud the job.
+            */}
+          <p className="lc-empty__how">
+            Finish a conversation worth repeating, then right-click it under its teammate in the sidebar and
+            choose <strong>Save as routine</strong>. You can give it a schedule there.
+          </p>
         </div>
       ) : (
         <div className="lc-routinelist">
