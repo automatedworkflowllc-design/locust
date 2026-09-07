@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.5 — 2026-09-07
+
+- **An approval now says what would leave your machine.** The card told you
+  what would happen, where, and whether it could be undone — never what data
+  it sends, which is the one question you cannot work out for yourself. A file
+  change says "Nothing. The change is written to this machine and sent
+  nowhere", because that is provable. A command that names a network tool says
+  it *can* reach the network and that Locust cannot see what it would send.
+  Any other command says plainly that this is unknown — Locust will never tell
+  you a command sends nothing, because `./deploy.sh` is two words and can do
+  anything.
+- **A question says you can just answer it.** The decision card offered two
+  buttons and looked like it took nothing else. It now says the composer works
+  too, so a third answer does not have to be squeezed into the closest wrong
+  option.
+
 ## 0.43.4 — 2026-09-07
 
 - **A card no longer says "no files changed" when it cannot know.** With two

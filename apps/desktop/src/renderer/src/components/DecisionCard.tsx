@@ -47,6 +47,13 @@ export function DecisionCard({
         <span className="lc-rail__meta">{standing}</span>
       </div>
       <p className="lc-decision__question">{request.question}</p>
+      {/*
+        * The card offers buttons and looks like it takes nothing else. It
+        * does -- the next thing typed goes to the same conversation. Said
+        * because a person who wants a third answer would otherwise pick the
+        * closest wrong one (design pass, the question scenario).
+        */}
+      <p className="lc-decision__freeform lc-mono">Or answer in the composer — free-form replies are fine</p>
       <div className="lc-decision__options">
         {request.options.map((option) => (
           <button

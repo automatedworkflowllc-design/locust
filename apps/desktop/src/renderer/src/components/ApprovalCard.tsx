@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
+import { dataSentLine } from '../../../shared/approval-data.js'
 import { Icon } from './Icon.js'
 import { DiffView } from './DiffView.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
@@ -29,6 +30,11 @@ export function ApprovalCard({
   // Drawn with the same viewer the activity fold uses, so an approval and
   // its record read the same.
   const files = request.patch === undefined ? [] : parseUnifiedDiff(request.patch.text)
+  // What would LEAVE this machine -- the question the card never answered, and
+  // the only one of the four a person cannot work out for themselves. Claimed
+  // as "nothing" for a file change, where that is provable, and never for a
+  // command, where it is not. See shared/approval-data.ts.
+  const dataSent = dataSentLine(request.kind, request.detail)
   const reversible =
     request.kind === 'command'
       ? 'Unknown — a command can do anything the workspace sandbox allows.'
@@ -71,6 +77,12 @@ export function ApprovalCard({
         )}
         <dt>Where</dt>
         <dd className="lc-mono">{request.cwd ?? 'the mission workspace'}</dd>
+        {dataSent !== undefined && (
+          <>
+            <dt>Data sent</dt>
+            <dd>{dataSent}</dd>
+          </>
+        )}
         {!isQuestion && (
           <>
             <dt>Reversible</dt>
