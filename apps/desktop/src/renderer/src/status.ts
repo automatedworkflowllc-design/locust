@@ -109,8 +109,15 @@ export interface RouteRowStatus {
  * 2. Among those, the one that needs no account -- OpenCode -- because on a
  *    fresh machine it is the only one that is a complete answer, and the
  *    first-run screen already recommends it by name.
- * 3. Failing everything, Codex, which is what this was before and is at least
- *    a stable answer for a machine mid-probe.
+ * 3. Failing everything, still OpenCode -- the runtime the first-run screen
+ *    is at that moment telling them to install. This used to fall back to
+ *    Codex "as a stable answer for a machine mid-probe", and a first outside
+ *    tester read the result exactly as it sounds (2026-09-07): a welcome
+ *    screen selling OpenCode above a composer claiming `Codex CLI /
+ *    account-default`, on a machine with no CLIs at all. A default that names
+ *    something absent is the defect this function exists to fix, and naming
+ *    the one the app is recommending is at least a claim the next click can
+ *    make true.
  *
  * The MODEL is left as `account-default` here on purpose: which model to
  * prefer is the catalogue's business, not discovery's, and the picker is what
@@ -128,7 +135,10 @@ export function defaultRoute(runtimes: readonly PublicRuntimeStatus[]): {
   )
   const free = usable.find((runtime) => runtime.id === FREE_START_RUNTIME)
   const chosen = free ?? usable[0]
-  return { runtime: (chosen?.id as MissionRuntimeId | undefined) ?? 'codex', model: ACCOUNT_DEFAULT_MODEL }
+  return {
+    runtime: (chosen?.id as MissionRuntimeId | undefined) ?? FREE_START_RUNTIME,
+    model: ACCOUNT_DEFAULT_MODEL
+  }
 }
 
 /**

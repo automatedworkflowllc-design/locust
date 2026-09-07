@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import { swarmEffortFor } from './App.js'
 import {
+  defaultRoute,
   defaultEffort,
   effortAfterRouteChange,
   checkpointLabel,
@@ -1009,5 +1010,32 @@ describe('the level on the chip is the level the run is given', () => {
 
   it('never invents a level for a model the catalogue does not know', () => {
     expect(swarmEffortFor(models, 'not-in-catalogue', false, undefined, 'codex')).toBeUndefined()
+  })
+})
+
+describe('a machine with nothing installed', () => {
+  // A first outside tester, 2026-09-07: the welcome screen sold OpenCode
+  // ("one install and you have a working teammate") above a composer claiming
+  // `Codex CLI / account-default`, on a machine with no CLIs at all. A
+  // default that names something absent is the defect defaultRoute exists to
+  // fix; naming the runtime the app is recommending is at least a claim the
+  // next click can make true.
+  const runtime = (id: string, ready: boolean): PublicRuntimeStatus =>
+    ({ id, displayName: id, ready, status: ready ? 'ready' : 'missing' }) as unknown as PublicRuntimeStatus
+
+  it('names the runtime the first-run screen recommends, not one that is absent', () => {
+    expect(defaultRoute([runtime('codex', false), runtime('opencode', false)]).runtime).toBe('opencode')
+  })
+
+  it('names nothing else when discovery has not reported at all', () => {
+    expect(defaultRoute([]).runtime).toBe('opencode')
+  })
+
+  it('still prefers a runtime that can actually run right now', () => {
+    expect(defaultRoute([runtime('codex', true), runtime('opencode', false)]).runtime).toBe('codex')
+  })
+
+  it('and among those, still the one that needs no account', () => {
+    expect(defaultRoute([runtime('codex', true), runtime('opencode', true)]).runtime).toBe('opencode')
   })
 })
