@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.8 — 2026-09-07
+
+- **Cursor's file rows name your file again.** Cursor Agent reports what it
+  edited from inside its own copy of the project
+  (`~/.cursor/projects/C-Users-you-code-streaks/src/streak.js`), and a real
+  two-line edit produced eleven rows like that, with the filename pushed off
+  the end of the row. That folder name is the workspace path with its
+  separators flattened to hyphens, so it is recognised rather than guessed:
+  only a mirror of the folder you actually opened is read as your file.
+  Another project's mirror keeps its full path.
+
 ## 0.38.7 — 2026-09-07
 
 Effort is its own control again, and it always says something.
