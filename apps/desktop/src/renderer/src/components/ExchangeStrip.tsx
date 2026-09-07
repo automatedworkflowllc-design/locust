@@ -37,7 +37,13 @@ export function ExchangeStrip({
     return (
       <button
         type="button"
-        className="lc-exchange__rest"
+        // Still the exchange, just collapsed. Dropping the .lc-exchange class
+        // when it folds meant the strip stopped EXISTING as far as anything
+        // looking for it was concerned -- assistive tech included, since the
+        // role and label went with it.
+        className="lc-exchange lc-exchange__rest"
+        role="status"
+        aria-label="Exchange"
         aria-expanded={false}
         onClick={() => setOpen(true)}
       >

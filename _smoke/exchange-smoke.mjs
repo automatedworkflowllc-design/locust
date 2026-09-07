@@ -195,7 +195,23 @@ try {
   check('the conversation opened', booty.found === true)
   check('the strip is there', typeof booty.strip === 'string')
   check('it names both participants', /Wren/.test(booty.strip ?? '') && /Booty/.test(booty.strip ?? ''), booty.strip)
-  check('it names each one\'s route', /Codex CLI \/ default/.test(booty.strip ?? '') && /Claude Code \/ claude\/sonnet/.test(booty.strip ?? ''), booty.strip)
+
+  say('       opening it: the routes are a detail, one click away')
+  const opened = await evaluate(`(async () => {
+    const rest = document.querySelector('.lc-exchange__rest')
+    if (!rest) return 'no collapsed strip to open'
+    rest.click()
+    await new Promise(r => setTimeout(r, 600))
+    const band = document.querySelector('.lc-exchange')
+    return band ? band.innerText.replace(/\\s+/g, ' ').trim() : 'the strip vanished when opened'
+  })()`)
+  say(`       ${String(opened).slice(0, 160)}`)
+  check(
+    'opened, it names each one\'s route',
+    /Codex CLI \/ default/.test(String(opened)) && /Claude Code \/ claude\/sonnet/.test(String(opened)),
+    String(opened).slice(0, 200)
+  )
+  check('and it still names both participants', /Wren/.test(String(opened)) && /Booty/.test(String(opened)), String(opened).slice(0, 200))
   check('it counts the automatic replies against the budget', /1 of 6 automatic replies/.test(booty.strip ?? ''), booty.strip)
   check('it adds up the cost of both runs', /\$0\.45/.test(booty.strip ?? ''), booty.strip)
   check('no stop control: nothing is running', !/Stop/.test(booty.strip ?? ''), booty.strip)
