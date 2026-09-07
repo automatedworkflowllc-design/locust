@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.9 — 2026-09-07
+
+- **A run that was allowed to edit and edited nothing says so.** Cursor Agent
+  said "Applying the two edits to notes.ts now", reported completed, and left
+  the file untouched — and nothing on screen contradicted it, because the
+  file count is only drawn when it is above zero. The fold now ends in
+  `no files changed`. Stated plainly rather than in amber: asking a question
+  in an edit-permitted session changes nothing either, and that is fine.
+
 ## 0.38.8 — 2026-09-07
 
 - **Cursor's file rows name your file again.** Cursor Agent reports what it
