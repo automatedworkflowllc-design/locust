@@ -128,7 +128,46 @@ export function defaultRoute(runtimes: readonly PublicRuntimeStatus[]): {
   )
   const free = usable.find((runtime) => runtime.id === FREE_START_RUNTIME)
   const chosen = free ?? usable[0]
-  return { runtime: (chosen?.id as MissionRuntimeId | undefined) ?? 'codex', model: 'account-default' }
+  return { runtime: (chosen?.id as MissionRuntimeId | undefined) ?? 'codex', model: ACCOUNT_DEFAULT_MODEL }
+}
+
+/**
+ * The model a route carries before the catalogue has been read.
+ *
+ * It is a real thing to run -- "whatever this account gives you" -- but it is
+ * not a row in any list, so a route left on it has no ACTIVE row in the
+ * picker, and everything the picker hangs on that row (the effort levels,
+ * most of all) has nothing to attach to. Measured on a fresh profile
+ * 2026-09-07: 0 ACTIVE rows, 0 effort chips.
+ */
+export const ACCOUNT_DEFAULT_MODEL = 'account-default'
+
+/**
+ * The concrete model a route should settle on once the catalogue is known.
+ *
+ * Undefined when the route already names a real model, when the runtime
+ * lists none, or when the person has chosen for themselves -- this only ever
+ * upgrades a placeholder nobody picked.
+ */
+export function settledModelFor(
+  route: { readonly runtime: string; readonly model: string },
+  models: readonly {
+    readonly runtime: string
+    readonly id: string
+    readonly supportedEfforts?: readonly string[]
+  }[]
+): string | undefined {
+  if (route.model !== ACCOUNT_DEFAULT_MODEL) return undefined
+  const mine = models.filter(
+    (model) => model.runtime === route.runtime && model.id !== ACCOUNT_DEFAULT_MODEL
+  )
+  // A model that reports effort levels first, because making effort reachable
+  // is the whole reason for moving off the placeholder. Otherwise the first
+  // model the runtime lists, which is still better than a row that does not
+  // exist. Nothing listed at all means stay put: an unrunnable route is worse
+  // than a vague one.
+  const withEfforts = mine.find((model) => (model.supportedEfforts?.length ?? 0) > 0)
+  return (withEfforts ?? mine[0])?.id
 }
 
 export function runtimeIsUsable(runtime: PublicRuntimeStatus): boolean {

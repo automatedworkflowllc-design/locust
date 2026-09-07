@@ -216,18 +216,31 @@ export function RoutePicker({
           * the right, not full width (`Locust UI Review 2026-09-06.dc.html`).
           * The mark stays as its glyph.
           */}
-        {swarmEffort !== undefined && (
-          <button
-            type="button"
-            className={`lc-picker__swarm${swarm ? ' is-on' : ''}`}
-            aria-pressed={swarm}
-            title={swarm ? `Every mission runs at ${swarmEffort}` : 'Run every mission at its model maximum'}
-            onClick={() => onSwarmChange(!swarm)}
-          >
-            <img src={mark} alt="" aria-hidden="true" />
-            Swarm
-          </button>
-        )}
+        {/*
+          * Drawn ALWAYS. Gating it on the selected route reporting effort
+          * levels meant a route that reports none had no swarm control at
+          * all -- and since the composer chip that used to carry it was
+          * removed in this same pass, the setting became unreachable rather
+          * than merely relocated. "account-default", the route a fresh
+          * profile starts on, is exactly such a route, so this hit a new
+          * person on first open (measured 2026-09-07).
+          */}
+        <button
+          type="button"
+          className={`lc-picker__swarm${swarm ? ' is-on' : ''}`}
+          aria-pressed={swarm}
+          title={
+            swarm
+              ? swarmEffort === undefined
+                ? 'Every mission runs at its model maximum'
+                : `Every mission runs at ${swarmEffort}`
+              : 'Run every mission at its model maximum'
+          }
+          onClick={() => onSwarmChange(!swarm)}
+        >
+          <img src={mark} alt="" aria-hidden="true" />
+          Swarm
+        </button>
       </div>
       {notice !== undefined && <div className="lc-picker__notice">{notice}</div>}
       <div className="lc-picker__list">
