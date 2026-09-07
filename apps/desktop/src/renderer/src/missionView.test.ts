@@ -1882,7 +1882,7 @@ describe('a run that could edit and edited nothing says so', () => {
 
   const traceOf = (mayEdit: boolean | undefined): string =>
     activityTrace(
-      [{ kind: 'tool', label: 'Read', detail: undefined, state: 'done' }],
+      [{ kind: 'tool', name: 'Read', settled: true }],
       readTool(),
       'completed',
       undefined,
@@ -1905,7 +1905,7 @@ describe('a run that could edit and edited nothing says so', () => {
 
   it('is plain, not amber: asking a question changes nothing either', () => {
     const files = activityTrace(
-      [{ kind: 'tool', label: 'Read', detail: undefined, state: 'done' }],
+      [{ kind: 'tool', name: 'Read', settled: true }],
       readTool(),
       'completed',
       undefined,

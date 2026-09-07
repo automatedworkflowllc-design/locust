@@ -760,7 +760,18 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // starts fresh, because a person replying to a failure is still
           // replying to it. `resumeThreadId` staying undefined is what makes
           // the run cold: no `exec resume`, no borrowed context.
-          resumeThreadId = priorThread
+          // A resumed session keeps the tools it was BUILT with, so a mode
+          // the person changed since cannot reach it: the chip said "Accept
+          // edits" while the runtime still answered "this session has no
+          // write, edit, or bash tools" (outside tester, 2026-09-07).
+          //
+          // So a changed mode starts cold rather than resuming. The thread
+          // already says what that costs -- "Started without the earlier
+          // messages" -- and that is a smaller thing to lose than the
+          // guarantee that the mode on screen is the mode being run.
+          const priorMode = prior.metadata.mode
+          const modeChanged = priorMode !== undefined && priorMode !== mode
+          resumeThreadId = modeChanged ? undefined : priorThread
           resumedMissionId = prior.metadata.missionId
         }
 

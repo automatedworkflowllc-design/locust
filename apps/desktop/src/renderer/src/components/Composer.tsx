@@ -436,6 +436,26 @@ export function Composer({
               maxLength={MAX_PROMPT_LENGTH}
               disabled={workingNow && queued !== undefined}
             />
+            {/*
+              * Enter sends; Shift+Enter makes a new line. The second half was
+              * true and unsaid, and a first outside tester lost their opening
+              * mission to it (2026-09-07): they typed a two-line prompt, the
+              * first Enter submitted the first line, and the rest queued
+              * behind it as NEXT until the conversation had closed.
+              *
+              * Shown only while there is something in the box. At rest it
+              * would be one more permanent object on the surface the design
+              * review just cut from seven controls to four; while typing it
+              * is the one moment the fact is worth anything.
+              */}
+            {value.length > 0 && !running && (
+              <span className="lc-composer__newline lc-mono" aria-hidden="true">
+                {/* Words, not glyphs: the vendored mono face has neither
+                    U+21E7 nor U+23CE, and the pair rendered as boxes on the
+                    built app (screenshot, 2026-09-07). */}
+                Shift+Enter for a new line
+              </span>
+            )}
             {running && !canQueue ? (
               <button
                 type="button"
@@ -465,6 +485,7 @@ export function Composer({
                 className="send-button lc-send"
                 disabled={!canStart}
                 aria-label="Start mission"
+                title="Start mission — Shift+Enter for a new line"
               >
                 <Icon name="arrow-up" size={15} />
               </button>
@@ -573,11 +594,6 @@ export function Composer({
                     resolvedModels={resolvedModels}
                     recentRoutes={recentRoutes}
                     active={running ? activeChoice : route}
-                    effort={effort}
-                    onEffortChange={onEffortChange}
-                    swarm={swarm}
-                    onSwarmChange={onSwarmChange}
-                    swarmEffort={swarmEffort}
                     onSelect={(choice) => {
                       setPickerOpen(false)
                       if (handoff !== 'available') {
@@ -622,14 +638,6 @@ export function Composer({
                   {runtimeLabel}
                   <span className="lc-separator">/</span>
                   <span className="lc-control__mono lc-control__model">{modelLabel}</span>
-                  {/*
-                    * The effort level rides HERE, not on a chip of its own.
-                    * "Effort is a property of the route, not a peer of it" --
-                    * and the reference draws it exactly like this, as
-                    * `Codex CLI / gpt-5.6 · high`. Absent when the route
-                    * reports no levels, which is the whole reason the old
-                    * chip had to say "effort · fixed" on most routes.
-                    */}
                   {/*
                     * The chevron the mode chip beside it has, and that the
                     * reference draws on this one too: `Codex CLI / gpt-5.6 ·

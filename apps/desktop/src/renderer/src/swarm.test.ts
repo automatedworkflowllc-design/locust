@@ -19,7 +19,19 @@ const MODELS: readonly PublicModel[] = [
 describe('swarm effort', () => {
   it('uses the chosen effort when swarm is off', () => {
     expect(swarmEffortFor(MODELS, 'sol', false, 'medium')).toBe('medium')
-    expect(swarmEffortFor(MODELS, 'sol', false, undefined)).toBeUndefined()
+  })
+
+  it('falls back to the level the chip shows, not to nothing', () => {
+    // This used to assert `undefined`, and that assertion was the bug: the
+    // composer rendered `effort ?? defaultEffort(supported)` while this sent
+    // only `effort`, so from every launch the chip stated "medium" and the
+    // run was started with no effort argument at all. Both now read the same
+    // expression, so the level on screen is the level the run is given.
+    expect(swarmEffortFor(MODELS, 'sol', false, undefined)).toBe('medium')
+  })
+
+  it('still sends nothing for a model that reports no levels', () => {
+    expect(swarmEffortFor([{ ...MODELS[0]!, id: 'bare', supportedEfforts: [] }], 'bare', false, undefined)).toBeUndefined()
   })
 
   it("uses THIS model's maximum, not a fixed name", () => {

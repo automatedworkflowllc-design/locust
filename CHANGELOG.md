@@ -6,6 +6,31 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.39.0 — 2026-09-07
+
+From a first outside tester's report and an audit of the six releases before
+this one. **It corrects 0.38.7, which claimed something untrue.**
+
+- **The composer says how to type a new line.** Enter sends and always did;
+  Shift+Enter makes a new line and nothing said so. A tester typed a two-line
+  prompt, the first Enter submitted the first line, and the rest queued behind
+  it as NEXT until the conversation had closed — losing their opening mission.
+  The hint appears while there is something in the box and nowhere else.
+- **The effort on the chip is the effort the run is given.** It was not.
+  0.38.7 said *"what the chip says is what the run is given"* and that was
+  false: the chip rendered a default that was never assigned, so from every
+  launch it read `medium` while the run was started with **no effort argument
+  at all**. Display and dispatch now share one expression.
+- **Changing the mode no longer promises writes it cannot deliver.** Set to
+  Accept edits on a thread begun in Ask, the follow-up still ran with no write
+  tools, because a resumed runtime session keeps the tools it was built with.
+  A changed mode now starts a fresh session instead of silently inheriting the
+  old permissions.
+- **The typecheck gate is green again.** `pnpm typecheck` runs two configs and
+  I had been running one, so three releases were cut over eight errors — six of
+  them dead props left by 0.38.7, two in a test file. The dead props are gone,
+  along with two comments that described the opposite of the shipped code.
+
 ## 0.38.9 — 2026-09-07
 
 - **A run that was allowed to edit and edited nothing says so.** Cursor Agent

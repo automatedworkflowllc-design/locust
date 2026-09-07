@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
+import { swarmEffortFor } from './App.js'
 import {
   defaultEffort,
   effortAfterRouteChange,
@@ -968,5 +969,45 @@ describe('effort reads as a constant', () => {
 
   it('still shows nothing when the new model reports no levels', () => {
     expect(effortAfterRouteChange('high', [])).toBeUndefined()
+  })
+})
+
+describe('the level on the chip is the level the run is given', () => {
+  // For one release it was not. `effort` starts undefined and is assigned only
+  // when someone opens the dropdown, while the chip rendered
+  // `effort ?? defaultEffort(supported)`. So from every launch the chip said
+  // "medium" and the run was started with no effort argument at all. The two
+  // now share one expression; these tests pin them together.
+  const models = [
+    { id: 'gpt-5.6-sol', runtime: 'codex' as const, displayName: 'Sol', description: '', supportedEfforts: ['low', 'medium', 'high'] },
+    { id: 'auto', runtime: 'copilot' as const, displayName: 'Auto', description: '', supportedEfforts: [] }
+  ]
+  // Exactly what Composer.tsx renders on the chip.
+  const displayed = (modelId: string, swarm: boolean, chosen: string | undefined): string | undefined => {
+    const supported = models.find((model) => model.id === modelId)?.supportedEfforts ?? []
+    return swarm ? supported[supported.length - 1] : chosen ?? defaultEffort(supported)
+  }
+
+  it('agree when nobody has chosen a level', () => {
+    expect(swarmEffortFor(models, 'gpt-5.6-sol', false, undefined, 'codex')).toBe('medium')
+    expect(swarmEffortFor(models, 'gpt-5.6-sol', false, undefined, 'codex')).toBe(displayed('gpt-5.6-sol', false, undefined))
+  })
+
+  it('agree when someone has', () => {
+    expect(swarmEffortFor(models, 'gpt-5.6-sol', false, 'high', 'codex')).toBe(displayed('gpt-5.6-sol', false, 'high'))
+  })
+
+  it('agree under swarm, which overrides both', () => {
+    expect(swarmEffortFor(models, 'gpt-5.6-sol', true, 'low', 'codex')).toBe('high')
+    expect(swarmEffortFor(models, 'gpt-5.6-sol', true, 'low', 'codex')).toBe(displayed('gpt-5.6-sol', true, 'low'))
+  })
+
+  it('agree on a model with no levels: both say nothing, and nothing is sent', () => {
+    expect(swarmEffortFor(models, 'auto', false, undefined, 'copilot')).toBeUndefined()
+    expect(displayed('auto', false, undefined)).toBeUndefined()
+  })
+
+  it('never invents a level for a model the catalogue does not know', () => {
+    expect(swarmEffortFor(models, 'not-in-catalogue', false, undefined, 'codex')).toBeUndefined()
   })
 })

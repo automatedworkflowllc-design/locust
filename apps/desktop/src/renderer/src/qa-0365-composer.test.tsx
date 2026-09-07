@@ -154,11 +154,6 @@ describe('the picker and the one model that costs nothing', () => {
         resolvedModels={new Map()}
         recentRoutes={[]}
         active={{ runtime: 'opencode', model: 'account-default' }}
-        effort={undefined}
-        onEffortChange={() => undefined}
-        swarm={false}
-        onSwarmChange={() => undefined}
-        swarmEffort={undefined}
         onSelect={() => undefined}
         onClose={() => undefined}
       />

@@ -916,9 +916,12 @@ export interface ConversationRowExtras {
  *
  * The control is meant to read as a constant -- Colin, 2026-09-07: "have it
  * be a constant" -- and a control showing nothing was how "we still have no
- * effort control" stayed true even after the levels existed. So the level is
- * always a real one, and because it is SET rather than merely displayed,
- * what the chip says is what the run is given.
+ * effort control" stayed true even after the levels existed.
+ *
+ * This is used in TWO places on purpose: the chip's display in Composer.tsx
+ * and the value `swarmEffortFor` hands the run. It has to be both, and for
+ * one release it was only the first -- the chip stated "medium" while the run
+ * was started with no effort argument at all.
  *
  * `medium` when the model offers it, because every runtime here treats it as
  * the ordinary setting. Otherwise the middle of what was reported, which for

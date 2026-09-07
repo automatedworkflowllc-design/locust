@@ -2541,6 +2541,19 @@ textarea {
   border-color: var(--lc-border-hover);
 }
 
+/* The newline hint, beside the send control and only while there is something
+   to send. Quiet enough to ignore once learned: it is a fact you need exactly
+   once, and a permanent label for it would be the "dead control" the design
+   review spent its first finding on. */
+.lc-composer__newline {
+  flex: none;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .lc-composer textarea {
   flex: 1;
   min-width: 0;

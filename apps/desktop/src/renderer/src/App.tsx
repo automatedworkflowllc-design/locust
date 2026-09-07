@@ -87,7 +87,7 @@ import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
-import { collapseConversations, defaultRoute, effortAfterRouteChange, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -381,11 +381,21 @@ export function swarmEffortFor(
   chosen: string | undefined,
   runtime?: MissionRuntimeId
 ): string | undefined {
-  if (!swarm) return chosen
   const supported =
     models.find((model) => model.id === modelId && (runtime === undefined || model.runtime === runtime))
       ?.supportedEfforts ?? []
-  return supported[supported.length - 1]
+  if (swarm) return supported[supported.length - 1]
+  // The SAME fallback the chip renders (`effort ?? defaultEffort(...)` in
+  // Composer.tsx), so the level on screen and the level the run is given are
+  // one expression rather than two that agree by luck.
+  //
+  // They did not agree. `effort` starts undefined and is only assigned when
+  // someone opens the dropdown, so from every launch the chip stated a level
+  // -- "medium" -- while this returned undefined and the run was started with
+  // no effort argument at all. The comment in status.ts claiming otherwise
+  // ("because it is SET rather than merely displayed") was wrong when I wrote
+  // it. Found by auditing 0.38.7's own release note, 2026-09-07.
+  return chosen ?? defaultEffort(supported)
 }
 
 /**

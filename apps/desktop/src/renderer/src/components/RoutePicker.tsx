@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import mark from '../assets/locust-mark.svg'
 import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
@@ -118,12 +117,7 @@ export function RoutePicker({
   onSelect,
   onClose,
   notice,
-  limitedRuntimes,
-  effort,
-  onEffortChange,
-  swarm,
-  onSwarmChange,
-  swarmEffort
+  limitedRuntimes
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -154,12 +148,7 @@ export function RoutePicker({
    *
    * Together they take the composer from seven controls to four.
    */
-  readonly effort: string | undefined
-  readonly onEffortChange: (effort: string | undefined) => void
-  readonly swarm: boolean
-  readonly onSwarmChange: (swarm: boolean) => void
   /** The maximum level swarm would hold every mission at, when one is known. */
-  readonly swarmEffort: string | undefined
 }): ReactElement {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
