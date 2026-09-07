@@ -20,6 +20,7 @@ import {
   runtimeIsUsable
 } from '../status.js'
 import { ContextRing } from './ContextRing.js'
+import { defaultEffort } from '../status.js'
 import { Icon } from './Icon.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
@@ -195,6 +196,7 @@ export function Composer({
     if (refusal !== undefined) setRefusal(undefined)
   }
   const [modeOpen, setModeOpen] = useState(false)
+  const [effortOpen, setEffortOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
 
   // A mode the chosen route cannot run is not the mode a mission would start
@@ -325,6 +327,10 @@ export function Composer({
   // to highest, so the maximum is the last one THIS model reported -- not a
   // fixed name that some models do not have.
   const swarmEffort = supportedEfforts[supportedEfforts.length - 1]
+  // What the chip states. Swarm overrides it, and otherwise an unchosen
+  // level shows the model's default rather than nothing -- the same value
+  // App.tsx sets on a route change, so the chip says what the run gets.
+  const shownEffort = swarm ? swarmEffort : effort ?? defaultEffort(supportedEfforts)
 
   // While a mission runs, the control states what IT is on. Otherwise it
   // states what the next mission will use -- which is what the person just
@@ -624,12 +630,6 @@ export function Composer({
                     * reports no levels, which is the whole reason the old
                     * chip had to say "effort · fixed" on most routes.
                     */}
-                  {effort !== undefined && (
-                    <>
-                      <span className="lc-separator">·</span>
-                      <span className="lc-control__mono lc-control__effort">{effort}</span>
-                    </>
-                  )}
                   {/*
                     * The chevron the mode chip beside it has, and that the
                     * reference draws on this one too: `Codex CLI / gpt-5.6 ·
@@ -642,6 +642,64 @@ export function Composer({
                   <Icon name="chevron-down" size={11} />
                 </button>
               </span>
+              {/*
+                * Effort, as its own control again.
+                *
+                * The design review folded it onto the route chip; that made
+                * it invisible until chosen and it vanished entirely whenever
+                * a model was picked, because choosing a model cleared it.
+                * Colin, 2026-09-07: "just go back to effort being separate,
+                * completely remove it from the model page". So: a chip that
+                * always states a real level, beside the model it belongs to,
+                * reading `gpt-5.6` `medium` the way the reference image does.
+                *
+                * Absent only when the model reports no levels -- there is
+                * nothing to choose then, and a control that says so would be
+                * the dead chip this replaced.
+                */}
+              {shownEffort !== undefined && (
+                <span className="lc-control__anchor">
+                  {effortOpen && (
+                    <div className="lc-menu" role="menu" aria-label="Reasoning effort">
+                      {supportedEfforts.map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={shownEffort === level}
+                          className="lc-menu__item"
+                          onClick={() => {
+                            onEffortChange(level)
+                            setEffortOpen(false)
+                          }}
+                        >
+                          <span className="lc-menu__text">
+                            <span className="lc-menu__name lc-control__mono">{level}</span>
+                          </span>
+                          {shownEffort === level && <Icon name="check" size={13} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="lc-control lc-control--boxed"
+                    aria-haspopup="menu"
+                    aria-expanded={effortOpen}
+                    aria-label="Reasoning effort"
+                    title={
+                      swarm
+                        ? `Swarm is holding this at ${swarmEffort ?? 'the model maximum'}`
+                        : 'How hard the model thinks'
+                    }
+                    disabled={running || swarm}
+                    onClick={() => setEffortOpen(!effortOpen)}
+                  >
+                    <span className="lc-control__mono lc-control__effort">{shownEffort}</span>
+                    <Icon name="chevron-down" size={11} />
+                  </button>
+                </span>
+              )}
               {/*
                 * The swarm mark, back on the composer.
                 *

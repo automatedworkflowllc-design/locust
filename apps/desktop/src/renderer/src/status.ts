@@ -911,6 +911,44 @@ export interface ConversationRowExtras {
  * folded to spaces on both sides so the search matches how names are said,
  * not how a CLI happened to spell them.
  */
+/**
+ * The effort level a route uses when nobody has chosen one.
+ *
+ * The control is meant to read as a constant -- Colin, 2026-09-07: "have it
+ * be a constant" -- and a control showing nothing was how "we still have no
+ * effort control" stayed true even after the levels existed. So the level is
+ * always a real one, and because it is SET rather than merely displayed,
+ * what the chip says is what the run is given.
+ *
+ * `medium` when the model offers it, because every runtime here treats it as
+ * the ordinary setting. Otherwise the middle of what was reported, which for
+ * a two-level model is the higher one -- the same bias as picking `medium`
+ * out of five. Undefined only when the model reports no levels at all, and
+ * then there is nothing to show.
+ */
+export function defaultEffort(supportedEfforts: readonly string[]): string | undefined {
+  if (supportedEfforts.length === 0) return undefined
+  if (supportedEfforts.includes('medium')) return 'medium'
+  return supportedEfforts[Math.floor(supportedEfforts.length / 2)]
+}
+
+/**
+ * The effort to use after a model switch.
+ *
+ * Carried across when the new model advertises it, so choosing a different
+ * model does not silently undo a choice about how hard it should think.
+ * Cleared to that model's default otherwise, never to nothing: sending a
+ * level a model never advertised is the thing this guards against, and
+ * showing an empty control is what it used to do instead.
+ */
+export function effortAfterRouteChange(
+  current: string | undefined,
+  supportedEfforts: readonly string[]
+): string | undefined {
+  if (current !== undefined && supportedEfforts.includes(current)) return current
+  return defaultEffort(supportedEfforts)
+}
+
 export function routeSearchText(text: string): string {
   return text.toLowerCase().replace(/[-_/.:]+/g, ' ').replace(/\s+/g, ' ').trim()
 }

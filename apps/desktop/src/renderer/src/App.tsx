@@ -87,7 +87,7 @@ import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
-import { collapseConversations, defaultRoute, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultRoute, effortAfterRouteChange, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -3039,9 +3039,19 @@ export default function App(): ReactElement {
               // moving it.
               routeChosen.current = true
               setRoute(next)
-              // Effort belongs to a model. Carrying it across a model switch
-              // could send a level the new model never advertised.
-              setEffort(undefined)
+              // Effort belongs to a model, so a level the new model never
+              // advertised must not follow it across. But clearing to NOTHING
+              // is what made picking a model empty the effort control --
+              // Colin, 2026-09-07: "if the user just clicks the model it
+              // instantly defaults to no effort, it was cleaner before". So
+              // it lands on the new model's default instead.
+              setEffort(
+                effortAfterRouteChange(
+                  effort,
+                  models.find((model) => model.runtime === next.runtime && model.id === next.model)
+                    ?.supportedEfforts ?? []
+                )
+              )
             }}
             models={models}
             resolvedModels={resolvedModels}

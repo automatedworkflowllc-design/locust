@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.7 — 2026-09-07
+
+Effort is its own control again, and it always says something.
+
+- **A separate effort dropdown, beside the model.** Folding it onto the route
+  chip made it invisible until chosen, and choosing a model cleared it — so
+  picking a model instantly left you with no effort and no way to see one.
+- **Picking a model no longer empties it.** The level carries across when the
+  new model advertises it, and lands on that model's default when it does not.
+  Never on nothing. What the chip says is what the run is given.
+- **Nothing about effort in the model list any more.** Each row still names
+  the levels a model reports, because that is information worth having while
+  choosing a model; choosing between them belongs on the composer.
+
 ## 0.38.6 — 2026-09-07
 
 - **The swarm mark is back on the composer.** The design review moved it into

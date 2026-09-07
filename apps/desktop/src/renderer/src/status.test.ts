@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import {
+  defaultEffort,
+  effortAfterRouteChange,
   checkpointLabel,
   collapseConversations,
   listedAsMission,
@@ -930,5 +932,41 @@ describe('the route you are on sorts first in its group', () => {
   it('leaves the order alone when nothing is active', () => {
     const ordered = orderRouteRows([row('gpt-6-astra'), row('gpt-5.6-sol')], ['gpt-5.6-sol'])
     expect(ordered[0]?.key).toBe('gpt-5.6-sol')
+  })
+})
+
+describe('effort reads as a constant', () => {
+  // A model switch used to clear effort to undefined, so picking a model
+  // left the control showing nothing at all -- Colin, 2026-09-07: "if the
+  // user just clicks the model it defaults to no effort with no effort
+  // screen, have it be a constant".
+  it('prefers medium, the ordinary setting on every runtime here', () => {
+    expect(defaultEffort(['low', 'medium', 'high', 'xhigh', 'max'])).toBe('medium')
+  })
+
+  it('takes the middle when there is no medium', () => {
+    expect(defaultEffort(['low', 'high', 'max'])).toBe('high')
+  })
+
+  it('biases upward on a two-level model, as picking medium out of five does', () => {
+    expect(defaultEffort(['low', 'high'])).toBe('high')
+  })
+
+  it('has nothing to show when the model reports no levels', () => {
+    expect(defaultEffort([])).toBeUndefined()
+  })
+
+  it('carries a chosen level across a model switch that supports it', () => {
+    expect(effortAfterRouteChange('xhigh', ['low', 'medium', 'xhigh'])).toBe('xhigh')
+  })
+
+  it('falls back to the new model default rather than to nothing', () => {
+    // The old behaviour sent nothing AND showed nothing. Guarding against an
+    // unadvertised level does not require an empty control.
+    expect(effortAfterRouteChange('ultra', ['low', 'medium', 'high'])).toBe('medium')
+  })
+
+  it('still shows nothing when the new model reports no levels', () => {
+    expect(effortAfterRouteChange('high', [])).toBeUndefined()
   })
 })

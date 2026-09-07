@@ -296,37 +296,14 @@ export function RoutePicker({
                 )}
               </button>
               {/*
-                * Effort, under the model it belongs to, and ONLY under the one
-                * currently chosen. It used to be a chip in the composer that
-                * read "effort · fixed" on most routes -- a control announcing
-                * it had nothing to say -- while this list was already
-                * printing each model's levels in the line above.
-                *
-                * Drawn only where there are levels to choose between: a
-                * runtime that reports none needs no row, which is the same
-                * rule the composer's chip failed to follow.
+                * No effort control here. It lived under the selected model
+                * for one release and was removed on Colin's word
+                * (2026-09-07): "just go back to effort being separate,
+                * completely remove it from the model page". Each row's
+                * detail line still NAMES the levels a model reports, which
+                * is information; choosing between them is the composer's
+                * job, next to the model it applies to.
                 */}
-              {isActive && !recent && row.efforts !== undefined && row.efforts.length > 0 && (
-                <div className="lc-picker__efforts" role="group" aria-label="Reasoning effort">
-                  {swarm ? (
-                    <span className="lc-picker__effortheld lc-mono">
-                      held at {swarmEffort} by swarm
-                    </span>
-                  ) : (
-                    row.efforts.map((level) => (
-                      <button
-                        key={level}
-                        type="button"
-                        className={`lc-picker__effort lc-mono${effort === level ? ' is-on' : ''}`}
-                        aria-pressed={effort === level}
-                        onClick={() => onEffortChange(effort === level ? undefined : level)}
-                      >
-                        {level}
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
               {hidden > 0 && (
                 <p className="lc-picker__more lc-mono">
                   {hidden} more {hidden === 1 ? 'model' : 'models'} {needle.length > 0 ? 'match · keep typing' : '· type to search them'}
