@@ -483,6 +483,32 @@ export function shellCommandText(command: string): string {
  */
 const WORKTREE_PATH_PREFIX = /^\.locust\/worktrees\/[^/]+\//
 
+/**
+ * Cursor Agent reports the file it edited from inside its OWN copy of the
+ * project, not from the folder you opened:
+ *
+ *   C:/Users/you/.cursor/projects/C-Users-you-code-streaks/src/streak.js
+ *
+ * That directory name is the workspace path with its separators and colon
+ * beaten into hyphens, so it can be recognised for certain rather than
+ * guessed at -- and only then, when it matches THIS workspace, is the rest
+ * of it the same file you would open yourself. Measured on a real Cursor run
+ * 2026-09-07: a two-line edit reported eleven file rows, every one of them
+ * wearing a path like that, with the filename pushed off the end of a
+ * one-line row.
+ *
+ * A mirror belonging to some OTHER project keeps its full path, because then
+ * the location genuinely is the information.
+ */
+function cursorMirrorRelative(full: string, root: string): string | undefined {
+  const mirror = /^(.*)\/\.cursor\/projects\/([^/]+)\/(.+)$/i.exec(full)
+  if (mirror === null) return undefined
+  const [, , project, rest] = mirror
+  if (project === undefined || rest === undefined) return undefined
+  const flattened = root.replace(/[:\/]+/g, '-').replace(/^-+|-+$/g, '')
+  return project.toLowerCase() === flattened.toLowerCase() ? rest : undefined
+}
+
 export function relativePath(path: string, workspacePath: string | undefined): string {
   if (workspacePath === undefined || workspacePath.length === 0) return path
   const normalise = (value: string): string => value.replace(/[\\/]+/g, '/').replace(/\/$/, '')
@@ -491,6 +517,8 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   if (root.length === 0) return path
   // Windows paths are case-insensitive; comparing them case-sensitively is how
   // a correct prefix fails to match and the row keeps the unreadable path.
+  const mirrored = cursorMirrorRelative(full, root)
+  if (mirrored !== undefined) return mirrored
   if (!full.toLowerCase().startsWith(`${root.toLowerCase()}/`)) {
     // Already relative (a runtime that reports paths from its cwd): the tree
     // prefix is still noise. An absolute path elsewhere stays whole.

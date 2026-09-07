@@ -1831,3 +1831,40 @@ describe('the model an alias turned out to mean (0.35.2)', () => {
     expect(names.get('claude:sonnet')).toBeUndefined()
   })
 })
+
+describe('Cursor reports files from inside its own copy of the project', () => {
+  // Measured on a real Cursor Agent run, 2026-09-07: a two-line edit produced
+  // eleven file rows, each one wearing a path under ~/.cursor/projects/, with
+  // the filename pushed off the end of a one-line row. The directory name is
+  // the workspace path with its separators flattened to hyphens, so the match
+  // is certain rather than guessed.
+  const WS = String.raw`C:\Users\<home>\code\streaks`
+
+  it('reads the mirrored path as the file you would open yourself', () => {
+    expect(
+      relativePath(
+        String.raw`C:\Users\<home>\.cursor\projects\C-Users-<home>-code-streaks\src\streak.js`,
+        WS
+      )
+    ).toBe('src/streak.js')
+  })
+
+  it('matches case-insensitively, as Windows paths do', () => {
+    expect(
+      relativePath(
+        String.raw`c:\users\<home>\.cursor\projects\c-users-<home>-code-streaks\src\cli.js`,
+        WS
+      )
+    ).toBe('src/cli.js')
+  })
+
+  it('leaves another project\u2019s mirror whole, because there the location is the point', () => {
+    const other = String.raw`C:\Users\<home>\.cursor\projects\C-Users-<home>-code-other\src\streak.js`
+    expect(relativePath(other, WS)).toBe(other)
+  })
+
+  it('is not fooled by a folder that merely looks like the mirror', () => {
+    const decoy = String.raw`C:\Users\<home>\notes\.cursor\projects\unrelated\a.js`
+    expect(relativePath(decoy, WS)).toBe(decoy)
+  })
+})
