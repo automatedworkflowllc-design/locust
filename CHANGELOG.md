@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.0 — 2026-09-07
+
+- **A routine replays at the effort it was taught with.** Saving one records
+  the level you had set; replaying it uses that instead of falling back to
+  whatever the runtime does by default. A route whose model reports no levels
+  stores none, so nothing changes on the runtimes that take no effort.
+- **A teammate stops volunteering another teammate's work.** Shared memory
+  stays on — it is useful, and each memory already names who wrote it — but a
+  teammate was bringing one up when nobody had asked, reporting what a
+  colleague had done to a file you were not asking about. It is now told when
+  *not* to raise a memory, which the brief had never said.
+
 ## 0.42.0 — 2026-09-07
 
 - **The effort chip agrees with the model beside it.** While a mission ran, the

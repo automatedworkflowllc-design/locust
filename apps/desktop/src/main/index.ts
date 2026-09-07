@@ -937,7 +937,13 @@ if (!ownsSingleInstanceLock) {
           input.prompt,
           input.runtime,
           input.mode,
-          input.model === undefined ? {} : { model: input.model },
+          {
+            ...(input.model === undefined ? {} : { model: input.model }),
+            // A routine replays on a STORED route, which now carries the level
+            // it was taught with. Without this one saved at `high` quietly
+            // replayed at the runtime's default.
+            ...(input.effort === undefined ? {} : { effort: input.effort })
+          },
           sendToWindow,
           undefined,
           input.peer,

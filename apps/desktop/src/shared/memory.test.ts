@@ -79,3 +79,31 @@ describe('what a mission is told', () => {
     expect(text).not.toContain('kept at once')
   })
 })
+
+describe('a memory is a colleague’s note, not a report on them', () => {
+  // A first outside tester ran two teammates on two files. Asked to edit
+  // notes.txt, Beta volunteered "Confirmed from memory: README.md retains
+  // Alpha's ALPHA-TOUCHED" -- attributed, and still nobody had asked. Colin's
+  // call (2026-09-07) was to keep shared memory on and fix the silence around
+  // it rather than the sharing; the brief already said WHEN to use one and
+  // never said when not to.
+  const brief = (): string =>
+    memorySection({
+      selfName: 'Beta',
+      workspaceName: 'locust-sample',
+      memories: [{ text: 'notes.txt ends with BETA-TOUCHED', by: 'Beta', scope: 'workspace', where: 'locust-sample' }],
+      askFirst: false
+    })
+
+  it('says not to raise one that has nothing to do with the question', () => {
+    expect(brief()).toContain('nothing to do with what was asked')
+  })
+
+  it('names the specific thing that went wrong: reporting another teammate’s work', () => {
+    expect(brief()).toContain("another teammate's work")
+  })
+
+  it('still tells it to answer from a memory that does fit', () => {
+    expect(brief()).toContain('answer from it and say it came from memory')
+  })
+})

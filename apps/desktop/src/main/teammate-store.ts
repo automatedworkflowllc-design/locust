@@ -105,6 +105,12 @@ export function isTeammateRoute(value: unknown): value is TeammateRoute {
     // would only make `rememberRoute` fail silently and leave a stale one on
     // the roster, which is the worse of the two.
     && (record.mode === 'ask' || record.mode === 'accept-edits' || record.mode === 'approve-each' || record.mode === 'plan' || record.mode === 'auto')
+    // Optional, and only ever a short string: a routine records the level it
+    // was taught with. Bounded rather than free -- it is written into a command
+    // line, and a route carrying something absurd should be refused here rather
+    // than at the runtime.
+    && (record.effort === undefined
+      || (typeof record.effort === 'string' && record.effort.length > 0 && record.effort.length <= 40))
   )
 }
 

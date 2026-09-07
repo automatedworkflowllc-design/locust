@@ -2053,7 +2053,20 @@ export default function App(): ReactElement {
       truncated: draft.truncated,
       // The route the routine will replay on: the teammate's own, else the
       // one this conversation actually ran on. Never a guess.
-      route: teammate?.route ?? { runtime: mission.runtime, model: mission.model ?? 'account-default', mode: 'ask' },
+      //
+      // The effort comes from the composer, because missions do not record
+      // theirs -- so there is no level to recover from the conversation being
+      // taught, and the one on screen is the level the next run would use.
+      // Undefined on a route whose model reports no levels, which is exactly
+      // the set of runtimes that refuse an effort.
+      route: {
+        ...(teammate?.route ?? {
+          runtime: mission.runtime,
+          model: mission.model ?? 'account-default',
+          mode: 'ask'
+        }),
+        ...(effort === undefined ? {} : { effort })
+      },
       busy: false
     })
   }

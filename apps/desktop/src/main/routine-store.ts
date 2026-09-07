@@ -97,7 +97,16 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
   // A schedule that does not read is dropped, not the routine: the steps
   // are the person's words and outrank a malformed timer.
   const schedule = validSchedule(record.schedule) ? record.schedule : undefined
-  const route: TeammateRoute = { runtime: record.route.runtime, model: record.route.model, mode: record.route.mode }
+  const route: TeammateRoute = {
+    runtime: record.route.runtime,
+    model: record.route.model,
+    mode: record.route.mode,
+    // Carried explicitly. This object is rebuilt field by field, so anything
+    // added to TeammateRoute and not named here is dropped in silence -- the
+    // shape that once lost a row's effort levels and drew a control with none
+    // under a detail line promising five.
+    ...(record.route.effort === undefined ? {} : { effort: record.route.effort })
+  }
   return {
     routineId: record.routineId,
     name: record.name.trim(),
@@ -210,7 +219,12 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           routineId: `rt_${randomUUID().replace(/-/g, '').slice(0, 24)}`,
           name: input.name.trim(),
           teammateId: input.teammateId,
-          route: { runtime: input.route.runtime, model: input.route.model, mode: input.route.mode },
+          route: {
+            runtime: input.route.runtime,
+            model: input.route.model,
+            mode: input.route.mode,
+            ...(input.route.effort === undefined ? {} : { effort: input.route.effort })
+          },
           steps: [...input.steps],
           learnedFrom: [...input.learnedFrom],
           createdAt: new Date().toISOString(),

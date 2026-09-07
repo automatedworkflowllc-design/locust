@@ -181,3 +181,39 @@ describe('a routine that runs on its own', () => {
     expect(back?.schedule).toBeUndefined()
   })
 })
+
+describe('a routine remembers the effort it was taught with', () => {
+  // Colin, 2026-09-07: a routine replays the turns you typed, and how hard the
+  // model was asked to think is part of how it ran -- one saved at `high` that
+  // replays at the runtime's default is not the same routine.
+  //
+  // The route is rebuilt field by field on both read and write, so a field
+  // added and not named there is dropped in silence. That shape has already
+  // cost a release once, when a picker row lost its effort levels and drew a
+  // control with none under a detail line promising five.
+  it('round-trips it through the store', async () => {
+    const store = createRoutineStore({ rootDirectory: await mkdtemp(join(tmpdir(), 'locust-routine-effort-')) })
+    const saved = await store.create({
+      name: 'Nightly sweep',
+      teammateId: 'tm_wren',
+      route: { runtime: 'codex', model: 'gpt-5.6-sol', mode: 'ask', effort: 'high' },
+      steps: ['Summarise what changed'],
+      learnedFrom: ['mission_taught']
+    })
+    expect(saved.route.effort).toBe('high')
+    const listed = await store.list()
+    expect(listed.find((entry) => entry.routineId === saved.routineId)?.route.effort).toBe('high')
+  })
+
+  it('leaves a route without one alone', async () => {
+    const store = createRoutineStore({ rootDirectory: await mkdtemp(join(tmpdir(), 'locust-routine-noeffort-')) })
+    const saved = await store.create({
+      name: 'Nightly sweep',
+      teammateId: 'tm_wren',
+      route: { runtime: 'opencode', model: 'big-pickle', mode: 'ask' },
+      steps: ['Summarise what changed'],
+      learnedFrom: ['mission_taught']
+    })
+    expect(saved.route.effort).toBeUndefined()
+  })
+})

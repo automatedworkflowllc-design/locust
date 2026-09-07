@@ -356,6 +356,16 @@ export interface TeammateRoute {
   /** A model id from the catalog, or `account-default`. */
   readonly model: string
   readonly mode: MissionMode
+  /**
+   * The reasoning effort this route runs at, when its model reports levels.
+   *
+   * A routine replays the turns you typed, and how hard the model was asked to
+   * think is part of how it ran -- one saved while set to `high` that replays
+   * at the runtime's default is not the same routine. Absent on every runtime
+   * whose models report no levels, which is also every runtime whose command
+   * builder refuses an effort outright.
+   */
+  readonly effort?: string
 }
 
 /**
