@@ -1820,6 +1820,61 @@ describe('continuing a conversation', () => {
     expect(response.data.followsUp).toEqual({ missionId: 'mission_prior', runtimeThreadId: 'thread-prior' })
   })
 
+  it('starts cold when the mode changed, so the chip is not lying about the run', async () => {
+    // An outside tester, 0.38.7 finding 5: "Composer mode does not apply to
+    // follow-ups in the open thread. Chip set to Accept edits; the follow-up
+    // still ran with no write tools because the thread started in Ask. The
+    // chip lies about the session that will actually run."
+    //
+    // A resumed session keeps the tools it was BUILT with, so the mode a
+    // person changed since cannot reach it. Losing the earlier messages is
+    // the smaller cost -- and the thread says that happened -- next to the
+    // mode on screen not being the mode that runs.
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const created: Record<string, unknown>[] = []
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => finished({ mode: 'ask' }) as never,
+      createMission: async (metadata) => {
+        created.push(metadata as unknown as Record<string, unknown>)
+      }
+    }))
+
+    const response = await service.start(
+      'now actually write it', 'codex', 'accept-edits', {}, () => undefined, undefined, undefined, 'mission_prior'
+    )
+
+    expect(response.ok).toBe(true)
+    const spec = start.mock.calls[0]?.[0] as { args: readonly string[] }
+    // Not `exec resume thread-prior`: that session cannot be given write tools.
+    expect(spec.args.slice(0, 3)).not.toEqual(['exec', 'resume', 'thread-prior'])
+    expect(spec.args).not.toContain('thread-prior')
+    // And the run it did start is the one the chip promised.
+    expect(created[0]?.sandbox).toBe('workspace-write')
+  })
+
+  it('still resumes when the mode is the same one the conversation started in', async () => {
+    // The guard above must not cost every follow-up its context: an unchanged
+    // mode resumes exactly as before.
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'thread.started', thread_id: 'thread-prior' }, { type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => finished({ mode: 'ask' }) as never
+    }))
+
+    const response = await service.start(
+      'and what did that say?', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior'
+    )
+
+    expect(response.ok).toBe(true)
+    const spec = start.mock.calls[0]?.[0] as { args: readonly string[] }
+    expect(spec.args.slice(0, 3)).toEqual(['exec', 'resume', 'thread-prior'])
+  })
+
   it('continues a conversation whose earlier turn recorded no session, cold rather than not at all', async () => {
     // A turn that failed before its runtime started leaves nothing to resume.
     // Refusing the reply is what made a follow-up after a failure open a
