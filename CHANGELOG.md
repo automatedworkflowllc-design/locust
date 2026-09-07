@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.39.1 — 2026-09-07
+
+- **Every runtime names the output cap, not just Codex.** Locust stops a run
+  whose single line of output passes 256 KB. Codex has said so since 0.38.4;
+  Claude Code, Cursor Agent and Copilot CLI share the same cap and said
+  nothing, so a huge-output run looked like the model shrugging rather than
+  Locust stopping it. (OpenCode's terminal path has a different shape and is
+  still to do.)
+
 ## 0.39.0 — 2026-09-07
 
 From a first outside tester's report and an audit of the six releases before
