@@ -246,7 +246,20 @@ try {
 
   say('5. the Team screen shows the schedule and the next run')
   const listed = await teamRows(app.evaluate)
-  check('the card reads "every 4 hours · next HH:MM"', /every 4 hours · next \d\d:\d\d/.test(String(listed)), String(listed).slice(0, 200))
+  // Show the SCHEDULE part, not the first 200 characters of the card -- the
+  // routine name ate the whole budget and the failure never showed what the
+  // line actually said.
+  const scheduleText = (String(listed).match(/every 4 hours[^|]{0,40}/) ?? ['no schedule line in the card'])[0]
+  // routineScheduleSummary has FOUR shapes, all correct, and which one you
+  // get depends on the clock: "next 06:12" today, "next tomorrow 02:08",
+  // "next Sat 09:00" further out, and "due now" once it is due. Pinning only
+  // the same-day one made this fail every evening -- it ran at 22:08, four
+  // hours later is tomorrow, and the card rightly said so.
+  check(
+    'the card reads "every 4 hours · next <when>"',
+    /every 4 hours · (due now|next (tomorrow |(Sun|Mon|Tue|Wed|Thu|Fri|Sat) )?\d\d:\d\d)/.test(String(listed)),
+    scheduleText
+  )
 
   const routinesPath = join(profile, 'routines.json')
   const file = JSON.parse(await readFile(routinesPath, 'utf8'))

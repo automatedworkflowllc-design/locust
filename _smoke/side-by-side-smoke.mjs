@@ -279,7 +279,22 @@ try {
   const all = await ledgers()
   check('two mission ledgers exist', all.length === 2, `ledgers: ${all.length}`)
   const completedCount = all.filter((entry) => entry.records.some((r) => r.recordType === 'mission.event' && r.event.type === 'run.completed')).length
-  check('both ledgers end in run.completed', completedCount === 2, `completed: ${completedCount}`)
+  // What each run actually ENDED with. "completed: 1" says a run did not
+  // finish; it does not say whether it failed, was cancelled, or simply
+  // stopped emitting -- which are three different bugs.
+  const endings = all.map((entry) => {
+    const terminal = entry.records
+      .filter((r) => r.recordType === 'mission.event' && /^run\.(completed|failed|cancelled)$/.test(r.event.type ?? ''))
+      .map((r) => r.event.type)
+    const reason = entry.records
+      .map((r) => (r.recordType === 'mission.event' ? r.event.message ?? r.event.reason : undefined))
+      .filter((text) => typeof text === 'string')
+      .at(-1)
+    const failed = entry.records.find((r) => r.recordType === 'mission.event' && r.event.type === 'run.failed')
+    if (failed !== undefined) return 'run.failed :: ' + JSON.stringify(failed.event).slice(-360)
+    return (terminal.at(-1) ?? 'NO TERMINAL EVENT') + (reason === undefined ? '' : ' :: ' + String(reason).slice(0, 90))
+  })
+  check('both ledgers end in run.completed', completedCount === 2, `completed: ${completedCount} || ${endings.join('  ;;  ')}`)
   const roster = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8'))
   const owners = new Set(Object.values(roster.missionOwners))
   check('each mission is recorded as its teammate\u2019s', owners.has('tm_atlas') && owners.has('tm_wren'), JSON.stringify(roster.missionOwners))

@@ -998,7 +998,15 @@ export function createCodexEventNormalizer(
         : "missing";
     let kind = failureKind(lastTerminalMessage);
     let message = lastTerminalMessage ?? "Codex invocation did not complete successfully";
-    if (sawTurnCompleted && !cleanExit) {
+    if (completion.outputLimitExceeded) {
+      // Checked FIRST: this is the one branch where the host, not the
+      // runtime, ended the run, so nothing the runtime said afterwards
+      // describes it better. Naming the cause is the difference between a
+      // person retrying the same prompt forever and narrowing it once.
+      kind = "process-failed";
+      message =
+        "Codex sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it.";
+    } else if (sawTurnCompleted && !cleanExit) {
       kind = "protocol-mismatch";
       message = "Codex reported turn completion but the host process did not exit cleanly";
     } else if (!sawTurnCompleted && cleanExit && !sawTurnFailed) {

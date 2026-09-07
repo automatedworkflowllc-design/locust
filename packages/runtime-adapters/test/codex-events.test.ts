@@ -266,6 +266,29 @@ describe("Codex JSONL event normalizer", () => {
     expect(ofType(terminal, "run.failed")).toHaveLength(0);
   });
 
+  it("says so when IT stopped the run for output volume", () => {
+    // The host kills a run whose JSONL carries a single record over its
+    // 256 KB cap. Before this, the person was told "Codex invocation did not
+    // complete successfully" -- the sentence reserved for an exit nobody can
+    // explain -- while the one thing we knew for certain was the cause.
+    // Seen in the wild by the side-by-side smoke, 2026-09-07.
+    const target = normalizer();
+    feed(target, [
+      { type: "thread.started", thread_id: "thread-flood" },
+      { type: "turn.started" },
+    ]);
+    const terminal = target.finish(completion({
+      exitCode: null,
+      signal: "SIGINT",
+      outputLimitExceeded: true,
+      recordCount: 7,
+    }));
+    const failed = ofType(terminal, "run.failed")[0]?.payload;
+    expect(failed).toMatchObject({ kind: "process-failed", runtimeTerminal: "missing" });
+    expect(failed?.message).toContain("larger than Locust accepts");
+    expect(failed?.message).not.toContain("did not complete successfully");
+  });
+
   it("rejects both EOF/exit mismatches instead of claiming success", () => {
     const completedButBadExit = normalizer();
     feed(completedButBadExit, [
