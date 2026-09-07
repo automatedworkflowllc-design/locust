@@ -6,6 +6,38 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.6 — 2026-09-07
+
+- **A long run is no longer killed by one big piece of output.** A mission on
+  Cursor Agent was stopped a minute and a half in, after 1,596 pieces of a
+  perfectly normal answer, because the 1,597th was larger than Locust would
+  take in one go - and everything already on screen was thrown away with it.
+  That one piece is now skipped and the run carries on. If a run later ends
+  with nothing to close it, Locust says a piece was skipped rather than
+  blaming the runtime for a silence Locust caused.
+- **Cursor Agent works again with an effort chosen.** After one turn, a
+  follow-up on the same conversation failed at once with "Cursor Agent takes
+  no effort level. Nothing was recorded." Cursor carries the effort inside the
+  model name, and Locust had stopped recognising its own model once that name
+  included one.
+- **You can open the file your teammate just wrote.** Every changed file in
+  the activity fold now has a control that shows it in File Explorer, and the
+  inspector's Artifacts tab lists what the mission produced instead of always
+  saying there is nothing. Locust shows the file rather than opening it: a
+  script a model wrote should not be one click from running. Anything outside
+  the folder your teammates work in is refused.
+- **OpenCode says why it stopped.** Running out of the free model's usage
+  read as "OpenCode ended without a step that reported it had stopped". It now
+  says the free model has no usage left and to pick another one or come back
+  later.
+- **The thread follows the newest line.** It stays at the bottom while you are
+  at the bottom, and stops the moment you scroll up to read something - it
+  will not yank you back mid-answer. The scrollbar is thin now, with no
+  trough.
+- **The composer stopped explaining Shift+Enter.** It was taking up room in
+  the box to say something everybody knows.
+- One written file no longer draws two identical rows in the activity fold.
+
 ## 0.43.5 — 2026-09-07
 
 - **An approval now says what would leave your machine.** The card told you
