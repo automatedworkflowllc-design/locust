@@ -5,8 +5,9 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { MissionRouteSummary, PublicRecoveredMission } from '../../../shared/ipc.js'
 import { costLine, runCostOf } from '../cost.js'
-import { buildSignalRail } from '../missionView.js'
+import { buildSignalRail, buildThread, producedFiles } from '../missionView.js'
 import { checkpointLabel, ledgerVerificationLabel, shortMissionId } from '../status.js'
+import { Icon } from './Icon.js'
 
 const TABS = ['Activity', 'Details', 'Artifacts', 'Receipt'] as const
 type Tab = (typeof TABS)[number]
@@ -27,12 +28,15 @@ function Empty({ children }: { readonly children: string }): ReactElement {
  */
 export function Inspector({
   events,
+  workspacePath,
   running,
   route,
   restoredMission,
   onClose
 }: {
   readonly events: readonly NormalizedRuntimeEvent[]
+  /** The folder this ran in, so artifact paths read the way a person writes them. */
+  readonly workspacePath: string | undefined
   readonly running: boolean
   readonly route: MissionRouteSummary | undefined
   readonly restoredMission: PublicRecoveredMission | undefined
@@ -43,6 +47,14 @@ export function Inspector({
   // not from whatever mode the composer happens to show now.
   const writes = route?.sandbox === 'workspace-write' || route?.sandbox === 'full-access'
   const rows = buildSignalRail(events, { running })
+  const [artifactNotice, setArtifactNotice] = useState<string | undefined>(undefined)
+  // Every file this run touched, gathered from the same activity the fold
+  // draws so the tab and the thread cannot disagree about what happened.
+  const artifacts = producedFiles(
+    buildThread(events, { running, mayEdit: writes, ...(workspacePath === undefined ? {} : { workspacePath }) })
+      .flatMap((item) => ('details' in item && Array.isArray(item.details) ? item.details : [])),
+    workspacePath
+  )
 
   return (
     <aside className="lc-inspector" aria-label="Mission inspector">
@@ -149,11 +161,48 @@ export function Inspector({
           </dl>
         )}
 
-        {tab === 'Artifacts' && (
-          <Empty>
-            No artifacts. A read-only mission produces none; artifacts appear once a run can write.
-          </Empty>
-        )}
+        {tab === 'Artifacts' &&
+          (artifacts.length === 0 ? (
+            <Empty>
+              No artifacts. A read-only mission produces none; artifacts appear once a run can write.
+            </Empty>
+          ) : (
+            // The tab has made this promise since it was built and never kept
+            // it: it said artifacts appear once a run can write, and then
+            // showed the same empty line after runs that wrote plenty. The
+            // rows come from the same entries the activity fold counts, so the
+            // two cannot disagree about what this mission touched.
+            <ul className="lc-artifacts">
+              {artifacts.map((artifact) => (
+                <li className="lc-artifacts__row" key={artifact.path}>
+                  <span className="lc-artifacts__path" title={artifact.path}>
+                    {artifact.shown}
+                  </span>
+                  {artifact.status !== undefined && <span className="lc-artifacts__status">{artifact.status}</span>}
+                  <button
+                    type="button"
+                    className="lc-filerow__reveal"
+                    title={`Show ${artifact.shown} in the file manager`}
+                    aria-label={`Show ${artifact.shown} in the file manager`}
+                    onClick={() => {
+                      const bridge = window.desktop
+                      if (bridge === undefined) return
+                      setArtifactNotice(undefined)
+                      void bridge
+                        .revealFile(artifact.path)
+                        .then((response) => {
+                          if (!response.ok) setArtifactNotice(response.message)
+                        })
+                        .catch(() => setArtifactNotice('That file could not be shown.'))
+                    }}
+                  >
+                    <Icon name="folder" size={13} />
+                  </button>
+                </li>
+              ))}
+              {artifactNotice !== undefined && <li className="lc-filerow__notice">{artifactNotice}</li>}
+            </ul>
+          ))}
 
         {tab === 'Receipt' &&
           (restoredMission === undefined ? (

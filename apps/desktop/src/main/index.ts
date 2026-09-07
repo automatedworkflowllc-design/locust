@@ -25,6 +25,7 @@ import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
 import { createModelCatalog } from './model-catalog.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
+import { decideReveal } from './reveal-file.js'
 import { createTeammateStore } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
@@ -96,6 +97,7 @@ import {
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
+  WORKSPACE_REVEAL_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
   ROOM_LIST_CHANNEL,
@@ -1090,6 +1092,27 @@ if (!ownsSingleInstanceLock) {
       })
       setTimeout(() => app.quit(), 150)
       return { ok: true, data: { path: next, reopening: true } } as const
+    })
+
+    ipcMain.handle(WORKSPACE_REVEAL_CHANNEL, (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      // The roots are the host's, never the renderer's. One workspace per
+      // launch, and every worktree lives inside it, so this is the whole list.
+      const decision = decideReveal(requested, workspaceChosen ? [workspacePath] : [])
+      if (!decision.ok) {
+        return {
+          ok: false,
+          message:
+            decision.reason === 'no-path'
+              ? 'There is no file to show.'
+              : 'That file is outside the folder your teammates work in, so Locust will not open it.'
+        } as const
+      }
+      // Reveals, never opens: `showItemInFolder` puts a file manager in front
+      // of the person. `openPath` would run a `.bat` or a `.ps1` that a model
+      // wrote, which is not a click anyone should be one step away from.
+      shell.showItemInFolder(decision.path)
+      return { ok: true } as const
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {

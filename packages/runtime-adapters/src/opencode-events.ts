@@ -21,6 +21,8 @@ import type {
   RuntimeJsonlRecord,
   RuntimeProcessCompletion,
 } from "./process-runner.js";
+import { openCodeErrorFacts, openCodeErrorSentence } from "./opencode-error.js";
+import type { OpenCodeErrorFacts } from "./opencode-error.js";
 
 /**
  * OpenCode `run --format json` -> product events.
@@ -148,6 +150,9 @@ export function createOpenCodeEventNormalizer(
   let inputTokens = 0;
   let outputTokens = 0;
   let sawTokens = false;
+  // The last provider error the runtime reported, kept so the run that follows
+  // it can say what happened instead of shrugging.
+  let providerError: OpenCodeErrorFacts | undefined;
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -274,6 +279,22 @@ export function createOpenCodeEventNormalizer(
       ];
     }
 
+    // OpenCode says why it is about to die. Until 2026-09-07 this fell through
+    // to `unknown_event` at level `info`, and the run then reported itself as
+    // having "ended without a step that reported it had stopped" -- the vaguest
+    // sentence available, about the one thing we actually knew. See
+    // `opencode-error.ts` for the record that was measured.
+    if (type === "error") {
+      const facts = openCodeErrorFacts(parsed);
+      if (facts !== undefined) {
+        // Kept for the completion path, which is where a run's failure is
+        // reported. Emitting `run.failed` from here would race the process
+        // exit and could finalize a run the runtime has not finished writing.
+        providerError = facts;
+        return [diagnostic("error", "opencode.provider_error", openCodeErrorSentence(facts), evidence)];
+      }
+    }
+
     return [
       diagnostic("info", "opencode.unknown_event", `Unhandled OpenCode record: ${type}`, evidence),
     ];
@@ -352,9 +373,15 @@ export function createOpenCodeEventNormalizer(
               ? `OpenCode asked for ${refusedPath}, which is outside the folder this run may use, and stopped.`
               : completion.outputLimitExceeded
                 ? "OpenCode sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
-                : sawStop
-                  ? `OpenCode exited with code ${String(completion.exitCode)}.`
-                  : "OpenCode ended without a step that reported it had stopped.",
+                // The runtime's own account of why, when it gave one. Sits
+                // below the two cases above because those describe something
+                // the HOST did, which the runtime could not know about, and
+                // above the exit code because a number is not a reason.
+                : providerError !== undefined
+                  ? openCodeErrorSentence(providerError)
+                  : sawStop
+                    ? `OpenCode exited with code ${String(completion.exitCode)}.`
+                    : "OpenCode ended without a step that reported it had stopped.",
             ...thread,
             runtimeTerminal: sawStop ? "completed" : "missing",
             process,

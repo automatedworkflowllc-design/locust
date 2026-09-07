@@ -284,6 +284,19 @@ export type RuntimeInstallResponse =
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
+/**
+ * Show a file a teammate wrote, in the operating system's file manager.
+ *
+ * The renderer sends a path it already holds; the host honours it only if it
+ * resolves inside a workspace the host knows about. See `main/reveal-file.ts`
+ * for why that check is the whole point of the channel.
+ */
+export const WORKSPACE_REVEAL_CHANNEL = 'workspace:reveal'
+
+/** What came of a reveal. A refusal names why, in words a card can show. */
+export type RevealFileResponse =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string }
 export const ROOM_LIST_CHANNEL = 'rooms:list'
 export const ROOM_CREATE_CHANNEL = 'rooms:create'
 export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
@@ -1168,6 +1181,11 @@ export interface DesktopApi {
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>
+  /**
+   * Show a file in the file manager. Answers whether it was shown, so the
+   * card can say something rather than appear to do nothing.
+   */
+  revealFile(path: string): Promise<RevealFileResponse>
   listRooms(): Promise<RoomListResponse>
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>
   removeRoom(roomId: string): Promise<RoomMutationResponse>

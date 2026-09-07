@@ -47,6 +47,20 @@ export function ActivityCard({
   readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
 }): ReactElement {
   const [open, setOpen] = useState(false)
+  // Only ever set when the host refuses. A reveal that works needs no words:
+  // the file manager comes to the front and that is the whole feedback.
+  const [revealNotice, setRevealNotice] = useState<string | undefined>(undefined)
+  const reveal = (path: string): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setRevealNotice(undefined)
+    void bridge
+      .revealFile(path)
+      .then((response) => {
+        if (!response.ok) setRevealNotice(response.message)
+      })
+      .catch(() => setRevealNotice('That file could not be shown.'))
+  }
   const entries = activityEntries(details, workspacePath)
   const counts = activityCounts(details, workspacePath)
   const anyPatch = entries.some((entry) => entry.kind === 'file')
@@ -107,19 +121,39 @@ export function ActivityCard({
             <Fragment key={entry.key}>
               {entry.kind === 'file' ? (
                 <>
-                  <button type="button" className="lc-filerow" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
-                    <Icon name="file" size={14} />
-                    <span className="lc-filerow__path">{relativePath(entry.file.path, workspacePath)}</span>
-                    <span className="lc-filerow__status">{entry.file.status}</span>
-                    {entry.large && <span className="lc-filerow__status is-large">LARGE</span>}
-                    <span className="lc-filerow__result">
-                      <span className="lc-diff__addmark">+{entry.counts.added}</span>
-                      <span className="lc-diff__delmark">−{entry.counts.removed}</span>
-                    </span>
-                    <span className="lc-activity__chev" aria-hidden="true">
-                      <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
-                    </span>
-                  </button>
+                  <div className="lc-filerow__line">
+                    <button type="button" className="lc-filerow" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
+                      <Icon name="file" size={14} />
+                      <span className="lc-filerow__path">{relativePath(entry.file.path, workspacePath)}</span>
+                      <span className="lc-filerow__status">{entry.file.status}</span>
+                      {entry.large && <span className="lc-filerow__status is-large">LARGE</span>}
+                      <span className="lc-filerow__result">
+                        <span className="lc-diff__addmark">+{entry.counts.added}</span>
+                        <span className="lc-diff__delmark">−{entry.counts.removed}</span>
+                      </span>
+                      <span className="lc-activity__chev" aria-hidden="true">
+                        <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
+                      </span>
+                    </button>
+                    {/*
+                      The file is on this disk and, until now, nothing on screen
+                      would take you to it -- found by dogfooding (Colin,
+                      2026-09-07): a teammate wrote a report, named it, and the
+                      name was not clickable. This is the row's own control
+                      rather than a menu item, because "where is it" is the
+                      first thing asked about a file and a fold two levels deep
+                      is not where the answer belongs.
+                    */}
+                    <button
+                      type="button"
+                      className="lc-filerow__reveal"
+                      title={`Show ${relativePath(entry.file.path, workspacePath)} in the file manager`}
+                      aria-label={`Show ${relativePath(entry.file.path, workspacePath)} in the file manager`}
+                      onClick={() => reveal(entry.file.path)}
+                    >
+                      <Icon name="folder" size={13} />
+                    </button>
+                  </div>
                   {isOpen(entry) && <DiffView file={entry.file} truncated={entry.truncated} reported={entry.reported} />}
                 </>
               ) : entry.kind === 'helper' ? (
@@ -165,6 +199,7 @@ export function ActivityCard({
               )}
             </Fragment>
           ))}
+          {revealNotice !== undefined && <p className="lc-filerow__notice">{revealNotice}</p>}
         </div>
       )}
     </div>

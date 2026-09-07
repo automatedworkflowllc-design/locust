@@ -3200,6 +3200,7 @@ export default function App(): ReactElement {
         {inspectorOpen && liveRun !== undefined && (
           <Inspector
             events={liveRun.events}
+            workspacePath={workspacePath}
             running={running}
             route={liveRun.data}
             restoredMission={liveRun.restoredMission}

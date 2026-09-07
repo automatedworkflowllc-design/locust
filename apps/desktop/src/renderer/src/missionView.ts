@@ -1990,3 +1990,46 @@ export function recentlyUsedRoutes(
     .sort((left, right) => right[1] - left[1])
     .map(([key]) => key)
 }
+
+/**
+ * The files a mission produced, for the Inspector's Artifacts tab.
+ *
+ * That tab has said "artifacts appear once a run can write" since it was
+ * built, and then showed nothing on runs that wrote plenty -- a promise the
+ * app never kept, found by dogfooding (Colin, 2026-09-07, and again in his own
+ * report: "No file listing, download trigger, or artifact delivery logic is
+ * attached to this tab yet"). What was missing was not the idea, it was this
+ * list.
+ *
+ * The rows are derived from the SAME entries the activity fold counts, through
+ * the same `relativePath` key, so the tab and the fold cannot report different
+ * files for one run -- the failure mode that produced `2 files` over a one-line
+ * change and is worth not repeating in a second place.
+ *
+ * Failed edits are left out. A tool that reported a failure did not produce an
+ * artifact, and a list that offered to show someone a file that was never
+ * written would be worse than an empty tab.
+ */
+export function producedFiles(
+  details: readonly ActivityDetail[],
+  workspacePath: string | undefined
+): readonly { readonly path: string; readonly shown: string; readonly status: string | undefined }[] {
+  const entries = activityEntries(details, workspacePath)
+  const key = (path: string): string =>
+    relativePath(path, workspacePath).replace(/[\/]+/g, '/').replace(/^\.\//, '').toLowerCase()
+  const seen = new Set<string>()
+  const rows: { path: string; shown: string; status: string | undefined }[] = []
+  for (const entry of entries) {
+    const path = entry.kind === 'file' ? entry.file.path : entry.kind === 'unreported' && entry.failed !== true ? entry.name : undefined
+    if (path === undefined) continue
+    const id = key(path)
+    if (seen.has(id)) continue
+    seen.add(id)
+    rows.push({
+      path,
+      shown: relativePath(path, workspacePath),
+      status: entry.kind === 'file' ? entry.file.status : undefined
+    })
+  }
+  return rows
+}
