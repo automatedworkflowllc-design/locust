@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.42.0 — 2026-09-07
+
+- **The effort chip agrees with the model beside it.** While a mission ran, the
+  chip named the live model but took its levels from whatever route you had
+  queued next — two models on one chip.
+- **Every turn says when it changed nothing.** `no files changed` was written
+  onto the newest turn only, so scrolling up in a conversation showed the same
+  silence the line exists to break.
+
 ## 0.41.3 — 2026-09-07
 
 - **A conversation shows that it has a menu.** Saving a routine needed a

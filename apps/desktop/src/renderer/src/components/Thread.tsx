@@ -354,12 +354,16 @@ export function Thread({
   handoff,
   peers
 }: ThreadProps): ReactElement {
+  // What the run was allowed, hoisted so EVERY turn can be told -- not just
+  // the newest. `no files changed` existed only on the last turn, so scrolling
+  // up in a conversation showed the silence the line exists to break.
+  const mayEdit = sandbox !== undefined && sandbox !== 'read-only'
   const items = buildThread(events, {
     running,
     latestTurn: true,
     awaitingDecision: approvals.length > 0,
     spokeToPeers: peers.messages.length > 0,
-    mayEdit: sandbox !== undefined && sandbox !== 'read-only',
+    mayEdit,
     ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso })
   })
   // A read-only run whose answer carries code is the one case where "run it
@@ -438,7 +442,7 @@ export function Thread({
               )}
               {turnPromptLine(turn) !== undefined && <div className="lc-bubble">{turnPromptLine(turn)}</div>}
               {cardsFor(index, 'before-work').map(peerCard)}
-              <ThreadItems items={buildThread(turn.events, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
+              <ThreadItems items={buildThread(turn.events, { running: false, mayEdit })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
               {cardsFor(index, 'after-work').map(peerCard)}
             </Fragment>
           )
@@ -451,7 +455,7 @@ export function Thread({
 
         {handoff !== undefined && (
           <>
-            <ThreadItems items={buildThread(handoff.priorEvents, { running: false })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
+            <ThreadItems items={buildThread(handoff.priorEvents, { running: false, mayEdit })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
             <HandoffDivider
               from={handoff.from}
               to={handoff.to}

@@ -1914,3 +1914,27 @@ describe('a run that could edit and edited nothing says so', () => {
     expect(files?.tone).toBeUndefined()
   })
 })
+
+describe('an earlier turn says it changed nothing too', () => {
+  // `mayEdit` was passed for the newest turn and nowhere else, so scrolling up
+  // in a conversation showed exactly the silence 0.38.9 exists to break: a run
+  // that was allowed to edit, finished, and touched nothing looked the same as
+  // one that had never been asked to.
+  const readOnce = (): NormalizedRuntimeEvent[] => [
+    event('tool.started', { itemId: 'r1', toolKind: 'read', name: 'Read' }),
+    event('tool.completed', { itemId: 'r1', toolKind: 'read', name: 'Read' })
+  ]
+  const traceOf = (options: { readonly running: boolean; readonly mayEdit?: boolean }): string => {
+    const items = buildThread(readOnce(), options)
+    const activity = items.find((item) => item.type === 'activity')
+    return activity?.type === 'activity' ? activity.trace.map((segment) => segment.text).join(' · ') : ''
+  }
+
+  it('says it on a finished turn that was allowed to edit', () => {
+    expect(traceOf({ running: false, mayEdit: true })).toContain('no files changed')
+  })
+
+  it('still says nothing when that turn was read-only', () => {
+    expect(traceOf({ running: false, mayEdit: false })).not.toContain('no files changed')
+  })
+})

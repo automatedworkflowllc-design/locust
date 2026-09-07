@@ -321,8 +321,20 @@ export function Composer({
   // Effort is offered ONLY where the chosen model says it is supported. The
   // design's rule is that an unsupported effort must show as unsupported
   // rather than be sent as a silent no-op.
+
+  // While a mission runs, the control states what IT is on. Otherwise it
+  // states what the next mission will use -- which is what the person just
+  // picked. Reading the live run's model when nothing is running left a
+  // finished mission's `account-default` on screen over a chosen model.
+  const shownRuntime = running ? activeRoute?.runtime ?? route.runtime : route.runtime
+  const shownModel = running ? activeRoute?.model ?? route.model : route.model
+  // Keyed to the route the chip is SHOWING, which while a mission runs is the
+  // live one rather than the next one. It used to read the next route's
+  // levels under the live route's name -- two models on one chip. The control
+  // is disabled during a run, so this is display only and has to agree with
+  // the label beside it; when nothing is running the two are the same route.
   const supportedEfforts =
-    models.find((model) => model.runtime === route.runtime && model.id === route.model)?.supportedEfforts ?? []
+    models.find((model) => model.runtime === shownRuntime && model.id === shownModel)?.supportedEfforts ?? []
   // Swarm means "this model's maximum", and the catalog orders efforts lowest
   // to highest, so the maximum is the last one THIS model reported -- not a
   // fixed name that some models do not have.
@@ -331,13 +343,6 @@ export function Composer({
   // level shows the model's default rather than nothing -- the same value
   // App.tsx sets on a route change, so the chip says what the run gets.
   const shownEffort = swarm ? swarmEffort : effort ?? defaultEffort(supportedEfforts)
-
-  // While a mission runs, the control states what IT is on. Otherwise it
-  // states what the next mission will use -- which is what the person just
-  // picked. Reading the live run's model when nothing is running left a
-  // finished mission's `account-default` on screen over a chosen model.
-  const shownRuntime = running ? activeRoute?.runtime ?? route.runtime : route.runtime
-  const shownModel = running ? activeRoute?.model ?? route.model : route.model
   const shownRuntimeStatus = runtimes.find((runtime) => runtime.id === shownRuntime)
   const runtimeLabel = shownRuntimeStatus?.displayName ?? runtimeDisplayName(shownRuntime)
   // A family known only through its effort variants is listed under its
