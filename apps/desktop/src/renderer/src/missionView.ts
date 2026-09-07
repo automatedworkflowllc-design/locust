@@ -579,7 +579,24 @@ export function activityTrace(
    * the prose alone got the plan INTO the fold and left this out
    * (`Locust UI Review 2026-09-06.dc.html`, looked at properly 2026-09-06).
    */
-  plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
+  plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number },
+  /**
+   * Whether this run was allowed to change files.
+   *
+   * A run that COULD edit, finished, and edited nothing is a fact worth
+   * stating. Cursor Agent said "Applying the two edits to notes.ts now",
+   * reported completed, and left the file untouched (measured 2026-09-07);
+   * the line above read `41s · thought 3s · asked 4 subagents · 14 tool
+   * calls` and never mentioned files at all, because the count is only drawn
+   * when it is greater than zero. Nothing on screen contradicted the model's
+   * own account of itself.
+   *
+   * Stated plainly rather than in amber: asking a question in an
+   * edit-permitted session changes nothing either, and that is not a
+   * problem. It is the person who asked for an edit who needs this, and for
+   * them the plain fact is enough.
+   */
+  mayEdit?: boolean
 ): readonly TraceSegment[] {
   const segments: TraceSegment[] = []
   const times = events.map((event) => Date.parse(event.occurredAt)).filter((t) => Number.isFinite(t))
@@ -657,6 +674,9 @@ export function activityTrace(
   }
   if (calls > 0) segments.push({ key: 'calls', text: pluralize(calls, 'tool call') })
   if (files > 0 && !(outcome === 'cancelled' && files === 0)) segments.push({ key: 'files', text: pluralize(files, 'file') })
+  else if (files === 0 && outcome === 'completed' && mayEdit === true) {
+    segments.push({ key: 'files', text: 'no files changed' })
+  }
   if (refused > 0) segments.push({ key: 'refused', text: `${String(refused)} refused`, tone: 'amber' })
   if (notices > 0) segments.push({ key: 'notices', text: pluralize(notices, 'notice') })
   return segments
@@ -794,6 +814,8 @@ export interface MissionThreadOptions {
    * what is happening, so nothing is added above it.
    */
   readonly awaitingDecision?: boolean
+  /** Whether the run was allowed to change files; see activityTrace. */
+  readonly mayEdit?: boolean
   /**
    * Whether this turn wrote to a teammate. Those messages are drawn beside
    * the thread rather than inside it, so a turn whose whole output was a
@@ -980,7 +1002,13 @@ export function buildThread(
       key: 'activity',
       type: 'activity',
       summary: activitySummary(activity),
-      trace: activityTrace(activity, events, traceOutcome(events, options.running), planSteps),
+      trace: activityTrace(
+        activity,
+        events,
+        traceOutcome(events, options.running),
+        planSteps,
+        options.mayEdit
+      ),
       finished: !options.running,
       details: activity,
       ...(planSteps === undefined ? {} : { plan: planSteps }),

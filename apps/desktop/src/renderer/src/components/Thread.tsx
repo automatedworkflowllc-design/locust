@@ -359,6 +359,7 @@ export function Thread({
     latestTurn: true,
     awaitingDecision: approvals.length > 0,
     spokeToPeers: peers.messages.length > 0,
+    mayEdit: sandbox !== undefined && sandbox !== 'read-only',
     ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso })
   })
   // A read-only run whose answer carries code is the one case where "run it

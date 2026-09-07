@@ -1868,3 +1868,49 @@ describe('Cursor reports files from inside its own copy of the project', () => {
     expect(relativePath(decoy, WS)).toBe(decoy)
   })
 })
+
+describe('a run that could edit and edited nothing says so', () => {
+  // Cursor Agent said "Applying the two edits to notes.ts now", reported
+  // completed, and left the file untouched (measured 2026-09-07). The trace
+  // read `41s · thought 3s · asked 4 subagents · 14 tool calls` and never
+  // mentioned files, because the count is only drawn when it is above zero --
+  // so nothing on screen contradicted the model's account of itself.
+  const readTool = (): NormalizedRuntimeEvent[] => [
+    event('tool.started', { itemId: 't1', toolKind: 'read', name: 'Read' }),
+    event('tool.completed', { itemId: 't1', toolKind: 'read', name: 'Read' })
+  ]
+
+  const traceOf = (mayEdit: boolean | undefined): string =>
+    activityTrace(
+      [{ kind: 'tool', label: 'Read', detail: undefined, state: 'done' }],
+      readTool(),
+      'completed',
+      undefined,
+      mayEdit
+    )
+      .map((segment) => segment.text)
+      .join(' · ')
+
+  it('states it when the run was allowed to change files', () => {
+    expect(traceOf(true)).toContain('no files changed')
+  })
+
+  it('says nothing of the sort on a read-only run, where it is the point', () => {
+    expect(traceOf(false)).not.toContain('no files changed')
+  })
+
+  it('says nothing when the caller does not know what the run was allowed', () => {
+    expect(traceOf(undefined)).not.toContain('no files changed')
+  })
+
+  it('is plain, not amber: asking a question changes nothing either', () => {
+    const files = activityTrace(
+      [{ kind: 'tool', label: 'Read', detail: undefined, state: 'done' }],
+      readTool(),
+      'completed',
+      undefined,
+      true
+    ).find((segment) => segment.key === 'files')
+    expect(files?.tone).toBeUndefined()
+  })
+})
