@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.38.6 — 2026-09-07
+
+- **The swarm mark is back on the composer.** The design review moved it into
+  the route picker's header; it belongs where you can see it. It is the app's
+  own logo and it says, at a glance, that every mission is running at its
+  model's maximum. It is never disabled now either -- swarm is a statement
+  about every mission, not about the one route you happen to be on. The
+  picker keeps the consequence rather than a second switch: the effort levels
+  grey out and say who is holding them.
+- **The route chip has a chevron.** Effort moved behind that chip, and nothing
+  said the chip opened anything.
+- **A connected runtime never offers to install itself.** Antigravity showed a
+  green dot and a `Get it ↗` button in the same row, because its tag is
+  EXPERIMENTAL rather than READY and the row fell through to the download
+  branch. A row cannot say connected and not-installed at the same time.
+
 ## 0.38.5 — 2026-09-07
 
 Effort on the route you actually start on. 0.38.4 put the control back but

@@ -217,30 +217,13 @@ export function RoutePicker({
           * The mark stays as its glyph.
           */}
         {/*
-          * Drawn ALWAYS. Gating it on the selected route reporting effort
-          * levels meant a route that reports none had no swarm control at
-          * all -- and since the composer chip that used to carry it was
-          * removed in this same pass, the setting became unreachable rather
-          * than merely relocated. "account-default", the route a fresh
-          * profile starts on, is exactly such a route, so this hit a new
-          * person on first open (measured 2026-09-07).
+          * No swarm toggle here any more. The mark is back on the composer
+          * where Colin wants it -- "it just looks cool, its our logo, and
+          * feels like something the user should know is on" -- and two
+          * toggles for one setting is the confusion the design review named
+          * in the first place. What stays is the CONSEQUENCE, one line down:
+          * the effort levels grey out and say who is holding them.
           */}
-        <button
-          type="button"
-          className={`lc-picker__swarm${swarm ? ' is-on' : ''}`}
-          aria-pressed={swarm}
-          title={
-            swarm
-              ? swarmEffort === undefined
-                ? 'Every mission runs at its model maximum'
-                : `Every mission runs at ${swarmEffort}`
-              : 'Run every mission at its model maximum'
-          }
-          onClick={() => onSwarmChange(!swarm)}
-        >
-          <img src={mark} alt="" aria-hidden="true" />
-          Swarm
-        </button>
       </div>
       {notice !== undefined && <div className="lc-picker__notice">{notice}</div>}
       <div className="lc-picker__list">

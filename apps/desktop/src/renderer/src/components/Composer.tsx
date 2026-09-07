@@ -1,3 +1,4 @@
+import mark from '../assets/locust-mark.svg'
 import { useState } from 'react'
 import type { ContextReading } from '../cost.js'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
@@ -629,8 +630,51 @@ export function Composer({
                       <span className="lc-control__mono lc-control__effort">{effort}</span>
                     </>
                   )}
+                  {/*
+                    * The chevron the mode chip beside it has, and that the
+                    * reference draws on this one too: `Codex CLI / gpt-5.6 ·
+                    * high ⌄`. Without it nothing said the chip opens
+                    * anything, and effort now lives behind it -- so a person
+                    * looking for effort had no reason to press here. Colin,
+                    * on the reference: "allows the user to see effort and
+                    * still has dropdown for it."
+                    */}
+                  <Icon name="chevron-down" size={11} />
                 </button>
               </span>
+              {/*
+                * The swarm mark, back on the composer.
+                *
+                * The design review moved it into the picker's header, and
+                * Colin put it back (2026-09-07): "still leave the swarm button
+                * though, its a good indicator and a fun part of the build...
+                * it just looks cool, its our logo, and feels like something
+                * the user should know is on." The review itself called the
+                * mark "the best small thing in the app", so as an
+                * always-visible state indicator it earns the slot the effort
+                * chip vacated.
+                *
+                * Unlike that chip it is never dead: it stays pressable
+                * whatever the route reports, because swarm is a statement
+                * about every mission rather than about this one.
+                */}
+              <button
+                type="button"
+                className={`lc-swarm${swarm ? ' is-on' : ''}`}
+                aria-pressed={swarm}
+                aria-label="Swarm mode"
+                disabled={running}
+                title={
+                  swarm
+                    ? swarmEffort === undefined
+                      ? 'Swarm on — every mission runs at its model maximum'
+                      : `Swarm on — every mission runs at ${swarmEffort}`
+                    : 'Swarm: run every mission at its model maximum'
+                }
+                onClick={() => onSwarmChange(!swarm)}
+              >
+                <img src={mark} alt="" aria-hidden="true" />
+              </button>
               {context !== undefined && <ContextRing reading={context} />}
             </div>
           </div>

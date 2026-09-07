@@ -201,8 +201,21 @@ export function FirstLaunch({
                   {/* READY needs no tag once the dot is green; every other
                     * state does, connected or not -- EXPERIMENTAL is the
                     * caveat on a runtime that IS connected. */}
-                  {status.tag === 'READY' || status.tag === 'ACTIVE' ? (
-                    <span className="lc-runtimecell__version">{shortVersion(runtime.version)}</span>
+                  {settled ? (
+                    // CONNECTED. Whatever caveat the tag carries -- and
+                    // EXPERIMENTAL is exactly that, "the caveat on a runtime
+                    // that IS connected" -- the runtime is already here, so
+                    // this slot says which build, never how to get one.
+                    // Antigravity fell past the READY/ACTIVE test to the
+                    // vendor branch and offered "Get it ↗" beside its own
+                    // green dot (Colin, 2026-09-07: "antigravity listed as
+                    // get it, pretty sure we have it"). A row cannot say
+                    // connected and not-installed at the same time.
+                    runtime.version === undefined ? (
+                      <span className="lc-runtimecell__tag">{status.tag}</span>
+                    ) : (
+                      <span className="lc-runtimecell__version">{shortVersion(runtime.version)}</span>
+                    )
                   ) : installing === runtime.id ? (
                     // Keeps its box rather than becoming a spinner, so the row
                     // does not resize while npm talks.
