@@ -147,7 +147,10 @@ try {
   // User session, 2026-09-05: with nobody picked the first teammate was drawn
   // as chosen while the composer addressed nobody.
   check('no teammate is drawn as chosen when nobody is', home.highlighted === 0, String(home.highlighted))
-  check('the mission of nobody\'s is listed outside the roster', /OTHER MISSIONS.*release date/i.test(home.sidebar), home.sidebar.slice(0, 200))
+  // The section is titled just "Missions" since 2026-09-06 (Colin: "just have
+  // it say missions lol, why other missions?"), so this asserts the section
+  // EXISTS and holds the conversation rather than pinning its old wording.
+  check('the mission of nobody\'s is listed outside the roster', /MISSIONS[\s\S]*release date/i.test(home.sidebar), home.sidebar.slice(0, 200))
 
   say('2. picking a teammate addresses them')
   const picked = await evaluate(`(async () => {

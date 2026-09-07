@@ -186,7 +186,7 @@ const waitForCompletion = `(async () => {
   for (let i = 0; i < 420; i += 1) {
     await new Promise(r => setTimeout(r, 1000))
     const stop = document.querySelector('button[aria-label^="Stop the running"]')
-    const marker = document.querySelector('.lc-thread__marker')
+    const marker = /completed|failed|cancelled/i.test((document.querySelector('.lc-workroom__header') || document.querySelector('.lc-workroom__mission') || { innerText: '' }).innerText)
     if (stop) sawRunning = true
     const spoke = document.querySelectorAll('.lc-agentline').length > 0
     if (sawRunning && !stop && marker && spoke) return JSON.stringify({ done: true, waitedMs: i * 1000 })
@@ -353,7 +353,7 @@ try {
   const early = await cdp.eval(`(async () => {
     for (let i = 0; i < 120; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const marker = document.querySelector('.lc-thread__marker')
+      const marker = /completed|failed|cancelled/i.test((document.querySelector('.lc-workroom__header') || document.querySelector('.lc-workroom__mission') || { innerText: '' }).innerText)
       const card = document.querySelector('.lc-peer')
       if (marker && card) {
         const column = document.querySelector('.lc-thread__column')

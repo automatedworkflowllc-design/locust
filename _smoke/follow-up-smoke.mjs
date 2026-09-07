@@ -134,7 +134,7 @@ const runTurn = (prompt) => `(async () => {
     if (!sawRunning && refused) {
       return JSON.stringify({ started: true, done: false, refused: refused.innerText.replace(/\\s+/g, ' ').trim() })
     }
-    const marker = document.querySelector('.lc-thread__marker')
+    const marker = /completed|failed|cancelled/i.test((document.querySelector('.lc-workroom__header') || document.querySelector('.lc-workroom__mission') || { innerText: '' }).innerText)
     if (sawRunning && !stop && marker) {
       return JSON.stringify({
         started: true,

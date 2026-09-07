@@ -198,9 +198,8 @@ try {
       // provider to have actually said something, so the transcript being
       // carried across the divider is not empty.
       const stop = document.querySelector('button[aria-label^="Stop the running"]')
-      const marker = document.querySelector('.lc-thread__marker')
       const spoke = document.querySelectorAll('.lc-agentline, .lc-card').length > 0
-      if (stop && marker && spoke) return true
+      if (stop && spoke) return true
     }
     return false
   })()`)
@@ -281,7 +280,7 @@ try {
       return c ? c.disabled : null
     })(),
     stopPresent: document.querySelector('button[aria-label^="Stop the running"]') !== null,
-    marker: (document.querySelector('.lc-thread__marker') || { innerText: '' }).innerText.trim()
+    header: (document.querySelector('.lc-workroom__header') || { innerText: '' }).innerText.split(/\s+/).join(' ').trim().slice(0, 120)
   })`)
   say(`       mid-flight: ${midFlight}`)
 
@@ -293,8 +292,8 @@ try {
     // short wait here would report a slow handoff as a broken one.
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const marker = document.querySelector('.lc-thread__marker')
-      const state = marker ? marker.innerText.trim() : 'no marker'
+      const head = document.querySelector('.lc-workroom__header')
+      const state = head ? head.innerText.split(/\s+/).join(' ').trim().slice(0, 90) : 'no header'
       if (trail[trail.length - 1] !== state) trail.push(state)
       const divider = document.querySelector('.lc-handoff')
       if (divider) {

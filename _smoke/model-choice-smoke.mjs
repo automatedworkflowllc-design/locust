@@ -220,7 +220,7 @@ try {
       await new Promise(r => setTimeout(r, 1000))
       const stop = document.querySelector('button[aria-label^="Stop the running"]')
       if (stop) sawRunning = true
-      const marker = document.querySelector('.lc-thread__marker')
+      const marker = /completed|failed|cancelled/i.test((document.querySelector('.lc-workroom__header') || document.querySelector('.lc-workroom__mission') || { innerText: '' }).innerText)
       const done = sawRunning && !stop && marker
       if (done) {
         return JSON.stringify({

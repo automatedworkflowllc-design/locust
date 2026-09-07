@@ -229,7 +229,7 @@ try {
   const live = await cdp.eval(`(async () => {
     for (let i = 0; i < 120; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      if (document.querySelector('.lc-thread__marker') && document.querySelector('.lc-livestep, .lc-agentline')) return ${faces}
+      if (document.querySelector('.lc-livestep, .lc-agentline')) return ${faces}
     }
     return ${faces}
   })()`)
