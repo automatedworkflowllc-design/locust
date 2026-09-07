@@ -1828,11 +1828,25 @@ export default function App(): ReactElement {
     if (!bridge) return
     setHandingOff(true)
     try {
+      // The same route the composer would start a fresh mission on, folded
+      // the same way. This used to send the model and NOTHING else, so
+      // resuming from a checkpoint silently dropped the effort the chip was
+      // showing -- and on Cursor, where effort is encoded in the model id
+      // rather than passed beside it, it also ran a different model than the
+      // one on screen. The contract already carried `effort`; the renderer
+      // was the half that never filled it in.
+      const resumed = startRoute(
+        models,
+        route.runtime,
+        route.model,
+        swarmEffortFor(models, route.model, swarm, effort, route.runtime)
+      )
       const response = await bridge.resumeMission({
         missionId,
         runtime: route.runtime,
         mode,
-        ...(route.model === 'account-default' ? {} : { model: route.model })
+        ...(resumed.model === 'account-default' ? {} : { model: resumed.model }),
+        ...(resumed.effort === undefined ? {} : { effort: resumed.effort })
       })
       if (!response.ok) {
         // Said in the thread the person is looking at, not swallowed: they
