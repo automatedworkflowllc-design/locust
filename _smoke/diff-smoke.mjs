@@ -161,25 +161,37 @@ try {
   const setup = await cdp.eval(`(async () => {
     const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
     control.click()
-    await new Promise(r => setTimeout(r, 400))
-    const picker = document.querySelector('.lc-picker')
-    if (!picker) return JSON.stringify({ picked: false, why: 'no picker' })
-    // Each runtime's group is capped, so a model outside the first few is
-    // reached the way a person reaches it: by typing.
-    const input = picker.querySelector('.lc-picker__input')
-    const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    setInput.call(input, 'composer 2.5')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-    await new Promise(r => setTimeout(r, 500))
-    let group = ''
+    // Discovery finishing is not one moment. The check above is satisfied by
+    // the FIRST runtime to land, and Cursor -- which reports 71 models -- is
+    // usually not it, so the list can still be empty here. Read it until the
+    // row shows up rather than once and early: a single 400ms look reported
+    // {"rows":[]} while drive-search-check found the row on every needle.
+    let picker
     let target
-    for (const node of picker.querySelector('.lc-picker__list').children) {
-      const header = node.querySelector('.lc-picker__group')
-      if (header) group = header.innerText
-      const row = node.querySelector('.lc-picker__row')
-      const label = row ? row.innerText.trim().toLowerCase() : ''
-      if (row && !row.disabled && /cursor/i.test(group) && label.startsWith('composer 2.5')) { target = row; break }
+    for (let attempt = 0; attempt < 60 && !target; attempt += 1) {
+      await new Promise(r => setTimeout(r, 500))
+      picker = document.querySelector('.lc-picker')
+      if (!picker) { control.click(); continue }
+      // Each runtime's group is capped, so a model outside the first few is
+      // reached the way a person reaches it: by typing.
+      const input = picker.querySelector('.lc-picker__input')
+      if (input && input.value !== 'composer 2.5') {
+        const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+        setInput.call(input, 'composer 2.5')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        await new Promise(r => setTimeout(r, 500))
+      }
+      const list = picker.querySelector('.lc-picker__list')
+      let group = ''
+      for (const node of (list ? list.children : [])) {
+        const header = node.querySelector('.lc-picker__group')
+        if (header) group = header.innerText
+        const row = node.querySelector('.lc-picker__row')
+        const label = row ? row.innerText.trim().toLowerCase() : ''
+        if (row && !row.disabled && /cursor/i.test(group) && label.startsWith('composer 2.5')) { target = row; break }
+      }
     }
+    if (!picker) return JSON.stringify({ picked: false, why: 'no picker' })
     if (!target) return JSON.stringify({ picked: false, why: 'no composer row after search', rows: [...picker.querySelectorAll('.lc-picker__row')].map(r => r.innerText).slice(0, 12) })
     target.click()
     await new Promise(r => setTimeout(r, 400))
