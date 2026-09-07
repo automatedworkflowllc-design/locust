@@ -371,9 +371,13 @@ try {
   const early = await cdp.eval(`(async () => {
     for (let i = 0; i < 120; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const marker = /completed|failed|cancelled/i.test((document.querySelector('.lc-workroom__header') || document.querySelector('.lc-workroom__mission') || { innerText: '' }).innerText)
+      // NOT a completion check: the claim is that the exchange appears as
+      // soon as the run STARTS, so waiting for a terminal state tests the
+      // opposite. (My own blanket edit made that mistake -- the marker this
+      // replaced meant "the thread is rendering", not "the run ended".)
       const card = document.querySelector('.lc-peer')
-      if (marker && card) {
+      const stillRunning = document.querySelector('button[aria-label^="Stop the running"]') !== null
+      if (card) {
         const column = document.querySelector('.lc-thread__column')
         const kids = [...column.children]
         const firstAgent = kids.findIndex(k => k.matches('.lc-agentline, .lc-card'))
@@ -382,6 +386,7 @@ try {
           text: card.innerText,
           cardIndex: kids.indexOf(card),
           firstAgent,
+          stillRunning,
           bubble: (document.querySelector('.lc-bubble') || { innerText: '' }).innerText
         })
       }
@@ -389,7 +394,9 @@ try {
     return JSON.stringify({ found: false })
   })()`)
   const earlyState = JSON.parse(early)
-  check('Wren\u2019s thread shows the exchange as soon as the run starts', earlyState.found === true)
+  check('Wren\u2019s thread shows the exchange as soon as the run starts', earlyState.found === true, JSON.stringify(earlyState).slice(0, 200))
+  // The point of "as soon as": it must not wait for the run to be over.
+  check('and it was there while the run was still going', earlyState.stillRunning === true, `stillRunning: ${earlyState.stillRunning}`)
   if (earlyState.found) {
     const t = earlyState.text.replace(/\s+/g, ' ')
     check('it counts one message with Atlas, and says which way it went', /1 message (to|from|with)\s*Atlas/i.test(t), t)
