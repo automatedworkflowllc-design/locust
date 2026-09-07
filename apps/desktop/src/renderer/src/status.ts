@@ -962,6 +962,24 @@ export function effortAfterRouteChange(
   return defaultEffort(supportedEfforts)
 }
 
+/**
+ * A model id as it should read beside the runtime that serves it.
+ *
+ * OpenCode aggregates providers, so its ids carry one:
+ * `anthropic/claude-sonnet-4`, `opencode/ling-3.0-flash-fin-free`. The
+ * provider is real information and stays -- EXCEPT when it merely repeats
+ * the runtime already named next to it, which is how the composer came to
+ * read `OpenCode / opencode/ling-3.0-flash-fin-free` and truncate to
+ * `OpenCode / opencode/big-pic...`: the runtime twice, and the part that
+ * identifies the model cut off (outside tester, 2026-09-07).
+ */
+export function modelLabelFor(runtime: string, modelId: string): string {
+  const slash = modelId.indexOf('/')
+  if (slash <= 0) return modelId
+  const provider = modelId.slice(0, slash)
+  return provider.toLowerCase() === runtime.toLowerCase() ? modelId.slice(slash + 1) : modelId
+}
+
 export function routeSearchText(text: string): string {
   return text.toLowerCase().replace(/[-_/.:]+/g, ' ').replace(/\s+/g, ' ').trim()
 }

@@ -20,7 +20,7 @@ import {
   runtimeIsUsable
 } from '../status.js'
 import { ContextRing } from './ContextRing.js'
-import { defaultEffort } from '../status.js'
+import { defaultEffort, modelLabelFor } from '../status.js'
 import { Icon } from './Icon.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
@@ -344,7 +344,8 @@ export function Composer({
   // family name; showing the stand-in variant's id ("cursor-grok-4.6-high-fast")
   // beside "effort · low" read as two different answers (2026-09-06).
   const shownEntry = models.find((model) => model.runtime === shownRuntime && model.id === shownModel)
-  const modelLabel = shownEntry?.variants !== undefined ? shownEntry.displayName : shownModel
+  const modelLabel =
+    shownEntry?.variants !== undefined ? shownEntry.displayName : modelLabelFor(shownRuntime, shownModel)
   // What the RUNNING mission is actually on, which is not always what the
   // composer's next-run route says. A handoff has to be measured against the
   // live run, or picking "the same" route would still stop it.

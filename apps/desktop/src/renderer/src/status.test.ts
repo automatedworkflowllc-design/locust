@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 import { swarmEffortFor } from './App.js'
 import {
+  modelLabelFor,
   defaultRoute,
   defaultEffort,
   effortAfterRouteChange,
@@ -1037,5 +1038,32 @@ describe('a machine with nothing installed', () => {
 
   it('and among those, still the one that needs no account', () => {
     expect(defaultRoute([runtime('codex', true), runtime('opencode', true)]).runtime).toBe('opencode')
+  })
+})
+
+describe('a model id read beside the runtime that serves it', () => {
+  // The composer read `OpenCode / opencode/ling-3.0-flash-fin-free` and
+  // truncated to `OpenCode / opencode/big-pic...` -- the runtime named twice,
+  // and the part that identifies the model cut off (outside tester,
+  // 2026-09-07).
+  it('drops a provider that merely repeats the runtime', () => {
+    expect(modelLabelFor('opencode', 'opencode/ling-3.0-flash-fin-free')).toBe('ling-3.0-flash-fin-free')
+  })
+
+  it('keeps a provider that is real information', () => {
+    // OpenCode aggregates providers: which one answers is worth knowing.
+    expect(modelLabelFor('opencode', 'anthropic/claude-sonnet-4')).toBe('anthropic/claude-sonnet-4')
+  })
+
+  it('matches case-insensitively, as the ids are written either way', () => {
+    expect(modelLabelFor('OpenCode', 'opencode/big-pickle')).toBe('big-pickle')
+  })
+
+  it('leaves an id with no provider alone', () => {
+    expect(modelLabelFor('claude', 'sonnet')).toBe('sonnet')
+  })
+
+  it('leaves a leading slash alone rather than eating the id', () => {
+    expect(modelLabelFor('opencode', '/weird')).toBe('/weird')
   })
 })

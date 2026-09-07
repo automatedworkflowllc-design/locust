@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.40.1 — 2026-09-07
+
+Three more from the outside tester's report.
+
+- **The two mission counts explain each other.** The sidebar is scoped to the
+  folder you are in; the Missions screen is the whole ledger. Both were right
+  and neither said so, so one read 3 while the other read 5. The header now
+  says `5 local, 0 in this folder`, and only adds that clause when the two
+  actually differ.
+- **The model chip stops naming the runtime twice.** `OpenCode /
+  opencode/ling-3.0-flash-fin-free` truncated to `OpenCode / opencode/big-pic…`
+  — the runtime twice and the model cut off. A provider that merely repeats
+  the runtime is dropped; one that is real information (`anthropic/…` under
+  OpenCode) stays.
+- **OpenCode names the output cap.** It was the last of the five runtimes that
+  went quiet when Locust stopped a run for sending more than it accepts.
+
 ## 0.40.0 — 2026-09-07
 
 - **Automations shows what you set up in the CLIs.** Agents, commands and
