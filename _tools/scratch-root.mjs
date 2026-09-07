@@ -36,9 +36,9 @@
 // root that depends on which runtime you picked is the kind of thing that is
 // true until someone changes a route.
 
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 
 /**
  * Outside AppData, and outside the repository.
@@ -56,3 +56,51 @@ mkdirSync(SCRATCH_ROOT, { recursive: true })
 process.env.TEMP = SCRATCH_ROOT
 process.env.TMP = SCRATCH_ROOT
 process.env.TMPDIR = SCRATCH_ROOT
+
+/**
+ * Which `.cursorignore` rule hides this path, if one does.
+ *
+ * The warning below is the whole point of this export. Ten red checks in
+ * diff-smoke described a diff that had not been rendered, and every one of
+ * them was a runtime that had been refused the file -- the report named the
+ * symptom furthest from the cause. A harness that can say "the runtime was
+ * not allowed to look at this folder" costs one line and replaces an
+ * afternoon.
+ *
+ * Directory rules only (`AppData/`, `node_modules/`). That covers what these
+ * files actually carry and stays honest about what it does not check: a glob
+ * over file names is not read here, so a quiet return is "no directory rule
+ * matched", never "Cursor can definitely see this".
+ */
+export function cursorIgnoreHit(path, ignoreFile = join(homedir(), '.cursorignore')) {
+  let text
+  try {
+    text = readFileSync(ignoreFile, 'utf8')
+  } catch {
+    return undefined
+  }
+  const segments = new Set(path.split(/[\\/]+/).filter(Boolean))
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    if (line.length === 0 || line.startsWith('#') || line.startsWith('!')) continue
+    if (!line.endsWith('/')) continue
+    const name = line.replace(/^\*\*\//, '').replace(/\/$/, '')
+    if (name.length > 0 && segments.has(name)) return { rule: line, file: ignoreFile }
+  }
+  return undefined
+}
+
+const hidden = cursorIgnoreHit(SCRATCH_ROOT)
+if (hidden !== undefined) {
+  // Not thrown: every drive imports this file, and most of them never touch
+  // Cursor. A run that cannot see its own workspace fails loudly enough on
+  // its own -- what it has never done is say why.
+  console.warn(
+    `\n  !! The scratch root is hidden from Cursor.\n` +
+      `     ${SCRATCH_ROOT}\n` +
+      `     matches ${JSON.stringify(hidden.rule)} in ${hidden.file}\n\n` +
+      `     A Cursor run here is refused every read and write before it starts,\n` +
+      `     and reports as a runtime that did nothing rather than one that was\n` +
+      `     not allowed to. Set LOCUST_SCRATCH to a path outside that rule.\n`
+  )
+}
