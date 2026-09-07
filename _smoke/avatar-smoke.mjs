@@ -163,7 +163,7 @@ try {
   check('the two faces differ though the names match', sidebar.length === 2 && sidebar[0].shadow !== sidebar[1].shadow)
   check('nothing animates while everyone is idle', idle.every((face) => face.animating.length === 0), JSON.stringify(idle.map((f) => f.animating)))
   check('idle chips carry no presence dot', sidebar.every((face) => face.presence === 'none'), JSON.stringify(sidebar.map((f) => f.presence)))
-  check('no progress bar exists anywhere', (await cdp.eval(`document.querySelectorAll('.lc-progress').length`)) === 0)
+  check('no progress bar exists anywhere', (await cdp.eval(`document.querySelectorAll('progress, [role="progressbar"], .lc-progress').length`)) === 0)
 
   say('3. faces at every size are crisp: integer pixels, centered')
   const sizes = JSON.parse(await cdp.eval(`JSON.stringify([...document.querySelectorAll('.lc-face')].map(f => {
@@ -271,7 +271,7 @@ try {
     const line = document.querySelector('.lc-livestep')
     if (!line) return null
     const face = line.querySelector('.lc-face')
-    return { kind: line.dataset.stepKind, activity: face ? face.dataset.activity : '', hasFace: face !== null, hasBar: line.querySelector('.lc-progress') !== null, dots: line.querySelectorAll('.lc-dots').length, text: line.innerText.replace(/\\s+/g, ' ').trim() }
+    return { kind: line.dataset.stepKind, activity: face ? face.dataset.activity : '', hasFace: face !== null, hasBar: line.querySelector('progress, [role="progressbar"], .lc-progress') !== null, dots: line.querySelectorAll('.lc-dots').length, text: line.innerText.replace(/\\s+/g, ' ').trim() }
   })())`)
   const stepState = JSON.parse(step)
   if (stepState !== null) {

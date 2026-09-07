@@ -322,7 +322,12 @@ try {
       const stop = document.querySelector('button[aria-label^="Stop the running"]')
       for (const toggle of document.querySelectorAll('.lc-peer:not(.is-open) .lc-peer__toggle')) toggle.click()
       const fromBooty = [...document.querySelectorAll('.lc-peer__message')].find(m => {
-        const author = (m.querySelector('.lc-peer__author') || { innerText: '' }).innerText.trim()
+        // Drawn per message only when BOTH sides spoke; a one-sided card
+        // names its sender once, on the pill above.
+        const card = m.closest('.lc-peer') ?? m
+        const author = (m.querySelector('.lc-peer__author')
+          || card.querySelector('.lc-peer__name')
+          || { innerText: '' }).innerText.trim()
         const body = (m.querySelector('.lc-peer__bubble') || { innerText: '' }).innerText
         return author === 'Booty' && body.includes(${JSON.stringify(CODE)})
       })
@@ -331,7 +336,12 @@ try {
       // newest turn's exchange -- so this was invisible and the thread read
       // as though Booty had answered the person (Colin, 2026-09-04).
       const fromWren = [...document.querySelectorAll('.lc-peer__message')].find(m => {
-        const author = (m.querySelector('.lc-peer__author') || { innerText: '' }).innerText.trim()
+        // Drawn per message only when BOTH sides spoke; a one-sided card
+        // names its sender once, on the pill above.
+        const card = m.closest('.lc-peer') ?? m
+        const author = (m.querySelector('.lc-peer__author')
+          || card.querySelector('.lc-peer__name')
+          || { innerText: '' }).innerText.trim()
         return author === 'Wren'
       })
       if (!stop && fromBooty) {

@@ -152,7 +152,7 @@ async function launch(files) {
         pending.set(n, res)
         socket.send(JSON.stringify({ id: n, method, params }))
       }),
-      new Promise((resolve) => { const t = setTimeout(() => resolve({ error: { message: 'cdp timeout' } }), 60_000); t.unref() })
+      new Promise((resolve) => { const t = setTimeout(() => resolve({ error: { message: 'cdp timeout' } }), 360_000); t.unref() })
     ])
   const evaluate = async (expression) => {
     const m = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })

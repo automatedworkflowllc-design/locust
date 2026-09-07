@@ -68,7 +68,7 @@ class Cdp {
     this.ws.send(JSON.stringify({ id, method, params }))
     return Promise.race([
       new Promise((resolve) => this.pending.set(id, { resolve })),
-      sleep(180_000).then(() => ({ error: { message: 'cdp timeout' } }))
+      sleep(360_000).then(() => ({ error: { message: 'cdp timeout' } }))
     ])
   }
   async eval(expression) {

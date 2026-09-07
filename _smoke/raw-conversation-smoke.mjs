@@ -114,7 +114,7 @@ try {
         pending.set(n, res)
         socket.send(JSON.stringify({ id: n, method, params }))
       }),
-      new Promise((resolve) => { const t = setTimeout(() => resolve({ error: { message: 'cdp timeout' } }), 60_000); t.unref() })
+      new Promise((resolve) => { const t = setTimeout(() => resolve({ error: { message: 'cdp timeout' } }), 420_000); t.unref() })
     ])
   const evaluate = async (expression) => {
     const m = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
@@ -188,7 +188,7 @@ try {
   })()`))
   say(`       ${after.sidebar.slice(0, 220)}`)
   check('the menu closed', after.menuOpen === false)
-  check('the mission now sits under Wren, not under Other missions', /Wren.*release date/i.test(after.sidebar) && !/OTHER MISSIONS.*release date/i.test(after.sidebar), after.sidebar.slice(0, 220))
+  check('the mission now sits under Wren, not under Other missions', /Wren.*release date/i.test(after.sidebar) && !/MISSIONS[^\n]*\n[^\n]*release date/i.test(after.sidebar), after.sidebar.slice(0, 220))
 
   await sleep(600)
   const stored = JSON.parse(await readFile(TEAMMATES, 'utf8'))

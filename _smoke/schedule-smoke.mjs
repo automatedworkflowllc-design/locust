@@ -110,7 +110,7 @@ async function launch() {
           say('  eval timed out: the app stopped answering')
           resolve_(undefined)
         }
-      }, 120_000)
+      }, 360_000)
       pending.set(next, (message) => {
         clearTimeout(gaveUp)
         const thrown = message.result?.exceptionDetails

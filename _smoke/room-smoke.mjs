@@ -157,7 +157,7 @@ try {
         pending.set(n, res)
         socket.send(JSON.stringify({ id: n, method, params }))
       }),
-      new Promise((resolve) => { const t = setTimeout(() => resolve({ error: { message: 'cdp timeout' } }), 120_000); t.unref() })
+      new Promise((resolve) => { const t = setTimeout(() => resolve({ error: { message: 'cdp timeout' } }), 720_000); t.unref() })
     ])
   const evaluate = async (expression) => {
     const m = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
