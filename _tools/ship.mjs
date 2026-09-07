@@ -20,7 +20,7 @@
 // missing twice tonight, because an em-dash is three bytes.
 
 import { spawnSync } from 'node:child_process'
-import { readFileSync, existsSync, statSync } from 'node:fs'
+import { readFileSync, existsSync, statSync, copyFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -129,6 +129,22 @@ if (!existsSync(asarPath)) {
   }
   if (markers.length === 0) {
     console.log('  note  no --marker given; the changelog’s claims were not checked against the artefact')
+  }
+}
+
+// A copy under a STABLE name, so one link always fetches the newest build.
+// locust.lol's download button points at
+// `/releases/latest/download/Locust-Setup.exe`. GitHub needs an exact
+// filename there, and the versioned installer carries the version in its own,
+// so pinning that 404s on the very next release. Uploading this beside it is
+// what keeps the button working without anyone remembering to edit a URL --
+// and the people it is for do not use GitHub, so a page of assets is not an
+// acceptable fallback.
+if (failed === 0 && !checkOnly) {
+  const installer = join(DESKTOP, 'release', `Locust-${version}-setup.exe`)
+  if (existsSync(installer)) {
+    copyFileSync(installer, join(DESKTOP, 'release', 'Locust-Setup.exe'))
+    ok('stable copy Locust-Setup.exe — upload it beside the versioned one')
   }
 }
 
