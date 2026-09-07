@@ -46,6 +46,27 @@ try {
       return (failed ? 'FAILED: ' : 'ran: ') + thread.slice(-260)
     })()`)
   })
+  // A SECOND turn, which is the case Colin actually hit on 2026-09-07 and the
+  // one turn above cannot reach. By now the route's model has been RESOLVED to
+  // the variant (`cursor-grok-4.6-medium`), and `startRoute` used to look a
+  // family up by id alone -- so on the follow-up no family matched, the effort
+  // travelled beside the model, and Cursor refused: "That runtime cannot be
+  // started with the options chosen. Cursor Agent takes no effort level."
+  await drive.capture('a SECOND turn, now that the model id IS a variant', async () => {
+    await drive.evaluate(sendAndWaitScript('Reply with exactly one word: again. Use no tools.', { waitSeconds: 240 }))
+    return drive.evaluate(`(async () => {
+      await new Promise(r => setTimeout(r, 800))
+      // Whitespace collapsed by split/join rather than a regex: an escape in
+      // here has to survive both this file and the CDP template literal, and
+      // a bare newline inside a regex literal is a syntax error at the far end.
+      // Whitespace collapsed without any escape sequence: one has to survive
+      // both this file and the CDP template literal, and a bare newline inside
+      // a regex literal is a syntax error at the far end (measured, this file).
+      const thread = (document.querySelector('.lc-thread')?.innerText ?? '').split(String.fromCharCode(10)).join(' ')
+      const refused = /takes no effort level|cannot be started with the options/.test(thread)
+      return (refused ? 'REFUSED ON THE FOLLOW-UP: ' : 'ran: ') + thread.slice(-260)
+    })()`)
+  })
   await drive.capture('the header: which model and effort the record says', () => drive.evaluate(`(document.querySelector('.lc-workroom__header')?.innerText.replace(/[ \\t\\n]+/g, ' ').slice(0, 200) ?? '')`))
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

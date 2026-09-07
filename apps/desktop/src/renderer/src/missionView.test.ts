@@ -1729,6 +1729,31 @@ describe("the host's disk observation of a path the runtime named", () => {
     expect(details.some((detail) => /other\.txt/.test(detail.name))).toBe(true)
     expect(activity?.type === 'activity' && activity.summary).toBe('Edited 2 files')
   })
+
+  it('still attaches when the runtime already sent its OWN diff for that path', () => {
+    // MEASURED 2026-09-07 by `_tools/drive-reveal.mjs`, Cursor Agent writing
+    // one file: the fold drew `report.md ADDED +1 -0` TWICE while the line
+    // above it said `1 file`. The merge above required the runtime's row to
+    // have NO patch -- which is true of Codex, whose file_change names a path
+    // and sends no diff, and false of Cursor, which sends one. So for every
+    // runtime that diffs its own edits, the host's disk observation of the
+    // same change became a second identical row.
+    const own = { text: '--- /dev/null\n+++ b/report.md\n@@ -0,0 +1 @@\n+hello\n', added: 1, removed: 0, truncated: false }
+    const observed = { text: '--- /dev/null\n+++ b/report.md\n@@ -0,0 +1 @@\n+hello\n', added: 1, removed: 0, truncated: false }
+    const thread = buildThread(
+      [
+        event('tool.started', { itemId: 'w', toolKind: 'write', name: 'write', command: 'report.md', phase: 'started' }),
+        event('tool.completed', { itemId: 'w', toolKind: 'write', name: 'write', command: 'report.md', phase: 'completed', patch: own }),
+        event('tool.started', { itemId: 'obs', toolKind: 'observed_edit', name: 'edit', command: 'report.md', status: 'reported by the runtime, read from disk', phase: 'started' }),
+        event('tool.completed', { itemId: 'obs', toolKind: 'observed_edit', name: 'edit', command: 'report.md', status: 'reported by the runtime, read from disk', phase: 'completed', patch: observed })
+      ],
+      { running: false }
+    )
+    const activity = thread.find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    expect(details.filter((detail) => /report\.md/.test(detail.name))).toHaveLength(1)
+    expect(activity?.type === 'activity' && activity.summary).toBe('Edited 1 file')
+  })
 })
 
 describe('a usage window, as a person reads it', () => {

@@ -261,32 +261,82 @@ describe("controlled runtime JSONL process runner", () => {
     });
   });
 
-  it("rejects an oversized JSONL record and terminates without exposing its content", async () => {
-    const child = fakeChild({
-      onKill: (signal, target) => {
-        if (signal === "SIGINT") queueMicrotask(() => target.close(null, "SIGINT"));
-      },
-    });
+  it("skips an oversized JSONL record and lets the run carry on", async () => {
+    // MEASURED 2026-09-07, Cursor Agent on grok-4.6, mission ef164de4: 1,596
+    // records had arrived and the answer was streaming normally when record
+    // 1,597 came in over the cap. The run was SIGINT-ed and everything already
+    // on screen was thrown away, on a mission whose whole output was 871
+    // tokens. Losing that record and losing the run are different sizes of
+    // loss; only one of them is a reason to stop.
+    const child = fakeChild();
     const runner = createNodeRuntimeProcessRunner({
       maxRecordBytes: 8,
       spawnProcess: () => child.process,
     });
     const run = runner.start(spec, prompt);
-    const firstRecord = run.records[Symbol.asyncIterator]().next();
-    child.stdout.emit("data", `${prompt}\n`);
+    const iterator = run.records[Symbol.asyncIterator]();
+    child.stdout.emit("data", `${prompt}\n{"ok":1}\n`);
+    child.close(0, null);
 
-    await expect(firstRecord).rejects.toThrow(
-      "Runtime JSONL output exceeded its safety limit",
-    );
+    // The record after the oversized one still arrives: that is the point.
+    await expect(iterator.next()).resolves.toEqual({
+      done: false,
+      value: { sequence: 1, raw: '{"ok":1}' },
+    });
     await expect(run.completion).resolves.toMatchObject({
-      outputLimitExceeded: true,
-      recordCount: 0,
+      outputLimitExceeded: false,
+      oversizedRecordsDropped: 1,
+      recordCount: 1,
       cancelled: false,
     });
-    await firstRecord.catch((error: unknown) => {
-      expect(String(error)).not.toContain(prompt);
+    // And it is still never killed for it.
+    expect(child.signals).toEqual([]);
+  });
+
+  it("never exposes the content of a record it skipped", async () => {
+    // The reason the cap exists at all. Skipping must not become a way for an
+    // oversized payload to reach the ledger by another door.
+    const child = fakeChild();
+    const runner = createNodeRuntimeProcessRunner({
+      maxRecordBytes: 8,
+      spawnProcess: () => child.process,
     });
-    expect(child.signals).toEqual(["SIGINT"]);
+    const run = runner.start(spec, prompt);
+    const drained: string[] = [];
+    child.stdout.emit("data", `${prompt}\n`);
+    child.close(0, null);
+    const completion = await run.completion;
+    for (const record of run.records.drainAvailable()) drained.push(record.raw);
+    expect(drained.join(" ")).not.toContain(prompt);
+    expect(JSON.stringify(completion)).not.toContain(prompt);
+  });
+
+  it("resynchronises on the next newline after a line it gave up on", async () => {
+    // A partial line already past the cap is thrown away, and the REST of that
+    // line keeps arriving. Without a resync the tail would be read as a record
+    // of its own -- half a line of JSON, reported as the runtime sending
+    // nonsense, which it did not.
+    const child = fakeChild();
+    const runner = createNodeRuntimeProcessRunner({
+      maxRecordBytes: 24,
+      spawnProcess: () => child.process,
+    });
+    const run = runner.start(spec, prompt);
+    const iterator = run.records[Symbol.asyncIterator]();
+    // Arrives in pieces, with no newline until well past the cap.
+    child.stdout.emit("data", '{"big":"aaaaaaaaaaaaaaa');
+    child.stdout.emit("data", 'aaaaaaaaaaaaaaaaaaaaaaa');
+    child.stdout.emit("data", 'tail-of-the-same-line"}\n{"next":2}\n');
+    child.close(0, null);
+
+    await expect(iterator.next()).resolves.toEqual({
+      done: false,
+      value: { sequence: 1, raw: '{"next":2}' },
+    });
+    await expect(run.completion).resolves.toMatchObject({
+      oversizedRecordsDropped: 1,
+      recordCount: 1,
+    });
   });
 
   it("bounds queued records when a consumer falls behind", async () => {

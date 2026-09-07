@@ -1090,7 +1090,24 @@ export function startRoute(
   effort: string | undefined
 ): { readonly model: string; readonly effort?: string } {
   if (effort === undefined) return { model: modelId }
-  const model = models.find((entry) => entry.runtime === runtime && entry.id === modelId)
+  // Found by id OR by being one of a family's variants.
+  //
+  // Matching on `id` alone was the whole of this bug (Colin, 2026-09-07:
+  // "before that model and effort was working perfectly fine"). A Cursor
+  // family that is never listed without an effort takes the FIRST VARIANT SEEN
+  // as its id -- `cursorModelsFrom` says so in as many words -- so the id in
+  // hand is routinely `cursor-grok-4.6-low` while the person has chosen
+  // `medium`. No family matched, the effort fell through as a separate value,
+  // and `createCursorPrintCommand` refuses any effort: "Cursor Agent takes no
+  // effort level. Nothing was recorded."
+  //
+  // Looking the family up through its variants as well makes the two paths
+  // agree, and re-resolves the id to the variant the effort actually names.
+  const model = models.find(
+    (entry) =>
+      entry.runtime === runtime &&
+      (entry.id === modelId || Object.values(entry.variants ?? {}).includes(modelId))
+  )
   const variant = model?.variants?.[effort]
   if (variant !== undefined) return { model: variant }
   // A model with variants and no variant for this effort: the effort names

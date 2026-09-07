@@ -443,25 +443,16 @@ export function Composer({
               disabled={workingNow && queued !== undefined}
             />
             {/*
-              * Enter sends; Shift+Enter makes a new line. The second half was
-              * true and unsaid, and a first outside tester lost their opening
-              * mission to it (2026-09-07): they typed a two-line prompt, the
-              * first Enter submitted the first line, and the rest queued
-              * behind it as NEXT until the conversation had closed.
+              * The "Shift+Enter for a new line" hint is GONE, on Colin's word
+              * (2026-09-07): "everyone knows that and it takes up half the
+              * chat box." It was added the same week because an outside tester
+              * lost their opening mission to it -- a two-line prompt whose
+              * first Enter submitted the first line -- so do not restore it
+              * citing that tester without asking him again.
               *
-              * Shown only while there is something in the box. At rest it
-              * would be one more permanent object on the surface the design
-              * review just cut from seven controls to four; while typing it
-              * is the one moment the fact is worth anything.
+              * The fact itself is not lost: it is on the send button's title,
+              * where it costs no space in the box.
               */}
-            {value.length > 0 && !running && (
-              <span className="lc-composer__newline lc-mono" aria-hidden="true">
-                {/* Words, not glyphs: the vendored mono face has neither
-                    U+21E7 nor U+23CE, and the pair rendered as boxes on the
-                    built app (screenshot, 2026-09-07). */}
-                Shift+Enter for a new line
-              </span>
-            )}
             {running && !canQueue ? (
               <button
                 type="button"

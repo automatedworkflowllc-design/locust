@@ -66,6 +66,13 @@
   --lc-border-strong: rgba(255, 255, 255, 0.11);
   --lc-overlay-scrim: rgba(8, 10, 10, 0.55);
 
+  /* The scroller. Thin, no track, and quiet until pointed at: the default
+     Windows scrollbar is a 17px channel with a painted trough, which reads as
+     a piece of furniture rather than a position indicator (Colin, 2026-09-07:
+     "ours in chat is clunky"). */
+  --lc-scroll-thumb: rgba(255, 255, 255, 0.13);
+  --lc-scroll-thumb-hover: rgba(255, 255, 255, 0.24);
+
   /* --- Text ------------------------------------------------------------
    * `--lc-text-muted` is the AA floor for anything
    * readable. `--lc-text-faint` is for NON-TEXT only (icon strokes, the `/`

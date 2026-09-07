@@ -443,9 +443,14 @@ export function createCursorEventNormalizer(
             // performed is the vaguest possible account of the one thing we
             // know for certain.
             message: completion.outputLimitExceeded
-              ? "Cursor Agent sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
+              ? "Cursor Agent sent more output than Locust could take in, so the run was stopped."
               : sawResult
               ? `Cursor Agent exited with code ${String(completion.exitCode)}.`
+              // A skipped record is the host's doing, and when the run then
+              // ends with nothing to close it, blaming the runtime for the
+              // silence would be blaming it for our own gap.
+              : completion.oversizedRecordsDropped > 0
+              ? `Cursor Agent ended without a terminal result record, after Locust skipped ${String(completion.oversizedRecordsDropped)} piece${completion.oversizedRecordsDropped === 1 ? "" : "s"} of output too large to take in. The answer above is what arrived before that.`
               : "Cursor Agent ended without a terminal result record.",
             ...thread,
             runtimeTerminal: sawResult ? "completed" : "missing",

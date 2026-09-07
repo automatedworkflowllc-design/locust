@@ -6106,3 +6106,44 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
+
+/*
+ * The scroller, everywhere.
+ *
+ * The app had no scrollbar styling at all, so every scrolling surface wore the
+ * default Windows Chromium bar: a wide channel with a painted trough, sitting
+ * permanently beside the thread (Colin, 2026-09-07: "ours in chat is clunky").
+ *
+ * This is the shape a reading surface wants -- a thin thumb, no trough, inset
+ * from the edge so it floats rather than butting against the content, and dim
+ * until the pointer is over the surface it belongs to. The thumb is drawn with
+ * a transparent border and `background-clip: padding-box`, which is the only
+ * way to inset a webkit scrollbar thumb: the track keeps its hit area (a 10px
+ * grab target, not a 4px one) while the paint reads as 4px.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lc-scroll-thumb) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--lc-scroll-thumb);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--lc-scroll-thumb-hover);
+  background-clip: padding-box;
+}

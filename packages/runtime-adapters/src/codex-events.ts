@@ -143,6 +143,8 @@ interface ProcessEvidence {
   readonly recordCount: number;
   readonly inputDeliveryFailed: boolean;
   readonly outputLimitExceeded: boolean;
+  /** Records the host skipped for being too large to carry. */
+  readonly oversizedRecordsDropped: number;
   readonly forcedTerminationAttempted: boolean;
   readonly terminationUnconfirmed: boolean;
   readonly startedAt: string;
@@ -464,6 +466,7 @@ export function processEvidence(completion: RuntimeProcessCompletion): ProcessEv
     recordCount: completion.recordCount,
     inputDeliveryFailed: completion.inputDeliveryFailed,
     outputLimitExceeded: completion.outputLimitExceeded,
+    oversizedRecordsDropped: completion.oversizedRecordsDropped,
     forcedTerminationAttempted: completion.forcedTerminationAttempted,
     terminationUnconfirmed: completion.terminationUnconfirmed,
     startedAt: completion.startedAt,

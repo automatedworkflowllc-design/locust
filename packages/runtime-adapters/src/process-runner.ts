@@ -69,6 +69,13 @@ export interface RuntimeProcessCompletion {
   readonly terminationUnconfirmed: boolean;
   readonly inputDeliveryFailed: boolean;
   readonly outputLimitExceeded: boolean;
+  /**
+   * How many single records were too large to carry, and were skipped.
+   *
+   * Skipping one is survivable and killing the run for it is not, so these are
+   * counted rather than fatal. See `exceedOutputLimit` for the whole argument.
+   */
+  readonly oversizedRecordsDropped: number;
   readonly startedAt: string;
   readonly finishedAt: string;
 }
@@ -376,6 +383,9 @@ export function createNodeRuntimeProcessRunner(
       let terminationUnconfirmed = false;
       let inputDeliveryFailed = false;
       let outputLimitExceeded = false;
+      let oversizedRecordsDropped = 0;
+      /** Discarding the tail of a line already given up on, until its newline. */
+      let skippingOversizedLine = false;
       let forceTimer: ReturnType<typeof setTimeout> | undefined;
       let confirmationTimer: ReturnType<typeof setTimeout> | undefined;
       let removeAbortListener = (): void => {};
@@ -406,7 +416,7 @@ export function createNodeRuntimeProcessRunner(
       const emitRecord = (raw: string): void => {
         if (!raw || outputLimitExceeded) return;
         if (Buffer.byteLength(raw, "utf8") > maxRecordBytes) {
-          exceedOutputLimit();
+          dropOversizedRecord();
           return;
         }
         const nextSequence = recordCount + 1;
@@ -425,16 +435,32 @@ export function createNodeRuntimeProcessRunner(
           let line = stdoutRemainder.slice(0, lineEnd);
           stdoutRemainder = stdoutRemainder.slice(lineEnd + 1);
           if (line.endsWith("\r")) line = line.slice(0, -1);
-          emitRecord(line);
+          if (skippingOversizedLine) {
+            // The tail of a line already given up on. Its newline is the
+            // resynchronisation point: without this the remainder would be
+            // read as a record of its own, and a half-line of JSON is worse
+            // than no line -- it parses as malformed and is reported as the
+            // runtime having sent nonsense, which it did not.
+            skippingOversizedLine = false;
+          } else {
+            emitRecord(line);
+          }
           if (outputLimitExceeded) {
             stdoutRemainder = "";
             return;
           }
           lineEnd = stdoutRemainder.indexOf("\n");
         }
+        // A tail with no newline yet that is already past the cap: the line
+        // being assembled can never be carried, so what is held is thrown away
+        // and the rest of it is skipped as it arrives. Counted once, at the
+        // moment the decision is made, not once per chunk that follows.
         if (Buffer.byteLength(stdoutRemainder, "utf8") > maxRecordBytes) {
           stdoutRemainder = "";
-          exceedOutputLimit();
+          if (!skippingOversizedLine) {
+            skippingOversizedLine = true;
+            dropOversizedRecord();
+          }
         }
       };
 
@@ -467,6 +493,7 @@ export function createNodeRuntimeProcessRunner(
           terminationUnconfirmed,
           inputDeliveryFailed,
           outputLimitExceeded,
+          oversizedRecordsDropped,
           startedAt,
           finishedAt: now().toISOString(),
         });
@@ -514,6 +541,41 @@ export function createNodeRuntimeProcessRunner(
         }, cancellationGraceMs);
       };
 
+      /**
+       * One record was too big to carry. Skip it; do not kill the run.
+       *
+       * MEASURED 2026-09-07, Cursor Agent on grok-4.6, mission ef164de4:
+       * 1,596 records arrived, the answer was streaming normally in fragments,
+       * and record 1,597 was over the cap. The run was killed with SIGINT and
+       * everything already on screen was thrown away -- for a mission whose
+       * whole output was 871 tokens. The person was told to ask for "a
+       * narrower slice", which was not the problem and would not have helped.
+       *
+       * A cap is still right: an unbounded record is a memory hole, and the
+       * one that arrives is usually a whole file's contents or a tool result
+       * nobody will read inline. But losing THAT record and losing THE RUN are
+       * different sizes of loss, and only one of them is a reason to stop.
+       * Cursor's own complete-message record REPLACES the fragments it already
+       * sent, so dropping it costs nothing that is not already on screen.
+       *
+       * The count rides on the completion so a run that then ends badly can
+       * say a piece was skipped, rather than blaming the runtime for a silence
+       * the host created.
+       */
+      function dropOversizedRecord(): void {
+        if (outputLimitExceeded) return;
+        oversizedRecordsDropped += 1;
+      }
+
+      /**
+       * The queue backed up: the consumer is not draining fast enough and
+       * records would be lost silently from here on.
+       *
+       * This one stays fatal. Skipping an oversized record loses a piece the
+       * host can name; a full queue loses an unknown number of unknown
+       * records, and a ledger with an unknown hole in it is worse than a run
+       * that stopped and said so.
+       */
       function exceedOutputLimit(): void {
         if (outputLimitExceeded) return;
         outputLimitExceeded = true;

@@ -832,6 +832,23 @@ describe('the route a mission starts on', () => {
     expect(startRoute(models, 'cursor', 'cursor-grok-4.6-high-fast', 'medium')).toEqual({ model: 'cursor-grok-4.6-high-fast' })
   })
 
+  it('finds the family when the id in hand is one of its variants, not its own id', () => {
+    // THE regression (Colin, 2026-09-07: "before that model and effort was
+    // working perfectly fine"). A Cursor family never listed without an effort
+    // takes the FIRST VARIANT SEEN as its id, so the id in hand is routinely a
+    // sibling variant of the one the effort names. Matching on `id` alone found
+    // no family, the effort travelled as a separate value, and Cursor refused
+    // the run: "Cursor Agent takes no effort level. Nothing was recorded."
+    expect(startRoute(models, 'cursor', 'cursor-grok-4.6-low', 'high')).toEqual({ model: 'cursor-grok-4.6-high' })
+    // And the same path must still never hand Cursor a loose effort, whichever
+    // variant it started from -- that is the thing that actually breaks a run.
+    for (const from of ['cursor-grok-4.6-low', 'cursor-grok-4.6-high', 'cursor-grok-4.6-high-fast']) {
+      for (const effort of ['low', 'high', 'high-fast', 'medium', 'nonsense']) {
+        expect(startRoute(models, 'cursor', from, effort).effort).toBeUndefined()
+      }
+    }
+  })
+
   it('sends the effort as itself where the runtime takes it as a flag', () => {
     expect(startRoute(models, 'claude', 'sonnet', 'medium')).toEqual({ model: 'sonnet', effort: 'medium' })
     expect(startRoute(models, 'claude', 'sonnet', undefined)).toEqual({ model: 'sonnet' })

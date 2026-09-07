@@ -939,10 +939,20 @@ export function buildThread(
         workBegan = true
         // The host's disk observation of a path the runtime already named:
         // its patch belongs on the runtime's row, not on a second one.
+        //
+        // This used to require the runtime's row to have NO patch, which
+        // quietly meant "only for Codex": its `file_change` names a path and
+        // sends no diff, while Cursor, OpenCode and Claude all diff their own
+        // edits. So on every one of those, the observation of a change the
+        // runtime had ALREADY reported became a second, identical row --
+        // measured 2026-09-07 by `_tools/drive-reveal.mjs`, where one written
+        // file drew `report.md ADDED +1 -0` twice under a line reading
+        // `1 file`. The stated intent above was always unconditional; the
+        // condition was the accident.
         if (event.payload.toolKind === 'observed_edit' && /reported by the runtime/.test(event.payload.status ?? '')) {
           const path = (event.payload.command ?? '').toLowerCase()
           const tail = path.split('/').at(-1) ?? path
-          const own = activity.find((detail) => detail.kind === 'edit' && detail.patch === undefined && detail.name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) === tail)
+          const own = activity.find((detail) => detail.kind === 'edit' && detail.name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) === tail)
           if (own !== undefined) {
             openTools.set(event.payload.itemId, own)
             break

@@ -58,6 +58,7 @@ function completion(overrides: Partial<RuntimeProcessCompletion> = {}): RuntimeP
     terminationUnconfirmed: false,
     inputDeliveryFailed: false,
     outputLimitExceeded: false,
+    oversizedRecordsDropped: 0,
     startedAt: NOW,
     finishedAt: NOW,
     ...overrides

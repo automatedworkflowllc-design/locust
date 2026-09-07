@@ -157,7 +157,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     forcedTerminationAttempted: false,
     terminationUnconfirmed: false,
     inputDeliveryFailed: false,
-    outputLimitExceeded: false,
+    outputLimitExceeded: false, oversizedRecordsDropped: 0,
     startedAt: run.startedAt,
     finishedAt: now().toISOString()
   })

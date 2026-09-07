@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -13,6 +13,7 @@ import type {
 import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnPromptLine } from '../missionView.js'
 import type { LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
+import { atBottom } from '../stickToBottom.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
 import { costLine, runCostOf } from '../cost.js'
@@ -410,8 +411,40 @@ export function Thread({
         minute: '2-digit'
       })
     : undefined
+  // Follow the newest line while the person is at the bottom, and stop the
+  // moment they scroll up to read something. See `stickToBottom.ts` for why
+  // the "am I at the bottom" question has to be asked BEFORE the content
+  // grows rather than after.
+  const scroller = useRef<HTMLDivElement | null>(null)
+  const following = useRef(true)
+  const lastHeight = useRef(0)
+  useLayoutEffect(() => {
+    const box = scroller.current
+    if (box === null) return
+    const grew = box.scrollHeight > lastHeight.current
+    lastHeight.current = box.scrollHeight
+    if (following.current && grew) box.scrollTop = box.scrollHeight
+  })
+  // A mission the person just opened starts at its newest line, wherever the
+  // previous one had been left.
+  useEffect(() => {
+    const box = scroller.current
+    if (box === null) return
+    following.current = true
+    box.scrollTop = box.scrollHeight
+    // Identity of the conversation on screen: the recovered mission when there
+    // is one, else this run's start time. Either changes exactly when the
+    // person opens a different conversation, which is the moment to jump.
+  }, [restoredMission?.missionId, startedAtIso])
+
   return (
-    <div className="lc-thread">
+    <div
+      className="lc-thread"
+      ref={scroller}
+      onScroll={(event) => {
+        following.current = atBottom(event.currentTarget)
+      }}
+    >
       <div className="lc-thread__column">
         {/*
           * The mission id is PROVENANCE, and provenance lives on the workroom
