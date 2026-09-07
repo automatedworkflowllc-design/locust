@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.41.2 — 2026-09-07
+
+- **Resuming a mission keeps the effort you set.** It sent the model and
+  nothing else, so a resume quietly fell back to the runtime's own default —
+  and on Cursor, where the effort is part of the model id rather than a
+  separate flag, it ran a different model than the one on screen.
+
 ## 0.41.1 — 2026-09-07
 
 - **Swarm is in Settings.** Its only control was the mark on the composer,
