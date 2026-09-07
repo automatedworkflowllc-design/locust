@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.40.0 — 2026-09-07
+
+- **Automations shows what you set up in the CLIs.** Agents, commands and
+  automations you configured in Claude Code, Codex or Cursor are listed in one
+  place — with what each one is for, and where to find the file. Locust did
+  not make them and does not run them, so they sit apart from your routines
+  and have no buttons. A machine with nine of them on it used to read
+  "Nothing saved yet."
+- **The Automations screen stops sending you to the wrong place.** It said to
+  save a routine "from that teammate's card", under a button reading "Open the
+  team" — and the control is on neither. It is a right-click on a conversation
+  in the sidebar, which is what the screen now says.
+
 ## 0.39.2 — 2026-09-07
 
 - **An npm permission error now shows the fix.** It used to say "run the
