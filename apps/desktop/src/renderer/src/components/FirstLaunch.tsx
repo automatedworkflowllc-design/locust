@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
@@ -43,6 +44,7 @@ export function FirstLaunch({
   onInstall,
   installing,
   installLine,
+  installLog,
   installFailure,
   npmMissing = false
 }: {
@@ -60,6 +62,11 @@ export function FirstLaunch({
   readonly installing?: string
   /** The last line npm printed, with how long it has been going. */
   readonly installLine?: string
+  /**
+   * Everything npm has said for the install now running. The line above is
+   * the last of these; this is what `Show output` opens onto.
+   */
+  readonly installLog?: readonly string[]
   /** What went wrong, and what to do about it. */
   readonly installFailure?: {
     readonly what: string
@@ -71,6 +78,10 @@ export function FirstLaunch({
   /** Node is not on this machine, so four of the five cannot install at all. */
   readonly npmMissing?: boolean
 }): ReactElement {
+  // Stays open across subsequent installs once a person opens it, which is
+  // what the design asks for: someone who wanted the trace once wants it
+  // for the next one too.
+  const [outputOpen, setOutputOpen] = useState(false)
   // Signed-in first, exceptions last -- the reference's own order, and the
   // one that reads: a person scanning this wants "what can I use" before
   // "what is not built yet". Discovery's order is alphabetical by id, which
@@ -281,6 +292,27 @@ export function FirstLaunch({
           <div className="lc-installnote lc-installnote--failed" role="alert">
             <div className="lc-installnote__what">{installFailure.what}</div>
             <div className="lc-installnote__next">{installFailure.next}</div>
+            {(installLog?.length ?? 0) > 0 && (
+              <>
+                {/*
+                  * On a failure the trace is the thing worth reading, so the
+                  * disclosure is here too -- and the LAST lines usually name
+                  * the cause, which is what the unknown-failure copy tells
+                  * people to look for.
+                  */}
+                <button
+                  type="button"
+                  className="lc-ghostbutton"
+                  aria-expanded={outputOpen}
+                  onClick={() => setOutputOpen(!outputOpen)}
+                >
+                  {outputOpen ? 'Hide output' : 'Show output'}
+                </button>
+                {outputOpen && (
+                  <pre className="lc-installoutput lc-mono">{installLog?.join('\n')}</pre>
+                )}
+              </>
+            )}
             {/*
               * THE COMMAND NEVER DISAPPEARS. It stops being the only option;
               * on a failure it is the option that works, because a person who
@@ -304,7 +336,39 @@ export function FirstLaunch({
           </div>
         )}
         {installLine !== undefined && installFailure === undefined && (
-          <p className="lc-installnote lc-mono">{installLine}</p>
+          <div className="lc-installnote">
+            {/*
+              * What is being run, while it runs. It used to appear only after
+              * a failure, so a person watching a 90-second install had no way
+              * to know what it was doing or to run it themselves instead.
+              */}
+            {installing !== undefined && installCommand(installing) !== undefined && (
+              <code className="lc-installnote__running lc-mono">{installCommand(installing)}</code>
+            )}
+            <div className="lc-installnote__live">
+              <span className="lc-mono lc-installnote__lastline">{installLine}</span>
+              {(installLog?.length ?? 0) > 0 && (
+                <button
+                  type="button"
+                  className="lc-ghostbutton"
+                  aria-expanded={outputOpen}
+                  onClick={() => setOutputOpen(!outputOpen)}
+                >
+                  {outputOpen ? 'Hide output' : 'Show output'}
+                </button>
+              )}
+            </div>
+            {/*
+              * npm's own words, bounded and scrollable. The elapsed count in
+              * the line above is the honest substitute for a progress bar --
+              * npm reports nothing that can become a percentage -- and this
+              * is for the person who wants to know WHAT it is doing, or who
+              * needs to hand the trace to somebody else.
+              */}
+            {outputOpen && (
+              <pre className="lc-installoutput lc-mono">{installLog?.join('\n')}</pre>
+            )}
+          </div>
         )}
 
         {/*

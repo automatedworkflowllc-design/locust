@@ -428,6 +428,13 @@ function missionTitle(prompt: string): string {
 const RUNTIME_RECHECK_MS = 15_000
 const RUNTIME_RECHECK_MIN_GAP_MS = 10_000
 
+/**
+ * How many lines of npm output to keep. Enough that the end of a failing
+ * install is all there -- which is where the cause is -- without letting a
+ * pathological install grow in memory without end.
+ */
+const INSTALL_LOG_LINES = 500
+
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
   // Declared HERE, right under its state, not a thousand lines down: a
@@ -751,6 +758,8 @@ export default function App(): ReactElement {
    */
   const [installing, setInstalling] = useState<string>()
   const [installLine, setInstallLine] = useState<string>()
+  /** Every line npm printed for the install now running, newest last. */
+  const [installLog, setInstallLog] = useState<readonly string[]>([])
   const [installFailure, setInstallFailure] = useState<{
     readonly what: string
     readonly next: string
@@ -777,6 +786,11 @@ export default function App(): ReactElement {
     if (!bridge) return
     return bridge.onRuntimeInstallProgress(({ line }) => {
       setInstallLine(line)
+      // Everything npm said, not just the last thing. The design asks for a
+      // disclosure that opens onto the whole transcript, and a person who
+      // cannot read an npm trace can still hand the whole thing to someone
+      // who can. Bounded so a pathological install cannot grow without end.
+      setInstallLog((held) => [...held, line].slice(-INSTALL_LOG_LINES))
     })
   }, [])
 
@@ -809,6 +823,7 @@ export default function App(): ReactElement {
           // without this the renderer waits for a timer or a focus event
           // while the screen says nothing was installed.
           setInstallLine(undefined)
+          setInstallLog([])
           askDiscoveryAgain.current()
           return
         }
@@ -2752,6 +2767,7 @@ export default function App(): ReactElement {
                 onChooseFolder={chooseWorkspace}
                 onInstall={installRuntime}
                 installing={installing}
+                installLog={installLog}
                 installLine={
                   installing === undefined
                     ? undefined

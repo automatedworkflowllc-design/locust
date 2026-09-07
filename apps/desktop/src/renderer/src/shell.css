@@ -2366,6 +2366,51 @@ textarea {
 
 /* The command, still reachable after a failure. It stops being the only
    option; on a failure it is the option that works. */
+/* The live line and its disclosure, side by side. */
+.lc-installnote__live {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lc-space-4);
+}
+
+.lc-installnote__lastline {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* What is being run, while it runs. */
+.lc-installnote__running {
+  display: block;
+  margin-bottom: var(--lc-space-3);
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-mono-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* npm's own words. Bounded and scrollable: the design's rule is that this
+   never turns the screen into a terminal, and an install that talks for a
+   minute must not push the rest of the panel off the page. */
+.lc-installoutput {
+  margin: var(--lc-space-3) 0 0;
+  padding: var(--lc-space-4);
+  max-height: 200px;
+  overflow: auto;
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-diff-surface);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .lc-installnote__command {
   display: flex;
   align-items: center;
