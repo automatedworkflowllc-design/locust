@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, defaultOpenEntry, relativePath } from '../missionView.js'
+import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, relativePath } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
@@ -18,6 +18,27 @@ import { Icon } from './Icon.js'
  * is derived from the same rows the diff draws -- the header total is the
  * sum of the file rows, and each file row is the sum of its hunks.
  */
+/**
+ * What a command printed, bounded and kept at both ends.
+ *
+ * `pre` rather than a diff view: this is output, not a change, and the shape
+ * of it — columns, indentation, a stack trace — is often the information.
+ */
+function ShellOutput({ output }: { readonly output: string }): ReactElement {
+  const { text, omitted } = boundedShellOutput(output)
+  return (
+    <div className="lc-shellout">
+      <pre className="lc-shellout__text">{text}</pre>
+      {omitted > 0 && (
+        <p className="lc-shellout__note">
+          {omitted} lines in the middle are not shown. The start and the end are, because an
+          error is as often the last line as the first.
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function ActivityCard({
   summary,
   details,
@@ -216,11 +237,42 @@ export function ActivityCard({
                   </span>
                 </div>
               ) : entry.kind === 'shell' ? (
-                <div className="lc-filerow is-shell is-static">
-                  <Icon name="terminal" size={14} />
-                  <span className="lc-filerow__path">{entry.command}</span>
-                  <span className={`lc-filerow__result ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
-                </div>
+                /*
+                 * A command row opens onto what the command PRINTED, when the
+                 * runtime reported it.
+                 *
+                 * It was `is-static`: the command, a result word, and no way
+                 * to see the output at all. A teammate ran `seq 1 1200`, said
+                 * "printed 1 through 1200, one per line", and the row said
+                 * `done` — the person could not see one of those lines
+                 * (drive-huge-turn, 2026-09-08). The adapter had captured the
+                 * output and the entry threw it away.
+                 *
+                 * Static still, where there is nothing to show. Only the Codex
+                 * exec stream reports command output today, so a row that
+                 * offered to expand everywhere would be a dead control on the
+                 * runtimes that do not — the rule this composer has already
+                 * paid for twice. The chevron follows the evidence.
+                 */
+                entry.output === undefined ? (
+                  <div className="lc-filerow is-shell is-static">
+                    <Icon name="terminal" size={14} />
+                    <span className="lc-filerow__path">{entry.command}</span>
+                    <span className={`lc-filerow__result ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <button type="button" className="lc-filerow is-shell" onClick={() => toggle(entry)}>
+                      <Icon name="terminal" size={14} />
+                      <span className="lc-filerow__path">{entry.command}</span>
+                      <span className={`lc-filerow__result ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
+                      <span className="lc-activity__chev" aria-hidden="true">
+                        <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
+                      </span>
+                    </button>
+                    {isOpen(entry) && <ShellOutput output={entry.output} />}
+                  </>
+                )
               ) : (
                 // An edit the runtime recorded without the change itself. The
                 // row says so, in words: silence here would read as "nothing

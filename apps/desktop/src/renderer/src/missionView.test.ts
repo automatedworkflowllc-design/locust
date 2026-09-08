@@ -17,6 +17,8 @@ import {
   conversationTurns,
   decisionStanding,
   errorAlreadyShown,
+  boundedShellOutput,
+  MAX_SHELL_OUTPUT_LINES,
   turnAttachments,
   turnPromptLine,
   peerRunFor,
@@ -2229,5 +2231,58 @@ describe('a turn sent with files attached', () => {
       'NOTES.md',
       'src/keys.ts'
     ])
+  })
+})
+
+describe('what a command printed', () => {
+  it('keeps a short output whole', () => {
+    expect(boundedShellOutput('one\ntwo\nthree')).toEqual({ text: 'one\ntwo\nthree', omitted: 0 })
+  })
+
+  it('keeps BOTH ends of a long one', () => {
+    // THE test, and the same rule message truncation follows. The interesting
+    // line is as often the last as the first -- an error, an exit summary, the
+    // answer. `seq 1 1200` is the cheerful case; `npm install` ending in a
+    // permission error is the one that matters.
+    const many = Array.from({ length: 1_200 }, (_, index) => `line ${String(index + 1)}`).join('\n')
+    const { text, omitted } = boundedShellOutput(many)
+    expect(text).toContain('line 1')
+    expect(text).toContain('line 1200')
+    expect(omitted).toBe(1_200 - MAX_SHELL_OUTPUT_LINES)
+    expect(text.split('\n').length).toBeLessThan(MAX_SHELL_OUTPUT_LINES + 3)
+  })
+
+  it('says how much it left out rather than trailing off', () => {
+    const many = Array.from({ length: 500 }, () => 'x').join('\n')
+    expect(boundedShellOutput(many).text).toContain('more lines')
+  })
+})
+
+describe('a shell row and its output', () => {
+  const shellDetail = (output?: string): ActivityDetail => ({
+    kind: 'shell',
+    name: 'seq 1 1200',
+    settled: true,
+    failed: false,
+    ...(output === undefined ? {} : { output })
+  }) as unknown as ActivityDetail
+
+  it('carries the output the runtime reported', () => {
+    const entry = activityEntries([shellDetail('1\n2\n3')], undefined)[0]
+    expect(entry?.kind).toBe('shell')
+    expect(entry?.kind === 'shell' ? entry.output : undefined).toBe('1\n2\n3')
+  })
+
+  it('carries nothing where the runtime reported nothing', () => {
+    // Undefined is the ordinary case: only the Codex exec stream reports
+    // command output. The row reads its own data rather than promising an
+    // expansion it cannot deliver on four other runtimes.
+    const entry = activityEntries([shellDetail()], undefined)[0]
+    expect(entry?.kind === 'shell' ? entry.output : 'missing').toBeUndefined()
+  })
+
+  it('treats an empty output as nothing to show', () => {
+    const entry = activityEntries([shellDetail('')], undefined)[0]
+    expect(entry?.kind === 'shell' ? entry.output : 'missing').toBeUndefined()
   })
 })

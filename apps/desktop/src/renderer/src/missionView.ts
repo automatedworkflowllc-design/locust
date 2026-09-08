@@ -68,6 +68,20 @@ export type ActivityEntry =
       readonly settled: boolean
       readonly failed: boolean
       readonly exitCode: number | undefined
+      /**
+       * What the command printed, where the runtime reported it.
+       *
+       * Undefined is the ordinary case, not a failure: only the Codex exec
+       * stream carries `aggregated_output` today. A row with nothing to show
+       * simply does not offer to show anything -- which is why this is a
+       * capability the row reads off the data rather than a promise made in
+       * advance and then broken per runtime.
+       *
+       * Already redacted when it gets here: the adapter runs it through
+       * `sanitizeJson`, pinned by a test that puts a bearer token in a command's
+       * output and asserts it never reaches the event.
+       */
+      readonly output?: string
     }
   | {
       /**
@@ -136,7 +150,14 @@ export function activityEntries(
         command: shellCommandText(detail.name),
         settled: detail.settled,
         failed,
-        exitCode: detail.exitCode
+        exitCode: detail.exitCode,
+        // Carried, where there is any. It was captured by the adapter and
+        // dropped here, so a teammate could run `seq 1 1200`, say "printed 1
+        // through 1200", and leave the person looking at a row that said
+        // `done` and nothing else (drive-huge-turn, 2026-09-08).
+        ...(typeof detail.output === 'string' && detail.output.length > 0
+          ? { output: detail.output }
+          : {})
       })
       return
     }
@@ -2047,6 +2068,29 @@ export function turnPromptLine(turn: {
  * Only for a turn the person started: a relayed or handed-off turn's prompt is
  * machine-written and nothing attached files to it.
  */
+/** How many lines of command output a row will draw before it cuts. */
+export const MAX_SHELL_OUTPUT_LINES = 200
+
+/**
+ * Command output, bounded for the screen, keeping BOTH ends.
+ *
+ * The same rule `boundedMessageText` follows and for the same reason: the
+ * interesting part of a long output is as often the last line as the first --
+ * an error, an exit summary, the answer -- and a head-only cut throws exactly
+ * that away. `seq 1 1200` is the cheerful case; `npm install` ending in a
+ * permission error is the one that matters.
+ */
+export function boundedShellOutput(output: string): { readonly text: string; readonly omitted: number } {
+  const lines = output.split('\n')
+  if (lines.length <= MAX_SHELL_OUTPUT_LINES) return { text: output, omitted: 0 }
+  const half = Math.floor(MAX_SHELL_OUTPUT_LINES / 2)
+  const omitted = lines.length - half * 2
+  return {
+    text: [...lines.slice(0, half), `… ${String(omitted)} more lines …`, ...lines.slice(-half)].join('\n'),
+    omitted
+  }
+}
+
 export function turnAttachments(turn: {
   readonly prompt: string
   readonly startedBy?: LiveStarter

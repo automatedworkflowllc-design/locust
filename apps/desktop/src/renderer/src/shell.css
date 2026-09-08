@@ -4393,6 +4393,42 @@ textarea {
   text-wrap: pretty;
 }
 
+/* --- Command output ----------------------------------------------------- */
+
+/*
+ * What a command printed, under the row that ran it.
+ *
+ * Monospace and pre-wrapped because the SHAPE of output is often the
+ * information -- aligned columns, an indented stack trace, a table. Scrolls in
+ * its own box rather than stretching the fold, and never sideways past the
+ * thread: a long line wraps instead of pushing the whole card wide.
+ */
+.lc-shellout {
+  margin: 0 0 var(--lc-space-2) 34px;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border-left: 2px solid var(--lc-border-card);
+  background: var(--lc-bg-raised-2);
+  max-height: 320px;
+  overflow: auto;
+}
+
+.lc-shellout__text {
+  margin: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.5;
+  color: var(--lc-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lc-shellout__note {
+  margin: var(--lc-space-3) 0 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
 /* --- Attached files ----------------------------------------------------- */
 
 /*
