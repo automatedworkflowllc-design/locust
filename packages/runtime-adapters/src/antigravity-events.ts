@@ -348,7 +348,30 @@ export function createAntigravityEventNormalizer(
         ?? identityValue(call.call_id)
         ?? identityValue(call.toolCallId)
         ?? `tool_${String(stepIndex)}_${String(index)}`;
-      const command = antigravityToolCommand(args);
+      /*
+       * `ask_question` says what it is asking, on the row.
+       *
+       * It used to read "Prompting user with options · ask_question · still
+       * running" while the run sat blocked for the full idle timeout, and the
+       * question and its four options were in the record the whole time
+       * (`docs/FINDING-antigravity-ask-question.md`, Colin's screenshot).
+       *
+       * Locust cannot ANSWER it -- measured 2026-09-08: an answer is a tool
+       * completion the IDE writes as `A1: <text>`, while the only channel
+       * Locust has, `agentapi send-message`, arrives as a SYSTEM_MESSAGE
+       * labelled "not actually sent by the user". So this row does the one
+       * honest thing available: it shows what is being asked, and says where
+       * the answer has to go. A person who can read the question in Locust can
+       * go and answer it; a person reading a spinner cannot.
+       */
+      const asked = name === "ask_question" ? antigravityQuestion(args) : undefined;
+      const command = asked === undefined
+        ? antigravityToolCommand(args)
+        : oneLine(
+            asked.options.length === 0
+              ? `${asked.question} — answer in Antigravity`
+              : `${asked.question} — ${asked.options.join(" / ")} — answer in Antigravity`,
+          );
       const open: OpenTool = {
         itemId,
         toolKind: name,
@@ -517,4 +540,50 @@ export function createAntigravityEventNormalizer(
       return [emit("run.completed", { ...thread, process })];
     },
   };
+}
+
+/** One question Antigravity's `ask_question` put to the person. */
+export interface AntigravityQuestion {
+  readonly question: string;
+  readonly options: readonly string[];
+  readonly multiSelect: boolean;
+}
+
+/**
+ * The question inside an `ask_question` call, or undefined when there is none.
+ *
+ * Locust drew this tool as a bare row -- "Prompting user with options ·
+ * ask_question · still running" -- while the run sat blocked for the full idle
+ * timeout (`docs/FINDING-antigravity-ask-question.md`). The question and its
+ * options were in the record the whole time; nothing read them.
+ *
+ * Reading them is worth doing even though Locust CANNOT answer. Measured
+ * 2026-09-08 against real transcripts: an answer arrives as a MODEL/GENERIC
+ * record whose content is `A1: <text>` -- a tool COMPLETION, written when the
+ * IDE resolves the card -- while `agentapi send-message`, the only channel
+ * Locust has, arrives as a SYSTEM_MESSAGE explicitly labelled "not actually
+ * sent by the user". Those are two different transports, and only the first
+ * one ends the tool.
+ *
+ * So the honest thing is to show the person exactly what is being asked and
+ * where to answer it, instead of a row that names a tool and a spinner.
+ *
+ * `args.questions` is a JSON-encoded ARRAY, and every value in an Antigravity
+ * `args` is JSON-encoded (see `antigravityToolArg`). Only the first question is
+ * returned: both measured payloads carry exactly one, and inventing a
+ * multi-question UI for a shape never observed would be building for a guess.
+ */
+export function antigravityQuestion(args: unknown): AntigravityQuestion | undefined {
+  const decoded = antigravityToolArg(args, "questions");
+  const first = Array.isArray(decoded) ? decoded[0] : undefined;
+  if (!isObject(first)) return undefined;
+  const question = stringValue(first.question);
+  if (question === undefined || question.length === 0) return undefined;
+  // A question with no options is still a question. It is the OPTIONS that are
+  // optional, not the asking -- so an empty list draws a question and no
+  // buttons rather than nothing at all.
+  const options = Array.isArray(first.options)
+    ? first.options.filter((option): option is string => typeof option === "string" && option.length > 0)
+    : [];
+  return { question, options, multiSelect: first.is_multi_select === true };
 }

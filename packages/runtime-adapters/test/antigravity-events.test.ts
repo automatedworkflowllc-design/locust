@@ -477,3 +477,75 @@ describe("the project id `new-conversation` refuses to start without", () => {
     expect(normalizeAntigravityWorkspace("D:\\work\\pebble")).toBe("d:/work/pebble");
   });
 });
+
+describe("the row an ask_question draws", () => {
+  /*
+   * The record Colin screenshotted, as Antigravity wrote it. He saw
+   * "Prompting user with options · ask_question · still running" while the run
+   * hung for the full idle timeout -- and the question and its four options
+   * were sitting in this very record, unread.
+   */
+  const askRecord = JSON.stringify({
+    step_index: 4,
+    source: "MODEL",
+    type: "PLANNER_RESPONSE",
+    status: "DONE",
+    created_at: "2026-09-07T19:36:08Z",
+    tool_calls: [
+      {
+        name: "ask_question",
+        args: {
+          questions:
+            '[{"is_multi_select":false,"options":["(Recommended) Run performance benchmark tests","Inspect codebase architecture","Execute automated unit tests","Review system environment settings"],"question":"Which test option would you like to select?"}]',
+          toolAction: '"Prompting user with options"',
+          toolSummary: '"Interactive option selection"',
+        },
+      },
+    ],
+  });
+
+  it("says what is being asked, and every option", () => {
+    const antigravity = normalizer();
+    const started = antigravity
+      .accept({ sequence: 1, raw: askRecord })
+      .find((event) => event.type === "tool.started");
+    const command = String((started?.payload as { command?: string } | undefined)?.command ?? "");
+    expect(command).toContain("Which test option would you like to select?");
+    expect(command).toContain("Run performance benchmark tests");
+    expect(command).toContain("Review system environment settings");
+  })
+
+  it("says where the answer has to go, because it cannot go here", () => {
+    // Measured 2026-09-08: an answer is a tool completion the IDE writes as
+    // `A1: <text>`; `agentapi send-message`, the only channel Locust has,
+    // arrives as a SYSTEM_MESSAGE labelled "not actually sent by the user".
+    // A row that showed the question without saying that would read as an
+    // invitation to answer it here.
+    const antigravity = normalizer();
+    const started = antigravity
+      .accept({ sequence: 1, raw: askRecord })
+      .find((event) => event.type === "tool.started");
+    expect(String((started?.payload as { command?: string } | undefined)?.command)).toContain(
+      "answer in Antigravity",
+    );
+  })
+
+  it("leaves every other tool's row exactly as it was", () => {
+    // The control: this changes ask_question and nothing else.
+    const write = JSON.stringify({
+      step_index: 1,
+      source: "MODEL",
+      type: "PLANNER_RESPONSE",
+      status: "DONE",
+      created_at: "2026-09-07T19:36:08Z",
+      tool_calls: [{ name: "write_to_file", args: { TargetFile: '"c:/x/notes.md"' } }],
+    });
+    const antigravity = normalizer();
+    const started = antigravity
+      .accept({ sequence: 1, raw: write })
+      .find((event) => event.type === "tool.started");
+    const command = String((started?.payload as { command?: string } | undefined)?.command ?? "");
+    expect(command).not.toContain("answer in Antigravity");
+    expect(command).toContain("notes.md");
+  })
+})
