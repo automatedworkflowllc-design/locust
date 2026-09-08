@@ -137,8 +137,11 @@ export function AutomationsScreen({
                     {' · '}
                     {owner?.name ?? 'teammate removed'}
                     {' · '}
-                    {String(routine.steps.length)} step{routine.steps.length === 1 ? '' : 's'}
-                    {' · '}
+                    {/* The step count comes from `routineRunSummary`, which
+                        opens with it. Naming it here as well is why every card
+                        on this screen read "2 steps · 2 steps · not run yet" --
+                        seen in a drive of the recovery card, 2026-09-08, and
+                        older than that work. */}
                     {routineRunSummary(routine)}
                   </span>
                   {schedule !== undefined && (
