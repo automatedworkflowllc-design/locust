@@ -88,8 +88,12 @@ try {
   await drive.capture('AFTER: is the work still there', () => drive.evaluate(`JSON.stringify(${census}, null, 2)`))
 
   await drive.capture('AFTER: what the fold says when opened', () => drive.evaluate(`(async () => {
-    const fold = [...document.querySelectorAll('button')].find(b => /activity/i.test(b.textContent ?? ''))
-    if (!fold) return 'no activity control'
+    // The per-turn fold, not the Activity PANEL button in the header. A first
+    // version matched any button whose text contained "activity" and got the
+    // header one, so this step reported rows that were on screen for an
+    // entirely different reason and could not have caught the fold closing.
+    const fold = document.querySelector('.lc-activity')
+    if (!fold) return 'no activity fold'
     // Only if it is closed. A finished turn's fold opens itself since 0.49.0,
     // so an unconditional click CLOSES it and the rows below read as absent.
     if (fold.getAttribute('aria-expanded') !== 'true') fold.click()
