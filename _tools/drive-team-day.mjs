@@ -23,7 +23,7 @@
 //   - renderer errors that only appear after long uptime
 //   - the ledger, the heap and the DOM over tens of turns rather than ten
 
-import { readdir, stat } from 'node:fs/promises'
+import { readdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
@@ -163,7 +163,22 @@ try {
     return `${String(trend.length)} turns || heap ${String(first.heapMb)} -> ${String(last.heapMb)}MB || nodes ${String(first.nodes)} -> ${String(last.nodes)} || ledger ${String(Math.round(first.ledger / 1024))} -> ${String(Math.round(last.ledger / 1024))}KB || screens ${String(first.screens)} -> ${String(last.screens)}`
   })
 
-  drive.record.push({ step: drive.record.length + 1, title: 'every turn', note: JSON.stringify(trend), errors: [] })
+  /*
+   * The per-turn measurements go to a FILE, not into the step table.
+   *
+   * `finish()` truncates each note at 220 characters for the table's sake, so
+   * pushing twenty-four turns of readings in as one note kept the first two
+   * and silently dropped the rest -- the whole point of a long run, lost to a
+   * column width. Read `trend.json` beside the screenshots instead.
+   */
+  await writeFile(join(drive.out, 'trend.json'), JSON.stringify(trend, null, 1), 'utf8')
+  const completed = trend.filter((entry) => entry.outcome.startsWith('done in')).length
+  drive.record.push({
+    step: drive.record.length + 1,
+    title: 'every turn',
+    note: `${String(completed)} of ${String(trend.length)} turns completed; full readings in trend.json`,
+    errors: []
+  })
 } finally {
   await drive.finish({
     intro: 'Three teammates, eight rounds each, real file work and peer messages, on free models. The long multi-teammate session the app is built for and has never had.'
