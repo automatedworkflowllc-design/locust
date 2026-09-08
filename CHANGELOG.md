@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.44.1 - 2026-09-08
+
+- **Your conversations are reachable from the narrow layout.** In the 64px
+  avatar rail, hovering a teammate opens their conversations beside it - name,
+  role, what they are doing, and each conversation with how many turns and how
+  long ago. Click the avatar to pin it open; Esc or a click elsewhere closes
+  it. A small count on the avatar says how many conversations are behind it.
+  Right-click a conversation there for the same menu as the full sidebar,
+  including Save as routine.
+
 ## 0.44.0 - 2026-09-08
 
 - **Teammates stop losing what they said.** A long reply had its ending cut

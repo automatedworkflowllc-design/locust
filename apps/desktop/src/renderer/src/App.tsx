@@ -2548,6 +2548,7 @@ export default function App(): ReactElement {
         ...(rootId === undefined ? {} : { rootId }),
         ...(parentId === undefined ? {} : { parentId }),
         ...(run.teammateId === undefined ? {} : { ownerId: run.teammateId }),
+        ...(run.startedAtIso === undefined ? {} : { lastAt: run.startedAtIso }),
         // A run's thread already shows the root's words for a continuation.
         // A relayed run's prompt is the host's briefing to a runtime, never a
         // sentence to name a conversation with.
@@ -2575,7 +2576,8 @@ export default function App(): ReactElement {
         ...(mission.continuesFrom === undefined ? {} : { parentId: mission.continuesFrom.missionId }),
         phase: mission.phase,
         runtime: mission.runtime,
-        integrityIssueCount: mission.integrityIssueCount
+        integrityIssueCount: mission.integrityIssueCount,
+        lastAt: mission.lastUpdatedAt
       })
     }
     // One row per conversation. The ledger still holds one mission per run;
@@ -2676,6 +2678,7 @@ export default function App(): ReactElement {
           routines={routines}
           onOpenAutomations={() => setScreen('automations')}
           missions={sidebarMissions}
+          compact={layoutMode === 'compact'}
           teammates={teammates}
           routineStepByTeammate={routineStepByTeammate}
           missionOwners={missionOwners}

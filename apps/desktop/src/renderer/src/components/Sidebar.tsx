@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
 import type { PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
@@ -20,6 +20,8 @@ import {
 import { PixelFace } from './PixelFace.js'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
+import { railCountBadge } from '../railFlyout.js'
+import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
 
 /**
@@ -61,6 +63,8 @@ export interface SidebarMission {
   readonly memberIds?: readonly string[]
   /** Turns in the conversation; 1 is an ordinary single-run mission. */
   readonly turns?: number
+  /** When this conversation last moved, for the rail flyout's age column. */
+  readonly lastAt?: string
 }
 
 /** Whether a row is the conversation the workroom is showing. */
@@ -146,7 +150,8 @@ export function Sidebar({
   onOpenRoom,
   onOpenRooms,
   onOpenAutomations,
-  onHome
+  onHome,
+  compact = false
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
@@ -186,8 +191,77 @@ export function Sidebar({
   readonly onOpenAutomations: () => void
   /** Back to the home screen: nothing picked, nothing open. */
   readonly onHome: () => void
+  /**
+   * The 64px avatar rail is on. The rail draws no conversation rows -- four
+   * pixels of a title is not a smaller list -- so hovering an avatar opens
+   * that teammate's conversations as a flyout beside it, and clicking pins it
+   * (design agent, 2026-09-08). None of that exists in the full sidebar, where
+   * the rows are already drawn.
+   */
+  readonly compact?: boolean
 }): ReactElement {
   const [query, setQuery] = useState('')
+  // The rail flyout: who it is open for, whether a click pinned it, and where
+  // its trigger sits on screen. Hover opens after 120ms of intent and closes
+  // a moment after the pointer leaves both the avatar and the panel; a pin
+  // survives the pointer and is undone by Esc, a click outside, or clicking
+  // the same avatar again.
+  const [railHovered, setRailHovered] = useState<string | undefined>(undefined)
+  const [railPinned, setRailPinned] = useState<string | undefined>(undefined)
+  const [railAnchor, setRailAnchor] = useState<{ readonly top: number; readonly left: number } | undefined>(undefined)
+  const railOpenTimer = useRef<number | undefined>(undefined)
+  const railCloseTimer = useRef<number | undefined>(undefined)
+  const railSlots = useRef(new Map<string, HTMLDivElement>())
+  const measureRail = (teammateId: string): void => {
+    // From the trigger's MEASURED rect, never a row-pitch constant: the mock's
+    // first draft guessed a pitch and drifted 4px further out with every
+    // teammate down the rail, pointing at the wrong face by the sixth.
+    const slot = railSlots.current.get(teammateId)
+    if (slot === undefined) return
+    const box = slot.getBoundingClientRect()
+    // Top from the slot, so the panel lines up with the face it belongs to.
+    // Left from the RAIL's edge, not the slot's: the slot is inset by the row
+    // margins, and anchoring on it put the panel one pixel inside the rail
+    // instead of eight past it (measured by drive-compact, 2026-09-08).
+    const rail = slot.closest('.lc-sidebar')?.getBoundingClientRect()
+    setRailAnchor({ top: Math.max(8, box.top - 6), left: (rail?.right ?? box.right) + 8 })
+  }
+  const railEnter = (teammateId: string): void => {
+    if (!compact) return
+    window.clearTimeout(railCloseTimer.current)
+    window.clearTimeout(railOpenTimer.current)
+    railOpenTimer.current = window.setTimeout(() => {
+      if (railPinned === undefined) {
+        measureRail(teammateId)
+        setRailHovered(teammateId)
+      }
+    }, 120)
+  }
+  const railLeave = (): void => {
+    window.clearTimeout(railOpenTimer.current)
+    if (railPinned !== undefined) return
+    railCloseTimer.current = window.setTimeout(() => setRailHovered(undefined), 160)
+  }
+  const railPin = (teammateId: string): void => {
+    if (!compact) return
+    window.clearTimeout(railOpenTimer.current)
+    window.clearTimeout(railCloseTimer.current)
+    if (railPinned === teammateId) {
+      setRailPinned(undefined)
+      setRailHovered(undefined)
+      return
+    }
+    measureRail(teammateId)
+    setRailPinned(teammateId)
+    setRailHovered(teammateId)
+  }
+  const railClose = (): void => {
+    window.clearTimeout(railOpenTimer.current)
+    window.clearTimeout(railCloseTimer.current)
+    setRailPinned(undefined)
+    setRailHovered(undefined)
+  }
+  const railOpenFor = compact ? (railPinned ?? railHovered) : undefined
   // Which groups are open. All three start open, which is how the sidebar
   // has always read; folding is for making room, not a new default.
   const [openSections, setOpenSections] = useState({ teammates: true, missions: true, automations: true })
@@ -297,7 +371,21 @@ export function Sidebar({
           })
           const selected = teammate.teammateId === selectedTeammateId
           return (
-            <div key={teammate.teammateId} className={`lc-teammate${selected ? ' is-selected' : ''}`}>
+            <div
+              key={teammate.teammateId}
+              className={`lc-teammate lc-railslot${selected ? ' is-selected' : ''}`}
+              ref={(node) => {
+                if (node === null) railSlots.current.delete(teammate.teammateId)
+                else railSlots.current.set(teammate.teammateId, node)
+              }}
+              onMouseEnter={() => railEnter(teammate.teammateId)}
+              onMouseLeave={railLeave}
+            >
+              {/* The rail's one new mark: how many conversations sit behind
+                  this face, drawn only past one. Hidden outside the rail. */}
+              {railCountBadge(owned.length) !== undefined && (
+                <span className="lc-railbadge" aria-hidden="true">{railCountBadge(owned.length)}</span>
+              )}
               {/*
                 * The hover says name, role AND model -- not just the name. In
                 * the compact rail all three are drawn as text and the rail
@@ -308,8 +396,15 @@ export function Sidebar({
                 type="button"
                 className="lc-row lc-row--button"
                 aria-current={selected ? 'true' : undefined}
-                title={teammateTooltip(teammate)}
-                onClick={() => onSelectTeammate(teammate.teammateId)}
+                // No native title in the rail: the flyout says the same three
+                // facts as real text, and a tooltip fading in over a panel is
+                // two answers to one question. The full sidebar keeps it.
+                {...(compact ? { 'aria-label': teammateTooltip(teammate) } : { title: teammateTooltip(teammate) })}
+                aria-expanded={compact ? railOpenFor === teammate.teammateId : undefined}
+                onClick={() => {
+                  onSelectTeammate(teammate.teammateId)
+                  railPin(teammate.teammateId)
+                }}
                 onContextMenu={(event) => {
                   event.preventDefault()
                   onTeammateMenu(teammate.teammateId, { x: event.clientX, y: event.clientY })
@@ -434,6 +529,53 @@ export function Sidebar({
           )
           })}
         </SidebarSection>
+        {railOpenFor !== undefined && railAnchor !== undefined && (() => {
+          const open = teammates.find((entry) => entry.teammateId === railOpenFor)
+          if (open === undefined) return null
+          const theirs = missions.filter(
+            (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === open.teammateId
+          )
+          const theirRuntime = theirs.find((mission) => mission.phase === 'running')?.runtime ?? theirs.at(0)?.runtime
+          const status = teammateStatusView({
+            runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
+            anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+            hasRunningMission: theirs.some((mission) => mission.phase === 'running'),
+            pendingApprovals: pendingApprovals[open.teammateId] ?? 0,
+            roleLabel: roleLabelOf(open),
+            ...(liveActivity[open.teammateId] === undefined ? {} : { liveActivity: liveActivity[open.teammateId] }),
+            recentlyDone: recentlyDone.includes(open.teammateId),
+            recentlyReceived: recentlyReceived.includes(open.teammateId)
+          })
+          return (
+            <RailFlyout
+              teammate={open}
+              statusLabel={status.label}
+              statusTone={status.tone === 'muted' ? 'muted' : status.tone}
+              route={open.route === undefined ? undefined : `${runtimeDisplayName(open.route.runtime)} / ${open.route.model}`}
+              missions={theirs}
+              selectedMissionId={selectedMissionId}
+              top={railAnchor.top}
+              left={railAnchor.left}
+              pinned={railPinned !== undefined}
+              onSelectMission={(missionId) => {
+                onSelectMission(missionId)
+                railClose()
+              }}
+              onMissionMenu={onMissionMenu}
+              onOpenMissions={() => {
+                onOpenMissions()
+                railClose()
+              }}
+              onNewConversation={() => {
+                onSelectTeammate(open.teammateId)
+                railClose()
+              }}
+              onPointerEnter={() => window.clearTimeout(railCloseTimer.current)}
+              onPointerLeave={railLeave}
+              onClose={railClose}
+            />
+          )
+        })()}
 
         {/*
           "Missions", not "Other missions". The old label drew a distinction

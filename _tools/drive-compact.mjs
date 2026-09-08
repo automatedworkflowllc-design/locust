@@ -83,7 +83,11 @@ try {
   // actually be looking at. One short run on Cursor, so it costs almost
   // nothing.
   await drive.capture('run one short mission at this width', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    // By aria-label in the rail: the avatar carries no native title there (the
+    // flyout says the same facts), and a title-only selector silently clicked
+    // nothing -- so the mission below was sent with nobody selected and the
+    // flyout, correctly, listed no conversations for Wren (2026-09-08).
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') ?? b.getAttribute('aria-label') ?? '').startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     await drive.evaluate(pickRouteScript({ group: '/cursor/i', search: 'grok-4.6', row: '/grok-4.6/i' }))
     await drive.evaluate(sendAndWaitScript('Reply with exactly one word: ready. Use no tools.', { waitSeconds: 240 }))
     return drive.evaluate(`(() => {
@@ -120,6 +124,64 @@ try {
     return 'rail scrolls sideways: ' + sideways
       + ' || conversation lists drawn: ' + missions
       + ' || selected box height: ' + selectedHeight + 'px'
+  })()`))
+
+  // The rail flyout (design agent, 2026-09-08). Hover is driven with
+  // mouseover/mouseout, not mouseenter/mouseleave: React derives its enter and
+  // leave handlers from the former and never listens for the latter, so a
+  // dispatched mouseenter is a hover that no handler ever sees. Hover an avatar and that
+  // teammate's conversations open beside the rail; click pins; Esc unpins.
+  // By now Wren has one conversation from the mission above.
+  await drive.capture('hover Wren in the rail: does the flyout open', () => drive.evaluate(`(async () => {
+    const slot = [...document.querySelectorAll('.lc-railslot')][0]
+    if (!slot) return 'no rail slot'
+    slot.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }))
+    await new Promise(r => setTimeout(r, 400))
+    const panel = document.querySelector('.lc-railflyout')
+    if (!panel) return 'NO FLYOUT after hover'
+    const box = panel.getBoundingClientRect()
+    const rail = document.querySelector('.lc-sidebar').getBoundingClientRect()
+    const rows = [...panel.querySelectorAll('.lc-railflyout__row')].map(r => r.innerText.split(String.fromCharCode(10)).join(' ').trim())
+    // The premise, checked: the hidden full-sidebar rows are still in the DOM
+    // in the rail, so counting them says whether Wren OWNS a conversation at
+    // this instant -- and the unowned MISSIONS rows say where it went if not.
+    const ownedInDom = document.querySelectorAll('.lc-railslot .lc-teammate__mission').length
+    const unownedInDom = document.querySelectorAll('.lc-row--mission').length
+    return 'flyout ' + Math.round(box.width) + 'px wide, left edge ' + Math.round(box.left - rail.right) + 'px past the rail'
+      + ' || owned rows in DOM: ' + ownedInDom + ' || unowned rows in DOM: ' + unownedInDom
+      + ' || header: ' + (panel.querySelector('.lc-railflyout__name')?.innerText ?? '?')
+      + ' || rows: [' + rows.join(' | ') + ']'
+      + ' || count: ' + (panel.querySelector('.lc-railflyout__count')?.innerText ?? 'none')
+  })()`))
+
+  await drive.capture('move the pointer away: does it close, then click to pin', () => drive.evaluate(`(async () => {
+    // Clear any pin first. Selecting Wren for the mission above is a click on
+    // the avatar, and click pins by design -- so without this the leave below
+    // finds a pinned panel and the click UNpins it, which read as both halves
+    // failing on the first run of this step.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await new Promise(r => setTimeout(r, 200))
+    const slot = [...document.querySelectorAll('.lc-railslot')][0]
+    slot.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }))
+    await new Promise(r => setTimeout(r, 400))
+    slot.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
+    await new Promise(r => setTimeout(r, 400))
+    const closed = document.querySelector('.lc-railflyout') === null
+    slot.querySelector('button').click()
+    await new Promise(r => setTimeout(r, 400))
+    const pinned = document.querySelector('.lc-railflyout') !== null
+    slot.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
+    await new Promise(r => setTimeout(r, 400))
+    const stays = document.querySelector('.lc-railflyout') !== null
+    return 'closed on leave: ' + closed + ' || open after click: ' + pinned + ' || survives the pointer leaving: ' + stays
+  })()`))
+
+  await drive.capture('Esc unpins; the avatar has no native tooltip in the rail', () => drive.evaluate(`(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await new Promise(r => setTimeout(r, 300))
+    const gone = document.querySelector('.lc-railflyout') === null
+    const button = document.querySelector('.lc-railslot button')
+    return 'gone after Esc: ' + gone + ' || title attr: ' + (button?.getAttribute('title') ?? 'none') + ' || aria-label: ' + (button?.getAttribute('aria-label') ?? 'none').slice(0, 60)
   })()`))
 
   // The layout is a CHOICE as well as a consequence of window size. At this
