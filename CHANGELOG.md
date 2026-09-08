@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.51.1 - 2026-09-08
+
+- **The same receipt failure on Antigravity missions.** Fixing this in "Approve
+  each action" prompted a sweep for the same shape, and the Antigravity path
+  had it too - a failed write to the durable record was treated as a passing
+  read error, so the run kept going unrecorded. It was worse in one way: the
+  place it had reached in the agent's transcript moved forward before the write
+  succeeded, so those events were skipped for good rather than retried. Both
+  fixed.
+
 ## 0.51.0 - 2026-09-08
 
 - **"Approve each action" could lose its record of what happened and keep
