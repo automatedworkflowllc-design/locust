@@ -3,6 +3,7 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
 import { describe, expect, it } from 'vitest'
+import { withAttachments } from '../../shared/attachments.js'
 
 import {
   activityCounts,
@@ -16,6 +17,7 @@ import {
   conversationTurns,
   decisionStanding,
   errorAlreadyShown,
+  turnAttachments,
   turnPromptLine,
   peerRunFor,
   defaultOpenEntry,
@@ -2182,5 +2184,39 @@ describe('whether a finished fold opens itself', () => {
     // prevent.
     expect(activity({ running: false })?.openByDefault).toBeUndefined()
     expect(activity({ running: false, latestTurn: false })?.openByDefault).toBeUndefined()
+  })
+})
+
+describe('a turn sent with files attached', () => {
+  // Colin asked for attachments; the host names them for the runtime in a line
+  // above the message. That line was reaching the person as well: their own
+  // bubble opened with an instruction they had not written, in the style that
+  // says they wrote it.
+  const sent = withAttachments('What is the passphrase?', ['NOTES.md', 'src/keys.ts'])
+
+  it('shows what was typed, not what was sent', () => {
+    expect(turnPromptLine({ prompt: sent })).toBe('What is the passphrase?')
+    expect(turnPromptLine({ prompt: sent })).not.toMatch(/Read these/)
+    expect(turnPromptLine({ prompt: sent })).not.toMatch(/NOTES\.md/)
+  })
+
+  it('still reports the files, so nothing is hidden by the fix', () => {
+    expect(turnAttachments({ prompt: sent })).toEqual(['NOTES.md', 'src/keys.ts'])
+  })
+
+  it('leaves an ordinary turn exactly as it was', () => {
+    expect(turnPromptLine({ prompt: 'Fix the parser.' })).toBe('Fix the parser.')
+    expect(turnAttachments({ prompt: 'Fix the parser.' })).toEqual([])
+  })
+
+  it('claims no attachments on a turn the person did not type', () => {
+    // A relayed or handed-off turn's prompt is machine-written; nothing
+    // attached files to it, and reading paths out of one would invent them.
+    expect(turnAttachments({ prompt: sent, startedBy: { kind: 'relay', hop: 1 } })).toEqual([])
+    // A routine step and a room post ARE the person's own words.
+    expect(turnAttachments({ prompt: sent, startedBy: { kind: 'routine', routineId: 'rt_1', step: 0 } })).toEqual([
+      'NOTES.md',
+      'src/keys.ts'
+    ])
   })
 })

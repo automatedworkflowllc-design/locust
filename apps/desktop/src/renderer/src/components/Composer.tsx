@@ -193,13 +193,25 @@ export function Composer({
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
   /** Why the last press of Enter did nothing. Cleared as soon as one lands. */
-  const [refusal, setRefusal] = useState<string>()
+  /**
+   * What the box has to say about the last press, and in which register.
+   *
+   * `plain` is the difference between "that did not work" and "here is what I
+   * did": a file copied in from outside the workspace is reported, not
+   * refused, and drawing it in the red of a failure taught the eye to read a
+   * success as a problem (seen in a drive, 2026-09-08).
+   */
+  const [refusal, setRefusal] = useState<{ readonly text: string; readonly plain?: boolean }>()
   const type = (next: string): void => {
     setValue(next)
     // The refusal was about the press, not about the text. Typing again is
     // the person trying something; leaving the old sentence up implies it
     // still applies.
     if (refusal !== undefined) setRefusal(undefined)
+  }
+  /** Say something, or -- with no text -- say nothing. */
+  const setNote = (text: string | undefined, plain = false): void => {
+    setRefusal(text === undefined ? undefined : { text, ...(plain ? { plain: true } : {}) })
   }
   const [modeOpen, setModeOpen] = useState(false)
   /**
@@ -353,7 +365,7 @@ export function Composer({
       // Silence here is the single worst thing this box can do: the person
       // types, presses Enter, and the app neither sends nor explains. It cost
       // the whole first run in the QA pass. Every refusal now names itself.
-      setRefusal(
+      setNote(
         !routeCanRun
           ? `The ${selected?.displayName ?? 'selected'} adapter is not finished, so a mission cannot start on it. Switch the route.`
           : readyElsewhere !== undefined
@@ -474,9 +486,11 @@ export function Composer({
           * errors: one place the box speaks, rather than a second voice.
           */}
         {refusal !== undefined && (
-          <div className="lc-notice" role="status" aria-live="polite">
-            <Icon name="shield" size={13} />
-            {refusal}
+          <div className={`lc-notice${refusal.plain === true ? ' is-plain' : ''}`} role="status" aria-live="polite">
+            {/* The shield says "refused". A note about what the host DID is
+                not a refusal, so it gets the icon for the thing it is. */}
+            <Icon name={refusal.plain === true ? 'file' : 'shield'} size={13} />
+            {refusal.text}
           </div>
         )}
         {queued !== undefined && (
@@ -556,6 +570,38 @@ export function Composer({
                 >
                   {command.detail}
                 </span>
+              </button>
+            ))}
+          </div>
+        )}
+            {/*
+          * Attached files, above the message rather than on the button row.
+          *
+          * They were a `1 file` chip beside the mode and folder controls,
+          * and that row does not wrap on purpose -- so a new fixed-width
+          * control on it had nowhere to go. Measured: 14px over, with the
+          * effort chip running under the swarm mark. Colin, 2026-09-08:
+          * "maybe just copy or use your own UI for inspiration, they just
+          * put the file square in the chat."
+          *
+          * So: a tile per file, inside the box, where what is being sent
+          * belongs -- and each one removes itself, because attaching four
+          * files and wanting three was previously all-or-nothing.
+          */}
+        {attached.length > 0 && (
+          <div className="lc-attached" aria-label={`${attachmentLabel(attached.length)} attached`}>
+            {attached.map((path) => (
+              <button
+                key={path}
+                type="button"
+                className="lc-attached__tile"
+                title={`${path} — click to remove`}
+                aria-label={`Remove ${path}`}
+                onClick={() => setAttached((current) => current.filter((entry) => entry !== path))}
+              >
+                <Icon name="file" size={13} />
+                <span className="lc-attached__name">{path.split('/').pop() ?? path}</span>
+                <Icon name="close" size={11} />
               </button>
             ))}
           </div>
@@ -713,8 +759,8 @@ export function Composer({
               <button
                 type="button"
                 className="lc-control lc-control--icon"
-                aria-label="Attach files from this workspace"
-                title="Attach files from this workspace"
+                aria-label="Attach files"
+                title="Attach a file — anywhere on this machine"
                 disabled={running || attaching}
                 onClick={() => {
                   const bridge = window.desktop
@@ -728,30 +774,20 @@ export function Composer({
                         // reference, and the cap is what keeps a stray
                         // multi-select out of the prompt budget.
                         setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
-                        setRefusal(undefined)
+                        // A success can still have something to say: a file
+                        // from outside the folder was copied in, and that is
+                        // a change to their project they should hear about.
+                        setNote(answer.message, true)
                       } else if (answer.message.length > 0) {
-                        setRefusal(answer.message)
+                        setNote(answer.message)
                       }
                     })
-                    .catch(() => setRefusal('Those files could not be attached.'))
+                    .catch(() => setNote('Those files could not be attached.'))
                     .finally(() => setAttaching(false))
                 }}
               >
                 <Icon name="plus" size={14} />
               </button>
-              {attached.length > 0 && (
-                <button
-                  type="button"
-                  className="lc-control lc-control--boxed lc-attachchip"
-                  title={`${attached.join(', ')} — click to remove all`}
-                  aria-label={`${attachmentLabel(attached.length)} attached; remove`}
-                  onClick={() => setAttached([])}
-                >
-                  <Icon name="attachment" size={12} />
-                  <span className="lc-control__mono">{attachmentLabel(attached.length)}</span>
-                  <Icon name="close" size={11} />
-                </button>
-              )}
             </div>
             <div className="lc-composer__group">
               <span className="lc-control__anchor">

@@ -90,6 +90,7 @@ import { conversationCost, costLine, latestContext } from './cost.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
+import { splitAttachments } from '../../shared/attachments.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
@@ -402,7 +403,12 @@ export function swarmEffortFor(
 }
 
 function missionTitle(prompt: string): string {
-  const trimmed = prompt.trim().split('\n')[0] ?? prompt
+  // The first line of a message sent with a file is the host's own "Read this
+  // file in the workspace before you answer:", so every mission started with
+  // an attachment was titled that -- identically, in the sidebar, in search,
+  // and in the header. The title is what the person typed.
+  const { text } = splitAttachments(prompt)
+  const trimmed = text.trim().split('\n')[0] ?? text
   return trimmed.length > 44 ? `${trimmed.slice(0, 44).trimEnd()}…` : trimmed
 }
 

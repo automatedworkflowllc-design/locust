@@ -59,3 +59,43 @@ export function withAttachments(prompt: string, paths: readonly string[]): strin
 export function attachmentLabel(count: number): string {
   return count === 1 ? '1 file' : `${String(count)} files`
 }
+
+/** What was typed, and what was attached, recovered from a sent prompt. */
+export interface SplitPrompt {
+  /** The person's own words, without the line the host added. */
+  readonly text: string
+  /** Workspace-relative paths, in the order they were attached. */
+  readonly attachments: readonly string[]
+}
+
+/**
+ * The inverse of `withAttachments`, for everything that SHOWS a prompt.
+ *
+ * The preamble is written for the runtime, and it was reaching the person as
+ * well: the bubble in their own thread, the sidebar row, the title a mission
+ * is found by. All three read "Read this file in the workspace before you
+ * answer: - NOTES.md" above words they had actually typed, which is the app
+ * putting its own machinery in their mouth.
+ *
+ * Recovering the pieces here rather than carrying them alongside the prompt is
+ * deliberate: every mission already saved has the preamble inside its recorded
+ * prompt, and a field added today would leave all of those still reading the
+ * instruction. This fixes them too.
+ *
+ * It matches ONLY what `attachmentPreamble` writes -- the exact opening, a
+ * list of `- ` lines, a blank line, then the rest. Anything else comes back
+ * whole, because a prompt this cannot account for is a prompt to leave alone.
+ */
+export function splitAttachments(prompt: string): SplitPrompt {
+  const match = /^Read th(?:is file|ese \d+ files) in the workspace before you answer:\n((?:- [^\n]+\n?)+)\n([\s\S]+)$/.exec(prompt)
+  if (match === null) return { text: prompt, attachments: [] }
+  const listed = (match[1] ?? '')
+    .split('\n')
+    .filter((line) => line.startsWith('- '))
+    .map((line) => line.slice(2))
+  // A preamble with nothing under it is not one of ours: `withAttachments`
+  // only ever writes the line above something the person typed.
+  const rest = match[2] ?? ''
+  if (listed.length === 0 || rest.length === 0) return { text: prompt, attachments: [] }
+  return { text: rest, attachments: listed }
+}

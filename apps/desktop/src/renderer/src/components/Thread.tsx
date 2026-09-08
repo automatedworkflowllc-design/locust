@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnPromptLine } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine } from '../missionView.js'
 import type { LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { atBottom } from '../stickToBottom.js'
@@ -390,6 +390,47 @@ export function Thread({
   // What the current turn is called: the person's words, or -- for a turn the
   // host briefed -- the message that caused it, or nothing at all.
   const currentLine = turnPromptLine({ prompt, startedBy, peerMessages: peers.messages })
+  /*
+   * The person's turn: what they typed, and under it the files they attached.
+   *
+   * The files used to be inside the bubble, because the host names them in a
+   * line above the message for the runtime to act on and that whole string was
+   * what the bubble drew. So the person read an instruction they had not
+   * written, and the files -- the thing they actually did -- were a sentence
+   * rather than something to look at or open.
+   *
+   * Rows, and the same reveal control the activity fold uses on a file a
+   * teammate wrote: "where is it" is the question a file attracts, and it
+   * should have the same answer wherever the file appears.
+   */
+  const userTurn = (line: string | undefined, attached: readonly string[]): ReactElement | undefined => {
+    if (line === undefined && attached.length === 0) return undefined
+    return (
+      <>
+        {line !== undefined && <div className="lc-bubble">{line}</div>}
+        {attached.length > 0 && (
+          <div className="lc-sentfiles">
+            {attached.map((path) => (
+              <button
+                key={path}
+                type="button"
+                className="lc-sentfile"
+                title={`Show ${path} in the file manager`}
+                onClick={() => {
+                  const bridge = window.desktop
+                  if (bridge === undefined || workspacePath === undefined) return
+                  void bridge.revealFile(`${workspacePath}/${path}`).catch(() => undefined)
+                }}
+              >
+                <Icon name="file" size={12} />
+                <span className="lc-sentfile__path">{path}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </>
+    )
+  }
   const exchanges = threadPeerCards([...earlierTurns.map((turn) => turn.peerMessages ?? []), peers.messages])
   const peerCard = (card: ThreadPeerCard): ReactElement => (
     <PeerThread
@@ -479,7 +520,7 @@ export function Thread({
               {marker !== undefined && (
                 <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
               )}
-              {turnPromptLine(turn) !== undefined && <div className="lc-bubble">{turnPromptLine(turn)}</div>}
+              {userTurn(turnPromptLine(turn), turnAttachments(turn))}
               {cardsFor(index, 'before-work').map(peerCard)}
               <ThreadItems items={buildThread(turn.events, { running: false, mayEdit, ...(workspacePath === undefined ? {} : { workspacePath }) })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
               {cardsFor(index, 'after-work').map(peerCard)}
@@ -490,7 +531,7 @@ export function Thread({
         {currentMarker !== undefined && (
           <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
         )}
-        {currentLine !== undefined && <div className="lc-bubble">{currentLine}</div>}
+        {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }))}
 
         {handoff !== undefined && (
           <>

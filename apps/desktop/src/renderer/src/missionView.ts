@@ -7,6 +7,7 @@ import type { DiffCounts, DiffFile } from './diff.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
 import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
+import { splitAttachments } from '../../shared/attachments.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
@@ -1994,11 +1995,19 @@ export function turnPromptLine(turn: {
   readonly startedBy?: LiveStarter
   readonly peerMessages?: readonly PublicPeerMessage[]
 }): string | undefined {
-  if (turn.startedBy === undefined) return turn.prompt
+  // Attached files are named for the RUNTIME, in a line the host writes above
+  // the message. It was reaching the person too -- their own bubble opened
+  // "Read this file in the workspace before you answer: - NOTES.md", words
+  // they never typed, in the style that says they said them. The files are
+  // still shown, as rows under the bubble; this is only about whose voice
+  // the sentence is in.
+  if (turn.startedBy === undefined) return splitAttachments(turn.prompt).text
   // A routine step is the person's own words, saved from a conversation they
   // had; it is theirs to see, even though the host pressed go. A room post
   // is the person's own words too, said to several at once.
-  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room') return turn.prompt
+  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room') {
+    return splitAttachments(turn.prompt).text
+  }
   // A relayed turn's prompt IS the message that started it, and the thread
   // already draws that message as a peer card, in time, before the work. The
   // bubble therefore repeated a teammate's words verbatim -- and drew them in
@@ -2010,6 +2019,22 @@ export function turnPromptLine(turn: {
   const relayed = relayedTitle({ startedBy: turn.startedBy, peerMessages: turn.peerMessages ?? [] })
   const drawnAsACard = (turn.peerMessages ?? []).some((message) => message.direction === 'received')
   return drawnAsACard ? undefined : relayed
+}
+
+/**
+ * The files a turn was sent with, recovered from its prompt.
+ *
+ * Only for a turn the person started: a relayed or handed-off turn's prompt is
+ * machine-written and nothing attached files to it.
+ */
+export function turnAttachments(turn: {
+  readonly prompt: string
+  readonly startedBy?: LiveStarter
+}): readonly string[] {
+  if (turn.startedBy !== undefined && turn.startedBy.kind !== 'routine' && turn.startedBy.kind !== 'room') {
+    return []
+  }
+  return splitAttachments(turn.prompt).attachments
 }
 
 export function relayedTitle(mission: {

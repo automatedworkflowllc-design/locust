@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { attachmentLabel, attachmentPreamble, withAttachments } from './attachments.js'
+import { attachmentLabel, attachmentPreamble, splitAttachments, withAttachments } from './attachments.js'
 
 describe('naming attached files in a message', () => {
   it('draws nothing at all when nothing is attached', () => {
@@ -43,5 +43,42 @@ describe('naming attached files in a message', () => {
     expect(attachmentLabel(1)).toBe('1 file')
     expect(attachmentLabel(3)).toBe('3 files')
     expect(attachmentLabel(1)).not.toMatch(/attach/i)
+  })
+})
+
+describe('reading a sent prompt back for display', () => {
+  it('gives back exactly what withAttachments put in', () => {
+    // The round trip is the whole contract: if these two ever disagree, the
+    // bubble shows the host's instruction again.
+    for (const paths of [['notes.md'], ['a.ts', 'b.ts'], ['src/deep/file name.md', 'x.json', 'y.csv']]) {
+      const split = splitAttachments(withAttachments('Fix the parser.', paths))
+      expect(split.text).toBe('Fix the parser.')
+      expect(split.attachments).toEqual(paths)
+    }
+  })
+
+  it('leaves a prompt with no attachments completely alone', () => {
+    expect(splitAttachments('Fix the parser.')).toEqual({ text: 'Fix the parser.', attachments: [] })
+    expect(splitAttachments(withAttachments('Fix the parser.', []))).toEqual({
+      text: 'Fix the parser.',
+      attachments: []
+    })
+  })
+
+  it('keeps a multi-line message intact under the preamble', () => {
+    const typed = 'Do this:\n\n- first\n- second\n'
+    const split = splitAttachments(withAttachments(typed, ['plan.md']))
+    expect(split.text).toBe(typed)
+    expect(split.attachments).toEqual(['plan.md'])
+  })
+
+  it('refuses to strip something it did not write', () => {
+    // A prompt this cannot account for is one to leave whole. Stripping a
+    // near-miss would delete words the person typed.
+    const nearly = 'Read this file in the workspace before you answer:\nnotes.md\n\nWhat is in it?'
+    expect(splitAttachments(nearly).text).toBe(nearly)
+    expect(splitAttachments(nearly).attachments).toEqual([])
+    const noWords = 'Read this file in the workspace before you answer:\n- notes.md\n'
+    expect(splitAttachments(noWords).text).toBe(noWords)
   })
 })

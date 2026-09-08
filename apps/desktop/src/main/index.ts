@@ -18,7 +18,7 @@ import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
@@ -28,6 +28,7 @@ import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal } from './reveal-file.js'
 import { MAX_ATTACHMENTS } from '../shared/attachments.js'
+import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { createTeammateStore } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
@@ -1158,39 +1159,95 @@ if (!ownsSingleInstanceLock) {
       if (!workspaceChosen) {
         return { ok: false, message: 'Choose the folder your teammates work in first.' } as const
       }
-      const picked = await dialog.showOpenDialog(owner, {
-        title: 'Attach files from this workspace',
-        buttonLabel: 'Attach',
-        // The workspace, and only the workspace. `defaultPath` merely opens
-        // there; the containment below is what actually holds, because a
-        // person can navigate anywhere from a file dialog.
-        defaultPath: workspacePath,
-        properties: ['openFile', 'multiSelections']
-      })
+      /*
+       * A drive cannot put a hand in a native file dialog, and `attachFiles`
+       * cannot be stubbed from the page either -- contextBridge exposes the
+       * bridge non-configurable, so a drive that tried got "Cannot redefine
+       * property: desktop". So a drive says which paths the dialog would have
+       * returned, the same way `LOCUST_HIDE_RUNTIMES` stands in for a machine
+       * with nothing installed.
+       *
+       * It is not a way past anything: the containment below runs on these
+       * paths exactly as it runs on a person's, so this can still only ever
+       * attach a file inside the workspace.
+       */
+      const scripted = process.env.LOCUST_ATTACH_PATHS
+      const picked = scripted !== undefined && scripted.length > 0
+        ? { canceled: false, filePaths: scripted.split(';').filter((entry) => entry.length > 0) }
+        : await dialog.showOpenDialog(owner, {
+            title: 'Attach files',
+            buttonLabel: 'Attach',
+            // Opens in the workspace because that is where most attachments
+            // are. Anywhere else is fine now -- a file from outside is copied
+            // in rather than refused, which is what the handler below does.
+            defaultPath: workspacePath,
+            properties: ['openFile', 'multiSelections']
+          })
       if (picked.canceled || picked.filePaths.length === 0) {
         return { ok: false, message: '' } as const
       }
+      /*
+       * A file from outside the folder is COPIED IN rather than refused.
+       *
+       * It used to be refused flat, and Colin sent a screenshot of that
+       * sentence: "we should definitely be able to share photos or attach
+       * stuff outside of the folder much like claude." The refusal was not
+       * wrong about the runtimes -- measured, only Cursor will read an
+       * absolute path outside its folder; Claude, Copilot and OpenCode all
+       * decline it -- so the fix is to bring the file to where every one of
+       * them can already read it, not to point them somewhere they cannot go.
+       *
+       * See `attach-outside.ts` for why it lands in one named folder and why
+       * that folder is kept out of git.
+       */
+      const chosenPaths = picked.filePaths.slice(0, MAX_ATTACHMENTS)
       const inside: string[] = []
-      let refused = 0
-      for (const chosen of picked.filePaths.slice(0, MAX_ATTACHMENTS)) {
-        // Same rule as a reveal, in the other direction: a path is honoured
-        // only when it resolves inside the folder the teammates work in.
-        // Attaching from outside would put a file the runtime cannot read into
-        // the prompt, and the run would fail for a reason nobody could see.
+      const copiedIn: string[] = []
+      const taken = new Set(await readAttachmentNames(workspacePath))
+      let failed = 0
+      for (const chosen of chosenPaths) {
         const decision = decideReveal(chosen, [workspacePath])
-        if (decision.ok) inside.push(relative(workspacePath, decision.path).split('\\').join('/'))
-        else refused += 1
+        if (decision.ok) {
+          inside.push(relative(workspacePath, decision.path).split('\\').join('/'))
+          continue
+        }
+        try {
+          const destination = attachmentDestination(chosen, taken)
+          taken.add(basename(destination))
+          await mkdir(join(workspacePath, ATTACHMENT_DIR), { recursive: true })
+          // `copyFile` rather than a read-then-write: it is one syscall, it
+          // keeps the bytes exactly (these are images as often as text), and
+          // the destination is already known not to exist.
+          await copyFile(chosen, join(workspacePath, destination))
+          await keepAttachmentsOutOfGit(workspacePath)
+          inside.push(destination)
+          copiedIn.push(destination)
+        } catch {
+          failed += 1
+        }
       }
       if (inside.length === 0) {
         return {
           ok: false,
-          message: 'Those files are outside the folder your teammates work in, so they cannot be read.'
+          message:
+            failed === 0
+              ? 'Nothing was attached.'
+              : 'Those files could not be copied into the folder your teammates work in.'
         } as const
       }
       return {
         ok: true,
         paths: inside,
-        ...(refused === 0 ? {} : { message: '' })
+        // Said out loud, because writing into someone's project folder is not
+        // something to do quietly.
+        ...(copiedIn.length === 0
+          ? {}
+          : {
+              message:
+                copiedIn.length === 1
+                  ? `${basename(copiedIn[0] ?? '')} was copied into ${ATTACHMENT_DIR} so your teammate can read it.`
+                  : `${String(copiedIn.length)} files were copied into ${ATTACHMENT_DIR} so your teammate can read them.`
+            })
       } as const
     })
 
@@ -2099,4 +2156,42 @@ if (ownsSingleInstanceLock) {
       app.exit(1)
     })
   })
+}
+
+/** Names already in the attachments folder, so a copy never overwrites one. */
+async function readAttachmentNames(workspacePath: string): Promise<readonly string[]> {
+  try {
+    return await readdir(join(workspacePath, ATTACHMENT_DIR))
+  } catch {
+    // No folder yet is the ordinary first case, not a failure.
+    return []
+  }
+}
+
+/**
+ * Keep the attachments folder out of the person's commits.
+ *
+ * `.git/info/exclude`, not `.gitignore`: their ignore file is tracked and
+ * belongs to them, and a line Locust added would show up as a change they did
+ * not make. A workspace that is not a git repository has neither, and nothing
+ * here needs to happen.
+ */
+async function keepAttachmentsOutOfGit(workspacePath: string): Promise<void> {
+  const excludePath = join(workspacePath, '.git', 'info', 'exclude')
+  try {
+    let current = ''
+    try {
+      current = await readFile(excludePath, 'utf8')
+    } catch {
+      // A repository with no exclude file yet: write one, but only if the
+      // folder it belongs in is really there, so this cannot invent a .git.
+      await readdir(join(workspacePath, '.git'))
+      await mkdir(join(workspacePath, '.git', 'info'), { recursive: true })
+    }
+    const next = excludeWith(current)
+    if (next !== undefined) await writeFile(excludePath, next, 'utf8')
+  } catch {
+    // Not a repository, or an unwritable one. The attachment still works;
+    // this was only ever tidiness.
+  }
 }

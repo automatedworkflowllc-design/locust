@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.47.0 - 2026-09-08
+
+- **You can attach a file from anywhere on your machine now.** Picking one
+  outside your project folder used to be refused outright - which was true of
+  most runtimes but not a good answer. Locust copies it into
+  `.locust/attachments` inside your folder so any teammate can read it, tells
+  you it did, and keeps that folder out of git.
+- **Attached files sit above the message box, not on the button row.** They
+  were a chip beside the mode and folder controls, on a row that does not wrap
+  - so attaching something pushed the effort chip off the edge and into the
+  swarm mark. Each file is its own tile now, and each one can be removed on its
+  own instead of all or nothing.
+- **Your own message no longer opens with instructions you did not write.**
+  Sending with a file attached put "Read this file in the workspace before you
+  answer:" at the top of your own bubble, and used it as the mission's name in
+  the sidebar and in search. Your words are the message; the files are shown
+  underneath it, and clicking one opens where it lives.
+
 ## 0.46.0 - 2026-09-08
 
 - **Type `/` in the message box to reach the controls without the mouse.** A

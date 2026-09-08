@@ -309,7 +309,13 @@ export const WORKSPACE_ATTACH_CHANNEL = 'workspace:attach'
 
 /** Files chosen to attach, workspace-relative, or why none were. */
 export type AttachFilesResponse =
-  | { readonly ok: true; readonly paths: readonly string[] }
+  /**
+   * `message` on a SUCCESS is not a warning -- it is the host saying it did
+   * something worth knowing about: a file from outside the workspace was
+   * copied in so the runtime could read it. Writing into someone's project
+   * folder is not something to do quietly.
+   */
+  | { readonly ok: true; readonly paths: readonly string[]; readonly message?: string }
   | { readonly ok: false; readonly message: string }
 
 /** What came of a reveal. A refusal names why, in words a card can show. */

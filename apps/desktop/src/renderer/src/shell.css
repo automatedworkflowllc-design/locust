@@ -548,6 +548,51 @@ textarea {
   text-wrap: pretty;
 }
 
+/*
+ * The files a message was sent with, under the message.
+ *
+ * On the person's side and tucked to the bubble's edge, because they are part
+ * of what was said. Quieter than the bubble: what was typed is the message,
+ * the files are what it came with -- and each one opens where it lives, the
+ * same as a file the teammate writes.
+ */
+.lc-sentfiles {
+  align-self: flex-end;
+  max-width: 78%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--lc-space-2);
+  margin-top: var(--lc-space-2);
+}
+
+.lc-sentfile {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  padding: 3px 8px;
+  border: 1px solid var(--lc-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-sentfile:hover {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-border-strong);
+}
+
+.lc-sentfile__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
 .lc-agentline {
   display: flex;
   gap: var(--lc-space-5);
@@ -2718,6 +2763,21 @@ textarea {
   font-size: var(--lc-text-description);
 }
 
+/*
+ * The same shape, in the register the sentence is actually in.
+ *
+ * Red is TERMINAL -- something failed. "from-downloads.md was copied into
+ * .locust/attachments so your teammate can read it" is neither a failure nor
+ * a pending decision; it is the host reporting what it did, and drawing it in
+ * red taught the eye to read a success as a problem (seen in a drive,
+ * 2026-09-08). Quiet, like every other statement of fact in this app.
+ */
+.lc-notice.is-plain {
+  border-color: var(--lc-border);
+  background: transparent;
+  color: var(--lc-text-muted);
+}
+
 .lc-composer form {
   display: block;
 }
@@ -2851,7 +2911,13 @@ textarea {
   gap: var(--lc-space-5);
 }
 
+/*
+ * `min-width: 0` is what makes the truncation above reachable: without it a
+ * flex item refuses to shrink past its content, so the two capped names stayed
+ * at their ceiling and the row overflowed instead of narrowing.
+ */
 .lc-control {
+  min-width: 0;
   border: 0;
   background: transparent;
   color: var(--lc-text-secondary);
@@ -2921,6 +2987,12 @@ textarea {
    * 26ch was still 255px, which the measurement above shows the row cannot
    * afford. Colin, 2026-09-06: "lets just only allow folder text to be a
    * certain length, to avoid this issue again."
+   *
+   * `min()` rather than a flat 18ch: 18ch is the CEILING, and the second term
+   * lets the name give ground when the row is genuinely short of space. With
+   * a flat cap the row had no slack left to find -- attaching a file added a
+   * chip and put it 14px over, with "fixed" running under the swarm mark
+   * (Colin, 2026-09-08, watching a drive).
    */
   max-width: 18ch;
   overflow: hidden;
@@ -2948,6 +3020,7 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* Same ceiling, same reason it has to be able to give: see the folder above. */
 .lc-control__model {
   display: inline-block;
   max-width: 18ch;
@@ -4318,6 +4391,48 @@ textarea {
   color: var(--lc-text-muted);
   line-height: 1.4;
   text-wrap: pretty;
+}
+
+/* --- Attached files ----------------------------------------------------- */
+
+/*
+ * Inside the box, above the message. The button row below does not wrap by
+ * design, so nothing that grows with what a person attaches can live there --
+ * a `1 file` chip put it 14px over its own width, with the effort chip running
+ * under the swarm mark.
+ */
+.lc-attached {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
+  margin: 0 var(--lc-space-2) var(--lc-space-2);
+}
+
+.lc-attached__tile {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  max-width: 260px;
+  padding: 4px 8px;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised-2);
+  color: var(--lc-text-secondary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-attached__tile:hover {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-border-strong);
+}
+
+.lc-attached__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- Slash commands ---------------------------------------------------- */
