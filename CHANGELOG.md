@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.50.1 - 2026-09-08
+
+- **Picking a teammate now keeps the effort they were set to.** It restored
+  their runtime, model and mode and quietly reset the reasoning effort to the
+  model default - so a teammate you had set to a low, cheap effort ran at
+  medium every time you selected them, and cost more than you asked for.
+- **"effort · fixed" is no longer shown before the model list has loaded.** It
+  means "this runtime chooses its own effort", and it was also what an empty
+  list looked like while the catalog was still arriving - so the composer
+  briefly stated something about the runtime that it had no information about.
+
 ## 0.50.0 - 2026-09-08
 
 - **When an Antigravity teammate asks you something, you can now read the
