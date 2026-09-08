@@ -65,7 +65,26 @@ export function ActivityCard({
   const decided = useRef(false)
   useEffect(() => {
     if (decided.current) return
-    setOpen(openByDefault)
+    /*
+     * A default may OPEN this fold. It may never close it.
+     *
+     * `openByDefault` is true only for the newest finished turn, so sending a
+     * follow-up flipped it back to false on the turn before -- and this effect
+     * dutifully closed a fold the person was looking at. Driven and measured
+     * (docs/user-session/2026-09-08T14-07-32-earlier-turn-work): six tool rows
+     * on screen, then `expanded: false, rowsVisible: 0` the moment the next
+     * message was sent, with nothing having been pressed.
+     *
+     * That is Colin's report, 2026-09-08 -- "the thoughts and tool calls
+     * disappear after an agent is done ... we want that to stay so they can
+     * see after the fact or if they missed it". The work was never lost, but
+     * it was taken off the screen by the app rather than by them.
+     *
+     * Opening is a default; closing is an action, and the app does not get to
+     * take it. A turn arriving from history still starts closed, because its
+     * initial state was closed and nothing here opens it.
+     */
+    if (openByDefault === true) setOpen(true)
   }, [openByDefault])
   // Only ever set when the host refuses. A reveal that works needs no words:
   // the file manager comes to the front and that is the whole feedback.

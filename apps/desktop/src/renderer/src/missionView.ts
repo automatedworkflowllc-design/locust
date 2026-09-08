@@ -1125,8 +1125,28 @@ export function buildThread(
         options.workspacePath
       ),
       finished: !options.running,
-      // The newest turn, done: keep what it did on screen.
-      ...(options.running || options.latestTurn !== true ? {} : { openByDefault: true }),
+      /*
+       * ANY finished turn keeps its work on screen, not only the newest.
+       *
+       * It used to be the newest alone, so that a long conversation was not a
+       * wall of tool rows. The cost of that turned out to be worse than the
+       * wall: `ActivityCard` remounts when a turn stops being the current one
+       * -- proven, because a fold opened BY HAND survives a later message and
+       * a defaulted one does not -- so sending a follow-up took a fold the
+       * person was reading and closed it. Measured in
+       * `docs/user-session/2026-09-08T14-07-32-earlier-turn-work`: six rows on
+       * screen, then `expanded: false, rowsVisible: 0`, with nothing pressed.
+       *
+       * Colin, 2026-09-08: "the thoughts and tool calls disappear after an
+       * agent is done ... we want that to stay so they can see after the fact
+       * or if they missed it." This is also what Claude Code does -- a
+       * transcript keeps its tool calls, they do not fold away behind you --
+       * and his standing rule is to match it where we have no better reason.
+       *
+       * Closing one still sticks, because a press is remembered where a
+       * default is not.
+       */
+      ...(options.running ? {} : { openByDefault: true }),
       details: activity,
       ...(planSteps === undefined ? {} : { plan: planSteps }),
       reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter

@@ -2169,7 +2169,7 @@ describe('whether a finished fold opens itself', () => {
     return item?.type === 'activity' ? item : undefined
   }
 
-  it('opens the newest turn once it has finished', () => {
+  it('opens a turn once it has finished', () => {
     expect(activity({ running: false, latestTurn: true })?.openByDefault).toBe(true)
   })
 
@@ -2179,11 +2179,22 @@ describe('whether a finished fold opens itself', () => {
     expect(activity({ running: true, latestTurn: true })?.openByDefault).toBeUndefined()
   })
 
-  it('leaves EARLIER turns closed, so a long conversation is not a wall', () => {
-    // The control. Every finished fold opening is the thing the fold exists to
-    // prevent.
-    expect(activity({ running: false })?.openByDefault).toBeUndefined()
-    expect(activity({ running: false, latestTurn: false })?.openByDefault).toBeUndefined()
+  it('keeps an EARLIER turn open too, rather than closing it behind the person', () => {
+    /*
+     * This assertion was the opposite until 2026-09-08, on the reasoning that
+     * every finished fold opening makes a long conversation a wall. That was a
+     * fair worry and it lost to a measured one: `ActivityCard` remounts when a
+     * turn stops being the current one, so the old rule did not merely fail to
+     * open an earlier fold -- it CLOSED one that was open and being read, the
+     * moment the next message was sent. Driven, six rows to zero, nothing
+     * pressed.
+     *
+     * Colin asked for the work to stay; Claude Code's transcript keeps its
+     * tool calls the same way. Closing one by hand still sticks, so the wall
+     * remains something a person can take down and the app cannot impose.
+     */
+    expect(activity({ running: false })?.openByDefault).toBe(true)
+    expect(activity({ running: false, latestTurn: false })?.openByDefault).toBe(true)
   })
 })
 
