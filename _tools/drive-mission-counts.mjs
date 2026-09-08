@@ -77,7 +77,7 @@ const drive = await startDrive({ name: 'mission-counts', port: 9347, workspace, 
 
 const COUNTS = `(async () => {
   const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
-  const sections = [...document.querySelectorAll('.lc-section, .lc-sidebar__section')]
+  const sections = [...document.querySelectorAll('.lc-sectionlabel')]
   const missions = sections.find((s) => /MISSIONS/i.test(flat(s).slice(0, 40)))
   const header = missions ? flat(missions).slice(0, 60) : 'no Missions section'
   const rows = document.querySelectorAll('.lc-sidebar .lc-row--button[title^="Open"], .lc-missionrow').length

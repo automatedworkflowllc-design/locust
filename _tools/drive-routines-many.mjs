@@ -104,7 +104,7 @@ try {
   await drive.capture('THE QUESTION: does the left bar show all three', () => drive.evaluate(`(() => {
     const sidebar = document.querySelector('.lc-sidebar')?.innerText.replace(/[ ]+/g, ' ') ?? ''
     const after = sidebar.slice(sidebar.indexOf('AUTOMATIONS'))
-    const rows = [...document.querySelectorAll('.lc-automation, .lc-routine, .lc-sidebar__routine')]
+    const rows = [...document.querySelectorAll('.lc-routinerow')]
     return 'rows found by class: ' + rows.length
       + ' || the section reads: ' + after.split(String.fromCharCode(10)).filter(t => t.trim().length > 0).slice(0, 10).join(' / ')
   })()`))
