@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.48.0 - 2026-09-08
+
+- **An attached image now looks like the image.** Attaching a screenshot showed
+  you the word `screenshot.png` and nothing else, so telling two screenshots
+  apart meant leaving the app. Images are drawn as themselves - in the message
+  box before you send, and on the message afterwards - beside the name, never
+  instead of it. Everything else still shows as a file, and an image that
+  cannot be drawn quietly stays a file row rather than leaving a broken picture
+  behind.
+- Teammates could already read the images you point them at - Claude Code,
+  Cursor and Copilot were each measured opening a screenshot and describing it.
+  This is the half you could not see.
+
 ## 0.47.0 - 2026-09-08
 
 - **You can attach a file from anywhere on your machine now.** Picking one

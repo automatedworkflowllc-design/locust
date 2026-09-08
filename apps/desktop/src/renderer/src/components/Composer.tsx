@@ -22,6 +22,8 @@ import {
 } from '../status.js'
 import { ContextRing } from './ContextRing.js'
 import { defaultEffort, modelLabelFor } from '../status.js'
+import { AttachedImage } from './AttachedImage.js'
+import { isImagePath } from '../../../shared/image-files.js'
 import { Icon } from './Icon.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
@@ -599,7 +601,10 @@ export function Composer({
                 aria-label={`Remove ${path}`}
                 onClick={() => setAttached((current) => current.filter((entry) => entry !== path))}
               >
-                <Icon name="file" size={13} />
+                {/* The picture where there is one, the file icon where there
+                    is not -- never both, and never a broken image in place of
+                    either. */}
+                {isImagePath(path) ? <AttachedImage path={path} /> : <Icon name="file" size={13} />}
                 <span className="lc-attached__name">{path.split('/').pop() ?? path}</span>
                 <Icon name="close" size={11} />
               </button>

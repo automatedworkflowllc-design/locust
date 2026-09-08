@@ -18,7 +18,7 @@ import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from 'node:fs'
-import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
@@ -29,6 +29,7 @@ import { relative } from 'node:path'
 import { decideReveal } from './reveal-file.js'
 import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
+import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { createTeammateStore } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
@@ -103,6 +104,7 @@ import {
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
+  WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
@@ -1149,6 +1151,46 @@ if (!ownsSingleInstanceLock) {
       // wrote, which is not a click anyone should be one step away from.
       shell.showItemInFolder(decision.path)
       return { ok: true } as const
+    })
+
+    /*
+     * An attached image, for the renderer to draw.
+     *
+     * The same containment as a reveal, and for the same reason: this reads
+     * bytes off the disk and hands them to a web page, so the only paths it
+     * will answer are ones inside the folder the teammates work in. A file
+     * from outside was already copied in by the attach handler, so by the time
+     * anything asks for a preview it IS inside -- there is nothing this needs
+     * to reach that the picker did not already put there.
+     *
+     * Every refusal is quiet. The file row is drawn either way and already
+     * carries the name; a preview is an extra, and an extra that fails should
+     * leave no wreckage on screen.
+     */
+    ipcMain.handle(WORKSPACE_IMAGE_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      if (typeof requested !== 'string' || requested.length === 0) {
+        return { ok: false, message: 'No path.' } as const
+      }
+      if (workspacePath === undefined) return { ok: false, message: 'No workspace.' } as const
+      const mediaType = imageMediaType(requested)
+      if (mediaType === undefined) return { ok: false, message: 'Not an image this app draws.' } as const
+      const decision = decideReveal(join(workspacePath, requested), [workspacePath])
+      if (!decision.ok) return { ok: false, message: 'Outside the workspace.' } as const
+      try {
+        // Size is checked BEFORE reading, not after: the point of the cap is
+        // to avoid holding a very large file in memory, and reading it first
+        // to find out how big it is would have already done that.
+        const measured = await stat(decision.path)
+        if (!measured.isFile()) return { ok: false, message: 'Not a file.' } as const
+        if (measured.size > MAX_PREVIEW_BYTES) {
+          return { ok: false, message: 'Too large to preview.' } as const
+        }
+        const bytes = await readFile(decision.path)
+        return { ok: true, dataUrl: `data:${mediaType};base64,${bytes.toString('base64')}` } as const
+      } catch {
+        return { ok: false, message: 'Could not be read.' } as const
+      }
     })
 
     ipcMain.handle(WORKSPACE_ATTACH_CHANNEL, async (event) => {

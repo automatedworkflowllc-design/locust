@@ -23,6 +23,8 @@ import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissio
 import { ActivityCard } from './ActivityCard.js'
 import { MemoryCard } from './MemoryCard.js'
 import type { MemoryCardLine } from './MemoryCard.js'
+import { AttachedImage } from './AttachedImage.js'
+import { isImagePath } from '../../../shared/image-files.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
@@ -422,7 +424,7 @@ export function Thread({
                   void bridge.revealFile(`${workspacePath}/${path}`).catch(() => undefined)
                 }}
               >
-                <Icon name="file" size={12} />
+                {isImagePath(path) ? <AttachedImage path={path} /> : <Icon name="file" size={12} />}
                 <span className="lc-sentfile__path">{path}</span>
               </button>
             ))}

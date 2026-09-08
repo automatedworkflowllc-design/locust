@@ -318,6 +318,19 @@ export type AttachFilesResponse =
   | { readonly ok: true; readonly paths: readonly string[]; readonly message?: string }
   | { readonly ok: false; readonly message: string }
 
+export const WORKSPACE_IMAGE_CHANNEL = 'workspace:image'
+
+/**
+ * An attached image, as a `data:` URL the renderer can put in an `<img>`.
+ *
+ * A refusal is not an error state worth drawing: the file row is already
+ * there and already says the file's name, so a preview that cannot be built
+ * simply is not drawn. `message` exists for a log, not for a card.
+ */
+export type WorkspaceImageResponse =
+  | { readonly ok: true; readonly dataUrl: string }
+  | { readonly ok: false; readonly message: string }
+
 /** What came of a reveal. A refusal names why, in words a card can show. */
 export type RevealFileResponse =
   | { readonly ok: true }
@@ -1223,6 +1236,7 @@ export interface DesktopApi {
   revealFile(path: string): Promise<RevealFileResponse>
   /** Open the picker for files to attach; answers workspace-relative paths. */
   attachFiles(): Promise<AttachFilesResponse>
+  readWorkspaceImage(path: string): Promise<WorkspaceImageResponse>
   listRooms(): Promise<RoomListResponse>
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>
   removeRoom(roomId: string): Promise<RoomMutationResponse>

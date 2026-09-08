@@ -4435,6 +4435,47 @@ textarea {
   white-space: nowrap;
 }
 
+/*
+ * An attached image, at the size of the icon it replaces.
+ *
+ * Small on purpose: it sits in a row whose job is still to name a file, and it
+ * is there to answer "which screenshot was that" at a glance rather than to be
+ * looked at. `object-fit: cover` so a wide screenshot and a square icon fill
+ * the same box and the row height never moves between them.
+ */
+.lc-thumb {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  object-fit: cover;
+  background: var(--lc-bg-raised-2);
+}
+
+/*
+ * Bigger in the composer than in the thread, because the two rows are asked
+ * different questions.
+ *
+ * Before sending, "which screenshot is this" is the whole reason the picture
+ * is there, and at 22px a drive showed you could not tell -- so the tile grows
+ * to fit it. Afterwards the file has already been sent and the row is a
+ * record; the name carries it and the picture is a reminder.
+ */
+.lc-attached__tile .lc-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+}
+
+.lc-attached__tile:has(.lc-thumb) {
+  padding: 4px 8px 4px 4px;
+}
+
+.lc-sentfile .lc-thumb {
+  width: 20px;
+  height: 20px;
+}
+
 /* --- Slash commands ---------------------------------------------------- */
 
 /*
