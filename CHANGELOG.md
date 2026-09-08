@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.49.1 - 2026-09-08
+
+- **A routine step that is too long to send now says so while you type it.** A
+  step could be saved at up to 20,000 characters when the message carrying it
+  holds 12,000 - the step, what the teammate is told about the workspace, and
+  anything waiting from other teammates, together. It said nothing until the
+  step ran and failed. The warning gives you the number to cut, and saving
+  still works: nothing you already have becomes unreadable.
+
 ## 0.49.0 - 2026-09-08
 
 - **A multi-step routine no longer disappears when Locust closes.** Quitting
