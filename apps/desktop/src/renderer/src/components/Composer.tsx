@@ -671,7 +671,16 @@ export function Composer({
                 * nothing to choose then, and a control that says so would be
                 * the dead chip this replaced.
                 */}
-              {shownEffort !== undefined && (
+              {/*
+                * A model with no levels never draws the pickable chip, even if
+                * an effort is still set from a previous route. It used to draw
+                * one showing that stale level with an empty menu behind it, so
+                * there was no way to clear it -- Colin, 2026-09-08: "it has an
+                * effort set and wont let me switch out of it". `startRoute`
+                * refuses to send it either way; this stops the app offering a
+                * choice that does not exist.
+                */}
+              {shownEffort !== undefined && supportedEfforts.length > 0 && (
                 <span className="lc-control__anchor">
                   {effortOpen && (
                     /*
@@ -766,7 +775,7 @@ export function Composer({
                 * the runtime, which is the same fact the route chip beside it
                 * is there to give.
                 */}
-              {shownEffort === undefined && supportedEfforts.length === 0 && (
+              {supportedEfforts.length === 0 && (
                 <span
                   className="lc-control lc-control--boxed is-static"
                   title="This runtime does not let the effort be chosen; it uses its own."

@@ -1129,6 +1129,21 @@ export function startRoute(
   // Looking the family up through its variants as well makes the two paths
   // agree, and re-resolves the id to the variant the effort actually names.
   const model = modelFamily(models, runtime, modelId)
+  // A model that advertises NO efforts must never be sent one.
+  //
+  // Colin, 2026-09-08: choosing OpenCode while an effort was set failed the run
+  // outright -- "That runtime cannot be started with the options chosen.
+  // OpenCode takes no effort level. Nothing was recorded." The effort was a
+  // leftover from the previous route, and every place that changes a route has
+  // to remember to clear it: the picker does, adopting a teammate's own route
+  // did not. This is the one path EVERY start takes, so it is the honest place
+  // to enforce it rather than a fourth caller remembering.
+  //
+  // Only when the family is actually KNOWN to have none. A model missing from
+  // the catalogue (an account default, or a probe that has not answered yet)
+  // says nothing about efforts, and dropping one there would quietly downgrade
+  // a Claude run that asked for `high`.
+  if (model !== undefined && model.supportedEfforts.length === 0) return { model: modelId }
   const variant = model?.variants?.[effort]
   if (variant !== undefined) return { model: variant }
   // A model with variants and no variant for this effort: the effort names

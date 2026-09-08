@@ -25,6 +25,12 @@ Dates are when the build was cut. Versions are the number Settings shows.
   Both work now.
 - **A numbered list of choices is a question again.** If a teammate offered
   "1. Rewrite it  2. Patch it", no card appeared and the run simply ended.
+- **A leftover effort can no longer fail a run.** Switching to a runtime that
+  takes no effort level - OpenCode, say - while one was still set from the
+  previous model failed the run outright: "OpenCode takes no effort level.
+  Nothing was recorded." The effort chip also stayed on screen showing a level
+  with nothing behind it, so there was no way to clear it. Locust no longer
+  sends an effort to a model that has none, and no longer offers one.
 - **A stalled Antigravity run says what it is stuck on** instead of reporting
   that the agent wrote nothing. If it is waiting on its own question, Locust
   now says so and tells you to answer it in Antigravity's window.

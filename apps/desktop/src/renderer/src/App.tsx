@@ -90,7 +90,7 @@ import { conversationCost, costLine, latestContext } from './cost.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -3247,8 +3247,10 @@ export default function App(): ReactElement {
               setEffort(
                 effortAfterRouteChange(
                   effort,
-                  models.find((model) => model.runtime === next.runtime && model.id === next.model)
-                    ?.supportedEfforts ?? []
+                  // Through `modelFamily`, not a bare id match: a Cursor route
+                  // resolved to a variant finds no family by id, and the effort
+                  // control then reads as though the model had none.
+                  modelFamily(models, next.runtime, next.model)?.supportedEfforts ?? []
                 )
               )
             }}

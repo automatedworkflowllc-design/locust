@@ -849,6 +849,32 @@ describe('the route a mission starts on', () => {
     }
   })
 
+  it('never sends an effort to a model that advertises none', () => {
+    // Colin, 2026-09-08: choosing OpenCode while an effort was set failed the
+    // run -- "OpenCode takes no effort level. Nothing was recorded." The effort
+    // was a leftover from the previous route. Every place that changes a route
+    // has to clear it, and adopting a teammate's own route did not; this is the
+    // one path every start takes.
+    const withNone: readonly PublicModel[] = [
+      ...models,
+      { id: 'opencode/muse-spark-1.3', runtime: 'opencode', displayName: 'Muse Spark', description: '', supportedEfforts: [] }
+    ]
+    expect(startRoute(withNone, 'opencode', 'opencode/muse-spark-1.3', 'medium')).toEqual({
+      model: 'opencode/muse-spark-1.3'
+    })
+  })
+
+  it('still sends an effort for a model the catalogue has never heard of', () => {
+    // The control, and the reason the guard checks for a KNOWN empty list. An
+    // account default, or a probe that has not answered yet, says nothing about
+    // efforts -- dropping one there would quietly downgrade a Claude run that
+    // asked for `high`.
+    expect(startRoute(models, 'claude', 'account-default', 'high')).toEqual({
+      model: 'account-default',
+      effort: 'high'
+    })
+  })
+
   it('sends the effort as itself where the runtime takes it as a flag', () => {
     expect(startRoute(models, 'claude', 'sonnet', 'medium')).toEqual({ model: 'sonnet', effort: 'medium' })
     expect(startRoute(models, 'claude', 'sonnet', undefined)).toEqual({ model: 'sonnet' })
