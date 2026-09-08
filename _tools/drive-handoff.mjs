@@ -85,7 +85,11 @@ try {
   await drive.capture('open the activity fold: what the two runs did', () => drive.evaluate(`(async () => {
     const fold = document.querySelector('.lc-activity')
     if (!fold) return 'no activity fold'
-    fold.click()
+    // Only when it is not already open. Since 0.49.0 a finished turn's fold
+    // opens itself, so an unconditional click CLOSES it and every row below
+    // then reads as absent -- a harness reporting a bare screen at an app
+    // that is fine.
+    if (fold.getAttribute('aria-expanded') !== 'true') fold.click()
     await new Promise(r => setTimeout(r, 300))
     return fold.innerText.replace(/\\s+/g, ' ').slice(0, 80) + ' || ' + [...document.querySelectorAll('.lc-filerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()).join(' | ').slice(0, 400)
   })()`))

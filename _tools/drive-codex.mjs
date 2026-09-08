@@ -27,7 +27,11 @@ const drive = await startDrive({
 const fold = `(async () => {
   const fold = document.querySelector('.lc-activity')
   if (!fold) return 'no activity fold'
-  if (!fold.closest('.lc-card')?.classList.contains('is-open')) fold.click()
+  // The is-open class is never set on the card. ActivityCard sets
+  // aria-expanded on the button and nothing else, so this guard never
+  // guarded anything. Harmless while earlier folds were closed anyway;
+  // since 0.49.0 a finished turn's fold opens itself and this CLOSED it.
+  if (fold.getAttribute('aria-expanded') !== 'true') fold.click()
   await new Promise(r => setTimeout(r, 300))
   return fold.innerText.replace(/\\s+/g, ' ').slice(0, 60) + ' || ' + [...document.querySelectorAll('.lc-filerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()).join(' | ').slice(0, 300)
 })()`
@@ -43,7 +47,11 @@ try {
   await drive.capture('the fold after turn 2, and the sidebar', () => drive.evaluate(`(async () => {
     const folds = [...document.querySelectorAll('.lc-activity')]
     const last = folds[folds.length - 1]
-    if (last && !last.closest('.lc-card')?.classList.contains('is-open')) last.click()
+    // The is-open class is never set on the card. ActivityCard sets
+    // aria-expanded on the button and nothing else, so this guard never
+    // guarded anything. Harmless while earlier folds were closed anyway;
+    // since 0.49.0 a finished turn's fold opens itself and this CLOSED it.
+    if (last && last.getAttribute('aria-expanded') !== 'true') last.click()
     await new Promise(r => setTimeout(r, 300))
     return folds.map(f => f.innerText.replace(/\\s+/g, ' ').slice(0, 50)).join(' / ') + ' || sidebar: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
   })()`))

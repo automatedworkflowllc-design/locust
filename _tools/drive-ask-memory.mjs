@@ -37,7 +37,9 @@ try {
     const fold = document.querySelector('.lc-memorycard .lc-activity')
     if (!fold) return 'no memory fold: ' + (document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-200) ?? '')
     const summary = fold.innerText.replace(/\\s+/g, ' ')
-    fold.click()
+    // Only if it is closed. A finished turn's fold opens itself since 0.49.0,
+    // so an unconditional click CLOSES it and the rows below read as absent.
+    if (fold.getAttribute('aria-expanded') !== 'true') fold.click()
     await new Promise(r => setTimeout(r, 300))
     return summary + ' || ' + [...document.querySelectorAll('.lc-memorycard__line')].map(l => l.innerText.replace(/\\s+/g, ' ')).join(' / ')
   })()`))

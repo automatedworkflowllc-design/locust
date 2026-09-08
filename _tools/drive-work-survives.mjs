@@ -90,7 +90,9 @@ try {
   await drive.capture('AFTER: what the fold says when opened', () => drive.evaluate(`(async () => {
     const fold = [...document.querySelectorAll('button')].find(b => /activity/i.test(b.textContent ?? ''))
     if (!fold) return 'no activity control'
-    fold.click()
+    // Only if it is closed. A finished turn's fold opens itself since 0.49.0,
+    // so an unconditional click CLOSES it and the rows below read as absent.
+    if (fold.getAttribute('aria-expanded') !== 'true') fold.click()
     await new Promise(r => setTimeout(r, 800))
     return JSON.stringify({
       rowsAfterOpening: document.querySelectorAll('.lc-filerow').length,

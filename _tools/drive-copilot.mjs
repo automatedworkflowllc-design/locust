@@ -39,7 +39,11 @@ try {
   await drive.capture('one sentence about README, and wait', () => drive.evaluate(sendAndWaitScript('Read README.md and tell me in one sentence what this project is. Do not edit anything.')))
   await drive.capture('the fold and the header', () => drive.evaluate(`(async () => {
     const fold = document.querySelector('.lc-activity')
-    if (fold && !fold.closest('.lc-card')?.classList.contains('is-open')) fold.click()
+    // The is-open class is never set on the card. ActivityCard sets
+    // aria-expanded on the button and nothing else, so this guard never
+    // guarded anything. Harmless while earlier folds were closed anyway;
+    // since 0.49.0 a finished turn's fold opens itself and this CLOSED it.
+    if (fold && fold.getAttribute('aria-expanded') !== 'true') fold.click()
     await new Promise(r => setTimeout(r, 300))
     return (document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? '') + ' || ' + (fold?.innerText.replace(/\\s+/g, ' ').slice(0, 60) ?? 'no fold') + ' || ' + [...document.querySelectorAll('.lc-filerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()).join(' | ').slice(0, 240)
   })()`))

@@ -53,7 +53,9 @@ try {
     // .lc-activity__summary matched nothing and read as a missing feature.
     // No backticks in here: one inside this template literal closes it.
     const fold = document.querySelector('button.lc-activity')
-    if (fold) { fold.click(); await new Promise(r => setTimeout(r, 600)) }
+    // Only if it is closed. A finished turn's fold opens itself since 0.49.0,
+    // so an unconditional click CLOSES it and the rows below read as absent.
+    if (fold && fold.getAttribute('aria-expanded') !== 'true') { fold.click(); await new Promise(r => setTimeout(r, 600)) }
     const rows = [...document.querySelectorAll('.lc-filerow__path')].map(n => n.innerText.trim())
     const reveals = [...document.querySelectorAll('.lc-filerow__reveal')]
     return 'file rows: [' + rows.join(', ') + '] || reveal controls: ' + reveals.length

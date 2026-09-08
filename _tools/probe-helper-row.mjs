@@ -136,7 +136,11 @@ try {
     const button = document.querySelector('.lc-activity')
     if (!button) return JSON.stringify({ error: 'no activity fold' })
     const summary = button.innerText.replace(/\\s+/g, ' ').trim()
-    button.click()
+    // Only when it is not already open. Since 0.49.0 a finished turn's fold
+    // opens itself, so an unconditional click CLOSES it and every row below
+    // then reads as absent -- a harness reporting a bare screen at an app
+    // that is fine.
+    if (button.getAttribute('aria-expanded') !== 'true') button.click()
     await new Promise(r => setTimeout(r, 300))
     const rows = [...document.querySelectorAll('.lc-filerow')].map(r => ({ helper: r.classList.contains('is-helper'), text: r.innerText.replace(/\\s+/g, ' ').trim() }))
     return JSON.stringify({ summary, rows })

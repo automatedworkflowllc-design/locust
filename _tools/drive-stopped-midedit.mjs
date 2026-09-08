@@ -60,7 +60,9 @@ const STOP = `(async () => {
   const flat = (el) => el.innerText.split(String.fromCharCode(10)).map((t) => t.trim()).filter(Boolean).join(' ')
   const button = document.querySelector('button[aria-label^="Stop the running"]')
   if (!button) return 'no stop button on screen'
-  button.click()
+  // Only if it is closed. A finished turn's fold opens itself since 0.49.0,
+  // so an unconditional click CLOSES it and the rows below read as absent.
+  if (button.getAttribute('aria-expanded') !== 'true') button.click()
   for (let i = 0; i < 90; i += 1) {
     await new Promise((r) => setTimeout(r, 1000))
     const header = document.querySelector('.lc-workroom__header')

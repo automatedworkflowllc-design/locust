@@ -42,7 +42,11 @@ const askMode = `(async () => {
 const fold = `(async () => {
   const fold = document.querySelector('.lc-activity')
   if (!fold) return 'no activity fold'
-  if (!fold.closest('.lc-card')?.classList.contains('is-open')) fold.click()
+  // The is-open class is never set on the card. ActivityCard sets
+  // aria-expanded on the button and nothing else, so this guard never
+  // guarded anything. Harmless while earlier folds were closed anyway;
+  // since 0.49.0 a finished turn's fold opens itself and this CLOSED it.
+  if (fold.getAttribute('aria-expanded') !== 'true') fold.click()
   await new Promise(r => setTimeout(r, 300))
   return (document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? '') + ' || ' + [...document.querySelectorAll('.lc-filerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()).join(' | ').slice(0, 300)
 })()`
