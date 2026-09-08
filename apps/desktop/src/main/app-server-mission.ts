@@ -282,6 +282,44 @@ export function createAppServerMissionService(
     run.process?.kill()
   }
 
+  /*
+   * The ledger refused a write, so the run stops and says so.
+   *
+   * `persistAndEmit` persists BEFORE it emits, on purpose -- "a receipt the
+   * user has seen must already be on disk". Its caller then discarded the
+   * rejection with `.catch(() => undefined)`, which turned that guarantee
+   * inside out: the receipt was not written, the events were never emitted, so
+   * nothing appeared on screen -- and the run carried on working. Unrecorded
+   * work, invisibly, with no error anywhere.
+   *
+   * The exec path has always failed closed here: `codex-mission.ts` aborts the
+   * process and emits `MISSION_PERSISTENCE_FAILED`. This path is the one that
+   * serves `approve-each`, the mode whose entire purpose is careful, auditable,
+   * per-action control -- so it had the least safe failure handling of the two,
+   * in the mode that can least afford it.
+   *
+   * Found by Astra reading the source (2026-09-08) and filed as a "source-level
+   * concern, not dynamically verified". It verified.
+   */
+  const receiptsFailed = (run: LiveRun): void => {
+    if (runs.get(run.runId) !== run) return
+    runs.delete(run.runId)
+    releaseApprovals(run.runId)
+    run.client?.dispose('the mission ledger could not be written')
+    run.process?.kill()
+    // Emitted, not persisted: the ledger is the thing that just failed, so
+    // trying to write this through it would be the same failure again.
+    options.emitUpdate?.({
+      kind: 'persistence-error',
+      runId: run.runId,
+      missionId: run.missionId,
+      error: {
+        code: 'MISSION_PERSISTENCE_FAILED',
+        message: 'The mission could not be written to the durable local ledger.'
+      }
+    })
+  }
+
   return {
     get pendingApprovalCount() {
       return approvals.size
@@ -413,7 +451,8 @@ export function createAppServerMissionService(
               if (changes !== undefined) changesByItem.set(found.id, changes)
             }
             const produced = normalizer.accept(notification)
-            void persistAndEmit(run, withFileChanges(produced, changesByItem, peer?.cwd ?? options.workspacePath)).catch(() => undefined)
+            void persistAndEmit(run, withFileChanges(produced, changesByItem, peer?.cwd ?? options.workspacePath))
+              .catch(() => receiptsFailed(run))
           },
           onRequest: async (request) => {
             const described = describeApproval(request)

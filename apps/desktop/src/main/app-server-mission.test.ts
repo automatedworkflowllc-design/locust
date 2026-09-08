@@ -282,6 +282,62 @@ describe('durability', () => {
     expect(order[0]).toBe('persist')
   })
 
+  it('STOPS the run when the ledger refuses a write, and says so', async () => {
+    /*
+     * THE test. `persistAndEmit` persists before it emits on purpose -- a
+     * receipt the person has seen must already be on disk -- and its caller
+     * discarded the rejection with `.catch(() => undefined)`. That turned the
+     * guarantee inside out: the receipt was not written, the events were never
+     * emitted so nothing appeared on screen, and the run CARRIED ON WORKING.
+     * Unrecorded work, invisibly, with no error anywhere.
+     *
+     * The exec path has always aborted here. This is the path that serves
+     * `approve-each` -- the mode whose whole purpose is careful, auditable,
+     * per-action control -- so it had the least safe failure handling of the
+     * two, in the mode that can least afford it.
+     *
+     * Found by Astra reading the source, filed as unverified, and it verified.
+     */
+    const harness = service({
+      ledger: fakeLedger({
+        appendEvents: async () => {
+          throw new Error('no space left on device')
+        }
+      })
+    })
+    await harness.instance.start('Do work.')
+    harness.fake.push({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 't', turn: {} } })
+
+    await vi.waitFor(() => {
+      expect(
+        harness.updates.some(
+          (update) =>
+            (update as { kind?: string }).kind === 'persistence-error'
+        )
+      ).toBe(true)
+    })
+
+    // Stopped, not merely reported: a run still alive after its receipts
+    // failed is doing work nobody can later prove happened.
+    expect(harness.instance.pendingApprovalCount).toBe(0)
+    await vi.waitFor(() => {
+      expect(harness.instance.liveMissionIds()).toHaveLength(0)
+    })
+  })
+
+  it('keeps running when the ledger is fine, so the guard is not simply always firing', async () => {
+    // The control. A test that only checks the failure case would pass against
+    // a service that stopped every run.
+    const harness = service()
+    await harness.instance.start('Do work.')
+    harness.fake.push({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 't', turn: {} } })
+    await vi.waitFor(() => {
+      expect(harness.events.length).toBeGreaterThan(0)
+    })
+    expect(harness.updates.some((update) => (update as { kind?: string }).kind === 'persistence-error')).toBe(false)
+    expect(harness.instance.liveMissionIds()).toHaveLength(1)
+  })
+
   it('refuses to start a second mission while one is running', async () => {
     const harness = service()
     await harness.instance.start('First.')
