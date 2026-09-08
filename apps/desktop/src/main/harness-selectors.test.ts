@@ -25,10 +25,18 @@ import { describe, expect, it } from 'vitest'
  * chain is for — and a selector with no `lc-` class at all is not this test's
  * business.
  *
- * Only `lc-` classes are checked. `aria-label` selectors rot the same way (a
- * changed avatar title once broke 68 of them at once) but those are prose,
- * and matching them here would produce false alarms this test could not
- * defend. Named rather than quietly skipped.
+ * `aria-label` selectors are checked too, and they rot the same way: a changed
+ * avatar title once broke 68 of them at once. Only EXACT (`[aria-label="x"]`)
+ * and PREFIX (`[aria-label^="x"]`) forms, against every string literal the app
+ * puts in an `aria-label` — including the ones inside a JSX expression, which
+ * is the false-positive mode this check had on its first run. It reported five
+ * dead selectors for `Save as routine` and `Edit routine`; both live inside
+ * `aria-label={editing ? 'Edit routine' : 'Save as routine'}`, and "fixing"
+ * those five would have broken two working smokes. The app was read before
+ * anything was changed, which is the only reason it did not happen.
+ *
+ * A label built entirely from a variable cannot be judged here and is not
+ * claimed to be.
  */
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url))
@@ -66,9 +74,32 @@ function readAll(directory: string, endings: readonly string[]): string[] {
   return out
 }
 
-const appClasses = new Set(
-  readAll(SRC, ['.tsx', '.ts', '.css']).flatMap((text) => text.match(/lc-[a-zA-Z0-9_-]+/g) ?? [])
-)
+const appSource = readAll(SRC, ['.tsx', '.ts', '.css'])
+const appClasses = new Set(appSource.flatMap((text) => text.match(/lc-[a-zA-Z0-9_-]+/g) ?? []))
+
+/** Every literal an `aria-label` can hold, plus the fixed prefix of a template one. */
+const appLabels = new Set<string>()
+const appLabelPrefixes: string[] = []
+for (const text of appSource) {
+  for (const [, literal] of text.matchAll(/aria-label="([^"{}]+)"/g)) appLabels.add(literal)
+  for (const [, expression] of text.matchAll(/aria-label=\{([^}]*)\}/g)) {
+    // A ternary of two literals is two literal labels. Missing this is what
+    // made the first run of this check report five false positives.
+    for (const [, quoted] of expression.matchAll(/'([^']+)'/g)) appLabels.add(quoted)
+    for (const [, quoted] of expression.matchAll(/"([^"]+)"/g)) appLabels.add(quoted)
+  }
+  for (const [, template] of text.matchAll(/aria-label=\{`([^`]*)`\}/g)) {
+    const fixed = template.split('$')[0] ?? ''
+    if (fixed.length > 0) appLabelPrefixes.push(fixed)
+  }
+}
+
+/** Whether anything the app draws could carry this label. */
+function labelIsReachable(label: string, exact: boolean): boolean {
+  if (exact && appLabels.has(label)) return true
+  if (!exact && [...appLabels].some((known) => known.startsWith(label))) return true
+  return appLabelPrefixes.some((prefix) => prefix.startsWith(label) || label.startsWith(prefix))
+}
 
 const CALL = /querySelectorAll?\(\s*(['"`])(.*?)\1/gs
 
@@ -92,6 +123,17 @@ const harnesses = ['_tools', '_smoke'].flatMap((folder) => {
     .map((name) => ({ name, text: readFileSync(join(at, name), 'utf8') }))
 })
 
+function deadLabels(text: string): string[] {
+  const dead: string[] = []
+  for (const [, label] of text.matchAll(/aria-label="([^"\]]+)"\]/g)) {
+    if (!labelIsReachable(label, true)) dead.push(`[aria-label="${label}"]`)
+  }
+  for (const [, label] of text.matchAll(/aria-label\^="([^"\]]+)"\]/g)) {
+    if (!labelIsReachable(label, false)) dead.push(`[aria-label^="${label}"]`)
+  }
+  return dead
+}
+
 describe('no harness selects something the app cannot draw', () => {
   it('found the app classes and the harnesses at all', () => {
     // Without this, a wrong path makes every case below vacuously green: no
@@ -100,10 +142,15 @@ describe('no harness selects something the app cannot draw', () => {
     expect(appClasses.size).toBeGreaterThan(200)
     expect(harnesses.length).toBeGreaterThan(20)
     expect(appClasses.has('lc-bubble')).toBe(true)
+    // The ternary case specifically, because missing it is what this check got
+    // wrong first time.
+    expect(appLabels.has('Save as routine')).toBe(true)
+    expect(appLabels.size).toBeGreaterThan(40)
   })
 
   it.each(harnesses.map((entry) => entry.name))('%s', (name: string) => {
     const found = harnesses.find((entry) => entry.name === name)
     expect(deadSelectors(found?.text ?? '', name)).toEqual([])
+    expect(deadLabels(found?.text ?? '')).toEqual([])
   })
 })
