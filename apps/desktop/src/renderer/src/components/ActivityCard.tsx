@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { activityCounts, activityEntries, defaultOpenEntry, relativePath } from '../missionView.js'
@@ -25,7 +25,8 @@ export function ActivityCard({
   trace,
   finished = false,
   workspacePath,
-  plan
+  plan,
+  openByDefault = false
 }: {
   readonly summary: string
   /** The trace line; when absent the summary string is drawn (older callers). */
@@ -45,8 +46,27 @@ export function ActivityCard({
    * 2026-09-06).
    */
   readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
+  /**
+   * Open on arrival, for the newest finished turn. See `openByDefault` on the
+   * activity item for why: the live narration disappears when a run ends, and
+   * a person looking back at it found one collapsed line.
+   */
+  readonly openByDefault?: boolean
 }): ReactElement {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(openByDefault)
+  /**
+   * Whether the person has decided for themselves.
+   *
+   * `openByDefault` flips from false to true when the run finishes, and this
+   * component does not remount -- so without remembering a deliberate press,
+   * closing the fold mid-run would be silently undone a moment later. A choice
+   * made by hand outranks the default, always.
+   */
+  const decided = useRef(false)
+  useEffect(() => {
+    if (decided.current) return
+    setOpen(openByDefault)
+  }, [openByDefault])
   // Only ever set when the host refuses. A reveal that works needs no words:
   // the file manager comes to the front and that is the whole feedback.
   const [revealNotice, setRevealNotice] = useState<string | undefined>(undefined)
@@ -67,6 +87,10 @@ export function ActivityCard({
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const initiallyOpen = defaultOpenEntry(entries)
   const isOpen = (entry: ActivityEntry): boolean => toggled.get(entry.key) ?? entry.key === initiallyOpen
+  const decide = (next: boolean): void => {
+    decided.current = true
+    setOpen(next)
+  }
   const toggle = (entry: ActivityEntry): void => {
     const next = new Map(toggled)
     next.set(entry.key, !isOpen(entry))
@@ -75,7 +99,7 @@ export function ActivityCard({
 
   return (
     <div className="lc-card">
-      <button type="button" className="lc-activity" onClick={() => setOpen(!open)} aria-expanded={open}>
+      <button type="button" className="lc-activity" onClick={() => decide(!open)} aria-expanded={open}>
         <Icon name="diff" size={14} />
         {trace === undefined || trace.length === 0 ? (
           <span>{summary}</span>

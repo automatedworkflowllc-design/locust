@@ -84,6 +84,7 @@ function ThreadItems({
               details={item.details}
               runtimeName={item.reportedBy === undefined ? undefined : runtimeDisplayName(item.reportedBy)}
               workspacePath={workspacePath}
+              openByDefault={item.openByDefault === true}
               {...(item.plan === undefined ? {} : { plan: item.plan })}
             />
           )

@@ -2146,3 +2146,41 @@ describe('"no files changed" is a claim, not a default', () => {
     expect(filesText([])).toBe('no files changed')
   })
 })
+
+/**
+ * The newest finished turn keeps its work on screen.
+ *
+ * While a run is going the live step narrates it -- "Thinking", then each tool
+ * as it is called -- and the moment it ended every bit of that was replaced by
+ * one collapsed line. So the work vanished at exactly the moment a person
+ * turns back to look at it (Colin, 2026-09-08: "the thoughts and tool calls
+ * disappear after an agent is done ... we want that to stay so they can see
+ * after the fact or if they missed it").
+ */
+describe('whether a finished fold opens itself', () => {
+  const withTool = [
+    event('tool.started', { itemId: 't1', toolKind: 'read', name: 'read', command: 'notes.md', phase: 'started' }),
+    event('tool.completed', { itemId: 't1', toolKind: 'read', name: 'read', command: 'notes.md', phase: 'completed' })
+  ]
+  const activity = (options: { running: boolean; latestTurn?: boolean }) => {
+    const item = buildThread(withTool, options).find((entry) => entry.type === 'activity')
+    return item?.type === 'activity' ? item : undefined
+  }
+
+  it('opens the newest turn once it has finished', () => {
+    expect(activity({ running: false, latestTurn: true })?.openByDefault).toBe(true)
+  })
+
+  it('leaves it closed while the run is still going', () => {
+    // The live step is narrating it; a fold opening underneath that would say
+    // the same thing twice.
+    expect(activity({ running: true, latestTurn: true })?.openByDefault).toBeUndefined()
+  })
+
+  it('leaves EARLIER turns closed, so a long conversation is not a wall', () => {
+    // The control. Every finished fold opening is the thing the fold exists to
+    // prevent.
+    expect(activity({ running: false })?.openByDefault).toBeUndefined()
+    expect(activity({ running: false, latestTurn: false })?.openByDefault).toBeUndefined()
+  })
+})

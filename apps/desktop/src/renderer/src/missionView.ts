@@ -371,6 +371,21 @@ export type ThreadItem =
   | {
       readonly key: string
       readonly type: 'activity'
+      /**
+       * Open this fold without being asked.
+       *
+       * True for the NEWEST turn once it has finished. While a run is going
+       * the live step narrates it -- "Thinking", then each tool as it is
+       * called -- and the moment it ended all of that was replaced by one
+       * collapsed line, so the work vanished at exactly the moment a person
+       * turns back to look at it (Colin, 2026-09-08: "the thoughts and tool
+       * calls disappear after an agent is done ... we want that to stay so
+       * they can see after the fact or if they missed it").
+       *
+       * Newest turn only. Every finished fold opening would make a long
+       * conversation a wall of tool rows, which is what the fold is for.
+       */
+      readonly openByDefault?: boolean
       /** The plan this run stated, drawn as the fold's first rows. */
       readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
       readonly summary: string
@@ -1109,6 +1124,8 @@ export function buildThread(
         options.workspacePath
       ),
       finished: !options.running,
+      // The newest turn, done: keep what it did on screen.
+      ...(options.running || options.latestTurn !== true ? {} : { openByDefault: true }),
       details: activity,
       ...(planSteps === undefined ? {} : { plan: planSteps }),
       reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter

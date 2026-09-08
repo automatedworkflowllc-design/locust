@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.45.2 - 2026-09-08
+
+- **What a teammate did stays on screen after it finishes.** While a run is
+  going you watch it think and call tools; the moment it ended, all of that
+  collapsed into a single line. The newest finished turn now keeps its work
+  open - the tools it called, the files it changed, the diffs - so you can read
+  it afterwards, or catch what you missed. Earlier turns stay collapsed, and if
+  you close one by hand it stays closed.
+
 ## 0.45.1 - 2026-09-08
 
 - **Copilot CLI's effort levels work.** It accepts seven of them - none,
