@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.46.0 - 2026-09-08
+
+- **Type `/` in the message box to reach the controls without the mouse.** A
+  menu opens listing what you can do from here - `/edit`, `/auto`, `/model`,
+  `/swarm`, `/stop` - with a sentence under each saying what it does. Arrows
+  pick, Enter runs it. Only what is genuinely available is listed: `/stop`
+  appears while something is running, and a mode the chosen model cannot honour
+  is not offered at all, so nothing in the menu can be chosen and then refused.
+  A slash inside a sentence is left alone - "run /plan on this file" is still a
+  message, not a command.
+- **Auto's warning is finally the colour it was meant to be.** The line saying
+  Auto "may change anything on this machine" was written to stand out in amber
+  and had been rendering in the same grey as everything else since it was
+  added.
+
 ## 0.45.4 - 2026-09-08
 
 - **A teammate writing a lot no longer gets stopped for it.** A long report on

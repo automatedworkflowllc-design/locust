@@ -26,6 +26,8 @@ import { Icon } from './Icon.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
 import { attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
+import { availableCommands, matchingCommands, slashQuery } from '../slashCommands.js'
+import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 
@@ -209,6 +211,15 @@ export function Composer({
    */
   const [attached, setAttached] = useState<readonly string[]>([])
   const [attaching, setAttaching] = useState(false)
+  /**
+   * Which slash command the arrow keys are on.
+   *
+   * Typing narrows the list under it, so this index can outlive the entry it
+   * pointed at. Every read clamps to the last row rather than resetting on
+   * every keystroke: resetting would drag the highlight back to the top mid-typing,
+   * and clamping means the index can never name a command that is not there.
+   */
+  const [slashAt, setSlashAt] = useState(0)
   const [effortOpen, setEffortOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -219,6 +230,45 @@ export function Composer({
   const effectiveMode: MissionMode = modeRunsOn(mode, route.runtime, platform)
     ? mode
     : modesFor(route.runtime, platform)[0] ?? 'accept-edits'
+  /*
+   * Slash commands. Every one maps to a control already on this row, so the
+   * menu is a keyboard path to things that exist rather than a new capability
+   * -- and the list is filtered by what is actually possible, so a command can
+   * never be offered and then refused.
+   */
+  const slashing = slashQuery(value)
+  const slashChoices = slashing === undefined
+    ? []
+    : matchingCommands(slashing, availableCommands({
+        modes: modesFor(route.runtime, platform),
+        running,
+        canSwarm: !running
+      }))
+  const runSlash = (command: SlashCommand): void => {
+    setValue('')
+    setSlashAt(0)
+    switch (command.action.kind) {
+      case 'mode':
+        // Exactly what choosing the mode in the menu does, including the part
+        // that is easy to miss: Auto is refused unless the workspace switch is
+        // on, and App turns it straight back to Accept edits. A drive on
+        // 2026-09-08 typed `/auto`, watched the box clear, and watched the
+        // mode not change -- a command offered and then quietly undone, which
+        // is the one thing this menu promises cannot happen.
+        if (command.action.mode === 'auto' && autoMode !== true) onEnableAutoMode?.()
+        onModeChange(command.action.mode)
+        break
+      case 'route':
+        onOpenRoutePicker()
+        break
+      case 'stop':
+        onCancel()
+        break
+      case 'swarm':
+        onSwarmChange(!swarm)
+        break
+    }
+  }
   const selected = runtimes.find((runtime) => runtime.id === route.runtime)
   // The account's window, from the latest reading (SURFACES-0.22 §3): a
   // sentence in the tooltip always; a dot on the chip only from 80%, when a
@@ -330,6 +380,32 @@ export function Composer({
   }
 
   const keyDown = (keyEvent: KeyboardEvent<HTMLTextAreaElement>): void => {
+    // While the slash menu is open the arrows and Enter belong to it. Enter
+    // must NOT fall through to submit: sending "/plan" as a message to a
+    // teammate is the one outcome this feature exists to prevent.
+    if (slashChoices.length > 0) {
+      if (keyEvent.key === 'ArrowDown') {
+        keyEvent.preventDefault()
+        setSlashAt((at) => (at + 1) % slashChoices.length)
+        return
+      }
+      if (keyEvent.key === 'ArrowUp') {
+        keyEvent.preventDefault()
+        setSlashAt((at) => (at - 1 + slashChoices.length) % slashChoices.length)
+        return
+      }
+      if (keyEvent.key === 'Enter' && !keyEvent.shiftKey) {
+        keyEvent.preventDefault()
+        const chosen = slashChoices[Math.min(slashAt, slashChoices.length - 1)]
+        if (chosen !== undefined) runSlash(chosen)
+        return
+      }
+      if (keyEvent.key === 'Escape') {
+        keyEvent.preventDefault()
+        setValue('')
+        return
+      }
+    }
     if (keyEvent.key === 'Enter' && !keyEvent.shiftKey) {
       keyEvent.preventDefault()
       keyEvent.currentTarget.form?.requestSubmit()
@@ -452,6 +528,36 @@ export function Composer({
           <div className="lc-continuation lc-mono" role="status">
             <Icon name="route" size={12} />
             <span>{continuationNote}</span>
+          </div>
+        )}
+        {/*
+          * The command menu, above the box, reading what is being typed.
+          *
+          * Every entry maps to a control already on the row below it, so this
+          * is a keyboard path to what exists rather than a second way to do
+          * something new -- and `availableCommands` drops any command that
+          * would be refused, so nothing here can be chosen and then fail.
+          */}
+        {slashChoices.length > 0 && (
+          <div className="lc-slash" role="listbox" aria-label="Commands">
+            {slashChoices.map((command, index) => (
+              <button
+                key={command.name}
+                type="button"
+                role="option"
+                aria-selected={index === Math.min(slashAt, slashChoices.length - 1)}
+                className={`lc-slash__item${index === Math.min(slashAt, slashChoices.length - 1) ? ' is-active' : ''}`}
+                onMouseEnter={() => setSlashAt(index)}
+                onClick={() => runSlash(command)}
+              >
+                <span className="lc-slash__name lc-mono">/{command.name}</span>
+                <span
+                  className={`lc-slash__detail${command.action.kind === 'mode' && command.action.mode === 'auto' ? ' lc-tone-amber' : ''}`}
+                >
+                  {command.detail}
+                </span>
+              </button>
+            ))}
           </div>
         )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>

@@ -4320,6 +4320,77 @@ textarea {
   text-wrap: pretty;
 }
 
+/* --- Slash commands ---------------------------------------------------- */
+
+/*
+ * The command menu sits above the box in normal flow rather than floating,
+ * because it is not a menu opened from a control -- it is an answer to what
+ * is being typed, and it should push the composer down the way the notices
+ * above it do rather than cover the message.
+ */
+.lc-slash {
+  display: flex;
+  flex-direction: column;
+  margin: 0 var(--lc-space-2) var(--lc-space-2);
+  background: var(--lc-bg-raised-2);
+  border: 1px solid var(--lc-border-strong);
+  border-radius: 11px;
+  box-shadow: var(--lc-shadow-menu);
+  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.lc-slash__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-4);
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--lc-text-secondary);
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+/* One highlight, driven by the arrow keys. Hover moves it rather than adding
+ * a second one, so the keyboard and the mouse never disagree about which
+ * command Enter would run. */
+.lc-slash__item.is-active {
+  background: var(--lc-hover-surface-strong);
+}
+
+.lc-slash__name {
+  flex: none;
+  min-width: 74px;
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+}
+
+.lc-slash__detail {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+/*
+ * Auto is the one consequence stated in a colour, in both menus that state it.
+ *
+ * The tone classes sit at the top of this file and the descriptions set their
+ * own colour further down, at the same specificity -- so `lc-tone-amber` lost
+ * the cascade and Auto has read plain grey since the 0906 review asked for
+ * amber. Measured on 2026-09-08: computed rgb(139,145,144), not #efc969. This
+ * rule sits after both descriptions so the tone wins where it is asked for.
+ */
+.lc-menu__desc.lc-tone-amber,
+.lc-slash__detail.lc-tone-amber {
+  color: var(--lc-amber-text);
+}
+
 /* --- Route picker ------------------------------------------------------ */
 
 .lc-picker {
