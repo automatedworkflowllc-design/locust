@@ -6261,9 +6261,23 @@ textarea {
   margin-top: 0.6rem;
 }
 
+/*
+ * Four things on a row: the teammate's face, the name, Run, and Edit/Remove.
+ *
+ * The columns said `1fr auto auto` -- three, written for a row with no face on
+ * it. With one, everything shifted a column: the FACE took the flexible
+ * column and sat alone at the left of it, the name was pushed to the middle of
+ * the row, and Edit/Remove wrapped underneath while Run ran off the window
+ * edge. Seen in a drive's screenshot after its step text had been read as a
+ * pass (2026-09-08).
+ *
+ * `minmax(0, 1fr)` rather than `1fr` on the name: a grid column will not
+ * shrink below its content otherwise, which is the same thing that let a card
+ * nested in that cell push Run off the edge in the first place.
+ */
 .lc-routinerow {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: 0.4rem;
   align-items: center;
 }
@@ -6272,6 +6286,21 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * The recovery card gets the whole width, on its own line under the controls.
+ *
+ * The row is three columns and its children already wrap; a card added to it
+ * without saying where it goes lands in one narrow cell and drags the rest of
+ * the row out of shape. This says where it goes.
+ */
+.lc-routinerow > .lc-recovery {
+  grid-column: 1 / -1;
+  /* The inline overrides this used to carry, now that it is a real element in
+     a real place: it wraps, and it is a block. */
+  white-space: normal;
+  margin-top: var(--lc-space-2);
 }
 
 .lc-routinerow__meta {

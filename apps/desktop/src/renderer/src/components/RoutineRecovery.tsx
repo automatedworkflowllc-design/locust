@@ -31,7 +31,19 @@ export function RoutineRecovery({ routine, recover, onOpenMission }: {
       setReviewed(false)
     }
   }
-  return <span className="lc-routinerow__meta lc-tone-amber" style={{ display: 'block', whiteSpace: 'normal' }}>
+  /*
+   * `lc-recovery` rather than an inline style.
+   *
+   * This carried `style={{ display: 'block', whiteSpace: 'normal' }}` because
+   * it used to live INSIDE `lc-routinerow__name`, a one-line ellipsised span
+   * that would otherwise have collapsed it. It is a row of its own now, so the
+   * override is no longer holding anything up and the class can say what this
+   * is instead.
+   *
+   * Amber is right and stays: this holds controls and is waiting on a person,
+   * which is the pending register.
+   */
+  return <div className="lc-recovery lc-routinerow__meta lc-tone-amber">
     <strong>{execution.status === 'abandoned' ? 'Attempt abandoned' : 'Waiting for your review'}</strong>
     {' · '}Step {execution.step} of {execution.of}{' · '}Attempt started {new Date(execution.startedAt).toLocaleString()}
     <span style={{ display: 'block' }}>{execution.reason ?? 'Dispatch outcome is uncertain. Nothing will be replayed automatically.'}</span>
@@ -52,5 +64,5 @@ export function RoutineRecovery({ routine, recover, onOpenMission }: {
         onClick={() => { void decide('abandon') }}>Abandon attempt and remove schedule</button>
     </>}
     {error !== undefined && <span role="alert">{error}</span>}
-  </span>
+  </div>
 }
