@@ -779,17 +779,10 @@ textarea {
   letter-spacing: 0.04em;
 }
 
-.lc-rerun {
-  display: flex;
-  gap: var(--lc-space-5);
-  align-items: center;
-  flex-wrap: wrap;
-  padding: var(--lc-space-5);
-  border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-card);
-  color: var(--lc-text-secondary);
-  font-size: var(--lc-text-description);
-}
+/* The boxed version of this rule was deleted 2026-09-08. It was overridden by
+   the note version further down and had been dead for some time -- and this
+   file has already been bitten once by dead CSS that could still win a
+   cascade (see the `.lc-workroom__more` note). A rerun offer is a note. */
 
 .lc-rerun span {
   flex: 1;
@@ -6318,10 +6311,14 @@ textarea {
  */
 .lc-card.is-standing {
   border: 0;
-  border-left: 2px solid var(--lc-border-strong);
+  /* The SAME rule the note register already uses -- `.lc-diagnostic` and
+     `.lc-memorycard` are both 2px of --lc-border-card at --lc-space-4. A
+     third slightly-different left rule would be a fourth species, which is
+     the thing this whole section is undoing. */
+  border-left: 2px solid var(--lc-border-card);
   border-radius: 0;
   background: transparent;
-  padding-left: var(--lc-space-5);
+  padding-left: var(--lc-space-4);
 }
 
 .lc-card.is-standing .lc-card__head {
