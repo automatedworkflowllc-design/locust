@@ -21,6 +21,12 @@ import { describe, expect, it } from 'vitest'
  * being investigated at the time. The third occurrence cost a full edit cycle
  * on a fix that was already correct.
  *
+ * It lives beside the main-process sources rather than in shared/, because it
+ * needs node types and shared/ is compiled by the WEB config, which has none.
+ * It was written there first and the ship gate caught it: the repo-wide
+ * typecheck runs configs that a single hand-run tsc invocation does not, so
+ * "I typechecked it" was true and insufficient.
+ *
  * A memory would not have caught it; a check that runs with every suite does.
  * `--check` parses without executing, so nothing here launches an app, spends
  * a quota or touches a runtime.
@@ -39,7 +45,7 @@ describe('every drive and probe under _tools parses', () => {
     expect(harnesses.length).toBeGreaterThan(20)
   })
 
-  it.each(harnesses)('%s', (name) => {
+  it.each(harnesses)('%s', (name: string) => {
     expect(() => {
       execFileSync(process.execPath, ['--check', join(TOOLS, name)], { stdio: 'pipe' })
     }).not.toThrow()
