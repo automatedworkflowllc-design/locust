@@ -31,8 +31,12 @@ import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib
 const ROUNDS = 8
 const TEAM = [
   { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations' },
-  { teammateId: 'tm_atlas', name: 'Atlas', hue: 'sky', role: 'Research & Briefs' },
-  { teammateId: 'tm_juno', name: 'Juno', hue: 'amber', role: 'Tests & Review' }
+  // Hues and roles the roster actually knows. `sky`, `amber` and
+  // `Tests & Review` are none of them, and seeding those dropped two of three
+  // teammates without a word -- which is the defect this drive then went on to
+  // find in drive-lib's own seed check.
+  { teammateId: 'tm_atlas', name: 'Atlas', hue: 'blue', role: 'Research & Briefs' },
+  { teammateId: 'tm_juno', name: 'Juno', hue: 'violet', role: 'Docs & QA' }
 ]
 
 const workspace = await scratchRepository('locust-drive-teamday-ws-')
