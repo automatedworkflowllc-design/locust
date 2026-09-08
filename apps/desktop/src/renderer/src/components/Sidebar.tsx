@@ -464,7 +464,7 @@ export function Sidebar({
                 <button
                   type="button"
                   key={mission.missionId}
-                  className="lc-row"
+                  className="lc-row lc-row--mission"
                   aria-current={isShown(mission, selectedMissionId)}
                   onClick={() => onSelectMission(mission.missionId)}
                   onContextMenu={(event) => {

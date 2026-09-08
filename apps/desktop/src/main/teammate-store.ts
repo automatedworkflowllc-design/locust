@@ -4,7 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import { isAvatarSpec, seedAvatar } from '../shared/avatar.js'
-import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode } from '../shared/ipc.js'
+import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode, LayoutPreference } from '../shared/ipc.js'
 import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
 
@@ -79,7 +79,12 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, layout: 'auto' }
+
+/** A layout this build can draw, or the default. Never trusts the file. */
+function parsedLayout(value: unknown): LayoutPreference {
+  return value === 'compact' || value === 'wide' || value === 'auto' ? value : 'auto'
+}
 
 function parsedMemoryMode(value: unknown): MemoryMode {
   return value === 'auto' || value === 'ask' || value === 'off' ? value : DEFAULT_MEMORY_MODE
@@ -254,7 +259,10 @@ function parsedFile(text: string): StoredFile {
     // an older version all read as off, which is the answer nobody regrets.
     autoMode: typeof rawSettings === 'object' && rawSettings !== null
       ? (rawSettings as Record<string, unknown>).autoMode === true
-      : false
+      : false,
+    layout: typeof rawSettings === 'object' && rawSettings !== null
+      ? parsedLayout((rawSettings as Record<string, unknown>).layout)
+      : 'auto'
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, settings }
@@ -459,7 +467,10 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           // must never be able to turn on.
           autoMode: typeof settings === 'object' && settings !== null
             ? (settings as Record<string, unknown>).autoMode === true
-            : false
+            : false,
+          layout: typeof settings === 'object' && settings !== null
+            ? parsedLayout((settings as Record<string, unknown>).layout)
+            : 'auto'
         }
         const file = await read()
         await write({ ...file, settings: next })

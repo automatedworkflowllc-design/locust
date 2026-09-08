@@ -3169,44 +3169,48 @@ textarea {
  *
  * The design pass asks for the compact layout AT 1120x720 -- an avatar rail
  * instead of the sidebar -- which is exactly the size this could not reach.
- * The bound is now 1199px: the smallest window the app allows is compact, and
- * a merely smallish one at 1200+ is not.
+ * It is now a CLASS rather than a media query, because a media query cannot
+ * be overridden by a preference and Colin asked for the layout to be
+ * toggleable as well as automatic (2026-09-07). `renderer/layout.ts` decides
+ * -- width when nobody has chosen, the choice when someone has -- and puts
+ * `is-compact` on the shell. The width it uses is 1199px, so the smallest
+ * window the app allows is compact by default and a merely smallish one at
+ * 1200+ is not.
  */
-@media (max-width: 1199px) {
-  .lc-sidebar {
+.lc-shell.is-compact .lc-sidebar {
     width: var(--lc-sidebar-rail-width);
   }
 
-  .lc-sidebar__brand {
+.lc-shell.is-compact .lc-sidebar__brand {
     justify-content: center;
     padding: var(--lc-space-5) 0 var(--lc-space-4);
   }
 
-  .lc-sidebar__brand img,
-  .lc-sidebar .lc-row__text,
-  .lc-sidebar .lc-sectionlabel,
-  .lc-search,
-  .lc-sidebar__footer button span,
-  /* Scoped to the sidebar on purpose. A bare `.lc-connected` here loses to
+/* Scoped to the sidebar on purpose. A bare `.lc-connected` here loses to
      the `.lc-connected` block far below this one -- same specificity, later
      in the file -- so the line came back inside the 64px rail and truncated
      to "6...". Measured on screen at 1120px, 2026-09-07. */
-  .lc-sidebar .lc-connected,
-  /* A sentence in a 68px rail wraps to one word per line and reads as a
+/* A sentence in a 68px rail wraps to one word per line and reads as a
      column of fragments -- "No / mis... / yet. / Des... / one". Measured on
      screen at 1014px wide, 2026-09-05. Every other piece of prose in this
      rail is already hidden here; this one was missed. */
-  .lc-sidebar__empty {
+.lc-shell.is-compact .lc-sidebar__brand img,
+.lc-shell.is-compact .lc-sidebar .lc-row__text,
+.lc-shell.is-compact .lc-sidebar .lc-sectionlabel,
+.lc-shell.is-compact .lc-search,
+.lc-shell.is-compact .lc-sidebar__footer button span,
+.lc-shell.is-compact .lc-sidebar .lc-connected,
+.lc-shell.is-compact .lc-sidebar__empty {
     display: none;
   }
 
-  .lc-row {
+.lc-shell.is-compact .lc-row {
     justify-content: center;
     margin: 0 var(--lc-space-3) var(--lc-space-2);
     width: calc(100% - var(--lc-space-3) * 2);
   }
 
-  /*
+/*
    * The inspector OVERLAYS at this width rather than disappearing.
    *
    * It used to be `display: none` here, which meant that at the smallest
@@ -3220,13 +3224,13 @@ textarea {
    * So it keeps its width and floats over the workroom, which is what "the
    * inspector collapses" has to mean on a screen with no room beside it.
    */
-  /* The overlay needs something to be absolute INSIDE. Only at this width,
+/* The overlay needs something to be absolute INSIDE. Only at this width,
      so nothing about the normal layout changes. */
-  .lc-body {
+.lc-shell.is-compact .lc-body {
     position: relative;
   }
 
-  .lc-inspector {
+.lc-shell.is-compact .lc-inspector {
     position: absolute;
     top: 0;
     right: 0;
@@ -3235,12 +3239,10 @@ textarea {
     box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
   }
 
-  .lc-thread__column,
-  .lc-composer__inner {
+.lc-shell.is-compact .lc-thread__column,
+.lc-shell.is-compact .lc-composer__inner {
     max-width: var(--lc-thread-max-width-compact);
   }
-}
-
 /* --- Plan card --------------------------------------------------------- */
 
 .lc-plan {
@@ -6239,4 +6241,53 @@ textarea {
   border-top: 1px solid var(--lc-border-hairline);
   font-size: var(--lc-text-caption);
   color: var(--lc-text-muted);
+}
+
+/*
+ * The compact rail, tidied. Colin, 2026-09-07, with a screenshot: "this parts
+ * a little buggy."
+ *
+ * Three faults, one cause. `.lc-teammate__missions` is padded 50px from the
+ * left so a conversation row lines up under the teammate's name -- which is
+ * right at 268px and absurd at 64px. Inside the rail it left about four pixels
+ * of room, so each conversation collapsed to a bare coloured dot with no way
+ * to tell what it was; the 50px pushed content past the rail and raised a
+ * horizontal scrollbar; and because the rows still occupied height, the
+ * selected teammate's box stretched into a tall empty rectangle below its
+ * avatar.
+ *
+ * Conversations are simply not drawn in the rail. Four pixels of a title is
+ * not a smaller version of a list, it is a decoration that lies about being
+ * one -- and a real way to reach conversations from the rail is a piece of
+ * design that does not exist yet rather than something to improvise here.
+ */
+.lc-shell.is-compact .lc-teammate__missions {
+  display: none;
+}
+
+/* With the rows gone the box is the avatar's own size again. */
+.lc-shell.is-compact .lc-teammate.is-selected {
+  background: transparent;
+  border-color: transparent;
+}
+
+.lc-shell.is-compact .lc-teammate.is-selected .lc-row {
+  background: var(--lc-bg-selected);
+  border: 1px solid var(--lc-border-card);
+}
+
+/* Nothing in a 64px rail may scroll sideways. */
+.lc-shell.is-compact .lc-sidebar__scroll {
+  overflow-x: hidden;
+}
+
+/*
+ * A conversation row in the rail is a coloured dot and nothing else -- its
+ * title is drawn as text and the rail hides text -- so it reads as a stray
+ * mark rather than a list (Colin's screenshot, 2026-09-07). Same call as the
+ * per-teammate lists above: not drawn, until there is a designed way to reach
+ * conversations from a 64px rail.
+ */
+.lc-shell.is-compact .lc-row--mission {
+  display: none;
 }

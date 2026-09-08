@@ -711,6 +711,9 @@ export type ModelCatalogResponse =
  * supported effort -- which is only meaningful because the catalog reports
  * effort per model, so "maximum" is a real value rather than a guess.
  */
+/** The shell layout a person has asked for. `auto` follows the window width. */
+export type LayoutPreference = 'auto' | 'compact' | 'wide'
+
 export interface WorkspaceSettings {
   readonly swarm: boolean
   /**
@@ -737,6 +740,13 @@ export interface WorkspaceSettings {
    * window or a saved routine gets to decide.
    */
   readonly autoMode: boolean
+  /**
+   * Which shell layout to draw: the full sidebar, the compact avatar rail, or
+   * whichever the window width calls for. Colin asked for the layout to be a
+   * choice as well as a consequence of window size (2026-09-07). Absent or
+   * malformed reads as `auto`, which is what it did before the choice existed.
+   */
+  readonly layout: LayoutPreference
 }
 
 export const DEFAULT_RELAY_HOP_CAP = 6

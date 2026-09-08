@@ -107,6 +107,51 @@ try {
     return (visible ? 'open, ' : 'RENDERED BUT NOT VISIBLE, ') + Math.round(box.width) + 'px wide, tabs: [' + tabs.join(', ') + ']'
   })()`))
 
+  // The rail's own tidiness, after Colin's screenshot: no sideways scrollbar,
+  // no conversation rows squeezed into four pixels, no tall empty box round
+  // the selected avatar.
+  await drive.capture('is the rail itself tidy', () => drive.evaluate(`(() => {
+    const scroll = document.querySelector('.lc-sidebar__scroll')
+    const sideways = scroll ? scroll.scrollWidth > scroll.clientWidth + 1 : false
+    const missions = [...document.querySelectorAll('.lc-teammate__missions')]
+      .filter(n => n.getBoundingClientRect().height > 0).length
+    const selected = document.querySelector('.lc-teammate.is-selected')
+    const selectedHeight = selected ? Math.round(selected.getBoundingClientRect().height) : 0
+    return 'rail scrolls sideways: ' + sideways
+      + ' || conversation lists drawn: ' + missions
+      + ' || selected box height: ' + selectedHeight + 'px'
+  })()`))
+
+  // The layout is a CHOICE as well as a consequence of window size. At this
+  // width auto gives the rail; asking for the full sidebar must win anyway.
+  await drive.capture('force the full sidebar at this width from Settings', () => drive.evaluate(`(async () => {
+    // By TITLE, not by text: the rail hides button labels, which is the whole
+    // point of the rail and the reason an innerText selector found nothing.
+    const settings = [...document.querySelectorAll('button')].find(b => /^Settings/.test(b.getAttribute('title') || ''))
+    if (!settings) return 'no Settings button'
+    settings.click()
+    await new Promise(r => setTimeout(r, 900))
+    const group = [...document.querySelectorAll('[role=radiogroup]')].find(g => /Sidebar layout/.test(g.getAttribute('aria-label') || ''))
+    if (!group) return 'no Sidebar layout control in Settings'
+    const full = [...group.querySelectorAll('button')].find(b => b.innerText.trim() === 'Full')
+    if (!full) return 'no Full option'
+    full.click()
+    await new Promise(r => setTimeout(r, 900))
+    const sidebar = document.querySelector('.lc-sidebar')
+    const width = sidebar ? Math.round(sidebar.getBoundingClientRect().width) : -1
+    return 'after choosing Full at ' + window.innerWidth + 'px: sidebar is ' + width + 'px'
+  })()`))
+
+  await drive.capture('and back to Rail', () => drive.evaluate(`(async () => {
+    const group = [...document.querySelectorAll('[role=radiogroup]')].find(g => /Sidebar layout/.test(g.getAttribute('aria-label') || ''))
+    const rail = group ? [...group.querySelectorAll('button')].find(b => b.innerText.trim() === 'Rail') : undefined
+    if (!rail) return 'no Rail option'
+    rail.click()
+    await new Promise(r => setTimeout(r, 900))
+    const sidebar = document.querySelector('.lc-sidebar')
+    return 'after choosing Rail: sidebar is ' + (sidebar ? Math.round(sidebar.getBoundingClientRect().width) : -1) + 'px'
+  })()`))
+
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {

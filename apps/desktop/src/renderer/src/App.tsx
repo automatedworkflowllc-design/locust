@@ -6,6 +6,7 @@ import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime
 import type { AvatarSpec } from '../../shared/avatar.js'
 
 import type {
+  LayoutPreference,
   CodexMissionUpdate,
   MissionRouteSummary,
   PublicRecoveredMission,
@@ -86,6 +87,7 @@ import {
   typedPrompt, assistantMessages } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
+import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
@@ -667,6 +669,31 @@ export default function App(): ReactElement {
   const [memories, setMemories] = useState<readonly PublicMemory[]>([])
   const [memoryWorkspace, setMemoryWorkspace] = useState<{ readonly id: string; readonly name: string }>({ id: '', name: '' })
   const [memoryMode, setMemoryMode] = useState<MemoryMode>(DEFAULT_MEMORY_MODE)
+  /**
+   * Which shell layout to draw, and how wide the window is.
+   *
+   * The width is tracked because `auto` -- the default -- answers with it, and
+   * a resize has to redraw. `resolveLayout` is the only place the two are
+   * combined; see `layout.ts` for why this is not a media query any more.
+   */
+  const [layout, setLayout] = useState<LayoutPreference>('auto')
+  const [windowWidth, setWindowWidth] = useState<number>(() =>
+    typeof window === 'undefined' ? 1440 : window.innerWidth
+  )
+  useEffect(() => {
+    const onResize = (): void => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const layoutMode = resolveLayout(layout, windowWidth)
+  const chooseLayout = (next: LayoutPreference): void => {
+    const before = layout
+    setLayout(next)
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode, layout: next })
+      .then((settings) => setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto'))
+      .catch(() => setLayout(before))
+  }
   const [memoryNotice, setMemoryNotice] = useState<string>()
   /**
    * The last scheduled routine that would not start, and why. Kept until it
@@ -1248,6 +1275,7 @@ export default function App(): ReactElement {
           setAutoMode(settings.autoMode === true)
           setRelayHopCap(settings.relayHopCap)
           setMemoryMode(settings.memoryMode)
+          setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto')
         }
       })
       .catch(() => undefined)
@@ -1585,7 +1613,7 @@ export default function App(): ReactElement {
     const before = memoryMode
     setMemoryMode(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next, autoMode })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next, autoMode, layout })
       .then((settings) => setMemoryMode(settings.memoryMode))
       .catch(() => setMemoryMode(before))
   }
@@ -2566,7 +2594,7 @@ export default function App(): ReactElement {
   }
 
   return (
-    <div className="lc-shell">
+    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
         // build instead (Colin, 2026-09-05).
@@ -2758,7 +2786,7 @@ export default function App(): ReactElement {
                 // reconciled with what the store actually saved.
                 setSwarm(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode })
+                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
                   .then((settings) => setSwarm(settings.swarm === true))
                   .catch(() => setSwarm(!next))
               }}
@@ -2766,27 +2794,30 @@ export default function App(): ReactElement {
               onAutoModeChange={(next) => {
                 setAutoMode(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: next })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: next, layout })
                   .then((settings) => setAutoMode(settings.autoMode === true))
                   .catch(() => setAutoMode(!next))
               }}
               relayHopCap={relayHopCap}
               memoryMode={memoryMode}
               onMemoryModeChange={changeMemoryMode}
+              layout={layout}
+              layoutMode={layoutMode}
+              onLayoutChange={chooseLayout}
               memoryCount={memories.filter((memory) => memory.status === 'kept').length}
               memoryWaiting={memories.filter((memory) => memory.status === 'proposed').length}
               onOpenMemory={() => setScreen('memory')}
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode, autoMode })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode, autoMode, layout })
                   .then((settings) => setRelayHopCap(settings.relayHopCap))
                   .catch(() => undefined)
               }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode, autoMode })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode, autoMode, layout })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -3134,7 +3165,7 @@ export default function App(): ReactElement {
               // same answer the composer just showed.
               setAutoMode(true)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: true })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: true, layout: 'auto' })
                 .then((settings) => setAutoMode(settings.autoMode === true))
                 .catch(() => setAutoMode(false))
             }}
@@ -3171,7 +3202,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}
@@ -3249,7 +3280,7 @@ export default function App(): ReactElement {
                   const next = !swarm
                   setSwarm(next)
                   void window.desktop
-                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode })
+                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
                     .then((settings) => setSwarm(settings.swarm === true))
                     .catch(() => setSwarm(!next))
                 }

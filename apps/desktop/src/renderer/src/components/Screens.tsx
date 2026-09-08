@@ -12,6 +12,7 @@ import type {
   PublicStorageReport,
   PublicTeammate,
   MemoryMode,
+  LayoutPreference,
   PublicRuntimeSetup,
   PublicWorkspaceBrief,
   PublicWorktree
@@ -695,6 +696,9 @@ export function SettingsScreen({
   relayHopCap,
   onRelayHopCapChange,
   memoryMode,
+  layout,
+  layoutMode,
+  onLayoutChange,
   onMemoryModeChange,
   memoryCount,
   memoryWaiting,
@@ -741,6 +745,11 @@ export function SettingsScreen({
   readonly onRelayHopCapChange: (cap: number) => void
   /** What happens to a memory a teammate writes. */
   readonly memoryMode: MemoryMode
+  /** What the person chose; `auto` follows the window width. */
+  readonly layout: LayoutPreference
+  /** What that actually resolves to right now, so `auto` can say which. */
+  readonly layoutMode: 'compact' | 'wide'
+  readonly onLayoutChange: (layout: LayoutPreference) => void
   readonly onMemoryModeChange: (mode: MemoryMode) => void
   readonly memoryCount: number
   /** Memories a teammate proposed that wait for a keep or a forget. */
@@ -1095,6 +1104,38 @@ export function SettingsScreen({
             </p>
           </More>
           <div className="lc-settingrows">
+          {/*
+            * The shell layout. It was decided by window width alone, so the
+            * only way to get the compact rail was to shrink the window and the
+            * only way out of it was to grow one (Colin, 2026-09-07: "can we
+            * have it be an optional toggle as well?"). Auto still follows the
+            * width, and it is what everyone gets until they choose.
+            */}
+          <div className="lc-settingrow">
+            <span className="lc-settings__note">
+              Sidebar layout{layout === 'auto' ? ` — following this window, currently ${layoutMode}` : ''}
+            </span>
+            <div className="lc-segmented" role="radiogroup" aria-label="Sidebar layout">
+              {(
+                [
+                  ['auto', 'Auto'],
+                  ['wide', 'Full'],
+                  ['compact', 'Rail']
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={layout === value}
+                  className={`lc-button${layout === value ? ' is-active' : ''}`}
+                  onClick={() => onLayoutChange(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="lc-settingrow">
             <span className="lc-settings__note">When a teammate writes a memory</span>
             <div className="lc-segmented" role="radiogroup" aria-label="When a teammate writes a memory">
