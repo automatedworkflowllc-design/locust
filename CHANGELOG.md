@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.50.0 - 2026-09-08
+
+- **When an Antigravity teammate asks you something, you can now read the
+  question.** It used to show as "Prompting user with options" and a spinner
+  while the run sat blocked - the question and its options were in the record
+  the whole time and nothing displayed them. The row now shows what is being
+  asked, every option, and that the answer has to be given in Antigravity
+  itself. Locust genuinely cannot answer it: Antigravity resolves that question
+  by completing the tool inside its own window, and the only channel Locust has
+  arrives as a message that starts a new turn instead.
+
 ## 0.49.1 - 2026-09-08
 
 - **A routine step that is too long to send now says so while you type it.** A
