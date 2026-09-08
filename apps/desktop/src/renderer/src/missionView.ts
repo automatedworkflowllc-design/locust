@@ -548,6 +548,12 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   // a correct prefix fails to match and the row keeps the unreadable path.
   const mirrored = cursorMirrorRelative(full, root)
   if (mirrored !== undefined) return mirrored
+  // The workspace root ITSELF, which a directory-listing tool reports as the
+  // thing it acted on. It fell through every branch below and kept its whole
+  // absolute path -- so a stopped run's FINISHED list opened with
+  // `C:\Users\...\locust-stopmid-ws-FtLao7` above three bare filenames
+  // (measured 2026-09-07). The folder's own name is what a person calls it.
+  if (full.toLowerCase() === root.toLowerCase()) return root.split('/').at(-1) ?? path
   if (!full.toLowerCase().startsWith(`${root.toLowerCase()}/`)) {
     // Already relative (a runtime that reports paths from its cwd): the tree
     // prefix is still noise. An absolute path elsewhere stays whole.
@@ -1235,9 +1241,25 @@ export interface CancellationSummary {
 
 export function cancellationSummary(
   events: readonly NormalizedRuntimeEvent[],
-  plannedSteps = 0
+  plannedSteps = 0,
+  /** The folder this ran in, so the list reads the way a person writes paths. */
+  workspacePath?: string
 ): CancellationSummary {
+  // Through `relativePath`, and deduplicated.
+  //
+  // MEASURED 2026-09-07 by `_tools/drive-stopped-midedit.mjs`: a stopped run
+  // listed FIVE things finished, of which one was the workspace DIRECTORY and
+  // two were the same file -- an absolute path and a bare `note-1.txt` -- because
+  // one tool named it absolutely and another relatively. The count of what a
+  // stopped run finished is the one number on that card a person might act on,
+  // and it was inflated by the same file twice.
+  //
+  // Same fix as the activity fold's, for the same reason: a path is not an
+  // identity until the workspace root has had a say.
+  const shown = (name: string): string => relativePath(name, workspacePath)
+  const key = (name: string): string => shown(name).replace(/[\\/]+/g, '/').toLowerCase()
   const settled: string[] = []
+  const seen = new Set<string>()
   const open = new Map<string, string>()
   for (const event of events) {
     if (event.type === 'tool.started') {
@@ -1245,15 +1267,23 @@ export function cancellationSummary(
     } else if (event.type === 'tool.completed' || event.type === 'tool.failed') {
       const name = open.get(event.payload.itemId)
       if (name !== undefined) {
-        settled.push(name)
+        if (!seen.has(key(name))) {
+          seen.add(key(name))
+          settled.push(shown(name))
+        }
         open.delete(event.payload.itemId)
       }
     }
   }
-  const done = settled.length + open.size
+  const interrupted = [...open.values()].map(shown).filter((name) => {
+    if (seen.has(key(name))) return false
+    seen.add(key(name))
+    return true
+  })
+  const done = settled.length + interrupted.length
   return {
     settled,
-    interrupted: [...open.values()],
+    interrupted,
     neverStarted: Math.max(0, plannedSteps - done)
   }
 }

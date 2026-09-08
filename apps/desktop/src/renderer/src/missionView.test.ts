@@ -129,6 +129,16 @@ describe('how a path is written in a row', () => {
     expect(relativePath(String.raw`c:\users\x\projects\streaks\src\cli.js`, WS)).toBe('src/cli.js')
   })
 
+  it('draws the workspace root as the folder name, not its whole path', () => {
+    // A directory-listing tool reports the folder it acted on, which is the
+    // workspace root. That fell through every branch and kept its absolute
+    // path, so a stopped run's FINISHED list opened with a long absolute path
+    // above three bare filenames (measured 2026-09-07).
+    expect(relativePath(WS, WS)).toBe('streaks')
+    // A trailing separator is the same folder.
+    expect(relativePath(WS + String.fromCharCode(92), WS)).toBe('streaks')
+  })
+
   it('keeps a path outside the workspace whole, because there the location is the information', () => {
     const outside = String.raw`C:\Users\x\other\thing.js`
     expect(relativePath(outside, WS)).toBe(outside)
@@ -789,6 +799,53 @@ describe('cancellation summary', () => {
     expect(summary.settled).toEqual(['pnpm build'])
     expect(summary.interrupted).toEqual(['pnpm test'])
     expect(summary.neverStarted).toBe(2)
+  })
+
+  it('counts one file once, however each tool spelled its path', () => {
+    // MEASURED 2026-09-07 by drive-stopped-midedit: a stopped run listed five
+    // things finished, of which two were the SAME file -- one tool named it
+    // absolutely, another relatively -- and one was the workspace directory.
+    // The count of what a stopped run finished is the one number on that card
+    // a person might act on, and it was inflated by the same file twice.
+    const workspace = 'C:' + String.fromCharCode(92) + 'work'
+    const absolute = workspace + String.fromCharCode(92) + 'note-1.txt'
+    const summary = cancellationSummary(
+      [
+        toolStart('t1', 'read', absolute),
+        toolDone('t1'),
+        toolStart('t2', 'write', 'note-1.txt'),
+        toolDone('t2')
+      ],
+      0,
+      workspace
+    )
+    expect(summary.settled).toEqual(['note-1.txt'])
+  })
+
+  it('still counts two genuinely different files as two', () => {
+    // The negative control. A function that always answered one would satisfy
+    // the test above and be useless.
+    const workspace = 'C:' + String.fromCharCode(92) + 'work'
+    const summary = cancellationSummary(
+      [
+        toolStart('t1', 'write', 'note-1.txt'),
+        toolDone('t1'),
+        toolStart('t2', 'write', 'note-2.txt'),
+        toolDone('t2')
+      ],
+      0,
+      workspace
+    )
+    expect(summary.settled).toEqual(['note-1.txt', 'note-2.txt'])
+  })
+
+  it('does not repeat a finished item in the interrupted list', () => {
+    const summary = cancellationSummary(
+      [toolStart('t1', 'write', 'note-1.txt'), toolDone('t1'), toolStart('t2', 'write', 'note-1.txt')],
+      0
+    )
+    expect(summary.settled).toEqual(['note-1.txt'])
+    expect(summary.interrupted).toEqual([])
   })
 
   it('never reports a negative count when more ran than were planned', () => {

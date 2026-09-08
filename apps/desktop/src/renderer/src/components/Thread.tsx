@@ -408,7 +408,7 @@ export function Thread({
     .filter((event) => event.type === 'plan.updated')
     .map((event) => (event.type === 'plan.updated' ? readPlan(event.payload.plan).length : 0))
     .at(-1) ?? 0
-  const stopped = cancelled ? cancellationSummary(events, plannedSteps) : undefined
+  const stopped = cancelled ? cancellationSummary(events, plannedSteps, workspacePath) : undefined
   const stoppedAt = cancelled
     ? new Date(events.at(-1)?.occurredAt ?? Date.now()).toLocaleTimeString(undefined, {
         hour: '2-digit',

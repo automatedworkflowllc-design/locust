@@ -6,6 +6,31 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.8 - 2026-09-08
+
+- **You can choose the sidebar layout.** Settings now offers Auto, Full and
+  Rail. Auto still follows the window - the compact avatar rail on a small
+  window, the full sidebar on a large one - but you can pin either, at any
+  size. The rail also stopped drawing conversation rows squeezed into four
+  pixels, which is what was causing the stray dots, the sideways scrollbar and
+  the tall empty box around the selected teammate.
+- **An approval no longer yanks the screen.** The approval card used to scroll
+  itself into view whenever it appeared, which was right the first time and
+  wrong every time after - a second approval, or one arriving while you were
+  scrolled up reading an earlier diff, took the page away mid-sentence. The
+  thread now decides, and it only follows if you were already at the bottom.
+- **The effort chip stopped disappearing on Cursor Agent.** After a run
+  resolved the route to a specific model, Locust stopped recognising its own
+  model and the chip vanished. A runtime that does not let you choose an
+  effort now says so, rather than leaving a gap.
+- **Amber means something again.** It marks a card that is waiting on you to
+  press something. The stopped-run summary and the "cannot be resumed" note
+  were wearing it while asking for nothing, so they now sit quietly with the
+  other notes.
+- **A stopped run lists what it finished properly.** It was showing the same
+  file twice - once with its full path, once without - and the folder itself
+  as a long absolute path above three short filenames.
+
 ## 0.43.7 - 2026-09-08
 
 - **Locust works properly in a small window.** The layout meant to appear on a
