@@ -18,7 +18,7 @@
 import './scratch-root.mjs'
 
 import { spawn, execFile } from 'node:child_process'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -64,9 +64,26 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   const out = outPath ?? join(new URL('../docs/user-session/', import.meta.url).pathname.slice(1), `${stamp}-${name}`)
   await mkdir(out, { recursive: true })
   const profile = profilePath ?? await mkdtemp(join(tmpdir(), `locust-drive-${name}-`))
-  if (seed !== undefined && profilePath === undefined) {
-    await mkdir(join(profile, 'mission-ledger'), { recursive: true })
+  if (seed !== undefined) {
+    // The seed used to be skipped whenever a drive supplied its own
+    // `profilePath` -- the two options were written for different reasons and
+    // nobody had used them together. The result was silent: the app launched
+    // with an EMPTY roster and the drive read that as the product's own
+    // behaviour. Two drives on 2026-09-07 lost time to it, one of them
+    // concluding the compact avatar rail was unimplemented when the rail had
+    // simply been given nobody to draw.
+    //
+    // A drive must be able to assert its own premise, so the seed is written
+    // wherever the profile is, and a profile that cannot take it says so
+    // rather than starting a run whose setup is not what the script says.
+    await mkdir(join(profile, 'mission-ledger'), { recursive: true }).catch(() => undefined)
     await writeFile(join(profile, 'teammates.json'), JSON.stringify(seed), 'utf8')
+    const written = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8'))
+    const wanted = seed.teammates?.length ?? 0
+    if ((written.teammates?.length ?? 0) !== wanted) {
+      say(`seed did not land: wanted ${String(wanted)} teammates`)
+      process.exit(1)
+    }
   }
   // Other profile files a drive wants in place BEFORE the app reads them
   // (memories.json, rooms.json, routines.json): written before launch, so

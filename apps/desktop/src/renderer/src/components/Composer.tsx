@@ -22,6 +22,7 @@ import {
 import { ContextRing } from './ContextRing.js'
 import { defaultEffort, modelLabelFor } from '../status.js'
 import { Icon } from './Icon.js'
+import { effortDescription, effortFooter } from '../effortLevels.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 
@@ -680,10 +681,22 @@ export function Composer({
                         >
                           <span className="lc-menu__text">
                             <span className="lc-menu__name lc-control__mono">{level}</span>
+                            {/*
+                              * What the level costs you, where this build can
+                              * honestly say. The levels come from the runtime,
+                              * so an unrecognised one draws no line rather
+                              * than an invented meaning.
+                              */}
+                            {effortDescription(level) !== undefined && (
+                              <span className="lc-menu__desc">{effortDescription(level)}</span>
+                            )}
                           </span>
                           {shownEffort === level && <Icon name="check" size={13} />}
                         </button>
                       ))}
+                      {effortFooter(route.runtime) !== undefined && (
+                        <p className="lc-menu__foot">{effortFooter(route.runtime)}</p>
+                      )}
                     </div>
                   )}
                   <button

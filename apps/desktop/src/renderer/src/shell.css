@@ -3159,7 +3159,20 @@ textarea {
 
 /* --- Compact ----------------------------------------------------------- */
 
-@media (max-width: 1119px) {
+/*
+ * The compact tier.
+ *
+ * This said `max-width: 1119px` and was therefore DEAD: `MIN_WINDOW_WIDTH` is
+ * 1120, so no window the app will open could ever be narrow enough to match it
+ * by one pixel. The rules were measured at 1014px on 2026-09-05, back when a
+ * window could be that small, and were orphaned when the minimum was raised.
+ *
+ * The design pass asks for the compact layout AT 1120x720 -- an avatar rail
+ * instead of the sidebar -- which is exactly the size this could not reach.
+ * The bound is now 1199px: the smallest window the app allows is compact, and
+ * a merely smallish one at 1200+ is not.
+ */
+@media (max-width: 1199px) {
   .lc-sidebar {
     width: var(--lc-sidebar-rail-width);
   }
@@ -3174,7 +3187,11 @@ textarea {
   .lc-sidebar .lc-sectionlabel,
   .lc-search,
   .lc-sidebar__footer button span,
-  .lc-connected,
+  /* Scoped to the sidebar on purpose. A bare `.lc-connected` here loses to
+     the `.lc-connected` block far below this one -- same specificity, later
+     in the file -- so the line came back inside the 64px rail and truncated
+     to "6...". Measured on screen at 1120px, 2026-09-07. */
+  .lc-sidebar .lc-connected,
   /* A sentence in a 68px rail wraps to one word per line and reads as a
      column of fragments -- "No / mis... / yet. / Des... / one". Measured on
      screen at 1014px wide, 2026-09-05. Every other piece of prose in this
@@ -3189,8 +3206,33 @@ textarea {
     width: calc(100% - var(--lc-space-3) * 2);
   }
 
+  /*
+   * The inspector OVERLAYS at this width rather than disappearing.
+   *
+   * It used to be `display: none` here, which meant that at the smallest
+   * window the app will open -- the size the design pass specifies, and the
+   * size a laptop actually is -- the inspector could not be opened at all.
+   * Ctrl I toggled a piece of state nothing drew, and everything reachable
+   * only through it (the signal rail, the receipt, the Artifacts tab) was
+   * unreachable. A control that cannot be reached is worse than one that is
+   * merely cramped.
+   *
+   * So it keeps its width and floats over the workroom, which is what "the
+   * inspector collapses" has to mean on a screen with no room beside it.
+   */
+  /* The overlay needs something to be absolute INSIDE. Only at this width,
+     so nothing about the normal layout changes. */
+  .lc-body {
+    position: relative;
+  }
+
   .lc-inspector {
-    display: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
   }
 
   .lc-thread__column,
@@ -6185,4 +6227,16 @@ textarea {
 
 .lc-ledgerfail__text {
   margin: 0;
+}
+
+/*
+ * The note under the effort menu. Not an item: it explains the list rather
+ * than adding to it, so it is quieter than the rows and has no hover.
+ */
+.lc-menu__foot {
+  margin: 0;
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-hairline);
+  font-size: var(--lc-text-caption);
+  color: var(--lc-text-muted);
 }

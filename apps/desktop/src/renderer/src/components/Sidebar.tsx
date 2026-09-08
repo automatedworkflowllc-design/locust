@@ -19,6 +19,7 @@ import {
 } from '../status.js'
 import { PixelFace } from './PixelFace.js'
 import { Icon } from './Icon.js'
+import { teammateTooltip } from '../teammateTooltip.js'
 import { routineStepLabel } from '../routines.js'
 
 /**
@@ -297,11 +298,17 @@ export function Sidebar({
           const selected = teammate.teammateId === selectedTeammateId
           return (
             <div key={teammate.teammateId} className={`lc-teammate${selected ? ' is-selected' : ''}`}>
+              {/*
+                * The hover says name, role AND model -- not just the name. In
+                * the compact rail all three are drawn as text and the rail
+                * hides text, so an avatar there was a coloured square with no
+                * way to find out whose it was (Colin, 2026-09-07).
+                */}
               <button
                 type="button"
                 className="lc-row lc-row--button"
                 aria-current={selected ? 'true' : undefined}
-                title={`Message ${teammate.name}`}
+                title={teammateTooltip(teammate)}
                 onClick={() => onSelectTeammate(teammate.teammateId)}
                 onContextMenu={(event) => {
                   event.preventDefault()
