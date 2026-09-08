@@ -17,6 +17,7 @@ import {
   modeRunsOn,
   modesFor,
   modeUnavailableReason,
+  modelFamily,
   runtimeIsUsable
 } from '../status.js'
 import { ContextRing } from './ContextRing.js'
@@ -334,8 +335,9 @@ export function Composer({
   // levels under the live route's name -- two models on one chip. The control
   // is disabled during a run, so this is display only and has to agree with
   // the label beside it; when nothing is running the two are the same route.
-  const supportedEfforts =
-    models.find((model) => model.runtime === shownRuntime && model.id === shownModel)?.supportedEfforts ?? []
+  // Through `modelFamily`, not a bare id match: once a run resolves a Cursor
+  // route to a variant, an id match finds no family and the chip vanishes.
+  const supportedEfforts = modelFamily(models, shownRuntime, shownModel)?.supportedEfforts ?? []
   // Swarm means "this model's maximum", and the catalog orders efforts lowest
   // to highest, so the maximum is the last one THIS model reported -- not a
   // fixed name that some models do not have.
@@ -716,6 +718,26 @@ export function Composer({
                     <span className="lc-control__mono lc-control__effort">{shownEffort}</span>
                     <Icon name="chevron-down" size={11} />
                   </button>
+                </span>
+              )}
+              {/*
+                * A model with no levels to choose says so, rather than leaving
+                * a gap where the chip was. Taken from Colin's reference image
+                * (2026-09-07), which reads `effort - fixed`.
+                *
+                * Not a disabled control: there is nothing here to press, so it
+                * is a label. A DISABLED chip would be the dead plus this
+                * composer already removed once -- something that looks like it
+                * should work and never does. This one just states a fact about
+                * the runtime, which is the same fact the route chip beside it
+                * is there to give.
+                */}
+              {shownEffort === undefined && supportedEfforts.length === 0 && (
+                <span
+                  className="lc-control lc-control--boxed is-static"
+                  title="This runtime does not let the effort be chosen; it uses its own."
+                >
+                  <span className="lc-control__mono lc-control__effort">effort · fixed</span>
                 </span>
               )}
               {/*

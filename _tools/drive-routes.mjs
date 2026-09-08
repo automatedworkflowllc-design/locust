@@ -26,7 +26,7 @@ const drive = await startDrive({
   }
 })
 
-const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message ${name}').click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
+const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
 const askMode = `(async () => {
   const mode = document.querySelector('button[aria-label="Permission mode"], button[title="Permission mode"]')
   if (!mode) return 'no mode control'

@@ -138,7 +138,7 @@ try {
     // the drive standing in the wrong room.
     // The Missions LIST has no composer either -- it is a list. The composer
     // lives where a person writes to a teammate.
-    ;[...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click()
+    ;[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
     await new Promise(r => setTimeout(r, 1200))
     const field = document.querySelector('form.command-dock textarea')
     const placeholder = field?.getAttribute('placeholder') ?? 'no composer'

@@ -96,7 +96,7 @@ try {
   await drive.capture('Antigravity / flash, Accept edits', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title') === 'Message Gem')
+      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Gem'))
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 1000))
     })()`)

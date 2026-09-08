@@ -52,7 +52,28 @@ export async function scratchRepository(prefix = 'locust-drive-ws-') {
  * and the first-launch screen). `env` is merged over the process
  * environment. `keep` leaves the profile and workspace on disk afterwards.
  */
-export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0 }) {
+/**
+ * Drives that spend a PAID account, and therefore do not run by default.
+ *
+ * Colin, 2026-09-08: "u r why we have zero codex usage, why we cn run zero
+ * tests on astra -- cause ur asking it to say pineapple." He is right. These
+ * drives run on `codex / account-default`, which is his own Codex quota, and
+ * they were being run dozens of times a night on one-word prompts to check a
+ * button. The quota that paid for it was the quota an outside QA pass needed.
+ *
+ * A drive that spends real money is now opt-in: set LOCUST_SPEND=1 to allow
+ * it. Everything else must run on a free model. This is a gate rather than a
+ * note in a comment because a note does not stop anything.
+ */
+export function assertMaySpend(name) {
+  if (process.env.LOCUST_SPEND === '1') return
+  say(`refusing to run "${name}": it spends a paid account.`)
+  say('This drive uses a real account quota. Re-run with LOCUST_SPEND=1 if you mean to spend it.')
+  process.exit(1)
+}
+
+export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false }) {
+  if (spends) assertMaySpend(name)
   try {
     const already = await fetch(`http://127.0.0.1:${String(port)}/json/list`, { signal: AbortSignal.timeout(1500) })
     if (already.ok) { say(`something is already debugging on port ${String(port)}`); process.exit(1) }

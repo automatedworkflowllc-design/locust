@@ -1083,6 +1083,31 @@ export function effortIsInModelId(
   )
 }
 
+/**
+ * The catalogue row a model id belongs to -- by its own id, or by being one of
+ * that family's effort variants.
+ *
+ * Two places needed this and each had written `find(m => m.id === modelId)`,
+ * which is wrong for exactly the same reason in both: a Cursor family never
+ * listed without an effort takes the FIRST VARIANT SEEN as its id, so the id
+ * in hand is routinely a sibling of the family's own. In `startRoute` that
+ * sent a loose effort to a runtime that refuses one (Colin, 2026-09-07). In
+ * the composer it meant no family matched, `supportedEfforts` came back empty,
+ * and the effort chip silently disappeared -- which is why the control count
+ * moved between three and four across otherwise identical drives.
+ */
+export function modelFamily(
+  models: readonly PublicModel[],
+  runtime: string,
+  modelId: string
+): PublicModel | undefined {
+  return models.find(
+    (entry) =>
+      entry.runtime === runtime &&
+      (entry.id === modelId || Object.values(entry.variants ?? {}).includes(modelId))
+  )
+}
+
 export function startRoute(
   models: readonly PublicModel[],
   runtime: MissionRuntimeId,
@@ -1103,11 +1128,7 @@ export function startRoute(
   //
   // Looking the family up through its variants as well makes the two paths
   // agree, and re-resolves the id to the variant the effort actually names.
-  const model = models.find(
-    (entry) =>
-      entry.runtime === runtime &&
-      (entry.id === modelId || Object.values(entry.variants ?? {}).includes(modelId))
-  )
+  const model = modelFamily(models, runtime, modelId)
   const variant = model?.variants?.[effort]
   if (variant !== undefined) return { model: variant }
   // A model with variants and no variant for this effort: the effort names

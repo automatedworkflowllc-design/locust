@@ -26,7 +26,7 @@ const drive = await startDrive({
 try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('start a slow task on the free model', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren').click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
     return drive.evaluate(sendAndWaitScript('Read README.md and LOCUST.md. Then write a numbered list of 40 distinct one-sentence ideas for improving this scratch project, each idea on its own line, thinking carefully about each. Do not edit any files.', { settle: false }))
   })
   await drive.capture('the run is live; the picker warns that switching stops it', () => drive.evaluate(`(async () => {

@@ -38,7 +38,7 @@ try {
   await drive.capture('at rest, with an empty box', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title') === 'Message Wren')
+      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 1000))
     })()`)

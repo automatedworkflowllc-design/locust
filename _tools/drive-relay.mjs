@@ -35,7 +35,7 @@ try {
     // what the relay said even when the screen shows nothing.
     window.__updates = []
     window.desktop.onCodexMissionUpdate(u => { if (u.kind !== 'event') window.__updates.push({ kind: u.kind, message: u.message, teammateId: u.teammateId, startedBy: u.startedBy, phase: u.phase }) })
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
+    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
     who.click()
     await new Promise(r => setTimeout(r, 500))
     const field = document.querySelector('form.command-dock textarea')

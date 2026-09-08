@@ -24,8 +24,10 @@ export function CancellationCard({
   const nothingHappened =
     summary.settled.length === 0 && summary.interrupted.length === 0 && summary.neverStarted === 0
 
+  // Standing, not amber: this reports a run that already stopped and asks for
+  // nothing. Amber is reserved for a card that holds a control.
   return (
-    <div className="lc-card is-terminal is-amber">
+    <div className="lc-card is-standing">
       <div className="lc-card__head">
         <span className="lc-approval__title">
           You stopped this run{stoppedAt === undefined ? '' : ` at ${stoppedAt}`}

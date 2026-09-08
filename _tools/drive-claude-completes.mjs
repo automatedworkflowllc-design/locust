@@ -30,7 +30,7 @@ try {
   await drive.capture('Wren on Claude Code / sonnet', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click()
+      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
       await new Promise(r => setTimeout(r, 700))
     })()`)
     return drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))

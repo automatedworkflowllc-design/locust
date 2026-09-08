@@ -35,7 +35,7 @@ const drive = await startDrive({
   }
 })
 
-const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message ${name}').click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
+const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
 
 try {
   await drive.capture('launch', () => drive.ready())

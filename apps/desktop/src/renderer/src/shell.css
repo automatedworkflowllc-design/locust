@@ -6291,3 +6291,51 @@ textarea {
 .lc-shell.is-compact .lc-row--mission {
   display: none;
 }
+
+/* --- The three registers ------------------------------------------------
+ *
+ * The design review's central complaint about the thread: it "read as a feed
+ * of unrelated widgets, and nothing tells you which ones want something from
+ * you." Nineteen visual species, and the colour that should have answered that
+ * question did not, because it was being used for two different jobs.
+ *
+ * The rule, stated once and enforced by the classes below:
+ *
+ *   PENDING (amber)  - this is waiting for you. It has a control in it.
+ *   TERMINAL (red)   - the run could not continue. Nothing to press.
+ *   STANDING (quiet) - a fact about what happened. Nothing to press.
+ *
+ * Amber was on cards that ask for nothing: the cancellation summary, which is
+ * a report about a run that already stopped, and the "cannot be resumed" note,
+ * which explains rather than offers. Both sat in the same colour as an
+ * approval holding a run open and waiting for a click, so the one colour that
+ * should mean "act" meant "look at me" as well -- which is how a person learns
+ * to stop looking.
+ *
+ * Standing is drawn as a left border rather than a filled, bordered box: the
+ * review asks for exactly that for the notes that merely stand, and a box is
+ * what makes an unrelated widget out of a sentence.
+ */
+.lc-card.is-standing {
+  border: 0;
+  border-left: 2px solid var(--lc-border-strong);
+  border-radius: 0;
+  background: transparent;
+  padding-left: var(--lc-space-5);
+}
+
+.lc-card.is-standing .lc-card__head {
+  color: var(--lc-text-secondary);
+}
+
+/* A chip that states something rather than doing something. No hover, no
+   pointer: it is a label wearing the control's shape so the row stays even. */
+.lc-control.is-static {
+  cursor: default;
+  color: var(--lc-text-muted);
+}
+
+.lc-control.is-static:hover {
+  background: transparent;
+  border-color: var(--lc-border-control);
+}

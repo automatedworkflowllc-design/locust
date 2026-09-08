@@ -131,7 +131,7 @@ try {
 
   say('3. Wren is asked to quote the code-word line -- only the brief carries it')
   const finished = await evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
+    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
     who.click()
     await new Promise(r => setTimeout(r, 400))
     const field = document.querySelector('form.command-dock textarea')

@@ -56,7 +56,7 @@ const drive = await startDrive({
 
 const startFor = async (name) => {
   await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message ${name}').click()
+    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click()
     await new Promise(r => setTimeout(r, 350))
   })()`)
   await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))

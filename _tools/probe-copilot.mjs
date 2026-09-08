@@ -186,7 +186,7 @@ try {
 
   // Select the teammate so the mission is composed as theirs.
   const chosen = await evaluate(`(async () => {
-    const button = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
+    const button = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
     if (!button) return 'no teammate button'
     button.click()
     await new Promise(r => setTimeout(r, 500))

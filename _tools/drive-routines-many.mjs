@@ -47,7 +47,7 @@ const drive = await startDrive({
 /** One conversation for a teammate, on its own route. */
 const converse = async (member) => {
   await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message ${member.name}')?.click()
+    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${member.name}'))?.click()
     await new Promise(r => setTimeout(r, 700))
   })()`)
   await drive.evaluate(pickRouteScript({ group: member.group, search: member.search, row: member.row }))

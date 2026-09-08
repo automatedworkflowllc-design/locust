@@ -35,7 +35,7 @@ let handoff
 try {
   await drive.capture('launch, and a run started but not waited for', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren').click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
     // `settle: false` returns as soon as it is sent; the point is to be mid-run.
     await drive.evaluate(sendAndWaitScript('Count slowly from 1 to 40, one number per line, then say done.', { settle: false }))
@@ -92,7 +92,7 @@ try {
   })()`))
 
   await drive.capture('and the profile still works: a fresh run on it', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
     await drive.evaluate(sendAndWaitScript('Reply with the single word RECOVERED.', { waitSeconds: 240 }))
     return drive.evaluate(`(document.querySelector('.lc-thread')?.innerText.replace(/[ \\t\\n]+/g, ' ').slice(-160) ?? '')`)
   })

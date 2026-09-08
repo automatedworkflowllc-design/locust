@@ -15,6 +15,7 @@ import { say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-approval-ws-')
 const drive = await startDrive({
+  spends: true,
   name: 'approval',
   port: 9294,
   workspace,
@@ -29,7 +30,7 @@ const drive = await startDrive({
 try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('pick Wren: the composer shows Approve each action on Codex', () => drive.evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
+    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
     who.click()
     await new Promise(r => setTimeout(r, 500))
     return [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' · ')

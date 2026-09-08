@@ -103,7 +103,7 @@ try {
 
   await drive.capture('and a message runs on what the button installed', async () => {
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click()
+      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
       await new Promise(r => setTimeout(r, 1200))
     })()`)
     await drive.evaluate(sendAndWaitScript('Reply with exactly the word INSTALLED and nothing else.', { waitSeconds: 300 }))

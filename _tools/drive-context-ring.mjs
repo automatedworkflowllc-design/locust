@@ -64,7 +64,7 @@ try {
   await drive.capture('before any run, on the starting route', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title') === 'Message Wren')
+      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 1000))
     })()`)

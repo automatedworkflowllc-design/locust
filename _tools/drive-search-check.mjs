@@ -68,7 +68,7 @@ const searchReport = (needle) => `(async () => {
 })()`
 
 const OPEN_PICKER = `(async () => {
-  const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title') === 'Message Wren')
+  const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
   if (open) open.click()
   await new Promise((r) => setTimeout(r, 900))
   const control = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')

@@ -62,7 +62,7 @@ try {
     // One short run so there is a real conversation to right-click. The free
     // model, so this costs nothing.
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click()
+      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
       await new Promise(r => setTimeout(r, 500))
     })()`)
     const { pickRouteScript, sendAndWaitScript } = await import('./drive-lib.mjs')
@@ -117,7 +117,7 @@ try {
   await drive.capture('right-click WHILE a run is going', async () => {
     const { pickRouteScript } = await import('./drive-lib.mjs')
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click()
+      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
       await new Promise(r => setTimeout(r, 600))
     })()`)
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))

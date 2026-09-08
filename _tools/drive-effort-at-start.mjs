@@ -16,6 +16,7 @@ import { say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-effort-start-ws-')
 const drive = await startDrive({
+  spends: true,
   name: 'effort-at-start',
   port: 9338,
   workspace,
@@ -29,7 +30,7 @@ const drive = await startDrive({
 
 const WATCH = `(async () => {
   const flat = (el) => el.innerText.split(/\s+/).join(' ').trim()
-  const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title') === 'Message Wren')
+  const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
   if (open) open.click()
   await new Promise((r) => setTimeout(r, 400))
   const seen = []

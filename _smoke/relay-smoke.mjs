@@ -163,7 +163,7 @@ try {
     // 2026-09-04 asked for the button in that beat and got nothing.
     let booty
     for (let attempt = 0; attempt < 40 && !booty; attempt += 1) {
-      booty = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Booty')
+      booty = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Booty'))
       if (!booty) await new Promise(r => setTimeout(r, 250))
     }
     if (!booty) return JSON.stringify({ booty: false })
@@ -221,7 +221,7 @@ try {
 
   say('2. message Wren on Cursor / Composer 2.5, Accept edits')
   const setup = await cdp.eval(`(async () => {
-    const wren = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
+    const wren = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
     if (!wren) return JSON.stringify({ wren: false })
     wren.click()
     await new Promise(r => setTimeout(r, 400))

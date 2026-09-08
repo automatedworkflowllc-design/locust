@@ -74,7 +74,7 @@ const modeMenuScript = `(async () => {
 try {
   await drive.capture('launch: Auto is in the menu even with the workspace switch off', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren').click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))
     return route + ' || ' + (await drive.evaluate(modeMenuScript))
   })
@@ -111,7 +111,7 @@ try {
     await drive.evaluate(`(async () => {
       document.querySelector('button[title="All missions (Ctrl 1)"]')?.click()
       await new Promise(r => setTimeout(r, 500))
-      ;[...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Vale').click()
+      ;[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Vale')).click()
       await new Promise(r => setTimeout(r, 900))
     })()`)
     await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))

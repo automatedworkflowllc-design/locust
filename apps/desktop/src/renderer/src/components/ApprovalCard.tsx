@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
@@ -45,19 +44,26 @@ export function ApprovalCard({
   // A card that waits on the person is brought into view when it appears.
   // Its buttons sat below the fold while the run said "waiting on you"
   // (seen driving the app, 2026-09-05).
-  const root = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    // Once on mount and once more a moment later: the diff arrives with the
-    // card but lays out after it, and a scroll taken before that left the
-    // buttons under the composer (the 21:12 drive). 'end', not 'nearest':
-    // the card is taller than the space below the message it follows.
-    const bring = (): void => root.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
-    bring()
-    const again = window.setTimeout(bring, 300)
-    return () => window.clearTimeout(again)
-  }, [])
+  /*
+   * This card no longer scrolls itself into view, and the thread does it.
+   *
+   * It used to call `scrollIntoView` on mount and again 300ms later, which
+   * fixed a real defect -- its buttons sat under the composer while the run
+   * said "waiting on you" (drive, 2026-09-05). But it moved the viewport
+   * UNCONDITIONALLY, so a second approval in one run, or one arriving while
+   * the person was scrolled up reading an earlier diff, took the screen away
+   * mid-sentence. Flagged by the design agent, 2026-09-08.
+   *
+   * Guarding it with "only if they are at the bottom" does not work here
+   * either: the card itself adds the height, so by the time this effect runs
+   * the answer is always no. The thread's own follow (`stickToBottom.ts`)
+   * remembers where the person was BEFORE the content grew, which is the only
+   * place that question can be answered honestly -- and it scrolls to the very
+   * bottom, so the buttons are in view for exactly the case the original fix
+   * was for. One mechanism, in the one place that has the facts.
+   */
   return (
-    <div ref={root} className="lc-card is-pending is-amber" role="group" aria-label="Approval required">
+    <div className="lc-card is-pending is-amber" role="group" aria-label="Approval required">
       <div className="lc-card__head">
         <span className="lc-approval__title">
           <Icon name="shield" size={13} />{' '}

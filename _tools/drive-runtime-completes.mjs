@@ -30,7 +30,7 @@ try {
   await drive.capture(`Wren on ${process.argv[2]} / ${process.argv[3]}`, async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click()
+      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
       await new Promise(r => setTimeout(r, 700))
     })()`)
     return drive.evaluate(pickRouteScript({ group: '/' + process.argv[2] + '/i', search: process.argv[3], row: '/^' + process.argv[4] + '/i' }))

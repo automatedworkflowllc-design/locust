@@ -155,7 +155,7 @@ try {
     if (!create || create.disabled) return 'create disabled'
     create.click()
     await new Promise(r => setTimeout(r, 600))
-    const juno = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Juno')
+    const juno = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Juno'))
     if (!juno) return 'no teammate row'
     juno.click()
     await new Promise(r => setTimeout(r, 400))

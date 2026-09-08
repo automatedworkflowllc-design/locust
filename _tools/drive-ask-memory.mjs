@@ -25,7 +25,7 @@ const drive = await startDrive({
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'ask' }
   }
 })
-const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message ${name}').click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
+const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
 
 try {
   await drive.capture('launch, mode Ask me first', () => drive.ready())

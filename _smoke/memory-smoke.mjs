@@ -169,7 +169,7 @@ try {
   check('the logo goes home', (await evaluate(`!!document.querySelector('.lc-runtimepanel')`)) === true)
 
   const ask = async (name, text) => evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message ${name}')
+    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}'))
     if (!who) return 'no teammate row'
     who.click()
     await new Promise(r => setTimeout(r, 400))

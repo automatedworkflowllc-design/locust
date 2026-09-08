@@ -95,7 +95,7 @@ try {
 
   say('2. Wren on Codex, approve-each, is asked to create a file')
   const mode = await evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')
+    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
     who.click()
     await new Promise(r => setTimeout(r, 500))
     const control = document.querySelector('button[title="Permission mode"]')

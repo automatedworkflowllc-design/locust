@@ -40,7 +40,7 @@ let handoff
 try {
   await drive.capture('a plan run, finished', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren').click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))
     const mode = await drive.evaluate(`(async () => {
       const control = [...document.querySelectorAll('.lc-control')].find(b => /Ask|Accept edits|Plan|Approve|Auto/.test(b.innerText))

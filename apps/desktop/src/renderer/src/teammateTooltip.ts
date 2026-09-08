@@ -22,7 +22,11 @@ export function teammateTooltip(teammate: {
   readonly role: string
   readonly route?: { readonly runtime: string; readonly model: string }
 }): string {
-  const parts = [teammate.name, teammate.role]
+  // Leads with the ACTION, then who they are. The hover has to answer both
+  // "what happens if I click this" and "whose avatar is this" -- the second
+  // only became urgent with the compact rail, where the name is not drawn at
+  // all, and the first was the only thing it used to say.
+  const parts = [`Message ${teammate.name}`, teammate.role]
   if (teammate.route !== undefined) {
     // A runtime id this build does not know reads as itself rather than
     // being forced through a lookup that would refuse it.

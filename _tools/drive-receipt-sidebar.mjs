@@ -31,7 +31,7 @@ let handoff
 try {
   await drive.capture('one run, so there is something to restore', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
     await drive.evaluate(sendAndWaitScript('Reply with exactly the word KEPT and nothing else.', { waitSeconds: 300 }))
     return 'ran'

@@ -28,10 +28,12 @@ export function ResumeCard({
   if (offer === undefined) return null
 
   if (offer.kind === 'refused') {
-    // Amber, not red: nothing failed here. The mission stopped and the app is
-    // declining to guess, which is the behaviour, not an error.
+    // Standing, not amber and not red. Nothing failed -- the mission stopped
+    // and the app is declining to guess, which is the behaviour. And nothing
+    // is being asked: this branch has no button, so wearing the colour that
+    // means "waiting for you" made it compete with cards that were.
     return (
-      <div className="lc-card is-pending is-amber" role="group" aria-label="This mission cannot be resumed">
+      <div className="lc-card is-standing" role="group" aria-label="This mission cannot be resumed">
         <div className="lc-card__head">
           <span>Cannot be resumed from here</span>
         </div>

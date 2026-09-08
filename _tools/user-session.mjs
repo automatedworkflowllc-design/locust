@@ -152,7 +152,7 @@ try {
   })()`))
 
   await capture('pick Nova and choose the free OpenCode route', () => evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Nova')
+    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Nova'))
     if (!who) return 'no Nova row'
     who.click()
     await new Promise(r => setTimeout(r, 400))

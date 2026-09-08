@@ -29,7 +29,7 @@ const drive = await startDrive({
 try {
   await drive.capture('the controls row, counted', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message Wren')?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
     return drive.evaluate(`(() => {
       const row = document.querySelector('.lc-composer__controls')
       const controls = [...(row?.querySelectorAll('button') ?? [])]

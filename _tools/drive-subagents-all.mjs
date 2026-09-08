@@ -30,7 +30,7 @@ const drive = await startDrive({
   }
 })
 const ASK = 'Use a subagent (a helper agent, if your tools offer one) to count the lines in README.md and report the number to you. Then reply with one sentence giving that number. If you have no way to start a subagent, say so in one sentence and count the lines yourself. Do not edit anything.'
-const pick = (name) => `(async () => { document.querySelector('.lc-brand__lockup').click(); await new Promise(r => setTimeout(r, 300)); [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Message ${name}').click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
+const pick = (name) => `(async () => { document.querySelector('.lc-brand__lockup').click(); await new Promise(r => setTimeout(r, 300)); [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
 const watch = (name) => `(async () => {
   const seen = []
   for (let i = 0; i < 480; i += 1) {
