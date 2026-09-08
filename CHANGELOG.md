@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.49.0 - 2026-09-08
+
+- **A multi-step routine no longer disappears when Locust closes.** Quitting
+  during step 2 meant the remaining steps simply never ran, with nothing on
+  screen to say so - and because the run was counted the moment step 1
+  *started*, a half-finished hourly routine then waited out its whole interval
+  before trying again. Progress is now written down as it goes, and a run only
+  counts when its last step genuinely finished.
+- **After an interruption, the routine waits for you rather than guessing.**
+  Its card says which step it stopped on, when, and whether that step actually
+  completed - and if Locust closed before it could tell, it says that too and
+  replays nothing. You choose to continue or abandon. Nothing restarts by
+  itself, because a step that has already sent an email or opened a PR should
+  not quietly do it twice.
+- **Work you have already read stays on screen.** Sending a follow-up used to
+  fold away the previous turn's thinking and tool calls, closing something you
+  were looking at. Finished turns keep their work now; closing one yourself
+  still sticks.
+- Every routine card said its step count twice.
+
 ## 0.48.0 - 2026-09-08
 
 - **An attached image now looks like the image.** Attaching a screenshot showed
