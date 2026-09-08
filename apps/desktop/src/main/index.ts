@@ -1302,7 +1302,29 @@ if (!ownsSingleInstanceLock) {
       try {
         return await teammates.writeSettings(settings)
       } catch {
-        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, layout: 'auto' } as const
+        /*
+         * The write failed, so answer with what is ACTUALLY STORED.
+         *
+         * This used to return hardcoded defaults, which is worse than
+         * unhelpful: the renderer sets its switches from whatever comes back,
+         * so a failed write told it relay was ON and Auto was OFF regardless
+         * of the file on disk. Someone running with relay off would watch it
+         * appear to switch itself on, and then switch back at the next launch
+         * when the real file was read again.
+         *
+         * The settings on disk are the truth whether or not this write landed.
+         * If even reading them fails the defaults are all that is left, and
+         * that is the one case where inventing them is the honest answer --
+         * there is nothing else to say.
+         */
+        return await teammates.readSettings().catch(() => ({
+          swarm: false,
+          relay: true,
+          relayHopCap: DEFAULT_RELAY_HOP_CAP,
+          memoryMode: DEFAULT_MEMORY_MODE,
+          autoMode: false,
+          layout: 'auto'
+        } as const))
       }
     })
 

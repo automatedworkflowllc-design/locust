@@ -538,3 +538,44 @@ describe('a fileChange item carries its change into the activity row', () => {
     expect(out[2]).toBe(message)
   })
 })
+
+describe('when the CLOSING receipt cannot be written', () => {
+  it('says so, rather than letting the mission look interrupted later', async () => {
+    /*
+     * Smaller than the live-run case and it lies about a different thing: the
+     * run is ending either way, but a mission whose terminal record never
+     * lands is recovered on the next launch as INTERRUPTED -- when what
+     * actually happened is that the person stopped it deliberately.
+     *
+     * `codex-mission.ts` has always reported this on its own stop path. This
+     * one discarded it, one function away from the defect fixed in 0.51.0.
+     */
+    let failWrites = false
+    const harness = service({
+      ledger: fakeLedger({
+        appendEvents: async () => {
+          if (failWrites) throw new Error('no space left on device')
+        }
+      })
+    })
+    const started = await harness.instance.start('Do work.')
+    failWrites = true
+    harness.instance.cancel(started.runId)
+
+    await vi.waitFor(() => {
+      expect(
+        harness.updates.some((update) => (update as { kind?: string }).kind === 'persistence-error')
+      ).toBe(true)
+    })
+  })
+
+  it('says nothing when the closing receipt lands, which is the ordinary case', async () => {
+    // The control: without it this would pass against a service that reported
+    // a persistence error on every cancellation.
+    const harness = service()
+    const started = await harness.instance.start('Do work.')
+    harness.instance.cancel(started.runId)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(harness.updates.some((update) => (update as { kind?: string }).kind === 'persistence-error')).toBe(false)
+  })
+})

@@ -275,7 +275,28 @@ export function createAppServerMissionService(
     if (runs.get(run.runId) !== run) return
     runs.delete(run.runId)
     const produced = run.normalizer.finish(reason)
-    void persistAndEmit(run, produced).catch(() => undefined)
+    /*
+     * The TERMINAL receipt. Losing it quietly is a smaller version of the
+     * defect fixed above, and it lies about history rather than about the
+     * present: a mission whose closing record never lands is recovered on the
+     * next launch as INTERRUPTED, when what actually happened is that the
+     * person stopped it on purpose.
+     *
+     * The run is already ending, so there is nothing to hold back -- the only
+     * thing missing was saying so. `codex-mission.ts` has always said it on
+     * this path; this one did not.
+     */
+    void persistAndEmit(run, produced).catch(() => {
+      options.emitUpdate?.({
+        kind: 'persistence-error',
+        runId: run.runId,
+        missionId: run.missionId,
+        error: {
+          code: 'MISSION_PERSISTENCE_FAILED',
+          message: 'The mission stopped, but its closing record could not be written to the durable local ledger.'
+        }
+      })
+    })
     // Never leave a person staring at a card nothing will answer.
     releaseApprovals(run.runId)
     run.client?.dispose(why)
