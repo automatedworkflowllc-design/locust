@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.52.0 - 2026-09-08
+
+- **You can see what a command printed.** A teammate would run something, tell
+  you it had printed 1,200 lines, and the row showed the command, the word
+  "done", and nothing else - the output had been captured and then thrown away
+  before it reached the screen. Command rows open now, showing the start and
+  the end of the output with a note saying how much of the middle was left out.
+  The end matters as much as the start: an error is usually the last line.
+- Rows still stay closed where the runtime reported no output, rather than
+  offering to open onto nothing.
+
 ## 0.51.1 - 2026-09-08
 
 - **The same receipt failure on Antigravity missions.** Fixing this in "Approve
