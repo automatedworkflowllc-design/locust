@@ -700,6 +700,23 @@ export function Composer({
                         <span className="lc-fieldlabel lc-mono">Effort</span>
                         <span className="lc-effortpanel__now lc-control__mono">{effortBase}</span>
                       </div>
+                      {/*
+                        * The stops are DRAWN, one dot per level, so the scale
+                        * shows how many choices there are and which one this
+                        * is without dragging it (Colin, 2026-09-08: "where you
+                        * can see the notches brother"). The dots sit behind a
+                        * real range input, which keeps the keyboard and screen
+                        * reader behaviour a hand-built track would lose.
+                        */}
+                      <span className="lc-effortpanel__scale">
+                        <span className="lc-effortpanel__notches" aria-hidden="true">
+                          {effortBases.map((base, index) => (
+                            <span
+                              key={base}
+                              className={`lc-effortpanel__notch${index <= effortIndex ? ' is-passed' : ''}`}
+                            />
+                          ))}
+                        </span>
                       <input
                         className="lc-effortpanel__slider"
                         type="range"
@@ -717,6 +734,7 @@ export function Composer({
                           if (level !== undefined) onEffortChange(level)
                         }}
                       />
+                      </span>
                       <div className="lc-effortpanel__ends lc-mono">
                         <span>Faster</span>
                         <span>Smarter</span>

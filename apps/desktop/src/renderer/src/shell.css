@@ -6400,11 +6400,85 @@ textarea {
   color: var(--lc-text-primary);
 }
 
+/*
+ * The scale: drawn stops, with a real range input on top.
+ *
+ * One dot per level, so you can see how many choices there are and which one
+ * this is without dragging it (Colin, 2026-09-08: "where you can see the
+ * notches brother"). The input keeps its own keyboard and screen-reader
+ * behaviour -- a hand-built track would throw both away -- so its track is made
+ * invisible and the dots show through from behind.
+ */
+.lc-effortpanel__scale {
+  position: relative;
+  display: block;
+  height: 20px;
+}
+
+.lc-effortpanel__notches {
+  position: absolute;
+  inset: 0 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+/* The rail the dots sit on. */
+.lc-effortpanel__notches::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--lc-border-button);
+}
+
+.lc-effortpanel__notch {
+  position: relative;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--lc-text-muted);
+}
+
+/* Everything up to and including the current level reads as chosen. */
+.lc-effortpanel__notch.is-passed {
+  background: var(--lc-text-primary);
+}
+
 .lc-effortpanel__slider {
+  position: relative;
+  z-index: 1;
   width: 100%;
+  height: 20px;
   margin: 0;
-  accent-color: var(--lc-lime);
+  background: transparent;
+  appearance: none;
   cursor: pointer;
+}
+
+.lc-effortpanel__slider::-webkit-slider-runnable-track {
+  height: 20px;
+  background: transparent;
+}
+
+.lc-effortpanel__slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lc-text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.lc-effortpanel__slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
 }
 
 .lc-effortpanel__slider:disabled {
