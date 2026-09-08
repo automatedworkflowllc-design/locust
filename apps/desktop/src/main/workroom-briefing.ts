@@ -189,10 +189,44 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
   }
 
   let prompt = assemble()
-  while (prompt.length > MAX_RUNTIME_PROMPT_LENGTH && delivered.length > 0) {
-    delivered = delivered.slice(0, -1)
-    remaining += 1
-    prompt = assemble()
+  if (prompt.length > MAX_RUNTIME_PROMPT_LENGTH) {
+    /*
+     * Only drop messages while dropping them can actually help.
+     *
+     * This loop used to shed inbound peer messages one at a time until the
+     * prompt fit OR the list was empty -- and when the person's own text is
+     * already over the cap by itself, "or the list was empty" is what happens
+     * every time. Every waiting message was thrown to a later mission, the
+     * prompt was still over the cap, and it was sent anyway: the messages were
+     * sacrificed for nothing.
+     *
+     * A routine step makes that reachable by hand. `MAX_STEP_LENGTH` is 20,000
+     * and this cap is 12,000, so a step the dialog accepts can evict a
+     * teammate's entire inbox on the way out (verified 2026-09-08 from a
+     * report by a Cursor teammate reading this source).
+     *
+     * So the floor is measured first. If the prompt without any messages is
+     * still too long, the messages stay -- they were not the problem and
+     * losing them would not have fixed it.
+     */
+    const held = delivered
+    const heldRemaining = remaining
+    delivered = []
+    const floor = assemble()
+    if (floor.length > MAX_RUNTIME_PROMPT_LENGTH) {
+      delivered = held
+      remaining = heldRemaining
+      prompt = assemble()
+    } else {
+      delivered = held
+      remaining = heldRemaining
+      prompt = assemble()
+      while (prompt.length > MAX_RUNTIME_PROMPT_LENGTH && delivered.length > 0) {
+        delivered = delivered.slice(0, -1)
+        remaining += 1
+        prompt = assemble()
+      }
+    }
   }
   return { prompt, delivered }
 }

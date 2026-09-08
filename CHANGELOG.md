@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.45.3 - 2026-09-08
+
+- **A routine that asks you something now waits for the answer.** A step that
+  ended by asking a question counted as finished, so the next step started
+  immediately - and your answer was then refused because the teammate was
+  already busy with it. The routine stops at that step and says so.
+- **A busy workspace no longer looks like a broken one.** When four missions
+  were already running, a scheduled routine treated the refusal like a
+  signed-out CLI and waited an hour for a slot that often frees in a minute.
+  It now waits for the next minute, like it does when the teammate is busy.
+- **A long routine step no longer throws away waiting messages for nothing.**
+  A step long enough to exceed what can be sent would drop every message
+  waiting for that teammate trying to make room, then send anyway - losing the
+  messages and fixing nothing.
+
 ## 0.45.2 - 2026-09-08
 
 - **What a teammate did stays on screen after it finishes.** While a run is

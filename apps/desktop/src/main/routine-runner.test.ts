@@ -27,6 +27,8 @@ interface Harness {
   readonly updates: CodexMissionUpdate[]
   readonly phases: Map<string, 'completed' | 'failed' | 'cancelled' | 'interrupted'>
   readonly runs: string[]
+  /** Missions whose final message carried a decision block. */
+  readonly asked: Set<string>
   readonly options: RoutineRunnerOptions
 }
 
@@ -38,6 +40,8 @@ function harness(input: {
   const starts: Harness['starts'] = []
   const updates: CodexMissionUpdate[] = []
   const phases = new Map<string, 'completed' | 'failed' | 'cancelled' | 'interrupted'>()
+  /** Missions whose final message carried a decision block. */
+  const asked = new Set<string>()
   const runs: string[] = []
   let counter = 0
   const held = new Map((input.routines ?? [routine()]).map((entry) => [entry.routineId, entry]))
@@ -69,11 +73,12 @@ function harness(input: {
     },
     assignOwner: async () => undefined,
     phaseOf: async (missionId) => phases.get(missionId),
+    askedAQuestion: async (missionId) => asked.has(missionId),
     notify: (update) => {
       updates.push(update)
     }
   }
-  return { starts, updates, phases, runs, options }
+  return { starts, updates, phases, runs, asked, options }
 }
 
 const notices = (h: Harness): string[] =>
@@ -337,4 +342,38 @@ describe('a routine that runs on its own', () => {
       await h.tick(new Date(NOON.getTime() + 60_000))
       expect(h.updates.filter((update) => update.kind === 'routine-blocked')).toHaveLength(1)
     })
+})
+
+describe('a routine step that ends by asking something', () => {
+  it('stops there instead of starting the next step', async () => {
+    /*
+     * A turn that ends on a decision block completes normally -- exit 0, a
+     * receipt, phase 'completed' -- so the runner read it as success and began
+     * step 2. The person's answer then reached a teammate already working and
+     * was refused as RUN_ALREADY_ACTIVE, so the routine carried on without the
+     * answer it had asked for. Verified 2026-09-08 from a Cursor teammate's
+     * read of this source.
+     */
+    const h = harness()
+    const runner = createRoutineRunner(h.options)
+    await runner.run('rt_1')
+    h.phases.set('mission_1', 'completed')
+    h.asked.add('mission_1')
+    await runner.onRunEnded({ missionId: 'mission_1' })
+    // Step 2 never started, and the routine is no longer holding the teammate.
+    expect(h.starts).toHaveLength(1)
+    expect(runner.running()).toHaveLength(0)
+    expect(notices(h).join(' ')).toMatch(/asked you something/i)
+  })
+
+  it('still advances when the step asked nothing', async () => {
+    // The control. A runner that stopped on every completed step would never
+    // finish a routine at all.
+    const h = harness()
+    const runner = createRoutineRunner(h.options)
+    await runner.run('rt_1')
+    h.phases.set('mission_1', 'completed')
+    await runner.onRunEnded({ missionId: 'mission_1' })
+    expect(h.starts).toHaveLength(2)
+  })
 })

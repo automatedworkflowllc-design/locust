@@ -85,6 +85,45 @@ describe('the runtime prompt a teammate is sent', () => {
     expect(prompt).toContain('(3 more are waiting and will be delivered to a later mission.)')
   })
 
+  it('keeps waiting messages when dropping them cannot help', () => {
+    /*
+     * THE case a routine step makes reachable by hand. `MAX_STEP_LENGTH` is
+     * 20,000 and the prompt cap is 12,000, so a step the edit dialog accepts
+     * can be over the cap on its own.
+     *
+     * The eviction loop used to shed messages until the prompt fit OR the list
+     * was empty -- and with an over-long prompt it is always the second. Every
+     * waiting message was pushed to a later mission, the prompt was still too
+     * long, and it was sent anyway: sacrificed for nothing. Verified
+     * 2026-09-08 from a Cursor teammate's read of this source.
+     */
+    const { prompt, delivered } = composeRuntimePrompt({
+      prompt: 'y'.repeat(MAX_RUNTIME_PROMPT_LENGTH + 5_000),
+      peer: PEER,
+      inbound: [message('one', 1), message('two', 2)],
+      remaining: 0
+    })
+    // Both kept: they were not the problem.
+    expect(delivered.map((entry) => entry.messageId)).toEqual(['wm_1', 'wm_2'])
+    // And the prompt is still over the cap, which was true before as well --
+    // the fix is that nothing was thrown away pretending to fix it.
+    expect(prompt.length).toBeGreaterThan(MAX_RUNTIME_PROMPT_LENGTH)
+  })
+
+  it('still evicts when eviction DOES help', () => {
+    // The control. A change that simply stopped evicting would break the cap
+    // for every ordinary long conversation.
+    const big = 'x'.repeat(3_000)
+    const { prompt, delivered } = composeRuntimePrompt({
+      prompt: 'y'.repeat(7_000),
+      peer: PEER,
+      inbound: [message(big, 1), message(big, 2), message(big, 3)],
+      remaining: 1
+    })
+    expect(prompt.length).toBeLessThanOrEqual(MAX_RUNTIME_PROMPT_LENGTH)
+    expect(delivered.length).toBeLessThan(3)
+  })
+
   it('says how many more are waiting when the batch was bounded upstream', () => {
     const { prompt } = composeRuntimePrompt({
       prompt: 'Task.',

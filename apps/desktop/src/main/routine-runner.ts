@@ -49,6 +49,21 @@ export interface RoutineRunnerOptions {
   readonly assignOwner: (teammateId: string, missionId: string) => Promise<void>
   /** How a finished mission ended, from the durable record. Undefined when the ledger cannot say. */
   readonly phaseOf: (missionId: string) => Promise<RecoveredMissionPhase | undefined>
+  /**
+   * Whether that turn ended by ASKING the person something.
+   *
+   * A turn that ends on a decision block completes perfectly normally -- exit
+   * 0, a receipt, phase 'completed' -- so the runner read it as success and
+   * started the next step. The person's answer then arrived at a teammate
+   * already working on step 2 and was refused as RUN_ALREADY_ACTIVE, so the
+   * routine carried on without the answer it had asked for. Verified
+   * 2026-09-08 from a report by a Cursor teammate reading this source.
+   *
+   * Absent, or a read that fails, means "cannot tell" and is treated as no
+   * question: a routine that stalled on every turn would be worse than one
+   * that occasionally runs past a fork.
+   */
+  readonly askedAQuestion?: (missionId: string) => Promise<boolean>
   readonly notify: (update: CodexMissionUpdate) => void
 }
 
@@ -75,6 +90,14 @@ export interface RoutineRunner {
    * last hour, is skipped this tick.
    */
   tick(now: Date): Promise<readonly string[]>
+}
+
+/**
+ * Whether a refused start means "no room right now" rather than "this is
+ * broken". Matched on the host's own sentence, which names the cap.
+ */
+function isAtCapacity(message: string): boolean {
+  return /missions can run at once/i.test(message)
 }
 
 /** How long a scheduled routine waits after a start that failed before it is tried again. */
@@ -208,6 +231,18 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed.`)
         return
       }
+      // A step that ended by asking something did not finish, whatever its
+      // exit code says. Stopping here leaves the decision card answerable: the
+      // teammate is free, so the answer starts a run instead of being refused
+      // as busy by the step this would otherwise have begun.
+      if (options.askedAQuestion !== undefined && (await options.askedAQuestion(mission.missionId).catch(() => false))) {
+        active.delete(progress.routineId)
+        notice(
+          progress,
+          `Routine "${progress.name}" stopped at step ${String(progress.step)} of ${String(progress.of)}: it asked you something. Answer it, then run the routine again when you are ready.`
+        )
+        return
+      }
       // The routine may have been edited or removed while it ran; the steps
       // that run are the ones on file NOW, so a correction lands next time.
       const routine = await options.routines.get(progress.routineId)
@@ -248,6 +283,22 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         const response = await this.run(routine.routineId)
         if (response.ok) {
           started.push(routine.routineId)
+        } else if (isAtCapacity(response.error.message)) {
+          /*
+           * The workspace being full is a WAIT, exactly like the teammate
+           * being busy two lines above -- and busy gets no hold-off.
+           *
+           * It used to fall to the branch below and wait an hour: the same
+           * hold-off as a signed-out CLI, for a slot that may free in a
+           * minute. And because `heldOff` is in memory, restarting cleared it
+           * and retried at once -- so staying open was punished and quitting
+           * was rewarded, which is the wrong way round (verified 2026-09-08
+           * from a report by a Cursor teammate reading this source).
+           *
+           * Not announced either. Nobody needs telling that four missions are
+           * running; they can see them.
+           */
+          continue
         } else {
           const retryAt = now.getTime() + SCHEDULE_HOLD_OFF_MS
           heldOff.set(routine.routineId, retryAt)

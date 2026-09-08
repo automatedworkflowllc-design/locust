@@ -41,6 +41,8 @@ import { readRuntimeSetup } from './runtime-setup.js'
 import { briefSection, readWorkspaceBrief, worktreeSection } from './workspace-brief.js'
 import { createMemoryReader } from './memory-reader.js'
 import { createAttentionReader } from './attention-reader.js'
+import { parseDecision } from '../shared/decision.js'
+import { createTranscriptTracker } from './peer-exchange.js'
 import type { AttentionReader } from './attention-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
@@ -961,6 +963,28 @@ if (!ownsSingleInstanceLock) {
         ),
       assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
       phaseOf: async (missionId) => (await missionLedger.getMission(missionId))?.phase,
+      /*
+       * Whether that turn ended by asking the person something.
+       *
+       * The same three steps `attention-reader.ts` already takes to decide it
+       * has a decision to announce: recover the mission, rebuild the last
+       * FINAL assistant message, look for a decision block. Reusing that path
+       * rather than inventing a second one is the point -- two readers
+       * disagreeing about whether a turn asked a question is how the card and
+       * the routine would end up on different sides of one fact.
+       */
+      askedAQuestion: async (missionId) => {
+        try {
+          const recovered = await missionLedger.getMission(missionId)
+          if (recovered === undefined) return false
+          const tracker = createTranscriptTracker()
+          tracker.track(recovered.events)
+          const text = tracker.latestFinal
+          return text === undefined ? false : parseDecision(text) !== undefined
+        } catch {
+          return false
+        }
+      },
       // A scheduled routine waits for any live run of the teammate's, whoever started it.
       teammateBusy: async (teammateId) => {
         const owners = await teammates.missionOwners()
