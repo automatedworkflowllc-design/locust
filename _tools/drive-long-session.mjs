@@ -45,7 +45,28 @@ const reading = `(() => {
     heapMb: memory === undefined ? null : Math.round(memory.usedJSHeapSize / 1048576),
     nodes: document.getElementsByTagName('*').length,
     threadChars: (document.querySelector('.lc-thread')?.innerText ?? '').length,
-    rows: document.querySelectorAll('.lc-row').length
+    rows: document.querySelectorAll('.lc-row').length,
+    /*
+     * What the fold change of 0.49.0 costs at length.
+     *
+     * Every FINISHED turn keeps its work open now. That reversed a deliberate
+     * earlier decision -- "leaves EARLIER turns closed, so a long conversation
+     * is not a wall" -- which was overruled because the old rule CLOSED a fold
+     * the person was reading. The wall worry was never wrong, it just lost to
+     * a worse harm, and nobody has looked past two turns since.
+     *
+     * screensToScroll is the honest measure: how many windows of scrolling
+     * sit between the top of the thread and the composer. If it climbs
+     * linearly with turns, the wall is real and the fold rule needs a bound.
+     */
+    foldsOpen: [...document.querySelectorAll('.lc-activity')].filter((f) => f.getAttribute('aria-expanded') === 'true').length,
+    foldsTotal: document.querySelectorAll('.lc-activity').length,
+    fileRowsOnScreen: document.querySelectorAll('.lc-filerow').length,
+    screensToScroll: (() => {
+      const scroller = document.querySelector('.lc-thread')?.parentElement ?? document.querySelector('.lc-thread')
+      if (!scroller) return null
+      return Math.round((scroller.scrollHeight / Math.max(1, scroller.clientHeight)) * 10) / 10
+    })()
   }
 })()`
 
