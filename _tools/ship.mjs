@@ -78,6 +78,43 @@ if (published.status === 0) {
   ok(`version ${version} is not published yet`)
 }
 
+// 2b. An installer is built from the WORKING TREE, not from a commit.
+//
+//     On 2026-09-08 two agents were editing this checkout at once, and for
+//     about forty-five minutes any release would have packaged the other's
+//     half-finished feature -- typechecking, passing its own tests, and
+//     completely unintended. The gates above cannot catch that: uncommitted
+//     work can be perfectly green and still be nobody's idea of a release.
+//
+//     So a release is cut from a tree with nothing outstanding in it. That is
+//     also what makes `git log` an honest record of what any given installer
+//     contains, which it silently was not before.
+//
+//     Untracked files under `docs/user-session/` are the one exception: drives
+//     write their records there constantly, they ship nothing, and requiring a
+//     commit for every screenshot would make this gate something to route
+//     around rather than obey.
+const dirty = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, shell: true, encoding: 'utf8' })
+if (dirty.status !== 0) {
+  // Not a git repository, or git is unavailable. Say so rather than passing a
+  // check that was never actually made.
+  bad('the working tree is clean', 'git status could not be read, so this was not checked')
+} else {
+  const outstanding = (dirty.stdout ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !/^\?\? docs\/user-session\//.test(line))
+  if (outstanding.length === 0) {
+    ok('the working tree is clean')
+  } else {
+    bad(
+      'the working tree is clean',
+      `${String(outstanding.length)} uncommitted change(s) would be built into this installer:\n        ${outstanding.slice(0, 6).join('\n        ')}`
+    )
+  }
+}
+
 // 3. A release with no entry is a release nobody can read.
 const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8')
 if (changelog.includes(`## ${version} —`) || changelog.includes(`## ${version} -`)) {
