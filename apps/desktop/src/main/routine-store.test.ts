@@ -69,7 +69,11 @@ describe('the routine store', () => {
       steps: ['Only this now.']
     })
 
-    await store.recordRun(routine.routineId)
+    // Counting now requires a final-step receipt, not merely a started run.
+    await store.saveProgress(routine.routineId, { attemptId: 'attempt_1', step: 1, of: 1,
+      status: 'running', missionId: 'mission_final', runId: 'run_final', workspaceId: 'ws_test',
+      startedAt: routine.createdAt, updatedAt: routine.createdAt, steps: corrected.steps, route: corrected.route }, null)
+    await store.recordRun(routine.routineId, 'attempt_1')
     const ran = await store.get(routine.routineId)
     expect(ran?.runs).toBe(1)
     expect(typeof ran?.lastRunAt).toBe('string')

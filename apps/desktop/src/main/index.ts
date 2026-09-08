@@ -133,6 +133,8 @@ import type {
   MissionHandoffRequest,
   MissionResumeRequest
 } from '../shared/ipc.js'
+import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
+import { decideRoutineRecovery } from './routine-recovery-ipc.js'
 
 const probeRunner = createNodeProbeRunner()
 // `LOCUST_HIDE_RUNTIMES=1` is a test seam: the first-run drive needs a
@@ -943,6 +945,7 @@ if (!ownsSingleInstanceLock) {
     const routines = createRoutineStore({ rootDirectory: app.getPath('userData') })
     const rooms = createRoomStore({ rootDirectory: app.getPath('userData') })
     routineRunner = createRoutineRunner({
+      workspaceId: memoryWorkspaceId,
       routines,
       peerContextFor,
       start: (input) =>
@@ -979,13 +982,14 @@ if (!ownsSingleInstanceLock) {
       askedAQuestion: async (missionId) => {
         try {
           const recovered = await missionLedger.getMission(missionId)
-          if (recovered === undefined) return false
+          if (recovered === undefined) throw new Error('Routine mission receipt unavailable')
           const tracker = createTranscriptTracker()
           tracker.track(recovered.events)
           const text = tracker.latestFinal
           return text === undefined ? false : parseDecision(text) !== undefined
-        } catch {
-          return false
+        } catch (error) {
+          // Recovery must distinguish an unreadable answer from "no question".
+          throw error
         }
       },
       // A scheduled routine waits for any live run of the teammate's, whoever started it.
@@ -1529,6 +1533,7 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(ROUTINE_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { ok: false, error: { code: 'ROUTINES_UNAVAILABLE', message: 'Routines are unavailable.' } } as const
       try {
+        await routineRunner?.reconcile()
         return { ok: true, data: { routines: await routines.list() } } as const
       } catch {
         return { ok: false, error: { code: 'ROUTINES_UNAVAILABLE', message: 'Routines could not be read.' } } as const
@@ -1585,6 +1590,9 @@ if (!ownsSingleInstanceLock) {
       if (!workspaceChosen) return routineRejected(NO_WORKSPACE_MESSAGE)
       return routineRunner.run(routineId)
     })
+
+    ipcMain.handle(ROUTINE_RECOVERY_CHANNEL, (event, request: unknown) =>
+      decideRoutineRecovery(request, fromOwnWindow(event), workspaceChosen, routineRunner))
 
     // Memory. Every answer carries the whole list so the screen never
     // shows a state the file does not hold.

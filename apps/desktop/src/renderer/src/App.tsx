@@ -235,6 +235,7 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'memory-changed') return live
   // A scheduled routine that would not start has no run to belong to.
   if (update.kind === 'routine-blocked') return live
+  if (update.kind === 'routine-recovery-changed') return live
 
   const events = [...live.events, update.event].slice(-500)
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
@@ -1192,6 +1193,10 @@ export default function App(): ReactElement {
         setAutomationNotice(
           `${update.name} did not start: ${update.message} Trying again at ${new Date(update.retryAt).toLocaleTimeString()}.`
         )
+        return
+      }
+      if (update.kind === 'routine-recovery-changed') {
+        void reloadRoutines()
         return
       }
       if (update.kind === 'mission-started') {
@@ -2252,6 +2257,13 @@ export default function App(): ReactElement {
       .catch(() => setTeammateError('That routine could not be started.'))
   }
 
+  const recoverRoutine: import('./components/RoutineRecovery.js').RecoverRoutine = async (request) => {
+    if (!window.desktop) return { ok: false, error: { message: 'Desktop connection is unavailable.' } }
+    const response = await window.desktop.recoverRoutine(request)
+    await reloadRoutines()
+    return response
+  }
+
   const removeRoutine = (routineId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -2764,6 +2776,7 @@ export default function App(): ReactElement {
               routines={routines}
               routineStepByTeammate={routineStepByTeammate}
               onRunRoutine={runRoutine}
+              onRecoverRoutine={recoverRoutine}
               onRemoveRoutine={removeRoutine}
               onEditRoutine={editRoutine}
               onNewTeammate={() => {
@@ -2799,10 +2812,12 @@ export default function App(): ReactElement {
             />
           ) : screen === 'automations' ? (
             <AutomationsScreen
+              onOpenMission={openMission}
               routines={routines}
               teammates={teammates}
               routineStepByTeammate={routineStepByTeammate}
               onRunRoutine={runRoutine}
+              onRecoverRoutine={recoverRoutine}
               onEditRoutine={editRoutine}
               onRemoveRoutine={removeRoutine}
               notice={automationNotice}

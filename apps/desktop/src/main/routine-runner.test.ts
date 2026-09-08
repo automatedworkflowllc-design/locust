@@ -46,18 +46,32 @@ function harness(input: {
   let counter = 0
   const held = new Map((input.routines ?? [routine()]).map((entry) => [entry.routineId, entry]))
   const options: RoutineRunnerOptions = {
+    workspaceId: 'ws_test',
     routines: {
       get: async (id) => held.get(String(id)),
       list: async () => [...held.values()],
       recordRun: async (id) => {
         runs.push(String(id))
+        const entry = held.get(String(id))!
+        const { execution: _execution, ...rest } = entry
+        held.set(String(id), { ...rest, runs: entry.runs + 1, lastRunAt: new Date().toISOString() })
+      },
+      saveProgress: async (id, execution) => { held.set(id, { ...held.get(id)!, execution }) },
+      clearProgress: async (id) => {
+        const { execution: _execution, ...rest } = held.get(id)!
+        held.set(id, rest)
+      },
+      abandon: async (id) => {
+        const { schedule: _schedule, ...rest } = held.get(id)!
+        held.set(id, { ...rest, execution: { ...rest.execution!, status: 'abandoned' } })
       }
     },
     peerContextFor: async () => ('peer' in input ? input.peer : WREN),
     start: async (request) => {
       starts.push(request)
       if (input.startFails === true) {
-        return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: 'no runtime' } } as CodexMissionStartResponse
+        // An unavailable runtime is a preflight refusal, not an uncertain spawn.
+        return { ok: false, error: { code: 'CODEX_UNAVAILABLE', message: 'no runtime' } } as CodexMissionStartResponse
       }
       counter += 1
       return {
@@ -85,7 +99,7 @@ const notices = (h: Harness): string[] =>
   h.updates.flatMap((update) => (update.kind === 'relay-notice' ? [update.message] : []))
 
 describe('running a routine', () => {
-  it('starts step 1 on the routine route, recorded as the routine, and counts the run', async () => {
+  it('starts step 1 on the routine route, recorded as the routine, but counts only completion', async () => {
     const h = harness()
     const runner = createRoutineRunner(h.options)
     const response = await runner.run('rt_1')
@@ -99,7 +113,8 @@ describe('running a routine', () => {
       followUpOf: undefined,
       startedBy: { kind: 'routine', routineId: 'rt_1', step: 1 }
     })
-    expect(h.runs).toEqual(['rt_1'])
+    // Contract changed deliberately: starting step 1 is not a completed routine.
+    expect(h.runs).toEqual([])
     const started = h.updates.find((update) => update.kind === 'mission-started')
     expect(started).toMatchObject({ teammateId: 'tm_wren', startedBy: { kind: 'routine', routineId: 'rt_1', step: 1 } })
     expect(runner.running()).toEqual([expect.objectContaining({ routineId: 'rt_1', step: 1, of: 3, missionId: 'mission_1' })])
@@ -169,7 +184,8 @@ describe('running a routine', () => {
     const runner = createRoutineRunner(h.options)
     await runner.run('rt_1')
     // The store now holds the edited routine.
-    h.options.routines.get = async () => edited
+    const read = h.options.routines.get
+    h.options.routines.get = async (id) => ({ ...edited, ...((await read(id))?.execution === undefined ? {} : { execution: (await read(id))!.execution! }) })
     h.phases.set('mission_1', 'completed')
     await runner.onRunEnded({ missionId: 'mission_1' })
     expect(h.starts[1]?.prompt).toBe('Now list only .ts files.')
@@ -218,12 +234,21 @@ describe('a routine that runs on its own', () => {
     const options: RoutineRunnerOptions = {
       ...base.options,
       routines: {
+        ...base.options.routines,
         get: async (id) => held.get(String(id)),
         list: async () => [...held.values()],
+        saveProgress: async (id, execution) => { held.set(id, { ...held.get(id)!, execution }) },
+        clearProgress: async (id) => {
+          const { execution: _execution, ...rest } = held.get(id)!
+          held.set(id, rest)
+        },
         recordRun: async (id) => {
           base.runs.push(String(id))
           const routine = held.get(String(id))
-          if (routine !== undefined) held.set(routine.routineId, { ...routine, runs: routine.runs + 1, lastRunAt: clock.toISOString() })
+          if (routine !== undefined) {
+            const { execution: _execution, ...rest } = routine
+            held.set(routine.routineId, { ...rest, runs: routine.runs + 1, lastRunAt: clock.toISOString() })
+          }
         }
       },
       // The real peer context is the routine's own teammate; the base stub answers Wren for everyone.
@@ -251,9 +276,10 @@ describe('a routine that runs on its own', () => {
     })
     expect(await h.tick(NOON)).toEqual(['rt_due'])
     expect(h.starts.map((start) => start.startedBy)).toEqual([{ kind: 'routine', routineId: 'rt_due', step: 1 }])
-    expect(h.runs).toEqual(['rt_due'])
+    // The old assertion counted a scheduled START. Only final completion counts.
+    expect(h.runs).toEqual([])
     expect(h.updates.some((update) => update.kind === 'mission-started' && update.missionId === 'mission_1')).toBe(true)
-    // The next minute: it ran, so it is not due again until two hours pass.
+    // The next minute: progress blocks a duplicate, not a premature lastRunAt.
     expect(await h.tick(new Date('2026-09-05T12:01:00.000Z'))).toEqual([])
     // Two hours on, rt_soon (four hours from nine) is due too, and rt_due is
     // still replaying step 1 so it waits.

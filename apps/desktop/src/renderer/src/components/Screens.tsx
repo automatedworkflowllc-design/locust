@@ -31,6 +31,8 @@ import type { FaceActivity } from '../faceState.js'
 import { costLine, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
+import { RoutineRecovery } from './RoutineRecovery.js'
+import type { RecoverRoutine } from './RoutineRecovery.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { FREE_START_RUNTIME, installCommand } from '../../../shared/runtime-install.js'
 
@@ -220,6 +222,7 @@ export function TeammatesScreen({
   routines,
   routineStepByTeammate,
   onRunRoutine,
+  onRecoverRoutine,
   onEditRoutine,
   onRemoveRoutine
 }: {
@@ -240,6 +243,7 @@ export function TeammatesScreen({
   /** Which routine each teammate is replaying right now, if any. */
   readonly routineStepByTeammate: Readonly<Record<string, { readonly name: string; readonly step: number; readonly of: number }>>
   readonly onRunRoutine: (routineId: string) => void
+  readonly onRecoverRoutine?: RecoverRoutine
   readonly onEditRoutine: (routine: PublicRoutine) => void
   readonly onRemoveRoutine: (routineId: string) => void
 }): ReactElement {
@@ -352,6 +356,8 @@ export function TeammatesScreen({
                         <span className="lc-routinerow__name" title={routine.steps.join(STEP_GAP)}>
                           {routine.name}
                           <span className="lc-routinerow__meta lc-mono"> · {routineRunSummary(routine)}</span>
+                          <RoutineRecovery key={`${routine.execution?.attemptId}:${routine.execution?.step}`} routine={routine} onOpenMission={onOpenMission}
+                            {...(onRecoverRoutine === undefined ? {} : { recover: onRecoverRoutine })} />
                           {routineScheduleSummary(routine, new Date()) !== undefined && (
                             <span className="lc-routinerow__meta lc-mono lc-routinerow__sched">
                               {routineScheduleSummary(routine, new Date())}
@@ -361,7 +367,7 @@ export function TeammatesScreen({
                         <button
                           type="button"
                           className="lc-ghostbutton"
-                          disabled={replaying !== undefined}
+                          disabled={replaying !== undefined || (routine.execution !== undefined && routine.execution.status !== 'abandoned')}
                           title={
                             replaying === undefined
                               ? undefined

@@ -103,6 +103,8 @@ import type {
   RuntimeInstallProgress,
   RuntimeInstallResponse
 } from '../shared/ipc.js'
+import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
+import type { RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
 
 export type {
   CodexMissionCancelRequest,
@@ -238,7 +240,8 @@ const desktopApi: DesktopApi = {
     return () => {
       ipcRenderer.removeListener(CODEX_MISSION_UPDATE_CHANNEL, wrapped)
     }
-  }
+  },
+  recoverRoutine: (request: RoutineRecoveryRequest) => ipcRenderer.invoke(ROUTINE_RECOVERY_CHANNEL, request) as Promise<RoutineRecoveryResponse>
 }
 
 contextBridge.exposeInMainWorld('desktop', desktopApi)

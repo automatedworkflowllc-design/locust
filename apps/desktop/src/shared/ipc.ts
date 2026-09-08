@@ -499,6 +499,7 @@ export interface PublicRoutine {
    * means what every routine was before: it runs when a person presses Run.
    */
   readonly schedule?: RoutineSchedule
+  readonly execution?: import('./routine-recovery.js').RoutineExecution
 }
 
 export interface RoutineCreateRequest {
@@ -1069,6 +1070,7 @@ export type CodexMissionUpdate =
       /** When it will be tried again, so the notice can say so. */
       readonly retryAt: string
     }
+  | { readonly kind: 'routine-recovery-changed' }
 
 /**
  * A checkpoint as the renderer may see it. Deliberately narrower than the
@@ -1261,6 +1263,7 @@ export interface DesktopApi {
   handOffMission(request: MissionHandoffRequest): Promise<MissionHandoffResponse>
   resumeMission(request: MissionResumeRequest): Promise<MissionHandoffResponse>
   onCodexMissionUpdate(listener: (update: CodexMissionUpdate) => void): () => void
+  recoverRoutine(request: import('./routine-recovery.js').RoutineRecoveryRequest): Promise<import('./routine-recovery.js').RoutineRecoveryResponse>
 }
 
 /** The words for what a teammate does: their own for a Custom role, the role's name otherwise. */

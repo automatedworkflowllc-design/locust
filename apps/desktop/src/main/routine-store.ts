@@ -6,6 +6,7 @@ import { isAbsolute, join } from 'node:path'
 import type { PublicRoutine, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
 import { isTeammateRoute, safeId } from './teammate-store.js'
+import type { RoutineExecution } from '../shared/routine-recovery.js'
 
 /**
  * Routines: conversations a person saved as steps a teammate can replay.
@@ -40,8 +41,11 @@ export interface RoutineStore {
   /** Corrections: the name, the steps, and the schedule (`null` clears it). The teammate, route and provenance stay. */
   update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown }): Promise<PublicRoutine>
   remove(routineId: unknown): Promise<void>
-  /** Count a run, and when. Unknown routine: nothing changes. */
-  recordRun(routineId: unknown): Promise<void>
+  /** Count reconciled final completion and clear its matching progress in one write. */
+  recordRun(routineId: unknown, attemptId: string): Promise<void>
+  saveProgress(routineId: string, progress: RoutineExecution, expectedAttemptId: string | null): Promise<void>
+  abandon(routineId: string, attemptId: string): Promise<void>
+  clearProgress(routineId: string, attemptId: string): Promise<void>
   /** Drop every routine of a teammate who is gone; their steps had nobody to run them. */
   removeForTeammate(teammateId: unknown): Promise<void>
 }
@@ -117,8 +121,29 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     createdAt: record.createdAt,
     runs: record.runs,
     ...(record.lastRunAt === undefined ? {} : { lastRunAt: record.lastRunAt }),
-    ...(schedule === undefined ? {} : { schedule })
+    ...(schedule === undefined ? {} : { schedule }),
+    ...(record.execution === undefined ? {} : { execution: parsedExecution(record.execution, record.steps, route) })
   }
+}
+
+function parsedExecution(value: unknown, steps: readonly string[], route: TeammateRoute): RoutineExecution {
+  const item = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>
+  if (safeId(item.attemptId) && ['dispatching', 'running', 'held', 'abandoned'].includes(String(item.status))
+    && Number.isInteger(item.step) && Number(item.step) >= 1 && validSteps(item.steps)
+    && item.of === item.steps.length && Number(item.step) <= Number(item.of) && isTeammateRoute(item.route) && safeId(item.workspaceId)
+    && typeof item.startedAt === 'string' && !Number.isNaN(Date.parse(item.startedAt))
+    && typeof item.updatedAt === 'string' && !Number.isNaN(Date.parse(item.updatedAt))
+    && [item.missionId, item.runId, item.followUpOf].every((id) => id === undefined || safeId(id))
+    && (item.reason === undefined || (typeof item.reason === 'string' && item.reason.length <= 4000))
+    && (item.canContinue === undefined || typeof item.canContinue === 'boolean')
+    && (item.recovered === undefined || typeof item.recovered === 'boolean')) {
+    return item as unknown as RoutineExecution
+  }
+  // Losing an invalid receipt must never turn uncertain side effects into a
+  // routine eligible for automatic replay. Keep a visible, non-resumable hold.
+  return { attemptId: 'invalid_receipt', status: 'held', step: 1, of: steps.length,
+    startedAt: '1970-01-01T00:00:00.000Z', updatedAt: '1970-01-01T00:00:00.000Z', steps, route,
+    workspaceId: 'unknown', reason: 'The saved execution receipt is invalid. Review external work before abandoning this attempt.', canContinue: false }
 }
 
 /**
@@ -174,6 +199,9 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
   }
 
   const write = async (file: StoredFile): Promise<void> => {
+    // Progress includes a saved definition. Refuse growth before committing a
+    // file our bounded reader would subsequently treat as empty.
+    if (Buffer.byteLength(JSON.stringify(file, null, 2) + '\n', 'utf8') > MAX_FILE_BYTES) throw new Error('Routine store is full; reduce saved routines before starting more work.')
     await mkdir(rootDirectory, { recursive: true, mode: 0o700 })
     const temporary = `${path}.${randomUUID()}.tmp`
     const handle = await open(temporary, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600)
@@ -275,17 +303,61 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
       })
     },
 
-    recordRun(routineId): Promise<void> {
+    recordRun(routineId, attemptId): Promise<void> {
       return serialize(async () => {
         if (!safeId(routineId)) return
         const file = await read()
         const held = file.routines.find((routine) => routine.routineId === routineId)
         if (held === undefined) return
-        const next: PublicRoutine = { ...held, runs: held.runs + 1, lastRunAt: new Date().toISOString() }
+        if (held.execution?.attemptId !== attemptId || held.execution.step !== held.execution.of
+          || held.execution.missionId === undefined || !['running', 'held'].includes(held.execution.status)) {
+          throw new Error('Routine completion receipt changed; reload before continuing.')
+        }
+        // Counting and clearing share ONE rename: a crash cannot count twice,
+        // nor leave a completed routine looking like it only started step 1.
+        const { execution: _execution, ...rest } = held
+        const next: PublicRoutine = { ...rest, runs: held.runs + 1, lastRunAt: new Date().toISOString() }
         await write({
           ...file,
           routines: file.routines.map((routine) => (routine.routineId === next.routineId ? next : routine))
         })
+      })
+    },
+
+    saveProgress(routineId, progress, expectedAttemptId) {
+      return serialize(async () => {
+        const file = await read()
+        const held = file.routines.find((routine) => routine.routineId === routineId)
+        const current = held?.execution
+        if (held === undefined || (expectedAttemptId === null
+          ? current !== undefined && current.status !== 'abandoned'
+          : current?.attemptId !== expectedAttemptId)) throw new Error('Routine execution changed; reload before continuing.')
+        if (parsedExecution(progress, held.steps, held.route).attemptId !== progress.attemptId) throw new Error('Invalid routine progress')
+        await write({ ...file, routines: file.routines.map((routine) => routine.routineId === routineId ? { ...held, execution: progress } : routine) })
+      })
+    },
+
+    clearProgress(routineId, attemptId) {
+      return serialize(async () => {
+        const file = await read()
+        const held = file.routines.find((routine) => routine.routineId === routineId)
+        if (held?.execution?.attemptId !== attemptId) throw new Error('Routine execution changed.')
+        const { execution: _execution, ...rest } = held
+        await write({ ...file, routines: file.routines.map((routine) => routine.routineId === routineId ? rest : routine) })
+      })
+    },
+
+    abandon(routineId, attemptId) {
+      return serialize(async () => {
+        const file = await read()
+        const held = file.routines.find((routine) => routine.routineId === routineId)
+        if (held?.execution?.attemptId !== attemptId || held.execution.status !== 'held') throw new Error('Routine execution changed; reload before continuing.')
+        // Acknowledgement is not permission for the due scheduler to replay
+        // step 1 a minute later. Pause the existing schedule in the same write.
+        const { schedule: _schedule, ...rest } = held
+        const next: PublicRoutine = { ...rest, execution: { ...held.execution, status: 'abandoned', canContinue: false,
+          updatedAt: new Date().toISOString(), reason: 'Abandoned by you; schedule removed. This does not stop an external runtime or undo its work.' } }
+        await write({ ...file, routines: file.routines.map((routine) => routine.routineId === routineId ? next : routine) })
       })
     },
 

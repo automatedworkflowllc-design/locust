@@ -75,8 +75,9 @@ export function routineStepLabel(progress: { readonly step: number; readonly of:
  * What a routine's card says about its last run. Never "never run" dressed up
  * as a time: a routine that has not run says so.
  */
-export function routineRunSummary(routine: Pick<PublicRoutine, 'runs' | 'steps'>): string {
+export function routineRunSummary(routine: Pick<PublicRoutine, 'runs' | 'steps' | 'execution'>): string {
   const steps = `${String(routine.steps.length)} step${routine.steps.length === 1 ? '' : 's'}`
+  if (routine.execution !== undefined) return `${steps} · ${routine.execution.status === 'abandoned' ? 'last attempt abandoned' : routine.execution.status === 'running' ? 'in progress' : 'waiting for review'} · ${String(routine.runs)} completed runs`
   if (routine.runs === 0) return `${steps} · not run yet`
   return `${steps} · run ${String(routine.runs)} time${routine.runs === 1 ? '' : 's'}`
 }
@@ -93,10 +94,11 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
  * pressed, so the card says nothing rather than "never".
  */
 export function routineScheduleSummary(
-  routine: Pick<PublicRoutine, 'schedule' | 'lastRunAt' | 'createdAt'>,
+  routine: Pick<PublicRoutine, 'schedule' | 'lastRunAt' | 'createdAt' | 'execution'>,
   now: Date
 ): string | undefined {
   if (routine.schedule === undefined) return undefined
+  if (routine.execution !== undefined && routine.execution.status !== 'abandoned') return `${scheduleLabel(routine.schedule)} · ${routine.execution.status === 'running' ? 'in progress' : 'held for review; no automatic retry'}`
   const next = nextRunAfter(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)
   const when =
     next.getTime() <= now.getTime()

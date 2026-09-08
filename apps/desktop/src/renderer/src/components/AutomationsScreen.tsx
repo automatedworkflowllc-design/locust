@@ -5,6 +5,8 @@ import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { Icon } from './Icon.js'
 import { PixelFace } from './PixelFace.js'
+import { RoutineRecovery } from './RoutineRecovery.js'
+import type { RecoverRoutine } from './RoutineRecovery.js'
 
 const STEP_GAP = '\n\n'
 
@@ -27,6 +29,8 @@ export function AutomationsScreen({
   teammates,
   routineStepByTeammate,
   onRunRoutine,
+  onRecoverRoutine,
+  onOpenMission,
   onEditRoutine,
   onRemoveRoutine,
   notice,
@@ -40,6 +44,8 @@ export function AutomationsScreen({
     Record<string, { readonly name: string; readonly step: number; readonly of: number }>
   >
   readonly onRunRoutine: (routineId: string) => void
+  readonly onRecoverRoutine?: RecoverRoutine
+  readonly onOpenMission?: (missionId: string) => void
   readonly onEditRoutine: (routine: PublicRoutine) => void
   readonly onRemoveRoutine: (routineId: string) => void
   /** The last scheduled routine that would not start, and why. */
@@ -58,6 +64,8 @@ export function AutomationsScreen({
   // Scheduled first: those are the ones that happen without anybody here,
   // and so the ones a person came to this screen to check.
   const ordered = [...routines].sort((first, second) => {
+    const held = (routine: PublicRoutine): number => routine.execution !== undefined && routine.execution.status !== 'abandoned' && routine.execution.status !== 'running' ? 0 : 1
+    if (held(first) !== held(second)) return held(first) - held(second)
     const firstScheduled = first.schedule === undefined ? 1 : 0
     const secondScheduled = second.schedule === undefined ? 1 : 0
     if (firstScheduled !== secondScheduled) return firstScheduled - secondScheduled
@@ -136,11 +144,14 @@ export function AutomationsScreen({
                   {schedule !== undefined && (
                     <span className="lc-routinerow__meta lc-mono lc-routinerow__sched">{schedule}</span>
                   )}
+                  <RoutineRecovery key={`${routine.execution?.attemptId}:${routine.execution?.step}`} routine={routine}
+                    {...(onRecoverRoutine === undefined ? {} : { recover: onRecoverRoutine })}
+                    {...(onOpenMission === undefined ? {} : { onOpenMission })} />
                 </span>
                 <button
                   type="button"
                   className="lc-ghostbutton"
-                  disabled={replaying !== undefined || owner === undefined}
+                  disabled={replaying !== undefined || owner === undefined || (routine.execution !== undefined && routine.execution.status !== 'abandoned')}
                   title={
                     owner === undefined
                       ? 'The teammate this was taught to is gone, so it has no route to run on.'

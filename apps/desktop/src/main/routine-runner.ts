@@ -4,6 +4,9 @@ import type { RecoveredMissionPhase } from '@teammate/mission-store'
 import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineRunResponse } from '../shared/ipc.js'
 import { isDue } from '../shared/routine-schedule.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
+import { randomUUID } from 'node:crypto'
+import type { RoutineExecution, RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
+import type { RoutineStore } from './routine-store.js'
 
 /**
  * Replays a routine: step 1 starts as a new mission for the teammate, and each
@@ -27,11 +30,8 @@ import type { MissionPeerContext } from './workroom-briefing.js'
  */
 
 export interface RoutineRunnerOptions {
-  readonly routines: {
-    get(routineId: unknown): Promise<PublicRoutine | undefined>
-    recordRun(routineId: unknown): Promise<void>
-    list(): Promise<readonly PublicRoutine[]>
-  }
+  readonly workspaceId: string
+  readonly routines: Pick<RoutineStore, 'get' | 'list' | 'recordRun' | 'saveProgress' | 'clearProgress' | 'abandon'>
   /** Whether the teammate has a live run of anyone's. A scheduled routine waits for it to end. */
   readonly teammateBusy?: (teammateId: string) => Promise<boolean>
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
@@ -59,9 +59,8 @@ export interface RoutineRunnerOptions {
    * routine carried on without the answer it had asked for. Verified
    * 2026-09-08 from a report by a Cursor teammate reading this source.
    *
-   * Absent, or a read that fails, means "cannot tell" and is treated as no
-   * question: a routine that stalled on every turn would be worse than one
-   * that occasionally runs past a fork.
+   * Absent, or a read that fails, means "cannot tell" and now holds for review.
+   * Counting an unreadable answer as completion would bypass recovery policy.
    */
   readonly askedAQuestion?: (missionId: string) => Promise<boolean>
   readonly notify: (update: CodexMissionUpdate) => void
@@ -79,6 +78,8 @@ export interface RoutineProgress {
 }
 
 export interface RoutineRunner {
+  reconcile(): Promise<void>
+  recover(request: RoutineRecoveryRequest): Promise<RoutineRecoveryResponse>
   run(routineId: string): Promise<RoutineRunResponse>
   /** Any run ending, however it ended. Only a routine's own current step moves it. */
   onRunEnded(mission: { readonly missionId: string }): Promise<void>
@@ -125,6 +126,48 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
   const active = new Map<string, RoutineProgress>()
   /** routineId -> epoch ms before which a scheduled start is not tried again. */
   const heldOff = new Map<string, number>()
+  const changed = (): void => options.notify({ kind: 'routine-recovery-changed' })
+
+  const hold = async (routine: PublicRoutine, execution: RoutineExecution, reason: string, canContinue = false): Promise<void> => {
+    if (execution.status === 'held' && execution.reason === reason && execution.canContinue === canContinue) return
+    await options.routines.saveProgress(routine.routineId, { ...execution, status: 'held', reason, canContinue }, execution.attemptId)
+    active.delete(routine.routineId)
+    changed()
+  }
+
+  const complete = async (routineId: string, execution: RoutineExecution): Promise<void> => {
+    await options.routines.recordRun(routineId, execution.attemptId)
+    active.delete(routineId)
+    changed()
+  }
+
+  // Policy (c): ask. A separate runtime can outlive Electron, and a missing
+  // receipt is not proof of no side effects. The cost is unattended routines
+  // waiting indefinitely for review, so the hold is persisted on their cards.
+  // Reconciliation is retried independently of lastRunAt, never the dispatch.
+  const reconcile = async (): Promise<void> => {
+    for (const routine of await options.routines.list()) {
+      const execution = routine.execution
+      if (execution === undefined || execution.status === 'abandoned' || active.has(routine.routineId)) continue
+      if (execution.workspaceId !== options.workspaceId) {
+        await hold(routine, execution, 'Open the original workspace to reconcile this attempt. Nothing will be replayed.')
+        continue
+      }
+      const phase = execution.missionId === undefined ? undefined : await options.phaseOf(execution.missionId).catch(() => undefined)
+      const question = execution.missionId === undefined || options.askedAQuestion === undefined
+        ? true : await options.askedAQuestion(execution.missionId).catch(() => true)
+      const confirmed = phase === 'completed' && !question
+      if (confirmed && execution.step === execution.of) {
+        await complete(routine.routineId, execution)
+      } else {
+        await hold(routine, execution, confirmed
+          ? 'The saved step completed. Review the remaining steps before continuing.'
+          : execution.missionId === undefined
+            ? 'Dispatch outcome is uncertain: the app stopped before saving a mission receipt. Review external work; nothing will be replayed.'
+            : `Review required: ${phaseWords(phase)}${question && phase === 'completed' ? ', but it asked a question or its answer could not be checked' : ''}. Nothing will be replayed.`, confirmed)
+      }
+    }
+  }
 
   const notice = (progress: RoutineProgress, message: string): void => {
     options.notify({ kind: 'relay-notice', runId: progress.runId, missionId: progress.missionId, message })
@@ -140,19 +183,51 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     if (prompt === undefined) {
       return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: `Routine has no step ${String(step)}.` } }
     }
-    return options.start({
-      prompt,
-      runtime: routine.route.runtime,
-      mode: routine.route.mode,
-      model: routine.route.model === 'account-default' ? undefined : routine.route.model,
-      // A routine replays the turns you typed, and how hard the model was
-      // asked to think is part of how it ran: one saved at `high` that
-      // replays at the runtime's default is not the same routine.
-      effort: routine.route.effort,
-      peer,
-      followUpOf,
-      startedBy: { kind: 'routine', routineId: routine.routineId, step }
-    })
+    const prior = routine.execution
+    const intent: RoutineExecution = {
+      attemptId: prior?.status === 'abandoned' || prior === undefined ? randomUUID() : prior.attemptId,
+      status: 'dispatching', step, of: routine.steps.length, steps: routine.steps, route: routine.route,
+      workspaceId: options.workspaceId,
+      ...(prior?.recovered === true ? { recovered: true } : {}),
+      startedAt: prior?.status === 'abandoned' || prior === undefined ? new Date().toISOString() : prior.startedAt,
+      updatedAt: new Date().toISOString(), ...(followUpOf === undefined ? {} : { followUpOf })
+    }
+    // Persist BEFORE spawn. If spawn succeeds but recording its id fails, the
+    // intent remains uncertain; restart must not replay it as an unstarted step.
+    await options.routines.saveProgress(routine.routineId, intent, prior?.status === 'abandoned' ? null : prior?.attemptId ?? null)
+    let response: CodexMissionStartResponse
+    try {
+      response = await options.start({
+        prompt,
+        runtime: routine.route.runtime,
+        mode: routine.route.mode,
+        model: routine.route.model === 'account-default' ? undefined : routine.route.model,
+        // A routine replays the turns you typed, and how hard the model was
+        // asked to think is part of how it ran: one saved at `high` that
+        // replays at the runtime's default is not the same routine.
+        effort: routine.route.effort,
+        peer,
+        followUpOf,
+        startedBy: { kind: 'routine', routineId: routine.routineId, step }
+      })
+      if (response.ok) {
+        await options.routines.saveProgress(routine.routineId, { ...intent, status: 'running',
+          missionId: response.data.missionId, runId: response.data.runId }, intent.attemptId)
+      } else if (step === 1 && (prior === undefined || prior.status === 'abandoned')
+        && ['INVALID_PROMPT', 'RUN_ALREADY_ACTIVE', 'CODEX_UNAVAILABLE'].includes(response.error.code)) {
+        // Only preflight refusals prove no dispatch. RUNTIME_START_FAILED and
+        // PERSISTENCE_FAILED can also come from the spawn boundary; without an
+        // id they remain uncertain, even though the service returned an error.
+        await options.routines.clearProgress(routine.routineId, intent.attemptId)
+      } else {
+        await hold(routine, intent, `Dispatch not confirmed for step ${String(step)}: ${response.error.message}. Review external work before proceeding.`)
+      }
+    } catch (error) {
+      active.delete(routine.routineId)
+      changed()
+      throw error
+    }
+    return response
   }
 
   const announce = (routine: PublicRoutine, peer: MissionPeerContext, step: number, response: CodexMissionStartResponse & { ok: true }): RoutineProgress => {
@@ -178,11 +253,41 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     return progress
   }
 
-  return {
+  const runner: RoutineRunner = {
+    reconcile,
+    async recover(request) {
+      await reconcile()
+      const routine = await options.routines.get(request.routineId)
+      const execution = routine?.execution
+      if (routine === undefined || execution?.status !== 'held' || execution.attemptId !== request.attemptId || execution.step !== request.step) {
+        return { ok: false, error: { message: 'This recovery decision is stale. Reload routines and review the current attempt.' } }
+      }
+      if (request.decision === 'abandon') {
+        await options.routines.abandon(routine.routineId, execution.attemptId)
+        changed()
+        return { ok: true }
+      }
+      if (!execution.canContinue || execution.missionId === undefined) return { ok: false, error: { message: 'The saved step is not confirmed complete. Review its mission and external work; it cannot be safely continued.' } }
+      if (options.teammateBusy !== undefined && await options.teammateBusy(routine.teammateId)) return { ok: false, error: { message: 'This teammate is busy. Wait for its current mission to finish.' } }
+      const peer = await options.peerContextFor(routine.teammateId)
+      if (peer === undefined) return { ok: false, error: { message: 'The teammate no longer exists.' } }
+      // Recovery uses the saved definition, not edits made four days later.
+      const saved = { ...routine, steps: execution.steps, route: execution.route, execution: { ...execution, recovered: true } }
+      const response = await startStep(saved, peer, execution.step + 1, execution.missionId)
+      if (!response.ok) return { ok: false, error: { message: response.error.message } }
+      await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
+      announce(saved, peer, execution.step + 1, response)
+      changed()
+      return { ok: true }
+    },
     async run(routineId) {
+      await reconcile()
       const routine = await options.routines.get(routineId)
       if (routine === undefined) {
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: 'That routine no longer exists.' } }
+      }
+      if (routine.execution !== undefined && routine.execution.status !== 'abandoned') {
+        return { ok: false, error: { code: 'ROUTINE_REJECTED', message: 'This routine is already running or waiting for review. Open its routine card before starting more work.' } }
       }
       if (!ROUTINE_RUNTIMES.has(routine.route.runtime)) {
         return {
@@ -210,7 +315,6 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       }
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
       const progress = announce(routine, peer, 1, response)
-      await options.routines.recordRun(routine.routineId).catch(() => undefined)
       if (routine.steps.length > 1) {
         notice(progress, `Routine "${routine.name}" · step 1 of ${String(routine.steps.length)}. Each next step starts when this one completes.`)
       }
@@ -221,34 +325,43 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       const progress = [...active.values()].find((held) => held.missionId === mission.missionId)
       if (progress === undefined) return
       const phase = await options.phaseOf(mission.missionId).catch(() => undefined)
-      if (phase !== 'completed') {
+      const stored = await options.routines.get(progress.routineId)
+      const execution = stored?.execution
+      if (stored === undefined) {
         active.delete(progress.routineId)
-        notice(progress, `Routine "${progress.name}" stopped at step ${String(progress.step)} of ${String(progress.of)}: ${phaseWords(phase)}.`)
         return
       }
-      if (progress.step >= progress.of) {
-        active.delete(progress.routineId)
-        notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed.`)
+      if (execution === undefined || execution.missionId !== mission.missionId) return
+      if (phase !== 'completed') {
+        await hold(stored, execution, phaseWords(phase))
+        notice(progress, `Routine "${progress.name}" stopped at step ${String(progress.step)} of ${String(progress.of)}: ${phaseWords(phase)}.`)
         return
       }
       // A step that ended by asking something did not finish, whatever its
       // exit code says. Stopping here leaves the decision card answerable: the
       // teammate is free, so the answer starts a run instead of being refused
       // as busy by the step this would otherwise have begun.
-      if (options.askedAQuestion !== undefined && (await options.askedAQuestion(mission.missionId).catch(() => false))) {
-        active.delete(progress.routineId)
+      if (options.askedAQuestion === undefined || (await options.askedAQuestion(mission.missionId).catch(() => true))) {
+        await hold(stored, execution, 'The step asked you something. Review its mission before proceeding.')
         notice(
           progress,
           `Routine "${progress.name}" stopped at step ${String(progress.step)} of ${String(progress.of)}: it asked you something. Answer it, then run the routine again when you are ready.`
         )
         return
       }
+      if (progress.step >= progress.of) {
+        await complete(progress.routineId, execution)
+        notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed.`)
+        return
+      }
       // The routine may have been edited or removed while it ran; the steps
       // that run are the ones on file NOW, so a correction lands next time.
-      const routine = await options.routines.get(progress.routineId)
+      const current = await options.routines.get(progress.routineId)
+      const routine = current === undefined ? undefined : execution.recovered === true
+        ? { ...current, steps: execution.steps, route: execution.route } : current
       const peer = routine === undefined ? undefined : await options.peerContextFor(routine.teammateId)
       if (routine === undefined || peer === undefined || progress.step >= routine.steps.length) {
-        active.delete(progress.routineId)
+        await hold(stored, execution, 'The routine or teammate changed while it was running.')
         notice(progress, `Routine "${progress.name}" stopped after step ${String(progress.step)}: the routine changed while it was running.`)
         return
       }
@@ -269,9 +382,17 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     },
 
     async tick(now) {
+      // An end callback can fail on a transient disk error. Retry its durable
+      // reconciliation too, rather than leaving this session stuck in RAM.
+      for (const progress of [...active.values()]) {
+        const phase = await options.phaseOf(progress.missionId).catch(() => undefined)
+        if (phase === 'completed' || phase === 'failed' || phase === 'cancelled' || phase === 'interrupted') await runner.onRunEnded({ missionId: progress.missionId })
+      }
+      await reconcile()
       const started: string[] = []
       const all = await options.routines.list().catch(() => [] as readonly PublicRoutine[])
       for (const routine of all) {
+        if (routine.execution !== undefined && routine.execution.status !== 'abandoned') continue
         if (routine.schedule === undefined) continue
         if (!isDue(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)) continue
         const until = heldOff.get(routine.routineId)
@@ -300,6 +421,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
            */
           continue
         } else {
+          const latest = await options.routines.get(routine.routineId)
+          if (latest?.execution !== undefined && latest.execution.status !== 'abandoned') continue
           const retryAt = now.getTime() + SCHEDULE_HOLD_OFF_MS
           heldOff.set(routine.routineId, retryAt)
           // Said, not just recorded. A scheduled routine is the one kind of
@@ -316,5 +439,22 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       }
       return started
     }
+  }
+  // One transition at a time: duplicate end events, Run, recovery decisions
+  // and timer ticks cannot dispatch the same step twice. Store writes also
+  // compare attempt ids so stale decisions cannot acknowledge a newer run.
+  let queue: Promise<unknown> = Promise.resolve()
+  const serial = <T>(action: () => Promise<T>): Promise<T> => {
+    const result = queue.then(action, action)
+    queue = result.catch(() => undefined)
+    return result
+  }
+  return {
+    running: () => runner.running(),
+    reconcile: () => serial(() => runner.reconcile()),
+    run: (id) => serial(() => runner.run(id)),
+    recover: (request) => serial(() => runner.recover(request)),
+    onRunEnded: (mission) => serial(() => runner.onRunEnded(mission)),
+    tick: (now) => serial(() => runner.tick(now))
   }
 }
