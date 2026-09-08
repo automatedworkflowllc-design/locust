@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.51.0 - 2026-09-08
+
+- **"Approve each action" could lose its record of what happened and keep
+  going.** If Locust could not write a mission receipt to disk in that mode,
+  the failure was discarded: nothing was written, nothing appeared on screen,
+  no error was shown, and the run carried on doing work nobody could later
+  prove happened. That is the exact failure the durable record exists to
+  prevent, and it was in the one mode built for careful, auditable control.
+  The run now stops and says so, the same way every other mode already did.
+
 ## 0.50.2 - 2026-09-08
 
 - **A rate-limit warning now says which limit, and when it lifts.** It read
