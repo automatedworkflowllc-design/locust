@@ -24,20 +24,29 @@
  * The descriptions, keyed by the level name as runtimes actually write it.
  *
  * Deliberately about TIME and COST rather than quality. "Thinks harder" is an
- * unfalsifiable claim about an answer nobody has seen yet; "takes longer and
- * usually costs more" is the trade the person is actually making, and it is
- * the one they can check afterwards on the receipt.
+ * unfalsifiable claim about an answer nobody has seen yet; "slower, costlier"
+ * is the trade the person is actually making, and it is one they can check
+ * afterwards on the receipt.
+ *
+ * And deliberately SHORT. The first version wrote a sentence under each level,
+ * which on Cursor -- eight levels -- produced a menu that ran off the bottom of
+ * the window and off its right edge (Colin, 2026-09-08, with a screenshot: "not
+ * only does this bleed off, this is way too much"). A few words on the same
+ * line as the level is the whole of what is worth saying.
  */
 const DESCRIPTIONS: Readonly<Record<string, string>> = {
-  minimal: 'barely reasons — fastest and cheapest',
-  low: 'little reasoning — fastest, cheapest',
-  fast: 'skips extended thinking — lowest latency',
-  medium: 'a middle amount of reasoning',
-  balanced: 'a middle amount of reasoning',
-  high: 'reasons at length — slower, usually costlier',
-  'high-fast': 'reasons at length, on the faster variant of the model',
-  max: 'deepest reasoning — slowest, usually costliest',
-  xhigh: 'deepest reasoning — slowest, usually costliest'
+  minimal: 'fastest, cheapest',
+  low: 'fast, cheap',
+  fast: 'lowest latency',
+  medium: 'in between',
+  balanced: 'in between',
+  high: 'slower, costlier',
+  'high-fast': 'slower, on the fast variant',
+  'low-fast': 'fast, on the fast variant',
+  'medium-fast': 'in between, on the fast variant',
+  max: 'slowest, costliest',
+  xhigh: 'slowest, costliest',
+  'xhigh-fast': 'slowest, on the fast variant'
 }
 
 /** What this level means, or undefined when this build cannot say. */
@@ -55,7 +64,5 @@ export function effortDescription(level: string): string | undefined {
  * surprised the app itself as recently as 2026-09-07, so it is worth a line.
  */
 export function effortFooter(runtime: string): string | undefined {
-  return runtime === 'cursor'
-    ? 'Cursor carries the effort inside the model name, so choosing one changes the model this runs on.'
-    : undefined
+  return runtime === 'cursor' ? 'Cursor puts the effort in the model name.' : undefined
 }

@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.9 - 2026-09-08
+
+- **Effort is a slider now, not a list.** Cursor Agent offers eight levels and
+  the old menu listed all eight with a sentence under each, which ran off the
+  bottom of the window and off its right edge. Those eight are really four,
+  each with a faster variant - so it is a Faster-to-Smarter slider with a
+  "Fast variant" switch, using whatever levels the chosen model actually
+  offers.
+- **A runtime's models turn up without a restart.** Locust calls a runtime
+  ready as soon as it is installed and signed in, which happens before it has
+  finished asking that runtime what models it has - and nothing asked again.
+  If you caught it at the wrong moment, a runtime offered only
+  "account-default" until you restarted the app.
+- **Assigning a conversation says so.** It moved a row in a list you may not
+  have been looking at, so a successful assign and a failed one looked
+  identical. It now confirms which teammate it went to.
+
 ## 0.43.8 - 2026-09-08
 
 - **You can choose the sidebar layout.** Settings now offers Auto, Full and

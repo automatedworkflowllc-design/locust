@@ -43,7 +43,7 @@ import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
-import { runtimeDisplayName } from '../../shared/runtimes.js'
+import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
@@ -489,6 +489,8 @@ export default function App(): ReactElement {
           setDeleteError(response.error.message)
           return
         }
+        setDeleteError(undefined)
+        setRowNotice(`Moved to ${teammatesRef.current.find((mate) => mate.teammateId === teammateId)?.name ?? 'that teammate'}.`)
         setMissionOwners((current) => ({ ...current, [missionId]: teammateId }))
         // The run on screen, if it is this one, is now theirs too.
         setRuns((current) => {
@@ -871,6 +873,7 @@ export default function App(): ReactElement {
   // re-runs every few seconds and hands back a new array each time, and
   // re-reading the catalogue on every sweep would be a request per tick.
   const usableKey = runtimes.filter((runtime) => runtimeIsUsable(runtime)).map((runtime) => runtime.id).join(',')
+
   useEffect(() => {
     if (runtimeState.phase !== 'ready') return
     readModels()
@@ -923,6 +926,42 @@ export default function App(): ReactElement {
         // account default, which is what a run is launched with anyway.
       })
   }
+  /**
+   * Ask again while a usable runtime still has no models.
+   *
+   * Discovery calls a runtime READY as soon as it is installed and signed in,
+   * which happens well before its `--list-models` probe answers. So the first
+   * catalogue read can legitimately come back with nothing for it -- and
+   * `usableKey` above never changes afterwards, because the runtime was
+   * already usable, so nothing ever asks again. The picker then offers only
+   * `account-default` for that runtime until the app is restarted.
+   *
+   * Colin, 2026-09-08: "cursor agent is only showing account default now on my
+   * end" ... "nvm it fixed it on reset". The same shape was diagnosed for
+   * Claude Code's aliases in the 0.36.5 QA pass and never fixed, because the
+   * fix looked like re-reading on a timer and nobody wanted a poll.
+   *
+   * This is a poll, but a self-limiting one: it stops the moment every usable
+   * runtime has at least one model, and it gives up after a handful of tries
+   * so a runtime that will never report a catalogue (Antigravity has none)
+   * cannot keep it running.
+   */
+  const awaitingModels = runtimes.some(
+    (runtime) =>
+      runtimeIsUsable(runtime) &&
+      isMissionRuntime(runtime.id) &&
+      !models.some((model) => model.runtime === runtime.id)
+  )
+  const modelRetries = useRef(0)
+  useEffect(() => {
+    if (runtimeState.phase !== 'ready') return
+    if (!awaitingModels || modelRetries.current >= 6) return
+    const again = window.setTimeout(() => {
+      modelRetries.current += 1
+      readModels()
+    }, 3_000)
+    return () => window.clearTimeout(again)
+  }, [awaitingModels, runtimeState.phase, models])
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
   // Off until the workspace says otherwise, and re-read from the host rather
@@ -2395,6 +2434,24 @@ export default function App(): ReactElement {
    */
   const [deleteArmed, setDeleteArmed] = useState(false)
   const [deleteError, setDeleteError] = useState<string>()
+  /**
+   * What a row action just did, when it worked.
+   *
+   * A refusal has had somewhere to appear since 2026-09-05. Success had
+   * nowhere, and that is the other half of the same complaint: assigning a
+   * conversation moves a row in a list you may not be looking at, so a
+   * successful assign and a failed one look identical from the composer --
+   * "i right clicked it and hit assign to wren, nothing happened" (Colin,
+   * 2026-09-08, on a build where assign demonstrably worked).
+   */
+  const [rowNotice, setRowNotice] = useState<string>()
+  // It confirms a thing that already happened, so it goes away on its own. A
+  // standing green line would become furniture, and furniture is not read.
+  useEffect(() => {
+    if (rowNotice === undefined) return
+    const clear = window.setTimeout(() => setRowNotice(undefined), 4_000)
+    return () => window.clearTimeout(clear)
+  }, [rowNotice])
   const deleteMissionById = (missionId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -3116,6 +3173,12 @@ export default function App(): ReactElement {
             <div className="lc-diagnostic lc-tone-red" role="alert">
               <Icon name="shield" size={12} />
               <span>{deleteError}</span>
+            </div>
+          )}
+          {rowNotice !== undefined && (
+            <div className="lc-diagnostic lc-tone-green" role="status">
+              <Icon name="check" size={12} />
+              <span>{rowNotice}</span>
             </div>
           )}
           {workspaceNotice !== undefined && (

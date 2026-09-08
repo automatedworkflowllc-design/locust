@@ -35,7 +35,7 @@ describe('the note under the menu', () => {
   it('says how Cursor actually takes an effort', () => {
     // Checkable, and it explains something the person can see: picking an
     // effort changes the model name in the composer.
-    expect(effortFooter('cursor')).toMatch(/inside the model name/i)
+    expect(effortFooter('cursor')).toMatch(/in the model name/i)
   })
 
   it('draws no note for a runtime it has nothing true to say about', () => {

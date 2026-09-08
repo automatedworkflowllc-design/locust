@@ -24,6 +24,7 @@ import { ContextRing } from './ContextRing.js'
 import { defaultEffort, modelLabelFor } from '../status.js'
 import { Icon } from './Icon.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
+import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 
@@ -346,6 +347,11 @@ export function Composer({
   // level shows the model's default rather than nothing -- the same value
   // App.tsx sets on a route change, so the chip says what the run gets.
   const shownEffort = swarm ? swarmEffort : effort ?? defaultEffort(supportedEfforts)
+  // The scale this model actually offers, and where the current level sits on
+  // it. Four stops and a switch rather than eight rows; see `effortScale.ts`.
+  const { bases: effortBases, hasFast: effortHasFast } = effortScale(supportedEfforts)
+  const { base: effortBase, fast: effortIsFast } = splitEffort(shownEffort ?? effortBases[0] ?? '')
+  const effortIndex = Math.max(0, effortBases.indexOf(effortBase))
   const shownRuntimeStatus = runtimes.find((runtime) => runtime.id === shownRuntime)
   const runtimeLabel = shownRuntimeStatus?.displayName ?? runtimeDisplayName(shownRuntime)
   // A family known only through its effort variants is listed under its
@@ -668,34 +674,62 @@ export function Composer({
               {shownEffort !== undefined && (
                 <span className="lc-control__anchor">
                   {effortOpen && (
-                    <div className="lc-menu" role="menu" aria-label="Reasoning effort">
-                      {supportedEfforts.map((level) => (
+                    /*
+                      * A SLIDER and a switch, not a list.
+                      *
+                      * Cursor lists eight levels and a menu of eight rows ran
+                      * off the window (Colin, 2026-09-08, with a screenshot).
+                      * His fix, and the right one: "you could just use claudes
+                      * since you already have access to it, and then if there
+                      * is a fast option just have a toggle for it." Those eight
+                      * are not eight things -- they are four, each with a
+                      * faster variant. The stops are whatever THIS model
+                      * listed, in the order it listed them, so right is more.
+                      */
+                    <div className="lc-menu lc-menu--right lc-effortpanel" role="group" aria-label="Reasoning effort">
+                      <div className="lc-effortpanel__head">
+                        <span className="lc-fieldlabel lc-mono">Effort</span>
+                        <span className="lc-effortpanel__now lc-control__mono">{effortBase}</span>
+                      </div>
+                      <input
+                        className="lc-effortpanel__slider"
+                        type="range"
+                        min={0}
+                        max={Math.max(0, effortBases.length - 1)}
+                        step={1}
+                        value={effortIndex}
+                        aria-label="Reasoning effort"
+                        aria-valuetext={effortBase}
+                        disabled={effortBases.length < 2}
+                        onChange={(event) => {
+                          const next = effortBases[Number(event.currentTarget.value)]
+                          if (next === undefined) return
+                          const level = joinEffort(next, effortIsFast, supportedEfforts)
+                          if (level !== undefined) onEffortChange(level)
+                        }}
+                      />
+                      <div className="lc-effortpanel__ends lc-mono">
+                        <span>Faster</span>
+                        <span>Smarter</span>
+                      </div>
+                      {effortDescription(effortBase) !== undefined && (
+                        <p className="lc-effortpanel__what">{effortDescription(effortBase)}</p>
+                      )}
+                      {effortHasFast && (
                         <button
-                          key={level}
                           type="button"
-                          role="menuitemradio"
-                          aria-checked={shownEffort === level}
-                          className="lc-menu__item"
+                          role="switch"
+                          aria-checked={effortIsFast}
+                          className={`lc-effortpanel__fast${effortIsFast ? ' is-on' : ''}`}
                           onClick={() => {
-                            onEffortChange(level)
-                            setEffortOpen(false)
+                            const level = joinEffort(effortBase, !effortIsFast, supportedEfforts)
+                            if (level !== undefined) onEffortChange(level)
                           }}
                         >
-                          <span className="lc-menu__text">
-                            <span className="lc-menu__name lc-control__mono">{level}</span>
-                            {/*
-                              * What the level costs you, where this build can
-                              * honestly say. The levels come from the runtime,
-                              * so an unrecognised one draws no line rather
-                              * than an invented meaning.
-                              */}
-                            {effortDescription(level) !== undefined && (
-                              <span className="lc-menu__desc">{effortDescription(level)}</span>
-                            )}
-                          </span>
-                          {shownEffort === level && <Icon name="check" size={13} />}
+                          <span>Fast variant</span>
+                          <span className="lc-effortpanel__pip" aria-hidden="true" />
                         </button>
-                      ))}
+                      )}
                       {effortFooter(route.runtime) !== undefined && (
                         <p className="lc-menu__foot">{effortFooter(route.runtime)}</p>
                       )}
