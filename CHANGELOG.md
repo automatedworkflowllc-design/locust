@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.43.7 - 2026-09-08
+
+- **Locust works properly in a small window.** The layout meant to appear on a
+  laptop-sized window had been unreachable for days: it was written for windows
+  narrower than the smallest one Locust will open. Now, at the minimum size,
+  the sidebar becomes an avatar rail and the inspector slides over the
+  conversation instead of vanishing - it used to disappear entirely at that
+  width, taking the signal rail, the receipt and the artifacts list with it.
+- **Hovering a teammate says who they are.** Name, role and the model they run
+  on. In the narrow layout that hover is the only way to tell one avatar from
+  another.
+- **The effort menu says what each level costs you.** Fast, medium, high and
+  the rest each explain themselves in terms of speed and money rather than a
+  promise about the answer. On Cursor Agent it also says that the effort is
+  part of the model name, which is why choosing one changes the model shown.
+- **A ledger Locust cannot write is now a proper screen.** It says what is
+  safe, what is at risk, and that stopping the run did not undo files it had
+  already changed - and it will open the folder for you. It used to say the
+  mission was "held" and, in the next sentence, that it had been stopped.
+
 ## 0.43.6 — 2026-09-07
 
 - **A long run is no longer killed by one big piece of output.** A mission on
