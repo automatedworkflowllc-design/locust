@@ -811,7 +811,12 @@ export function Composer({
                           }}
                         >
                           <span>Fast variant</span>
-                          <span className="lc-effortpanel__pip" aria-hidden="true" />
+                          {/* A switch track, not a filled button: Colin,
+                              2026-09-08, "just make the fast variant a simple
+                              toggle bar, doesnt need to be so big". */}
+                          <span className="lc-switch" aria-hidden="true">
+                            <span className="lc-switch__knob" />
+                          </span>
                         </button>
                       )}
                       {effortFooter(route.runtime) !== undefined && (

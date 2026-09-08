@@ -916,9 +916,21 @@ describe("OpenCode and Copilot CLI commands", () => {
     expect(spec.args).not.toContain("--session-id");
   });
 
-  it("refuses an effort for two runtimes that have no effort flag", () => {
+  it("refuses an effort for OpenCode, whose run names no effort flag", () => {
+    // OpenCode has `--variant` ("provider-specific reasoning effort"), NOT
+    // `--effort`, and which models accept which variants has not been
+    // measured -- so an effort is still refused here rather than guessed at.
     expect(() => createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, effort: "high" })).toThrow(/effort/);
-    expect(() => createCopilotPromptCommand(copilot, { workspacePath, prompt: PROMPT, effort: "high" })).toThrow(/effort/);
+  });
+
+  it("PASSES an effort to Copilot, which does take one", () => {
+    // This used to be paired with OpenCode above as a runtime with "no effort
+    // flag". Measured 2026-09-08 against copilot 1.0.83, that was untrue:
+    // `--effort, --reasoning-effort <level>` with seven choices. Locust
+    // refused a level the CLI accepts, and read none of its choices either.
+    const spec = createCopilotPromptCommand(copilot, { workspacePath, prompt: PROMPT, effort: "high" });
+    expect(spec.args).toContain("--effort");
+    expect(spec.args[spec.args.indexOf("--effort") + 1]).toBe("high");
   });
 
   it("refuses to build a command with no prompt, because the prompt IS the argv here", () => {

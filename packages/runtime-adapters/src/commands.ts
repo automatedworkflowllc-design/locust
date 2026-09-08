@@ -369,6 +369,35 @@ function requireEffort(value: string): string {
 }
 
 /**
+ * The effort levels a CLI says it takes, read from its own `--help`.
+ *
+ * Two shapes, because two CLIs write it differently and both are real:
+ *
+ *   Claude   --effort <level>  ... (low, medium, high)
+ *   Copilot  --effort, --reasoning-effort <level>  Set the reasoning effort
+ *            level (choices: "none", "minimal", "low", ...)
+ *
+ * The original pattern required `--effort <level>` immediately and accepted
+ * only bare words, so Copilot's list -- quoted, wrapped across three lines,
+ * and behind a second flag name -- matched nothing. Copilot therefore reported
+ * no efforts at all, the composer drew "effort - fixed", and seven levels the
+ * installed CLI genuinely accepts could never be chosen (measured 2026-09-08
+ * against copilot 1.0.83).
+ *
+ * Nothing is guessed: a CLI that names no choices yields none.
+ */
+export function parseEffortChoices(helpText: string): readonly string[] {
+  const clause = /--(?:reasoning-)?effort\b[\s\S]{0,240}?\(\s*(?:choices:)?\s*([^)]*)\)/i.exec(helpText);
+  if (clause === null) return [];
+  return [...new Set(
+    clause[1]!
+      .split(",")
+      .map((entry) => entry.trim().replace(/^["']|["']$/g, "").trim())
+      .filter((entry) => EFFORT.test(entry))
+  )];
+}
+
+/**
  * Read what the Claude Code CLI says about models in its own `--help`: the
  * aliases it accepts for the newest model of each family, and the effort
  * levels it takes. Missing text yields nothing, never a guess.
@@ -378,10 +407,7 @@ export function parseClaudeModelHints(helpText: string): RuntimeModelHints | und
   const aliases = aliasClause
     ? [...aliasClause[1]!.matchAll(/'([a-z0-9][a-z0-9.-]{0,30})'/g)].map((match) => match[1]!)
     : [];
-  const effortClause = /--effort <level>[\s\S]{0,200}?\(([a-z, ]+)\)/.exec(helpText);
-  const efforts = effortClause
-    ? effortClause[1]!.split(",").map((entry) => entry.trim()).filter((entry) => EFFORT.test(entry))
-    : [];
+  const efforts = parseEffortChoices(helpText);
   if (aliases.length === 0 && efforts.length === 0) return undefined;
   return { aliases: [...new Set(aliases)], efforts: [...new Set(efforts)] };
 }
@@ -846,7 +872,14 @@ export function createCopilotPromptCommand(
     args.push("--model", requireText(options.model, "Model"));
   }
   if (options.effort !== undefined) {
-    throw new Error("Copilot CLI takes no effort level");
+    // `--effort, --reasoning-effort <level>`, choices none/minimal/low/medium/
+    // high/xhigh/max (copilot 1.0.83, measured 2026-09-08). This used to throw
+    // "Copilot CLI takes no effort level", which was simply untrue -- and the
+    // discovery side never read its choices either, so the composer said the
+    // effort was fixed. Both halves are fixed together; either alone would
+    // leave the app offering a level it refuses to send, or refusing one it
+    // offers.
+    args.push("--effort", requireEffort(options.effort));
   }
   if (options.resumeThreadId !== undefined) {
     // Measured: the resume flag takes its value with `=`, and the run recalled

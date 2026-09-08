@@ -6795,3 +6795,33 @@ textarea {
   border-color: var(--lc-border-hover);
   color: var(--lc-text-primary);
 }
+
+/* A switch track. Small, and the state is the knob's position rather than the
+   whole row filling with colour. */
+.lc-switch {
+  flex: none;
+  width: 26px;
+  height: 14px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--lc-border-button);
+  display: inline-flex;
+  align-items: center;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-switch__knob {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--lc-bg-raised-2);
+  transition: transform var(--lc-motion-hover) var(--lc-ease);
+}
+
+.is-on .lc-switch {
+  background: var(--lc-lime);
+}
+
+.is-on .lc-switch__knob {
+  transform: translateX(12px);
+}

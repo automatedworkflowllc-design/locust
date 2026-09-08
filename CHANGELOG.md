@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.45.1 - 2026-09-08
+
+- **Copilot CLI's effort levels work.** It accepts seven of them - none,
+  minimal, low, medium, high, xhigh, max - and Locust both failed to read them
+  and refused to send one, so the composer said the effort was fixed when it
+  was not. Locust now reads the levels a runtime names in its own help,
+  whichever way it writes them, and passes your choice through.
+- **The Fast variant is a switch**, not a button that fills with colour.
+
 ## 0.45.0 - 2026-09-08
 
 - **Attachments.** The `+` is back on the composer and it does something: it

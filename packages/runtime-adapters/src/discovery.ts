@@ -9,6 +9,7 @@ import {
   OMNIROUTE_REQUIRED_FEATURES,
   OPENCODE_REQUIRED_FEATURES,
   parseClaudeModelHints,
+  parseEffortChoices,
   parseCursorModelList,
   parseOpenCodeModelList,
 } from "./commands.js";
@@ -302,7 +303,16 @@ async function discoverOne(
     ? detectSupportedFeatures(definition.id, capabilityText)
     : [];
   // The same help text names the models the CLI accepts; only Claude's does.
-  let modelHints = definition.id === "claude" ? parseClaudeModelHints(capabilityText) : undefined;
+  // Claude's help also names model ALIASES, so it keeps its own reader. Every
+  // other runtime still has effort levels worth reading -- Copilot names seven
+  // in its help and Locust reported none, so the composer said "fixed" and the
+  // levels the CLI accepts were unreachable (measured 2026-09-08).
+  let modelHints = definition.id === "claude"
+    ? parseClaudeModelHints(capabilityText)
+    : (() => {
+        const efforts = parseEffortChoices(capabilityText);
+        return efforts.length === 0 ? undefined : { aliases: [], efforts };
+      })();
 
   if (!succeeded(capabilityOutcome)) {
     diagnostics.push(
