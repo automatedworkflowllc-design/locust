@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.45.4 - 2026-09-08
+
+- **A teammate writing a lot no longer gets stopped for it.** A long report on
+  Cursor Agent died with "sent more output than Locust could take in" partway
+  through - not because anything was wrong, but because Locust would only hold
+  64 lines of output while it wrote the previous batch to disk, and a fast
+  model writes more than that in the time one save takes. It holds far more
+  now.
+
 ## 0.45.3 - 2026-09-08
 
 - **A routine that asks you something now waits for the answer.** A step that

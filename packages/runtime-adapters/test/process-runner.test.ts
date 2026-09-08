@@ -339,6 +339,36 @@ describe("controlled runtime JSONL process runner", () => {
     });
   });
 
+  it("carries a long, productive burst without stopping the run", async () => {
+    /*
+     * MEASURED 2026-09-08: a Cursor teammate on grok-4.6 writing a long report
+     * died with "Cursor Agent sent more output than Locust could take in" at
+     * 373k in / 15k out, and an earlier run of the same shape carried 1,596
+     * records. The queue held 64.
+     *
+     * The consumer already batches to avoid exactly this, but the pile-up
+     * happens during the await that writes a batch -- so the only thing that
+     * fixes it is a queue deep enough to hold what a fast runtime emits while
+     * one write completes.
+     */
+    const child = fakeChild();
+    const runner = createNodeRuntimeProcessRunner({ spawnProcess: () => child.process });
+    const run = runner.start(spec, prompt);
+    // Far more than the old ceiling, in one burst, with nobody reading yet.
+    const burst = Array.from({ length: 500 }, (_, index) => JSON.stringify({ n: index })).join("\n");
+    child.stdout.emit("data", burst + "\n");
+    child.close(0, null);
+
+    const collected = await collect(run.records);
+    expect(collected).toHaveLength(500);
+    await expect(run.completion).resolves.toMatchObject({
+      outputLimitExceeded: false,
+      recordCount: 500,
+      cancelled: false,
+    });
+    expect(child.signals).toEqual([]);
+  });
+
   it("bounds queued records when a consumer falls behind", async () => {
     const child = fakeChild({
       onKill: (signal, target) => {

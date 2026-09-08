@@ -326,9 +326,34 @@ export function createNodeRuntimeProcessRunner(
     256 * 1024,
     "maxRecordBytes",
   );
+  /*
+   * How many records may sit unread before the run is stopped.
+   *
+   * This was 64, and 64 is not enough. The consumer already batches -- it
+   * drains everything available and writes it in one go, precisely so a
+   * verbose mission is not killed for being verbose (see the comment at that
+   * drain in `codex-mission.ts`) -- but the pile-up happens DURING the await
+   * that writes the batch, and a fast runtime pushes more than 64 lines in the
+   * time one fsync takes.
+   *
+   * MEASURED 2026-09-08: a Cursor teammate on grok-4.6 writing a long report
+   * died with "Cursor Agent sent more output than Locust could take in" at
+   * 373k in / 15k out. One earlier run of the same shape carried 1,596
+   * records. So the ceiling was being hit by ordinary, productive work.
+   *
+   * 2048 instead. A record is one JSONL line, individually capped at 16 KiB
+   * and in practice a few hundred bytes, so the realistic cost of the deeper
+   * queue is well under a megabyte of memory held briefly.
+   *
+   * Overflow stays FATAL, deliberately, and that is unchanged: it means an
+   * unknown number of unknown records were lost, and a ledger with an unknown
+   * hole in it is worse than a run that stopped and said so. The point of the
+   * larger number is that overflow now means something is actually wrong,
+   * rather than that a model wrote a lot.
+   */
   const maxQueuedRecords = positiveInteger(
     options.maxQueuedRecords,
-    64,
+    2_048,
     "maxQueuedRecords",
   );
   const cancellationGraceMs = positiveInteger(
