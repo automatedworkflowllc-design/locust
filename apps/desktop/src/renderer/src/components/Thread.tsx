@@ -14,6 +14,7 @@ import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, 
 import type { LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { atBottom } from '../stickToBottom.js'
+import { ledgerFailureRows, ledgerFailureSentence } from '../ledgerFailure.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
 import { costLine, runCostOf } from '../cost.js'
@@ -288,6 +289,8 @@ export interface ThreadProps {
   readonly restoredMission: PublicRecoveredMission | undefined
   readonly error: string | undefined
   readonly errorIsPersistence: boolean
+  /** Where receipts are written; the ledger-failure card offers to open it. */
+  readonly ledgerPath?: string
   /** Local wall-clock label for when the mission began. */
   readonly startedAt: string | undefined
   /** The same moment as an ISO string, for the waiting line's clock. */
@@ -346,6 +349,7 @@ export function Thread({
   restoredMission,
   error,
   errorIsPersistence,
+  ledgerPath,
   startedAt,
   startedAtIso,
   approvals,
@@ -568,23 +572,57 @@ export function Thread({
         {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} />}
 
         {error !== undefined && !errorAlreadyShown(items, error) && (
-          <div className="lc-card is-terminal is-red">
-            <div className="lc-card__head">
-              <span>
-                <Icon name="shield" size={13} />{' '}
-                {errorIsPersistence ? 'Mission held — receipts could not be written' : 'The run could not continue'}
-              </span>
+          errorIsPersistence ? (
+            /*
+              The one moment the product's central claim breaks, drawn rather
+              than shrugged at (design pass section: "a persistence-failure
+              state"). It used to title itself "Mission held" and then say in
+              the next sentence that the run had been stopped -- and stopped is
+              what the host does. Both halves matter, so the card says which
+              happened, splits what is safe from what is at risk, and offers
+              the folder.
+            */
+            <div className="lc-card is-terminal is-red">
+              <div className="lc-card__head">
+                <span>
+                  <Icon name="shield" size={13} /> Can&apos;t write the mission ledger
+                </span>
+              </div>
+              <div className="lc-card__body">
+                <p className="lc-ledgerfail__why">{ledgerFailureSentence(error)}</p>
+                <dl className="lc-ledgerfail">
+                  {ledgerFailureRows(restoredMission?.checkpoints?.length).map((row) => (
+                    <Fragment key={row.label}>
+                      <dt className={`lc-ledgerfail__label is-${row.tone}`}>{row.label}</dt>
+                      <dd className="lc-ledgerfail__text">{row.text}</dd>
+                    </Fragment>
+                  ))}
+                </dl>
+                {ledgerPath !== undefined && ledgerPath.length > 0 && (
+                  <button
+                    type="button"
+                    className="lc-button"
+                    onClick={() => {
+                      const bridge = window.desktop
+                      if (bridge === undefined) return
+                      void bridge.revealFile(ledgerPath).catch(() => undefined)
+                    }}
+                  >
+                    Show the ledger folder
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="lc-card__body">
-              {error}
-              {errorIsPersistence && (
-                <>
-                  {' '}
-                  The run was stopped rather than continued without a durable record.
-                </>
-              )}
+          ) : (
+            <div className="lc-card is-terminal is-red">
+              <div className="lc-card__head">
+                <span>
+                  <Icon name="shield" size={13} /> The run could not continue
+                </span>
+              </div>
+              <div className="lc-card__body">{error}</div>
             </div>
-          </div>
+          )
         )}
 
         {/*

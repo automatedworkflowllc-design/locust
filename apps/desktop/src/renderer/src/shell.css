@@ -6147,3 +6147,42 @@ textarea {
   background-color: var(--lc-scroll-thumb-hover);
   background-clip: padding-box;
 }
+
+/*
+ * The ledger-failure card's SAFE / AT RISK rows.
+ *
+ * A definition list because that is what it is: a label and what it means.
+ * The label carries the colour so the split reads at a glance -- which of
+ * these two columns a line is in is the whole point of the card.
+ */
+.lc-ledgerfail__why {
+  margin: 0 0 var(--lc-space-5);
+}
+
+.lc-ledgerfail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--lc-space-3) var(--lc-space-5);
+  margin: 0 0 var(--lc-space-5);
+}
+
+.lc-ledgerfail__label {
+  margin: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.lc-ledgerfail__label.is-safe {
+  color: var(--lc-lime-text);
+}
+
+.lc-ledgerfail__label.is-risk {
+  color: var(--lc-red-text);
+}
+
+.lc-ledgerfail__text {
+  margin: 0;
+}

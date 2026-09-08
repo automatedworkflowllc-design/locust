@@ -500,9 +500,12 @@ if (!ownsSingleInstanceLock) {
     const noWorkspaceRefusal = () =>
       workspaceChosen ? undefined : ({ ok: false, error: { code: 'NO_WORKSPACE', message: NO_WORKSPACE_MESSAGE } } as const)
 
-    const missionLedger = createFileMissionLedger({
-      rootDirectory: join(app.getPath('userData'), 'mission-ledger')
-    })
+    // Named once, because two things need it: the ledger itself, and the
+    // reveal root that lets someone open the folder when a write to it fails.
+    // A person told "Locust cannot write its ledger" and given no way to go
+    // and look at the folder has been informed and not helped.
+    const ledgerDirectory = join(app.getPath('userData'), 'mission-ledger')
+    const missionLedger = createFileMissionLedger({ rootDirectory: ledgerDirectory })
     // Its own directory: the ledger treats every `.jsonl` in ITS directory as
     // a mission, and the channel is not one.
     // Team memory: kept per folder in the app's own data, briefed to every
@@ -1098,7 +1101,12 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       // The roots are the host's, never the renderer's. One workspace per
       // launch, and every worktree lives inside it, so this is the whole list.
-      const decision = decideReveal(requested, workspaceChosen ? [workspacePath] : [])
+      // The workspace, plus Locust's own ledger folder. Both are the HOST's
+      // paths; the renderer still names nothing it was not already shown.
+      const decision = decideReveal(requested, [
+        ...(workspaceChosen ? [workspacePath] : []),
+        ledgerDirectory
+      ])
       if (!decision.ok) {
         return {
           ok: false,
@@ -1484,7 +1492,7 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(APP_INFO_CHANNEL, (event) => {
-      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged, platform: process.platform, workspaceName: '', workspacePath: '', workspaceMade: false } as const
+      if (!fromOwnWindow(event)) return { name: 'Locust', version: 'unknown', packaged: app.isPackaged, platform: process.platform, workspaceName: '', workspacePath: '', workspaceMade: false, ledgerPath: '' } as const
       // The version electron-builder stamped, which is the one on the installer.
       return {
         name: 'Locust',
@@ -1493,7 +1501,11 @@ if (!ownsSingleInstanceLock) {
         platform: process.platform,
         workspaceName: workspaceChosen ? basename(workspacePath) || workspacePath : '',
         workspacePath: workspaceChosen ? workspacePath : '',
-        workspaceMade
+        workspaceMade,
+        // Where the receipts live. The renderer needs it for one thing: when a
+        // write to the ledger fails, the card offers to open the folder, and
+        // an offer to show someone a place has to know which place.
+        ledgerPath: ledgerDirectory
       } as const
     })
 

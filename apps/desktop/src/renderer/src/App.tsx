@@ -917,6 +917,8 @@ export default function App(): ReactElement {
   const [workspaceName, setWorkspaceName] = useState('Local workspace')
   /** The folder itself, so activity rows can show paths the way a person writes them. */
   const [workspacePath, setWorkspacePath] = useState<string | undefined>(undefined)
+  // Only the ledger-failure card reads this: it offers to open the folder.
+  const [ledgerPath, setLedgerPath] = useState<string | undefined>(undefined)
   const [workspaceMade, setWorkspaceMade] = useState(false)
   // A word about the folder, at shell level: a refused start, a refused
   // choice, or the reopen that follows a successful one.
@@ -1189,6 +1191,7 @@ export default function App(): ReactElement {
           setWorkspaceName(info.workspaceName)
           setWorkspacePath(info.workspacePath.length === 0 ? undefined : info.workspacePath)
           setWorkspaceMade(info.workspaceMade === true)
+          setLedgerPath(info.ledgerPath.length === 0 ? undefined : info.ledgerPath)
         }
       })
       .catch(() => undefined)
@@ -1753,8 +1756,21 @@ export default function App(): ReactElement {
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId })
       })
       if (!response.ok) {
+        // A ledger that cannot be written is the same failure whether it hits
+        // on the FIRST write or the fortieth, and only the second one used to
+        // reach the card that explains it. The first -- a ledger folder that
+        // is unwritable when the app starts, which is the likeliest way anyone
+        // meets this -- arrived as a plain start error and drew the generic
+        // "The run could not continue". Measured by
+        // `_tools/drive-ledger-failure.mjs`, which blocks the ledger path.
+        const persistence = response.error.code === 'PERSISTENCE_FAILED'
         setRuns((current) =>
-          withRun(current, key, (run) => ({ ...run, phase: 'failed', error: response.error.message }))
+          withRun(current, key, (run) => ({
+            ...run,
+            phase: 'failed',
+            error: response.error.message,
+            ...(persistence ? { errorIsPersistence: true } : {})
+          }))
         )
         // The turn IS on screen -- prompt bubble and failure card -- so the
         // composer must let go of it. Holding on left the same sentence in
@@ -3028,6 +3044,7 @@ export default function App(): ReactElement {
                 restoredMission={liveRun.restored === true ? liveRun.restoredMission : undefined}
                 error={liveRun.error}
                 errorIsPersistence={liveRun.errorIsPersistence === true}
+                {...(ledgerPath === undefined ? {} : { ledgerPath })}
                 approvals={shownApprovals}
                 onDecide={decideApproval}
                 decidingIds={decidingIds}

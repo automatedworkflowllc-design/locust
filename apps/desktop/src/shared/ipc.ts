@@ -204,6 +204,12 @@ export interface AppInfo {
    * teammates' files went and that any other folder is one click away.
    */
   readonly workspaceMade: boolean
+  /**
+   * Where the durable receipts are written. Carried so that the one card
+   * about a ledger that cannot be written can offer to open the folder;
+   * nothing else in the renderer needs it.
+   */
+  readonly ledgerPath: string
 }
 
 /**
