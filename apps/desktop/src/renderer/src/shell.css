@@ -6772,3 +6772,26 @@ textarea {
 .lc-shell.is-compact .lc-teammate {
   position: relative;
 }
+
+/* The attach control and the chip that says what is attached. The chip is a
+   button because pressing it removes them; it says "2 files", not "attached",
+   because on most runtimes nothing is attached in the API sense. */
+.lc-control--icon {
+  /* Square, and the same height as the boxed controls beside it. `.lc-control`
+     has no height of its own -- it is padding around text -- so an icon-only
+     button came out 28x14 and sat short in the row (measured, drive-attach). */
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+
+.lc-attachchip {
+  gap: var(--lc-space-3);
+}
+
+.lc-attachchip:hover {
+  border-color: var(--lc-border-hover);
+  color: var(--lc-text-primary);
+}

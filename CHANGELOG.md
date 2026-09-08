@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.45.0 - 2026-09-08
+
+- **Attachments.** The `+` is back on the composer and it does something: it
+  opens a picker limited to the folder your teammates work in, and the files
+  you choose are named at the top of your message so the teammate reads them
+  before answering. It works on every runtime, because reading a file in the
+  workspace is the one thing all six can already do - and the read shows up in
+  the activity fold, so you can see it happened rather than take Locust's word
+  for it. Files outside the folder are refused, and a file's contents are
+  never pasted into the message.
+  The chip says "2 files" rather than "attached", because on most runtimes
+  nothing is attached in the technical sense. Three of the six take a file
+  natively and a later build will use that, and say so when it does.
+
 ## 0.44.1 - 2026-09-08
 
 - **Your conversations are reachable from the narrow layout.** In the 64px

@@ -25,6 +25,7 @@ import { defaultEffort, modelLabelFor } from '../status.js'
 import { Icon } from './Icon.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
+import { attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 
@@ -199,6 +200,15 @@ export function Composer({
     if (refusal !== undefined) setRefusal(undefined)
   }
   const [modeOpen, setModeOpen] = useState(false)
+  /**
+   * Files this message will point the runtime at, workspace-relative.
+   *
+   * Cleared on send, like the box itself: an attachment belongs to the message
+   * it was chosen for, and carrying it silently into the next one would attach
+   * a file nobody asked for.
+   */
+  const [attached, setAttached] = useState<readonly string[]>([])
+  const [attaching, setAttaching] = useState(false)
   const [effortOpen, setEffortOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -309,8 +319,13 @@ export function Composer({
     // as lag (Colin, 2026-09-05, screenshot). If the send never happened at
     // all, the words come straight back rather than being lost.
     setValue('')
-    void onStart(prompt).then((started) => {
-      if (!started) setValue(prompt)
+    const sending = attached
+    setAttached([])
+    void onStart(withAttachments(prompt, sending)).then((started) => {
+      if (!started) {
+        setValue(prompt)
+        setAttached(sending)
+      }
     })
   }
 
@@ -579,16 +594,58 @@ export function Composer({
                 <span className="lc-control__folder">{workspaceName ?? 'No folder'}</span>
               </button>
               {/*
-                * The `+` is gone until attachments ship.
+                * The `+`, back as the real thing.
                 *
-                * It was permanently disabled, titled "not built yet", on the
-                * most-visited surface in the app -- and it is the one control
-                * a new person presses first, because every other chat app has
-                * one. That breaks this app's own rule about never drawing a
-                * control for a capability that does not exist. A dead plus
-                * costs more than a missing one (design review, 2026-09-06).
-                * It comes back as the real thing when B40 lands.
+                * It was removed in the 0906 design review because it was a
+                * permanently disabled control titled "not built yet" on the
+                * most-visited surface in the app -- "a dead plus costs more
+                * than a missing one". It only returns now because attaching
+                * actually works: the picker is limited to the workspace and
+                * the chosen paths are named in the message, which every
+                * runtime can act on (docs/ATTACHMENTS-INTAKE-2026-09-08.md).
                 */}
+              <button
+                type="button"
+                className="lc-control lc-control--icon"
+                aria-label="Attach files from this workspace"
+                title="Attach files from this workspace"
+                disabled={running || attaching}
+                onClick={() => {
+                  const bridge = window.desktop
+                  if (bridge === undefined) return
+                  setAttaching(true)
+                  void bridge
+                    .attachFiles()
+                    .then((answer) => {
+                      if (answer.ok) {
+                        // Deduplicated and capped: the same file twice is one
+                        // reference, and the cap is what keeps a stray
+                        // multi-select out of the prompt budget.
+                        setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
+                        setRefusal(undefined)
+                      } else if (answer.message.length > 0) {
+                        setRefusal(answer.message)
+                      }
+                    })
+                    .catch(() => setRefusal('Those files could not be attached.'))
+                    .finally(() => setAttaching(false))
+                }}
+              >
+                <Icon name="plus" size={14} />
+              </button>
+              {attached.length > 0 && (
+                <button
+                  type="button"
+                  className="lc-control lc-control--boxed lc-attachchip"
+                  title={`${attached.join(', ')} — click to remove all`}
+                  aria-label={`${attachmentLabel(attached.length)} attached; remove`}
+                  onClick={() => setAttached([])}
+                >
+                  <Icon name="attachment" size={12} />
+                  <span className="lc-control__mono">{attachmentLabel(attached.length)}</span>
+                  <Icon name="close" size={11} />
+                </button>
+              )}
             </div>
             <div className="lc-composer__group">
               <span className="lc-control__anchor">

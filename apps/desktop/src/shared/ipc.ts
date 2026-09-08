@@ -298,6 +298,19 @@ export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
  * for why that check is the whole point of the channel.
  */
 export const WORKSPACE_REVEAL_CHANNEL = 'workspace:reveal'
+/**
+ * Choose files to attach to the next message.
+ *
+ * The host opens the picker and returns only paths INSIDE the workspace --
+ * the same containment `main/reveal-file.ts` enforces on the way out, applied
+ * on the way in. The renderer never names a folder to open.
+ */
+export const WORKSPACE_ATTACH_CHANNEL = 'workspace:attach'
+
+/** Files chosen to attach, workspace-relative, or why none were. */
+export type AttachFilesResponse =
+  | { readonly ok: true; readonly paths: readonly string[] }
+  | { readonly ok: false; readonly message: string }
 
 /** What came of a reveal. A refusal names why, in words a card can show. */
 export type RevealFileResponse =
@@ -1202,6 +1215,8 @@ export interface DesktopApi {
    * card can say something rather than appear to do nothing.
    */
   revealFile(path: string): Promise<RevealFileResponse>
+  /** Open the picker for files to attach; answers workspace-relative paths. */
+  attachFiles(): Promise<AttachFilesResponse>
   listRooms(): Promise<RoomListResponse>
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>
   removeRoom(roomId: string): Promise<RoomMutationResponse>

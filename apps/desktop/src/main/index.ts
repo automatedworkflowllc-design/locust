@@ -25,7 +25,9 @@ import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
 import { createModelCatalog } from './model-catalog.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
+import { relative } from 'node:path'
 import { decideReveal } from './reveal-file.js'
+import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { createTeammateStore } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
@@ -97,6 +99,7 @@ import {
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
+  WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
@@ -1121,6 +1124,50 @@ if (!ownsSingleInstanceLock) {
       // wrote, which is not a click anyone should be one step away from.
       shell.showItemInFolder(decision.path)
       return { ok: true } as const
+    })
+
+    ipcMain.handle(WORKSPACE_ATTACH_CHANNEL, async (event) => {
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (owner === null || !fromOwnWindow(event)) {
+        return { ok: false, message: 'That request was rejected.' } as const
+      }
+      if (!workspaceChosen) {
+        return { ok: false, message: 'Choose the folder your teammates work in first.' } as const
+      }
+      const picked = await dialog.showOpenDialog(owner, {
+        title: 'Attach files from this workspace',
+        buttonLabel: 'Attach',
+        // The workspace, and only the workspace. `defaultPath` merely opens
+        // there; the containment below is what actually holds, because a
+        // person can navigate anywhere from a file dialog.
+        defaultPath: workspacePath,
+        properties: ['openFile', 'multiSelections']
+      })
+      if (picked.canceled || picked.filePaths.length === 0) {
+        return { ok: false, message: '' } as const
+      }
+      const inside: string[] = []
+      let refused = 0
+      for (const chosen of picked.filePaths.slice(0, MAX_ATTACHMENTS)) {
+        // Same rule as a reveal, in the other direction: a path is honoured
+        // only when it resolves inside the folder the teammates work in.
+        // Attaching from outside would put a file the runtime cannot read into
+        // the prompt, and the run would fail for a reason nobody could see.
+        const decision = decideReveal(chosen, [workspacePath])
+        if (decision.ok) inside.push(relative(workspacePath, decision.path).split('\\').join('/'))
+        else refused += 1
+      }
+      if (inside.length === 0) {
+        return {
+          ok: false,
+          message: 'Those files are outside the folder your teammates work in, so they cannot be read.'
+        } as const
+      }
+      return {
+        ok: true,
+        paths: inside,
+        ...(refused === 0 ? {} : { message: '' })
+      } as const
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
