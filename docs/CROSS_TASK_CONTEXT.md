@@ -119,6 +119,15 @@ Use this template:
 
 ## Handoff log
 
+### 2026-09-08 — app-server receipt-failure hold measurement (astra/work)
+
+- Scope: measurement only, in the isolated locust-astra worktree; no runtime or UI changes.
+- Decision: close arbitrary ledger-failure pause as cannot with Codex 0.153.0's exposed protocol. Approval waits are not an all-work-stopped barrier.
+- Evidence and limits: [app-server hold finding](FINDING-app-server-hold-2026-09-08.md); generated experimental inventory plus six live dispatcher replies, no generation. Empty-data control exits nonzero.
+- Validation: recursive typecheck green; full root Vitest 1,660/1,660, 103 files.
+- Separate concern: app-server mission notification persistence rejection is swallowed in this snapshot; source-level finding only, left unchanged for the owning agent.
+- Next step: review the finding and merge the named documentation/probe commit from astra/work if accepted. No pause implementation is queued.
+
 ### 2026-08-30 — workspace and product baseline
 
 - Scope/owner: initial shared product documentation.
