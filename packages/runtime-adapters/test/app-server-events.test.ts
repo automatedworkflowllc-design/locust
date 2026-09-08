@@ -217,3 +217,65 @@ describe("errors and noise", () => {
     expect(events[0]?.sourceAdapter).toBe("claude");
   });
 });
+
+describe("saying which limit, and when it lifts", () => {
+  /*
+   * VERBATIM from `~/.codex/sessions/.../rollout-2026-09-08T12-26-52-*.jsonl`,
+   * captured while Colin's account was near its ceiling. The keys are the
+   * snake_case ones Codex writes to disk.
+   *
+   * This fixture is the whole point. Reporting "primary limit 93% used" told
+   * him his Codex quota was nearly gone. It was not: `primary` is the
+   * FIVE-HOUR window, `secondary` is the weekly one, and the weekly bucket
+   * was at 14%. He pushed back, and he was right.
+   */
+  const REAL = {
+    primary: { used_percent: 93.0, window_minutes: 300, resets_at: 1788892785 },
+    secondary: { used_percent: 14.0, window_minutes: 10080, resets_at: 1789479585 },
+  };
+
+  it("names the window a person recognises, not the API's own key", () => {
+    const limit = limitFromSnapshot(REAL);
+    expect(limit?.message).toContain("5-hour");
+    expect(limit?.message).not.toContain("primary");
+  });
+
+  it("still reports the worst window, which is the one that stops you", () => {
+    expect(limitFromSnapshot(REAL)?.message).toContain("93%");
+    expect(limitFromSnapshot(REAL)?.kind).toBe("temporary-rate-limit");
+  });
+
+  it("says when it lifts, because that is the decision", () => {
+    // "Wait an hour" and "stop for the week" are different actions and the
+    // percentage alone cannot tell them apart.
+    expect(limitFromSnapshot(REAL)?.message).toMatch(/resets \d\d:\d\d/);
+  });
+
+  it("reads the camelCase spelling the app-server sends", () => {
+    // Two serialisations of one fact: the notification is camelCase, the
+    // rollout file on disk is snake_case. A field it cannot see is a field it
+    // silently drops.
+    const limit = limitFromSnapshot({ primary: { usedPercent: 93, windowMinutes: 300, resetsAt: 1788892785 } });
+    expect(limit?.message).toContain("5-hour");
+    expect(limit?.message).toMatch(/resets \d\d:\d\d/);
+  });
+
+  it("calls the seven-day window weekly", () => {
+    expect(limitFromSnapshot({ secondary: { used_percent: 99, window_minutes: 10080 } })?.message)
+      .toContain("weekly");
+  });
+
+  it("falls back to the raw key when no window is given", () => {
+    // Better a label that says little than a window invented from nothing.
+    expect(limitFromSnapshot({ primary: { usedPercent: 95 } })?.message).toContain("primary");
+  });
+
+  it("says nothing about a reset it was not told", () => {
+    expect(limitFromSnapshot({ primary: { usedPercent: 95, windowMinutes: 300 } })?.message)
+      .not.toContain("resets");
+  });
+
+  it("stays quiet well below the ceiling", () => {
+    expect(limitFromSnapshot({ primary: { used_percent: 14, window_minutes: 10080 } })).toBeUndefined();
+  });
+})

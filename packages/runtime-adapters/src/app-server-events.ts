@@ -90,31 +90,76 @@ export function toolCommandOf(item: Record<string, unknown>): string | undefined
  * server pushes these unprompted and often while everything is fine; emitting
  * one every time would fill the transcript with "nothing is wrong".
  */
+/**
+ * A window, in the words a person uses for it.
+ *
+ * The snapshot's own keys are `primary` and `secondary`, which say nothing:
+ * measured on a real account, `primary` is the FIVE-HOUR window and
+ * `secondary` is the weekly one. Reporting "primary limit 93% used" told
+ * Colin his Codex quota was nearly gone when the weekly bucket was at 14% and
+ * the five-hour one refilled 56 minutes later. He was right to push back, and
+ * the snapshot had `window_minutes` in it the whole time.
+ */
+function windowName(minutes: number | undefined, label: string): string {
+  if (minutes === undefined) return label;
+  if (minutes >= 10_080) return "weekly";
+  if (minutes >= 1_440) return `${String(Math.round(minutes / 1_440))}-day`;
+  if (minutes >= 60 && minutes % 60 === 0) return `${String(minutes / 60)}-hour`;
+  return `${String(minutes)}-minute`;
+}
+
+/** `14:39`, from epoch seconds, or nothing when there is nothing to say. */
+function resetClock(resets: unknown): string | undefined {
+  const seconds = typeof resets === "number" ? resets : undefined;
+  // Epoch SECONDS, not milliseconds: a value this small in ms would be 1970.
+  if (seconds === undefined || seconds < 1_000_000_000) return undefined;
+  const at = new Date(seconds * 1000);
+  const pad = (value: number): string => String(value).padStart(2, "0");
+  return `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
+/**
+ * A rate-limit snapshot only becomes an event when it says something. The
+ * server pushes these unprompted and often while everything is fine; emitting
+ * one every time would fill the transcript with "nothing is wrong".
+ *
+ * Both spellings are read. The app-server notification is camelCase and the
+ * rollout file Codex writes to disk is snake_case, and this has to survive
+ * either -- a field it cannot see is a field it silently drops, which is how
+ * the window and the reset went missing from the message for so long.
+ */
 export function limitFromSnapshot(
   snapshot: unknown,
 ): { readonly kind: "quota-exhausted" | "temporary-rate-limit"; readonly message: string } | undefined {
   if (!isObject(snapshot)) return undefined;
-  const windows: { label: string; used: number; resets: unknown }[] = [];
+  const number = (value: unknown): number | undefined => (typeof value === "number" ? value : undefined);
+  const windows: { name: string; used: number; resets: unknown }[] = [];
   for (const [label, value] of Object.entries(snapshot)) {
     if (!isObject(value)) continue;
-    const used = typeof value.usedPercent === "number"
-      ? value.usedPercent
-      : typeof value.utilization === "number"
-        ? value.utilization * 100
-        : undefined;
+    const used = number(value.usedPercent)
+      ?? number(value.used_percent)
+      ?? (number(value.utilization) === undefined ? undefined : (value.utilization as number) * 100);
     if (used === undefined) continue;
-    windows.push({ label, used, resets: value.resetsAt ?? value.resetsInSeconds });
+    windows.push({
+      name: windowName(number(value.windowMinutes) ?? number(value.window_minutes), label),
+      used,
+      resets: value.resetsAt ?? value.resets_at ?? value.resetsInSeconds,
+    });
   }
   if (windows.length === 0) return undefined;
   const worst = windows.reduce((left, right) => (right.used > left.used ? right : left));
+  // The reset is the actionable half: "wait an hour" and "stop for the week"
+  // are different decisions, and the percentage alone cannot tell them apart.
+  const clock = resetClock(worst.resets);
+  const until = clock === undefined ? "" : `, resets ${clock}`;
   if (worst.used >= 100) {
-    return { kind: "quota-exhausted", message: `${worst.label} limit reached` };
+    return { kind: "quota-exhausted", message: `${worst.name} limit reached${until}` };
   }
   // Only speak up when it is close enough to matter to a decision.
   if (worst.used >= 90) {
     return {
       kind: "temporary-rate-limit",
-      message: `${worst.label} limit ${Math.round(worst.used)}% used`,
+      message: `${worst.name} limit ${String(Math.round(worst.used))}% used${until}`,
     };
   }
   return undefined;
