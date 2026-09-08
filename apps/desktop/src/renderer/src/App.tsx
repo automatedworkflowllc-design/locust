@@ -2517,6 +2517,24 @@ export default function App(): ReactElement {
     if (own !== undefined) {
       setRoute({ runtime: own.runtime, model: own.model })
       setMode(own.mode)
+      /*
+       * Including the effort, which this used to drop.
+       *
+       * `TeammateRoute` carries one, and its own docstring says why -- "how
+       * hard the model was asked to think is part of how it ran". Picking the
+       * teammate restored their runtime, model and mode and then silently
+       * reset the effort to the model's default, so a teammate saved at `low`
+       * ran at `medium` every time they were selected. Seen while driving
+       * approve-each on 2026-09-08: the seed said `low`, the composer said
+       * `medium`, and the run cost more than it was asked to.
+       *
+       * This is the same shape as the bug `routine-store.ts` guards against by
+       * naming every field it copies -- an object rebuilt field by field
+       * quietly loses anything nobody remembered. `undefined` is a real value
+       * here: a teammate on a runtime with no levels must CLEAR the effort,
+       * not inherit the last one.
+       */
+      setEffort(own.effort)
     }
     const theirs = [...runs.entries()].filter(([, run]) => ownerOf(run) === teammateId)
     const startedAt = (run: LiveRunState): number =>

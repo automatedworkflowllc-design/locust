@@ -5,7 +5,17 @@
 // Wren on Codex CLI in "Approve each action" mode is asked to create one
 // file. What a person sees: the run stopping at the card, the card naming
 // the file and showing the added line, the Approve press, the run finishing,
-// the file on disk. Spends one short Codex run on Colin's account.
+// the file on disk.
+//
+// Spends one short Codex run on Colin's account, at the cheapest setting the
+// runtime offers. `model/list` reports exactly one model -- `gpt-6-astra` --
+// so there is no cheaper model to pick and the only lever is reasoning
+// effort, which is pinned to `low` here. Colin, 2026-09-08: "use cheap models
+// especially for codex". The prompt is deliberately one file and no shell.
+//
+// This is the ONLY drive that covers `approve-each`, and `modeRunsOn` makes
+// that mode Codex-only -- so while this stayed gated, an entire permission
+// mode went unexercised.
 
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -21,7 +31,7 @@ const drive = await startDrive({
   workspace,
   seed: {
     schemaVersion: 1,
-    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-05T05:00:00.000Z', route: { runtime: 'codex', model: 'account-default', mode: 'approve-each' } }],
+    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-05T05:00:00.000Z', route: { runtime: 'codex', model: 'gpt-6-astra', mode: 'approve-each', effort: 'low' } }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 6, memoryMode: 'off' }
   }
@@ -33,7 +43,26 @@ try {
     const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
     who.click()
     await new Promise(r => setTimeout(r, 500))
-    return [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' · ')
+    const controls = [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' · ')
+    /*
+     * The effort is ASSERTED, not just printed. The seed saves Wren at low
+     * effort, and selectTeammate used to restore runtime, model and mode while
+     * silently dropping the effort -- so this read medium and the run cost
+     * more than it had been asked to (found here, 2026-09-08).
+     *
+     * There is no unit test for it: the drop was one line inside a component
+     * and this repo has no DOM to render one in. This drive is the guard, so
+     * it has to fail loudly rather than print a wrong word quietly.
+     *
+     * No backticks in here: this comment lives inside a template literal, and
+     * one would end it. That has cost this repo a debugging session before.
+     */
+    // Asserted POSITIVELY. A first version only looked for the wrong words
+    // (medium/high/max) and so passed silently when the row said
+    // "effort - fixed" instead -- which was a different bug, and one this
+    // drive then found anyway on its third run.
+    const kept = /(^| )low( |$)/.test(controls)
+    return controls + (kept ? '' : ' || EFFORT DID NOT FOLLOW THE TEAMMATE (seeded low)')
   })()`))
   await drive.capture('ask for a new file and wait for the card', () => drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')

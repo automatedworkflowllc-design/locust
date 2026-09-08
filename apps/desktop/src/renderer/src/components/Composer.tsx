@@ -443,7 +443,20 @@ export function Composer({
   // the label beside it; when nothing is running the two are the same route.
   // Through `modelFamily`, not a bare id match: once a run resolves a Cursor
   // route to a variant, an id match finds no family and the chip vanishes.
-  const supportedEfforts = modelFamily(models, shownRuntime, shownModel)?.supportedEfforts ?? []
+  /*
+   * What this model reports -- and, separately, whether we have been told yet.
+   *
+   * These were one value, and an empty list meant both "this model has no
+   * levels" and "the catalog has not arrived". So a composer opened before the
+   * model list loaded stated "effort · fixed", which reads as a fact about the
+   * runtime ("it uses its own") when nothing was known at all. Caught by the
+   * approve-each drive on 2026-09-08: three runs of the same seed showed
+   * `medium`, then `low`, then `effort · fixed`.
+   */
+  const shownFamily = modelFamily(models, shownRuntime, shownModel)
+  const supportedEfforts = shownFamily?.supportedEfforts ?? []
+  /** Only true once the catalog has actually answered for THIS model. */
+  const effortIsGenuinelyFixed = shownFamily !== undefined && shownFamily.supportedEfforts.length === 0
   // Swarm means "this model's maximum", and the catalog orders efforts lowest
   // to highest, so the maximum is the last one THIS model reported -- not a
   // fixed name that some models do not have.
@@ -1002,7 +1015,7 @@ export function Composer({
                 * the runtime, which is the same fact the route chip beside it
                 * is there to give.
                 */}
-              {supportedEfforts.length === 0 && (
+              {effortIsGenuinelyFixed && (
                 <span
                   className="lc-control lc-control--boxed is-static"
                   title="This runtime does not let the effort be chosen; it uses its own."
