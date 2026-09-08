@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.50.2 - 2026-09-08
+
+- **A rate-limit warning now says which limit, and when it lifts.** It read
+  "primary limit 93% used" - the provider's own internal word - when what it
+  meant was the five-hour window, which refills within the hour. The weekly
+  budget was barely touched. It now reads "5-hour limit 93% used, resets
+  14:39", because waiting an hour and stopping for the week are different
+  decisions and a percentage cannot tell them apart.
+- **And a limit could go unmentioned entirely.** The reader understood only one
+  of the two spellings the runtime uses for these numbers, so on the other it
+  said nothing at all.
+
 ## 0.50.1 - 2026-09-08
 
 - **Picking a teammate now keeps the effort they were set to.** It restored
