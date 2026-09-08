@@ -31,7 +31,7 @@ const WRITE_LINES = [
   JSON.stringify({ step_index: 4, source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', created_at: NOW, content: 'DONE' })
 ]
 
-function fakeLedger(): { ledger: MissionLedger; created: unknown[]; appended: { missionId: string; events: readonly { type: string; payload: Record<string, unknown> }[] }[] } {
+function fakeLedger(refuseAppend = false): { ledger: MissionLedger; created: unknown[]; appended: { missionId: string; events: readonly { type: string; payload: Record<string, unknown> }[] }[] } {
   const created: unknown[] = []
   const appended: { missionId: string; events: readonly { type: string; payload: Record<string, unknown> }[] }[] = []
   const ledger = {
@@ -39,6 +39,7 @@ function fakeLedger(): { ledger: MissionLedger; created: unknown[]; appended: { 
       created.push(input)
     },
     appendEvents: async (missionId: string, events: readonly { type: string; payload: Record<string, unknown> }[]) => {
+      if (refuseAppend) throw new Error('no space left on device')
       appended.push({ missionId, events })
     },
     appendHostFailure: async () => undefined,
@@ -65,19 +66,22 @@ interface Harness {
   readonly emitted: { type: string; payload: Record<string, unknown> }[]
   readonly created: unknown[]
   readonly appended: ReturnType<typeof fakeLedger>['appended']
+  readonly updates: { kind: string }[]
 }
 
-function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number } = {}): Harness {
-  const { ledger, created, appended } = fakeLedger()
+function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; refuseAppend?: boolean } = {}): Harness {
+  const { ledger, created, appended } = fakeLedger(options.refuseAppend === true)
   const api = { calls: [] as { kind: string; input: unknown }[] }
   const transcript = { lines: options.lines ?? [] }
   const emitted: { type: string; payload: Record<string, unknown> }[] = []
+  const updates: { kind: string }[] = []
   let ids = 0
   const service = createAntigravityMissionService({
     workspacePath: WORKSPACE,
     ledger,
     probe: async () => (options.host === undefined && 'host' in options ? undefined : (options.host ?? host())),
     emitEvent: (_runId, _missionId, event) => emitted.push(event as { type: string; payload: Record<string, unknown> }),
+    emitUpdate: (update) => updates.push(update as unknown as { kind: string }),
     agentApi: (): AgentApi => ({
       newConversation: async (input) => {
         api.calls.push({ kind: 'new', input })
@@ -94,7 +98,7 @@ function harness(options: { host?: AntigravityHost | undefined; lines?: string[]
     pollMs: 5,
     ...(options.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: options.idleTimeoutMs })
   })
-  return { service, api, transcript, emitted, created, appended }
+  return { service, api, transcript, emitted, created, appended, updates }
 }
 
 const settle = async (ticks = 12): Promise<void> => {
@@ -256,5 +260,43 @@ describe('a mission through Antigravity', () => {
     const peer = { self: { teammateId: 'tm_w', name: 'Wren', role: 'Code & Migrations' }, others: [] }
     await h.service.start('one', peer, {})
     await expect(h.service.start('two', peer, {})).rejects.toThrow(/already has a mission running/)
+  })
+})
+
+describe('when the ledger refuses a receipt', () => {
+  /*
+   * The same defect the app-server path carried until 0.51.0, found by
+   * sweeping for the shape rather than waiting for it to bite. This one was
+   * worse in one specific way, which the second test pins.
+   */
+  it('ends the run and says so, instead of polling on with nobody recording', async () => {
+    const test = harness({ lines: WRITE_LINES, refuseAppend: true })
+    await test.service.start('Write hello.txt', undefined, {})
+    await settle()
+    expect(test.updates.some((update) => update.kind === 'persistence-error')).toBe(true)
+  })
+
+  it('does NOT advance past events it failed to write', async () => {
+    /*
+     * The cursor used to move BEFORE the write, so a ledger failure took those
+     * events with it -- never persisted, never emitted, and never retried,
+     * because the next tick started after them. Re-reading the transcript from
+     * the same place is what makes a transient failure genuinely retryable.
+     */
+    const test = harness({ lines: WRITE_LINES, refuseAppend: true })
+    await test.service.start('Write hello.txt', undefined, {})
+    await settle()
+    expect(test.appended).toHaveLength(0)
+    expect(test.emitted).toHaveLength(0)
+  })
+
+  it('leaves a healthy run completely alone', async () => {
+    // The control: without it both tests above would pass against a service
+    // that ended every run it started.
+    const test = harness({ lines: WRITE_LINES })
+    await test.service.start('Write hello.txt', undefined, {})
+    await settle()
+    expect(test.appended.length).toBeGreaterThan(0)
+    expect(test.updates.some((update) => update.kind === 'persistence-error')).toBe(false)
   })
 })

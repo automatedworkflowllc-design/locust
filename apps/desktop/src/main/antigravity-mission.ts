@@ -136,11 +136,49 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
   const starting = new Set<string>()
   let disposed = false
 
+  /** Thrown when the LEDGER refused, so a caller can tell it from a read error. */
+  class LedgerWriteFailed extends Error {
+    constructor(readonly cause: unknown) {
+      super('The mission could not be written to the durable local ledger.')
+    }
+  }
+
+  /*
+   * End a run whose receipts cannot be written, and say so.
+   *
+   * Not persisted, because the ledger is the thing that just failed and
+   * writing this through it would be the same failure again.
+   */
+  const endOnReceiptFailure = async (run: LiveRun): Promise<void> => {
+    if (run.ended) return
+    run.ended = true
+    if (run.timer !== undefined) clearInterval(run.timer)
+    runs.delete(run.runId)
+    options.emitUpdate?.({
+      kind: 'persistence-error',
+      runId: run.runId,
+      missionId: run.missionId,
+      error: {
+        code: 'MISSION_PERSISTENCE_FAILED',
+        message: 'The mission could not be written to the durable local ledger.'
+      }
+    })
+    await Promise.resolve()
+  }
+
   const persistAndEmit = async (run: LiveRun, events: readonly NormalizedRuntimeEvent[]): Promise<void> => {
     if (events.length === 0) return
     // Persist-before-emit, as every transport here does: a receipt the person
     // has seen is already on disk.
-    await options.ledger.appendEvents(run.missionId, events as never)
+    //
+    // Wrapped so the poll loop can tell a durability failure from the ordinary
+    // transient read failure it also catches. Matching on a message would be
+    // guessing; this is the only write here, so it can say so itself.
+    try {
+      await options.ledger.appendEvents(run.missionId, events as never)
+    } catch (error) {
+      throw new LedgerWriteFailed(error)
+    }
     run.transcript.track(events)
     for (const event of events) options.emitEvent(run.runId, run.missionId, event)
   }
@@ -218,11 +256,20 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       for (let index = run.fed; index < lines.length; index += 1) {
         fresh.push(...run.normalizer.accept({ sequence: index + 1, raw: lines[index]! }))
       }
+      /*
+       * The cursor advances only once the events are DURABLE.
+       *
+       * It used to advance first, so a ledger write that failed took those
+       * events with it: never persisted, never emitted, and never retried,
+       * because the next tick started after them. The transcript is re-read
+       * from `run.fed` every tick, so leaving it where it was is what makes a
+       * transient failure genuinely retryable.
+       */
+      if (fresh.length > 0) await persistAndEmit(run, fresh)
       if (lines.length > run.fed) {
         run.fed = lines.length
         run.lastProgressAt = Date.now()
       }
-      if (fresh.length > 0) await persistAndEmit(run, fresh)
       if (run.normalizer.latestFinal) {
         await end(run, {})
         return
@@ -247,7 +294,22 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
             : `Antigravity's agent has been waiting ${minutes} minutes on its own "${pending}" step. If it is asking you something, Locust cannot see the question or answer it yet — answer it in Antigravity's own window.`
         })
       }
-    } catch {
+    } catch (error) {
+      /*
+       * A transient READ failure is retried on the next tick, which is what
+       * this catch was written for. A LEDGER failure is not that: it means the
+       * receipt for work already done cannot be written, and continuing to
+       * poll would keep the run alive with nobody recording it -- the same
+       * defect fixed on the app-server path in 0.51.0.
+       *
+       * The two are told apart by asking the ledger, not by matching on a
+       * message: `persistAndEmit` is the only thing here that writes, so a
+       * failure it reports is a durability failure by construction.
+       */
+      if (error instanceof LedgerWriteFailed) {
+        await endOnReceiptFailure(run)
+        return
+      }
       // A transient read failure is retried on the next tick.
     } finally {
       run.polling = false
