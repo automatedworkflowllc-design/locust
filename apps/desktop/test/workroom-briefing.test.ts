@@ -39,7 +39,13 @@ describe('the runtime prompt a teammate is sent', () => {
 
   it('lists the other teammates and the exact share form, and only when there is someone to share with', () => {
     const withOthers = composeRuntimePrompt({ prompt: 'Look around.', peer: PEER, inbound: [], remaining: 0 })
-    expect(withOthers.prompt).toContain('besides you (Wren, Code & Migrations): Atlas (Research & Briefs), Nova (Docs & QA).')
+    // The roster names the role AND the exact `to=` value. Printing
+    // `Atlas (Research & Briefs)` while the parser matched on `Atlas` is how a
+    // model came to write the whole line into to= and have its share refused
+    // (reported 2026-09-08).
+    expect(withOthers.prompt).toContain(
+      'besides you (Wren, Code & Migrations): Atlas (Research & Briefs), Nova (Docs & QA).'
+    )
     expect(withOthers.prompt).toContain('<locust-share to="Atlas">')
     expect(withOthers.prompt).toContain('never secrets, credentials or tokens')
 

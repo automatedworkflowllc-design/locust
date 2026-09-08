@@ -21,7 +21,28 @@ export const SHARE_TAG = 'locust-share'
 export const MAX_SHARE_TEXT_LENGTH = 1_200
 export const MAX_SHARES_PER_MISSION = 4
 
-const BLOCK = /<locust-share\s+to="([^"<>\n]{1,40})"\s*>([\s\S]*?)<\/locust-share>/g
+/**
+ * A share block, and the two ways models reasonably get `to=` wrong.
+ *
+ * SINGLE QUOTES. The example is written with double quotes and this pattern
+ * accepted only those, so `to='Gem'` matched nothing at all — no block, no
+ * error, no share.
+ *
+ * THE ROLE SUFFIX. The briefing prints the roster as `Gem (Custom)` and the
+ * matcher compares against the bare name, so copying the line as printed
+ * produced "who is not on the roster. Nothing was sent." Reported by a Cursor
+ * teammate reading this source from inside Locust (2026-09-08), which is
+ * exactly how a model meets it.
+ *
+ * Both are the app failing to read something unambiguous. The role is stripped
+ * in `parseShareBlocks` so this stays one expression.
+ */
+const BLOCK = /<locust-share\s+to=(?:"([^"<>\n]{1,60})"|'([^'<>\n]{1,60})')\s*>([\s\S]*?)<\/locust-share>/g
+
+/** `Gem (Custom)` → `Gem`. The roster prints the role; the parser wants the name. */
+function withoutRole(name: string): string {
+  return name.replace(/\s*\([^()]*\)\s*$/, '').trim()
+}
 
 export interface ShareBlock {
   readonly to: string
@@ -32,8 +53,8 @@ export interface ShareBlock {
 export function parseShareBlocks(text: string): readonly ShareBlock[] {
   const blocks: ShareBlock[] = []
   for (const match of text.matchAll(BLOCK)) {
-    const to = (match[1] ?? '').trim()
-    const body = (match[2] ?? '').trim()
+    const to = withoutRole(match[1] ?? match[2] ?? '')
+    const body = (match[3] ?? '').trim()
     if (to.length === 0 || body.length === 0) continue
     blocks.push({ to, text: body })
   }

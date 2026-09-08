@@ -1,3 +1,4 @@
+import { BLOCK_PLACEMENT } from './trailer.js'
 /**
  * The task block: how a teammate claims, finishes, hands off or adds a task
  * on a room's board, the same way a share block reaches a teammate.
@@ -140,7 +141,7 @@ export function taskSection(input: {
   return [
     `You are answering in the room "${input.roomName}" with ${others.length === 0 ? 'nobody else' : others.join(', ')}. The room keeps a task board:`,
     board,
-    'If your work claims, finishes, hands off or adds a task on that board, end your reply with exactly this block and nothing after it -- one line per task, quoting the task text as it appears above:',
+    `If your work claims, finishes, hands off or adds a task on that board, use exactly this block and ${BLOCK_PLACEMENT} -- one line per task, quoting the task text as it appears above:`,
     `<${TASK_TAG}>`,
     'claim :: the task text',
     'done :: the task text',

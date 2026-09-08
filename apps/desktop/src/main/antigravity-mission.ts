@@ -228,7 +228,24 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
         return
       }
       if (Date.now() - run.lastProgressAt > idleTimeoutMs) {
-        await end(run, { stderr: `Antigravity's agent wrote nothing to its transcript for ${String(Math.round(idleTimeoutMs / 60_000))} minutes.` })
+        // Say WHY, and do not blame the model for a silence this app caused.
+        //
+        // Antigravity's native `ask_question` holds the run open waiting for an
+        // answer through a channel Locust does not collect, so the run sat
+        // until this timeout and was then reported as the agent having written
+        // nothing -- which is true and completely misleading. The tool is still
+        // open in the normalizer, so the timeout can name it.
+        //
+        // The real fix is to route a native question into the approval path so
+        // it can be answered; see docs/FINDING-antigravity-ask-question.md.
+        // This is the half that stops the app misattributing the hang.
+        const minutes = String(Math.round(idleTimeoutMs / 60_000))
+        const pending = run.normalizer.pendingToolName
+        await end(run, {
+          stderr: pending === undefined
+            ? `Antigravity's agent wrote nothing to its transcript for ${minutes} minutes.`
+            : `Antigravity's agent has been waiting ${minutes} minutes on its own "${pending}" step. If it is asking you something, Locust cannot see the question or answer it yet — answer it in Antigravity's own window.`
+        })
       }
     } catch {
       // A transient read failure is retried on the next tick.

@@ -4,6 +4,7 @@ import type { TeammateRoute } from '../shared/ipc.js'
 
 import { sanitizeInbound, SHARE_TAG } from '../shared/peer-share.js'
 import { ASK_TAG } from '../shared/decision.js'
+import { BLOCK_PLACEMENT } from '../shared/trailer.js'
 
 /**
  * What a teammate's runtime is told about its colleagues.
@@ -86,6 +87,18 @@ function rosterSection(peer: MissionPeerContext): string {
   const others = peer.others.map((entry) => `${entry.name} (${entry.role})`).join(', ')
   const example = peer.others[0]?.name ?? 'Name'
   return [
+    // The roster prints `Name (Role)` while `to=` takes the NAME ALONE, which
+    // is how a model came to copy the printed line into to= and have its share
+    // refused with "who is not on the roster. Nothing was sent." (reported
+    // 2026-09-08).
+    //
+    // Fixed in the PARSER rather than here, deliberately. Spelling the rule out
+    // in the briefing costs prompt budget on every mission, and this file's own
+    // tests already sit at a boundary where forty more characters push a
+    // waiting peer message out of the prompt entirely -- which is the exact
+    // failure this whole change is about. `parseShareBlocks` strips a trailing
+    // role and accepts single quotes, so the mistake costs nothing and the
+    // budget is spent on messages instead.
     `Teammates in this workspace besides you (${peer.self.name}, ${peer.self.role}): ${others}.`,
     // MEASURED 2026-09-03 by using the app: asked to "give Bramble a review
     // and ask whether they agree", the model wrote "Bramble, do you agree?"
@@ -120,7 +133,7 @@ function askSection(): string {
   return [
     'If you reach a real fork -- two defensible ways to do what was asked, where picking wrong means work has to be undone -- stop and ask instead of choosing. Asking there is better than finishing.',
     'Do NOT ask about anything you can settle by reading the workspace, and do not ask permission to continue: that is not a fork.',
-    'To ask, end your reply with exactly this block and nothing after it:',
+    `To ask, use exactly this block and ${BLOCK_PLACEMENT}:`,
     `<${ASK_TAG}>`,
     'The question, in one or two sentences.',
     '- The first option :: what it costs or implies',

@@ -6,6 +6,29 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.44.0 - 2026-09-08
+
+- **Teammates stop losing what they said.** A long reply had its ending cut
+  off, and everything a teammate uses to reach you or another teammate - a
+  message to a colleague, something learned worth remembering, a question, a
+  room task - is written at the end. So the longest, most substantial turns
+  looked perfect in the thread and quietly delivered nothing. Long replies now
+  keep both ends, and on Cursor Agent a long answer is properly closed instead
+  of being left half-finished.
+- **Three instructions that contradicted each other.** Memory, questions and
+  room tasks each told a teammate its block had to be the last thing in the
+  reply. A turn that needed two of them had to disobey one, and dropped it.
+  They now say what was always true: put them at the end, in any order.
+- **Sending to a teammate is harder to get wrong.** Writing `to='Gem'` with
+  single quotes silently sent nothing, and copying a teammate's name from the
+  roster exactly as shown - `Gem (Custom)` - was refused as not on the roster.
+  Both work now.
+- **A numbered list of choices is a question again.** If a teammate offered
+  "1. Rewrite it  2. Patch it", no card appeared and the run simply ended.
+- **A stalled Antigravity run says what it is stuck on** instead of reporting
+  that the agent wrote nothing. If it is waiting on its own question, Locust
+  now says so and tells you to answer it in Antigravity's window.
+
 ## 0.43.9 - 2026-09-08
 
 - **Effort is a slider now, not a list.** Cursor Agent offers eight levels and

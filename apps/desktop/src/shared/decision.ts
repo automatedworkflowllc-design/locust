@@ -45,8 +45,21 @@ export const MIN_OPTIONS = 2
 export const MAX_OPTIONS = 4
 
 const BLOCK = /<locust-ask\s*>([\s\S]*?)<\/locust-ask>/g
-/** `- Label :: what it costs`, where the cost half is optional. */
-const OPTION_LINE = /^[-*]\s+(.+)$/
+/**
+ * `- Label :: what it costs`, where the cost half is optional.
+ *
+ * A NUMBERED list counts too. The briefing writes its example with dashes and
+ * this accepted only dashes and asterisks, so a model that answered with
+ * "1. Rewrite it  2. Patch it" produced a block with no options at all -- the
+ * card never appeared and the run simply ended, with the question stranded in
+ * prose. Reported by a Cursor teammate reading this source from inside Locust
+ * (2026-09-08): "Numbered option lists are not decisions; only `-` / `*`
+ * count. The card never appears and the run just ends."
+ *
+ * Numbering a list of choices is not a mistake, and refusing to read one is
+ * this app failing to understand something unambiguous.
+ */
+const OPTION_LINE = /^(?:[-*]|\d{1,2}[.)])\s+(.+)$/
 
 /**
  * A button that only agrees, or only refuses.

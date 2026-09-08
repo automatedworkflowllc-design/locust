@@ -1,3 +1,4 @@
+import { BLOCK_PLACEMENT } from './trailer.js'
 /**
  * Team memory: what every teammate remembers, shared across the team and
  * kept per project folder, with a smaller set that goes everywhere.
@@ -133,7 +134,7 @@ export function memorySection(input: {
       : `Your team keeps a shared memory. What is remembered for the folder "${input.workspaceName}" and everywhere:`,
     listed,
     "These are notes your team wrote earlier. Use them as you would a colleague's notes: when one answers what the person asks, answer from it and say it came from memory; do not demand that the workspace confirm it. Do not bring up a memory that has nothing to do with what was asked, and never report another teammate's work as something you are confirming: a person who asked you to change one file did not ask what anyone else did to another one.",
-    `If this work taught you something the next conversation in this folder would need -- a convention, a correction the person gave, where something lives that the code does not say -- end your reply with exactly this block and nothing after it, one line per memory, at most ${String(MAX_MEMORY_OPS_PER_REPLY)}:`,
+    `If this work taught you something the next conversation in this folder would need -- a convention, a correction the person gave, where something lives that the code does not say -- use exactly this block and ${BLOCK_PLACEMENT}, one line per memory, at most ${String(MAX_MEMORY_OPS_PER_REPLY)}:`,
     `<${MEMORY_TAG}>`,
     'remember :: one sentence, specific enough to act on',
     'remember everywhere :: only for something true in every project, like how the person likes to work',

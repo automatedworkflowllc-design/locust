@@ -406,3 +406,57 @@ describe("the change itself", () => {
     expect(toolPatchFrom("")).toBeUndefined();
   });
 });
+
+/**
+ * A long Cursor answer must still CLOSE its message.
+ *
+ * Reported 2026-09-08 by a Cursor teammate reading this source from inside
+ * Locust: when partial output is on and the fragments already sum past the
+ * message cap, the complete message is skipped -- and it used to be skipped by
+ * emitting nothing at all, so the item was never marked final.
+ *
+ * Everything the host parses out of a reply reads the last FINAL message: the
+ * share in `peer-exchange.ts` ("if (final) latestFinal = next"), the memory
+ * block, a decision, a room task. So the longest, most substantial turns --
+ * exactly the ones that land here -- rendered perfectly in the thread and
+ * posted nothing to the workroom, with nothing on screen saying so.
+ */
+describe("a long answer whose fragments outrun the complete message", () => {
+  const fragment = "x".repeat(9_000);
+  const lines = [
+    JSON.stringify({ type: "assistant", timestamp_ms: 1, message: { role: "assistant", content: [{ type: "text", text: fragment }] } }),
+    JSON.stringify({ type: "assistant", timestamp_ms: 2, message: { role: "assistant", content: [{ type: "text", text: fragment }] } }),
+    // The complete message: bounded to the cap, so SHORTER than the two
+    // fragments already delivered.
+    JSON.stringify({ type: "assistant", model_call_id: "c1", message: { role: "assistant", content: [{ type: "text", text: `${fragment}${fragment}` }] } })
+  ];
+
+  it("keeps the fragments rather than taking text back out of the ledger", () => {
+    const { events } = run(lines);
+    // Read the id off the events rather than assuming it.
+    const built = [...messages(events).values()];
+    expect(built.length).toBeGreaterThan(0);
+    expect(Math.max(...built.map((text) => text.length))).toBeGreaterThanOrEqual(18_000);
+  });
+
+  it("MARKS THE MESSAGE FINAL, so the host still reads what the reply said", () => {
+    // THE test. Without it the turn looks complete and posts nothing.
+    const { events } = run(lines);
+    const finals = events.filter(
+      (event) => event.type === "message.delta" && (event.payload as { final: boolean }).final
+    );
+    expect(finals.length).toBeGreaterThan(0);
+  });
+
+  it("does not rewrite the text when it closes the item", () => {
+    // The control: closing must not become a way to shorten the answer.
+    const { events } = run(lines);
+    const closing = events.filter(
+      (event) => event.type === "message.delta" && (event.payload as { final: boolean }).final
+    );
+    for (const event of closing) {
+      const { operation, text } = event.payload as { operation: string; text: string };
+      if (operation === "append") expect(text).toBe("");
+    }
+  });
+});

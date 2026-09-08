@@ -299,14 +299,40 @@ export function stringValue(value: unknown): string | undefined {
 // event that cannot be persisted -- a truncated tool name costs nothing next
 // to a mission whose recovery stops at that record.
 const MAX_IDENTITY_LENGTH = 512;
-// The ledger reader's cap for free text. Losing the tail of one very long
-// delta, marked as truncated, beats emitting an event that cannot be persisted.
+// The ledger reader's cap for free text.
 const MAX_MESSAGE_TEXT_LENGTH = 16_384;
 
+/**
+ * How much of the END is always kept.
+ *
+ * This cap used to keep the head and drop the tail, which is the wrong end.
+ * Every teammate protocol block -- `<locust-share>`, the memory block, the ask,
+ * the room task -- is TAUGHT to sit at the end of the reply, in as many words:
+ * "end your reply with exactly this block and nothing after it". So a long
+ * answer had its blocks cut off here, and the run posted nothing to the
+ * workroom while the thread showed a complete, healthy turn.
+ *
+ * Reported by a Cursor teammate surveying this source from inside Locust
+ * (2026-09-08) and confirmed against these lines: "A long Cursor turn can look
+ * complete in the thread and still post nothing to the workroom."
+ *
+ * 4 KiB holds any of the four blocks with room to spare -- a share carrying a
+ * paragraph is a few hundred characters -- and still leaves 12 KiB of the
+ * answer itself, which is more than anybody reads inline.
+ */
+const MESSAGE_TAIL_KEPT = 4_096;
+const TRUNCATION_MARK = "\n\u2026[truncated]\u2026\n";
+
+/**
+ * Bound a message, keeping BOTH ends.
+ *
+ * The middle is what nobody misses: the start says what the answer is about,
+ * and the end carries the blocks the host has to parse.
+ */
 export function boundedMessageText(value: string): string {
-  return value.length > MAX_MESSAGE_TEXT_LENGTH
-    ? `${value.slice(0, MAX_MESSAGE_TEXT_LENGTH - 12)}\u2026[truncated]`
-    : value;
+  if (value.length <= MAX_MESSAGE_TEXT_LENGTH) return value;
+  const head = value.slice(0, MAX_MESSAGE_TEXT_LENGTH - MESSAGE_TAIL_KEPT - TRUNCATION_MARK.length);
+  return `${head}${TRUNCATION_MARK}${value.slice(-MESSAGE_TAIL_KEPT)}`;
 }
 
 export function identityValue(value: unknown): string | undefined {

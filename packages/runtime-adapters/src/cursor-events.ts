@@ -292,7 +292,31 @@ export function createCursorEventNormalizer(
       // earlier. When that happens the fragments stand, and the item is
       // closed without rewriting it.
       const alreadyDelivered = deliveredLength.get(itemId) ?? 0;
-      if (bounded.length < alreadyDelivered) return [];
+      if (bounded.length < alreadyDelivered) {
+        // The fragments stand -- but the item must still be CLOSED.
+        //
+        // This used to `return []`, emitting nothing at all, so the message was
+        // never marked final. Everything the host parses out of a reply reads
+        // the last FINAL message: the share in `peer-exchange.ts` ("if (final)
+        // latestFinal = next"), the memory block, a decision, a room task. So a
+        // long Cursor answer -- exactly the case that lands here -- rendered
+        // perfectly in the thread and posted nothing to the workroom, with
+        // nothing on screen saying so.
+        //
+        // An APPEND of nothing changes no text and sets the flag:
+        // `assistantMessages` computes `existing + ''`. The fragments are kept,
+        // which is what this branch is for, and the turn is closed, which is
+        // what it forgot to do.
+        return [
+          emit("message.delta", {
+            itemId,
+            operation: "append",
+            text: "",
+            final: true,
+            evidence,
+          }),
+        ];
+      }
       return [
         emit("message.delta", {
           itemId,

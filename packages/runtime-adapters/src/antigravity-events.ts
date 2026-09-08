@@ -105,6 +105,17 @@ export interface AntigravityEventNormalizer {
    * The host's completion signal; see the heuristic note above.
    */
   readonly latestFinal: boolean;
+  /**
+   * The name of a tool that started and never reported back, if any.
+   *
+   * Exists for one reason: when a run goes quiet, the host has to say WHY, and
+   * "the agent wrote nothing for ten minutes" blames the model for a silence
+   * the app caused. Antigravity's native `ask_question` shows up here as a
+   * tool that is still running -- it is waiting for an answer through a
+   * channel Locust does not collect -- and a timeout that can name it can say
+   * so instead (see `docs/FINDING-antigravity-ask-question.md`).
+   */
+  readonly pendingToolName: string | undefined;
   accept(record: RuntimeJsonlRecord): readonly NormalizedRuntimeEvent[];
   finish(completion: RuntimeProcessCompletion): readonly NormalizedRuntimeEvent[];
 }
@@ -447,6 +458,9 @@ export function createAntigravityEventNormalizer(
     },
     get latestFinal() {
       return latestFinal;
+    },
+    get pendingToolName() {
+      return openTools[openTools.length - 1]?.name;
     },
 
     accept(record: RuntimeJsonlRecord): readonly NormalizedRuntimeEvent[] {
