@@ -54,6 +54,30 @@ export const GIT_EXCLUDE_LINE = '.locust/'
  */
 export function attachmentDestination(source: string, taken: ReadonlySet<string>): string {
   const name = basename(source)
+  /*
+   * The name has to be a NAME, not a way out of the folder.
+   *
+   * `basename` does not always return a plain filename. Measured:
+   *
+   *   basename('C:\\a\\..')  ->  '..'     ->  .locust/attachments/..  ->  .locust
+   *   basename('C:\\a\\.')   ->  '.'      ->  the attachments folder itself
+   *   basename('C:\\')       ->  ''       ->  the attachments folder itself
+   *
+   * So a source of that shape produced a destination ABOVE the folder this is
+   * supposed to write into, and two others produced the folder itself, which
+   * would try to write a file over a directory.
+   *
+   * The OS file dialog cannot return those, so nothing a person does reaches
+   * this today -- but a function that BUILDS A WRITE PATH must not depend on
+   * its caller to be safe. `LOCUST_ATTACH_PATHS` already feeds it strings from
+   * somewhere else, and the next caller will not read this comment first.
+   *
+   * A colon is refused with them: on Windows `file.txt:stream` names an
+   * alternate data stream rather than a file, and a picked file never has one.
+   */
+  if (name === '' || name === '.' || name === '..' || /[\\/:]/.test(name)) {
+    throw new Error(`That file cannot be attached: "${basename(source)}" is not a file name.`)
+  }
   if (!taken.has(name)) return `${ATTACHMENT_DIR}/${name}`
   const extension = extname(name)
   const stem = extension.length === 0 ? name : name.slice(0, -extension.length)
