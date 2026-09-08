@@ -2252,6 +2252,15 @@ describe('what a command printed', () => {
     expect(text.split('\n').length).toBeLessThan(MAX_SHELL_OUTPUT_LINES + 3)
   })
 
+  it('does not end on the blank line almost every command leaves behind', () => {
+    // Driven on a real `seq 1 300`, whose output ends with a newline: the tail
+    // read as an empty line instead of `300`, which undercuts the one promise
+    // this bounding makes.
+    const many = `${Array.from({ length: 400 }, (_, index) => String(index + 1)).join('\n')}\n`
+    const { text } = boundedShellOutput(many)
+    expect(text.split('\n').at(-1)).toBe('400')
+  })
+
   it('says how much it left out rather than trailing off', () => {
     const many = Array.from({ length: 500 }, () => 'x').join('\n')
     expect(boundedShellOutput(many).text).toContain('more lines')

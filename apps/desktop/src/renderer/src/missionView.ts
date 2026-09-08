@@ -2081,7 +2081,11 @@ export const MAX_SHELL_OUTPUT_LINES = 200
  * permission error is the one that matters.
  */
 export function boundedShellOutput(output: string): { readonly text: string; readonly omitted: number } {
-  const lines = output.split('\n')
+  // Trailing whitespace goes first. Almost every command ends with a newline,
+  // and keeping it made the last visible line BLANK -- which quietly undercuts
+  // the one promise this function makes. Driven on a real `seq 1 300`: the
+  // tail read as an empty line rather than `300`.
+  const lines = output.replace(/\s+$/, '').split('\n')
   if (lines.length <= MAX_SHELL_OUTPUT_LINES) return { text: output, omitted: 0 }
   const half = Math.floor(MAX_SHELL_OUTPUT_LINES / 2)
   const omitted = lines.length - half * 2
