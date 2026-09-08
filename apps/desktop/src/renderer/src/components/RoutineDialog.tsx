@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 
 import type { PublicTeammate, RoutineSchedule } from '../../../shared/ipc.js'
 import { EVERY_HOURS_CHOICES } from '../../../shared/routine-schedule.js'
+import { stepTooLongNotice } from '../../../shared/step-budget.js'
 import { MAX_ROUTINE_STEPS } from '../routines.js'
 import { PixelFace } from './PixelFace.js'
 
@@ -91,28 +92,56 @@ export function RoutineDialog({
             <span className="lc-fieldlabel lc-mono">
               Steps <span className="lc-queued__note">{String(steps.length)} of {String(MAX_ROUTINE_STEPS)}</span>
             </span>
-            {steps.map((step, index) => (
-              <div className="lc-routinestep" key={`step_${String(index)}`}>
-                <span className="lc-routinestep__n lc-mono">{index + 1}</span>
-                <textarea
-                  className="lc-input lc-routinestep__text"
-                  aria-label={`Step ${String(index + 1)}`}
-                  value={step}
-                  rows={2}
-                  onChange={(event) =>
-                    setSteps(steps.map((held, at) => (at === index ? event.target.value : held)))
-                  }
-                />
-                <button
-                  type="button"
-                  className="lc-ghostbutton lc-routinestep__drop"
-                  aria-label={`Remove step ${String(index + 1)}`}
-                  onClick={() => setSteps(steps.filter((_, at) => at !== index))}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+            {steps.map((step, index) => {
+              /*
+               * A step longer than the message can carry, said WHILE it is
+               * typed.
+               *
+               * The store accepts 20,000 characters and the runtime prompt cap
+               * is 12,000 for the step, the workspace briefing, anything
+               * waiting from teammates and the roster trailer together. So a
+               * step could be saved here and then never send -- and worse, an
+               * over-long one used to make the host shed every waiting peer
+               * message trying to fit, fail anyway, and send it over the cap
+               * regardless (R4, docs/ROUTINES-RECHECK-2026-09-08.md). That
+               * half is fixed in the host; this is the half that stops it
+               * being saved in the first place.
+               *
+               * A warning, not a block: the cap is not lowered, because
+               * `parsedRoutine` validates length on READ and a smaller one
+               * would make routines people already saved unreadable.
+               */
+              const tooLong = stepTooLongNotice(step)
+              return (
+                <div className="lc-routinestep" key={`step_${String(index)}`}>
+                  <span className="lc-routinestep__n lc-mono">{index + 1}</span>
+                  <textarea
+                    className="lc-input lc-routinestep__text"
+                    aria-label={`Step ${String(index + 1)}`}
+                    value={step}
+                    rows={2}
+                    aria-invalid={tooLong !== undefined}
+                    {...(tooLong === undefined ? {} : { 'aria-describedby': `step-too-long-${String(index)}` })}
+                    onChange={(event) =>
+                      setSteps(steps.map((held, at) => (at === index ? event.target.value : held)))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="lc-ghostbutton lc-routinestep__drop"
+                    aria-label={`Remove step ${String(index + 1)}`}
+                    onClick={() => setSteps(steps.filter((_, at) => at !== index))}
+                  >
+                    Remove
+                  </button>
+                  {tooLong !== undefined && (
+                    <p className="lc-routinestep__over lc-tone-amber" id={`step-too-long-${String(index)}`}>
+                      {tooLong}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
             {/*
               * Kept and disabled at the cap rather than unmounted. A control
               * that vanishes reads as a broken dialog; one that stays and

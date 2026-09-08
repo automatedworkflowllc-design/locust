@@ -6197,6 +6197,22 @@ textarea {
   white-space: pre-wrap;
 }
 
+/*
+ * The "this will not send" line, under its own step.
+ *
+ * Second column so it sits under the box it is about rather than under the
+ * step number, and amber because it is a PENDING problem -- the step is still
+ * editable and nothing has failed yet. Red here would be a claim that
+ * something went wrong, which it has not.
+ */
+.lc-routinestep__over {
+  grid-column: 2;
+  margin: 0.25rem 0 0;
+  font-size: var(--lc-text-description);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
 .lc-routinestep__drop {
   padding-inline: 0.5rem;
 }
