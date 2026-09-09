@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lc-tokens.css">
+<style>
+  html, body { margin: 0; background: var(--lc-bg-app); }
+  * { box-sizing: border-box; }
+  a { color: var(--lc-lime); text-decoration: none; }
+  a:hover { color: var(--lc-lime-text); }
+  @keyframes lcPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+</style>
+</helmet>
+<div style="min-height: 100vh; padding: 36px; display: flex; flex-direction: column; gap: 44px; font-family: var(--lc-font-ui); color: var(--lc-text-primary); font-size: var(--lc-text-body); line-height: var(--lc-leading-prose);">
+
+  <div style="display: flex; flex-direction: column; gap: 8px; max-width: 920px;">
+    <div style="font-size: var(--lc-text-screen-title); font-weight: 500; letter-spacing: -0.015em;">The room that is bigger than the cap</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">Recreated from <span style="font-family: var(--lc-font-mono);">RoomScreen.tsx</span> and the 2026-09-09 captures — real names, real phase strings, real chrome. Room pane 1013px, cards 317px, as measured in step 6.</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Answering 2 first, because it collapses the other three: <strong style="font-weight: 500;">yes, queue.</strong> Then the never-started card stops needing a treatment, and the warning stops being a warning.</div>
+    <div style="padding: 11px 13px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-amber-border); background: var(--lc-amber-tint); font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">One thing the brief understates.</strong> The reason Otto and Pike did not start is <em>already on screen</em> — in the composer note, per teammate, concatenated: <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">Otto: Up to 4 missions can run at once. Wait for one to finish or stop it first. · Pike: Up to 4 missions can run at once. Wait for one to finish or stop it first.</span> Two sentences saying one thing, in the smallest text on the screen, at the bottom, 500px from the cards they explain. So this is not only a missing explanation; it is an explanation in the wrong place, repeated per victim.</div>
+  </div>
+
+  <!-- ═══════════ SHIPPED, RECREATED ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-amber-text);">Shipped · step 5 of the session</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Four running, Otto and Pike absent.</span>
+    </div>
+
+    <div style="width: 1013px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-strong); border-radius: var(--lc-radius-card); box-shadow: var(--lc-shadow-window); overflow: hidden; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--lc-border-hairline);">
+        <span style="height: 28px; padding: 0 11px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg); flex: none;">← Rooms</span>
+        <span style="font-size: var(--lc-text-screen-title); font-weight: 500; letter-spacing: -0.015em; flex: none;">Standup</span>
+        <span style="flex: 1; min-width: 0; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Wren · Booty · Gem · Fen · Otto · Pike</span>
+        <span style="height: 28px; padding: 0 11px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg); flex: none;">Remove room</span>
+      </div>
+
+      <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); background: var(--lc-bg-raised); padding: 11px 13px; display: flex; flex-direction: column; gap: 9px;">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Tasks</span>
+            <span style="margin-left: auto; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);">none yet</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <span style="flex: 1; min-width: 0; height: 30px; padding: 0 10px; display: flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-field); font-size: var(--lc-text-description); color: var(--lc-text-muted);">Add a task</span>
+            <span style="height: 30px; padding: 0 13px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);">Add</span>
+          </div>
+        </div>
+
+        <div style="align-self: flex-end; max-width: 668px; padding: 10px 13px; border-radius: var(--lc-radius-card); background: var(--lc-bg-bubble-user); display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: var(--lc-text-body);">Reply with exactly one word and nothing else. Wren says ALMANAC. Booty says BRAMBLE. Gem says CINDER. Fen says DAMSON. Otto says ELDER. Pike says FALLOW. Say only your own word.</span>
+          <span style="align-self: flex-end; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">02:40 PM</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+          <sc-for list="{{ shippedCards }}" as="c" hint-placeholder-count="6">
+            <div style="{{ c.style }}">
+              <div style="display: flex; align-items: center; gap: 7px;">
+                <span style="{{ c.chip }}"><span style="{{ c.box }}"><span style="{{ c.l1 }}"></span><span style="{{ c.l2 }}"></span><span style="{{ c.l3 }}"></span></span></span>
+                <span style="font-size: var(--lc-text-body); font-weight: 500; color: var(--lc-text-name);">{{ c.name }}</span>
+                <span style="{{ c.absentPhaseStyle }}">did not start</span>
+              </div>
+              <div style="{{ c.routeStyle }}">OpenCode / opencode/muse-spark-1.3-contributor-free</div>
+              <div style="{{ c.phaseRowStyle }}">
+                <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);">{{ c.phase }}</span>
+                <span style="margin-left: auto; height: 26px; padding: 0 12px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);">Open</span>
+              </div>
+              <div style="{{ c.bodyStyle }}">{{ c.body }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding: 12px 16px 14px; border-top: 1px solid var(--lc-border-hairline);">
+        <div style="height: 56px; padding: 9px 11px; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-card); background: var(--lc-bg-field); font-size: var(--lc-text-body); color: var(--lc-text-muted);">Post to Standup…</div>
+        <div style="display: flex; align-items: flex-start; gap: 12px; margin-top: 9px;">
+          <span style="flex: 1; min-width: 0; font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">Otto: Up to 4 missions can run at once. Wait for one to finish or stop it first. · Pike: Up to 4 missions can run at once. Wait for one to finish or stop it first.</span>
+          <span style="height: 32px; padding: 0 15px; flex: none; display: inline-flex; align-items: center; border: 1px solid var(--lc-lime-border); border-radius: var(--lc-radius-control); background: var(--lc-lime-tint-strong); color: var(--lc-lime-text); font-size: var(--lc-text-control); font-weight: 500;">Post</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 920px; display: grid; grid-template-columns: 132px 1fr; gap: 7px 16px; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">
+      <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">THE ABSENT CARD</span><span style="text-wrap: pretty;">Not quite "an empty box with two grey words". It is a card with an avatar, a name, <span style="font-family: var(--lc-font-mono);">did not start</span> inline beside the name, and then <strong style="font-weight: 500;">nothing at all</strong> where a route, a phase row, an Open button and an answer should be — about 90px of empty card. Your <span style="font-family: var(--lc-font-mono);">is-absent</span> class carries no tone, so it is not <em>coloured</em> like a terminal; it reads broken because of the void, and because it is 317px wide and as tall as the card beside it.</span>
+      <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">WHY IT IS TALL</span><span style="text-wrap: pretty;">Row two is as tall as Fen, and Fen is tall because the model name wraps to two mono lines. So the absent cards are sized by an unrelated string in a neighbouring cell — which is exactly the grid problem in 3, visible at six.</span>
+      <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">NO STATUS SLOT</span><span style="text-wrap: pretty;">There is no line above the grid, and the room's only status voice is the composer note — which is where <span style="font-family: var(--lc-font-mono);">Everyone in Standup has answered.</span> lands. So a corrected count has to live <em>there</em>, not in a new slot. My first draft of this drawing invented one; corrected below.</span>
+    </div>
+  </section>
+
+  <!-- ═══════════ 2 · THE FORK ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-green-text);">2 · Queue — the answer, and the reason</span>
+    </div>
+
+    <div style="max-width: 920px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-green-border); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">One cost is transient. The other is permanent.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Your <em>don't</em> case is real: a room that answers in four minutes is worse to watch than one that answers in one. But that cost is <strong style="font-weight: 500;">paid by the person watching, and only while they watch</strong> — and nobody watches a room, which is the reason rooms exist. You post and go.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">The never-start cost is paid by <strong style="font-weight: 500;">the record, forever</strong>. Step 9 of your own session is the proof: <span style="font-family: var(--lc-font-mono);">Otto · did not start · none</span> and <span style="font-family: var(--lc-font-mono);">Pike · did not start · none</span>, beside four completed words, and step 11 shows <strong style="font-weight: 500;">4 local</strong> missions in the list — Otto and Pike left no mission at all. Tomorrow the ledger has no trace that they were asked. A warning before the post does not repair a record after it.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">And the wave is not a defect of the design; it is what the modelled thing looks like. A standup where six people answer at once has never happened. The grid filling in over a few minutes is more legible than six cards resolving simultaneously, because you can read them as they land.</span>
+      </div>
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">It needs one new state, not three.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">Waiting</strong> is the one, and it is standing: nothing is happening, nothing is wrong, nothing wants you. A roster line, not a card. And it is not even a new <em>phase</em> — <span style="font-family: var(--lc-font-mono);">RoomAnswer.phase</span> is already "whatever the record says", so this is one more string in a set that already carries six.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">Next</strong> is not a state, it is a position, and it changes without anybody doing anything. Drawing it means the screen mutates while you read it to say which of two identical waits is fractionally sooner. Do not draw it: order the line and let position be position.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">Cancelled before starting</strong> is not a state either — it is a removal. A teammate who never started and never will has nothing to report, so the line loses a name and the count drops. A whole-room cancel is the room's terminal card, which exists.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 1 and 3 · LIVE ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-green-text);">1 and 3 · The same room, queuing</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Live — step the post from the moment it lands to the moment it is done.</span>
+    </div>
+
+    <div style="width: 1013px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="background: var(--lc-bg-window); border: 1px solid var(--lc-border-strong); border-radius: var(--lc-radius-card); box-shadow: var(--lc-shadow-window); overflow: hidden; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--lc-border-hairline);">
+          <span style="height: 28px; padding: 0 11px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg); flex: none;">← Rooms</span>
+          <span style="font-size: var(--lc-text-screen-title); font-weight: 500; letter-spacing: -0.015em; flex: none;">Standup</span>
+          <span style="flex: 1; min-width: 0; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Wren · Booty · Gem · Fen · Otto · Pike</span>
+          <span style="height: 28px; padding: 0 11px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg); flex: none;">Remove room</span>
+        </div>
+
+        <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); background: var(--lc-bg-raised); padding: 11px 13px; display: flex; align-items: baseline; gap: 10px;">
+            <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Tasks</span>
+            <span style="margin-left: auto; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);">none yet</span>
+          </div>
+
+          <div style="align-self: flex-end; max-width: 668px; padding: 10px 13px; border-radius: var(--lc-radius-card); background: var(--lc-bg-bubble-user); display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: var(--lc-text-body);">Reply with exactly one word and nothing else. Wren says ALMANAC. Booty says BRAMBLE. Gem says CINDER. Fen says DAMSON. Otto says ELDER. Pike says FALLOW. Say only your own word.</span>
+            <span style="align-self: flex-end; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">02:40 PM</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+            <sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+              <div style="border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); background: var(--lc-bg-raised); padding: 11px 12px; display: flex; flex-direction: column; gap: 7px;">
+                <div style="display: flex; align-items: center; gap: 7px;">
+                  <span style="{{ c.chip }}"><span style="{{ c.box }}"><span style="{{ c.l1 }}"></span><span style="{{ c.l2 }}"></span><span style="{{ c.l3 }}"></span></span></span>
+                  <span style="flex: 1; min-width: 0; font-size: var(--lc-text-body); font-weight: 500; color: var(--lc-text-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.name }}</span>
+                  <span style="{{ c.dotStyle }}"></span>
+                </div>
+                <div style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted); text-wrap: pretty;">OpenCode / opencode/muse-spark-1.3-contributor-free</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);">{{ c.phase }}</span>
+                  <span style="margin-left: auto; height: 26px; padding: 0 12px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);">Open</span>
+                </div>
+                <div style="{{ c.bodyStyle }}">{{ c.body }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="{{ waitingStyle }}">
+            <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted); flex: none;">Waiting for a slot</span>
+            <span style="flex: 1; min-width: 0; font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">{{ waitingNames }}</span>
+            <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted); flex: none;">{{ waitingCount }}</span>
+          </div>
+        </div>
+
+        <div style="padding: 12px 16px 14px; border-top: 1px solid var(--lc-border-hairline);">
+          <div style="height: 56px; padding: 9px 11px; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-card); background: var(--lc-bg-field); font-size: var(--lc-text-body); color: var(--lc-text-muted);">Post to Standup…</div>
+          <div style="display: flex; align-items: center; gap: 12px; margin-top: 9px;">
+            <span style="flex: 1; min-width: 0; font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">{{ notice }}</span>
+            <span style="height: 32px; padding: 0 15px; flex: none; display: inline-flex; align-items: center; border: 1px solid var(--lc-lime-border); border-radius: var(--lc-radius-control); background: var(--lc-lime-tint-strong); color: var(--lc-lime-text); font-size: var(--lc-text-control); font-weight: 500;">Post</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">STEP</span>
+        <sc-for list="{{ phases }}" as="p" hint-placeholder-count="5">
+          <button type="button" onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.label }}</button>
+        </sc-for>
+      </div>
+      <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty; max-width: 920px;">{{ phaseNote }}</div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 1 · THE CARD ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">1 · The absent card, at its real 317px</span>
+    </div>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+      <div style="width: 317px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-amber-text);">SHIPPED · lc-roomanswer.is-absent</span>
+        <div style="border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); background: var(--lc-bg-raised); padding: 11px 12px; height: 117px;">
+          <div style="display: flex; align-items: center; gap: 7px;">
+            <span style="{{ otto.chip }}"><span style="{{ otto.box }}"><span style="{{ otto.l1 }}"></span><span style="{{ otto.l2 }}"></span><span style="{{ otto.l3 }}"></span></span></span>
+            <span style="font-size: var(--lc-text-body); font-weight: 500; color: var(--lc-text-name);">Otto</span>
+            <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);">did not start</span>
+          </div>
+        </div>
+        <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">Its height comes from Fen in the cell beside it, whose model name wraps. Around 90px of nothing under two words — and no route, no phase row, no Open, because there is no mission to open.</div>
+      </div>
+
+      <div style="width: 317px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">IF THE CAP STAYS HARD</span>
+        <div style="display: flex; align-items: center; gap: 9px; padding: 8px 0 8px 10px; border-left: 2px solid var(--lc-border-button);">
+          <span style="flex: 1; min-width: 0; font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Otto and Pike were not asked — the room runs four at a time.</span>
+        </div>
+        <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">One left-ruled line for both, below the grid, in the register you use for a fact that already happened. They share one fact, so they are one line — which also retires the two concatenated composer sentences, since the reason is now beside the names.</div>
+      </div>
+
+      <div style="width: 317px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-green-text);">WITH A QUEUE · recommended</span>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--lc-radius-card); background: var(--lc-bg-terminal); box-shadow: var(--lc-shadow-terminal);">
+          <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted); flex: none;">Waiting for a slot</span>
+          <span style="flex: 1; min-width: 0; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">Otto, Pike</span>
+          <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted); flex: none;">2</span>
+        </div>
+        <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">A roster line, recessed, below the grid. No avatar, no box per person, no answer-shaped container — because there is no answer and there is not going to be one <em>yet</em>. A name leaves this line and becomes a card the moment its mission starts, which is the only transition the queue draws.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 3 · GRID vs LIST ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">3 · Does the grid hold</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">At six yes, at ten no — and your own capture shows the mechanism.</span>
+    </div>
+
+    <div style="max-width: 920px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Your measurement is right and it is not the constraint. <strong style="font-weight: 500;">A grid forces equal-height cells, and cell content is of wildly unequal length.</strong> In the capture it is not even the answers doing it — every answer is one word — it is <span style="font-family: var(--lc-font-mono);">opencode/muse-spark-1.3-contributor-free</span> wrapping to two mono lines, which sets the height for two cards that have nothing in them.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">With real answers it is worse, because prose varies more than model names. One teammate writes two lines, another writes twelve; every row is as tall as its longest cell, and it worsens with width, since a wider row has more chances to contain one long answer.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Survivable at six, where a row is three cells and one glance. At ten it is a 4×3 that scrolls, and the grid is then costing you the only thing it was for — seeing the room at once — while still paying the whitespace. <strong style="font-weight: 500;">Grid to six, list past it</strong>, switched on rendered rows rather than member count, since rows are what break. A list gives every answer one column width and its own height, and puts the room in the same shape as the thread.</span>
+      </div>
+
+      <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+        <div style="display: flex; flex-direction: column; gap: 8px; width: 448px;">
+          <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">GRID AT SIX · unequal answers</span>
+          <div style="padding: 12px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+            <sc-for list="{{ gridDemo }}" as="g" hint-placeholder-count="6">
+              <div style="border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-control); background: var(--lc-bg-raised); padding: 8px; display: flex; flex-direction: column; gap: 5px;">
+                <span style="display: flex; align-items: center; gap: 5px;"><span style="{{ g.chipStyle }}"></span><span style="font-size: 10px; color: var(--lc-text-muted);">{{ g.name }}</span></span>
+                <span style="{{ g.barsStyle }}"><sc-for list="{{ g.bars }}" as="b" hint-placeholder-count="3"><span style="{{ b.style }}"></span></sc-for></span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">Row one is as tall as Wren's twelve lines; Booty and Gem pay for it in whitespace. Legible at six because a row is one glance.</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; width: 448px;">
+          <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-green-text);">LIST PAST SIX · each answer its own height</span>
+          <div style="padding: 12px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); display: flex; flex-direction: column; gap: 2px;">
+            <sc-for list="{{ listDemo }}" as="g" hint-placeholder-count="6">
+              <div style="display: flex; gap: 8px; padding: 7px 8px; border-radius: var(--lc-radius-control); align-items: flex-start;">
+                <span style="{{ g.chipStyle }}"></span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 10px; color: var(--lc-text-muted);">{{ g.name }}</span>
+                  <span style="{{ g.barsStyle }}"><sc-for list="{{ g.bars }}" as="b" hint-placeholder-count="3"><span style="{{ b.style }}"></span></sc-for></span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">No cell padded to match a neighbour. Same shape as the thread, so a long answer reads like a long reply — and it keeps working at ten.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 4 · THE WARNING ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">4 · The over-cap note</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Both instances of it — <span style="font-family: var(--lc-font-mono);">overCapNote()</span> is said twice.</span>
+    </div>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+      <div style="width: 448px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-amber-text);">SHIPPED · in the form, amber</span>
+        <div style="padding: 14px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <sc-for list="{{ ticked }}" as="t" hint-placeholder-count="6">
+              <span style="{{ t.style }}"><span style="{{ t.chip }}"><span style="{{ t.box }}"><span style="{{ t.l1 }}"></span><span style="{{ t.l2 }}"></span><span style="{{ t.l3 }}"></span></span></span>{{ t.name }}</span>
+            </sc-for>
+          </div>
+          <span style="font-size: var(--lc-text-description); color: var(--lc-amber-text); text-wrap: pretty;">Only 4 missions run at once, so a post to 6 starts 4 and 2 will not start.</span>
+          <span style="height: 32px; padding: 0 15px; align-self: flex-start; display: inline-flex; align-items: center; border: 1px solid var(--lc-lime-border); border-radius: var(--lc-radius-control); background: var(--lc-lime-tint-strong); color: var(--lc-lime-text); font-size: var(--lc-text-control); font-weight: 500;">Create room</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 104px 1fr; gap: 6px 14px; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">
+          <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">AMBER</span><span style="text-wrap: pretty;">Amber in this app means a person needs to do something. Nothing here is theirs to do — the cap is a fact about the machine, and ticking a sixth teammate is allowed.</span>
+          <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">FOUR NUMBERS</span><span style="text-wrap: pretty;"><span style="font-family: var(--lc-font-mono);">4, 6, 4, 2</span> in one sentence, three derived from the first. It reads as a calculation because it is one.</span>
+          <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">MOMENT · FINE</span><span style="text-wrap: pretty;">First tick past the cap is when the fact becomes true, and it is the only screen where the number can still change — your comment says exactly that. Keep it.</span>
+          <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">THE SECOND ONE</span><span style="text-wrap: pretty;">The composer instance is <em>not</em> amber, and in the capture it never appears — the host notice wins the slot, so the room's own explanation is displaced by two copies of a refusal.</span>
+        </div>
+      </div>
+
+      <div style="width: 448px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-green-text);">WITH A QUEUE · a timing note</span>
+        <div style="padding: 14px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <sc-for list="{{ ticked }}" as="t" hint-placeholder-count="6">
+              <span style="{{ t.style }}"><span style="{{ t.chip }}"><span style="{{ t.box }}"><span style="{{ t.l1 }}"></span><span style="{{ t.l2 }}"></span><span style="{{ t.l3 }}"></span></span></span>{{ t.name }}</span>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 2px 0 2px 10px; border-left: 2px solid var(--lc-border-button);">
+            <span style="flex: 1; min-width: 0; font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">A post asks all 6. Four run at a time, so the last answers arrive a little later.</span>
+          </div>
+          <span style="height: 32px; padding: 0 15px; align-self: flex-start; display: inline-flex; align-items: center; border: 1px solid var(--lc-lime-border); border-radius: var(--lc-radius-control); background: var(--lc-lime-tint-strong); color: var(--lc-lime-text); font-size: var(--lc-text-control); font-weight: 500;">Create room</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 104px 1fr; gap: 6px 14px; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">
+          <span style="color: var(--lc-text-muted); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">STANDING</span><span style="text-wrap: pretty;">A quiet left rule: a fact about how the room will behave, not a thing to decide. Nothing is being warned about, because nobody is left out.</span>
+          <span style="color: var(--lc-text-muted); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">ONE NUMBER</span><span style="text-wrap: pretty;">The cap. <span style="font-family: var(--lc-font-mono);">6</span> is the room, which is on screen as six ticks. Nothing is subtracted, because nothing is lost.</span>
+          <span style="color: var(--lc-text-muted); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">AND THE OTHER</span><span style="text-wrap: pretty;">The composer instance becomes the room's status while a post is live: <span style="color: var(--lc-text-primary);">4 of 6 answered · 2 waiting for a slot</span> — the same slot that already ends up saying <span style="font-family: var(--lc-font-mono);">Everyone in Standup has answered.</span></span>
+          <span style="color: var(--lc-text-muted); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">IF NO QUEUE</span><span style="text-wrap: pretty;">It stays amber and stays a warning — something genuinely is lost — but drop the arithmetic: <span style="color: var(--lc-text-primary);">Only 4 run at once. The other 2 will not be asked.</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div style="max-width: 920px; padding: 16px 18px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 10px;">
+    <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">Copy, and where each string lives</span>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">
+      <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">Waiting for a slot</span><span style="color: var(--lc-text-muted);">roster-line label, below <span style="font-family: var(--lc-font-mono);">.lc-roompost__answers</span></span>
+      <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">Otto, Pike</span><span style="color: var(--lc-text-muted);">the queue, in start order</span>
+      <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">4 of 6 answered · 2 waiting for a slot</span><span style="color: var(--lc-text-muted);">the composer note slot — where the host notice already lands</span>
+      <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">Everyone in Standup has answered.</span><span style="color: var(--lc-text-muted);">unchanged in <span style="font-family: var(--lc-font-mono);">room-tasks.ts</span> — and with a queue, finally true</span>
+      <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">A post asks all 6. Four run at a time, so the last answers arrive a little later.</span><span style="color: var(--lc-text-muted);"><span style="font-family: var(--lc-font-mono);">overCapNote()</span>, form instance, standing</span>
+      <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">Otto and Pike were not asked — the room runs four at a time.</span><span style="color: var(--lc-text-muted);">only if the cap stays hard; retires the two concatenated refusals</span>
+    </div>
+    <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">Every number counts something on screen: the cap from <span style="font-family: var(--lc-font-mono);">MAX_LIVE_MISSIONS</span>, the room from <span style="font-family: var(--lc-font-mono);">room.teammateIds.length</span>, the answered count from answers that have text, the waiting count from names on the line. The one subtraction is <span style="font-family: var(--lc-font-mono);">4 of 6</span>, which is what someone asked for by opening the room.</span>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:1600}}">
+/* Faces from shared/avatar.ts — same tables, seed and layer geometry. */
+const HEADWEAR = [
+  [],
+  [[2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2], [0, 4], [0, 6], [14, 4], [14, 6]],
+  [[2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2]],
+  [[4, 2], [6, 2], [8, 2], [10, 2], [0, 4], [0, 6], [14, 4], [14, 6]],
+  [[4, 0], [6, 0], [8, 0], [10, 0], [2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2]],
+  [[6, 0], [6, 2], [4, 4], [6, 4], [8, 4], [10, 4]]
+];
+const ACCESSORY = [[], [[2, 6], [12, 6]], [[2, 4], [12, 4]]];
+const MOUTH = [
+  [[6, 10], [8, 10]],
+  [[4, 10], [6, 10], [8, 10], [10, 10]],
+  [[6, 10], [8, 10], [6, 12], [8, 12]],
+  [[6, 10], [8, 12]]
+];
+const EYES = [[4, 6], [10, 6]];
+
+function seedAvatar(id) {
+  let hash = 2166136261;
+  for (const character of id) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash ^= hash >>> 13;
+  const part = (shift, modulus) => ((hash >>> shift) & 0xff) % modulus;
+  return { headwear: part(4, 6), accessory: part(12, 3), mouth: part(20, 4) };
+}
+const facePixelSize = (size) => Math.max(2, Math.round((size * 0.72) / 8));
+const chipRadius = (size) => Math.max(4, Math.round(size / 6));
+
+function layer(cells, pixel, color) {
+  const base = cells[0];
+  if (base === undefined) return 'display: none;';
+  const [bx, by] = base;
+  const shadow = cells.slice(1).map(([x, y]) => `${((x - bx) / 2) * pixel}px ${((y - by) / 2) * pixel}px 0 ${color}`).join(', ');
+  return `position: absolute; left: ${(bx / 2) * pixel}px; top: ${(by / 2) * pixel}px; width: ${pixel}px; height: ${pixel}px; background: ${color}; display: block;`
+    + (shadow === '' ? '' : ` box-shadow: ${shadow};`);
+}
+
+/** PixelFace at 22px, the size .lc-roomanswer__who actually asks for. */
+function faceStyles(id, hue, size) {
+  const spec = seedAvatar(id);
+  const pixel = facePixelSize(size);
+  const grid = pixel * 8;
+  const color = `var(--lc-hue-${hue}-face)`;
+  return {
+    chip: `position: relative; flex: none; width: ${size}px; height: ${size}px; border-radius: ${chipRadius(size)}px; background: var(--lc-hue-${hue}); border: 1px solid color-mix(in srgb, var(--lc-hue-${hue}) 55%, transparent); display: block; overflow: hidden;`,
+    box: `position: absolute; left: ${Math.round((size - grid) / 2) - 1}px; top: ${Math.round((size - grid) / 2) - 1}px; width: ${grid}px; height: ${grid}px; display: block;`,
+    l1: layer([...HEADWEAR[spec.headwear], ...ACCESSORY[spec.accessory]], pixel, color),
+    l2: layer(EYES, pixel, color),
+    l3: layer(MOUTH[spec.mouth], pixel, color)
+  };
+}
+
+const CAP = 4;
+
+/*
+ * The real room from docs/user-session/2026-09-09T18-39-44-room-many:
+ * six teammates, one word each, Otto and Pike never started.
+ */
+const MEMBERS = [
+  { id: 'wren', name: 'Wren', hue: 'lime', word: 'ALMANAC' },
+  { id: 'booty', name: 'Booty', hue: 'blue', word: 'BRAMBLE' },
+  { id: 'gem', name: 'Gem', hue: 'clay', word: 'CINDER' },
+  { id: 'fen', name: 'Fen', hue: 'violet', word: 'DAMSON' },
+  { id: 'otto', name: 'Otto', hue: 'lime', word: 'ELDER' },
+  { id: 'pike', name: 'Pike', hue: 'blue', word: 'FALLOW' }
+];
+
+/*
+ * Five moments of one post, queuing. The only thing moving is the queue:
+ * names leave the waiting line and become cards. Phase strings are the
+ * record's own -- starting / running / completed -- as RoomAnswer.phase.
+ */
+const PHASES = {
+  posted: {
+    label: 'posted',
+    running: 4, answered: 0, waiting: 2,
+    notice: '0 of 6 answered · 2 waiting for a slot',
+    note: 'The post asks all six. Four start; two are on the waiting line, which is a roster line rather than two empty cards. The composer note carries the count instead of two copies of a refusal.'
+  },
+  first: {
+    label: 'two answered',
+    running: 2, answered: 2, waiting: 2,
+    notice: '2 of 6 answered · 2 waiting for a slot',
+    note: 'Two answers landed, and their slots are not free yet — the other two are still running. Nothing changed for the waiting pair, and nothing on screen moved to tell them so.'
+  },
+  slot: {
+    label: 'slots free, queue starts',
+    running: 2, answered: 2, waiting: 0, starting: 2,
+    notice: '2 of 6 answered · 2 starting',
+    note: 'The moment the design exists for: two slots freed, so Otto and Pike start. Their names leave the waiting line and become cards, carrying the record\u2019s own phase — starting. That is the one transition a queue draws, and it is a name becoming a card.'
+  },
+  most: {
+    label: 'five answered',
+    running: 1, answered: 5, waiting: 0,
+    notice: '5 of 6 answered',
+    note: 'Late in the wave. The room reads five of six, and the sixth is visibly running rather than mysteriously absent.'
+  },
+  done: {
+    label: 'done',
+    running: 0, answered: 6, waiting: 0,
+    notice: 'Everyone in Standup has answered.',
+    note: 'Six of six, and the notice from room-tasks.ts is finally a true sentence — which is the whole argument for the queue in one line. Step 9 of the session is the same moment with two cards permanently empty.'
+  }
+};
+
+class Component extends DCLogic {
+  state = { phase: 'posted' };
+
+  renderVals() {
+    const key = this.state.phase;
+    const p = PHASES[key];
+
+    /* Shipped recreation: four running, two absent. */
+    const shippedCards = MEMBERS.map((m, i) => {
+      const absent = i >= CAP;
+      const f = faceStyles(m.id, m.hue, 22);
+      return {
+        name: m.name,
+        chip: f.chip, box: f.box, l1: f.l1, l2: f.l2, l3: f.l3,
+        // is-absent carries no tone class in shell.css; the void is the signal.
+        style: `border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); background: var(--lc-bg-raised); padding: 11px 12px; display: flex; flex-direction: column; gap: 7px;`,
+        absentPhaseStyle: absent
+          ? 'font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);'
+          : 'display: none;',
+        routeStyle: absent ? 'display: none;' : 'font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted); text-wrap: pretty;',
+        phaseRowStyle: absent ? 'display: none;' : 'display: flex; align-items: center; gap: 8px;',
+        phase: 'running',
+        bodyStyle: absent ? 'display: none;' : 'font-size: var(--lc-text-description); color: var(--lc-text-muted);',
+        body: 'working…'
+      };
+    });
+
+    /* Proposed: cards only for members whose mission exists. */
+    const shown = MEMBERS.slice(0, p.answered + p.running + (p.starting ?? 0));
+    const cards = shown.map((m, i) => {
+      const answered = i < p.answered;
+      const starting = (p.starting ?? 0) > 0 && i >= p.answered + p.running;
+      const f = faceStyles(m.id, m.hue, 22);
+      return {
+        name: m.name,
+        chip: f.chip, box: f.box, l1: f.l1, l2: f.l2, l3: f.l3,
+        dotStyle: answered
+          ? 'width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--lc-green); display: block;'
+          : 'width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--lc-lime); display: block; animation: lcPulse 1.6s ease-in-out infinite;',
+        phase: answered ? 'completed' : starting ? 'starting' : 'running',
+        bodyStyle: `font-size: var(--lc-text-description); color: var(${answered ? '--lc-text-secondary' : '--lc-text-muted'});`,
+        body: answered ? m.word : 'working…'
+      };
+    });
+
+    const waiting = MEMBERS.slice(p.answered + p.running + (p.starting ?? 0));
+    const anyWaiting = p.waiting > 0;
+    const otto = faceStyles('otto', 'lime', 22);
+
+    return {
+      shippedCards,
+      otto: { chip: otto.chip, box: otto.box, l1: otto.l1, l2: otto.l2, l3: otto.l3 },
+      ticked: MEMBERS.map((m) => {
+        const f = faceStyles(m.id, m.hue, 16);
+        return {
+          name: m.name,
+          chip: f.chip, box: f.box, l1: f.l1, l2: f.l2, l3: f.l3,
+          style: 'height: 28px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--lc-lime-border); border-radius: var(--lc-radius-control); background: var(--lc-lime-tint); color: var(--lc-lime-text); font-size: var(--lc-text-description);'
+        };
+      }),
+      cards,
+      notice: p.notice,
+      waitingStyle: anyWaiting
+        ? 'display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--lc-radius-card); background: var(--lc-bg-terminal); box-shadow: var(--lc-shadow-terminal);'
+        : 'display: none;',
+      waitingNames: waiting.map((m) => m.name).join(', '),
+      waitingCount: String(p.waiting),
+      phases: Object.entries(PHASES).map(([k, v]) => ({
+        label: v.label,
+        style: `height: 26px; padding: 0 10px; border-radius: var(--lc-radius-control); font-family: var(--lc-font-ui); font-size: var(--lc-text-description); cursor: pointer; ${k === key
+          ? 'border: 1px solid var(--lc-lime-border); background: var(--lc-lime-tint); color: var(--lc-lime-text);'
+          : 'border: 1px solid var(--lc-border-control); background: var(--lc-bg-control); color: var(--lc-text-control-fg);'}`,
+        onClick: () => this.setState({ phase: k })
+      })),
+      phaseNote: p.note,
+      gridDemo: this.demo(true),
+      listDemo: this.demo(false)
+    };
+  }
+
+  /** Answer bodies as bars, so length is the only variable on show. */
+  demo(equalise) {
+    const LENGTHS = [12, 2, 4, 3, 2, 6];
+    return MEMBERS.map((m, i) => {
+      const rows = LENGTHS[i];
+      const band = i < 3 ? LENGTHS.slice(0, 3) : LENGTHS.slice(3, 6);
+      const rowTallest = equalise ? Math.max(...band) : rows;
+      return {
+        name: m.name,
+        chipStyle: `width: 12px; height: 12px; flex: none; border-radius: 3px; background: var(--lc-hue-${m.hue}); display: block;`,
+        barsStyle: `display: flex; flex-direction: column; gap: 3px; min-height: ${rowTallest * 6}px;`,
+        bars: Array.from({ length: rows }, (_unused, r) => ({
+          style: `height: 3px; border-radius: 2px; background: var(--lc-border-button); width: ${r === rows - 1 ? 55 : 100}%; display: block;`
+        }))
+      };
+    });
+  }
+}
+</script>
+</body>
+</html>
