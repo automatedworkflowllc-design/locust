@@ -57,7 +57,14 @@ const memoryMb = async () => {
 const before = await memoryMb()
 say(`  baseline working set: ${String(before)} MB`)
 
-const workspace = await scratchRepository('locust-drive-cap-ws-')
+// A brief that does NOT fight the prompt. The default LOCUST.md says "Keep
+// answers to one paragraph", Locust carries it to every teammate, and the
+// first runs of this probe measured eight agents arguing with that rather
+// than eight agents producing output.
+const workspace = await scratchRepository(
+  'locust-drive-cap-ws-',
+  'Answer exactly what you are asked for, at whatever length that takes. Do not shorten or summarise.\n'
+)
 const drive = await startDrive({
   name: `cap-${String(COUNT)}`,
   port: 9432,
@@ -101,8 +108,31 @@ try {
     if (!create || create.disabled) return 'Create room disabled'
     create.click()
     await new Promise(r => setTimeout(r, 1200))
-    return 'ticked ' + members.filter(m => m.getAttribute('aria-checked') === 'true').length + ' · warning: ' + ([...document.querySelectorAll('.lc-settings__note')].map(n => n.innerText.trim()).find(t => /run at once/.test(t)) ?? 'none')
+    const ticked = members.filter(m => m.getAttribute('aria-checked') === 'true').length
+    const warning = [...document.querySelectorAll('.lc-settings__note')].map(n => n.innerText.trim()).find(t => /run at once/.test(t)) ?? 'none'
+    // Whether the room EXISTS, not whether the button was clicked. The
+    // composer is the proof: no room, no compose box.
+    const made = document.querySelector('.lc-roomcompose__box') !== null
+    const refusal = [...document.querySelectorAll('.lc-settings__note')].map(n => n.innerText.trim()).find(t => /needs between|could not/i.test(t)) ?? ''
+    return (made ? 'MADE' : 'NOT MADE') + ' · ticked ' + ticked + ' · warning: ' + warning + (refusal ? ' · refused: ' + refusal : '')
   })()`))
+
+  /*
+   * The premise, asserted OUTSIDE capture().
+   *
+   * capture() records a thrown error as the step's note and walks on, so a
+   * failed premise reads as the app having nothing to show. COUNT=12 was run
+   * with no room at all: the room store refuses more than MAX_ROOM_TEAMMATES
+   * (8) with "a room needs between 1 and 8 teammates", the compose box never
+   * appeared, and the probe reported 401 seconds and a memory figure for a
+   * post that was never made. Third time this session that a drive has
+   * reported the app for a premise it never checked.
+   */
+  const made = await drive.evaluate(`document.querySelector('.lc-roomcompose__box') !== null`)
+  if (made !== true) {
+    const why = await drive.evaluate(`[...document.querySelectorAll('.lc-settings__note')].map(n => n.innerText.trim()).join(' · ')`)
+    throw new Error(`NOT A CAP TEST: no room of ${String(COUNT)} was made, so nothing was posted. The screen said: ${String(why)}`)
+  }
 
   const started = Date.now()
   await drive.capture('one post, counting to 250 each', () => drive.evaluate(`(async () => {

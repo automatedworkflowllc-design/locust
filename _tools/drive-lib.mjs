@@ -32,14 +32,28 @@ export const git = (args, cwd) => new Promise((resolve, reject) => {
   execFile('git', args, { cwd, windowsHide: true }, (error, stdout) => (error ? reject(error) : resolve(stdout)))
 })
 
-/** A scratch git repository with a README and a LOCUST.md, committed. */
-export async function scratchRepository(prefix = 'locust-drive-ws-') {
+/**
+ * A scratch git repository with a README and a LOCUST.md, committed.
+ *
+ * `brief` is that LOCUST.md, and Locust carries it to EVERY teammate started
+ * in this folder -- it is not decoration. The default asks for one
+ * paragraph, which keeps most drives' output small and readable.
+ *
+ * A drive whose whole point is long output has to pass its own, because the
+ * default actively fights it. The cap probe asked eight teammates to count
+ * to 250 and watched them answer "Your 1-to-250 count conflicts with the
+ * one-paragraph rule -- checking the workspace before I answer" instead
+ * (2026-09-09). The runs completed and the numbers looked fine, but they
+ * measured deliberation rather than the throughput they were meant to
+ * measure. A fixture that argues with the prompt is a silent confound.
+ */
+export async function scratchRepository(prefix = 'locust-drive-ws-', brief = 'Keep answers to one paragraph.\n') {
   const workspace = await mkdtemp(join(tmpdir(), prefix))
   await git(['init', '-q', '-b', 'main'], workspace)
   await git(['config', 'user.email', 'drive@locust.test'], workspace)
   await git(['config', 'user.name', 'Locust drive'], workspace)
   await writeFile(join(workspace, 'README.md'), '# scratch\n\nA scratch project for a user session.\n', 'utf8')
-  await writeFile(join(workspace, 'LOCUST.md'), 'Keep answers to one paragraph.\n', 'utf8')
+  await writeFile(join(workspace, 'LOCUST.md'), brief, 'utf8')
   await git(['add', '.'], workspace)
   await git(['commit', '-q', '-m', 'first'], workspace)
   return workspace

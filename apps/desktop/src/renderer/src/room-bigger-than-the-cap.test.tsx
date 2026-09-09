@@ -6,22 +6,25 @@ import { MAX_LIVE_MISSIONS } from '../../shared/live-missions.js'
 import { RoomScreen, overCapNote } from './components/RoomScreen.js'
 
 /**
- * A room bigger than the live-mission cap says so BEFORE the post.
+ * What the room says about a post it cannot run in full.
  *
- * Found driving a six-member room on 2026-09-09. The form offered all six
- * teammates and took all six. The composer promised "Goes to 6 teammates,
- * each on their own route." The post started FOUR -- `MAX_LIVE_MISSIONS` is
- * a resource bound and the fifth and sixth starts were refused -- and Otto
- * and Pike were drawn as empty cards reading "did not start", with no reason
- * given anywhere on the screen.
+ * Found driving a six-member room on 2026-09-09. The mission cap was 4 and
+ * the room limit was 8, so the form offered all six teammates, took all six,
+ * started FOUR, drew the other two as empty cards reading "did not start",
+ * and then said "Everyone in Standup has answered." The host's refusal
+ * naming those two was shown in the same slot and was replaced by the false
+ * line, so the one true sentence on the screen was overwritten.
  *
- * The refusal WAS said, once, in the note under the composer. Then the room
- * finished and overwrote that note with "Everyone in Standup has answered."
- * So the one true sentence on the screen was replaced by a false one, and
- * what was left looked like two teammates that silently broke.
+ * The cap was then measured and raised to 8, matching the room limit, and
+ * `room-and-mission-caps-agree.test.ts` holds them together. So a room can
+ * no longer be built bigger than what can run, and the sentences below are
+ * now a guard rather than a description of today's screen.
  *
- * This covers the two fixes on the way IN. The third -- not calling four of
- * six everyone -- is in `room-tasks.test.ts`, where the false claim was made.
+ * They stay because the cap is still reachable another way: it counts every
+ * live mission, not just this room's, so a room of eight posted while other
+ * missions are running still refuses some of its members. And because the
+ * two numbers could move apart again -- which is the whole reason the other
+ * test exists.
  */
 
 const teammate = (id: string, name: string): PublicTeammate =>
@@ -37,7 +40,7 @@ const teammate = (id: string, name: string): PublicTeammate =>
     avatar: { headwear: 0, accessory: 0, mouth: 0 }
   }) as PublicTeammate
 
-const NAMES = ['Wren', 'Booty', 'Gem', 'Fen', 'Otto', 'Pike']
+const NAMES = ['Wren', 'Booty', 'Gem', 'Fen', 'Otto', 'Pike', 'Ash', 'Bryn']
 const ROSTER = NAMES.map((name, i) => teammate(`tm_${String(i)}`, name))
 
 const room = (members: number): PublicRoom => ({
@@ -69,43 +72,34 @@ function open(members: number): string {
   )
 }
 
-describe('a room with more members than can run at once', () => {
-  it('is a real gap, not a hypothetical one', () => {
-    // The control. If the cap ever rises above the roster this file uses,
-    // every assertion below would pass by describing a case that cannot
-    // happen, and the screen could go back to saying nothing.
-    expect(MAX_LIVE_MISSIONS).toBeLessThan(NAMES.length)
-    // And the screen must actually be rendering: without this, a RoomScreen
-    // that threw or drew the empty list would satisfy every `not.toContain`.
-    expect(open(6)).toContain('Post to Standup')
+describe('the note under a room composer', () => {
+  it('is rendered at all', () => {
+    // The control. A RoomScreen that threw, or drew the room list instead of
+    // the open room, would satisfy every `not.toContain` below by drawing
+    // no composer.
+    expect(open(MAX_LIVE_MISSIONS)).toContain('Post to Standup')
   })
 
-  it('says how many will not start, and how many will', () => {
-    const said = overCapNote(6)
-    expect(said).toBe('Only 4 missions run at once, so a post to 6 starts 4 and 2 will not start.')
-    // The exact case that was silent: one over the cap.
+  it('says how many would not start, when that can happen', () => {
+    const said = overCapNote(MAX_LIVE_MISSIONS + 2)
+    expect(said).toContain(`Only ${String(MAX_LIVE_MISSIONS)} missions run at once`)
+    expect(said).toContain('2 will not start')
+    // One over is the case that used to be silent.
     expect(overCapNote(MAX_LIVE_MISSIONS + 1)).toContain('1 will not start')
   })
 
   it('stays quiet at and under the cap', () => {
-    // An off-by-one here would nag every four-member room about a limit it
-    // never reaches.
+    // An off-by-one here would nag every full room about a limit it reaches
+    // exactly and never exceeds -- which, now that the two caps agree, is
+    // every room there is.
     expect(overCapNote(MAX_LIVE_MISSIONS)).toBeUndefined()
     expect(overCapNote(1)).toBeUndefined()
     expect(overCapNote(0)).toBeUndefined()
   })
 
-  it('puts it under the composer of a room that is already too big', () => {
-    const big = open(6)
-    // THE regression: the only thing the composer said was the claim that
-    // the post goes to all six.
-    expect(big).not.toContain('Goes to 6 teammates, each on their own route')
-    expect(big).toContain('2 will not start')
-  })
-
-  it('leaves a room the cap does not bite alone', () => {
-    const small = open(3)
-    expect(small).toContain('Goes to 3 teammates, each on their own route')
-    expect(small).not.toContain('will not start')
+  it('tells a full room its post goes to everyone, because now it does', () => {
+    const full = open(MAX_LIVE_MISSIONS)
+    expect(full).toContain(`Goes to ${String(MAX_LIVE_MISSIONS)} teammates, each on their own route`)
+    expect(full).not.toContain('will not start')
   })
 })

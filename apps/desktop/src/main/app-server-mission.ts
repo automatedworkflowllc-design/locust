@@ -102,11 +102,14 @@ export interface AppServerMissionService {
 }
 
 /**
- * Same bound as the exec transport, for the same reason: each live run is a
- * provider process tree holding a ledger writer, and four is already more
- * than one person can follow.
+ * Same bound as the exec transport, because the cap is ONE pool across all
+ * three -- and now literally the same number, re-exported rather than
+ * copied. Three copies of 4 lived in three files until 2026-09-09, when the
+ * cap was measured and raised and only one of them moved.
  */
-export const MAX_LIVE_APP_SERVER_MISSIONS = 4
+import { MAX_LIVE_MISSIONS as MAX_LIVE_APP_SERVER_MISSIONS } from '../shared/live-missions.js'
+
+export { MAX_LIVE_APP_SERVER_MISSIONS }
 const NOBODY = ''
 
 const MAX_APPROVAL_DETAIL = 4_000
