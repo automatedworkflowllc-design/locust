@@ -110,6 +110,28 @@ export function absentLine(absent: readonly { readonly name: string; readonly re
  * people turned away by the cap are one fact with two names; two turned away
  * for different reasons stay two lines.
  */
+/**
+ * Whether a post's answers are laid out as a grid or as a list.
+ *
+ * A grid forces EQUAL-HEIGHT CELLS, and answers are of wildly unequal
+ * length, so every row is as tall as its longest cell. It is paid in
+ * whitespace and it worsens with width, because a wider row has more
+ * chances to contain one long answer. It is visible even when every answer
+ * is one word: on 2026-09-09 two cards took their height from
+ * `opencode/muse-spark-1.3-contributor-free` wrapping to two mono lines in
+ * the card beside them.
+ *
+ * Survivable at six, where a row is three cells and one glance. Past that a
+ * grid scrolls, and it is then costing the only thing it was for -- seeing
+ * the room at once -- while still paying the whitespace. A list gives every
+ * answer one column width and its own height, which is what prose wants,
+ * and puts the room in the same shape as the thread.
+ *
+ * Counted on RENDERED answers rather than room members, because rows are
+ * what break. A room of eight where three were never asked draws five.
+ */
+export const ANSWERS_BEFORE_A_LIST = 6
+
 export function refusalNotice(refused: readonly { readonly name: string; readonly message: string }[]): string | undefined {
   if (refused.length === 0) return undefined
   const byReason = new Map<string, string[]>()
@@ -417,7 +439,7 @@ export function RoomScreen({
                   {new Date(entry.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
-              <div className="lc-roompost__answers">
+              <div className={`lc-roompost__answers${answers.length > ANSWERS_BEFORE_A_LIST ? ' is-list' : ''}`}>
                 {room.teammateIds.map((teammateId) => {
                   const teammate = teammates.find((candidate) => candidate.teammateId === teammateId)
                   const answer = answers.find((candidate) => candidate.teammateId === teammateId)

@@ -2108,6 +2108,21 @@ textarea {
   gap: var(--lc-space-3);
 }
 
+/*
+ * Past six answers the grid stops earning its keep.
+ *
+ * Equal-height cells against unequal-length answers means every row is as
+ * tall as its longest cell, paid in whitespace, and worse the wider the row
+ * gets. At six a row is three cells and one glance; past that it scrolls,
+ * and a grid that scrolls is no longer showing you the room at once.
+ *
+ * One column, so every answer has its own height -- the shape the thread
+ * already uses for a long reply.
+ */
+.lc-roompost__answers.is-list {
+  grid-template-columns: 1fr;
+}
+
 .lc-roomanswer {
   display: flex;
   flex-direction: column;

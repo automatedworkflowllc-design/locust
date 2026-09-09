@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { PublicRoom, PublicTeammate } from '../../shared/ipc.js'
-import { RoomScreen, absentLine, refusalNotice } from './components/RoomScreen.js'
+import { ANSWERS_BEFORE_A_LIST, RoomScreen, absentLine, refusalNotice } from './components/RoomScreen.js'
 import type { RoomAnswer } from './components/RoomScreen.js'
 
 /**
@@ -36,7 +36,7 @@ const teammate = (id: string, name: string): PublicTeammate =>
     avatar: { headwear: 0, accessory: 0, mouth: 0 }
   }) as PublicTeammate
 
-const NAMES = ['Wren', 'Booty', 'Gem', 'Fen', 'Otto', 'Pike']
+const NAMES = ['Wren', 'Booty', 'Gem', 'Fen', 'Otto', 'Pike', 'Dell', 'Ember']
 const ROSTER = NAMES.map((name, i) => teammate(`tm_${String(i)}`, name))
 
 const answer = (teammateId: string): RoomAnswer =>
@@ -92,11 +92,11 @@ describe('the members a post did not reach', () => {
   it('is one line naming everyone it missed', () => {
     const some = screen(4)
     expect(some).toContain('lc-roomabsent')
-    expect(some).toContain('Otto and Pike were not asked')
+    expect(some).toContain('Otto, Pike, Dell and Ember were not asked')
   })
 
   it('says nothing when the post reached everyone', () => {
-    const all = screen(6)
+    const all = screen(NAMES.length)
     expect(all).not.toContain('lc-roomabsent')
     expect(all).not.toContain('not asked')
   })
@@ -172,5 +172,33 @@ describe('the members a post did not reach', () => {
 
   it('says nothing when nobody was refused', () => {
     expect(refusalNotice([])).toBeUndefined()
+  })
+
+  /*
+   * A grid forces equal-height cells and answers are of wildly unequal
+   * length, so every row is as tall as its longest cell -- paid in
+   * whitespace, and worse the wider the row. Raised by the design agent, and
+   * the mechanism was visible in my own capture even with one-word answers:
+   * two cards took their height from the model name wrapping in the card
+   * beside them.
+   *
+   * The switch is on RENDERED answers, not room members, because rows are
+   * what break: a room of eight where three were never asked draws five.
+   */
+  it('lays six or fewer answers out as a grid', () => {
+    expect(screen(ANSWERS_BEFORE_A_LIST)).not.toContain('is-list')
+    expect(screen(3)).not.toContain('is-list')
+  })
+
+  it('switches to a list past that', () => {
+    expect(screen(ANSWERS_BEFORE_A_LIST + 1)).toContain('lc-roompost__answers is-list')
+  })
+
+  it('counts what is drawn, not who is in the room', () => {
+    // Eight members, five answers: five rows, so it stays a grid. Counting
+    // members would have listed a screen showing five cards.
+    const room = screen(5)
+    expect(room).not.toContain('is-list')
+    expect([...room.matchAll(/lc-roomanswer"/g)]).toHaveLength(5)
   })
 })
