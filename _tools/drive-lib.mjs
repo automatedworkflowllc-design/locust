@@ -72,7 +72,7 @@ export function assertMaySpend(name) {
   process.exit(1)
 }
 
-export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false }) {
+export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false, packaged }) {
   if (spends) assertMaySpend(name)
   try {
     const already = await fetch(`http://127.0.0.1:${String(port)}/json/list`, { signal: AbortSignal.timeout(1500) })
@@ -116,7 +116,21 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   for (const [file, content] of Object.entries(files)) {
     await writeFile(join(profile, file), typeof content === 'string' ? content : JSON.stringify(content), 'utf8')
   }
-  const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`], {
+  /*
+   * The dev build by default, the PACKAGED binary when asked.
+   *
+   * `app.isPackaged` is false under `electron .`, so the version line, the
+   * window title and the update section all read differently from what a
+   * person who ran the installer sees. A drive that walks the ordinary path
+   * has to walk it through the same bytes the installer lays down, or it is
+   * reading a screen nobody has.
+   *
+   * Same profile handling, same capture machinery, same everything else --
+   * only the argv differs, because the packaged exe IS the app and takes no
+   * directory argument.
+   */
+  const launch = packaged === undefined ? [ELECTRON, [APP_DIR]] : [packaged, []]
+  const child = spawn(launch[0], [...launch[1], `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`], {
     cwd: workspace,
     env: { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}`, ...env },
     stdio: ['ignore', 'pipe', 'pipe']
