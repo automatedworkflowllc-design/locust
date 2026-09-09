@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -36,9 +35,10 @@ import { describe, expect, it } from 'vitest'
  * behaviour, only about the vocabulary the components are allowed to use.
  */
 
-const COMPONENTS = join(process.cwd(), 'apps/desktop/src/renderer/src/components')
+// The caller's working directory must not change which components are checked.
+const COMPONENTS = new URL('../renderer/src/components/', import.meta.url)
 
-const sourceOf = (file: string): string => readFileSync(join(COMPONENTS, file), 'utf8')
+const sourceOf = (file: string): string => readFileSync(new URL(file, COMPONENTS), 'utf8')
 
 /** Every `className="lc-card ..."` in a file, with its modifier classes. */
 function cardClasses(source: string): readonly string[] {

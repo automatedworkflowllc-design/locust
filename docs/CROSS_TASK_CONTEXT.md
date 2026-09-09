@@ -119,6 +119,13 @@ Use this template:
 
 ## Handoff log
 
+### 2026-09-08 — physical torn-ledger recovery proof (astra/work)
+
+- Tests/findings only: [torn-ledger finding](FINDING-torn-ledger-2026-09-08.md). Nineteen new physical-file reader/history/preload/component-rendering checks, with clean zero-issue controls and ten measured mutation failures.
+- Reader safely retains prefixes and raises issues for all six requested shapes. Body issues render incomplete-receipt wording. **Unfixed:** invalid headers/oversized files have global issues but no recovered mission, so Missions falsely says ledger verified; five tests explicitly characterize the defect.
+- Limits: actual React component HTML and mocked Electron transport; no live Electron relaunch or App mount. No production changes. Two existing source-inspection tests now resolve paths from import.meta.url so both test entry points agree.
+- Validation: root pnpm test and full Vitest 1,679/1,679; desktop pnpm test 1,227/1,227, matching root's desktop portion. Recursive typecheck green, including node and web.
+
 ### 2026-09-08 — app-server receipt-failure hold measurement (astra/work)
 
 - Scope: measurement only, in the isolated locust-astra worktree; no runtime or UI changes.

@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -27,7 +26,8 @@ const SOURCES = [
   'main/relay.ts'
 ]
 
-const read = (file: string): string => readFileSync(join(process.cwd(), 'apps/desktop/src', file), 'utf8')
+// Anchor to the test, so package and repository invocations inspect the same files.
+const read = (file: string): string => readFileSync(new URL('../' + file, import.meta.url), 'utf8')
 
 describe('how briefings tell a model to place its blocks', () => {
   it('finds the briefings, so a pass means something', () => {
