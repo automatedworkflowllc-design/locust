@@ -285,7 +285,22 @@ export function pickRouteScript({ group, search, row }) {
     const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
     if (!control) return 'no route control'
     if (control.disabled) return 'route control disabled'
-    control.click()
+    /*
+     * Open it only if it is CLOSED. This used to click unconditionally, which
+     * on an already-open picker closes it -- and the selection then does not
+     * apply, while the helper still returns its success line naming whatever
+     * route was there before.
+     *
+     * Measured 2026-09-09, both builds: called as the first thing to touch the
+     * picker it moves the chip Codex -> OpenCode -> Cursor first try; called
+     * after anything else had opened the picker, it reported success and left
+     * the chip untouched. That difference cost two walkthroughs and a false
+     * alarm about sixty drives being in doubt -- they were not, because they
+     * all happen to call this first.
+     *
+     * One line, so no drive has to know that rule.
+     */
+    if (!document.querySelector('.lc-picker')) control.click()
     let target
     let notice = null
     for (let attempt = 0; attempt < 60 && !target; attempt += 1) {

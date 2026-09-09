@@ -22,17 +22,27 @@ import { join } from 'node:path'
 
 import { APP_DIR, pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
+/*
+ * `--dev` runs the SAME probe against the development build.
+ *
+ * The question this answers is how much is in doubt: if the shared helper
+ * fails only against the packaged binary, the drives that verified routes on
+ * dev are still evidence. If it fails on both, roughly sixty drives have been
+ * asserting things about a route they may never have switched.
+ */
+const DEV = process.argv.includes('--dev')
 const EXE = join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
-if (!existsSync(EXE)) {
+if (!DEV && !existsSync(EXE)) {
   say(`no packaged build at ${EXE}`)
   process.exit(1)
 }
+say(DEV ? 'probing the DEV build' : 'probing the PACKAGED build')
 
 const workspace = await scratchRepository('locust-probe-picker-ws-')
 const drive = await startDrive({
-  name: 'picker-contents',
-  port: 9423,
-  packaged: EXE,
+  name: DEV ? 'picker-contents-dev' : 'picker-contents',
+  port: DEV ? 9424 : 9423,
+  ...(DEV ? {} : { packaged: EXE }),
   workspace,
   seed: {
     schemaVersion: 1,

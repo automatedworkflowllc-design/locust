@@ -24,7 +24,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { APP_DIR, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { APP_DIR, pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const EXE = join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
 if (!existsSync(EXE)) {
@@ -94,44 +94,25 @@ const WAIT_FOR_CATALOG = `(async () => {
 })()`
 
 /**
- * Choose OpenCode's free model, by the row's own label.
+ * Choose OpenCode's free model.
  *
- * NOT through the shared `pickRouteScript`, which does not reliably apply a
- * selection against the packaged build: measured three ways in
- * `probe-picker-contents` on 2026-09-09, the helper reported success and left
- * the chip on `Codex CLI / account-default`, while clicking the same row by
- * hand -- filtered or unfiltered -- moved it to `OpenCode /
- * ling-3.0-flash-fin-free` every time. The app is fine in every hand-driven
- * path; the helper is the unreliable part, and that is worth knowing because
- * about sixty drives use it.
+ * Uses the shared `pickRouteScript`, which is sound. An earlier version of
+ * this file carried a private copy and a comment calling the helper
+ * "unreliable against the packaged build" -- THAT WAS WRONG, and the retraction
+ * matters more than the claim did.
  *
- * Matched on the LABEL rather than the row's `innerText`, which is what the
- * helper tests: a label is one string the component renders, and innerText
- * folds in the detail line and the tag.
+ * What actually happened: `probe-picker-contents` called the helper as its
+ * fourth step, after it had already opened the picker and typed a search, and
+ * in that state the selection did not apply. I read one failing sequence as a
+ * property of the helper and wrote down that sixty drives were in doubt.
+ * `probe-pickroute-first` then called it the way every real drive does -- first
+ * picker interaction on a freshly opened teammate -- and it moved the chip from
+ * Codex to OpenCode and then to Cursor, on the packaged binary, first try.
+ *
+ * The only real defect here was the catalog race, which is why the wait above
+ * still matters.
  */
-const PICK_FREE_OPENCODE = `(async () => {
-  if (document.querySelector('.lc-picker') === null) {
-    const control = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')
-    control?.click()
-    await new Promise((r) => setTimeout(r, 900))
-  }
-  const picker = document.querySelector('.lc-picker')
-  if (picker === null) return 'picker would not open'
-  let group = ''
-  for (const node of picker.querySelector('.lc-picker__list').children) {
-    const header = node.querySelector('.lc-picker__group')
-    if (header) group = (header.textContent ?? '').trim()
-    const rowEl = node.querySelector('.lc-picker__row')
-    if (rowEl === null || rowEl.disabled === true) continue
-    const label = (rowEl.querySelector('.lc-picker__label')?.textContent ?? '').trim()
-    if (/opencode/i.test(group) && /free/i.test(label)) {
-      rowEl.click()
-      await new Promise((r) => setTimeout(r, 1200))
-      return 'chose ' + label
-    }
-  }
-  return 'no free OpenCode row offered'
-})()`
+const PICK_FREE_OPENCODE = pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' })
 
 /** What the screen says, in the words a person would read off it. */
 const reading = `(() => {
