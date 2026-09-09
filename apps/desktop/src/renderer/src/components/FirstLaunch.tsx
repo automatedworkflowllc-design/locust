@@ -22,6 +22,23 @@ import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFact
  * needs no tag once its dot is green, so only the exception is tagged --
  * which is the reference's own rule, applied to more exceptions than it drew.
  */
+/**
+ * Ask the host to open one of the addresses it allows.
+ *
+ * These used to be `<a target="_blank">`, which does nothing in this app:
+ * the host denies `window.open` outright and cancels navigation away from
+ * its own URL, on purpose, because `openExternal` bypasses every egress
+ * rule the packaged build has. So every "Get it" link ever shipped was
+ * dead -- it looked like a link, it had a cursor, and nothing happened.
+ * Found by the first outside tester on 0.55.0.
+ *
+ * A button rather than an anchor, because that is what it is: it makes a
+ * request the host may refuse, and it never navigates.
+ */
+function openLink(url: string): void {
+  void window.desktop?.openLink(url)
+}
+
 /** The line a person runs once to sign in, when the runtime needs an account. */
 function signInCommand(runtime: string): string | undefined {
   const facts = runtimeInstallFacts(runtime)
@@ -270,9 +287,14 @@ export function FirstLaunch({
                   ) : vendorUrl(runtime.id) !== undefined ? (
                     // Not a package, and not second-class either: the same
                     // slot, the same box, one different word.
-                    <a className="lc-runtimecell__install" href={vendorUrl(runtime.id)} target="_blank" rel="noreferrer">
+                    <button
+                      type="button"
+                      className="lc-runtimecell__install"
+                      onClick={() => openLink(vendorUrl(runtime.id) ?? '')}
+                      title={`Open ${vendorUrl(runtime.id) ?? ''} in your browser`}
+                    >
                       Get it ↗
-                    </a>
+                    </button>
                   ) : (
                     <span className="lc-runtimecell__tag">{status.tag}</span>
                   )}
@@ -293,10 +315,24 @@ export function FirstLaunch({
           * progress bar: npm reports nothing that honestly becomes a
           * percentage, so the screen shows the number it actually has.
           */}
-        {discoveryPhase === 'ready' && connected === 0 && npmMissing && (
+        {/*
+          * Said whenever npm is missing, not only when NOTHING is connected.
+          *
+          * This was gated on `connected === 0`, so the moment one runtime
+          * happened to be found -- Codex signs itself in on many machines --
+          * the sentence explaining why every Install button is switched off
+          * disappeared, and the reason survived only in a tooltip. The first
+          * outside tester on 0.55.0 had exactly that: Codex connected, every
+          * other row offering a button that "does nothing", and no visible
+          * reason anywhere. A disabled control has to say why it is disabled
+          * on the screen, not on hover.
+          */}
+        {discoveryPhase === 'ready' && npmMissing && (
           <p className="lc-installnote lc-tone-amber">
-            Node.js is not on this machine. Four of these five install through npm, which comes with it.{' '}
-            <a href="https://nodejs.org" target="_blank" rel="noreferrer">Get Node.js ↗</a>
+            Node.js is not on this machine, so the Install buttons below cannot run.{' '}
+            <button type="button" className="lc-linkbutton" onClick={() => openLink('https://nodejs.org')}>
+              Get Node.js ↗
+            </button>
           </p>
         )}
         {installFailure !== undefined && (

@@ -26,6 +26,7 @@ import {
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
+  OPEN_LINK_CHANNEL,
   ROOM_LIST_CHANNEL,
   ROOM_CREATE_CHANNEL,
   ROOM_REMOVE_CHANNEL,
@@ -76,6 +77,7 @@ import type {
   WorkspaceSettings,
   WorkspaceChooseResponse,
   AttachFilesResponse,
+  OpenLinkResponse,
   RevealFileResponse,
   WorkspaceImageResponse,
   RoomListResponse,
@@ -203,6 +205,7 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(WORKSPACE_SETTINGS_READ_CHANNEL) as Promise<WorkspaceSettings>,
   chooseWorkspace: () => ipcRenderer.invoke(WORKSPACE_CHOOSE_CHANNEL) as Promise<WorkspaceChooseResponse>,
   revealFile: (path: string) => ipcRenderer.invoke(WORKSPACE_REVEAL_CHANNEL, path) as Promise<RevealFileResponse>,
+  openLink: (url: string) => ipcRenderer.invoke(OPEN_LINK_CHANNEL, url) as Promise<OpenLinkResponse>,
   readWorkspaceImage: (path: string) =>
     ipcRenderer.invoke(WORKSPACE_IMAGE_CHANNEL, path) as Promise<WorkspaceImageResponse>,
   attachFiles: () => ipcRenderer.invoke(WORKSPACE_ATTACH_CHANNEL) as Promise<AttachFilesResponse>,

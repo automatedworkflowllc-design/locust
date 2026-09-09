@@ -107,6 +107,7 @@ import {
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
+  OPEN_LINK_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
   ROOM_LIST_CHANNEL,
@@ -122,6 +123,7 @@ import {
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { roleLabelOf } from '../shared/ipc.js'
+import { isOutboundLink } from '../shared/outbound-links.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { createUpdateService } from './updates.js'
 import type {
@@ -130,6 +132,7 @@ import type {
   CodexMissionStartRequest,
   CodexMissionUpdate,
   MissionMode,
+  PublicRoom,
   PublicTeammate,
   MissionHandoffRequest,
   MissionResumeRequest
@@ -1179,6 +1182,32 @@ if (!ownsSingleInstanceLock) {
       return { ok: true, data: { path: next, reopening: true } } as const
     })
 
+    /*
+     * Open one of the addresses this app is allowed to open, and no other.
+     *
+     * The policy above still holds -- `window.open` is denied and navigation
+     * away from the app's URL is cancelled -- and it asked that a feature
+     * needing a link name the exact URL in the HOST. The first-run panel
+     * grew three links and nobody did, so every "Get it" in every shipped
+     * build was dead: it looked like a link, it had a cursor, and clicking
+     * it did nothing at all. Found by the first outside tester on 0.55.0,
+     * who had no Node.js and whose only offered way out was one of them.
+     *
+     * The renderer names a URL; the host opens it only if it is on the
+     * host's own list, so a renderer turned against the person can still
+     * reach nowhere else.
+     */
+    ipcMain.handle(OPEN_LINK_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      if (!isOutboundLink(requested)) return { ok: false, message: 'Locust does not open that address.' } as const
+      try {
+        await shell.openExternal(requested)
+        return { ok: true } as const
+      } catch {
+        return { ok: false, message: 'Your browser could not be opened.' } as const
+      }
+    })
+
     ipcMain.handle(WORKSPACE_REVEAL_CHANNEL, (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       // The roots are the host's, never the renderer's. One workspace per
@@ -1506,6 +1535,91 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    /**
+     * Start one room member's mission, or say why not.
+     *
+     * Pulled out of the post handler so the QUEUE can use it too: a member
+     * who had no slot when the post went out is started by exactly this
+     * path when one frees, on the same route, with the same briefing.
+     *
+     * `retryable` is the whole point of the split. RUN_ALREADY_ACTIVE means
+     * "not now" -- the live cap is full, or that teammate is already working
+     * -- and waiting fixes both. Everything else (gone from the roster,
+     * Antigravity, approve-each) is a refusal that waiting will not fix, and
+     * only those are recorded against the post as refused.
+     */
+    const startRoomMember = async (
+      room: PublicRoom,
+      teammateId: string,
+      text: string,
+      roster: readonly PublicTeammate[]
+    ): Promise<
+      | { readonly ok: true; readonly data: CodexMissionStartData }
+      | { readonly ok: false; readonly name: string; readonly message: string; readonly retryable: boolean }
+    > => {
+      const teammate = roster.find((entry) => entry.teammateId === teammateId)
+      const peer = await peerContextFor(teammateId)
+      if (teammate === undefined || peer === undefined) {
+        return { ok: false, name: teammate?.name ?? teammateId, message: 'No longer on the roster.', retryable: false }
+      }
+      const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
+      // The person's words, then the board: which room this is, who else
+      // is in it, every task as it stands, and how to move one. The room
+      // keeps only the person's words as the post; this trailer is what
+      // the mission is briefed with. Read fresh, so a member started from
+      // the queue is briefed with the board as it stands NOW.
+      const memberNames = room.teammateIds.map((id: string) => roster.find((entry) => entry.teammateId === id)?.name ?? id)
+      const briefed = `${text}
+
+${taskSection({
+        roomName: room.name,
+        selfName: teammate.name,
+        memberNames,
+        tasks: room.tasks.map((task: PublicRoom['tasks'][number]) => ({
+          text: task.text,
+          state: task.state,
+          ownerName: task.ownerId === undefined ? undefined : roster.find((entry) => entry.teammateId === task.ownerId)?.name ?? task.ownerId
+        }))
+      })}`
+      if (route.runtime === 'antigravity') {
+        return { ok: false, name: teammate.name, message: 'Antigravity cannot be posted to from a room yet.', retryable: false }
+      }
+      // Per-action approvals only exist on the app-server transport, which a
+      // room post does not use. Without this the post ran read-only with no
+      // cards while the chip said approvals.
+      if (route.mode === 'approve-each') {
+        return {
+          ok: false,
+          name: teammate.name,
+          message: 'This teammate is set to "approve each action", and a room post cannot show per-action approvals. Message them directly instead.',
+          retryable: false
+        }
+      }
+      const response = await codexMissions.start(
+        briefed,
+        route.runtime,
+        route.mode,
+        route.model === 'account-default' ? {} : { model: route.model },
+        sendToWindow,
+        undefined,
+        peer,
+        undefined,
+        undefined,
+        undefined
+      )
+      if (!response.ok) {
+        return {
+          ok: false,
+          name: teammate.name,
+          message: response.error.message,
+          retryable: response.error.code === 'RUN_ALREADY_ACTIVE'
+        }
+      }
+      await assignOwner(teammateId, response.data.missionId)
+      return { ok: true, data: response.data }
+    }
+
+
     ipcMain.handle(ROOM_POST_CHANNEL, async (event, request: unknown) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (owner === null || !fromOwnWindow(event)) return roomRejected('The post could not be made.')
@@ -1524,59 +1638,28 @@ if (!ownsSingleInstanceLock) {
       const started: Record<string, string> = {}
       const startedData: { teammateId: string; data: CodexMissionStartData }[] = []
       const refusals: { teammateId: string; name: string; message: string }[] = []
+      const queued: string[] = []
       const roster = await teammates.list()
       for (const teammateId of room.teammateIds) {
-        const teammate = roster.find((entry) => entry.teammateId === teammateId)
-        const peer = await peerContextFor(teammateId)
-        if (teammate === undefined || peer === undefined) {
-          refusals.push({ teammateId, name: teammate?.name ?? teammateId, message: 'No longer on the roster.' })
+        const attempt = await startRoomMember(room, teammateId, text, roster)
+        if (!attempt.ok) {
+          /*
+           * Everything is a refusal until something drains the queue.
+           *
+           * `attempt.retryable` marks the two the queue is for -- the live
+           * cap is full, or that teammate is already working, both of which
+           * waiting fixes. The record and the store can already carry a
+           * queue, but nothing starts from it yet, so routing anyone into
+           * one here would lose them: no mission, no line naming them, and
+           * nobody to come back for them. Worse than what it replaces.
+           *
+           * The branch lands with the drain, in one change.
+           */
+          refusals.push({ teammateId, name: attempt.name, message: attempt.message })
           continue
         }
-        const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
-        // The person's words, then the board: which room this is, who else
-        // is in it, every task as it stands, and how to move one. The room
-        // keeps only the person's words as the post; this trailer is what
-        // the mission is briefed with.
-        const memberNames = room.teammateIds.map((id) => roster.find((entry) => entry.teammateId === id)?.name ?? id)
-        const briefed = `${text}\n\n${taskSection({
-          roomName: room.name,
-          selfName: teammate.name,
-          memberNames,
-          tasks: room.tasks.map((task) => ({
-            text: task.text,
-            state: task.state,
-            ownerName: task.ownerId === undefined ? undefined : roster.find((entry) => entry.teammateId === task.ownerId)?.name ?? task.ownerId
-          }))
-        })}`
-        const response =
-          route.runtime === 'antigravity'
-            ? roomRejected('Antigravity cannot be posted to from a room yet.')
-            : // Per-action approvals only exist on the app-server transport,
-              // which a room post does not use. Without this the post ran
-              // read-only with no cards while the chip said approvals.
-              route.mode === 'approve-each'
-              ? roomRejected(
-                  'This teammate is set to "approve each action", and a room post cannot show per-action approvals. Message them directly instead.'
-                )
-              : await codexMissions.start(
-                briefed,
-                route.runtime,
-                route.mode,
-                route.model === 'account-default' ? {} : { model: route.model },
-                sendToWindow,
-                undefined,
-                peer,
-                undefined,
-                undefined,
-                undefined
-              )
-        if (!response.ok) {
-          refusals.push({ teammateId, name: teammate.name, message: response.error.message })
-          continue
-        }
-        started[teammateId] = response.data.missionId
-        startedData.push({ teammateId, data: response.data })
-        await assignOwner(teammateId, response.data.missionId)
+        started[teammateId] = attempt.data.missionId
+        startedData.push({ teammateId, data: attempt.data })
       }
       let post
       try {
@@ -1587,7 +1670,10 @@ if (!ownsSingleInstanceLock) {
           // response -- said once in the composer note and then overwritten
           // by whatever the room said next -- so the absence outlived its
           // own explanation.
-          refused: Object.fromEntries(refusals.map((entry) => [entry.teammateId, entry.message]))
+          refused: Object.fromEntries(refusals.map((entry) => [entry.teammateId, entry.message])),
+          // Nobody yet -- see the note above. The field is here so the store
+          // and the record can carry a queue before anything fills one.
+          queued
         })
       } catch (error) {
         return roomRejected(error instanceof Error ? error.message : 'The post could not be recorded.')

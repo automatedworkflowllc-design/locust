@@ -43,8 +43,19 @@ export interface RoomStore {
       readonly missions: Readonly<Record<string, string>>
       /** Why a member was not asked, by teammate id. The reason outlives the response that carried it. */
       readonly refused?: Readonly<Record<string, string>>
+      /** Who is waiting for a slot, in the order they will get one. */
+      readonly queued?: readonly string[]
     }
   ): Promise<RoomPost>
+  /**
+   * A queued member's mission has started: move them out of the queue and
+   * into the post's missions, in one write.
+   *
+   * One operation rather than two, because a crash between them would leave
+   * a member both waiting and running -- and the drain would start them
+   * again on the next slot.
+   */
+  startQueued(roomId: string, postId: string, teammateId: string, missionId: string): Promise<void>
   /** A teammate who is gone leaves every room; a room left empty is removed. */
   removeTeammate(teammateId: unknown): Promise<void>
   /**
@@ -129,6 +140,10 @@ function parsedPost(value: unknown): RoomPost | undefined {
   // Posts written before refusals were recorded have none, and a malformed
   // one costs the reasons rather than the post -- losing a post would lose
   // the answers with it, which is the durable part.
+  // A queue written before this existed is none, and a malformed one costs
+  // the queue rather than the post -- losing a post would lose the answers
+  // with it, which is the durable part.
+  const queued = Array.isArray(record.queued) ? record.queued.filter((id): id is string => typeof id === 'string' && safeId(id)) : []
   const refused: Record<string, string> = {}
   if (typeof record.refused === 'object' && record.refused !== null) {
     for (const [teammateId, reason] of Object.entries(record.refused as Record<string, unknown>)) {
@@ -140,6 +155,7 @@ function parsedPost(value: unknown): RoomPost | undefined {
     text: record.text,
     at: record.at,
     missions,
+    ...(queued.length === 0 ? {} : { queued: queued.filter((id) => missions[id] === undefined) }),
     ...(Object.keys(refused).length === 0 ? {} : { refused })
   }
 }
@@ -304,11 +320,13 @@ export function createRoomStore(options: {
         for (const [teammateId, reason] of Object.entries(post.refused ?? {})) {
           if (safeId(teammateId) && typeof reason === 'string' && reason.length > 0) refused[teammateId] = reason.slice(0, 200)
         }
+        const queued = (post.queued ?? []).filter((teammateId) => safeId(teammateId) && missions[teammateId] === undefined)
         const added: RoomPost = {
           postId: `post_${createId()}`,
           text: post.text,
           at: now().toISOString(),
           missions,
+          ...(queued.length === 0 ? {} : { queued }),
           ...(Object.keys(refused).length === 0 ? {} : { refused })
         }
         // The newest MAX_ROOM_POSTS posts; the missions themselves are the
@@ -319,6 +337,31 @@ export function createRoomStore(options: {
           rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))
         })
         return added
+      })
+    },
+
+    startQueued(roomId, postId, teammateId, missionId): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(teammateId) || !safeId(missionId)) return
+        const file = await read()
+        const room = file.rooms.find((entry) => entry.roomId === roomId)
+        if (room === undefined) return
+        const posts = room.posts.map((post) => {
+          if (post.postId !== postId) return post
+          const queued = (post.queued ?? []).filter((id) => id !== teammateId)
+          return {
+            ...post,
+            missions: { ...post.missions, [teammateId]: missionId },
+            ...(queued.length === 0 ? {} : { queued })
+          }
+        })
+        // Dropped rather than kept empty, so a room file never carries an
+        // empty queue that reads as "someone is waiting".
+        for (const post of posts) if (post.postId === postId && (post.queued?.length ?? 0) === 0) delete (post as { queued?: readonly string[] }).queued
+        await write({
+          ...file,
+          rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))
+        })
       })
     },
 

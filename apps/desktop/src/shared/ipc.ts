@@ -346,6 +346,17 @@ export type WorkspaceImageResponse =
 export type RevealFileResponse =
   | { readonly ok: true }
   | { readonly ok: false; readonly message: string }
+export const OPEN_LINK_CHANNEL = 'shell:open-link'
+/**
+ * What came of opening a link. A refusal names why, the same as a reveal.
+ *
+ * The host opens only the addresses on its own list; a URL that is not one
+ * of them is refused rather than opened, which is what keeps `openExternal`
+ * from being a hole through the packaged build's egress rules.
+ */
+export type OpenLinkResponse =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string }
 export const ROOM_LIST_CHANNEL = 'rooms:list'
 export const ROOM_CREATE_CHANNEL = 'rooms:create'
 export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
@@ -551,7 +562,26 @@ export interface RoomPost {
   /** The mission each teammate answered in, by teammate id. A teammate whose run could not start is absent. */
   readonly missions: Readonly<Record<string, string>>
   /**
-   * Why a member was not asked, by teammate id, in the host's own words.
+   * Who is still waiting for a slot, in the order they will get one.
+   *
+   * A post asks everyone in the room, but only `MAX_LIVE_MISSIONS` can run
+   * at once and a teammate already working cannot take a second mission. A
+   * member in that position is not refused -- waiting fixes it -- so they
+   * wait here and start when a slot frees.
+   *
+   * Before this existed they were simply never asked, and the room said so
+   * and moved on. That cost was permanent and it was paid by the RECORD:
+   * a teammate who never started left no mission at all, so the next day
+   * nothing showed they had been asked.
+   *
+   * A name leaves this list the moment its mission starts, and appears in
+   * `missions` instead. Absent on posts written before this existed.
+   */
+  readonly queued?: readonly string[]
+  /**
+   * Why a member was not asked at all, by teammate id, in the host's own
+   * words. Only reasons waiting cannot fix -- gone from the roster, a
+   * runtime a room cannot post to. Anything retryable queues instead.
    *
    * Recorded because the reason is a fact about the PAST. It used to live
    * only in the response to the post -- shown once in the composer note,
@@ -1344,6 +1374,8 @@ export interface DesktopApi {
    * card can say something rather than appear to do nothing.
    */
   revealFile(path: string): Promise<RevealFileResponse>
+  /** Open one of the addresses the host allows, in the person's browser. */
+  openLink(url: string): Promise<OpenLinkResponse>
   /** Open the picker for files to attach; answers workspace-relative paths. */
   attachFiles(): Promise<AttachFilesResponse>
   readWorkspaceImage(path: string): Promise<WorkspaceImageResponse>
