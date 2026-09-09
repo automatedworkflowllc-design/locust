@@ -666,6 +666,8 @@ export default function App(): ReactElement {
   /** Which run's thread is on screen; undefined shows the addressed teammate's idle state. */
   const [shownKey, setShownKey] = useState<string>()
   const [history, setHistory] = useState<readonly PublicRecoveredMission[]>([])
+  /** Ledger files that raised an issue and yielded no mission. See the history read. */
+  const [unreadableLedgers, setUnreadableLedgers] = useState(0)
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
@@ -1408,6 +1410,17 @@ export default function App(): ReactElement {
         seedLimitsFrom(response)
         if (!active || !response.ok) return
         setHistory(response.data.missions)
+        /*
+         * Ledger files that could not be read at all.
+         *
+         * Kept because the Missions header cannot be honest without it: a file
+         * damaged in its header recovers NO mission, so there is nothing to
+         * carry a per-mission issue count, and the screen said "ledger
+         * verified" about a ledger it had just failed to read (Astra,
+         * 2026-09-08). The count travelled across IPC correctly all along and
+         * was dropped here.
+         */
+        setUnreadableLedgers(response.data.unreadableCount)
         setWorkspaceId(response.data.currentWorkspaceId)
         // The most recent mission IN THIS FOLDER opens on launch. It used to be
         // the most recent mission anywhere, so opening Locust in a new project
@@ -2770,6 +2783,7 @@ export default function App(): ReactElement {
           {screen === 'missions' ? (
             <MissionsScreen
               missions={history}
+              unreadableLedgers={unreadableLedgers}
               workspaceId={workspaceId}
               runningMissionIds={
                 new Set(

@@ -1189,6 +1189,17 @@ export type MissionHistoryResponse =
         readonly currentWorkspaceId: string
         readonly issueCount: number
         /**
+         * Ledger files that raised an issue and produced no mission at all.
+         *
+         * Separate from `issueCount` because the screen needs a count of
+         * FILES, not of issues: one badly damaged file raises several. And
+         * separate from the per-mission counts because these files have no
+         * mission to hang a count on -- which is exactly why the Missions
+         * header used to read "ledger verified" for a ledger it could not
+         * read (Astra, 2026-09-08).
+         */
+        readonly unreadableCount: number
+        /**
          * Runtimes whose most recent word, across every mission in the
          * ledger, was that the account is out of quota -- with that word.
          * Derived here rather than remembered by the window, because the
