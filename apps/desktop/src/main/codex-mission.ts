@@ -43,16 +43,18 @@ import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionStarter } from '@teammate/mission-store'
 import { recordableCommand } from './command-record.js'
 import { commandTooLong } from './command-length.js'
+import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 /**
- * Missions run side by side now, one per teammate. The cap is a resource
- * bound, not a product rule: each live mission is a provider process holding
- * a bounded record queue and a ledger writer, and four of them is already
- * more than one person can follow.
+ * Missions run side by side now, one per teammate.
+ *
+ * The number moved to shared/ so the room screen can say it before a person
+ * builds a room bigger than it -- re-exported here because it has been part
+ * of this module's surface since the cap existed.
  */
-export const MAX_LIVE_MISSIONS = 4
+export { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 /** Owner key for a mission that belongs to nobody; those still run one at a time. */
 const NOBODY = ''
 

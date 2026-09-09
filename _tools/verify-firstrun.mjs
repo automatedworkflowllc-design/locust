@@ -158,7 +158,7 @@ try {
   const rows = await evaluate(`(() => {
     const seen = []
     for (const row of document.querySelectorAll('.lc-runtimerow')) {
-      seen.push((row.innerText || '').replace(/[\r\n]+/g, ' | ').slice(0, 90))
+      seen.push((row.innerText || '').replace(/[\\r\\n]+/g, ' | ').slice(0, 90))
     }
     return JSON.stringify(seen)
   })()`)

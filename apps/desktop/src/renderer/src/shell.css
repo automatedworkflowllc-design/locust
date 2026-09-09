@@ -335,30 +335,6 @@ textarea {
   min-width: 0;
 }
 
-.lc-tone-lime {
-  color: var(--lc-lime-text);
-}
-
-.lc-tone-green {
-  color: var(--lc-green-text);
-}
-
-.lc-tone-amber {
-  color: var(--lc-amber-text);
-}
-
-.lc-tone-red {
-  color: var(--lc-red-text);
-}
-
-.lc-tone-blue {
-  color: var(--lc-blue-text);
-}
-
-.lc-tone-muted {
-  color: var(--lc-text-muted);
-}
-
 .lc-dot {
   width: 6px;
   height: 6px;
@@ -4198,11 +4174,6 @@ textarea {
   white-space: pre;
 }
 
-/* Declared after .lc-runtimerow__detail on purpose: same specificity, later wins. */
-.lc-runtimerow__usage.lc-tone-amber {
-  color: var(--lc-amber-text);
-}
-
 .lc-control.is-pressing::after {
   content: '';
   width: 5px;
@@ -4792,20 +4763,6 @@ textarea {
   color: var(--lc-text-muted);
   line-height: 1.4;
   text-wrap: pretty;
-}
-
-/*
- * Auto is the one consequence stated in a colour, in both menus that state it.
- *
- * The tone classes sit at the top of this file and the descriptions set their
- * own colour further down, at the same specificity -- so `lc-tone-amber` lost
- * the cascade and Auto has read plain grey since the 0906 review asked for
- * amber. Measured on 2026-09-08: computed rgb(139,145,144), not #efc969. This
- * rule sits after both descriptions so the tone wins where it is asked for.
- */
-.lc-menu__desc.lc-tone-amber,
-.lc-slash__detail.lc-tone-amber {
-  color: var(--lc-amber-text);
 }
 
 /* --- Route picker ------------------------------------------------------ */
@@ -7506,4 +7463,47 @@ textarea {
   color: var(--lc-text-primary);
   font: inherit;
   font-size: var(--lc-text-body);
+}
+
+/* --- Tone -------------------------------------------------------------- */
+
+/*
+ * A tone class says what colour a piece of text is FOR, and it has to win.
+ *
+ * These used to sit near the top as plain single-class rules, which lost the
+ * cascade to every component that set its own colour further down -- same
+ * specificity, later rule wins -- so text asked to be amber or red simply
+ * came out grey. It was patched twice, once for the Auto menu descriptions
+ * and once for a runtime row, each time by adding a more specific copy of
+ * the same declaration further down. The third instance found it on
+ * `.lc-settings__note`, which is what every note in the room form uses: the
+ * over-cap warning read grey, and so had the form's own ERROR messages.
+ *
+ * Doubling the class wins on specificity (0,2,0) rather than on position, so
+ * a tone now holds wherever it is asked for, whatever a component declares
+ * and wherever the component declares it. Both earlier patches are gone;
+ * they said exactly what this says.
+ */
+.lc-tone-lime.lc-tone-lime {
+  color: var(--lc-lime-text);
+}
+
+.lc-tone-green.lc-tone-green {
+  color: var(--lc-green-text);
+}
+
+.lc-tone-amber.lc-tone-amber {
+  color: var(--lc-amber-text);
+}
+
+.lc-tone-red.lc-tone-red {
+  color: var(--lc-red-text);
+}
+
+.lc-tone-blue.lc-tone-blue {
+  color: var(--lc-blue-text);
+}
+
+.lc-tone-muted.lc-tone-muted {
+  color: var(--lc-text-muted);
 }

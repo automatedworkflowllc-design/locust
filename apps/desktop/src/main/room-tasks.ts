@@ -90,7 +90,32 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
             break
           }
         }
-        if (allDone && Object.keys(post.missions).length > 1) say(`Everyone in ${found.room.name} has answered.`)
+        /*
+         * "Everyone" means every MEMBER, not everyone who started.
+         *
+         * A post only starts as many missions as the live cap allows, so a
+         * room with more members than that gets a post where some members
+         * never ran at all -- their cards read "did not start". Those
+         * members are absent from post.missions, so the loop above never
+         * looked at them, and a six-member room whose four started runs
+         * finished was told "Everyone in Standup has answered."
+         *
+         * Worse than merely untrue: the host's refusal line naming who
+         * could not start is shown in this same slot, so the false claim
+         * REPLACED the true one and the person was left with no way to
+         * learn two teammates were never asked.
+         *
+         * Seen on 2026-09-09 driving a six-member room, with four answers
+         * on screen and two empty cards beside them.
+         */
+        const missing = found.room.teammateIds.filter((id) => post?.missions[id] === undefined).length
+        if (allDone && Object.keys(post.missions).length > 1) {
+          say(
+            missing === 0
+              ? `Everyone in ${found.room.name} has answered.`
+              : `${String(Object.keys(post.missions).length)} of ${String(found.room.teammateIds.length)} in ${found.room.name} answered; ${String(missing)} never started.`
+          )
+        }
       }
       post = undefined
 
