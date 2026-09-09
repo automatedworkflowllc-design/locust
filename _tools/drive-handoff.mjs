@@ -4,9 +4,29 @@
 //
 // Wren starts on the free OpenCode model with a task that takes a while.
 // While it runs, the person opens the route picker (which must say that
-// choosing here stops the run), picks Claude Code / sonnet, and watches:
-// the run stop, the handoff divider appear, and the continuation start on
-// Claude Code from the checkpoint. Spends one short Claude Code run.
+// choosing here stops the run), picks a DIFFERENT model, and watches: the run
+// stop, the handoff divider appear, and the continuation start from the
+// checkpoint.
+//
+// IT SPENDS, and it cannot be made free. Measured 2026-09-09: handing off to a
+// second FREE OpenCode model changes the route and does NOT hand anything over,
+// because a handoff is a change of RUNTIME -- the picker's own warning says so
+// in as many words, "Choosing another runtime stops it". OpenCode's free models
+// are the only free runtime here, so there is no free pair to hand between.
+// The attempt produced a run that simply finished where it started, with no
+// divider, which reads exactly like the feature being broken.
+//
+// So the far side is Claude Code again, and this is the riskiest workflow in
+// the app -- it KILLS a running mission before it knows the next one will
+// start -- which is why it is worth the short run when it is run deliberately.
+//
+// VERIFIED FOR FREE on the way to learning that: with a live run, the picker
+// does show its warning, and the route control stays enabled rather than being
+// disabled mid-run:
+//
+//   "This mission is running. Choosing another runtime stops it, writes a
+//    checkpoint, and hands the work over -- it cannot be undone."
+
 
 import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
 
@@ -27,14 +47,42 @@ try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('start a slow task on the free model', async () => {
     await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
-    return drive.evaluate(sendAndWaitScript('Read README.md and LOCUST.md. Then write a numbered list of 40 distinct one-sentence ideas for improving this scratch project, each idea on its own line, thinking carefully about each. Do not edit any files.', { settle: false }))
+    return drive.evaluate(sendAndWaitScript('Count from 1 to 400. Put each number on its own line, in order, with no other text and no commentary. Do not stop early and do not summarise. Do not edit any files.', { settle: false }))
   })
   await drive.capture('the run is live; the picker warns that switching stops it', () => drive.evaluate(`(async () => {
-    for (let i = 0; i < 120; i += 1) {
+    /*
+     * THE PREMISE, asserted rather than assumed.
+     *
+     * A handoff needs a RUNNING mission. This waited for the Stop button and
+     * then carried on regardless of whether it ever appeared -- so on
+     * 2026-09-09, against a fast free model that finished the whole task in
+     * 16s, the picker was opened after the run had already completed. It
+     * reported "NO NOTICE", "no divider in 2 minutes" and "no divider", all of
+     * which read as the handoff being broken. Nothing was broken: there was
+     * nothing to hand off.
+     *
+     * Same shape as the crash sweep killing after a run had ended, and the
+     * routine card read mid-run. A drive whose premise is not met has to say
+     * so instead of reporting the app.
+     */
+    let live = false
+    for (let i = 0; i < 120 && !live; i += 1) {
       await new Promise(r => setTimeout(r, 250))
-      if (document.querySelector('button[aria-label^="Stop the running"]') && document.querySelector('.lc-thread__marker')) break
+      // The Stop button IS liveness. This also required the thread marker --
+      // the "Started HH:MM" line -- and that appears on its own schedule, so a
+      // run could be plainly live with the condition still false. Two signals
+      // ANDed together is one more way to miss the state you are waiting for.
+      //
+      // No backticks in this comment: it sits inside a template literal and
+      // one would end it. That is what happened on the first attempt, and
+      // node --check does not catch it because the file still parses.
+      if (document.querySelector('button[aria-label^="Stop the running"]')) live = true
     }
-    await new Promise(r => setTimeout(r, 3000))
+    if (!live) return 'NOT A HANDOFF TEST: no run was live within 30s'
+    await new Promise(r => setTimeout(r, 2000))
+    if (document.querySelector('button[aria-label^="Stop the running"]') === null) {
+      return 'NOT A HANDOFF TEST: the run finished before the picker could be opened -- give it slower work'
+    }
     const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
     if (!control) return 'no route control'
     if (control.disabled) return 'route control disabled while running'
