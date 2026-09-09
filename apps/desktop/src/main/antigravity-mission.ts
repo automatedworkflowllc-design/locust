@@ -45,6 +45,8 @@ const NOBODY = ''
 export interface AntigravityMissionOptions {
   readonly workspacePath: string
   readonly ledger: MissionLedger
+  /** Missions live on the other transports; the cap is one pool. See codex-mission.ts. */
+  readonly liveElsewhere?: () => number
   readonly workroom?: Workroom
   /** What the team remembers, briefed to every teammate mission. */
   readonly memory?: MemoryBriefing
@@ -329,7 +331,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           peer === undefined ? 'A mission is already running.' : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
         )
       }
-      if (starting.size + runs.size >= MAX_LIVE_ANTIGRAVITY_MISSIONS) {
+      if (starting.size + runs.size + (options.liveElsewhere ?? (() => 0))() >= MAX_LIVE_ANTIGRAVITY_MISSIONS) {
         throw new AntigravityStartError(`Up to ${String(MAX_LIVE_ANTIGRAVITY_MISSIONS)} Antigravity missions can run at once.`)
       }
       starting.add(owner)

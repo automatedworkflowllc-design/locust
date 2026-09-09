@@ -587,6 +587,19 @@ if (!ownsSingleInstanceLock) {
     let roomTasks: RoomTasks | undefined
     const codexMissions = createCodexMissionService({
       workspacePath,
+      /*
+       * The cap is ONE pool across all three transports.
+       *
+       * Each service counted only its own live runs, so four exec runs, four
+       * approve-each runs and four Antigravity runs could be live together --
+       * twelve -- while the refusal still read \"up to 4\" and every read in
+       * this file already summed all three (teammateBusy, the sidebar count,
+       * the busy list). Reported as one number, enforced as three.
+       *
+       * Read lazily rather than captured, because these three are constructed
+       * in sequence and each needs the other two.
+       */
+      liveElsewhere: () => appServerMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       // Asked at the moment a run starts, never cached: switching Auto off in
       // Settings has to reach the next run, including one a relay or a saved
       // routine is about to start.
@@ -635,6 +648,8 @@ if (!ownsSingleInstanceLock) {
     const antigravityMissions = createAntigravityMissionService({
       workspacePath,
       ledger: missionLedger,
+      // One pool -- see the note on codexMissions above.
+      liveElsewhere: () => codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length,
       workroom,
       memory: memoryBriefing,
       probe: () => antigravityProbe.probe(),
@@ -705,6 +720,8 @@ if (!ownsSingleInstanceLock) {
     const appServerMissions = createAppServerMissionService({
       workspacePath,
       ledger: missionLedger,
+      // One pool -- see the note on codexMissions above.
+      liveElsewhere: () => codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       discover: discoverForWork,
       spawn: spawnAppServer,
       emitApproval: (request) => {
@@ -922,6 +939,20 @@ if (!ownsSingleInstanceLock) {
               error: { code: 'RUNTIME_START_FAILED', message: error instanceof Error ? error.message : 'Antigravity could not start the mission.' }
             } as const
           }
+        }
+        // Same silent degrade as routines and room posts: a relay goes through
+        // exec, where approve-each falls through to read-only and no card is
+        // ever drawn. A teammate relaying to a teammate saved on that mode ran
+        // with no approvals and no mention of it.
+        if (input.mode === 'approve-each') {
+          return {
+            ok: false,
+            error: {
+              code: 'RUN_MODE_UNSUPPORTED',
+              message:
+                'That teammate is set to "approve each action", and a relayed message cannot show per-action approvals. Nothing was started.'
+            }
+          } as const
         }
         return codexMissions.start(
           input.prompt,
@@ -1509,7 +1540,14 @@ if (!ownsSingleInstanceLock) {
         const response =
           route.runtime === 'antigravity'
             ? roomRejected('Antigravity cannot be posted to from a room yet.')
-            : await codexMissions.start(
+            : // Per-action approvals only exist on the app-server transport,
+              // which a room post does not use. Without this the post ran
+              // read-only with no cards while the chip said approvals.
+              route.mode === 'approve-each'
+              ? roomRejected(
+                  'This teammate is set to "approve each action", and a room post cannot show per-action approvals. Message them directly instead.'
+                )
+              : await codexMissions.start(
                 briefed,
                 route.runtime,
                 route.mode,

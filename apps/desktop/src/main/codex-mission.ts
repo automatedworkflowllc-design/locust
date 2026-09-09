@@ -222,6 +222,19 @@ interface CodexMissionServiceOptions {
    * get Auto by omission.
    */
   readonly autoModeAllowed?: () => Promise<boolean>
+  /**
+   * How many missions are live on the OTHER transports right now.
+   *
+   * The cap is one pool, not one per transport. Each of the three services
+   * counted only its own, so four exec runs, four approve-each runs and four
+   * Antigravity runs could all be live at once -- twelve -- while every read
+   * in the app (`teammateBusy`, the sidebar count, the busy list) already
+   * summed all three into one number and the refusal still said "up to 4".
+   * The reporting was right and the enforcement was not.
+   *
+   * Defaults to zero so a service constructed alone behaves as before.
+   */
+  readonly liveElsewhere?: () => number
 }
 
 function error(
@@ -637,7 +650,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
           ) as CodexMissionStartResponse
         }
-        if (starting.size + active.size >= MAX_LIVE_MISSIONS) {
+        if (starting.size + active.size + (options.liveElsewhere ?? (() => 0))() >= MAX_LIVE_MISSIONS) {
           return error(
             'RUN_ALREADY_ACTIVE',
             `Up to ${MAX_LIVE_MISSIONS} missions can run at once. Wait for one to finish or stop it first.`

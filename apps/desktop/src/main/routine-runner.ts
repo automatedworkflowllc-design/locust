@@ -183,6 +183,31 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     if (prompt === undefined) {
       return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: `Routine has no step ${String(step)}.` } }
     }
+    /*
+     * A routine cannot replay per-action approvals, so it says so.
+     *
+     * The cards exist only on the app-server transport, and only the
+     * composer's own start reaches it. Everything here goes through exec,
+     * where the mode falls through to `read-only` -- so a routine on a
+     * teammate saved to "approve each action" used to run with no cards and
+     * no writes, and nothing anywhere said either. The chip kept claiming
+     * approvals.
+     *
+     * Refused ABOVE the saveProgress below, so nothing is persisted and the
+     * outcome is never uncertain. This is the same reasoning already applied
+     * to effort a few lines down: a routine replayed at a level -- or a
+     * permission -- the person did not teach it is not the routine they saved.
+     */
+    if (routine.route.mode === 'approve-each') {
+      return {
+        ok: false,
+        error: {
+          code: 'RUN_MODE_UNSUPPORTED',
+          message:
+            'This routine is saved to a teammate set to "approve each action", and a routine cannot replay per-action approvals. Nothing was started. Save the routine again on a different mode, or run the steps yourself.'
+        }
+      }
+    }
     const prior = routine.execution
     const intent: RoutineExecution = {
       attemptId: prior?.status === 'abandoned' || prior === undefined ? randomUUID() : prior.attemptId,

@@ -69,7 +69,16 @@ export function ApprovalCard({
           <Icon name="shield" size={13} />{' '}
           {isQuestion ? 'The runtime is asking you something' : 'Approval required — exact action'}
         </span>
-        <span className="lc-rail__meta">Codex CLI · this workspace</span>
+        {/*
+          * The header used to read "Codex CLI · this workspace" as a constant,
+          * which contradicted the card's own Where row four lines down: on a
+          * worktree teammate that row shows the worktree path while this said
+          * "this workspace". A card whose two halves disagree about where an
+          * action would happen is worse than one that says less, so when the
+          * request names a folder the header defers to the Where row rather
+          * than restating it wrongly.
+          */}
+        <span className="lc-rail__meta">{request.cwd === null ? 'Codex CLI · this workspace' : 'Codex CLI'}</span>
       </div>
 
       <dl className="lc-receipt">
