@@ -3,6 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
+import { MAX_ROOM_TEAMMATES } from '../shared/live-missions.js'
 import type { PublicRoom, RoomPost, RoomTask, RoomTaskRequest } from '../shared/ipc.js'
 import { boundedTaskText, taskKey } from '../shared/room-task.js'
 import type { TaskOp } from '../shared/room-task.js'
@@ -23,7 +24,7 @@ import { safeId } from './teammate-store.js'
 const SCHEMA_VERSION = 1 as const
 const MAX_FILE_BYTES = 4 * 1024 * 1024
 export const MAX_ROOMS = 32
-export const MAX_ROOM_TEAMMATES = 8
+export { MAX_ROOM_TEAMMATES }
 export const MAX_ROOM_POSTS = 200
 export const MAX_ROOM_NAME_LENGTH = 60
 export const MAX_POST_LENGTH = 8_000

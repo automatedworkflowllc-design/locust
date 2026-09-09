@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
-import { MAX_LIVE_MISSIONS } from '../../../shared/live-missions.js'
+import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
 import { PixelFace } from './PixelFace.js'
 
 /**
@@ -29,22 +29,28 @@ export interface RoomAnswer {
 }
 
 /**
- * What a post to this many teammates will really do, or undefined when the
- * cap does not bite.
+ * What is wrong with a room this size, while it can still be changed.
  *
- * A post starts one mission per member and only MAX_LIVE_MISSIONS run at
- * once, so a bigger room has members who never start at all. Nothing said
- * that until 2026-09-09: a six-member room offered six, took six, started
- * four, and drew the other two as empty cards reading "did not start".
+ * This used to warn that a room bigger than `MAX_LIVE_MISSIONS` would only
+ * start that many -- true when the cap was 4 and the room limit 8. The cap
+ * has since been measured and raised to 8, and the two are now held equal by
+ * `room-and-mission-caps-agree`, so that sentence can never be true again
+ * and has gone.
  *
- * A function rather than two inline strings because it is said twice -- once
- * in the form, where the number can still be changed, and once under the
- * composer for a room that already exists -- and because a sentence in JSX
- * driven by component state cannot be tested without a browser.
+ * What replaced it is the fact that IS true past eight and was said nowhere:
+ * the store refuses the room. Ticking a ninth teammate was allowed, and
+ * Create room then failed with "A room needs between 1 and 8 teammates." --
+ * offered and then refused, in the one place the number can still change.
+ *
+ * The design agent's note about register applies here and resolves the other
+ * way. Amber says a person has something to do, and their objection was that
+ * the cap is a fact about the machine while ticking is allowed. This is not
+ * that: the room cannot be made, and unticking is the reader's to do. The
+ * register was wrong because the fact was wrong.
  */
-export function overCapNote(members: number): string | undefined {
-  if (members <= MAX_LIVE_MISSIONS) return undefined
-  return `Only ${String(MAX_LIVE_MISSIONS)} missions run at once, so a post to ${String(members)} starts ${String(MAX_LIVE_MISSIONS)} and ${String(members - MAX_LIVE_MISSIONS)} will not start.`
+export function roomFullNote(ticked: number): string | undefined {
+  if (ticked <= MAX_ROOM_TEAMMATES) return undefined
+  return `A room holds ${String(MAX_ROOM_TEAMMATES)} teammates. Untick ${String(ticked - MAX_ROOM_TEAMMATES)} to make this one.`
 }
 
 /**
@@ -104,7 +110,7 @@ export function absentLine(absent: readonly { readonly name: string; readonly re
  *
  * The same sentence twice, in the smallest text on the screen, 500px below
  * the cards it explains, and repeated once per person it happened to. It
- * also displaces `overCapNote()`, which shares that slot.
+ * also displaced the room's own note, which shares that slot.
  *
  * Grouped by message, because the message is what they actually share. Two
  * people turned away by the cap are one fact with two names; two turned away
@@ -287,11 +293,23 @@ export function RoomScreen({
                 </div>
                 {/* Said HERE, while the room is being built, because this
                   * is the only screen where the number can still be changed. */}
-                {overCapNote(draftMembers.length) !== undefined && (
-                  <span className="lc-settings__note lc-tone-amber">{overCapNote(draftMembers.length)}</span>
+                {roomFullNote(draftMembers.length) !== undefined && (
+                  <span className="lc-settings__note lc-tone-amber">{roomFullNote(draftMembers.length)}</span>
                 )}
                 <div className="lc-roomform__actions">
-                  <button type="submit" className="lc-button is-active" disabled={busy || draftName.trim().length === 0 || draftMembers.length === 0}>
+                  <button
+                    type="submit"
+                    className="lc-button is-active"
+                    // Not offered while it would be refused: the store turns
+                    // a ninth teammate away, and finding that out by pressing
+                    // the button is how it used to go.
+                    disabled={
+                      busy ||
+                      draftName.trim().length === 0 ||
+                      draftMembers.length === 0 ||
+                      roomFullNote(draftMembers.length) !== undefined
+                    }
+                  >
                     Create room
                   </button>
                   {formError !== undefined && <span className="lc-settings__note lc-tone-red">{formError}</span>}
@@ -507,10 +525,7 @@ export function RoomScreen({
           <span className="lc-settings__note">
             {notice ??
               formError ??
-              // The same truth at the moment of posting, for a room that
-              // already exists -- or was made before any of this was said.
-              (overCapNote(room.teammateIds.length) ??
-                `Goes to ${String(room.teammateIds.length)} teammate${room.teammateIds.length === 1 ? '' : 's'}, each on their own route.`)}
+              `Goes to ${String(room.teammateIds.length)} teammate${room.teammateIds.length === 1 ? '' : 's'}, each on their own route.`}
           </span>
           <button type="submit" className="lc-button is-active" disabled={busy || draftText.trim().length === 0}>
             {busy ? 'Posting…' : 'Post'}

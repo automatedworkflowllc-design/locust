@@ -47,3 +47,17 @@
  * It lives in shared/ because the screen has to be able to say it.
  */
 export const MAX_LIVE_MISSIONS = 8
+
+/**
+ * How many teammates a room may hold.
+ *
+ * It lives here, beside the mission cap, because the two have to agree: a
+ * room bigger than what can run has members who never start, which is the
+ * defect of 2026-09-09 in one sentence. `room-and-mission-caps-agree` holds
+ * them together.
+ *
+ * The screen needs it too. Ticking a ninth teammate used to be allowed and
+ * then refused by the store on Create room -- offered and then refused, the
+ * pattern this app tries not to have anywhere.
+ */
+export const MAX_ROOM_TEAMMATES = 8
