@@ -550,6 +550,16 @@ export interface RoomPost {
   readonly at: string
   /** The mission each teammate answered in, by teammate id. A teammate whose run could not start is absent. */
   readonly missions: Readonly<Record<string, string>>
+  /**
+   * Why a member was not asked, by teammate id, in the host's own words.
+   *
+   * Recorded because the reason is a fact about the PAST. It used to live
+   * only in the response to the post -- shown once in the composer note,
+   * then overwritten by the next thing the room had to say -- so a reload,
+   * or simply waiting for the room to finish, left the absence with no
+   * explanation at all. Absent on posts written before this existed.
+   */
+  readonly refused?: Readonly<Record<string, string>>
 }
 
 /**

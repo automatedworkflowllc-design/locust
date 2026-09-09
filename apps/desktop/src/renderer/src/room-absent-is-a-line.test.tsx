@@ -1,0 +1,176 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it } from 'vitest'
+
+import type { PublicRoom, PublicTeammate } from '../../shared/ipc.js'
+import { RoomScreen, absentLine, refusalNotice } from './components/RoomScreen.js'
+import type { RoomAnswer } from './components/RoomScreen.js'
+
+/**
+ * A member a post did not reach gets a line, not an empty answer card.
+ *
+ * Raised by the design agent on 2026-09-09 after reading `RoomScreen.tsx`
+ * against that morning's captures, and it corrected my own description of
+ * the defect. The absent member was not "an empty box with two grey words":
+ * it was a full-width answer card carrying an avatar, a name and `did not
+ * start`, followed by about 90px of void where a route, a phase row, an Open
+ * button and an answer belong.
+ *
+ * Their argument is about shape rather than colour, and it holds. In a grid
+ * of answers a card is a promise that an answer is inside it, so an empty one
+ * reads as broken however it is toned -- `is-absent` carried no tone class at
+ * all. And because a grid forces equal-height cells, the two empty cards took
+ * their height from an unrelated string in a neighbouring cell: the model
+ * name `opencode/muse-spark-1.3-contributor-free` wrapping to two mono lines
+ * in Fen's card. Two empty boxes sized by someone else's model name.
+ *
+ * They share one fact, so they are one line.
+ */
+
+const teammate = (id: string, name: string): PublicTeammate =>
+  ({
+    teammateId: id,
+    name,
+    hue: 'lime',
+    role: 'Code & Migrations',
+    createdAt: '2026-09-05T05:00:00.000Z',
+    avatar: { headwear: 0, accessory: 0, mouth: 0 }
+  }) as PublicTeammate
+
+const NAMES = ['Wren', 'Booty', 'Gem', 'Fen', 'Otto', 'Pike']
+const ROSTER = NAMES.map((name, i) => teammate(`tm_${String(i)}`, name))
+
+const answer = (teammateId: string): RoomAnswer =>
+  ({ teammateId, missionId: `m_${teammateId}`, phase: 'completed', text: 'ALMANAC', runtime: 'opencode', model: 'free' }) as RoomAnswer
+
+/** A room of six where only the first `started` members ran. */
+function screen(started: number): string {
+  const room: PublicRoom = {
+    roomId: 'room_standup',
+    name: 'Standup',
+    teammateIds: ROSTER.map((entry) => entry.teammateId),
+    createdAt: '2026-09-05T05:00:00.000Z',
+    posts: [{ postId: 'post_1', text: 'Say your word', at: '2026-09-05T05:00:00.000Z', missions: {} }],
+    tasks: []
+  }
+  const answers = ROSTER.slice(0, started).map((entry) => answer(entry.teammateId))
+  return renderToStaticMarkup(
+    <RoomScreen
+      rooms={[room]}
+      teammates={ROSTER}
+      currentRoomId="room_standup"
+      answersFor={() => answers}
+      runtimeNameOf={(id) => id}
+      onSelectRoom={() => undefined}
+      onCreateRoom={async () => undefined}
+      onRemoveRoom={() => undefined}
+      onPost={async () => undefined}
+      onOpenMission={() => undefined}
+      onTask={async () => undefined}
+      notice={undefined}
+    />
+  )
+}
+
+describe('the members a post did not reach', () => {
+  it('renders at all, with a card for everyone who did answer', () => {
+    // The control. A screen that threw, or drew the room list, would satisfy
+    // every `not.toContain` below by drawing nothing.
+    const some = screen(4)
+    expect(some).toContain('ALMANAC')
+    expect([...some.matchAll(/lc-roomanswer"/g)]).toHaveLength(4)
+  })
+
+  it('gets no answer card, because there is no answer in it', () => {
+    const some = screen(4)
+    // THE regression: two more cards, each an avatar and a name over 90px of
+    // nothing, sized by a neighbour's model name.
+    expect(some).not.toContain('is-absent')
+    expect(some).not.toContain('did not start')
+    expect([...some.matchAll(/lc-roomanswer"/g)]).toHaveLength(4)
+  })
+
+  it('is one line naming everyone it missed', () => {
+    const some = screen(4)
+    expect(some).toContain('lc-roomabsent')
+    expect(some).toContain('Otto and Pike were not asked')
+  })
+
+  it('says nothing when the post reached everyone', () => {
+    const all = screen(6)
+    expect(all).not.toContain('lc-roomabsent')
+    expect(all).not.toContain('not asked')
+  })
+
+  it('carries the host’s own recorded reason', () => {
+    /*
+     * The reason is a fact about the PAST, so it cannot be derived at render
+     * time. The first version guessed it from how many missions this room
+     * started, which was wrong the moment the cap was reached by work
+     * ELSEWHERE: a room of eight posted beside three other live missions
+     * started five, five is under the cap of eight, and the line dropped the
+     * explanation on the one run where it mattered. Driven and seen on
+     * 2026-09-09 before the reason was recorded on the post.
+     */
+    const cap = 'Up to 8 missions can run at once. Wait for one to finish or stop it first.'
+    expect(absentLine([{ name: 'Otto', reason: cap }])).toBe(
+      'Otto was not asked — up to 8 missions can run at once. Wait for one to finish or stop it first.'
+    )
+  })
+
+  it('says one reason once, not once per person', () => {
+    const cap = 'Up to 8 missions can run at once.'
+    const said = absentLine([
+      { name: 'Pike', reason: cap },
+      { name: 'Dell', reason: cap },
+      { name: 'Ember', reason: cap }
+    ])
+    expect(said).toBe('Pike, Dell and Ember were not asked — up to 8 missions can run at once.')
+    expect([...(said ?? '').matchAll(/up to 8/gi)]).toHaveLength(1)
+  })
+
+  it('keeps different reasons apart, and says less when it has none', () => {
+    const said = absentLine([
+      { name: 'Otto', reason: 'Up to 8 missions can run at once.' },
+      { name: 'Pike' }
+    ])
+    expect(said).toContain('Otto was not asked — up to 8 missions')
+    // A post written before refusals were recorded. Inventing a reason here
+    // would be worse than saying less.
+    expect(said).toContain('Pike was not asked.')
+    expect(absentLine([])).toBeUndefined()
+  })
+
+  it('joins names the way a person would', () => {
+    expect(absentLine([{ name: 'Otto' }])).toContain('Otto was not asked')
+    expect(absentLine([{ name: 'Otto' }, { name: 'Pike' }])).toContain('Otto and Pike were')
+    expect(absentLine([{ name: 'Otto' }, { name: 'Pike' }, { name: 'Ash' }])).toContain('Otto, Pike and Ash were')
+  })
+
+  it('says one reason once, however many people it turned away', () => {
+    const cap = 'Up to 8 missions can run at once. Wait for one to finish or stop it first.'
+    /*
+     * THE regression. This read "Otto: Up to 8 missions can run at once.
+     * Wait for one to finish or stop it first. · Pike: Up to 8 missions can
+     * run at once. Wait for one to finish or stop it first." -- one fact,
+     * said twice, in the smallest text on the screen.
+     */
+    const said = refusalNotice([
+      { name: 'Otto', message: cap },
+      { name: 'Pike', message: cap }
+    ])
+    expect(said).toBe(`Otto, Pike: ${cap}`)
+    expect([...(said ?? '').matchAll(/Up to 8/g)]).toHaveLength(1)
+  })
+
+  it('keeps different reasons apart', () => {
+    const said = refusalNotice([
+      { name: 'Otto', message: 'Up to 8 missions can run at once.' },
+      { name: 'Pike', message: 'No longer on the roster.' }
+    ])
+    expect(said).toBe('Otto: Up to 8 missions can run at once. · Pike: No longer on the roster.')
+  })
+
+  it('says nothing when nobody was refused', () => {
+    expect(refusalNotice([])).toBeUndefined()
+  })
+})

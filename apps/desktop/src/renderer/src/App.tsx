@@ -55,6 +55,7 @@ import { Composer } from './components/Composer.js'
 import { ExchangeStrip } from './components/ExchangeStrip.js'
 import { RoomScreen } from './components/RoomScreen.js'
 import type { RoomAnswer } from './components/RoomScreen.js'
+import { refusalNotice } from './components/RoomScreen.js'
 import { exchangeOf } from './exchange.js'
 import type { ExchangeMission } from './exchange.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
@@ -1753,12 +1754,8 @@ export default function App(): ReactElement {
     if (response === undefined) return 'The post could not be made.'
     if (!response.ok) return response.error.message
     refreshRooms()
-    // Who could not be started is said once, by name, in the host's words.
-    setRoomNotice(
-      response.data.refused.length === 0
-        ? undefined
-        : response.data.refused.map((entry) => `${entry.name}: ${entry.message}`).join(' · ')
-    )
+    // Who could not be started, in the host's words, said once per reason.
+    setRoomNotice(refusalNotice(response.data.refused))
     return undefined
   }
 

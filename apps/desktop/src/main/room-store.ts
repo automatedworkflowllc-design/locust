@@ -35,7 +35,15 @@ export interface RoomStore {
   create(input: { readonly name: unknown; readonly teammateIds: unknown }): Promise<PublicRoom>
   remove(roomId: unknown): Promise<void>
   /** Record a post and the missions it started. The newest post is last. */
-  addPost(roomId: unknown, post: { readonly text: string; readonly missions: Readonly<Record<string, string>> }): Promise<RoomPost>
+  addPost(
+    roomId: unknown,
+    post: {
+      readonly text: string
+      readonly missions: Readonly<Record<string, string>>
+      /** Why a member was not asked, by teammate id. The reason outlives the response that carried it. */
+      readonly refused?: Readonly<Record<string, string>>
+    }
+  ): Promise<RoomPost>
   /** A teammate who is gone leaves every room; a room left empty is removed. */
   removeTeammate(teammateId: unknown): Promise<void>
   /**
@@ -117,7 +125,22 @@ function parsedPost(value: unknown): RoomPost | undefined {
     if (!safeId(teammateId) || !safeId(missionId)) return undefined
     missions[teammateId] = missionId
   }
-  return { postId: record.postId, text: record.text, at: record.at, missions }
+  // Posts written before refusals were recorded have none, and a malformed
+  // one costs the reasons rather than the post -- losing a post would lose
+  // the answers with it, which is the durable part.
+  const refused: Record<string, string> = {}
+  if (typeof record.refused === 'object' && record.refused !== null) {
+    for (const [teammateId, reason] of Object.entries(record.refused as Record<string, unknown>)) {
+      if (safeId(teammateId) && typeof reason === 'string' && reason.length > 0) refused[teammateId] = reason.slice(0, 200)
+    }
+  }
+  return {
+    postId: record.postId,
+    text: record.text,
+    at: record.at,
+    missions,
+    ...(Object.keys(refused).length === 0 ? {} : { refused })
+  }
 }
 
 export function parsedRoom(value: unknown): PublicRoom | undefined {
@@ -273,7 +296,20 @@ export function createRoomStore(options: {
         for (const [teammateId, missionId] of Object.entries(post.missions)) {
           if (safeId(teammateId) && safeId(missionId)) missions[teammateId] = missionId
         }
-        const added: RoomPost = { postId: `post_${createId()}`, text: post.text, at: now().toISOString(), missions }
+        // Bounded the same way the messages are: a teammate id that is not
+        // an id, or a reason longer than one sentence's worth, is dropped
+        // rather than written into the room file.
+        const refused: Record<string, string> = {}
+        for (const [teammateId, reason] of Object.entries(post.refused ?? {})) {
+          if (safeId(teammateId) && typeof reason === 'string' && reason.length > 0) refused[teammateId] = reason.slice(0, 200)
+        }
+        const added: RoomPost = {
+          postId: `post_${createId()}`,
+          text: post.text,
+          at: now().toISOString(),
+          missions,
+          ...(Object.keys(refused).length === 0 ? {} : { refused })
+        }
         // The newest MAX_ROOM_POSTS posts; the missions themselves are the
         // durable record, so an old post dropping off the room loses nothing.
         const posts = [...room.posts, added].slice(-MAX_ROOM_POSTS)

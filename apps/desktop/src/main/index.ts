@@ -1580,7 +1580,15 @@ if (!ownsSingleInstanceLock) {
       }
       let post
       try {
-        post = await rooms.addPost(roomId, { text, missions: started })
+        post = await rooms.addPost(roomId, {
+          text,
+          missions: started,
+          // The reasons, kept with the post. They used to live only in this
+          // response -- said once in the composer note and then overwritten
+          // by whatever the room said next -- so the absence outlived its
+          // own explanation.
+          refused: Object.fromEntries(refusals.map((entry) => [entry.teammateId, entry.message]))
+        })
       } catch (error) {
         return roomRejected(error instanceof Error ? error.message : 'The post could not be recorded.')
       }

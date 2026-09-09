@@ -47,6 +47,76 @@ export function overCapNote(members: number): string | undefined {
   return `Only ${String(MAX_LIVE_MISSIONS)} missions run at once, so a post to ${String(members)} starts ${String(MAX_LIVE_MISSIONS)} and ${String(members - MAX_LIVE_MISSIONS)} will not start.`
 }
 
+/**
+ * The people a post did not reach, as one line.
+ *
+ * A member with no mission used to get an ANSWER CARD with nothing in it --
+ * an avatar, a name, `did not start` beside it, and then about 90px of void
+ * where a route, a phase, an Open button and an answer belong. In a grid of
+ * answers a card is a promise that an answer is inside it, so an empty one
+ * reads as broken however it is coloured; and because a grid forces
+ * equal-height cells, those two empty cards took their height from an
+ * unrelated string in a neighbouring cell (the model name wrapping to two
+ * lines) rather than from anything of their own.
+ *
+ * They share one fact, so they are one line.
+ *
+ * The reason is NOT in the record -- the refusal is a transient response, so
+ * a reload has only the absence -- and this must not invent one. The cap is
+ * named only when the cap can actually have been what bit: as many missions
+ * started as are allowed to run.
+ */
+export function absentLine(absent: readonly { readonly name: string; readonly reason?: string }[]): string | undefined {
+  if (absent.length === 0) return undefined
+  const say = (names: readonly string[]): string =>
+    names.length === 1
+      ? String(names[0])
+      : `${names.slice(0, -1).join(', ')} and ${String(names[names.length - 1] ?? '')}`
+  const verb = (names: readonly string[]): string => (names.length === 1 ? 'was' : 'were')
+
+  // Grouped by reason, so people turned away by the same thing are one
+  // sentence rather than one each -- the mistake the composer note used to
+  // make, repeated once per person in the smallest text on the screen.
+  const byReason = new Map<string, string[]>()
+  for (const entry of absent) byReason.set(entry.reason ?? '', [...(byReason.get(entry.reason ?? '') ?? []), entry.name])
+
+  return [...byReason]
+    .map(([reason, names]) =>
+      reason === ''
+        ? // No recorded reason: posts written before refusals were kept, and
+          // anything the host declined to explain. Says less rather than
+          // inventing why.
+          `${say(names)} ${verb(names)} not asked.`
+        : `${say(names)} ${verb(names)} not asked — ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`
+    )
+    .join(' ')
+}
+
+/**
+ * The host's refusals as one notice, said once per REASON.
+ *
+ * This was written inline as one sentence per refused teammate, joined with
+ * a separator, so a room where the live cap turned two people away read:
+ *
+ *   Otto: Up to 4 missions can run at once. Wait for one to finish or stop
+ *   it first. · Pike: Up to 4 missions can run at once. Wait for one to
+ *   finish or stop it first.
+ *
+ * The same sentence twice, in the smallest text on the screen, 500px below
+ * the cards it explains, and repeated once per person it happened to. It
+ * also displaces `overCapNote()`, which shares that slot.
+ *
+ * Grouped by message, because the message is what they actually share. Two
+ * people turned away by the cap are one fact with two names; two turned away
+ * for different reasons stay two lines.
+ */
+export function refusalNotice(refused: readonly { readonly name: string; readonly message: string }[]): string | undefined {
+  if (refused.length === 0) return undefined
+  const byReason = new Map<string, string[]>()
+  for (const entry of refused) byReason.set(entry.message, [...(byReason.get(entry.message) ?? []), entry.name])
+  return [...byReason].map(([message, names]) => `${names.join(', ')}: ${message}`).join(' · ')
+}
+
 export function RoomScreen({
   rooms,
   teammates,
@@ -331,6 +401,14 @@ export function RoomScreen({
         )}
         {room.posts.map((entry) => {
           const answers = answersFor(room, entry.postId)
+          const absent = absentLine(
+            room.teammateIds
+              .filter((id) => answers.every((candidate) => candidate.teammateId !== id))
+              .map((id) => ({
+                name: teammates.find((candidate) => candidate.teammateId === id)?.name ?? id,
+                ...(entry.refused?.[id] === undefined ? {} : { reason: entry.refused[id] })
+              }))
+          )
           return (
             <section key={entry.postId} className="lc-roompost">
               <div className="lc-roompost__you">
@@ -344,41 +422,40 @@ export function RoomScreen({
                   const teammate = teammates.find((candidate) => candidate.teammateId === teammateId)
                   const answer = answers.find((candidate) => candidate.teammateId === teammateId)
                   const name = teammate?.name ?? teammateId
+                  // No mission, no card. They are named together underneath.
+                  if (answer === undefined) return null
                   return (
-                    <div key={teammateId} className={`lc-roomanswer${answer === undefined ? ' is-absent' : ''}`}>
+                    <div key={teammateId} className="lc-roomanswer">
                       <div className="lc-roomanswer__who">
                         {teammate !== undefined && (
                           <PixelFace
                             hue={teammate.hue}
                             avatar={teammate.avatar}
                             size={22}
-                            activity={answer?.phase === 'running' || answer?.phase === 'starting' ? 'thinking' : 'idle'}
-                            presence={answer?.phase === 'running' || answer?.phase === 'starting' ? 'working' : 'none'}
+                            activity={answer.phase === 'running' || answer.phase === 'starting' ? 'thinking' : 'idle'}
+                            presence={answer.phase === 'running' || answer.phase === 'starting' ? 'working' : 'none'}
                           />
                         )}
                         <span className="lc-roomanswer__name">{name}</span>
-                        {answer !== undefined && (
-                          <span className="lc-roomanswer__route lc-mono">
-                            {runtimeNameOf(answer.runtime)} / {answer.model === 'account-default' ? 'default' : answer.model}
-                          </span>
-                        )}
-                        <span className={`lc-roomanswer__phase lc-mono${answer?.phase === 'failed' ? ' lc-tone-red' : ''}`}>
-                          {answer === undefined ? 'did not start' : answer.phase}
+                        <span className="lc-roomanswer__route lc-mono">
+                          {runtimeNameOf(answer.runtime)} / {answer.model === 'account-default' ? 'default' : answer.model}
                         </span>
-                        {answer !== undefined && (
-                          <button type="button" className="lc-ghostbutton" onClick={() => onOpenMission(answer.missionId)}>
-                            Open
-                          </button>
-                        )}
+                        <span className={`lc-roomanswer__phase lc-mono${answer.phase === 'failed' ? ' lc-tone-red' : ''}`}>
+                          {answer.phase}
+                        </span>
+                        <button type="button" className="lc-ghostbutton" onClick={() => onOpenMission(answer.missionId)}>
+                          Open
+                        </button>
                       </div>
-                      {answer?.text !== undefined && <p className="lc-roomanswer__text lc-para">{answer.text}</p>}
-                      {answer !== undefined && answer.text === undefined && (answer.phase === 'running' || answer.phase === 'starting') && (
+                      {answer.text !== undefined && <p className="lc-roomanswer__text lc-para">{answer.text}</p>}
+                      {answer.text === undefined && (answer.phase === 'running' || answer.phase === 'starting') && (
                         <p className="lc-roomanswer__text lc-settings__note">working…</p>
                       )}
                     </div>
                   )
                 })}
               </div>
+              {absent !== undefined && <p className="lc-roomabsent">{absent}</p>}
             </section>
           )
         })}
