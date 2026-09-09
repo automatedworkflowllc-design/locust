@@ -5,6 +5,7 @@ import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, 
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
+import { PlanSteps } from './ThreadItems.js'
 
 /**
  * The disclosure chain for what a teammate did, three rungs deep:
@@ -261,19 +262,11 @@ export function ActivityCard({
         <div className="lc-activity__list">
           {plan !== undefined && (
             <div className="lc-activity__plan">
-              <div className="lc-rail__meta lc-mono">
-                PLAN · {plan.doneCount} of {plan.steps.length} done
-              </div>
-              <ul className="lc-plan">
-                {plan.steps.map((step, index) => (
-                  <li key={`${String(index)}-${step.text}`} className={`lc-plan__step is-${step.state}`}>
-                    <span className="lc-plan__marker" aria-hidden="true">
-                      {step.state === 'done' ? <Icon name="check" size={11} /> : <span className="lc-dot" />}
-                    </span>
-                    <span>{step.text}</span>
-                  </li>
-                ))}
-              </ul>
+              {/* The same component the thread uses for a Plan-mode answer,
+                  with the one prop that separates the two jobs. Inside a fold
+                  a run happened, so the steps have outcomes and the counter is
+                  a fact about them. */}
+              <PlanSteps steps={plan.steps} doneCount={plan.doneCount} outcomes />
             </div>
           )}
           {entries.map((entry) => (

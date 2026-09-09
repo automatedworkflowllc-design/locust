@@ -3333,6 +3333,62 @@ textarea {
   font-weight: 500;
 }
 
+/*
+ * A plan that IS the answer: ordinals, reading size, no box.
+ *
+ * The list inside a fold keeps its markers and its meta size, because a run
+ * happened there and the steps have outcomes. This one has none -- a
+ * Plan-mode turn attempts nothing by contract -- so a dot, which means "not
+ * done yet", would state a false thing once per step. An ordinal states the
+ * true one: order, which is the whole content of a plan.
+ */
+.lc-plan.is-answer {
+  padding: 0;
+  gap: var(--lc-space-3);
+  margin: var(--lc-space-3) 0 0;
+}
+
+.lc-plan.is-answer .lc-plan__step {
+  /* Baseline, not flex-start: the ordinal has to sit on the FIRST line of a
+     step that wraps to a paragraph, not float above it. */
+  align-items: baseline;
+  gap: var(--lc-space-3);
+  font-size: var(--lc-text-body);
+  color: var(--lc-text-primary);
+}
+
+.lc-plan__ordinal {
+  flex: 0 0 18px;
+  text-align: right;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  /* Copying the plan yields the steps, not the numbering. */
+  user-select: none;
+}
+
+/* Past nine steps the ordinals gain a digit, so the gutter widens and the text
+   column stays flush rather than stepping right at step ten. */
+.lc-plan.is-answer.is-wide .lc-plan__ordinal {
+  flex-basis: 24px;
+}
+
+/*
+ * Why nothing changed, in the standing register.
+ *
+ * A fact about the turn that just happened -- the same class the trace line
+ * carries -- not a promise about a future action. It names the mode as the
+ * cause and points at the composer, which is the affordance that already
+ * exists.
+ */
+.lc-planmode {
+  margin: var(--lc-space-4) 0 0;
+  padding-left: var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-card);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
 .lc-plan__step.is-done {
   color: var(--lc-text-secondary);
 }
