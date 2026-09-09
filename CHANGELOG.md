@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.54.1 - 2026-09-09
+
+- **Two buttons on every teammate card were drawn on top of each other.** In a
+  teammate's Routines list, "Run" and "Edit" occupied the same box and read as
+  one unusable control, and the line under them was squeezed until the routine's
+  next run time was cut off. The name and schedule now have their own line and
+  the three buttons sit under them.
+- **Locust now finds a runtime you installed into a moved npm folder.** If npm
+  has been pointed somewhere other than its default — common on work machines,
+  with any Node version manager, and the exact fix Locust itself suggests when
+  an install fails on permissions — then the install worked and Locust reported
+  the runtime as missing anyway, sending you to install something you had just
+  installed.
+- **The model list no longer says a model does not exist while it is still
+  loading.** Opening the runtime picker and typing in the first seconds after
+  launch answered "Nothing matches that", which is a claim about your search
+  rather than about the list. It now says it is still reading the list.
+
 ## 0.54.0 - 2026-09-09
 
 - **When Codex asks you a question, your answer now reaches it.** In
