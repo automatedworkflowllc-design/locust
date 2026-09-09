@@ -15,6 +15,24 @@ export interface PathExecutableLocatorOptions {
    * back to cmd.exe rather than failing discovery.
    */
   readonly readFile?: (path: string) => Promise<string | undefined>;
+  /**
+   * npm's global bin directory, when the host has asked npm where it is.
+   *
+   * The install roots below hardcode npm's DEFAULT prefix -- `%APPDATA%
+pm`
+   * on Windows -- and that is only where a runtime lands if nobody has moved
+   * it. `npm config set prefix` is common on machines where the default
+   * folder is not writable, which is corporate Windows, every nvm-style
+   * manager, and the exact remedy Locust itself prints when an install fails
+   * with EACCES. A runtime installed perfectly well into a custom prefix was
+   * invisible to this locator unless that prefix also happened to be on the
+   * PATH a windowed app inherits, which it usually is not.
+   *
+   * Supplied rather than discovered here: asking npm costs a child process,
+   * this module has no business spawning one, and the answer is stable for a
+   * session. The host asks once and passes it in.
+   */
+  readonly npmBinDirectory?: string;
 }
 
 /**
@@ -404,8 +422,19 @@ export function createPathExecutableLocator(
         return undefined;
       };
 
+      /*
+       * PATH, then npm's ACTUAL bin directory, then the inferred roots.
+       *
+       * npm's real prefix sits between them deliberately. It is a fact the
+       * host was told rather than a guess, so it outranks the inferred table
+       * -- but PATH still wins, because a runtime the shell can find is the
+       * one a person would get from a terminal, and this whole search exists
+       * to agree with that.
+       */
+      const npmBin = options.npmBinDirectory
       return (
         (await resolveWithin(pathOnly))
+        ?? (npmBin === undefined ? undefined : await resolveWithin([npmBin]))
         ?? (await resolveWithin(
           await installDirectories(commandName, environment, platform, readDirectory),
         ))
