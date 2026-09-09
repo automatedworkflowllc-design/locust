@@ -99,3 +99,12 @@ export function splitAttachments(prompt: string): SplitPrompt {
   if (listed.length === 0 || rest.length === 0) return { text: prompt, attachments: [] }
   return { text: rest, attachments: listed }
 }
+
+/**
+ * Where a file copied in from outside the workspace lives, workspace-relative.
+ *
+ * Shared rather than main-only because the composer's tile says so too: the
+ * "copied in" fact belongs on the durable object, and its title names this
+ * folder. The main process owns the copying; both sides name the same place.
+ */
+export const ATTACHMENT_DIR = '.locust/attachments'

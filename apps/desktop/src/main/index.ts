@@ -1315,16 +1315,10 @@ if (!ownsSingleInstanceLock) {
       return {
         ok: true,
         paths: inside,
-        // Said out loud, because writing into someone's project folder is not
-        // something to do quietly.
-        ...(copiedIn.length === 0
-          ? {}
-          : {
-              message:
-                copiedIn.length === 1
-                  ? `${basename(copiedIn[0] ?? '')} was copied into ${ATTACHMENT_DIR} so your teammate can read it.`
-                  : `${String(copiedIn.length)} files were copied into ${ATTACHMENT_DIR} so your teammate can read them.`
-            })
+        // Which ones came from outside, so the composer can mark those tiles.
+        // Not a sentence any more: the fact is durable and belongs on the
+        // durable object. See AttachFilesResponse.
+        ...(copiedIn.length === 0 ? {} : { copied: copiedIn })
       } as const
     })
 

@@ -33,22 +33,36 @@ export interface SlashCommand {
   /** What it does, in the words the menu shows. */
   readonly detail: string
   readonly action: SlashAction
+  /**
+   * This one has consequences the others do not, and is drawn apart.
+   *
+   * Amber text alone was doing a whole section's work: it says "this row is
+   * different" only AFTER you have read it, which is the wrong order for the
+   * row that lets a run change anything on the machine (design, 2026-09-08).
+   * A weighted command sits below a hairline, in its own tinted section, with
+   * the shield glyph.
+   */
+  readonly weighted?: true
 }
 
 /**
  * Every command this build has. Order is the order the menu draws them: the
  * modes first, because that is what a person changes most, then the route,
  * then the two that are only sometimes there.
+ *
+ * `/auto` is LAST, and that is the only deliberate reordering. Arrow-down from
+ * a bare slash should land on `/edit`; the most consequential row belongs
+ * furthest from an accidental Enter (design, 2026-09-08).
  */
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: 'ask', detail: 'Reads and explains. Every write is refused.', action: { kind: 'mode', mode: 'ask' } },
   { name: 'plan', detail: 'Answers with the steps it would take, and changes nothing.', action: { kind: 'mode', mode: 'plan' } },
   { name: 'edit', detail: 'May edit files inside this folder.', action: { kind: 'mode', mode: 'accept-edits' } },
   { name: 'approve', detail: 'Stops and asks before every command or file change.', action: { kind: 'mode', mode: 'approve-each' } },
-  { name: 'auto', detail: 'Runs without asking, and may change anything on this machine.', action: { kind: 'mode', mode: 'auto' } },
   { name: 'model', detail: 'Choose the runtime and model.', action: { kind: 'route' } },
   { name: 'swarm', detail: 'Every mission at its model maximum.', action: { kind: 'swarm' } },
-  { name: 'stop', detail: 'Stop the running mission.', action: { kind: 'stop' } }
+  { name: 'stop', detail: 'Stop the running mission.', action: { kind: 'stop' } },
+  { name: 'auto', detail: 'Runs without asking, and may change anything on this machine.', action: { kind: 'mode', mode: 'auto' }, weighted: true }
 ]
 
 /**

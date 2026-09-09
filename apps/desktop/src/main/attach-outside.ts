@@ -38,8 +38,11 @@
 
 import { basename, extname } from 'node:path'
 
-/** Where copied-in attachments live, relative to the workspace. */
-export const ATTACHMENT_DIR = '.locust/attachments'
+// One definition, in shared: the renderer's attachment tile names this folder
+// too, and two copies of a path constant is how they drift.
+import { ATTACHMENT_DIR } from '../shared/attachments.js'
+
+export { ATTACHMENT_DIR }
 
 /** What `.git/info/exclude` needs so the folder never reaches a commit. */
 export const GIT_EXCLUDE_LINE = '.locust/'

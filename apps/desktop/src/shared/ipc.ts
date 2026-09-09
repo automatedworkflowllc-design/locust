@@ -310,12 +310,23 @@ export const WORKSPACE_ATTACH_CHANNEL = 'workspace:attach'
 /** Files chosen to attach, workspace-relative, or why none were. */
 export type AttachFilesResponse =
   /**
-   * `message` on a SUCCESS is not a warning -- it is the host saying it did
-   * something worth knowing about: a file from outside the workspace was
-   * copied in so the runtime could read it. Writing into someone's project
-   * folder is not something to do quietly.
+   * `copied` names the paths that were brought in from outside the workspace,
+   * a subset of `paths`. Writing into someone's project folder is not
+   * something to do quietly, and this is how the composer says so.
+   *
+   * It used to be a `message` -- one sentence for the whole batch, drawn as a
+   * full-width bordered box above the composer, directly above an actual text
+   * input and shaped exactly like one. Two objects for one event, and the
+   * transient one was carrying a permanent fact: the file STAYS copied for as
+   * long as the tile exists, so dismissing the notice lost information that
+   * was still true. The tile is the durable object, so the fact goes there
+   * (design, 2026-09-08).
+   *
+   * A subset, not a flag, because a multi-select can copy some files and not
+   * others -- one already inside the folder needs no mark, and marking it
+   * would claim something that did not happen.
    */
-  | { readonly ok: true; readonly paths: readonly string[]; readonly message?: string }
+  | { readonly ok: true; readonly paths: readonly string[]; readonly copied?: readonly string[] }
   | { readonly ok: false; readonly message: string }
 
 export const WORKSPACE_IMAGE_CHANNEL = 'workspace:image'

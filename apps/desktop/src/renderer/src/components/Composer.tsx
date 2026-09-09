@@ -27,7 +27,7 @@ import { isImagePath } from '../../../shared/image-files.js'
 import { Icon } from './Icon.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
-import { attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
+import { ATTACHMENT_DIR, attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
 import { availableCommands, matchingCommands, slashQuery } from '../slashCommands.js'
 import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
@@ -224,6 +224,14 @@ export function Composer({
    * a file nobody asked for.
    */
   const [attached, setAttached] = useState<readonly string[]>([])
+  /**
+   * Which attached files were brought in from outside the workspace.
+   *
+   * The mark appears only where something actually happened: a file already
+   * inside the folder gets a plain tile, because marking it would claim a copy
+   * that never took place.
+   */
+  const [copiedIn, setCopiedIn] = useState<ReadonlySet<string>>(new Set())
   const [attaching, setAttaching] = useState(false)
   /**
    * Which slash command the arrow keys are on.
@@ -575,14 +583,20 @@ export function Composer({
                 type="button"
                 role="option"
                 aria-selected={index === Math.min(slashAt, slashChoices.length - 1)}
-                className={`lc-slash__item${index === Math.min(slashAt, slashChoices.length - 1) ? ' is-active' : ''}`}
+                /*
+                 * A weighted command gets its own section rather than only its
+                 * own colour: hairline above, tinted ground, shield glyph.
+                 * Amber text alone announced "this one is different" only once
+                 * the row had already been read.
+                 */
+                className={`lc-slash__item${command.weighted === true ? ' is-weighted' : ''}${index === Math.min(slashAt, slashChoices.length - 1) ? ' is-active' : ''}`}
                 onMouseEnter={() => setSlashAt(index)}
                 onClick={() => runSlash(command)}
               >
-                <span className="lc-slash__name lc-mono">/{command.name}</span>
-                <span
-                  className={`lc-slash__detail${command.action.kind === 'mode' && command.action.mode === 'auto' ? ' lc-tone-amber' : ''}`}
-                >
+                <span className="lc-slash__name lc-mono">
+                  {command.weighted === true && <Icon name="shield" size={11} />}/{command.name}
+                </span>
+                <span className={`lc-slash__detail${command.weighted === true ? ' lc-tone-amber' : ''}`}>
                   {command.detail}
                 </span>
               </button>
@@ -605,23 +619,39 @@ export function Composer({
           */}
         {attached.length > 0 && (
           <div className="lc-attached" aria-label={`${attachmentLabel(attached.length)} attached`}>
-            {attached.map((path) => (
-              <button
-                key={path}
-                type="button"
-                className="lc-attached__tile"
-                title={`${path} — click to remove`}
-                aria-label={`Remove ${path}`}
-                onClick={() => setAttached((current) => current.filter((entry) => entry !== path))}
-              >
-                {/* The picture where there is one, the file icon where there
-                    is not -- never both, and never a broken image in place of
-                    either. */}
-                {isImagePath(path) ? <AttachedImage path={path} /> : <Icon name="file" size={13} />}
-                <span className="lc-attached__name">{path.split('/').pop() ?? path}</span>
-                <Icon name="close" size={11} />
-              </button>
-            ))}
+            {attached.map((path) => {
+              const wasCopied = copiedIn.has(path)
+              return (
+                <button
+                  key={path}
+                  type="button"
+                  className="lc-attached__tile"
+                  title={
+                    wasCopied
+                      ? `${path} — copied into ${ATTACHMENT_DIR} so your teammate can read it. Click to remove.`
+                      : `${path} — click to remove`
+                  }
+                  aria-label={wasCopied ? `Remove ${path}, copied into the workspace` : `Remove ${path}`}
+                  onClick={() => setAttached((current) => current.filter((entry) => entry !== path))}
+                >
+                  {/* The picture where there is one, the file icon where there
+                      is not -- never both, and never a broken image in place of
+                      either. */}
+                  {isImagePath(path) ? <AttachedImage path={path} /> : <Icon name="file" size={13} />}
+                  <span className="lc-attached__name">{path.split('/').pop() ?? path}</span>
+                  {/* The fact, as a segment of the tile behind a hairline. Two
+                      words on screen; the whole sentence on the title, and only
+                      if asked. */}
+                  {wasCopied && (
+                    <span className="lc-attached__copied">
+                      <Icon name="copy" size={10} />
+                      copied in
+                    </span>
+                  )}
+                  <Icon name="close" size={11} />
+                </button>
+              )
+            })}
           </div>
         )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>
@@ -792,10 +822,24 @@ export function Composer({
                         // reference, and the cap is what keeps a stray
                         // multi-select out of the prompt budget.
                         setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
-                        // A success can still have something to say: a file
-                        // from outside the folder was copied in, and that is
-                        // a change to their project they should hear about.
-                        setNote(answer.message, true)
+                        /*
+                         * The "copied in" fact goes on the TILE, not in a note.
+                         *
+                         * It was a full-width bordered box above the composer,
+                         * the same shape as a text input and directly above
+                         * one -- two objects for one event, three stacked rows
+                         * above the box, and a transient object carrying a
+                         * permanent fact. The file stays copied for as long as
+                         * the tile exists, so dismissing the note lost
+                         * something still true (design, 2026-09-08).
+                         *
+                         * Remembered across picks rather than replaced: two
+                         * separate attaches each copying one file must leave
+                         * both tiles marked.
+                         */
+                        if (answer.copied !== undefined && answer.copied.length > 0) {
+                          setCopiedIn((current) => new Set([...current, ...(answer.copied ?? [])]))
+                        }
                       } else if (answer.message.length > 0) {
                         setNote(answer.message)
                       }

@@ -19,6 +19,8 @@ import {
   errorAlreadyShown,
   boundedShellOutput,
   MAX_SHELL_OUTPUT_LINES,
+  SHELL_OUTPUT_HEAD_LINES,
+  SHELL_OUTPUT_TAIL_LINES,
   turnAttachments,
   turnPromptLine,
   peerRunFor,
@@ -1848,8 +1850,39 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     const activity = thread.find((item) => item.type === 'activity')
     const details = activity?.type === 'activity' ? activity.details : []
     const segments = activityTrace(details, events, traceOutcome(events, false))
-    expect(joined(segments)).toBe('41s · thought 7s · asked 1 subagent · 1 tool call · 1 notice')
+    /*
+     * No `1 notice` on the end any more.
+     *
+     * The chip counted a thing the person could not read, and counted a
+     * DIFFERENT set than the thread drew -- this function took every
+     * diagnostic bar a usage window, while the thread drops any that arrives
+     * before the first tool call unless it is a run-level error. A real
+     * `seq 1 300` capture showed `1 notice` with no sentence anywhere on the
+     * screen. The notice itself is now drawn at the foot of the fold instead;
+     * `carries the notices it used to only count` below is the other half.
+     */
+    expect(joined(segments)).toBe('41s · thought 7s · asked 1 subagent · 1 tool call')
+    expect(segments.some((seg) => seg.key === 'notices')).toBe(false)
     expect(segments.find((seg) => seg.key === 'subagents')?.tone).toBeUndefined()
+  })
+
+  it('carries the notices it used to only count, as sentences on the fold', () => {
+    // The positive control for the change above: dropping the chip must not
+    // mean dropping the fact. This diagnostic arrives BEFORE any tool call and
+    // is not a run-level error, so the thread's own gate drops it -- which is
+    // exactly the set that used to be counted and never shown.
+    const events = [
+      ev(1, 'run.started', { runtimeThreadId: 't', process: {} }, 0),
+      ev(2, 'adapter.diagnostic', { code: 'codex.setup', level: 'info', terminal: false, message: 'Skill descriptions were shortened.' }, 1),
+      ev(3, 'tool.started', { itemId: 'a', toolKind: 'shell', name: 'Bash', command: 'ls', phase: 'started' }, 2),
+      ev(4, 'tool.completed', { itemId: 'a', toolKind: 'shell', name: 'Bash', command: 'ls', phase: 'completed', output: 'README.md' }, 3),
+      ev(5, 'run.completed', { runtimeThreadId: 't', process: {} }, 4)
+    ]
+    const activity = buildThread(events, { running: false }).find((item) => item.type === 'activity')
+    const notices = activity?.type === 'activity' ? activity.notices : undefined
+    expect(notices).toEqual([{ level: 'info', message: 'Skill descriptions were shortened.' }])
+    // And it is NOT also drawn as a thread diagnostic, which would say it twice.
+    expect(buildThread(events, { running: false }).some((item) => item.type === 'diagnostic')).toBe(false)
   })
 
   it('says a subagent did not report, in amber, only once the turn is over', () => {
@@ -2235,21 +2268,51 @@ describe('a turn sent with files attached', () => {
 })
 
 describe('what a command printed', () => {
-  it('keeps a short output whole', () => {
-    expect(boundedShellOutput('one\ntwo\nthree')).toEqual({ text: 'one\ntwo\nthree', omitted: 0 })
+  it('keeps a short output whole, and asks for no elision control', () => {
+    // Under the budget: no tail, nothing omitted, and so nothing drawn to say
+    // that nothing was left out. `git status --short` with three lines should
+    // not carry a line count and a button explaining an absence.
+    expect(boundedShellOutput('one\ntwo\nthree')).toEqual({
+      head: 'one\ntwo\nthree',
+      tail: '',
+      omitted: 0,
+      total: 3,
+      text: 'one\ntwo\nthree'
+    })
   })
 
-  it('keeps BOTH ends of a long one', () => {
+  it('keeps BOTH ends of a long one, as two halves the caller can put a control between', () => {
     // THE test, and the same rule message truncation follows. The interesting
     // line is as often the last as the first -- an error, an exit summary, the
     // answer. `seq 1 1200` is the cheerful case; `npm install` ending in a
     // permission error is the one that matters.
     const many = Array.from({ length: 1_200 }, (_, index) => `line ${String(index + 1)}`).join('\n')
-    const { text, omitted } = boundedShellOutput(many)
-    expect(text).toContain('line 1')
-    expect(text).toContain('line 1200')
+    const { head, tail, omitted, total, text } = boundedShellOutput(many)
+    expect(head.split('\n')).toHaveLength(SHELL_OUTPUT_HEAD_LINES)
+    expect(tail.split('\n')).toHaveLength(SHELL_OUTPUT_TAIL_LINES)
+    expect(head).toContain('line 1')
+    expect(tail).toContain('line 1200')
     expect(omitted).toBe(1_200 - MAX_SHELL_OUTPUT_LINES)
+    expect(total).toBe(1_200)
+    // The joined form still exists for anything that wants one block.
     expect(text.split('\n').length).toBeLessThan(MAX_SHELL_OUTPUT_LINES + 3)
+  })
+
+  it('bounds by LINES rather than pixels, so nothing needs an inner scroller', () => {
+    /*
+     * Eight and eight. It was 200 lines in a 320px box with `overflow: auto`,
+     * which put a scrolling region inside a scrolling thread and drew a 300px
+     * black rectangle showing "1" through "19" above the two lines the
+     * teammate actually said (design, 2026-09-08).
+     *
+     * Sixteen is also the boundary the drawing's third case sits on: a
+     * 16-line output shows whole, with no button and no count.
+     */
+    expect(MAX_SHELL_OUTPUT_LINES).toBe(16)
+    const sixteen = Array.from({ length: 16 }, (_, index) => String(index + 1)).join('\n')
+    expect(boundedShellOutput(sixteen).omitted).toBe(0)
+    const seventeen = `${sixteen}\n17`
+    expect(boundedShellOutput(seventeen).omitted).toBe(1)
   })
 
   it('does not end on the blank line almost every command leaves behind', () => {

@@ -88,6 +88,7 @@ function ThreadItems({
               workspacePath={workspacePath}
               openByDefault={item.openByDefault === true}
               {...(item.plan === undefined ? {} : { plan: item.plan })}
+              {...(item.notices === undefined ? {} : { notices: item.notices })}
             />
           )
         }
@@ -629,7 +630,11 @@ export function Thread({
             <div className="lc-card is-terminal is-red">
               <div className="lc-card__head">
                 <span>
-                  <Icon name="shield" size={13} /> Can&apos;t write the mission ledger
+                  {/* The title leads with what HAPPENED, not with the fault.
+                      "Can't write the mission ledger" describes the app's
+                      problem; "Stopped" is the fact about the person's run
+                      (design, 2026-09-08). */}
+                  <Icon name="shield" size={13} /> Stopped — the mission ledger could not be written
                 </span>
               </div>
               <div className="lc-card__body">
@@ -642,18 +647,38 @@ export function Thread({
                     </Fragment>
                   ))}
                 </dl>
+                {/*
+                  * One action, and the path beside it.
+                  *
+                  * The design draws two -- Retry and "Change where the ledger
+                  * lives" -- and neither exists to be wired. The ledger
+                  * directory is a fixed `join(userData, 'mission-ledger')`
+                  * with no setting behind it, so changing it is a feature; and
+                  * the run is already dead, so retrying is what ResumeCard
+                  * does. Drawing either would be a dead control, which is the
+                  * rule this app has paid for more than once and the same
+                  * discipline the design praised on the slash menu.
+                  *
+                  * The path is shown regardless, which is the half of that
+                  * idea that costs nothing: someone told their ledger cannot
+                  * be written and not told where it lives has been informed
+                  * and not helped.
+                  */}
                 {ledgerPath !== undefined && ledgerPath.length > 0 && (
-                  <button
-                    type="button"
-                    className="lc-button"
-                    onClick={() => {
-                      const bridge = window.desktop
-                      if (bridge === undefined) return
-                      void bridge.revealFile(ledgerPath).catch(() => undefined)
-                    }}
-                  >
-                    Show the ledger folder
-                  </button>
+                  <div className="lc-ledgerfail__actions">
+                    <button
+                      type="button"
+                      className="lc-button"
+                      onClick={() => {
+                        const bridge = window.desktop
+                        if (bridge === undefined) return
+                        void bridge.revealFile(ledgerPath).catch(() => undefined)
+                      }}
+                    >
+                      Show the ledger folder
+                    </button>
+                    <span className="lc-ledgerfail__path lc-mono">{ledgerPath}</span>
+                  </div>
                 )}
               </div>
             </div>

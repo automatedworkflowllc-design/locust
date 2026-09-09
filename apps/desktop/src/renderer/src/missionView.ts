@@ -408,6 +408,15 @@ export type ThreadItem =
        * conversation a wall of tool rows, which is what the fold is for.
        */
       readonly openByDefault?: boolean
+      /**
+       * Notices about this turn's work, drawn at the FOOT of the fold.
+       *
+       * These are the diagnostics the thread's own gate drops -- the ones a
+       * runtime raises before its first tool call, which used to be counted in
+       * the trace line as `1 notice` and shown nowhere. The count is gone; the
+       * sentence is here.
+       */
+      readonly notices?: readonly { readonly level: 'info' | 'warning' | 'error'; readonly message: string }[]
       /** The plan this run stated, drawn as the fold's first rows. */
       readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
       readonly summary: string
@@ -755,7 +764,6 @@ export function activityTrace(
     (event) => event.payload.code === 'host.shared_workspace'
   )
   const refused = diagnostics.filter((event) => /denied|refus|permission/i.test(event.payload.code) || /not permitted|refused/i.test(event.payload.message)).length
-  const notices = diagnostics.length - refused
 
   if (outcome === 'failed' || outcome === 'cancelled') {
     segments.push({ key: 'duration', text: `stopped at ${duration}` })
@@ -798,7 +806,23 @@ export function activityTrace(
     segments.push({ key: 'files', text: 'no files changed' })
   }
   if (refused > 0) segments.push({ key: 'refused', text: `${String(refused)} refused`, tone: 'amber' })
-  if (notices > 0) segments.push({ key: 'notices', text: pluralize(notices, 'notice') })
+  /*
+   * No `1 notice` chip. The notices themselves are drawn at the foot of the
+   * fold instead -- see `activityNotices` and ActivityCard.
+   *
+   * The chip counted a thing the person could not read, and worse, it counted
+   * a DIFFERENT set than the thread showed. This function counted every
+   * diagnostic bar a usage window; the thread's own gate drops any diagnostic
+   * arriving before the first tool call unless it is a run-level
+   * `runtime_error` or `notification`, because Codex comments on its own setup
+   * as every turn opens. So a `seq 1 300` run displayed `1 notice` with no
+   * sentence anywhere on the screen -- confirmed in the shipped 0.52.0 capture,
+   * whose whole recorded text is "1 tool call / no files changed / 1 notice /
+   * seq 1 300 / exit 0".
+   *
+   * A count of an unnamed thing is not information. Naming it also makes the
+   * two filters impossible to drift apart again, because there is only one.
+   */
   return segments
 }
 
@@ -975,6 +999,8 @@ export function buildThread(
   // about the mission. They stay in the Signal Rail; the thread keeps only
   // notices raised while the work was under way.
   let workBegan = false
+  /** Diagnostics the thread gate drops, drawn at the foot of the fold instead. */
+  const foldNotices: { readonly level: 'info' | 'warning' | 'error'; readonly message: string }[] = []
 
   for (const event of events) {
     switch (event.type) {
@@ -1097,7 +1123,24 @@ export function buildThread(
         // item. Only the former is worth interrupting an empty thread for.
         // A usage window is state the host keeps, not a line in the thread.
         if (/\.usage_window$/.test(event.payload.code)) break
-        if (!workBegan && !/\.(runtime_error|notification)$/.test(event.payload.code)) break
+        if (!workBegan && !/\.(runtime_error|notification)$/.test(event.payload.code)) {
+          /*
+           * Not shown in the thread -- and, until now, not shown anywhere.
+           *
+           * The trace line counted these as `1 notice` while this gate kept
+           * the sentence off the screen, so the person read a number for a
+           * thing they could never open. The design's rule is that a chip
+           * counting an unnamed thing becomes a sentence that names it, and
+           * these belong to the turn's WORK, so the fold's foot is where they
+           * go.
+           *
+           * Collected HERE, in the same branch that drops them, rather than
+           * re-derived by a second function -- two filters over one set is
+           * how the count and the sentence disagreed in the first place.
+           */
+          foldNotices.push({ level: event.payload.level, message: event.payload.message })
+          break
+        }
         // Said once. A quota failure arrives as a limit event AND as the
         // runtime's error line carrying the same sentence; user session 1
         // (2026-09-05) showed "You've hit your usage limit..." three times in
@@ -1170,6 +1213,7 @@ export function buildThread(
       ...(options.running ? {} : { openByDefault: true }),
       details: activity,
       ...(planSteps === undefined ? {} : { plan: planSteps }),
+      ...(foldNotices.length === 0 ? {} : { notices: foldNotices }),
       reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
     })
   } else if (planSteps !== undefined) {
@@ -2068,30 +2112,63 @@ export function turnPromptLine(turn: {
  * Only for a turn the person started: a relayed or handed-off turn's prompt is
  * machine-written and nothing attached files to it.
  */
-/** How many lines of command output a row will draw before it cuts. */
-export const MAX_SHELL_OUTPUT_LINES = 200
+/**
+ * How many lines of command output a row draws before it elides the middle.
+ *
+ * Eight and eight. It was 200 in a box 320px tall that scrolled inside a
+ * thread that also scrolls, which put a 300px black rectangle showing "1"
+ * through "19" above the two lines the teammate actually said -- stdout drawn
+ * louder than the person's collaborator talking (design, 2026-09-08).
+ *
+ * Eight each end is "enough to see a command worked, and enough to see how it
+ * failed": a vitest failure puts the assertion, the file and the counts in its
+ * last six lines. Anything more is asked for, and asking for it prints ALL of
+ * it rather than more of a bounded window.
+ */
+export const SHELL_OUTPUT_HEAD_LINES = 8
+export const SHELL_OUTPUT_TAIL_LINES = 8
+export const MAX_SHELL_OUTPUT_LINES = SHELL_OUTPUT_HEAD_LINES + SHELL_OUTPUT_TAIL_LINES
 
 /**
- * Command output, bounded for the screen, keeping BOTH ends.
+ * Command output split for the screen, keeping BOTH ends.
  *
  * The same rule `boundedMessageText` follows and for the same reason: the
  * interesting part of a long output is as often the last line as the first --
  * an error, an exit summary, the answer -- and a head-only cut throws exactly
  * that away. `seq 1 1200` is the cheerful case; `npm install` ending in a
  * permission error is the one that matters.
+ *
+ * Head and tail are returned SEPARATELY rather than joined around a sentence,
+ * because the elision is a control now: a button between the halves that
+ * prints everything, the same pattern the diff's folded context already uses.
+ * A sentence in the middle of a `pre` cannot be pressed.
  */
-export function boundedShellOutput(output: string): { readonly text: string; readonly omitted: number } {
+export function boundedShellOutput(output: string): {
+  readonly head: string
+  readonly tail: string
+  readonly omitted: number
+  readonly total: number
+  /** Kept for callers that want one block: head, a marker line, tail. */
+  readonly text: string
+} {
   // Trailing whitespace goes first. Almost every command ends with a newline,
   // and keeping it made the last visible line BLANK -- which quietly undercuts
   // the one promise this function makes. Driven on a real `seq 1 300`: the
   // tail read as an empty line rather than `300`.
-  const lines = output.replace(/\s+$/, '').split('\n')
-  if (lines.length <= MAX_SHELL_OUTPUT_LINES) return { text: output, omitted: 0 }
-  const half = Math.floor(MAX_SHELL_OUTPUT_LINES / 2)
-  const omitted = lines.length - half * 2
+  const trimmed = output.replace(/\s+$/, '')
+  const lines = trimmed.split('\n')
+  if (lines.length <= MAX_SHELL_OUTPUT_LINES) {
+    return { head: trimmed, tail: '', omitted: 0, total: lines.length, text: trimmed }
+  }
+  const omitted = lines.length - SHELL_OUTPUT_HEAD_LINES - SHELL_OUTPUT_TAIL_LINES
+  const head = lines.slice(0, SHELL_OUTPUT_HEAD_LINES).join('\n')
+  const tail = lines.slice(-SHELL_OUTPUT_TAIL_LINES).join('\n')
   return {
-    text: [...lines.slice(0, half), `… ${String(omitted)} more lines …`, ...lines.slice(-half)].join('\n'),
-    omitted
+    head,
+    tail,
+    omitted,
+    total: lines.length,
+    text: `${head}\n… ${String(omitted)} more lines …\n${tail}`
   }
 }
 

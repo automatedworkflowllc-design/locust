@@ -15,6 +15,7 @@ export type IconName =
   | 'close'
   | 'code'
   | 'command'
+  | 'copy'
   | 'diff'
   | 'dots'
   | 'file'
@@ -47,6 +48,9 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }): Re
     close: <><path d="m7 7 10 10" /><path d="M17 7 7 17" /></>,
     code: <><path d="m8 9-4 3 4 3" /><path d="m16 9 4 3-4 3" /><path d="m14 5-4 14" /></>,
     command: <path d="M9 6V5a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v14a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6Z" />,
+    // Two sheets, the front one offset. Same 24-box, same 2px stroke as the
+    // rest of the set; used by the command output foot to take all of it.
+    copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></>,
     dots: <><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" /></>,
     // Two columns and a divider: a change with a before and an after.
     diff: <><rect x="3" y="5" width="6" height="14" /><rect x="15" y="5" width="6" height="14" /><path d="M12 2v20" /></>,

@@ -25,16 +25,79 @@ import { Icon } from './Icon.js'
  * of it — columns, indentation, a stack trace — is often the information.
  */
 function ShellOutput({ output }: { readonly output: string }): ReactElement {
-  const { text, omitted } = boundedShellOutput(output)
+  const { head, tail, omitted, total } = boundedShellOutput(output)
+  /**
+   * Everything, once asked for.
+   *
+   * Deliberately unbounded from here: at that point the person has pressed a
+   * button that says how many lines they are asking for, and a second cut
+   * after an explicit request is the app deciding it knows better.
+   */
+  const [showAll, setShowAll] = useState(false)
+  if (showAll || omitted === 0) {
+    return (
+      <div className="lc-shellout">
+        <pre className="lc-shellout__text">{showAll ? output.replace(/\s+$/, '') : head}</pre>
+        <ShellOutputFoot output={output} total={total} />
+      </div>
+    )
+  }
   return (
     <div className="lc-shellout">
-      <pre className="lc-shellout__text">{text}</pre>
-      {omitted > 0 && (
-        <p className="lc-shellout__note">
-          {omitted} lines in the middle are not shown. The start and the end are, because an
-          error is as often the last line as the first.
-        </p>
-      )}
+      <pre className="lc-shellout__text">{head}</pre>
+      {/*
+        * The elision is a CONTROL, not a sentence.
+        *
+        * It used to be a line of prose in the middle of the `pre` explaining
+        * that lines were missing, inside a box 320px tall that scrolled --
+        * so the fact was unpressable and the box shouted. Same pattern as the
+        * diff's folded context, which this app already ships.
+        */}
+      <button type="button" className="lc-shellout__more" onClick={() => setShowAll(true)}>
+        {omitted} more lines
+      </button>
+      <pre className="lc-shellout__text">{tail}</pre>
+      <ShellOutputFoot output={output} total={total} />
+    </div>
+  )
+}
+
+/**
+ * The foot of the output: take all of it, and how much there is.
+ *
+ * Copying is the honest answer to a bounded view -- the whole point of cutting
+ * the middle is that the screen is the wrong place for 300 lines, and the
+ * right place is wherever the person was going to put them.
+ */
+function ShellOutputFoot({ output, total }: { readonly output: string; readonly total: number }): ReactElement {
+  const [copied, setCopied] = useState(false)
+  const copy = (): void => {
+    const text = output.replace(/\s+$/, '')
+    const done = (): void => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1_600)
+    }
+    // Same fallback as `InstallCommand`: `navigator.clipboard` is the right
+    // call and is not always available to a packaged page.
+    navigator.clipboard?.writeText(text).then(done).catch(() => {
+      const field = document.createElement('textarea')
+      field.value = text
+      document.body.appendChild(field)
+      field.select()
+      try {
+        document.execCommand('copy')
+        done()
+      } finally {
+        field.remove()
+      }
+    })
+  }
+  return (
+    <div className="lc-shellout__foot">
+      <button type="button" className="lc-shellout__copy" onClick={copy}>
+        <Icon name="copy" size={12} />
+        {copied ? 'Copied' : `Copy all ${String(total)} ${total === 1 ? 'line' : 'lines'}`}
+      </button>
     </div>
   )
 }
@@ -47,6 +110,7 @@ export function ActivityCard({
   finished = false,
   workspacePath,
   plan,
+  notices = [],
   openByDefault = false
 }: {
   readonly summary: string
@@ -67,6 +131,15 @@ export function ActivityCard({
    * 2026-09-06).
    */
   readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
+  /**
+   * What the runtime said about this turn, drawn at the foot of the fold.
+   *
+   * The diagnostics the thread's gate drops. They were counted in the trace
+   * line as `1 notice` and shown nowhere -- see missionView's collection
+   * point, which is inside the branch that drops them so the two can never
+   * describe different sets again.
+   */
+  readonly notices?: readonly { readonly level: 'info' | 'warning' | 'error'; readonly message: string }[]
   /**
    * Open on arrival, for the newest finished turn. See `openByDefault` on the
    * activity item for why: the live narration disappears when a run ends, and
@@ -254,18 +327,36 @@ export function ActivityCard({
                  * runtimes that do not — the rule this composer has already
                  * paid for twice. The chevron follows the evidence.
                  */
-                entry.output === undefined ? (
+                /*
+                 * The exit code leads, as a badge.
+                 *
+                 * It used to sit at the far right of the command line, which
+                 * is where the eye arrives LAST for the fact that decides
+                 * whether any of the output below is worth reading (design,
+                 * 2026-09-08). Green for a clean exit, red for a failure, and
+                 * it arrives before the thing it is a verdict on.
+                 *
+                 * A command that printed NOTHING is a static row saying so.
+                 * It used to open onto an empty box, which reads as "the app
+                 * lost it" rather than "there was none" -- and `undefined`
+                 * (the runtime never reported output) and `''` (it reported
+                 * none) are different facts, so they get different words.
+                 */
+                entry.output === undefined || entry.output.trim() === '' ? (
                   <div className="lc-filerow is-shell is-static">
                     <Icon name="terminal" size={14} />
+                    <span className={`lc-shellbadge ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
                     <span className="lc-filerow__path">{entry.command}</span>
-                    <span className={`lc-filerow__result ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
+                    {entry.output !== undefined && entry.settled && (
+                      <span className="lc-filerow__result is-muted">no output</span>
+                    )}
                   </div>
                 ) : (
                   <>
                     <button type="button" className="lc-filerow is-shell" onClick={() => toggle(entry)}>
                       <Icon name="terminal" size={14} />
+                      <span className={`lc-shellbadge ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
                       <span className="lc-filerow__path">{entry.command}</span>
-                      <span className={`lc-filerow__result ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
                       <span className="lc-activity__chev" aria-hidden="true">
                         <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
                       </span>
@@ -295,6 +386,29 @@ export function ActivityCard({
             </Fragment>
           ))}
           {revealNotice !== undefined && <p className="lc-filerow__notice">{revealNotice}</p>}
+          {/*
+            * What the runtime said about this turn, at the foot of the work it
+            * is about.
+            *
+            * These arrive before the first tool call, so the thread's own gate
+            * drops them -- Codex comments on its own setup as every turn opens
+            * and that belongs nowhere near the top of a conversation. The
+            * trace line counted them anyway, as `1 notice`, which meant a
+            * number for a sentence that was on no screen at all.
+            *
+            * Standing register: a left rule, no box, no new species. Amber
+            * only where a person may need to act, which is what `level`
+            * already distinguishes -- an `info` notice about shortened skill
+            * descriptions is not a warning and must not be dressed as one.
+            */}
+          {notices.map((notice, index) => (
+            <p
+              key={`notice_${String(index)}`}
+              className={`lc-shellnotice lc-tone-${notice.level === 'error' ? 'red' : notice.level === 'warning' ? 'amber' : 'muted'}`}
+            >
+              {notice.message}
+            </p>
+          ))}
         </div>
       )}
     </div>
