@@ -668,6 +668,8 @@ export default function App(): ReactElement {
   const [history, setHistory] = useState<readonly PublicRecoveredMission[]>([])
   /** Ledger files that raised an issue and yielded no mission. See the history read. */
   const [unreadableLedgers, setUnreadableLedgers] = useState(0)
+  /** The ledger could not be read AT ALL -- not the same as having no missions. */
+  const [ledgerUnreadable, setLedgerUnreadable] = useState(false)
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
@@ -1408,7 +1410,27 @@ export default function App(): ReactElement {
       .getMissionHistory()
       .then((response) => {
         seedLimitsFrom(response)
-        if (!active || !response.ok) return
+        if (!active) return
+        /*
+         * The whole read failed, and that is not the same as an empty ledger.
+         *
+         * Found by driving it (drive-ledger-failure, 2026-09-08): with the
+         * ledger directory replaced by a plain file, every write and every
+         * read fails, `readMissionHistory` answers HISTORY_UNAVAILABLE, and
+         * this handler used to return here -- leaving `history` empty and the
+         * damage count at zero, so the Missions header rendered
+         * "0 local - ledger verified" about a ledger it had not read at all.
+         *
+         * That is the same defect Astra found one step further out. Their case
+         * was a file too damaged to yield a mission; this is the directory
+         * failing outright, which the fix for theirs did not reach because it
+         * counts issues INSIDE a snapshot that never arrived.
+         */
+        if (!response.ok) {
+          setLedgerUnreadable(true)
+          return
+        }
+        setLedgerUnreadable(false)
         setHistory(response.data.missions)
         /*
          * Ledger files that could not be read at all.
@@ -2784,6 +2806,7 @@ export default function App(): ReactElement {
             <MissionsScreen
               missions={history}
               unreadableLedgers={unreadableLedgers}
+              ledgerUnreadable={ledgerUnreadable}
               workspaceId={workspaceId}
               runningMissionIds={
                 new Set(

@@ -48,6 +48,37 @@ describe('what is safe and what is at risk when the ledger cannot be written', (
     expect(rows.some((row) => /still changed/i.test(row.text))).toBe(true)
   })
 
+  it('does not offer to reopen a mission that was never written', () => {
+    /*
+     * Caught the first time this card was ever put on a screen
+     * (`drive-ledger-failure`, 2026-09-08): its own first line said "The
+     * mission could not be created in the durable local ledger" and the SAFE
+     * row underneath said "this mission can be reopened from it". There was no
+     * record to reopen.
+     *
+     * `codex-mission.ts` writes the record BEFORE starting the process, so a
+     * creation failure means nothing ran -- which is better news than a
+     * mid-run failure, and the card should say so rather than warn about work
+     * to check.
+     */
+    const rows = ledgerFailureRows(undefined, true)
+    const safe = rows.find((row) => row.tone === 'safe')
+    expect(safe?.text).not.toMatch(/reopened/i)
+    expect(safe?.text).toMatch(/nothing ran/i)
+    expect(rows.find((row) => row.label === 'At risk')?.text).toMatch(/never began/i)
+    // And it does not tell them to go and check a folder for work that never
+    // happened, which the mid-run copy correctly does.
+    expect(rows.some((row) => /check the folder yourself/i.test(row.text))).toBe(false)
+  })
+
+  it('still offers the mid-run copy when something WAS written', () => {
+    // The control. Without it, the branch above could swallow every case and
+    // the card would under-warn on the failure that actually loses work.
+    const rows = ledgerFailureRows(3, false)
+    expect(rows.find((row) => row.tone === 'safe')?.text).toMatch(/reopened/i)
+    expect(rows.some((row) => /still changed/i.test(row.text))).toBe(true)
+  })
+
   it('admits the app cannot say what was lost', () => {
     const risk = ledgerFailureRows(3).find((row) => row.label === 'At risk')
     expect(risk?.text).toMatch(/cannot tell you what it was/i)

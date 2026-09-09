@@ -118,7 +118,8 @@ export function MissionsScreen({
   runningMissionIds,
   titleOf,
   onOpen,
-  unreadableLedgers = 0
+  unreadableLedgers = 0,
+  ledgerUnreadable = false
 }: {
   readonly missions: readonly PublicRecoveredMission[]
   /** The folder this window is open on, so the header can say how many are its own. */
@@ -144,6 +145,15 @@ export function MissionsScreen({
    * updated reads as it did before rather than crashing.
    */
   readonly unreadableLedgers?: number
+  /**
+   * The ledger could not be read at all, so this screen knows nothing.
+   *
+   * Distinct from "no missions": an empty ledger is a fact, and a ledger that
+   * would not open is the absence of any facts. Both used to render the same
+   * confident "ledger verified" -- seen by driving it with the ledger
+   * directory replaced by a plain file (2026-09-08).
+   */
+  readonly ledgerUnreadable?: boolean
 }): ReactElement {
   const [filter, setFilter] = useState<Filter>('All')
   const shown = missions.filter((mission) => matchesFilter(mission, filter, runningMissionIds))
@@ -184,7 +194,11 @@ export function MissionsScreen({
       <ScreenHeader
         title="Missions"
         meta={`${missions.length} local${elsewhere === 0 ? '' : `, ${missions.length - elsewhere} in this folder`} · ${
-          damaged === 0 ? 'ledger verified' : ledgerDamageWords(withIssues, unreadableLedgers)
+          ledgerUnreadable
+            ? 'the ledger could not be read'
+            : damaged === 0
+              ? 'ledger verified'
+              : ledgerDamageWords(withIssues, unreadableLedgers)
         }${total === undefined ? '' : ` · ${total} across ${priced} priced`}`}
       />
       {/*

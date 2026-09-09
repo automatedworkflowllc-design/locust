@@ -40,7 +40,41 @@ export interface LedgerFailureRow {
  * undefined during a live run -- in which case the safe row says what is true
  * without a number rather than dressing up a blank.
  */
-export function ledgerFailureRows(checkpoints: number | undefined): readonly LedgerFailureRow[] {
+export function ledgerFailureRows(
+  checkpoints: number | undefined,
+  nothingWritten = false
+): readonly LedgerFailureRow[] {
+  /*
+   * The mission was never created, so there is nothing partial to describe.
+   *
+   * Seen the first time this card was ever put on a screen
+   * (`drive-ledger-failure`, 2026-09-08, with the ledger directory replaced by
+   * a plain file). The header read "Mission · not started · failed" and the
+   * sentence above the rows read "The mission could not be created in the
+   * durable local ledger" -- while SAFE underneath it said "this mission can
+   * be reopened from it". There was no record to reopen. The card contradicted
+   * its own first line.
+   *
+   * `codex-mission.ts` writes the mission BEFORE it starts the process, and
+   * says so in as many words -- "a mission must not run on messages its own
+   * record cannot name" -- so when creation fails, nothing ran. That is much
+   * better news than a mid-run failure and the card should say it plainly
+   * rather than warning about work to go and check.
+   */
+  if (nothingWritten) {
+    return [
+      {
+        tone: 'safe',
+        label: 'Safe',
+        text: 'Everything. The record is written before the runtime starts, so nothing ran, nothing was changed, and your project files are exactly as they were.'
+      },
+      {
+        tone: 'risk',
+        label: 'At risk',
+        text: 'Nothing from this turn — it never began. Locust refused to start work it could not record. Fix the ledger and send it again.'
+      }
+    ]
+  }
   return [
     {
       tone: 'safe',

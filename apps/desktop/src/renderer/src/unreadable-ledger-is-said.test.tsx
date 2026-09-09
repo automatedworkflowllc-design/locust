@@ -55,11 +55,16 @@ const mission = (missionId: string, integrityIssueCount: number): PublicRecovere
   mode: 'ask'
 } as unknown as PublicRecoveredMission)
 
-const header = (missions: readonly PublicRecoveredMission[], unreadableLedgers: number): string => {
+const header = (
+  missions: readonly PublicRecoveredMission[],
+  unreadableLedgers: number,
+  ledgerUnreadable = false
+): string => {
   const html = renderToStaticMarkup(
     <MissionsScreen
       missions={missions}
       unreadableLedgers={unreadableLedgers}
+      ledgerUnreadable={ledgerUnreadable}
       workspaceId="ws_here"
       teammates={[]}
       missionOwners={{}}
@@ -108,6 +113,24 @@ describe('what the Missions header says about a damaged ledger', () => {
     expect(said).toContain('1 with an incomplete receipt')
     expect(said).toContain('1 file could not be read')
     expect(said).not.toContain('2 with an incomplete receipt')
+  })
+
+  it('never claims verification when the ledger could not be read at all', () => {
+    /*
+     * The third case, and the most extreme: not a damaged file but a ledger
+     * that would not open. Found by driving it -- `drive-ledger-failure`
+     * replaces the ledger directory with a plain file, so every read and write
+     * fails on a real syscall, `readMissionHistory` answers
+     * HISTORY_UNAVAILABLE, and App used to return early on `!response.ok`.
+     * History stayed empty, the damage count stayed zero, and the header read
+     * "0 local · ledger verified" about a ledger it had never opened.
+     *
+     * An empty ledger is a fact. A ledger that would not open is the absence
+     * of any facts, and the two must not read the same.
+     */
+    const said = header([], 0, true)
+    expect(said).not.toMatch(/verified/i)
+    expect(said).toContain('the ledger could not be read')
   })
 
   it('still counts body damage on its own, as it always did', () => {

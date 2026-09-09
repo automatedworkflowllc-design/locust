@@ -640,7 +640,16 @@ export function Thread({
               <div className="lc-card__body">
                 <p className="lc-ledgerfail__why">{ledgerFailureSentence(error)}</p>
                 <dl className="lc-ledgerfail">
-                  {ledgerFailureRows(restoredMission?.checkpoints?.length).map((row) => (
+                  {/*
+                    * Nothing written at all: no recovered record AND no events
+                    * on screen. A mid-run failure has events either way, and a
+                    * failure to CREATE the mission has neither -- which is the
+                    * case where "this mission can be reopened" is false.
+                    */}
+                  {ledgerFailureRows(
+                    restoredMission?.checkpoints?.length,
+                    restoredMission === undefined && events.length === 0
+                  ).map((row) => (
                     <Fragment key={row.label}>
                       <dt className={`lc-ledgerfail__label is-${row.tone}`}>{row.label}</dt>
                       <dd className="lc-ledgerfail__text">{row.text}</dd>
