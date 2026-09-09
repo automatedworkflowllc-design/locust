@@ -6,6 +6,51 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.53.0 - 2026-09-08
+
+- **Pressing `/` then down then enter no longer switches you into Auto.** The
+  command menu listed `/auto` second, so the two most ordinary keystrokes after
+  opening it landed on the one mode that lets a run change anything on this
+  machine. It is now last, in its own marked section, and arrow-down lands on
+  `/edit`. The menu is also attached to the message box instead of floating
+  above it, because it is completing what you are typing.
+- **A command's output no longer shouts over what your teammate said.** A
+  300-line output used to draw a tall scrolling box, inside the scrolling
+  conversation, above the two lines the teammate actually wrote. It now shows
+  the first eight lines and the last eight, with a button between them that
+  prints the rest, and one that copies all of it. The exit code moved to the
+  front of the command, because it is what tells you whether the output is
+  worth reading. A command that printed nothing says so on one line instead of
+  opening an empty box. And the fold's summary now names the command, so
+  `ran seq 1 300` is on screen without opening anything.
+- **The app no longer says a ledger is verified when it could not read it.**
+  Three separate ways it did. A mission whose record was damaged part-way
+  through was reported correctly; a record damaged in its header, or too large
+  to open, produced no mission at all, so nothing carried the damage and the
+  Missions screen said "ledger verified". Worse: if the ledger folder itself
+  could not be opened, the screen still said "verified" about a ledger it had
+  never read. It now says how many files could not be read, or that the ledger
+  could not be read at all.
+- **And the card shown when a record cannot be written no longer contradicts
+  itself.** It said the mission could not be created, then offered to reopen
+  it. Nothing had been written. Because the record is always written before a
+  runtime starts, that failure means nothing ran at all — which the card now
+  says, rather than warning you to go and check work that never happened.
+- **Attaching a file from outside the folder shows one thing, not three.** The
+  full-width notice above the message box is gone; the file's own tile now
+  carries "copied in", with the whole sentence on hover.
+- **A teammate set to "approve each action" no longer runs silently without
+  approvals.** Routines, room posts and relayed messages could not show the
+  approval cards, so they quietly ran read-only while the composer still said
+  approvals were on. All three now refuse and say why, before anything starts.
+- **"Up to 4 missions at once" is now actually 4.** Three separate limits of
+  four were counted separately, so twelve could run while every count on screen
+  said otherwise.
+- **A denied action says it was denied.** In per-action approvals, a request
+  Locust did not recognise — or one arriving while sixteen approvals were
+  already waiting — was refused with nothing said, so the run carried on as if
+  you had pressed Deny.
+
 ## 0.52.0 - 2026-09-08
 
 - **You can see what a command printed.** A teammate would run something, tell
