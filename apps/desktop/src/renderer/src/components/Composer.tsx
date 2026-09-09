@@ -1,7 +1,8 @@
 import mark from '../assets/locust-mark.svg'
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { ContextReading } from '../cost.js'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
+import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
 
 import type {
@@ -244,6 +245,27 @@ export function Composer({
   const [slashAt, setSlashAt] = useState(0)
   const [effortOpen, setEffortOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+
+  /*
+   * These three panels closed only by pressing their own control again,
+   * which is not how a menu behaves anywhere else in this app or on the
+   * machine. Reported by the first outside tester on 0.55.0: "you to click
+   * out of it you have to click the button again instead of just clicking
+   * anywhere on the page."
+   *
+   * The ref is on the ANCHOR, which holds the panel and the control that
+   * opens it, so a press on the control still toggles rather than being
+   * swallowed by the close.
+   */
+  const modeAnchor = useRef<HTMLSpanElement>(null)
+  const pickerAnchor = useRef<HTMLSpanElement>(null)
+  const effortAnchor = useRef<HTMLSpanElement>(null)
+  const closeMode = useCallback(() => setModeOpen(false), [])
+  const closePicker = useCallback(() => setPickerOpen(false), [])
+  const closeEffort = useCallback(() => setEffortOpen(false), [])
+  useDismissOnOutsidePress(modeOpen, closeMode, modeAnchor)
+  useDismissOnOutsidePress(pickerOpen, closePicker, pickerAnchor)
+  useDismissOnOutsidePress(effortOpen, closeEffort, effortAnchor)
 
   // A mode the chosen route cannot run is not the mode a mission would start
   // in, so it is not the mode the control shows either. Switching route used
@@ -714,7 +736,7 @@ export function Composer({
           </div>
           <div className="lc-composer__controls">
             <div className="lc-composer__group">
-              <span className="lc-control__anchor">
+              <span className="lc-control__anchor" ref={modeAnchor}>
                 {modeOpen && (
                   <div className="lc-menu" role="menu" aria-label="Permission mode">
                     {MODES.map((option) => {
@@ -852,7 +874,7 @@ export function Composer({
               </button>
             </div>
             <div className="lc-composer__group">
-              <span className="lc-control__anchor">
+              <span className="lc-control__anchor" ref={pickerAnchor}>
                 {pickerOpen && (
                   <RoutePicker
                     runtimes={runtimes}
@@ -942,7 +964,7 @@ export function Composer({
                 * choice that does not exist.
                 */}
               {shownEffort !== undefined && supportedEfforts.length > 0 && (
-                <span className="lc-control__anchor">
+                <span className="lc-control__anchor" ref={effortAnchor}>
                   {effortOpen && (
                     /*
                       * A SLIDER and a switch, not a list.
