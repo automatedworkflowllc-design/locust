@@ -571,7 +571,7 @@ textarea {
   align-items: center;
   gap: var(--lc-space-2);
   padding: 3px 8px;
-  border: 1px solid var(--lc-border);
+  border: 1px solid var(--lc-border-control);
   border-radius: 999px;
   background: transparent;
   color: var(--lc-text-muted);
@@ -1063,7 +1063,7 @@ textarea {
 .lc-filerow__notice {
   margin: 0;
   padding: var(--lc-space-4) var(--lc-space-5);
-  font-size: var(--lc-text-caption);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
@@ -2773,7 +2773,7 @@ textarea {
  * 2026-09-08). Quiet, like every other statement of fact in this app.
  */
 .lc-notice.is-plain {
-  border-color: var(--lc-border);
+  border-color: var(--lc-border-card);
   background: transparent;
   color: var(--lc-text-muted);
 }
@@ -4619,7 +4619,7 @@ textarea {
   gap: var(--lc-space-2);
   max-width: 260px;
   padding: 4px 8px;
-  border: 1px solid var(--lc-border);
+  border: 1px solid var(--lc-border-control);
   border-radius: var(--lc-radius-control);
   background: var(--lc-bg-raised-2);
   color: var(--lc-text-secondary);
@@ -4653,7 +4653,7 @@ textarea {
   flex: 0 0 auto;
   margin-left: 2px;
   padding-left: var(--lc-space-2);
-  border-left: 1px solid var(--lc-border);
+  border-left: 1px solid var(--lc-border-control);
   color: var(--lc-text-muted);
   white-space: nowrap;
 }
@@ -6765,7 +6765,7 @@ textarea {
   margin: 0;
   padding: var(--lc-space-4) var(--lc-space-5);
   border-top: 1px solid var(--lc-border-hairline);
-  font-size: var(--lc-text-caption);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
@@ -7029,7 +7029,7 @@ textarea {
 
 .lc-effortpanel__what {
   margin: 0;
-  font-size: var(--lc-text-caption);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
@@ -7377,4 +7377,96 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   overflow-wrap: anywhere;
+}
+
+/* --- A question, answered ------------------------------------------------ */
+
+/*
+ * The runtime asked something, so the card offers the options it sent rather
+ * than Approve / Always / Deny. An option's LABEL is its identity on the wire,
+ * so the label is what is drawn and what is sent.
+ */
+.lc-questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-5);
+  padding: var(--lc-space-4) var(--lc-space-5) 0;
+}
+
+.lc-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
+.lc-question__header {
+  margin: 0;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lc-question__text {
+  margin: 0;
+  font-size: var(--lc-text-body);
+  color: var(--lc-text-primary);
+  text-wrap: pretty;
+}
+
+.lc-question__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-question__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised-2);
+  color: var(--lc-text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-question__option:hover {
+  border-color: var(--lc-border-strong);
+  color: var(--lc-text-primary);
+}
+
+.lc-question__option.is-chosen {
+  border-color: var(--lc-green);
+  background: var(--lc-green-tint);
+  color: var(--lc-text-primary);
+}
+
+.lc-question__option:focus-visible,
+.lc-question__free:focus-visible {
+  outline: 2px solid var(--lc-green);
+  outline-offset: 2px;
+}
+
+.lc-question__label {
+  font-size: var(--lc-text-body);
+}
+
+.lc-question__desc {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
+.lc-question__free {
+  width: 100%;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font: inherit;
+  font-size: var(--lc-text-body);
 }

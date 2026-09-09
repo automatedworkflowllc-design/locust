@@ -1,10 +1,117 @@
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
+import type { MissionApprovalDecision, MissionApprovalRequest, MissionQuestion } from '../../../shared/ipc.js'
 import { dataSentLine } from '../../../shared/approval-data.js'
 import { Icon } from './Icon.js'
 import { DiffView } from './DiffView.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
+
+
+/**
+ * A question, answered rather than authorized.
+ *
+ * The protocol files answers under each question's OWN id, and identifies a
+ * chosen option by its LITERAL LABEL -- options carry no id and no index, and
+ * the server matches the strings it gets back against the labels it sent. So
+ * the label is what travels, and sending "3" for the third option answers with
+ * the string "3".
+ *
+ * There is deliberately no "Always allow this session" here. The server has no
+ * session-grant field for a question; offering one promised something the
+ * protocol has no way to mean.
+ */
+function QuestionForm({
+  questions,
+  onAnswer,
+  busy
+}: {
+  readonly questions: readonly MissionQuestion[]
+  readonly onAnswer: (answers: Readonly<Record<string, readonly string[]>>) => void
+  readonly busy: boolean
+}): ReactElement {
+  const [chosen, setChosen] = useState<Readonly<Record<string, string>>>({})
+  const [typed, setTyped] = useState<Readonly<Record<string, string>>>({})
+
+  const answersFor = (question: MissionQuestion): readonly string[] => {
+    const values: string[] = []
+    const pick = chosen[question.id]
+    if (pick !== undefined) values.push(pick)
+    const free = (typed[question.id] ?? '').trim()
+    if (free.length > 0) values.push(free)
+    return values
+  }
+  // Every question, or none: a partial answer is a question silently dropped,
+  // and the model is told nothing rather than told less.
+  const ready = questions.every((question) => answersFor(question).length > 0)
+
+  return (
+    <div className="lc-questions">
+      {questions.map((question) => (
+        <div key={question.id} className="lc-question">
+          {question.header !== null && question.header.length > 0 && (
+            <p className="lc-question__header lc-mono">{question.header}</p>
+          )}
+          <p className="lc-question__text">{question.question}</p>
+          {question.options.length > 0 && (
+            <div className="lc-question__options" role="radiogroup" aria-label={question.question}>
+              {question.options.map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={chosen[question.id] === option.label}
+                  className={`lc-question__option${chosen[question.id] === option.label ? ' is-chosen' : ''}`}
+                  disabled={busy}
+                  onClick={() => setChosen((current) => ({ ...current, [question.id]: option.label }))}
+                >
+                  <span className="lc-question__label">{option.label}</span>
+                  {option.description !== null && option.description.length > 0 && (
+                    <span className="lc-question__desc">{option.description}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Free text where the question takes it: no options at all, or
+              `isOther`, which is the protocol saying an unlisted answer is
+              allowed. A secret answer is never echoed to the screen. */}
+          {(question.options.length === 0 || question.isOther) && (
+            <input
+              className="lc-question__free"
+              type={question.isSecret ? 'password' : 'text'}
+              value={typed[question.id] ?? ''}
+              disabled={busy}
+              aria-label={question.options.length === 0 ? question.question : 'Something else'}
+              placeholder={question.options.length === 0 ? 'Your answer' : 'Something else…'}
+              onChange={(event) => setTyped((current) => ({ ...current, [question.id]: event.target.value }))}
+            />
+          )}
+        </div>
+      ))}
+      <div className="lc-approval__actions">
+        <button
+          type="button"
+          className="lc-primarybutton"
+          disabled={busy || !ready}
+          onClick={() => {
+            const answers: Record<string, readonly string[]> = {}
+            for (const question of questions) answers[question.id] = answersFor(question)
+            onAnswer(answers)
+          }}
+        >
+          {questions.length > 1 ? 'Send answers' : 'Send answer'}
+        </button>
+      </div>
+      <p className="lc-approval__note">
+        {/* No "Always": a question has no session grant in the protocol, and a
+            button that cannot mean what it says is worse than one fewer. */}
+        This goes back to the runtime as your answer. Stop the run below if you
+        would rather not answer.
+      </p>
+    </div>
+  )
+}
 
 /**
  * The approval card.
@@ -18,13 +125,25 @@ import { fileCounts, parseUnifiedDiff } from '../diff.js'
 export function ApprovalCard({
   request,
   onDecide,
+  onAnswer,
   busy
 }: {
   readonly request: MissionApprovalRequest
   readonly onDecide: (decision: MissionApprovalDecision) => void
+  /**
+   * Answer a QUESTION, keyed by question id.
+   *
+   * Separate from `onDecide` because the two are different acts with different
+   * payloads: an action is authorized, a question is answered. Sending a
+   * decision for a question is what discarded the person's reply -- the server
+   * cannot deserialize it, so it substituted an empty answer and told the model
+   * they had said nothing.
+   */
+  readonly onAnswer: (answers: Readonly<Record<string, readonly string[]>>) => void
   readonly busy: boolean
 }): ReactElement {
   const isQuestion = request.kind === 'question'
+  const questions = request.questions ?? []
   // The change itself, when Codex sent it with the item (parity row 32).
   // Drawn with the same viewer the activity fold uses, so an approval and
   // its record read the same.
@@ -133,29 +252,46 @@ export function ApprovalCard({
         </div>
       )}
 
-      <div className="lc-approval__actions">
-        <button
-          type="button"
-          className="lc-primarybutton"
-          disabled={busy}
-          onClick={() => onDecide('approve-once')}
-        >
-          {isQuestion ? 'Allow once' : 'Approve once'}
-        </button>
-        <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => onDecide('approve-always')}>
-          Always allow this session
-        </button>
-        <button type="button" className="lc-denybutton" disabled={busy} onClick={() => onDecide('deny')}>
-          Deny
-        </button>
-      </div>
-      <p className="lc-approval__note">
-        {/*
-          "Always" is scoped to this session on purpose, and says so. A grant
-          that outlives the run is a Settings decision, not one to take here.
+      {/*
+        * A question is ANSWERED; an action is authorized. They were the same
+        * three buttons, and for a question all three were malformed -- the
+        * server could not deserialize a decision as an answer, so it logged the
+        * failure, substituted an empty answer map, and told the model the
+        * person had said nothing. Whatever they picked went nowhere.
+        *
+        * `questions` is present only when the request carried them, so a
+        * question this build cannot read still falls through to the
+        * authorization controls rather than drawing a form with no fields.
         */}
-        Nothing has happened yet. “Always” lasts until this mission ends.
-      </p>
+      {isQuestion && questions.length > 0 ? (
+        <QuestionForm questions={questions} onAnswer={onAnswer} busy={busy} />
+      ) : (
+        <>
+          <div className="lc-approval__actions">
+            <button
+              type="button"
+              className="lc-primarybutton"
+              disabled={busy}
+              onClick={() => onDecide('approve-once')}
+            >
+              {isQuestion ? 'Allow once' : 'Approve once'}
+            </button>
+            <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => onDecide('approve-always')}>
+              Always allow this session
+            </button>
+            <button type="button" className="lc-denybutton" disabled={busy} onClick={() => onDecide('deny')}>
+              Deny
+            </button>
+          </div>
+          <p className="lc-approval__note">
+            {/*
+              "Always" is scoped to this session on purpose, and says so. A grant
+              that outlives the run is a Settings decision, not one to take here.
+            */}
+            Nothing has happened yet. “Always” lasts until this mission ends.
+          </p>
+        </>
+      )}
     </div>
   )
 }

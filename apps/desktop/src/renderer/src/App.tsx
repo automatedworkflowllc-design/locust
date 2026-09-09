@@ -17,6 +17,7 @@ import type {
   AppUpdateState,
   MissionApprovalDecision,
   MissionApprovalRequest,
+  MissionApprovalAnswer,
   MissionHistoryResponse,
   MissionMode,
   PublicModel,
@@ -1493,12 +1494,19 @@ export default function App(): ReactElement {
     }
   }, [])
 
-  const decideApproval = (approvalId: string, decision: MissionApprovalDecision): void => {
+  /**
+   * Send one reply to a pending request, whichever kind it is.
+   *
+   * An authorization and an answer travel the same channel and need the same
+   * care -- the card only goes when the reply was DELIVERED -- so they share
+   * this and differ only in what they carry.
+   */
+  const replyToApproval = (approvalId: string, reply: Omit<MissionApprovalAnswer, 'approvalId'>): void => {
     const bridge = window.desktop
     if (bridge === undefined) return
     setDecidingIds((current) => [...current, approvalId])
     void bridge
-      .decideMissionApproval({ approvalId, decision })
+      .decideMissionApproval({ approvalId, ...reply } as MissionApprovalAnswer)
       .then((response) => {
         // The card goes when the answer was DELIVERED. It used to go whatever
         // happened, so a rejected call left the person believing they had
@@ -1514,6 +1522,13 @@ export default function App(): ReactElement {
         setDecidingIds((current) => current.filter((entry) => entry !== approvalId))
       })
   }
+
+  const decideApproval = (approvalId: string, decision: MissionApprovalDecision): void =>
+    replyToApproval(approvalId, { decision })
+
+  /** A question's answers, keyed by question id. Never a decision -- see the card. */
+  const answerQuestion = (approvalId: string, answers: Readonly<Record<string, readonly string[]>>): void =>
+    replyToApproval(approvalId, { answers })
 
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent): void => {
@@ -3217,6 +3232,7 @@ export default function App(): ReactElement {
                 {...(ledgerPath === undefined ? {} : { ledgerPath })}
                 approvals={shownApprovals}
                 onDecide={decideApproval}
+                onAnswerQuestion={answerQuestion}
                 decidingIds={decidingIds}
                 cancelled={liveRun.phase === 'cancelled'}
                 handoff={liveRun.handoff}

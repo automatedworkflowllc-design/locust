@@ -341,6 +341,9 @@ export interface ThreadProps {
   /** Approvals waiting on the user, oldest first. */
   readonly approvals: readonly MissionApprovalRequest[]
   readonly onDecide: (approvalId: string, decision: MissionApprovalDecision) => void
+  /** A QUESTION's answers, keyed by question id. Distinct from `onAnswer`, which
+   *  answers a decision block in the transcript -- different surface, different act. */
+  readonly onAnswerQuestion: (approvalId: string, answers: Readonly<Record<string, readonly string[]>>) => void
   readonly decidingIds: readonly string[]
   /** True once the run has been stopped by the user. */
   readonly cancelled: boolean
@@ -397,6 +400,7 @@ export function Thread({
   startedAtIso,
   approvals,
   onDecide,
+  onAnswerQuestion,
   decidingIds,
   cancelled,
   handoff,
@@ -623,6 +627,7 @@ export function Thread({
             request={request}
             busy={decidingIds.includes(request.approvalId)}
             onDecide={(decision) => onDecide(request.approvalId, decision)}
+            onAnswer={(answers) => onAnswerQuestion(request.approvalId, answers)}
           />
         ))}
 
