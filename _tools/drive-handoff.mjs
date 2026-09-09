@@ -73,9 +73,11 @@ try {
       // run could be plainly live with the condition still false. Two signals
       // ANDed together is one more way to miss the state you are waiting for.
       //
-      // No backticks in this comment: it sits inside a template literal and
-      // one would end it. That is what happened on the first attempt, and
-      // node --check does not catch it because the file still parses.
+      // No backticks in this comment: it sits inside a template literal, so
+      // one would END the literal here. That is what happened on the first
+      // attempt. node --check cannot catch it -- the file still parses --
+      // which is why harness-backticks.test.ts now scans for it instead of
+      // this note asking the next author to remember.
       if (document.querySelector('button[aria-label^="Stop the running"]')) live = true
     }
     if (!live) return 'NOT A HANDOFF TEST: no run was live within 30s'
