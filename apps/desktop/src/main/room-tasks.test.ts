@@ -126,4 +126,55 @@ describe('when the last teammate in a room answers', () => {
       expect(notices).toEqual([])
     }
   })
+
+  /*
+   * A post starts at most MAX_LIVE_MISSIONS runs, so a room with more
+   * members than that has members who never ran -- absent from
+   * post.missions, and drawn on screen as "did not start".
+   *
+   * The check walked post.missions, which is who STARTED, so those members
+   * were never looked at and a six-member room whose four runs finished was
+   * told "Everyone in Standup has answered." The same slot carries the
+   * host's line naming who could not start, so the false claim replaced the
+   * true one. Seen driving a six-member room on 2026-09-09.
+   */
+  function partly() {
+    const notices: CodexMissionUpdate[] = []
+    const big: PublicRoom = {
+      ...room(),
+      // Six members, four started: exactly what the live cap produces.
+      teammateIds: ['tm_wren', 'tm_booty', 'tm_gem', 'tm_fen', 'tm_otto', 'tm_pike'],
+      posts: [
+        {
+          postId: 'post_1',
+          text: 'Get the release out',
+          at: NOW,
+          missions: { tm_wren: 'mission_w', tm_booty: 'mission_b', tm_gem: 'mission_g', tm_fen: 'mission_f' }
+        }
+      ]
+    }
+    const tasks = createRoomTasks({
+      rooms: { list: async () => [big], applyTaskOps: async () => ({ changed: [], refused: [] }) },
+      ledger: {
+        getMission: async (missionId) => {
+          if (missionId === 'mission_w') return replied('All done here.')
+          if (['mission_b', 'mission_g', 'mission_f'].includes(missionId)) return { ...replied('x'), phase: 'completed' } as never
+          return undefined
+        }
+      },
+      teammates: { list: async () => [WREN, BOOTY] },
+      notify: (update) => notices.push(update)
+    })
+    return { tasks, notices }
+  }
+
+  it('does not call four of six everyone', async () => {
+    const { tasks, notices } = partly()
+    await tasks.onRunEnded({ missionId: 'mission_w' })
+    // The control: something IS said, so this cannot pass by silence.
+    expect(notices).toHaveLength(1)
+    const message = (notices[0] as { message: string }).message
+    expect(message).not.toContain('Everyone')
+    expect(message).toBe('4 of 6 in Release answered; 2 never started.')
+  })
 })

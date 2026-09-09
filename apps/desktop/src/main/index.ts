@@ -23,6 +23,7 @@ import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
 import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
+import { readNpmBinDirectory } from './npm-prefix.js'
 import { createModelCatalog } from './model-catalog.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
@@ -139,9 +140,25 @@ import { decideRoutineRecovery } from './routine-recovery-ipc.js'
 const probeRunner = createNodeProbeRunner()
 // `LOCUST_HIDE_RUNTIMES=1` is a test seam: the first-run drive needs a
 // machine with nothing installed, and this one has everything.
+/*
+ * npm's REAL prefix, asked once, so a runtime installed into a moved one is
+ * findable.
+ *
+ * The locator's install-root table names npm's default prefix; a machine that
+ * has run `npm config set prefix` -- corporate Windows, any nvm-style manager,
+ * or anyone who followed the remedy LOCUST ITSELF prints on an EACCES failure
+ * -- puts its shims somewhere else entirely. Discovery then reports "not
+ * installed" for something the person has just installed, which is the worst
+ * possible answer because it sends them to install it again.
+ *
+ * Resolved before the locator is built and passed in, so the search order
+ * stays PATH first. A machine with no npm answers undefined and nothing
+ * changes. See `npm-prefix.ts`.
+ */
+const npmBinDirectory = await readNpmBinDirectory()
 const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
   ? { find: async () => undefined }
-  : createPathExecutableLocator()
+  : createPathExecutableLocator(npmBinDirectory === undefined ? {} : { npmBinDirectory })
 // Antigravity has no CLI probe: its readiness is whether the app is open,
 // which the host checks itself and merges into the same sweep.
 const antigravityProbe = createAntigravityHostProbe()

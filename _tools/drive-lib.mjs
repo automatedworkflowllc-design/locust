@@ -32,14 +32,28 @@ export const git = (args, cwd) => new Promise((resolve, reject) => {
   execFile('git', args, { cwd, windowsHide: true }, (error, stdout) => (error ? reject(error) : resolve(stdout)))
 })
 
-/** A scratch git repository with a README and a LOCUST.md, committed. */
-export async function scratchRepository(prefix = 'locust-drive-ws-') {
+/**
+ * A scratch git repository with a README and a LOCUST.md, committed.
+ *
+ * `brief` is that LOCUST.md, and Locust carries it to EVERY teammate started
+ * in this folder -- it is not decoration. The default asks for one
+ * paragraph, which keeps most drives' output small and readable.
+ *
+ * A drive whose whole point is long output has to pass its own, because the
+ * default actively fights it. The cap probe asked eight teammates to count
+ * to 250 and watched them answer "Your 1-to-250 count conflicts with the
+ * one-paragraph rule -- checking the workspace before I answer" instead
+ * (2026-09-09). The runs completed and the numbers looked fine, but they
+ * measured deliberation rather than the throughput they were meant to
+ * measure. A fixture that argues with the prompt is a silent confound.
+ */
+export async function scratchRepository(prefix = 'locust-drive-ws-', brief = 'Keep answers to one paragraph.\n') {
   const workspace = await mkdtemp(join(tmpdir(), prefix))
   await git(['init', '-q', '-b', 'main'], workspace)
   await git(['config', 'user.email', 'drive@locust.test'], workspace)
   await git(['config', 'user.name', 'Locust drive'], workspace)
   await writeFile(join(workspace, 'README.md'), '# scratch\n\nA scratch project for a user session.\n', 'utf8')
-  await writeFile(join(workspace, 'LOCUST.md'), 'Keep answers to one paragraph.\n', 'utf8')
+  await writeFile(join(workspace, 'LOCUST.md'), brief, 'utf8')
   await git(['add', '.'], workspace)
   await git(['commit', '-q', '-m', 'first'], workspace)
   return workspace
@@ -72,7 +86,7 @@ export function assertMaySpend(name) {
   process.exit(1)
 }
 
-export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false }) {
+export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false, packaged }) {
   if (spends) assertMaySpend(name)
   try {
     const already = await fetch(`http://127.0.0.1:${String(port)}/json/list`, { signal: AbortSignal.timeout(1500) })
@@ -116,7 +130,21 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   for (const [file, content] of Object.entries(files)) {
     await writeFile(join(profile, file), typeof content === 'string' ? content : JSON.stringify(content), 'utf8')
   }
-  const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`], {
+  /*
+   * The dev build by default, the PACKAGED binary when asked.
+   *
+   * `app.isPackaged` is false under `electron .`, so the version line, the
+   * window title and the update section all read differently from what a
+   * person who ran the installer sees. A drive that walks the ordinary path
+   * has to walk it through the same bytes the installer lays down, or it is
+   * reading a screen nobody has.
+   *
+   * Same profile handling, same capture machinery, same everything else --
+   * only the argv differs, because the packaged exe IS the app and takes no
+   * directory argument.
+   */
+  const launch = packaged === undefined ? [ELECTRON, [APP_DIR]] : [packaged, []]
+  const child = spawn(launch[0], [...launch[1], `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`], {
     cwd: workspace,
     env: { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}`, ...env },
     stdio: ['ignore', 'pipe', 'pipe']
@@ -271,7 +299,22 @@ export function pickRouteScript({ group, search, row }) {
     const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
     if (!control) return 'no route control'
     if (control.disabled) return 'route control disabled'
-    control.click()
+    /*
+     * Open it only if it is CLOSED. This used to click unconditionally, which
+     * on an already-open picker closes it -- and the selection then does not
+     * apply, while the helper still returns its success line naming whatever
+     * route was there before.
+     *
+     * Measured 2026-09-09, both builds: called as the first thing to touch the
+     * picker it moves the chip Codex -> OpenCode -> Cursor first try; called
+     * after anything else had opened the picker, it reported success and left
+     * the chip untouched. That difference cost two walkthroughs and a false
+     * alarm about sixty drives being in doubt -- they were not, because they
+     * all happen to call this first.
+     *
+     * One line, so no drive has to know that rule.
+     */
+    if (!document.querySelector('.lc-picker')) control.click()
     let target
     let notice = null
     for (let attempt = 0; attempt < 60 && !target; attempt += 1) {

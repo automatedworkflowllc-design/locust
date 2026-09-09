@@ -6,6 +6,69 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.54.1 - 2026-09-09
+
+- **Two buttons on every teammate card were drawn on top of each other.** In a
+  teammate's Routines list, "Run" and "Edit" occupied the same box and read as
+  one unusable control, and the line under them was squeezed until the routine's
+  next run time was cut off. The name and schedule now have their own line and
+  the three buttons sit under them.
+- **Locust now finds a runtime you installed into a moved npm folder.** If npm
+  has been pointed somewhere other than its default — common on work machines,
+  with any Node version manager, and the exact fix Locust itself suggests when
+  an install fails on permissions — then the install worked and Locust reported
+  the runtime as missing anyway, sending you to install something you had just
+  installed.
+- **The model list no longer says a model does not exist while it is still
+  loading.** Opening the runtime picker and typing in the first seconds after
+  launch answered "Nothing matches that", which is a claim about your search
+  rather than about the list. It now says it is still reading the list.
+
+## 0.54.0 - 2026-09-09
+
+- **When Codex asks you a question, your answer now reaches it.** In
+  "Approve each action", a question from the runtime was drawn with the same
+  Approve / Always / Deny buttons as a command — and all three were the wrong
+  kind of reply. Codex could not read any of them as an answer, so it recorded
+  an empty one and told the model you had said nothing, whichever button you
+  pressed. Questions now show what was actually asked, with the options the
+  runtime offered, a box for anything else where it allows one, and a hidden
+  field where the answer is sensitive. "Always allow this session" is gone from
+  questions: there is no such thing for a question, so the button could never
+  have meant what it said.
+  This is built to Codex's published description of the exchange and tested
+  against it, but **it has not yet been seen working against a live question.**
+- **A plan is now the answer it is, rather than a card about a run that never
+  happened.** In Plan mode the steps are the whole reply, and they were drawn
+  in a bordered box with a PLAN label, a "0 of 5 done" counter and one grey dot
+  per step — which read as a run stalled at step one. They are now numbered and
+  set at reading size, where your teammate's replies appear, with one line
+  saying that Plan mode changed nothing and how to have it done for real. The
+  plan shown inside a finished run's activity is unchanged, because there the
+  steps really do have outcomes.
+- **Locust no longer warns that a healthy ledger is damaged.** 0.53.0 added a
+  warning for records that could not be read; it counted any older mission that
+  had scrolled out of the recent list as unreadable, so a perfectly good ledger
+  could report "20 local · 1 file could not be read". A warning is only worth
+  having if it is rare enough to believe.
+- **And that warning now stays right after you delete missions.** Three places
+  re-read your history and only one of them updated the damage state, so
+  clearing out old missions could leave a warning on screen that no longer
+  matched anything.
+- **A command that printed nothing says so.** The case was added in 0.53.0 and
+  could not actually be reached: "the runtime reported no output" and "the
+  runtime reports output but there was none" had been collapsed into the same
+  thing.
+- **A failed command's last lines are easier to find.** When a command exits
+  non-zero, the end of its output — where the error almost always is — is drawn
+  brighter than the rest.
+- **The one-line summary of a turn names the command it ran**, so `ran seq 1
+  300` is on screen without opening anything, instead of "1 tool call".
+- **Several borders were heavier than intended** — the attachment tile, the
+  "copied in" mark, the file chip on a sent message and plain notices — because
+  they named a colour that does not exist and quietly fell back to the text
+  colour.
+
 ## 0.53.0 - 2026-09-08
 
 - **Pressing `/` then down then enter no longer switches you into Auto.** The

@@ -132,13 +132,45 @@ try {
     return (document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? 'no header')
   })()`))
   await drive.capture('let it finish, then the Team card', () => drive.evaluate(`(async () => {
-    for (let i = 0; i < 480; i += 1) {
-      await new Promise(r => setTimeout(r, 500))
-      if (!document.querySelector('button[aria-label^="Stop the running"]')) break
-    }
+    /*
+     * Wait for the run to START, and only then for it to end.
+     *
+     * This used to break the moment no Stop button was present -- which is
+     * also true before the routine has spawned anything, so on 2026-09-09 it
+     * exited after 500ms and captured the card mid-run. Every reading this
+     * step has ever produced said "in progress - 0 completed runs", and that
+     * was the drive's own impatience rather than the app's state: the sidebar
+     * in the same capture read "1 running" with the teammate "working".
+     *
+     * Which means the finished card -- the one that should say a completed run
+     * happened -- had never once been looked at.
+     *
+     * Same shape as a wait for "rows > 1" that the placeholder rows satisfy:
+     * an exit condition true of the state you are waiting to leave.
+     */
+    /*
+     * Poll the ROUTINE ROW until it settles, which is the thing being asked
+     * about.
+     *
+     * Two earlier versions both watched the Stop button and both were wrong in
+     * opposite directions. Breaking as soon as it is absent exits before the
+     * run has spawned, and captures "in progress" -- that is what every prior
+     * reading of this step was. Waiting for it to appear first then times out,
+     * because by the time this step runs the earlier steps have already let
+     * the run start AND finish.
+     *
+     * The state of the button is not the question. Whether the routine's own
+     * card stops saying "in progress" is, so that is what is polled -- true
+     * whether the run finished a moment ago or is still going.
+     */
     document.querySelector('button[title="Team (Ctrl 2)"]').click()
     await new Promise(r => setTimeout(r, 700))
-    return [...document.querySelectorAll('.lc-routinerow')].map(r => r.innerText.replace(/\\s+/g, ' ')).join(' | ')
+    const rowText = () => [...document.querySelectorAll('.lc-routinerow')].map(r => r.innerText.replace(/\\s+/g, ' ')).join(' | ')
+    for (let i = 0; i < 240; i += 1) {
+      if (!/in progress/i.test(rowText())) break
+      await new Promise(r => setTimeout(r, 500))
+    }
+    return rowText()
   })()`))
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

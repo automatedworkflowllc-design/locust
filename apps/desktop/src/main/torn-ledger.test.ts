@@ -257,9 +257,26 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     expect(html).not.toContain('ledger verified')
   })
 
-  // New characterization, not one of the five repaired cases: absence from
-  // the limited page is incorrectly treated as failure to recover a file.
-  it('KNOWN DEFECT — history limit mislabels an older recoverable receipt as unreadable', async () => {
+  /*
+   * FIXED. This was Astra's KNOWN DEFECT and it is now the regression test.
+   *
+   * Absence from the limited page is not failure to recover. The count used to
+   * ask which issue ids were missing from `snapshot.missions`, which is right
+   * only if that list is every mission the reader recovered -- and it is a
+   * PAGE. So an older mission that recovered its safe prefix perfectly and
+   * merely fell outside the twenty newest was reported as a file that could
+   * not be read: `20 local · 1 file could not be read`, over a ledger with
+   * nothing wrong in it.
+   *
+   * The count now comes from `MissionLedgerSnapshot.unreadableCount`, computed
+   * inside the reader from its parse results BEFORE any slicing -- the one
+   * place where whether a file produced a mission is actually known.
+   *
+   * Their harness caught this on my fix for their previous finding, and the
+   * expectations below are flipped exactly as their report said a future fix
+   * should flip them.
+   */
+  it('does not call an older recoverable receipt unreadable when it falls off the page', async () => {
     const { ledger, root } = await file(prefix + '{broken\n')
     // The older damaged BODY is readable. Twenty newer clean missions put it
     // outside readMissionHistory's returned page, not outside recovery itself.
@@ -278,9 +295,11 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     if (!response.ok) throw new Error('Paged history unexpectedly unavailable')
     expect(response.data.missions).toHaveLength(20)
     expect(response.data.missions.every((mission) => mission.integrityIssueCount === 0)).toBe(true)
-    // Desired zero went red (received one) against pinned main. Leave the
-    // production fix to its owner; keep the observed false wording explicit.
-    expect(response.data.unreadableCount).toBe(1)
-    expect(renderHistory(response)).toContain('20 local, 0 in this folder · 1 file could not be read')
+    // Nothing failed to recover, so nothing is unreadable -- the assertion
+    // Astra's report named as the one a fix should make true.
+    expect(response.data.unreadableCount).toBe(0)
+    const said = renderHistory(response)
+    expect(said).not.toContain('could not be read')
+    expect(said).toContain('ledger verified')
   })
 })

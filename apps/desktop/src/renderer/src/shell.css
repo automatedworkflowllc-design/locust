@@ -335,30 +335,6 @@ textarea {
   min-width: 0;
 }
 
-.lc-tone-lime {
-  color: var(--lc-lime-text);
-}
-
-.lc-tone-green {
-  color: var(--lc-green-text);
-}
-
-.lc-tone-amber {
-  color: var(--lc-amber-text);
-}
-
-.lc-tone-red {
-  color: var(--lc-red-text);
-}
-
-.lc-tone-blue {
-  color: var(--lc-blue-text);
-}
-
-.lc-tone-muted {
-  color: var(--lc-text-muted);
-}
-
 .lc-dot {
   width: 6px;
   height: 6px;
@@ -571,7 +547,7 @@ textarea {
   align-items: center;
   gap: var(--lc-space-2);
   padding: 3px 8px;
-  border: 1px solid var(--lc-border);
+  border: 1px solid var(--lc-border-control);
   border-radius: 999px;
   background: transparent;
   color: var(--lc-text-muted);
@@ -1063,7 +1039,7 @@ textarea {
 .lc-filerow__notice {
   margin: 0;
   padding: var(--lc-space-4) var(--lc-space-5);
-  font-size: var(--lc-text-caption);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
@@ -2773,7 +2749,7 @@ textarea {
  * 2026-09-08). Quiet, like every other statement of fact in this app.
  */
 .lc-notice.is-plain {
-  border-color: var(--lc-border);
+  border-color: var(--lc-border-card);
   background: transparent;
   color: var(--lc-text-muted);
 }
@@ -3331,6 +3307,62 @@ textarea {
 .lc-plan__step.is-running {
   color: var(--lc-text-primary);
   font-weight: 500;
+}
+
+/*
+ * A plan that IS the answer: ordinals, reading size, no box.
+ *
+ * The list inside a fold keeps its markers and its meta size, because a run
+ * happened there and the steps have outcomes. This one has none -- a
+ * Plan-mode turn attempts nothing by contract -- so a dot, which means "not
+ * done yet", would state a false thing once per step. An ordinal states the
+ * true one: order, which is the whole content of a plan.
+ */
+.lc-plan.is-answer {
+  padding: 0;
+  gap: var(--lc-space-3);
+  margin: var(--lc-space-3) 0 0;
+}
+
+.lc-plan.is-answer .lc-plan__step {
+  /* Baseline, not flex-start: the ordinal has to sit on the FIRST line of a
+     step that wraps to a paragraph, not float above it. */
+  align-items: baseline;
+  gap: var(--lc-space-3);
+  font-size: var(--lc-text-body);
+  color: var(--lc-text-primary);
+}
+
+.lc-plan__ordinal {
+  flex: 0 0 18px;
+  text-align: right;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  /* Copying the plan yields the steps, not the numbering. */
+  user-select: none;
+}
+
+/* Past nine steps the ordinals gain a digit, so the gutter widens and the text
+   column stays flush rather than stepping right at step ten. */
+.lc-plan.is-answer.is-wide .lc-plan__ordinal {
+  flex-basis: 24px;
+}
+
+/*
+ * Why nothing changed, in the standing register.
+ *
+ * A fact about the turn that just happened -- the same class the trace line
+ * carries -- not a promise about a future action. It names the mode as the
+ * cause and points at the composer, which is the affordance that already
+ * exists.
+ */
+.lc-planmode {
+  margin: var(--lc-space-4) 0 0;
+  padding-left: var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-card);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
 }
 
 .lc-plan__step.is-done {
@@ -4142,11 +4174,6 @@ textarea {
   white-space: pre;
 }
 
-/* Declared after .lc-runtimerow__detail on purpose: same specificity, later wins. */
-.lc-runtimerow__usage.lc-tone-amber {
-  color: var(--lc-amber-text);
-}
-
 .lc-control.is-pressing::after {
   content: '';
   width: 5px;
@@ -4421,6 +4448,19 @@ textarea {
   background: var(--lc-bg-raised-2);
 }
 
+/*
+ * The half of a failed command's output that answers the question.
+ *
+ * A vitest failure puts the assertion, the file and the counts in its last six
+ * lines. Drawn in the same muted grey as 300 lines of `seq` output, they are
+ * work to find; this is the whole reason both ends are kept.
+ *
+ * Failure only. Emphasising every tail would make the emphasis mean nothing.
+ */
+.lc-shellout__text.is-answer {
+  color: var(--lc-text-primary);
+}
+
 .lc-shellout__text {
   margin: 0;
   font-family: var(--lc-font-mono);
@@ -4550,7 +4590,7 @@ textarea {
   gap: var(--lc-space-2);
   max-width: 260px;
   padding: 4px 8px;
-  border: 1px solid var(--lc-border);
+  border: 1px solid var(--lc-border-control);
   border-radius: var(--lc-radius-control);
   background: var(--lc-bg-raised-2);
   color: var(--lc-text-secondary);
@@ -4584,7 +4624,7 @@ textarea {
   flex: 0 0 auto;
   margin-left: 2px;
   padding-left: var(--lc-space-2);
-  border-left: 1px solid var(--lc-border);
+  border-left: 1px solid var(--lc-border-control);
   color: var(--lc-text-muted);
   white-space: nowrap;
 }
@@ -4723,20 +4763,6 @@ textarea {
   color: var(--lc-text-muted);
   line-height: 1.4;
   text-wrap: pretty;
-}
-
-/*
- * Auto is the one consequence stated in a colour, in both menus that state it.
- *
- * The tone classes sit at the top of this file and the descriptions set their
- * own colour further down, at the same specificity -- so `lc-tone-amber` lost
- * the cascade and Auto has read plain grey since the 0906 review asked for
- * amber. Measured on 2026-09-08: computed rgb(139,145,144), not #efc969. This
- * rule sits after both descriptions so the tone wins where it is asked for.
- */
-.lc-menu__desc.lc-tone-amber,
-.lc-slash__detail.lc-tone-amber {
-  color: var(--lc-amber-text);
 }
 
 /* --- Route picker ------------------------------------------------------ */
@@ -6431,11 +6457,48 @@ textarea {
  * shrink below its content otherwise, which is the same thing that let a card
  * nested in that cell push Run off the edge in the first place.
  */
+/*
+ * Three columns, and the FLEXIBLE one is the name.
+ *
+ * This declared four -- `auto minmax(0, 1fr) auto auto` -- for a row with
+ * three children, and the flexible column landed on the Run button rather
+ * than on the name. Measured on the packaged build, 2026-09-09: the computed
+ * columns were `125.297px 0px 134.859px 0px`, so Run sat in a ZERO-WIDTH cell
+ * and overflowed it, drawing on top of Edit. On screen the two read as one
+ * button saying "REdit", and the schedule line was squeezed until it ended on
+ * a dangling separator with its next-run time cut off.
+ *
+ * The comment on the recovery rule below has said "the row is three columns"
+ * the whole time; the template had drifted to four and nothing noticed,
+ * because a collapsed column looks like a layout choice rather than a
+ * mistake.
+ *
+ * The name takes the space and truncates -- it already has the ellipsis rules
+ * for exactly that -- and each control sizes to its own content.
+ */
 .lc-routinerow {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto auto;
+  justify-content: start;
   gap: 0.4rem;
   align-items: center;
+}
+
+/*
+ * The name gets its OWN row, and the three controls sit under it.
+ *
+ * Squeezing all four onto one line inside a ~300px teammate card is what
+ * caused this in the first place. Simply giving the name the flexible column
+ * fixed the overlap and left it 76px wide -- "Reply with …" over "every 4 ho",
+ * the schedule clipped mid-word with no ellipsis, because it is a block inside
+ * an overflow-hidden span and blocks clip rather than ellipsize.
+ *
+ * A routine's name and its schedule are what a person reads; Run, Edit and
+ * Remove are what they press. Those want different amounts of room and there
+ * is not enough for both on one line, so they get two.
+ */
+.lc-routinerow__name {
+  grid-column: 1 / -1;
 }
 
 .lc-routinerow__name {
@@ -6696,7 +6759,7 @@ textarea {
   margin: 0;
   padding: var(--lc-space-4) var(--lc-space-5);
   border-top: 1px solid var(--lc-border-hairline);
-  font-size: var(--lc-text-caption);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
@@ -6960,7 +7023,7 @@ textarea {
 
 .lc-effortpanel__what {
   margin: 0;
-  font-size: var(--lc-text-caption);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
@@ -7308,4 +7371,139 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   overflow-wrap: anywhere;
+}
+
+/* --- A question, answered ------------------------------------------------ */
+
+/*
+ * The runtime asked something, so the card offers the options it sent rather
+ * than Approve / Always / Deny. An option's LABEL is its identity on the wire,
+ * so the label is what is drawn and what is sent.
+ */
+.lc-questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-5);
+  padding: var(--lc-space-4) var(--lc-space-5) 0;
+}
+
+.lc-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
+.lc-question__header {
+  margin: 0;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lc-question__text {
+  margin: 0;
+  font-size: var(--lc-text-body);
+  color: var(--lc-text-primary);
+  text-wrap: pretty;
+}
+
+.lc-question__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-question__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised-2);
+  color: var(--lc-text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-question__option:hover {
+  border-color: var(--lc-border-strong);
+  color: var(--lc-text-primary);
+}
+
+.lc-question__option.is-chosen {
+  border-color: var(--lc-green);
+  background: var(--lc-green-tint);
+  color: var(--lc-text-primary);
+}
+
+.lc-question__option:focus-visible,
+.lc-question__free:focus-visible {
+  outline: 2px solid var(--lc-green);
+  outline-offset: 2px;
+}
+
+.lc-question__label {
+  font-size: var(--lc-text-body);
+}
+
+.lc-question__desc {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
+.lc-question__free {
+  width: 100%;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font: inherit;
+  font-size: var(--lc-text-body);
+}
+
+/* --- Tone -------------------------------------------------------------- */
+
+/*
+ * A tone class says what colour a piece of text is FOR, and it has to win.
+ *
+ * These used to sit near the top as plain single-class rules, which lost the
+ * cascade to every component that set its own colour further down -- same
+ * specificity, later rule wins -- so text asked to be amber or red simply
+ * came out grey. It was patched twice, once for the Auto menu descriptions
+ * and once for a runtime row, each time by adding a more specific copy of
+ * the same declaration further down. The third instance found it on
+ * `.lc-settings__note`, which is what every note in the room form uses: the
+ * over-cap warning read grey, and so had the form's own ERROR messages.
+ *
+ * Doubling the class wins on specificity (0,2,0) rather than on position, so
+ * a tone now holds wherever it is asked for, whatever a component declares
+ * and wherever the component declares it. Both earlier patches are gone;
+ * they said exactly what this says.
+ */
+.lc-tone-lime.lc-tone-lime {
+  color: var(--lc-lime-text);
+}
+
+.lc-tone-green.lc-tone-green {
+  color: var(--lc-green-text);
+}
+
+.lc-tone-amber.lc-tone-amber {
+  color: var(--lc-amber-text);
+}
+
+.lc-tone-red.lc-tone-red {
+  color: var(--lc-red-text);
+}
+
+.lc-tone-blue.lc-tone-blue {
+  color: var(--lc-blue-text);
+}
+
+.lc-tone-muted.lc-tone-muted {
+  color: var(--lc-text-muted);
 }

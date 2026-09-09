@@ -14,8 +14,11 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import type {
   CodexMissionUpdate,
   MissionApprovalAnswer,
+  MissionApprovalDecision,
   MissionApprovalKind,
   MissionApprovalRequest,
+  MissionQuestion,
+  MissionQuestionOption,
   PublicPeerMessage
 } from '../shared/ipc.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
@@ -99,11 +102,14 @@ export interface AppServerMissionService {
 }
 
 /**
- * Same bound as the exec transport, for the same reason: each live run is a
- * provider process tree holding a ledger writer, and four is already more
- * than one person can follow.
+ * Same bound as the exec transport, because the cap is ONE pool across all
+ * three -- and now literally the same number, re-exported rather than
+ * copied. Three copies of 4 lived in three files until 2026-09-09, when the
+ * cap was measured and raised and only one of them moved.
  */
-export const MAX_LIVE_APP_SERVER_MISSIONS = 4
+import { MAX_LIVE_MISSIONS as MAX_LIVE_APP_SERVER_MISSIONS } from '../shared/live-missions.js'
+
+export { MAX_LIVE_APP_SERVER_MISSIONS }
 const NOBODY = ''
 
 const MAX_APPROVAL_DETAIL = 4_000
@@ -127,9 +133,15 @@ function bounded(value: unknown): string {
  * Turn a protocol approval request into something a person can decide about.
  * A card that cannot say WHAT would happen is not an approval, it is a dare.
  */
-export function describeApproval(
-  request: AppServerRequest
-): { readonly kind: MissionApprovalKind; readonly summary: string; readonly detail: string; readonly cwd: string | null } | undefined {
+export function describeApproval(request: AppServerRequest):
+  | {
+      readonly kind: MissionApprovalKind
+      readonly summary: string
+      readonly detail: string
+      readonly cwd: string | null
+      readonly questions?: readonly MissionQuestion[]
+    }
+  | undefined {
   const kind = approvalKindFor(request.method)
   if (kind === undefined) return undefined
   const params = (typeof request.params === 'object' && request.params !== null ? request.params : {}) as Record<
@@ -158,21 +170,118 @@ export function describeApproval(
       cwd
     }
   }
+  /*
+   * A question, read the way the protocol actually sends it.
+   *
+   * This looked for singular `params.question`, `params.prompt` or
+   * `params.message`. The request carries a `questions` ARRAY -- each entry
+   * with `id`, `header`, `question`, `isOther`, `isSecret` and nullable
+   * `options` -- so none of the three ever matched and the card drew "Answer a
+   * question" with nothing under it. Verified against the schema codex-cli
+   * 0.153.0 generates for itself (Astra, 2026-09-09).
+   *
+   * The singular keys are still read, last, because a request that carries one
+   * costs nothing to honour and this build should not be the reason a question
+   * goes unshown twice.
+   */
+  const questions = questionsOf(params)
+  const first = questions[0]
+  const detail =
+    first !== undefined
+      ? bounded(first.question)
+      : bounded(params.question ?? params.prompt ?? params.message ?? '')
   return {
     kind,
-    summary: 'Answer a question',
-    detail: bounded(params.question ?? params.prompt ?? params.message ?? ''),
-    cwd
+    summary:
+      questions.length > 1 ? `Answer ${String(questions.length)} questions` : 'Answer a question',
+    detail,
+    cwd,
+    questions
   }
 }
 
-/** The protocol decision for each of the product's three answers. */
-export function protocolDecisionFor(decision: MissionApprovalAnswer['decision']): string {
+/** How many questions one request may carry, and how many options each may offer. */
+const MAX_QUESTIONS = 12
+const MAX_OPTIONS = 24
+
+/** The `questions` array, defensively: a malformed entry is dropped, not guessed at. */
+export function questionsOf(params: Record<string, unknown>): readonly MissionQuestion[] {
+  const raw = Array.isArray(params.questions) ? params.questions : []
+  const questions: MissionQuestion[] = []
+  for (const entry of raw.slice(0, MAX_QUESTIONS)) {
+    if (typeof entry !== 'object' || entry === null) continue
+    const value = entry as Record<string, unknown>
+    // An answer is filed under the id. Without one there is nowhere to put the
+    // person's reply, so the question cannot be answered and is not offered.
+    const id = typeof value.id === 'string' ? value.id : undefined
+    const text = bounded(value.question)
+    if (id === undefined || id.length === 0 || text.length === 0) continue
+    const options: MissionQuestionOption[] = []
+    for (const option of Array.isArray(value.options) ? value.options.slice(0, MAX_OPTIONS) : []) {
+      if (typeof option !== 'object' || option === null) continue
+      const shape = option as Record<string, unknown>
+      const label = bounded(shape.label)
+      // The label IS the identity: the protocol gives options no id or index,
+      // and the server matches a returned string against the labels it sent.
+      // An option with no label cannot be chosen, so it is not drawn.
+      if (label.length === 0) continue
+      options.push({
+        label,
+        description: typeof shape.description === 'string' ? bounded(shape.description) : null
+      })
+    }
+    questions.push({
+      id,
+      header: typeof value.header === 'string' ? bounded(value.header) : null,
+      question: text,
+      options,
+      isOther: value.isOther === true,
+      isSecret: value.isSecret === true
+    })
+  }
+  return questions
+}
+
+/** The protocol decision for each of the product's three authorization answers. */
+export function protocolDecisionFor(decision: MissionApprovalDecision): string {
   if (decision === 'approve-once') return 'accept'
   // Session-scoped, never durable: a forever-grant is a Settings decision, not
   // one to take mid-run under time pressure.
   if (decision === 'approve-always') return 'acceptForSession'
   return 'reject'
+}
+
+/**
+ * The protocol result for one answer, whichever kind it is.
+ *
+ * A question is answered, an action is authorized, and they do not share a
+ * payload. `item/tool/requestUserInput` wants
+ *
+ *     { answers: { <questionId>: { answers: [ "<literal label or free text>" ] } } }
+ *
+ * and a decision is not a member of that type. Locust sent one anyway, for all
+ * three buttons: the server logs the deserialization failure, substitutes an
+ * EMPTY answer map, and tells the model the person said nothing. Whatever they
+ * had chosen was discarded on the way (Astra, 2026-09-09, from the version-
+ * matched upstream handler).
+ *
+ * An option is identified by its LITERAL LABEL. The protocol gives options no
+ * id and no index, and the server matches the strings it gets back against the
+ * labels it sent -- so sending `"3"` for the third option answers with the
+ * string "3".
+ */
+export function protocolAnswerFor(answer: MissionApprovalAnswer): JsonValue {
+  if ('answers' in answer) {
+    const answers: Record<string, JsonValue> = {}
+    for (const [questionId, given] of Object.entries(answer.answers)) {
+      // An empty list is a question the person left alone. Sent as an empty
+      // array rather than omitted, so "asked and not answered" and "never
+      // asked" stay distinguishable on the wire.
+      answers[questionId] = { answers: [...given] }
+    }
+    return { answers }
+  }
+  return { decision: protocolDecisionFor(answer.decision) }
 }
 
 /**
@@ -217,6 +326,16 @@ export function createAppServerMissionService(
 
   interface Pending {
     readonly runId: string
+    readonly missionId: string
+    /**
+     * What the runtime asked for, kept so an answer can be checked against it.
+     *
+     * A question takes answers and an action takes a decision, and the server
+     * validates neither -- it deserializes, fails silently, and substitutes an
+     * empty answer. So the pairing is enforced here, and that needs the kind
+     * to still be in hand when the person replies.
+     */
+    readonly kind: MissionApprovalKind
     readonly resolve: (value: JsonValue) => void
   }
 
@@ -514,12 +633,20 @@ export function createAppServerMissionService(
             const changes = described.kind === 'file-change' && itemId !== undefined ? changesByItem.get(itemId) : undefined
             const patch = approvalPatchFrom(changes, peer?.cwd ?? options.workspacePath)
             return await new Promise<JsonValue>((resolve) => {
-              approvals.set(approvalId, { runId, resolve })
+              approvals.set(approvalId, { runId, missionId, kind: described.kind, resolve })
               options.emitApproval({
                 approvalId,
                 runId,
                 missionId,
                 kind: described.kind,
+                // What was actually asked, structured, so the card can offer
+                // the options rather than a sentence about them.
+                ...(described.questions === undefined || described.questions.length === 0
+                  ? {}
+                  : { questions: described.questions }),
+                // Per request, not assumed of every one. A non-blocking
+                // question is one the run carries on past.
+                ...(requestParams.isBlocking === false ? { blocking: false } : {}),
                 // The item names its files; the request alone does not.
                 summary: changes !== undefined && changes.length > 0 ? `Change ${String(changes.length)} file${changes.length === 1 ? '' : 's'}` : described.summary,
                 detail: described.detail,
@@ -595,7 +722,30 @@ export function createAppServerMissionService(
       // double-click on the card must not take the run down.
       if (pending === undefined) return false
       approvals.delete(answer.approvalId)
-      pending.resolve({ decision: protocolDecisionFor(answer.decision) })
+      /*
+       * A question's answer must not reach a command's request, or the reverse.
+       *
+       * The two payloads are different types, and the server does not validate
+       * which one it got -- it deserializes, fails quietly, and substitutes an
+       * empty answer. So the pairing is checked HERE, where both the pending
+       * request's kind and the answer's shape are in hand.
+       */
+      const answering = 'answers' in answer
+      if (answering !== (pending.kind === 'question')) {
+        options.emitUpdate?.({
+          kind: 'relay-notice',
+          runId: pending.runId,
+          missionId: pending.missionId,
+          message: answering
+            ? 'Locust did not send that answer: it belongs to a question, and the runtime was waiting on an authorization.'
+            : 'Locust did not send that decision: the runtime asked a question, which is answered rather than approved.'
+        })
+        // Refused rather than forwarded. Resolving with the wrong shape is
+        // exactly what discarded the person's answer before.
+        pending.resolve(protocolAnswerFor({ approvalId: answer.approvalId, decision: 'deny' }))
+        return false
+      }
+      pending.resolve(protocolAnswerFor(answer))
       return true
     },
 

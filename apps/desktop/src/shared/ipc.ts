@@ -833,6 +833,21 @@ export interface MissionApprovalRequest {
    * sent none -- the card then says what it was told and no more.
    */
   readonly patch?: ApprovalPatch
+  /**
+   * For a question: what was actually asked, structured.
+   *
+   * Present only on `kind: 'question'`. A command or a file change is
+   * authorized, not answered, so it carries none.
+   */
+  readonly questions?: readonly MissionQuestion[]
+  /**
+   * Whether the runtime is waiting on this before it can go on.
+   *
+   * The protocol says so per request and Locust assumed it of every one. A
+   * non-blocking question is one the run continues past, and drawing it as a
+   * stop-everything card would be a claim about the run that is not true.
+   */
+  readonly blocking?: boolean
 }
 
 export interface ApprovalPatch {
@@ -850,10 +865,56 @@ export interface ApprovalPatch {
  */
 export type MissionApprovalDecision = 'approve-once' | 'approve-always' | 'deny'
 
-export interface MissionApprovalAnswer {
-  readonly approvalId: string
-  readonly decision: MissionApprovalDecision
+/** One choice a question offers. The protocol gives a label and a description, and no id. */
+export interface MissionQuestionOption {
+  readonly label: string
+  readonly description: string | null
 }
+
+/**
+ * One question a runtime asked, as the protocol actually sends it.
+ *
+ * `item/tool/requestUserInput` carries a `questions` ARRAY, each entry with its
+ * own id, header, text, flags and nullable options. Locust read singular
+ * `params.question` / `prompt` / `message` and found none of them, so the card
+ * showed "Answer a question" with no question -- verified against the schema
+ * codex-cli 0.153.0 generates for itself (Astra, 2026-09-09).
+ */
+export interface MissionQuestion {
+  /** The key an answer is filed under. Not an index, not the request id. */
+  readonly id: string
+  readonly header: string | null
+  readonly question: string
+  /** Absent or empty means free text only. */
+  readonly options: readonly MissionQuestionOption[]
+  /** The person may answer with something not offered. */
+  readonly isOther: boolean
+  /** The answer is sensitive: never logged, never persisted in the clear. */
+  readonly isSecret: boolean
+}
+
+/**
+ * What the person said back.
+ *
+ * A question is NOT an authorization, and this is where that stops being a
+ * comment and becomes a type. A command or a file change is answered with a
+ * decision; a question is answered with ANSWERS, keyed by question id, each a
+ * list of strings -- a chosen option's literal label, or free text, or both.
+ *
+ * Locust used to send `{ decision: 'accept' }` for all three buttons on a
+ * question card. The server cannot deserialize that as an answer, logs the
+ * failure, and submits an EMPTY answer map -- so the person's selection was
+ * discarded and the model was told they had said nothing. "Always allow this
+ * session" was the worst of the three, because there is no session-grant field
+ * for a question at all: it promised something the protocol has no way to mean.
+ */
+export type MissionApprovalAnswer =
+  | { readonly approvalId: string; readonly decision: MissionApprovalDecision }
+  | {
+      readonly approvalId: string
+      /** Keyed by `MissionQuestion.id`; each value is that question's answers. */
+      readonly answers: Readonly<Record<string, readonly string[]>>
+    }
 
 export interface CodexMissionStartRequest {
   readonly prompt: string

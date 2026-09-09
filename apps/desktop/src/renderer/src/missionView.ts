@@ -151,13 +151,24 @@ export function activityEntries(
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode,
-        // Carried, where there is any. It was captured by the adapter and
-        // dropped here, so a teammate could run `seq 1 1200`, say "printed 1
-        // through 1200", and leave the person looking at a row that said
-        // `done` and nothing else (drive-huge-turn, 2026-09-08).
-        ...(typeof detail.output === 'string' && detail.output.length > 0
-          ? { output: detail.output }
-          : {})
+        /*
+         * Carried whenever the runtime SAID something about output, including
+         * when what it said was "none".
+         *
+         * It was captured by the adapter and dropped here, so a teammate could
+         * run `seq 1 1200`, say "printed 1 through 1200", and leave the person
+         * looking at a row that said `done` and nothing else (drive-huge-turn,
+         * 2026-09-08).
+         *
+         * The empty string used to be dropped along with the absent case, and
+         * that collapsed two different facts into one: `undefined` is a
+         * runtime that reports no output at all -- five of the six -- and `''`
+         * is one that ran the command and it printed nothing. The row draws
+         * "no output" for the second and must stay silent for the first, so
+         * they cannot arrive here as the same value. Caught by rendering the
+         * card: the case was written, and unreachable.
+         */
+        ...(typeof detail.output === 'string' ? { output: detail.output } : {})
       })
       return
     }

@@ -97,8 +97,7 @@ try {
     for (const toggle of document.querySelectorAll('.lc-peer:not(.is-open) .lc-peer__toggle')) toggle.click()
     await new Promise(r => setTimeout(r, 400))
     const strip = document.querySelector('.lc-exchange')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? 'no exchange strip'
-    const messages = [...document.querySelectorAll('.lc-peer__message')].map(m => (m.closest('.lc-peer')?.querySelector('.lc-peer__toggle')?.innerText.replace(/[ 	
-]+/g, ' ').trim() ?? '?') + ': ' + (m.querySelector('.lc-peer__bubble')?.innerText.replace(/\\s+/g, ' ').slice(0, 80) ?? ''))
+    const messages = [...document.querySelectorAll('.lc-peer__message')].map(m => (m.closest('.lc-peer')?.querySelector('.lc-peer__toggle')?.innerText.replace(/\\s+/g, ' ').trim() ?? '?') + ': ' + (m.querySelector('.lc-peer__bubble')?.innerText.replace(/\\s+/g, ' ').slice(0, 80) ?? ''))
     return 'strip: ' + strip + ' || ' + messages.join(' | ') + ' || passphrase seen: ' + /${CODE}/.test(document.querySelector('.lc-thread')?.innerText ?? '')
   })()`))
   await drive.capture('scroll the thread to its end', () => drive.evaluate(`(async () => {

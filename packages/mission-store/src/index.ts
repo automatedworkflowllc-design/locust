@@ -308,6 +308,21 @@ export interface RecoveredMission {
 export interface MissionLedgerSnapshot {
   readonly missions: readonly RecoveredMission[]
   readonly issues: readonly MissionLedgerIssue[]
+  /**
+   * Ledger files that were read and produced NO mission.
+   *
+   * Counted here because here is the only place it is knowable. A caller
+   * cannot derive it by comparing issue ids against `missions`: that list is
+   * sliced to a page, so a mission that recovered perfectly well and merely
+   * fell outside the page looks identical to one that could not be recovered
+   * at all. Astra measured exactly that, 2026-09-09 -- an older incomplete
+   * receipt, twenty newer clean missions, and a screen reading "20 local · 1
+   * file could not be read" when every file had in fact been read.
+   *
+   * It is a count of FILES, not of issues: one truncated header raises both
+   * `truncated-tail` and `invalid-record`.
+   */
+  readonly unreadableCount: number
 }
 
 export interface MissionLedger {
@@ -1683,7 +1698,11 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       } catch {
         return {
           missions: [],
-          issues: [publicIssue('read-failed', 'Local mission history could not be read.')]
+          issues: [publicIssue('read-failed', 'Local mission history could not be read.')],
+          // The directory itself would not open, so no file was read and none
+          // can be said to be unreadable. The caller distinguishes this from a
+          // damaged file by the read-failed issue, not by a count.
+          unreadableCount: 0
         }
       }
       const allIds = entries
@@ -1725,7 +1744,18 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         .sort((left, right) => Date.parse(right.lastUpdatedAt) - Date.parse(left.lastUpdatedAt))
         .slice(0, limit)
       for (const result of parsed) issues.push(...result.issues)
-      return { missions, issues }
+      /*
+       * Counted from `parsed`, BEFORE the slice above.
+       *
+       * `missions` is a page; `issues` is not. Deriving this by asking which
+       * issue ids are missing from `missions` therefore counts every recovered
+       * mission that fell off the page as a file that could not be read --
+       * measured by Astra, 2026-09-09, as "20 local · 1 file could not be
+       * read" with nothing wrong. A parse result either produced a mission or
+       * it did not, and that is known right here and nowhere else.
+       */
+      const unreadableCount = parsed.filter((result) => result.mission === undefined).length
+      return { missions, issues, unreadableCount }
     },
 
     flush(): Promise<void> {

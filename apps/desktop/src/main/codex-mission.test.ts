@@ -10,6 +10,7 @@ import type {
 import type { MissionLedger, MissionPeerLink, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import { describe, expect, it, vi } from 'vitest'
 import type { CodexMissionUpdate } from '../shared/ipc.js'
+import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { createCodexMissionService } from './codex-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
@@ -117,7 +118,7 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
     storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
     pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
     getMission: async () => undefined,
-    listMissions: async () => ({ missions: [], issues: [] }),
+    listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
     flush: async () => undefined,
     ...overrides
   }
@@ -1685,12 +1686,24 @@ describe('missions side by side', () => {
   it('caps how many missions can be live at once, and says the number', async () => {
     const { start } = openEnded()
     const { service } = scheduledService({ start })
-    for (const peer of [ATLAS, WREN, NOVA, KAI]) {
-      await expect(service.start('Work.', 'codex', 'ask', {}, () => undefined, undefined, peer)).resolves.toMatchObject({ ok: true })
+    /*
+     * Derived from the constant, not written out.
+     *
+     * This said "Up to 4 missions" and filled the pool with four named
+     * peers. Both broke the day the cap was measured and raised to 8 -- a
+     * failing test that only meant the number moved, which is noise, and
+     * which cannot tell a deliberate change from a mistaken one.
+     *
+     * A teammate may hold one mission, so the pool is filled with a distinct
+     * teammate per slot, however many slots there are.
+     */
+    const slot = (i: number) => ({ self: { teammateId: `tm_slot_${String(i)}`, name: `Slot${String(i)}`, role: 'Custom' }, others: [] })
+    for (let i = 0; i < MAX_LIVE_MISSIONS; i += 1) {
+      await expect(service.start('Work.', 'codex', 'ask', {}, () => undefined, undefined, slot(i))).resolves.toMatchObject({ ok: true })
     }
     await expect(service.start('One too many.', 'codex', 'ask', {}, () => undefined, undefined, ORION)).resolves.toMatchObject({
       ok: false,
-      error: { code: 'RUN_ALREADY_ACTIVE', message: expect.stringContaining('Up to 4 missions') }
+      error: { code: 'RUN_ALREADY_ACTIVE', message: expect.stringContaining(`Up to ${String(MAX_LIVE_MISSIONS)} missions`) }
     })
   })
 

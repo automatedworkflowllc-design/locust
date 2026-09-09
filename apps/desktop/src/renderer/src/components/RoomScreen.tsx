@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
+import { MAX_LIVE_MISSIONS } from '../../../shared/live-missions.js'
 import { PixelFace } from './PixelFace.js'
 
 /**
@@ -25,6 +26,25 @@ export interface RoomAnswer {
   readonly text: string | undefined
   readonly runtime: string
   readonly model: string
+}
+
+/**
+ * What a post to this many teammates will really do, or undefined when the
+ * cap does not bite.
+ *
+ * A post starts one mission per member and only MAX_LIVE_MISSIONS run at
+ * once, so a bigger room has members who never start at all. Nothing said
+ * that until 2026-09-09: a six-member room offered six, took six, started
+ * four, and drew the other two as empty cards reading "did not start".
+ *
+ * A function rather than two inline strings because it is said twice -- once
+ * in the form, where the number can still be changed, and once under the
+ * composer for a room that already exists -- and because a sentence in JSX
+ * driven by component state cannot be tested without a browser.
+ */
+export function overCapNote(members: number): string | undefined {
+  if (members <= MAX_LIVE_MISSIONS) return undefined
+  return `Only ${String(MAX_LIVE_MISSIONS)} missions run at once, so a post to ${String(members)} starts ${String(MAX_LIVE_MISSIONS)} and ${String(members - MAX_LIVE_MISSIONS)} will not start.`
 }
 
 export function RoomScreen({
@@ -173,6 +193,11 @@ export function RoomScreen({
                     )
                   })}
                 </div>
+                {/* Said HERE, while the room is being built, because this
+                  * is the only screen where the number can still be changed. */}
+                {overCapNote(draftMembers.length) !== undefined && (
+                  <span className="lc-settings__note lc-tone-amber">{overCapNote(draftMembers.length)}</span>
+                )}
                 <div className="lc-roomform__actions">
                   <button type="submit" className="lc-button is-active" disabled={busy || draftName.trim().length === 0 || draftMembers.length === 0}>
                     Create room
@@ -381,7 +406,12 @@ export function RoomScreen({
         />
         <div className="lc-roomcompose__row">
           <span className="lc-settings__note">
-            {notice ?? formError ?? `Goes to ${String(room.teammateIds.length)} teammate${room.teammateIds.length === 1 ? '' : 's'}, each on their own route.`}
+            {notice ??
+              formError ??
+              // The same truth at the moment of posting, for a room that
+              // already exists -- or was made before any of this was said.
+              (overCapNote(room.teammateIds.length) ??
+                `Goes to ${String(room.teammateIds.length)} teammate${room.teammateIds.length === 1 ? '' : 's'}, each on their own route.`)}
           </span>
           <button type="submit" className="lc-button is-active" disabled={busy || draftText.trim().length === 0}>
             {busy ? 'Posting…' : 'Post'}

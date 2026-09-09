@@ -28,7 +28,7 @@ import { isImagePath } from '../../../shared/image-files.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard } from './CancellationCard.js'
-import { AgentAvatar, AgentText, DiagnosticLine, LiveStepCard, PlanCard } from './ThreadItems.js'
+import { AgentAvatar, AgentText, DiagnosticLine, LiveStepCard, PlanSteps } from './ThreadItems.js'
 import { DecisionCard } from './DecisionCard.js'
 import { ResumeCard } from './ResumeCard.js'
 import { resumeOffer } from '../resume.js'
@@ -74,7 +74,46 @@ function ThreadItems({
           )
         }
         if (item.type === 'plan') {
-          return <PlanCard key={item.key} steps={item.steps} doneCount={item.doneCount} />
+          /*
+           * A Plan-mode turn is the teammate's ANSWER, so it sits where their
+           * prose sits: beside the face, no box, at reading size.
+           *
+           * It was an `lc-card` -- the register this app reserves for
+           * something holding a control -- carrying a PLAN label, a
+           * `0 of 5 done` counter and five identical dots. Nothing here holds
+           * a control and nothing here is standing; it is the reply. Drawing
+           * it as a box was the defect, and the census goes to thirteen by
+           * deleting a species rather than adding one (design, 2026-09-09).
+           *
+           * The plan INSIDE a fold is untouched. One is a record of work, the
+           * other is an answer, which is exactly why the same markup was wrong
+           * in one of the two places.
+           */
+          return (
+            <div className="lc-agentline" key={item.key}>
+              <AgentAvatar teammate={owner} />
+              <div className="lc-agentline__body">
+                <PlanSteps steps={item.steps} doneCount={item.doneCount} outcomes={false} />
+                {/*
+                  * Derived, and true: this run changed nothing, and the mode is
+                  * why. The same class of fact the trace line carries, said in
+                  * the standing register.
+                  *
+                  * It points at the mode control on the composer rather than
+                  * offering a "run this plan" button, because that button does
+                  * not exist -- and the question behind it is what a turn IS,
+                  * which is a product decision to answer before anything is
+                  * drawn.
+                  */}
+                {item.steps.length > 0 && (
+                  <p className="lc-planmode">
+                    Plan mode — nothing was changed. Switch the mode below and send again to have{' '}
+                    {owner?.name ?? 'your teammate'} do it.
+                  </p>
+                )}
+              </div>
+            </div>
+          )
         }
         if (item.type === 'activity') {
           return (
@@ -302,6 +341,9 @@ export interface ThreadProps {
   /** Approvals waiting on the user, oldest first. */
   readonly approvals: readonly MissionApprovalRequest[]
   readonly onDecide: (approvalId: string, decision: MissionApprovalDecision) => void
+  /** A QUESTION's answers, keyed by question id. Distinct from `onAnswer`, which
+   *  answers a decision block in the transcript -- different surface, different act. */
+  readonly onAnswerQuestion: (approvalId: string, answers: Readonly<Record<string, readonly string[]>>) => void
   readonly decidingIds: readonly string[]
   /** True once the run has been stopped by the user. */
   readonly cancelled: boolean
@@ -358,6 +400,7 @@ export function Thread({
   startedAtIso,
   approvals,
   onDecide,
+  onAnswerQuestion,
   decidingIds,
   cancelled,
   handoff,
@@ -584,6 +627,7 @@ export function Thread({
             request={request}
             busy={decidingIds.includes(request.approvalId)}
             onDecide={(decision) => onDecide(request.approvalId, decision)}
+            onAnswer={(answers) => onAnswerQuestion(request.approvalId, answers)}
           />
         ))}
 

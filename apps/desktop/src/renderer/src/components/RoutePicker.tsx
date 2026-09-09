@@ -109,6 +109,31 @@ function buildRows(
   return [...recentRouteRows(ordered, recent), ...ordered]
 }
 
+/**
+ * What to say when the picker is showing no rows.
+ *
+ * "Nothing matches that" is a claim about the SEARCH, and it must not be made
+ * when the search is not why the list is empty.
+ *
+ * Seen walking the packaged 0.54.0 build as a new person would (2026-09-09):
+ * open the picker, type `free`, and it answered "Nothing matches that." while
+ * the status line read "6 runtimes connected". The model genuinely exists --
+ * every other drive here selects it by that word -- but the catalog had not
+ * arrived, and a person typing fast is told a model does not exist. It sent
+ * that whole walkthrough to the wrong runtime without anyone noticing.
+ *
+ * The SAME defect 0.50.1 fixed on the effort chip, in a second place:
+ * "effort · fixed" was drawn whenever the effort list was empty, which is also
+ * what an unloaded catalog looks like. Neither surface may speak from having
+ * no information.
+ *
+ * Extracted so it can be tested: the picker keeps its search in its own state,
+ * so no test can reach this branch by rendering the component with a query.
+ */
+export function pickerEmptyMessage(modelCount: number): string {
+  return modelCount === 0 ? 'Still reading the model list…' : 'Nothing matches that.'
+}
+
 export function RoutePicker({
   runtimes,
   models,
@@ -302,7 +327,25 @@ export function RoutePicker({
             </div>
           )
         })}
-        {shown.length === 0 && <p className="lc-inspector__empty">Nothing matches that.</p>}
+        {/*
+          * "Nothing matches that" is a claim about the SEARCH, and it must not
+          * be made when the search is not why the list is empty.
+          *
+          * Seen walking the packaged 0.54.0 build as a new person would
+          * (2026-09-09): open the picker, type `free`, and it answers "Nothing
+          * matches that." while the status line reads "6 runtimes connected".
+          * The model genuinely exists -- every other drive picks it by that
+          * word -- but the catalog had not arrived yet, and a person typing
+          * fast is told the model does not exist. It sent that whole
+          * walkthrough to the wrong runtime.
+          *
+          * This is the SAME defect 0.50.1 fixed on the effort chip, in a
+          * second place: "effort · fixed" was drawn whenever the effort list
+          * was empty, which is also what an unloaded catalog looks like. An
+          * empty list is not an answer, and neither of these surfaces may
+          * speak from having no information.
+          */}
+        {shown.length === 0 && <p className="lc-inspector__empty">{pickerEmptyMessage(models.length)}</p>}
       </div>
       <div className="lc-picker__foot">
         Fallback chain, privacy and permissions live in Settings.

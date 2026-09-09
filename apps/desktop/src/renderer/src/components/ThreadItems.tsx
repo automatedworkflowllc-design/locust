@@ -151,24 +151,74 @@ export function AgentText({
   )
 }
 
-export function PlanCard({
+/**
+ * A plan's steps, in either of the two jobs a plan does.
+ *
+ * One component with one question behind it -- **does this plan have step
+ * outcomes** -- because markers versus ordinals, meta size versus reading
+ * size, and header versus none all follow from that single answer. Two
+ * components that looked alike is what let the same markup do the wrong job in
+ * one of the two places (design, 2026-09-09).
+ *
+ * `outcomes: true` -- inside an activity fold. A run happened, the steps have
+ * states, and the counter is a fact about it. Markers, meta size, and the
+ * `PLAN · 2 of 5 done` header. Exactly as shipped; do not touch.
+ *
+ * `outcomes: false` -- a Plan-mode turn, which is the whole answer to the
+ * question and has no fold to live in. It was a bordered card with a `PLAN`
+ * label, a `0 of 5 done` counter and five identical dots, which read as a run
+ * stalled at step one. All three of those were reporting on a run that by
+ * contract never happened:
+ *
+ *   - A dot is a STATE, meaning "not done yet". Nothing was attempted and
+ *     nothing will be, so five dots say something false five times. Ordinals
+ *     say the true thing instead -- order, which is the entire content of a
+ *     plan.
+ *   - The counter counts outcomes there are none of.
+ *   - The `PLAN` label only ever named which kind of box you were looking at,
+ *     and there is no box. The teammate's own sentence above the list says
+ *     what it is better than a five-letter caption.
+ *
+ * A real `<ol>`, so it is an ordered list to a screen reader as well as to the
+ * eye. The ordinals are `user-select: none`, so copying the plan yields the
+ * steps and not the numbering.
+ */
+export function PlanSteps({
   steps,
-  doneCount
+  doneCount,
+  outcomes
 }: {
   readonly steps: readonly PlanStep[]
   readonly doneCount: number
-}): ReactElement {
+  /** Whether a run happened and these steps have states to report. */
+  readonly outcomes: boolean
+}): ReactElement | null {
+  // A Plan-mode turn that produced no steps is not a plan -- it is the
+  // silent-turn case, which already has its own diagnostic. An empty list with
+  // a header would be this component inventing a plan nobody made.
+  if (steps.length === 0) return null
+  if (!outcomes) {
+    return (
+      <ol className={`lc-plan is-answer${steps.length > 9 ? ' is-wide' : ''}`}>
+        {steps.map((step, index) => (
+          <li key={`${String(index)}-${step.text}`} className="lc-plan__step">
+            <span className="lc-plan__ordinal lc-mono" aria-hidden="true">
+              {index + 1}
+            </span>
+            <span>{step.text}</span>
+          </li>
+        ))}
+      </ol>
+    )
+  }
   return (
-    <div className="lc-card">
-      <div className="lc-card__head">
-        <span className="lc-mono lc-rail__meta">PLAN</span>
-        <span className="lc-rail__meta">
-          {doneCount} of {steps.length} done
-        </span>
+    <>
+      <div className="lc-rail__meta lc-mono">
+        PLAN · {doneCount} of {steps.length} done
       </div>
       <ul className="lc-plan">
         {steps.map((step, index) => (
-          <li key={`${index}-${step.text}`} className={`lc-plan__step is-${step.state}`}>
+          <li key={`${String(index)}-${step.text}`} className={`lc-plan__step is-${step.state}`}>
             <span className="lc-plan__marker" aria-hidden="true">
               {step.state === 'done' ? <Icon name="check" size={11} /> : <span className="lc-dot" />}
             </span>
@@ -176,7 +226,7 @@ export function PlanCard({
           </li>
         ))}
       </ul>
-    </div>
+    </>
   )
 }
 
