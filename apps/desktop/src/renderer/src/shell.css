@@ -4393,6 +4393,142 @@ textarea {
   text-wrap: pretty;
 }
 
+/* --- Command output ----------------------------------------------------- */
+
+/*
+ * What a command printed, under the row that ran it.
+ *
+ * Monospace and pre-wrapped because the SHAPE of output is often the
+ * information -- aligned columns, an indented stack trace, a table. Scrolls in
+ * its own box rather than stretching the fold, and never sideways past the
+ * thread: a long line wraps instead of pushing the whole card wide.
+ */
+/*
+ * No inner scroll. The thread is the only scroller.
+ *
+ * This was 320px tall with `overflow: auto`, which put a scrolling region
+ * inside a scrolling thread: the wheel did one or the other depending on where
+ * the pointer happened to be, and nothing on screen said which. It also drew a
+ * 300px black rectangle showing "1" through "19" above the two lines the
+ * teammate actually said. The bound is now on the LINES (8 and 8, in
+ * boundedShellOutput) rather than on the pixels, so the box is only ever as
+ * tall as what it has to say.
+ */
+.lc-shellout {
+  margin: 0 0 var(--lc-space-2) 34px;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border-left: 2px solid var(--lc-border-card);
+  background: var(--lc-bg-raised-2);
+}
+
+.lc-shellout__text {
+  margin: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.5;
+  color: var(--lc-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * The elision, as a control between the two halves.
+ *
+ * Full width and hairline-ruled so it reads as the seam it is, rather than as
+ * a button floating in the output. Same idea as the diff's folded context.
+ */
+.lc-shellout__more {
+  display: block;
+  width: 100%;
+  margin: var(--lc-space-2) 0;
+  padding: var(--lc-space-1) 0;
+  border: 0;
+  border-top: 1px solid var(--lc-border-card);
+  border-bottom: 1px solid var(--lc-border-card);
+  background: transparent;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  cursor: pointer;
+  text-align: center;
+}
+
+.lc-shellout__more:hover {
+  color: var(--lc-text-primary);
+  background: var(--lc-bg-raised);
+}
+
+.lc-shellout__more:focus-visible,
+.lc-shellout__copy:focus-visible {
+  outline: 2px solid var(--lc-green);
+  outline-offset: 2px;
+}
+
+.lc-shellout__foot {
+  display: flex;
+  align-items: center;
+  margin: var(--lc-space-3) 0 0;
+}
+
+.lc-shellout__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  cursor: pointer;
+}
+
+.lc-shellout__copy:hover {
+  color: var(--lc-text-primary);
+}
+
+/*
+ * The exit code, at the HEAD of the command line.
+ *
+ * It sat at the far right, which is where the eye arrives last for the fact
+ * that decides whether the output below is worth reading at all.
+ */
+.lc-shellbadge {
+  flex: 0 0 auto;
+  padding: 1px var(--lc-space-2);
+  border-radius: var(--lc-radius-control);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.lc-shellbadge.is-ok {
+  color: var(--lc-green-text);
+  background: var(--lc-green-tint);
+}
+
+.lc-shellbadge.is-failed {
+  color: var(--lc-red);
+  background: var(--lc-red-tint);
+}
+
+.lc-shellbadge.is-running {
+  color: var(--lc-text-muted);
+  background: var(--lc-bg-raised-2);
+}
+
+/*
+ * What the runtime said about the turn, at the foot of the fold. Standing
+ * register -- a left rule, no box, no new species on the census.
+ */
+.lc-shellnotice {
+  margin: var(--lc-space-2) 0 0 34px;
+  padding-left: var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-card);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}
+
 /* --- Attached files ----------------------------------------------------- */
 
 /*
@@ -4427,6 +4563,36 @@ textarea {
 .lc-attached__tile:hover {
   color: var(--lc-text-primary);
   border-color: var(--lc-border-strong);
+}
+
+/*
+ * "copied in", as a segment of the tile behind a hairline.
+ *
+ * The fact used to be a full-width bordered notice above the composer, shaped
+ * like a text input and sitting directly above one. It was transient and the
+ * fact is not: the file stays copied for as long as the tile exists. So it
+ * rides on the durable object, two words wide, with the whole sentence on the
+ * tile's title and only if asked.
+ *
+ * `max-width` on the tile means the NAME must yield before this does -- a
+ * long filename may ellipsize, the fact may not.
+ */
+.lc-attached__copied {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: 2px;
+  padding-left: var(--lc-space-2);
+  border-left: 1px solid var(--lc-border);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+}
+
+.lc-attached__tile .lc-attached__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lc-attached__name {
@@ -4484,17 +4650,43 @@ textarea {
  * is being typed, and it should push the composer down the way the notices
  * above it do rather than cover the message.
  */
+/*
+ * Attached to the box, not floating near it.
+ *
+ * It had `margin-bottom` and its own full radius, which read as a separate
+ * panel that happened to be nearby. It is completing what you are typing, so
+ * it shares a border with the field: no gap, and the two corners where they
+ * meet are squared (design, 2026-09-08).
+ */
 .lc-slash {
   display: flex;
   flex-direction: column;
-  margin: 0 var(--lc-space-2) var(--lc-space-2);
+  margin: 0 var(--lc-space-2) -1px;
   background: var(--lc-bg-raised-2);
   border: 1px solid var(--lc-border-strong);
-  border-radius: 11px;
+  border-radius: 11px 11px 0 0;
+  border-bottom: 0;
   box-shadow: var(--lc-shadow-menu);
   overflow: hidden;
   max-height: 260px;
   overflow-y: auto;
+}
+
+/*
+ * The one row with consequences, in its own section.
+ *
+ * Last in the list, so arrow-down from a bare slash lands on `/edit` and the
+ * most consequential row sits furthest from an accidental Enter.
+ */
+.lc-slash__item.is-weighted {
+  border-top: 1px solid var(--lc-border-strong);
+  background: var(--lc-amber-tint);
+}
+
+.lc-slash__item.is-weighted .lc-slash__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .lc-slash__item {
@@ -6225,9 +6417,23 @@ textarea {
   margin-top: 0.6rem;
 }
 
+/*
+ * Four things on a row: the teammate's face, the name, Run, and Edit/Remove.
+ *
+ * The columns said `1fr auto auto` -- three, written for a row with no face on
+ * it. With one, everything shifted a column: the FACE took the flexible
+ * column and sat alone at the left of it, the name was pushed to the middle of
+ * the row, and Edit/Remove wrapped underneath while Run ran off the window
+ * edge. Seen in a drive's screenshot after its step text had been read as a
+ * pass (2026-09-08).
+ *
+ * `minmax(0, 1fr)` rather than `1fr` on the name: a grid column will not
+ * shrink below its content otherwise, which is the same thing that let a card
+ * nested in that cell push Run off the edge in the first place.
+ */
 .lc-routinerow {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: 0.4rem;
   align-items: center;
 }
@@ -6236,6 +6442,21 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * The recovery card gets the whole width, on its own line under the controls.
+ *
+ * The row is three columns and its children already wrap; a card added to it
+ * without saying where it goes lands in one narrow cell and drags the rest of
+ * the row out of shape. This says where it goes.
+ */
+.lc-routinerow > .lc-recovery {
+  grid-column: 1 / -1;
+  /* The inline overrides this used to carry, now that it is a real element in
+     a real place: it wraps, and it is a block. */
+  white-space: normal;
+  margin-top: var(--lc-space-2);
 }
 
 .lc-routinerow__meta {
@@ -7067,4 +7288,24 @@ textarea {
 
 .is-on .lc-switch__knob {
   transform: translateX(12px);
+}
+
+/*
+ * The ledger card's action row: the control, and the path it is about.
+ *
+ * The path is shown because someone told their ledger cannot be written and
+ * not told where it lives has been informed and not helped.
+ */
+.lc-ledgerfail__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  flex-wrap: wrap;
+  margin-top: var(--lc-space-3);
+}
+
+.lc-ledgerfail__path {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  overflow-wrap: anywhere;
 }

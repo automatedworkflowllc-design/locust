@@ -282,6 +282,62 @@ describe('durability', () => {
     expect(order[0]).toBe('persist')
   })
 
+  it('STOPS the run when the ledger refuses a write, and says so', async () => {
+    /*
+     * THE test. `persistAndEmit` persists before it emits on purpose -- a
+     * receipt the person has seen must already be on disk -- and its caller
+     * discarded the rejection with `.catch(() => undefined)`. That turned the
+     * guarantee inside out: the receipt was not written, the events were never
+     * emitted so nothing appeared on screen, and the run CARRIED ON WORKING.
+     * Unrecorded work, invisibly, with no error anywhere.
+     *
+     * The exec path has always aborted here. This is the path that serves
+     * `approve-each` -- the mode whose whole purpose is careful, auditable,
+     * per-action control -- so it had the least safe failure handling of the
+     * two, in the mode that can least afford it.
+     *
+     * Found by Astra reading the source, filed as unverified, and it verified.
+     */
+    const harness = service({
+      ledger: fakeLedger({
+        appendEvents: async () => {
+          throw new Error('no space left on device')
+        }
+      })
+    })
+    await harness.instance.start('Do work.')
+    harness.fake.push({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 't', turn: {} } })
+
+    await vi.waitFor(() => {
+      expect(
+        harness.updates.some(
+          (update) =>
+            (update as { kind?: string }).kind === 'persistence-error'
+        )
+      ).toBe(true)
+    })
+
+    // Stopped, not merely reported: a run still alive after its receipts
+    // failed is doing work nobody can later prove happened.
+    expect(harness.instance.pendingApprovalCount).toBe(0)
+    await vi.waitFor(() => {
+      expect(harness.instance.liveMissionIds()).toHaveLength(0)
+    })
+  })
+
+  it('keeps running when the ledger is fine, so the guard is not simply always firing', async () => {
+    // The control. A test that only checks the failure case would pass against
+    // a service that stopped every run.
+    const harness = service()
+    await harness.instance.start('Do work.')
+    harness.fake.push({ jsonrpc: '2.0', method: 'turn/started', params: { threadId: 't', turn: {} } })
+    await vi.waitFor(() => {
+      expect(harness.events.length).toBeGreaterThan(0)
+    })
+    expect(harness.updates.some((update) => (update as { kind?: string }).kind === 'persistence-error')).toBe(false)
+    expect(harness.instance.liveMissionIds()).toHaveLength(1)
+  })
+
   it('refuses to start a second mission while one is running', async () => {
     const harness = service()
     await harness.instance.start('First.')
@@ -480,5 +536,46 @@ describe('a fileChange item carries its change into the activity row', () => {
     expect(out[0]).toBe(shell)
     expect(out[1]).toBe(unknown)
     expect(out[2]).toBe(message)
+  })
+})
+
+describe('when the CLOSING receipt cannot be written', () => {
+  it('says so, rather than letting the mission look interrupted later', async () => {
+    /*
+     * Smaller than the live-run case and it lies about a different thing: the
+     * run is ending either way, but a mission whose terminal record never
+     * lands is recovered on the next launch as INTERRUPTED -- when what
+     * actually happened is that the person stopped it deliberately.
+     *
+     * `codex-mission.ts` has always reported this on its own stop path. This
+     * one discarded it, one function away from the defect fixed in 0.51.0.
+     */
+    let failWrites = false
+    const harness = service({
+      ledger: fakeLedger({
+        appendEvents: async () => {
+          if (failWrites) throw new Error('no space left on device')
+        }
+      })
+    })
+    const started = await harness.instance.start('Do work.')
+    failWrites = true
+    harness.instance.cancel(started.runId)
+
+    await vi.waitFor(() => {
+      expect(
+        harness.updates.some((update) => (update as { kind?: string }).kind === 'persistence-error')
+      ).toBe(true)
+    })
+  })
+
+  it('says nothing when the closing receipt lands, which is the ordinary case', async () => {
+    // The control: without it this would pass against a service that reported
+    // a persistence error on every cancellation.
+    const harness = service()
+    const started = await harness.instance.start('Do work.')
+    harness.instance.cancel(started.runId)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(harness.updates.some((update) => (update as { kind?: string }).kind === 'persistence-error')).toBe(false)
   })
 })

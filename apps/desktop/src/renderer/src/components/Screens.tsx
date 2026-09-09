@@ -82,6 +82,28 @@ export function matchesFilter(
 }
 
 /**
+ * What the Missions header says when the ledger is not clean.
+ *
+ * Two different facts, and they must not be merged into one number: a mission
+ * with an incomplete receipt is HERE and readable with a gap in it, while an
+ * unreadable file is not here at all. "3 with an incomplete receipt" for two
+ * of one and one of the other would replace a false reassurance with a false
+ * count, which is not an improvement.
+ *
+ * Files, not issues: one truncated header raises both `truncated-tail` and
+ * `invalid-record`, and "2 could not be read" for one file is its own lie.
+ * `unreadableFileCount` in mission-history is what does that counting.
+ */
+export function ledgerDamageWords(withIssues: number, unreadable: number): string {
+  const parts: string[] = []
+  if (withIssues > 0) parts.push(`${String(withIssues)} with an incomplete receipt`)
+  if (unreadable > 0) {
+    parts.push(`${String(unreadable)} ${unreadable === 1 ? 'file' : 'files'} could not be read`)
+  }
+  return parts.join(' · ')
+}
+
+/**
  * Missions.
  *
  * The reference offers a "Needs approval" filter; there is no approval channel
@@ -95,7 +117,9 @@ export function MissionsScreen({
   missionOwners,
   runningMissionIds,
   titleOf,
-  onOpen
+  onOpen,
+  unreadableLedgers = 0,
+  ledgerUnreadable = false
 }: {
   readonly missions: readonly PublicRecoveredMission[]
   /** The folder this window is open on, so the header can say how many are its own. */
@@ -112,10 +136,43 @@ export function MissionsScreen({
    */
   readonly titleOf: (mission: PublicRecoveredMission) => string
   readonly onOpen: (missionId: string) => void
+  /**
+   * Ledger files that raised an issue and produced no mission.
+   *
+   * They cannot appear in `missions` by definition -- that is the whole
+   * defect: nothing in the list could carry their damage, so the header
+   * reassured about them. Defaulted to zero so a caller that has not been
+   * updated reads as it did before rather than crashing.
+   */
+  readonly unreadableLedgers?: number
+  /**
+   * The ledger could not be read at all, so this screen knows nothing.
+   *
+   * Distinct from "no missions": an empty ledger is a fact, and a ledger that
+   * would not open is the absence of any facts. Both used to render the same
+   * confident "ledger verified" -- seen by driving it with the ledger
+   * directory replaced by a plain file (2026-09-08).
+   */
+  readonly ledgerUnreadable?: boolean
 }): ReactElement {
   const [filter, setFilter] = useState<Filter>('All')
   const shown = missions.filter((mission) => matchesFilter(mission, filter, runningMissionIds))
   const withIssues = missions.filter((mission) => mission.integrityIssueCount > 0).length
+  /*
+   * "ledger verified" is a claim, and it must cover the files that are NOT here.
+   *
+   * `withIssues` counts recovered missions carrying an issue, which is every
+   * mission whose file was damaged in its BODY. A file damaged in its HEADER,
+   * or over the size limit, recovers no mission at all -- so it contributed
+   * nothing to this count and the header said "0 local · ledger verified"
+   * about a ledger the reader had just refused (Astra, 2026-09-08, rendering
+   * this very component from hand-written damaged JSONL).
+   *
+   * The worse the damage, the more confident the reassurance. The count was
+   * computed in mission-history and carried across IPC the whole time; nothing
+   * on this side read it.
+   */
+  const damaged = withIssues + unreadableLedgers
   // This screen is the whole ledger; the sidebar is only the folder you are
   // in. Both are right and neither said so, so a tester counted 3 in one and
   // 5 in the other and could not tell which to believe (2026-09-07). Said
@@ -137,7 +194,11 @@ export function MissionsScreen({
       <ScreenHeader
         title="Missions"
         meta={`${missions.length} local${elsewhere === 0 ? '' : `, ${missions.length - elsewhere} in this folder`} · ${
-          withIssues === 0 ? 'ledger verified' : `${withIssues} with an incomplete receipt`
+          ledgerUnreadable
+            ? 'the ledger could not be read'
+            : damaged === 0
+              ? 'ledger verified'
+              : ledgerDamageWords(withIssues, unreadableLedgers)
         }${total === undefined ? '' : ` · ${total} across ${priced} priced`}`}
       />
       {/*

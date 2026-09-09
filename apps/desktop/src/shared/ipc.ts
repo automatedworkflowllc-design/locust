@@ -310,12 +310,23 @@ export const WORKSPACE_ATTACH_CHANNEL = 'workspace:attach'
 /** Files chosen to attach, workspace-relative, or why none were. */
 export type AttachFilesResponse =
   /**
-   * `message` on a SUCCESS is not a warning -- it is the host saying it did
-   * something worth knowing about: a file from outside the workspace was
-   * copied in so the runtime could read it. Writing into someone's project
-   * folder is not something to do quietly.
+   * `copied` names the paths that were brought in from outside the workspace,
+   * a subset of `paths`. Writing into someone's project folder is not
+   * something to do quietly, and this is how the composer says so.
+   *
+   * It used to be a `message` -- one sentence for the whole batch, drawn as a
+   * full-width bordered box above the composer, directly above an actual text
+   * input and shaped exactly like one. Two objects for one event, and the
+   * transient one was carrying a permanent fact: the file STAYS copied for as
+   * long as the tile exists, so dismissing the notice lost information that
+   * was still true. The tile is the durable object, so the fact goes there
+   * (design, 2026-09-08).
+   *
+   * A subset, not a flag, because a multi-select can copy some files and not
+   * others -- one already inside the folder needs no mark, and marking it
+   * would claim something that did not happen.
    */
-  | { readonly ok: true; readonly paths: readonly string[]; readonly message?: string }
+  | { readonly ok: true; readonly paths: readonly string[]; readonly copied?: readonly string[] }
   | { readonly ok: false; readonly message: string }
 
 export const WORKSPACE_IMAGE_CHANNEL = 'workspace:image'
@@ -667,6 +678,21 @@ export type CodexMissionErrorCode =
    * so rather than implying the user can simply try again.
    */
   | 'HANDOFF_REFUSED'
+  /**
+   * The saved route asks for a mode this way of starting cannot honour.
+   *
+   * Per-action approvals live only on the app-server transport, which only the
+   * composer's own start reaches. A routine, a room post and a relay all go
+   * through the exec transport, where the mode falls through to `read-only` --
+   * so a teammate saved on "approve each action" ran with no cards, no writes
+   * and no mention of either, while the chip still said approvals. Safer than
+   * silent writes, and still a lie about what happened.
+   *
+   * Refused before anything is dispatched or persisted. The same argument the
+   * routine runner already makes about effort applies harder to permission: a
+   * replay at a mode the person did not teach is not the same routine.
+   */
+  | 'RUN_MODE_UNSUPPORTED'
   /**
    * No folder is chosen for the teammates to work in. The installed app is
    * launched from its own install folder, which is never a workspace, so a
@@ -1162,6 +1188,17 @@ export type MissionHistoryResponse =
         /** The folder this window is working in; missions elsewhere are not its own. */
         readonly currentWorkspaceId: string
         readonly issueCount: number
+        /**
+         * Ledger files that raised an issue and produced no mission at all.
+         *
+         * Separate from `issueCount` because the screen needs a count of
+         * FILES, not of issues: one badly damaged file raises several. And
+         * separate from the per-mission counts because these files have no
+         * mission to hang a count on -- which is exactly why the Missions
+         * header used to read "ledger verified" for a ledger it could not
+         * read (Astra, 2026-09-08).
+         */
+        readonly unreadableCount: number
         /**
          * Runtimes whose most recent word, across every mission in the
          * ledger, was that the account is out of quota -- with that word.

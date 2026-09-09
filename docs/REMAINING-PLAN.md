@@ -130,7 +130,7 @@ run pretending to be a reply is the failure being prevented.
 **Discovery finds a CLI that never joined PATH. DONE 2026-09-02.** The
 packaged app reported "Codex CLI was not found on this machine" on a machine
 where Codex was installed and working: it installs into
-`%LOCALAPPDATA%\OpenAI\Codexin\<version>\`, which no PATH names, and a
+`%LOCALAPPDATA%\OpenAI\Codex\bin\<version>\`, which no PATH names, and a
 window launched from the Start menu inherits no shell profile. The locator
 now also checks the official per-user install roots (newest version first),
 and finds the PowerShell host for Claude Code's `.ps1` shim the same way.

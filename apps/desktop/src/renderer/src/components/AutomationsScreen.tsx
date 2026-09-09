@@ -147,9 +147,6 @@ export function AutomationsScreen({
                   {schedule !== undefined && (
                     <span className="lc-routinerow__meta lc-mono lc-routinerow__sched">{schedule}</span>
                   )}
-                  <RoutineRecovery key={`${routine.execution?.attemptId}:${routine.execution?.step}`} routine={routine}
-                    {...(onRecoverRoutine === undefined ? {} : { recover: onRecoverRoutine })}
-                    {...(onOpenMission === undefined ? {} : { onOpenMission })} />
                 </span>
                 <button
                   type="button"
@@ -174,6 +171,27 @@ export function AutomationsScreen({
                     Remove
                   </button>
                 </span>
+                {/*
+                  * A row of its own, across every column.
+                  *
+                  * It was nested INSIDE `lc-routinerow__name` -- a span that is
+                  * `white-space: nowrap; overflow: hidden; text-overflow:
+                  * ellipsis`, meant to hold a one-line name. A card carrying a
+                  * checkbox and two buttons cannot shrink, so the `1fr` name
+                  * column could not shrink either: the Run button was pushed
+                  * off the window edge and the teammate's avatar sat alone in a
+                  * tall empty gutter beside it.
+                  *
+                  * Invisible to the tests, which render to a string. Seen in
+                  * the drive's SCREENSHOT, after its step text had already been
+                  * read as a pass (2026-09-08).
+                  */}
+                <RoutineRecovery
+                  key={`${routine.execution?.attemptId}:${routine.execution?.step}`}
+                  routine={routine}
+                  {...(onRecoverRoutine === undefined ? {} : { recover: onRecoverRoutine })}
+                  {...(onOpenMission === undefined ? {} : { onOpenMission })}
+                />
               </div>
             )
           })}

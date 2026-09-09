@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
@@ -35,10 +37,12 @@ import { describe, expect, it } from 'vitest'
  * behaviour, only about the vocabulary the components are allowed to use.
  */
 
-// The caller's working directory must not change which components are checked.
-const COMPONENTS = new URL('../renderer/src/components/', import.meta.url)
+// Resolved from THIS file, not the working directory -- see the note in
+// block-placement.test.ts. A cwd-relative path made this file pass under the
+// ship gate and fail under `pnpm test`, which is the worst way round.
+const COMPONENTS = fileURLToPath(new URL('../renderer/src/components/', import.meta.url))
 
-const sourceOf = (file: string): string => readFileSync(new URL(file, COMPONENTS), 'utf8')
+const sourceOf = (file: string): string => readFileSync(join(COMPONENTS, file), 'utf8')
 
 /** Every `className="lc-card ..."` in a file, with its modifier classes. */
 function cardClasses(source: string): readonly string[] {

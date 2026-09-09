@@ -105,6 +105,10 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
       say(`seed did not land: wanted ${String(wanted)} teammates`)
       process.exit(1)
     }
+    // NOTE: this proves the file was WRITTEN, nothing more -- it reads back
+    // what it just wrote and compares it to itself, so it can only catch a
+    // disk failure. Whether the APP accepts those records is a different
+    // question and is checked after launch, in `ready`.
   }
   // Other profile files a drive wants in place BEFORE the app reads them
   // (memories.json, rooms.json, routines.json): written before launch, so
@@ -188,14 +192,51 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   }
 
   /** Wait until discovery has finished, so the first step is the real first screen. */
-  const ready = () => evaluate(`(async () => {
-    for (let i = 0; i < 240; i += 1) {
-      const field = document.querySelector('form.command-dock textarea')
-      if (field && !/Checking local runtimes/.test(field.placeholder)) return 'discovery finished; ' + (document.querySelector('.lc-connected')?.innerText ?? '')
-      await new Promise(r => setTimeout(r, 250))
+  const ready = async () => {
+    const settled = await evaluate(`(async () => {
+      for (let i = 0; i < 240; i += 1) {
+        const field = document.querySelector('form.command-dock textarea')
+        if (field && !/Checking local runtimes/.test(field.placeholder)) return 'discovery finished; ' + (document.querySelector('.lc-connected')?.innerText ?? '')
+        await new Promise(r => setTimeout(r, 250))
+      }
+      return 'discovery never finished'
+    })()`)
+
+    /*
+     * Did the app ACCEPT the roster it was seeded with?
+     *
+     * The write-back check above cannot answer this: it compares the file to
+     * itself. The app parses each record on load and DROPS any it cannot read
+     * -- a hue outside `lime|blue|violet|clay`, a role outside its own list --
+     * and says so only to the main-process console, which nothing here reads.
+     *
+     * So a drive seeded with three teammates could run with one, address two
+     * chips that were never drawn, and report the results as though its own
+     * premise had held. That cost a session an hour in 0.36.3, was written up,
+     * and then cost another one today: `sky` and `amber` are not hues and
+     * `Tests & Review` is not a role, so two of three teammates were dropped
+     * and a twenty-minute drive measured the wrong thing.
+     *
+     * A drive must be able to assert its own premise. This is that assertion.
+     */
+    if (seed?.teammates?.length) {
+      const names = seed.teammates.map((member) => member.name)
+      const drawn = JSON.parse(await evaluate(`JSON.stringify(
+        [...document.querySelectorAll('button')]
+          .map((b) => b.getAttribute('title') ?? '')
+          .filter((t) => t.startsWith('Message '))
+          .map((t) => t.slice('Message '.length).split(' ')[0])
+      )`))
+      const missing = names.filter((name) => !drawn.includes(name))
+      if (missing.length > 0) {
+        say(`the app did not accept ${String(missing.length)} seeded teammate(s): ${missing.join(', ')}`)
+        say('a record is dropped when its hue or role is not one the roster knows.')
+        say(`hues: lime, blue, violet, clay -- roles: Code & Migrations, Research & Briefs, Ops & Scheduling, Docs & QA, Data & Reporting, Custom`)
+        process.exit(1)
+      }
     }
-    return 'discovery never finished'
-  })()`)
+    return settled
+  }
 
   /** Write SESSION.md with the step table and close the app. */
   const finish = async ({ intro, extra = '', last = true }) => {

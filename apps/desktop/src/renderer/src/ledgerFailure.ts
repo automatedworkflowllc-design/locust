@@ -40,20 +40,71 @@ export interface LedgerFailureRow {
  * undefined during a live run -- in which case the safe row says what is true
  * without a number rather than dressing up a blank.
  */
-export function ledgerFailureRows(checkpoints: number | undefined): readonly LedgerFailureRow[] {
+export function ledgerFailureRows(
+  checkpoints: number | undefined,
+  nothingWritten = false
+): readonly LedgerFailureRow[] {
+  /*
+   * The mission was never created, so there is nothing partial to describe.
+   *
+   * Seen the first time this card was ever put on a screen
+   * (`drive-ledger-failure`, 2026-09-08, with the ledger directory replaced by
+   * a plain file). The header read "Mission · not started · failed" and the
+   * sentence above the rows read "The mission could not be created in the
+   * durable local ledger" -- while SAFE underneath it said "this mission can
+   * be reopened from it". There was no record to reopen. The card contradicted
+   * its own first line.
+   *
+   * `codex-mission.ts` writes the mission BEFORE it starts the process, and
+   * says so in as many words -- "a mission must not run on messages its own
+   * record cannot name" -- so when creation fails, nothing ran. That is much
+   * better news than a mid-run failure and the card should say it plainly
+   * rather than warning about work to go and check.
+   */
+  if (nothingWritten) {
+    return [
+      {
+        tone: 'safe',
+        label: 'Safe',
+        text: 'Everything. The record is written before the runtime starts, so nothing ran, nothing was changed, and your project files are exactly as they were.'
+      },
+      {
+        tone: 'risk',
+        label: 'At risk',
+        text: 'Nothing from this turn — it never began. Locust refused to start work it could not record. Fix the ledger and send it again.'
+      }
+    ]
+  }
   return [
     {
       tone: 'safe',
       label: 'Safe',
+      /*
+       * The safe row names the thing a person actually fears at that moment.
+       *
+       * "A SAFE row that names no specific thing is just the word safe"
+       * (design, 2026-09-08), and the specific fear when a card mentions a
+       * failed write is that something has been undone to their project. It
+       * has not: the ledger is the app's own record and lives elsewhere.
+       *
+       * It says "by this failure" rather than the design's flatter "your
+       * workspace files are untouched", because those are different claims.
+       * Files the run already edited ARE changed -- that is the Not undone row
+       * below, and a test pins it -- so the reassurance is scoped to what the
+       * failure did, which is nothing.
+       */
       text:
         checkpoints === undefined
-          ? 'Everything written before the failure. The ledger only ever appends, so what reached the disk is intact and this mission can be reopened from it.'
-          : `The ${String(checkpoints)} checkpoint${checkpoints === 1 ? '' : 's'} already written. The ledger only ever appends, so what reached the disk is intact and this mission can be reopened from it.`
+          ? 'Everything written before the failure. The ledger only ever appends, so what reached the disk is intact and this mission can be reopened from it. Your project files are untouched by this failure — nothing was rolled back.'
+          : `The ${String(checkpoints)} checkpoint${checkpoints === 1 ? '' : 's'} already written. The ledger only ever appends, so what reached the disk is intact and this mission can be reopened from it. Your project files are untouched by this failure — nothing was rolled back.`
     },
     {
       tone: 'risk',
       label: 'At risk',
-      text: 'Anything the runtime did after the last successful write. It was not recorded, so Locust cannot tell you what it was — check the folder yourself before trusting this turn.'
+      // The consequence, stated concretely. "Not recorded" is abstract; not
+      // being here when you reopen the conversation is the thing that will
+      // actually happen to you.
+      text: 'This turn. Anything the runtime did after the last successful write was not recorded, so Locust cannot tell you what it was, and it will not be here when you reopen this conversation — check the folder yourself before trusting it.'
     },
     {
       tone: 'risk',
@@ -72,7 +123,10 @@ export function ledgerFailureRows(checkpoints: number | undefined): readonly Led
  */
 export function ledgerFailureSentence(reason: string | undefined): string {
   const said = reason?.trim()
+  // Locust is named as the actor. "The run was stopped" is a passive that
+  // leaves open who stopped it and why; the app did, on purpose, and saying so
+  // is the difference between a failure and a decision (design, 2026-09-08).
   return said === undefined || said.length === 0
-    ? 'Locust could not write this mission to its durable local ledger, so the run was stopped rather than continued without a record of it.'
-    : `${said} The run was stopped rather than continued without a record of it.`
+    ? 'Locust could not write this mission to its durable local ledger, so it stopped the run rather than continue without a durable record.'
+    : `${said} Locust stopped the run rather than continue without a durable record.`
 }

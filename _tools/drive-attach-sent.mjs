@@ -78,7 +78,7 @@ try {
   })()`))
 
   await drive.capture('THE QUESTION: what the person reads back in their own bubble', () => drive.evaluate(`(() => {
-    const mine = [...document.querySelectorAll('.lc-msg, .lc-turn, [class*="user"]')]
+    const mine = [...document.querySelectorAll('.lc-bubble')]
       .map(n => n.textContent?.replace(/\\s+/g, ' ').trim())
       .filter(t => t && t.includes('passphrase'))
     return JSON.stringify(mine.slice(0, 3), null, 1)

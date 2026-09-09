@@ -51,6 +51,8 @@ export interface AppServerProcess {
 export interface AppServerMissionOptions {
   readonly workspacePath: string
   readonly ledger: MissionLedger
+  /** Missions live on the other transports; the cap is one pool. See codex-mission.ts. */
+  readonly liveElsewhere?: () => number
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
   readonly spawn: (executablePath: string, args: readonly string[]) => AppServerProcess
   readonly emitApproval: (request: MissionApprovalRequest) => void
@@ -275,11 +277,70 @@ export function createAppServerMissionService(
     if (runs.get(run.runId) !== run) return
     runs.delete(run.runId)
     const produced = run.normalizer.finish(reason)
-    void persistAndEmit(run, produced).catch(() => undefined)
+    /*
+     * The TERMINAL receipt. Losing it quietly is a smaller version of the
+     * defect fixed above, and it lies about history rather than about the
+     * present: a mission whose closing record never lands is recovered on the
+     * next launch as INTERRUPTED, when what actually happened is that the
+     * person stopped it on purpose.
+     *
+     * The run is already ending, so there is nothing to hold back -- the only
+     * thing missing was saying so. `codex-mission.ts` has always said it on
+     * this path; this one did not.
+     */
+    void persistAndEmit(run, produced).catch(() => {
+      options.emitUpdate?.({
+        kind: 'persistence-error',
+        runId: run.runId,
+        missionId: run.missionId,
+        error: {
+          code: 'MISSION_PERSISTENCE_FAILED',
+          message: 'The mission stopped, but its closing record could not be written to the durable local ledger.'
+        }
+      })
+    })
     // Never leave a person staring at a card nothing will answer.
     releaseApprovals(run.runId)
     run.client?.dispose(why)
     run.process?.kill()
+  }
+
+  /*
+   * The ledger refused a write, so the run stops and says so.
+   *
+   * `persistAndEmit` persists BEFORE it emits, on purpose -- "a receipt the
+   * user has seen must already be on disk". Its caller then discarded the
+   * rejection with `.catch(() => undefined)`, which turned that guarantee
+   * inside out: the receipt was not written, the events were never emitted, so
+   * nothing appeared on screen -- and the run carried on working. Unrecorded
+   * work, invisibly, with no error anywhere.
+   *
+   * The exec path has always failed closed here: `codex-mission.ts` aborts the
+   * process and emits `MISSION_PERSISTENCE_FAILED`. This path is the one that
+   * serves `approve-each`, the mode whose entire purpose is careful, auditable,
+   * per-action control -- so it had the least safe failure handling of the two,
+   * in the mode that can least afford it.
+   *
+   * Found by Astra reading the source (2026-09-08) and filed as a "source-level
+   * concern, not dynamically verified". It verified.
+   */
+  const receiptsFailed = (run: LiveRun): void => {
+    if (runs.get(run.runId) !== run) return
+    runs.delete(run.runId)
+    releaseApprovals(run.runId)
+    run.client?.dispose('the mission ledger could not be written')
+    run.process?.kill()
+    // Emitted, not persisted: the ledger is the thing that just failed, so
+    // trying to write this through it would be the same failure again.
+    options.emitUpdate?.({
+      kind: 'persistence-error',
+      runId: run.runId,
+      missionId: run.missionId,
+      error: {
+        code: 'MISSION_PERSISTENCE_FAILED',
+        message: 'The mission could not be written to the durable local ledger.'
+      }
+    })
   }
 
   return {
@@ -314,7 +375,7 @@ export function createAppServerMissionService(
             : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
         )
       }
-      if (starting.size + runs.size >= MAX_LIVE_APP_SERVER_MISSIONS) {
+      if (starting.size + runs.size + (options.liveElsewhere ?? (() => 0))() >= MAX_LIVE_APP_SERVER_MISSIONS) {
         throw new Error(`Up to ${MAX_LIVE_APP_SERVER_MISSIONS} missions can run at once. Wait for one to finish or stop it first.`)
       }
       starting.add(owner)
@@ -413,17 +474,40 @@ export function createAppServerMissionService(
               if (changes !== undefined) changesByItem.set(found.id, changes)
             }
             const produced = normalizer.accept(notification)
-            void persistAndEmit(run, withFileChanges(produced, changesByItem, peer?.cwd ?? options.workspacePath)).catch(() => undefined)
+            void persistAndEmit(run, withFileChanges(produced, changesByItem, peer?.cwd ?? options.workspacePath))
+              .catch(() => receiptsFailed(run))
           },
           onRequest: async (request) => {
+            /*
+             * Both refusals below are RIGHT, and both used to be silent.
+             *
+             * The run carried on exactly as if the person had pressed Deny,
+             * and nothing in the thread said a decision had been taken on
+             * their behalf. In a mode whose entire purpose is that a person
+             * decides each action, an unattributed denial is the one outcome
+             * that must never be quiet -- someone watching a run stall has no
+             * way to tell a refusal from a model that changed its mind.
+             *
+             * The policies are unchanged. Only the silence is.
+             */
+            const refuse = (why: string): JsonValue => {
+              options.emitUpdate?.({ kind: 'relay-notice', runId, missionId, message: why })
+              return { decision: 'reject' }
+            }
             const described = describeApproval(request)
             if (described === undefined) {
               // A request this build does not understand is refused rather
               // than guessed at. Approving something unnamed is the one answer
               // that can never be right.
-              return { decision: 'reject' }
+              return refuse(
+                `Locust denied a request it does not recognise (${request.method}) because it could not say what would happen. This build is older than the runtime's protocol.`
+              )
             }
-            if (approvals.size >= MAX_PENDING_APPROVALS) return { decision: 'reject' }
+            if (approvals.size >= MAX_PENDING_APPROVALS) {
+              return refuse(
+                `Locust denied an action because ${String(MAX_PENDING_APPROVALS)} approvals are already waiting on you. Answer some of them and ask again.`
+              )
+            }
             const approvalId = `ap_${createId()}`
             const requestParams = (typeof request.params === 'object' && request.params !== null ? request.params : {}) as Record<string, unknown>
             const itemId = typeof requestParams.itemId === 'string' ? requestParams.itemId : undefined

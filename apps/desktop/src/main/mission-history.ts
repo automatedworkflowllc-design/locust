@@ -183,6 +183,49 @@ export function publicRecoveredMission(
 }
 
 /**
+ * Ledger files that raised an issue and yielded NO mission at all.
+ *
+ * Found by Astra, 2026-09-08, writing damaged JSONL by hand and rendering the
+ * real Missions component from the result. The reader is sound: for all six
+ * damage shapes it keeps exactly the safe prefix and reports the right issue
+ * code. What is not sound is what the screen then says.
+ *
+ * A file damaged in its BODY still recovers a mission, that mission carries
+ * `integrityIssueCount`, and the header reads "1 with an incomplete receipt".
+ * A file damaged in its HEADER -- or one over the size limit -- recovers no
+ * mission at all, so there is nothing to carry a per-mission count, and the
+ * header reads **"0 local · ledger verified"**. The snapshot's own issue is
+ * right there, and `issueCount` carried it faithfully all the way across the
+ * IPC boundary, where App.tsx never read it.
+ *
+ * So the worse the damage, the more confident the reassurance. That is the
+ * exact shape this app spends its time hunting: the mechanism was fine and the
+ * reporting lied.
+ *
+ * Counted by distinct mission id rather than by issue, because one bad file
+ * raises several -- a truncated header produces both `truncated-tail` and
+ * `invalid-record` -- and "2 could not be read" for one file would be a new
+ * false statement in place of the old one. An issue with no id at all is
+ * still a file that could not be read, so it counts once.
+ */
+export function unreadableFileCount(snapshot: {
+  readonly missions: readonly RecoveredMission[]
+  readonly issues: readonly { readonly missionId?: string }[]
+}): number {
+  const recovered = new Set(snapshot.missions.map((mission) => mission.metadata.missionId))
+  const unreadable = new Set<string>()
+  let anonymous = 0
+  for (const issue of snapshot.issues) {
+    if (issue.missionId === undefined) {
+      anonymous += 1
+      continue
+    }
+    if (!recovered.has(issue.missionId)) unreadable.add(issue.missionId)
+  }
+  return unreadable.size + (anonymous > 0 ? 1 : 0)
+}
+
+/**
  * Take missions until the response would exceed its byte budget. The first
  * mission is always included even if it alone is over budget: returning an
  * empty history for one large mission would look like "you have no missions",
@@ -234,6 +277,7 @@ export async function readMissionHistory(
         ),
         currentWorkspaceId: workspaceIdFor(workspacePath),
         issueCount: snapshot.issues.length,
+        unreadableCount: unreadableFileCount(snapshot),
         limitedRuntimes: limitedRuntimesFrom(snapshot.missions),
         usageWindows: usageWindowsFrom(snapshot.missions)
       }

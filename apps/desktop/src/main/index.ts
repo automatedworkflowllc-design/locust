@@ -587,6 +587,19 @@ if (!ownsSingleInstanceLock) {
     let roomTasks: RoomTasks | undefined
     const codexMissions = createCodexMissionService({
       workspacePath,
+      /*
+       * The cap is ONE pool across all three transports.
+       *
+       * Each service counted only its own live runs, so four exec runs, four
+       * approve-each runs and four Antigravity runs could be live together --
+       * twelve -- while the refusal still read \"up to 4\" and every read in
+       * this file already summed all three (teammateBusy, the sidebar count,
+       * the busy list). Reported as one number, enforced as three.
+       *
+       * Read lazily rather than captured, because these three are constructed
+       * in sequence and each needs the other two.
+       */
+      liveElsewhere: () => appServerMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       // Asked at the moment a run starts, never cached: switching Auto off in
       // Settings has to reach the next run, including one a relay or a saved
       // routine is about to start.
@@ -635,6 +648,8 @@ if (!ownsSingleInstanceLock) {
     const antigravityMissions = createAntigravityMissionService({
       workspacePath,
       ledger: missionLedger,
+      // One pool -- see the note on codexMissions above.
+      liveElsewhere: () => codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length,
       workroom,
       memory: memoryBriefing,
       probe: () => antigravityProbe.probe(),
@@ -705,6 +720,8 @@ if (!ownsSingleInstanceLock) {
     const appServerMissions = createAppServerMissionService({
       workspacePath,
       ledger: missionLedger,
+      // One pool -- see the note on codexMissions above.
+      liveElsewhere: () => codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       discover: discoverForWork,
       spawn: spawnAppServer,
       emitApproval: (request) => {
@@ -922,6 +939,20 @@ if (!ownsSingleInstanceLock) {
               error: { code: 'RUNTIME_START_FAILED', message: error instanceof Error ? error.message : 'Antigravity could not start the mission.' }
             } as const
           }
+        }
+        // Same silent degrade as routines and room posts: a relay goes through
+        // exec, where approve-each falls through to read-only and no card is
+        // ever drawn. A teammate relaying to a teammate saved on that mode ran
+        // with no approvals and no mention of it.
+        if (input.mode === 'approve-each') {
+          return {
+            ok: false,
+            error: {
+              code: 'RUN_MODE_UNSUPPORTED',
+              message:
+                'That teammate is set to "approve each action", and a relayed message cannot show per-action approvals. Nothing was started.'
+            }
+          } as const
         }
         return codexMissions.start(
           input.prompt,
@@ -1284,16 +1315,10 @@ if (!ownsSingleInstanceLock) {
       return {
         ok: true,
         paths: inside,
-        // Said out loud, because writing into someone's project folder is not
-        // something to do quietly.
-        ...(copiedIn.length === 0
-          ? {}
-          : {
-              message:
-                copiedIn.length === 1
-                  ? `${basename(copiedIn[0] ?? '')} was copied into ${ATTACHMENT_DIR} so your teammate can read it.`
-                  : `${String(copiedIn.length)} files were copied into ${ATTACHMENT_DIR} so your teammate can read them.`
-            })
+        // Which ones came from outside, so the composer can mark those tiles.
+        // Not a sentence any more: the fact is durable and belongs on the
+        // durable object. See AttachFilesResponse.
+        ...(copiedIn.length === 0 ? {} : { copied: copiedIn })
       } as const
     })
 
@@ -1302,7 +1327,29 @@ if (!ownsSingleInstanceLock) {
       try {
         return await teammates.writeSettings(settings)
       } catch {
-        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, layout: 'auto' } as const
+        /*
+         * The write failed, so answer with what is ACTUALLY STORED.
+         *
+         * This used to return hardcoded defaults, which is worse than
+         * unhelpful: the renderer sets its switches from whatever comes back,
+         * so a failed write told it relay was ON and Auto was OFF regardless
+         * of the file on disk. Someone running with relay off would watch it
+         * appear to switch itself on, and then switch back at the next launch
+         * when the real file was read again.
+         *
+         * The settings on disk are the truth whether or not this write landed.
+         * If even reading them fails the defaults are all that is left, and
+         * that is the one case where inventing them is the honest answer --
+         * there is nothing else to say.
+         */
+        return await teammates.readSettings().catch(() => ({
+          swarm: false,
+          relay: true,
+          relayHopCap: DEFAULT_RELAY_HOP_CAP,
+          memoryMode: DEFAULT_MEMORY_MODE,
+          autoMode: false,
+          layout: 'auto'
+        } as const))
       }
     })
 
@@ -1487,7 +1534,14 @@ if (!ownsSingleInstanceLock) {
         const response =
           route.runtime === 'antigravity'
             ? roomRejected('Antigravity cannot be posted to from a room yet.')
-            : await codexMissions.start(
+            : // Per-action approvals only exist on the app-server transport,
+              // which a room post does not use. Without this the post ran
+              // read-only with no cards while the chip said approvals.
+              route.mode === 'approve-each'
+              ? roomRejected(
+                  'This teammate is set to "approve each action", and a room post cannot show per-action approvals. Message them directly instead.'
+                )
+              : await codexMissions.start(
                 briefed,
                 route.runtime,
                 route.mode,

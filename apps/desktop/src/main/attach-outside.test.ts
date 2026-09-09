@@ -46,3 +46,48 @@ describe('keeping the folder out of git', () => {
     expect(excludeWith('*.log\n/.locust/\n')).toBeUndefined()
   })
 })
+
+describe('a source that is not really a file name', () => {
+  /*
+   * `attachmentDestination` builds a path this app WRITES to, from
+   * `basename(source)` -- and basename does not always return a plain name.
+   * Measured before this guard existed:
+   *
+   *   'C:\a\..'  ->  '..'  ->  .locust/attachments/..  ->  .locust
+   *
+   * One level above the folder it is supposed to write into. Nothing a person
+   * does reaches it -- the OS dialog cannot return such a path -- but a
+   * path-builder must not rely on its caller for containment, and
+   * `LOCUST_ATTACH_PATHS` already feeds this from elsewhere.
+   */
+  it('refuses a name that would climb out of the folder', () => {
+    expect(() => attachmentDestination('C:\\a\\..', new Set())).toThrow(/not a file name/)
+    expect(() => attachmentDestination('..', new Set())).toThrow(/not a file name/)
+  })
+
+  it('refuses a name that would land on the folder itself', () => {
+    // These would try to write a file over a directory.
+    expect(() => attachmentDestination('C:\\a\\.', new Set())).toThrow(/not a file name/)
+    expect(() => attachmentDestination('C:\\', new Set())).toThrow(/not a file name/)
+  })
+
+  it('refuses an alternate data stream', () => {
+    // `file.txt:stream` names a hidden stream on Windows rather than a file,
+    // and a picked file never has one.
+    expect(() => attachmentDestination('C:\\a\\file.txt:stream', new Set())).toThrow(/not a file name/)
+  })
+
+  it('still takes every ordinary name, including awkward ones', () => {
+    // The control. A guard that refused real filenames would be worse than
+    // the hole it closes.
+    for (const name of ['notes.md', 'my report (final).pdf', 'a b  c.txt', '.gitignore', 'ünïcodé.md', 'archive.tar.gz']) {
+      expect(attachmentDestination(`C:\\downloads\\${name}`, new Set())).toBe(`${ATTACHMENT_DIR}/${name}`)
+    }
+  })
+
+  it('a traversal INSIDE the source path is harmless, because only the name is used', () => {
+    // `C:\a\..\..\evil.txt` is just a roundabout way of naming evil.txt, and
+    // the file it points at was already chosen by the person.
+    expect(attachmentDestination('C:\\a\\..\\..\\evil.txt', new Set())).toBe(`${ATTACHMENT_DIR}/evil.txt`)
+  })
+})
