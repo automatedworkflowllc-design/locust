@@ -6500,11 +6500,48 @@ textarea {
  * shrink below its content otherwise, which is the same thing that let a card
  * nested in that cell push Run off the edge in the first place.
  */
+/*
+ * Three columns, and the FLEXIBLE one is the name.
+ *
+ * This declared four -- `auto minmax(0, 1fr) auto auto` -- for a row with
+ * three children, and the flexible column landed on the Run button rather
+ * than on the name. Measured on the packaged build, 2026-09-09: the computed
+ * columns were `125.297px 0px 134.859px 0px`, so Run sat in a ZERO-WIDTH cell
+ * and overflowed it, drawing on top of Edit. On screen the two read as one
+ * button saying "REdit", and the schedule line was squeezed until it ended on
+ * a dangling separator with its next-run time cut off.
+ *
+ * The comment on the recovery rule below has said "the row is three columns"
+ * the whole time; the template had drifted to four and nothing noticed,
+ * because a collapsed column looks like a layout choice rather than a
+ * mistake.
+ *
+ * The name takes the space and truncates -- it already has the ellipsis rules
+ * for exactly that -- and each control sizes to its own content.
+ */
 .lc-routinerow {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto auto;
+  justify-content: start;
   gap: 0.4rem;
   align-items: center;
+}
+
+/*
+ * The name gets its OWN row, and the three controls sit under it.
+ *
+ * Squeezing all four onto one line inside a ~300px teammate card is what
+ * caused this in the first place. Simply giving the name the flexible column
+ * fixed the overlap and left it 76px wide -- "Reply with …" over "every 4 ho",
+ * the schedule clipped mid-word with no ellipsis, because it is a block inside
+ * an overflow-hidden span and blocks clip rather than ellipsize.
+ *
+ * A routine's name and its schedule are what a person reads; Run, Edit and
+ * Remove are what they press. Those want different amounts of room and there
+ * is not enough for both on one line, so they get two.
+ */
+.lc-routinerow__name {
+  grid-column: 1 / -1;
 }
 
 .lc-routinerow__name {
