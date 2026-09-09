@@ -2396,8 +2396,26 @@ describe('a shell row and its output', () => {
     expect(entry?.kind === 'shell' ? entry.output : 'missing').toBeUndefined()
   })
 
-  it('treats an empty output as nothing to show', () => {
-    const entry = activityEntries([shellDetail('')], undefined)[0]
-    expect(entry?.kind === 'shell' ? entry.output : 'missing').toBeUndefined()
+  it('keeps an empty output distinct from an absent one', () => {
+    /*
+     * This used to assert that an empty output was dropped, the same as an
+     * absent one. Both then arrived at the row as `undefined`, and the row
+     * could not tell "the runtime reports no output at all" -- true of five of
+     * the six -- from "it ran the command and it printed nothing".
+     *
+     * The design's fourth case is the second of those: one line saying `no
+     * output`, rather than an empty black rectangle. The case was written in
+     * ActivityCard and was UNREACHABLE, because this normaliser had already
+     * collapsed the two. Caught by rendering the card
+     * (`command-output.test.tsx`), not by any test of this function.
+     *
+     * The intent the old test protected -- an empty output must not offer an
+     * expansion it cannot deliver -- is unchanged and is asserted below: the
+     * row stays static. What changed is that it now says so.
+     */
+    const empty = activityEntries([shellDetail('')], undefined)[0]
+    expect(empty?.kind === 'shell' ? empty.output : 'missing').toBe('')
+    const absent = activityEntries([shellDetail()], undefined)[0]
+    expect(absent?.kind === 'shell' ? absent.output : 'missing').toBeUndefined()
   })
 })

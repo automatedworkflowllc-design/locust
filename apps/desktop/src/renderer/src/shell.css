@@ -4421,6 +4421,19 @@ textarea {
   background: var(--lc-bg-raised-2);
 }
 
+/*
+ * The half of a failed command's output that answers the question.
+ *
+ * A vitest failure puts the assertion, the file and the counts in its last six
+ * lines. Drawn in the same muted grey as 300 lines of `seq` output, they are
+ * work to find; this is the whole reason both ends are kept.
+ *
+ * Failure only. Emphasising every tail would make the emphasis mean nothing.
+ */
+.lc-shellout__text.is-answer {
+  color: var(--lc-text-primary);
+}
+
 .lc-shellout__text {
   margin: 0;
   font-family: var(--lc-font-mono);

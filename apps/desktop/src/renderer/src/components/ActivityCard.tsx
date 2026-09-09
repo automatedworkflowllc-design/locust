@@ -24,8 +24,21 @@ import { Icon } from './Icon.js'
  * `pre` rather than a diff view: this is output, not a change, and the shape
  * of it — columns, indentation, a stack trace — is often the information.
  */
-function ShellOutput({ output }: { readonly output: string }): ReactElement {
+function ShellOutput({ output, failed = false }: { readonly output: string; readonly failed?: boolean }): ReactElement {
   const { head, tail, omitted, total } = boundedShellOutput(output)
+  /*
+   * On a failing run the TAIL is the answer, so it is drawn brighter.
+   *
+   * The whole reason both ends are kept is that an error is as often the last
+   * line as the first -- a vitest failure puts the assertion, the file and the
+   * counts in its last six. When the command failed, those lines are what the
+   * person opened the row for, and drawing them in the same muted grey as 300
+   * lines of `seq` output makes them work to find it (design, 2026-09-08).
+   *
+   * Only on failure. Emphasising the tail of every successful command would
+   * make the emphasis mean nothing, which is how `1 notice` happened.
+   */
+  const tailClass = `lc-shellout__text${failed ? ' is-answer' : ''}`
   /**
    * Everything, once asked for.
    *
@@ -35,9 +48,18 @@ function ShellOutput({ output }: { readonly output: string }): ReactElement {
    */
   const [showAll, setShowAll] = useState(false)
   if (showAll || omitted === 0) {
+    /*
+     * Expanded: nothing is emphasised. A short output IS its own tail, so a
+     * failing one is drawn as the answer -- but once the person has asked for
+     * all 300 lines, marking all 300 as "the answer" is emphasis that means
+     * nothing, which is the rule stated three lines above this one and broken
+     * one line below it in the first version.
+     */
     return (
       <div className="lc-shellout">
-        <pre className="lc-shellout__text">{showAll ? output.replace(/\s+$/, '') : head}</pre>
+        <pre className={showAll ? 'lc-shellout__text' : tailClass}>
+          {showAll ? output.replace(/\s+$/, '') : head}
+        </pre>
         <ShellOutputFoot output={output} total={total} />
       </div>
     )
@@ -56,7 +78,7 @@ function ShellOutput({ output }: { readonly output: string }): ReactElement {
       <button type="button" className="lc-shellout__more" onClick={() => setShowAll(true)}>
         {omitted} more lines
       </button>
-      <pre className="lc-shellout__text">{tail}</pre>
+      <pre className={tailClass}>{tail}</pre>
       <ShellOutputFoot output={output} total={total} />
     </div>
   )
@@ -361,7 +383,7 @@ export function ActivityCard({
                         <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
                       </span>
                     </button>
-                    {isOpen(entry) && <ShellOutput output={entry.output} />}
+                    {isOpen(entry) && <ShellOutput output={entry.output} failed={entry.failed === true} />}
                   </>
                 )
               ) : (
