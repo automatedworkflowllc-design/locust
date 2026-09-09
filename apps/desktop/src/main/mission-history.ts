@@ -182,48 +182,26 @@ export function publicRecoveredMission(
   }
 }
 
-/**
- * Ledger files that raised an issue and yielded NO mission at all.
+/*
+ * `unreadableFileCount` lived here and is gone.
  *
- * Found by Astra, 2026-09-08, writing damaged JSONL by hand and rendering the
- * real Missions component from the result. The reader is sound: for all six
- * damage shapes it keeps exactly the safe prefix and reports the right issue
- * code. What is not sound is what the screen then says.
+ * It counted ledger files that raised an issue and yielded no mission, by
+ * asking which issue ids were absent from `snapshot.missions`. That is right
+ * only if `missions` is every mission the reader recovered -- and it is not:
+ * `listMissions` slices it to a page. An older mission that recovered
+ * perfectly and simply fell outside the twenty newest therefore had its issue
+ * counted as a file that could not be read, and the screen said
+ * "20 local - 1 file could not be read" about a ledger with nothing wrong.
  *
- * A file damaged in its BODY still recovers a mission, that mission carries
- * `integrityIssueCount`, and the header reads "1 with an incomplete receipt".
- * A file damaged in its HEADER -- or one over the size limit -- recovers no
- * mission at all, so there is nothing to carry a per-mission count, and the
- * header reads **"0 local · ledger verified"**. The snapshot's own issue is
- * right there, and `issueCount` carried it faithfully all the way across the
- * IPC boundary, where App.tsx never read it.
+ * Found by Astra, 2026-09-09, in the fix I had just shipped for their previous
+ * finding. Crying wolf is the same disease as false reassurance pointed the
+ * other way, and it is worse here: a damage warning is only worth having if it
+ * is rare enough to believe.
  *
- * So the worse the damage, the more confident the reassurance. That is the
- * exact shape this app spends its time hunting: the mechanism was fine and the
- * reporting lied.
- *
- * Counted by distinct mission id rather than by issue, because one bad file
- * raises several -- a truncated header produces both `truncated-tail` and
- * `invalid-record` -- and "2 could not be read" for one file would be a new
- * false statement in place of the old one. An issue with no id at all is
- * still a file that could not be read, so it counts once.
+ * The count now comes from `MissionLedgerSnapshot.unreadableCount`, computed
+ * inside the reader from its parse results before any slicing -- the one place
+ * where whether a file produced a mission is actually known.
  */
-export function unreadableFileCount(snapshot: {
-  readonly missions: readonly RecoveredMission[]
-  readonly issues: readonly { readonly missionId?: string }[]
-}): number {
-  const recovered = new Set(snapshot.missions.map((mission) => mission.metadata.missionId))
-  const unreadable = new Set<string>()
-  let anonymous = 0
-  for (const issue of snapshot.issues) {
-    if (issue.missionId === undefined) {
-      anonymous += 1
-      continue
-    }
-    if (!recovered.has(issue.missionId)) unreadable.add(issue.missionId)
-  }
-  return unreadable.size + (anonymous > 0 ? 1 : 0)
-}
 
 /**
  * Take missions until the response would exceed its byte budget. The first
@@ -277,7 +255,11 @@ export async function readMissionHistory(
         ),
         currentWorkspaceId: workspaceIdFor(workspacePath),
         issueCount: snapshot.issues.length,
-        unreadableCount: unreadableFileCount(snapshot),
+        // Straight from the reader. It used to be derived here by comparing
+        // issue ids against the recovered missions, which is wrong the moment
+        // that list is a page rather than the whole ledger -- see
+        // `unreadableFileCount` for what that cost.
+        unreadableCount: snapshot.unreadableCount,
         limitedRuntimes: limitedRuntimesFrom(snapshot.missions),
         usageWindows: usageWindowsFrom(snapshot.missions)
       }

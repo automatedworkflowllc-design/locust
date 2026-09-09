@@ -146,7 +146,7 @@ describe('peer messages in history', () => {
   it('reads history even when the workroom itself cannot be read', async () => {
     const response = await readMissionHistory(
       ledger({
-        listMissions: async () => ({ missions: [recovered({ peerLinks: [link('posted', 'wm_1')] })], issues: [] })
+        listMissions: async () => ({ missions: [recovered({ peerLinks: [link('posted', 'wm_1')] })], issues: [], unreadableCount: 0 })
       }),
       {
         post: async () => { throw new Error('unused') },
@@ -172,7 +172,7 @@ describe('peer messages in history', () => {
     storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
     pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
       getMission: async () => undefined,
-      listMissions: async () => ({ missions: [], issues: [] }),
+      listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
       flush: async () => undefined,
       ...overrides
     }
@@ -190,7 +190,7 @@ describe('mission history reads', () => {
     storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
     pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
     getMission: async () => undefined,
-    listMissions: async () => ({ missions: [], issues: [] }),
+    listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
     flush: async () => undefined,
     ...overrides
   })
@@ -199,7 +199,12 @@ describe('mission history reads', () => {
     const response = await readMissionHistory(ledger({
       listMissions: async () => ({
         missions: [recovered()],
-        issues: [{ code: 'read-failed', message: 'A mission ledger could not be read.' }]
+        issues: [{ code: 'read-failed', message: 'A mission ledger could not be read.' }],
+        // One file raised the issue and produced no mission. Reported by the
+        // reader now, rather than inferred here from the recovered list --
+        // which is a PAGE, so the inference counted paged-out missions as
+        // unreadable (Astra, 2026-09-09).
+        unreadableCount: 1
       })
     }))
     expect(response.ok).toBe(true)
@@ -284,7 +289,7 @@ describe('deleting a mission', () => {
     storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
     pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
       getMission: async () => undefined,
-      listMissions: async () => ({ missions: [], issues: [] }),
+      listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
       flush: async () => undefined,
       ...overrides
     }
@@ -386,7 +391,7 @@ describe('which runtimes the record still holds at their limit', () => {
       storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
       pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
       getMission: async () => undefined,
-      listMissions: async () => ({ missions: [recovered({ events: [limit('codex', 5)] })], issues: [] }),
+      listMissions: async () => ({ missions: [recovered({ events: [limit('codex', 5)] })], issues: [], unreadableCount: 0 }),
       flush: async () => undefined
     }
     const response = await readMissionHistory(stub)

@@ -117,7 +117,7 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
     storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
     pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
     getMission: async () => undefined,
-    listMissions: async () => ({ missions: [], issues: [] }),
+    listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
     flush: async () => undefined,
     ...overrides
   }
