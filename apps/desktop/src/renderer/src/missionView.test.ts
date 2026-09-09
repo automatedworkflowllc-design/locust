@@ -1866,6 +1866,49 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     expect(segments.find((seg) => seg.key === 'subagents')?.tone).toBeUndefined()
   })
 
+  it('names the one command it ran, rather than counting it', () => {
+    /*
+     * "1 tool call" counts a thing you cannot see without opening the fold --
+     * the same complaint as the `1 notice` chip. A finished turn should read
+     * as a bubble, one line and two replies, and that only works if the line
+     * says what happened (design, 2026-09-08).
+     *
+     * Through `shellCommandText`, so a Windows run does not spend the whole
+     * summary on the powershell preamble before reaching the command. That is
+     * what `WRAPPED` is: the command exactly as the host builds it.
+     */
+    const WRAPPED = '"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "seq 1 300"'
+    const events = [
+      ev(1, 'run.started', { runtimeThreadId: 't', process: {} }, 0),
+      ev(2, 'tool.started', { itemId: 'a', toolKind: 'command_execution', name: 'shell', command: WRAPPED, phase: 'started' }, 1),
+      ev(3, 'tool.completed', { itemId: 'a', toolKind: 'command_execution', name: 'shell', command: WRAPPED, phase: 'completed', output: '1\n2\n3', exitCode: 0 }, 12),
+      ev(4, 'run.completed', { runtimeThreadId: 't', process: {} }, 12)
+    ]
+    const activity = buildThread(events, { running: false }).find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    const segments = activityTrace(details, events, traceOutcome(events, false))
+    const calls = segments.find((seg) => seg.key === 'calls')
+    expect(calls?.text).toBe('ran seq 1 300')
+    expect(calls?.text).not.toContain('powershell')
+  })
+
+  it('goes back to counting when there is more than one command', () => {
+    // The control: naming one of several would be arbitrary, so the count has
+    // to survive for that case rather than the summary picking a favourite.
+    const events = [
+      ev(1, 'run.started', { runtimeThreadId: 't', process: {} }, 0),
+      ev(2, 'tool.started', { itemId: 'a', toolKind: 'command_execution', name: 'shell', command: 'ls', phase: 'started' }, 1),
+      ev(3, 'tool.completed', { itemId: 'a', toolKind: 'command_execution', name: 'shell', command: 'ls', phase: 'completed', exitCode: 0 }, 2),
+      ev(4, 'tool.started', { itemId: 'b', toolKind: 'command_execution', name: 'shell', command: 'pwd', phase: 'started' }, 3),
+      ev(5, 'tool.completed', { itemId: 'b', toolKind: 'command_execution', name: 'shell', command: 'pwd', phase: 'completed', exitCode: 0 }, 4),
+      ev(6, 'run.completed', { runtimeThreadId: 't', process: {} }, 4)
+    ]
+    const activity = buildThread(events, { running: false }).find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    const segments = activityTrace(details, events, traceOutcome(events, false))
+    expect(segments.find((seg) => seg.key === 'calls')?.text).toBe('2 tool calls')
+  })
+
   it('carries the notices it used to only count, as sentences on the fold', () => {
     // The positive control for the change above: dropping the chip must not
     // mean dropping the fact. This diagnostic arrives BEFORE any tool call and

@@ -800,7 +800,37 @@ export function activityTrace(
     else if (helpersSilent > 0) { text += helpers.length === 1 ? ' · it did not report' : ` · ${String(helpersSilent)} did not report`; tone = 'amber' }
     segments.push({ key: 'subagents', text, ...(tone === undefined ? {} : { tone }) })
   }
-  if (calls > 0) segments.push({ key: 'calls', text: pluralize(calls, 'tool call') })
+  /*
+   * One command, and the line NAMES it: `ran seq 1 300`.
+   *
+   * "1 tool call" is a count of a thing the person cannot see without opening
+   * the fold, which is the same complaint as the `1 notice` chip above. The
+   * point of the closed state is that a finished turn reads as bubble, one
+   * line, two replies -- and that only works if the one line says what
+   * happened (design, 2026-09-08).
+   *
+   * Only when there is exactly one, and only for a shell command: naming one
+   * of four would be arbitrary, and a `Read` of a path is already the file
+   * rows' job. Bounded, because a command can be a paragraph and this line
+   * shares its row with the duration, the file count and the cost.
+   */
+  const shellCommands = details.filter((detail) => detail.kind === 'shell')
+  // Through `shellCommandText`, the same unwrapping the command ROW uses. A
+  // raw name on Windows begins with the whole
+  // `"C:\Windows\...\powershell.exe" -NoProfile -Command` preamble, so a
+  // summary built from it would spend its 60 characters on the host shell and
+  // never reach the command.
+  const onlyCommand =
+    shellCommands.length === 1
+      ? shellCommandText(shellCommands[0]?.name ?? '').split('\n')[0]?.trim()
+      : undefined
+  if (calls > 0) {
+    segments.push(
+      onlyCommand !== undefined && onlyCommand.length > 0 && calls === 1
+        ? { key: 'calls', text: `ran ${onlyCommand.length > 60 ? `${onlyCommand.slice(0, 59)}…` : onlyCommand}` }
+        : { key: 'calls', text: pluralize(calls, 'tool call') }
+    )
+  }
   if (files > 0 && !(outcome === 'cancelled' && files === 0)) segments.push({ key: 'files', text: pluralize(files, 'file') })
   else if (files === 0 && outcome === 'completed' && mayEdit === true && !cannotAttribute) {
     segments.push({ key: 'files', text: 'no files changed' })
