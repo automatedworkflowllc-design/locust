@@ -17,6 +17,7 @@ import type {
   AppUpdateState,
   MissionApprovalDecision,
   MissionApprovalRequest,
+  MissionHistoryResponse,
   MissionMode,
   PublicModel,
   PublicRuntimeArtifact,
@@ -655,7 +656,7 @@ export default function App(): ReactElement {
         bridge.listTeammates()
       ])
       if (next.ok) setStorage(next.data)
-      if (listed.ok) setHistory(listed.data.missions)
+      applyHistory(listed)
       seedLimitsFrom(listed)
       if (roster.ok) setMissionOwners(roster.data.missionOwners)
     }
@@ -670,6 +671,35 @@ export default function App(): ReactElement {
   const [unreadableLedgers, setUnreadableLedgers] = useState(0)
   /** The ledger could not be read AT ALL -- not the same as having no missions. */
   const [ledgerUnreadable, setLedgerUnreadable] = useState(false)
+
+  /**
+   * Apply a history response to ALL of what it decides, in one place.
+   *
+   * Three separate reads call this: the initial load, `refreshHistory`, and
+   * the re-read after a storage prune. Each of them used to call `setHistory`
+   * on its own, and only the first was taught about the two damage states -- so
+   * pruning the damaged mission, or any later refresh, left a warning on
+   * screen that its own data no longer supported, and a ledger that BECAME
+   * unreadable after launch would never have said so.
+   *
+   * Raised by Astra as a source-only concern, 2026-09-09: "App's other history
+   * reads update missions but not these two new damage states." Not
+   * live-reproduced, and it does not need to be -- three call sites deciding
+   * two related things independently is the shape of the bug, not evidence of
+   * one.
+   */
+  const applyHistory = (response: MissionHistoryResponse): void => {
+    if (!response.ok) {
+      // A failed read is not an empty ledger. `history` is deliberately left
+      // as it was: replacing known missions with [] on a transient read
+      // failure would erase the record from the screen.
+      setLedgerUnreadable(true)
+      return
+    }
+    setLedgerUnreadable(false)
+    setHistory(response.data.missions)
+    setUnreadableLedgers(response.data.unreadableCount)
+  }
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
@@ -1113,7 +1143,7 @@ export default function App(): ReactElement {
       .getMissionHistory()
       .then((response) => {
         seedLimitsFrom(response)
-        if (response.ok) setHistory(response.data.missions)
+        applyHistory(response)
       })
       .catch(() => undefined)
   }
@@ -1411,38 +1441,11 @@ export default function App(): ReactElement {
       .then((response) => {
         seedLimitsFrom(response)
         if (!active) return
-        /*
-         * The whole read failed, and that is not the same as an empty ledger.
-         *
-         * Found by driving it (drive-ledger-failure, 2026-09-08): with the
-         * ledger directory replaced by a plain file, every write and every
-         * read fails, `readMissionHistory` answers HISTORY_UNAVAILABLE, and
-         * this handler used to return here -- leaving `history` empty and the
-         * damage count at zero, so the Missions header rendered
-         * "0 local - ledger verified" about a ledger it had not read at all.
-         *
-         * That is the same defect Astra found one step further out. Their case
-         * was a file too damaged to yield a mission; this is the directory
-         * failing outright, which the fix for theirs did not reach because it
-         * counts issues INSIDE a snapshot that never arrived.
-         */
-        if (!response.ok) {
-          setLedgerUnreadable(true)
-          return
-        }
-        setLedgerUnreadable(false)
-        setHistory(response.data.missions)
-        /*
-         * Ledger files that could not be read at all.
-         *
-         * Kept because the Missions header cannot be honest without it: a file
-         * damaged in its header recovers NO mission, so there is nothing to
-         * carry a per-mission issue count, and the screen said "ledger
-         * verified" about a ledger it had just failed to read (Astra,
-         * 2026-09-08). The count travelled across IPC correctly all along and
-         * was dropped here.
-         */
-        setUnreadableLedgers(response.data.unreadableCount)
+        // Everything the response decides, in one place -- see `applyHistory`.
+        // This handler used to do it inline while the other two reads did not,
+        // which is how they came to disagree.
+        applyHistory(response)
+        if (!response.ok) return
         setWorkspaceId(response.data.currentWorkspaceId)
         // The most recent mission IN THIS FOLDER opens on launch. It used to be
         // the most recent mission anywhere, so opening Locust in a new project
