@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.55.1 - 2026-09-09
+
+- **The "Get it" links now open.** Cursor, Antigravity and Node.js each offered
+  a link to where you get them, and none of them did anything — in every build
+  that had them. They looked like links, and clicking one was silent. Found by
+  the first person outside this machine to install Locust.
+- **A greyed-out Install button now says why on the screen.** With no Node.js
+  installed, four of the five runtimes cannot be installed at all, and the
+  sentence explaining that disappeared the moment any one runtime connected —
+  which Codex often does by itself. What was left was a panel of buttons that
+  did nothing, with the reason only visible if you hovered over one.
+
 ## 0.55.0 - 2026-09-09
 
 - **Eight missions can run at once, not four.** The old limit of four was a
