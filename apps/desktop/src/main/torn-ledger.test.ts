@@ -10,7 +10,7 @@ import type { MissionLedgerIssueCode, MissionLedgerMetadata } from '@teammate/mi
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { readMissionHistory } from './mission-history.js'
 import { MISSION_HISTORY_CHANNEL } from '../shared/ipc.js'
-import type { DesktopApi, PublicRecoveredMission } from '../shared/ipc.js'
+import type { DesktopApi, MissionHistoryResponse, PublicRecoveredMission } from '../shared/ipc.js'
 
 const transport = vi.hoisted(() => ({ invoke: vi.fn(), expose: vi.fn() }))
 vi.mock('electron', () => ({ contextBridge: { exposeInMainWorld: transport.expose },
@@ -118,10 +118,37 @@ interface ScreenProps {
   readonly runningMissionIds: ReadonlySet<string>
   readonly titleOf: (mission: PublicRecoveredMission) => string
   readonly onOpen: (id: string) => void
+  readonly unreadableLedgers: number
+  readonly ledgerUnreadable: boolean
 }
 const screenModule = await import(new URL('../renderer/src/components/Screens.tsx', import.meta.url).href) as { MissionsScreen: ComponentType<ScreenProps> }
 await import('../preload/index.js')
 const bridge = transport.expose.mock.calls[0]?.[1] as DesktopApi
+
+async function throughPreload(response: MissionHistoryResponse) {
+  transport.invoke.mockImplementationOnce(async (channel: string) => {
+    expect(channel).toBe(MISSION_HISTORY_CHANNEL)
+    // Simulate serialization, not actual Electron transport or sender validation.
+    return structuredClone(response)
+  })
+  const received = await bridge.getMissionHistory()
+  expect(received).toEqual(response)
+  return received
+}
+
+function renderHistory(received: MissionHistoryResponse): string {
+  // Mirror App's initial history response mapping, including its distinct
+  // directory-failure flag. This is not an App mount: the real component is
+  // rendered, while App's mapping is separately source-inspected in the report.
+  return renderToStaticMarkup(createElement(screenModule.MissionsScreen, {
+    missions: received.ok ? received.data.missions : [],
+    workspaceId: received.ok ? received.data.currentWorkspaceId : undefined,
+    unreadableLedgers: received.ok ? received.data.unreadableCount : 0,
+    ledgerUnreadable: !received.ok,
+    teammates: [], missionOwners: {}, runningMissionIds: new Set<string>(),
+    titleOf: (mission) => mission.prompt, onOpen: () => undefined
+  }))
+}
 
 async function displayed(text: string, oversized = false, cleanNeighbor = false) {
   const { ledger, root } = await file(text, oversized)
@@ -133,33 +160,25 @@ async function displayed(text: string, oversized = false, cleanNeighbor = false)
   const response = await readMissionHistory(ledger, undefined, root)
   expect(response.ok).toBe(true)
   if (!response.ok) throw new Error('History failed instead of returning recoverable evidence')
-  transport.invoke.mockImplementationOnce(async (channel: string) => {
-    expect(channel).toBe(MISSION_HISTORY_CHANNEL)
-    // Electron's process boundary is simulated explicitly; counts cannot ride
-    // through by object identity or by retaining the private ledger object.
-    return structuredClone(response)
-  })
-  const received = await bridge.getMissionHistory()
-  expect(received).toEqual(response)
+  const received = await throughPreload(response)
   if (!received.ok) throw new Error('Preload dropped successful response')
   expect(received.data.issueCount).toBe(snapshot.issues.length)
-  const html = renderToStaticMarkup(createElement(screenModule.MissionsScreen, {
-    missions: received.data.missions, workspaceId: received.data.currentWorkspaceId,
-    teammates: [], missionOwners: {}, runningMissionIds: new Set<string>(), titleOf: (mission) => mission.prompt, onOpen: () => undefined
-  }))
+  const html = renderHistory(received)
   return { html, snapshot, data: received.data }
 }
 
 describe('physical torn ledger: reader → history → preload → rendered Missions screen', () => {
-  it('KNOWN DEFECT — invalid header beside a clean ledger: clean receipt survives but global warning is invisible', async () => {
+  it('invalid header beside a clean ledger: clean receipt survives and unreadable file is visible', async () => {
     const result = await displayed('{broken\n', false, true)
     expect(result.snapshot.issues.map((issue) => issue.code)).toEqual(['invalid-record'])
     expect(result.data.issueCount).toBe(1)
+    expect(result.data.unreadableCount).toBe(1)
     expect(result.snapshot.missions).toHaveLength(1)
     expect(result.snapshot.missions[0]?.issues).toEqual([])
     expect(result.data.missions.map((mission) => mission.missionId)).toEqual(['mission_clean'])
     expect(result.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([0])
-    expect(result.html).toContain('1 local, 0 in this folder · ledger verified')
+    expect(result.html).toContain('1 local, 0 in this folder · 1 file could not be read')
+    expect(result.html).not.toContain('ledger verified')
     expect(result.html).not.toContain('with an incomplete receipt')
   })
 
@@ -167,29 +186,101 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     const result = await displayed(clean)
     expect(result.snapshot.issues).toEqual([])
     expect(result.data.issueCount).toBe(0)
+    expect(result.data.unreadableCount).toBe(0)
     expect(result.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([0])
     expect(result.html).toContain('1 local, 0 in this folder · ledger verified')
     expect(result.html).not.toContain('with an incomplete receipt')
+    expect(result.html).not.toContain('could not be read')
   })
 
   it.each(shapes.filter((shape) => shape.surviving !== null))('$name: issue becomes incomplete receipt wording', async (shape) => {
     const result = await displayed(shape.text)
     expect(result.snapshot.issues.map((issue) => issue.code)).toEqual(shape.codes)
     expect(result.data.issueCount).toBe(shape.codes.length)
+    expect(result.data.unreadableCount).toBe(0)
     expect(result.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([shape.codes.length])
     expect(result.data.missions[0]?.events).toEqual(events.slice(0, shape.surviving!))
     expect(result.html).toContain('1 local, 0 in this folder · 1 with an incomplete receipt')
     expect(result.html).not.toContain('ledger verified')
   })
 
-  // Characterization, NOT desired behavior. These green checks deliberately
-  // pin the observed defect so the report cannot hide it behind reader success.
-  it.each(shapes.filter((shape) => shape.surviving === null))('KNOWN DEFECT — $name: global issue survives, but screen says verified', async (shape) => {
+  // Former KNOWN DEFECT cases now require the fixed contract. A truncated
+  // header raises two issues but is ONE unreadable file, not two missing files.
+  it.each(shapes.filter((shape) => shape.surviving === null))('$name: unreadable file count reaches the visible warning', async (shape) => {
     const result = await displayed(shape.text, shape.oversized)
     expect(result.snapshot.issues.map((issue) => issue.code)).toEqual(shape.codes)
     expect(result.data.issueCount).toBe(shape.codes.length)
+    expect(result.data.unreadableCount).toBe(1)
     expect(result.data.missions).toEqual([])
-    expect(result.html).toContain('0 local · ledger verified')
+    expect(result.html).toContain('0 local · 1 file could not be read')
+    expect(result.html).not.toContain('ledger verified')
     expect(result.html).not.toContain('with an incomplete receipt')
+  })
+
+  it('directory failure: real file at mission-ledger path renders unavailable, not verified', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'locust-ledger-directory-proof-'))
+    roots.push(root)
+    const ledgerPath = join(root, 'mission-ledger')
+    await writeFile(ledgerPath, 'blocking file, not a directory', 'utf8')
+    const ledger = createFileMissionLedger({ rootDirectory: ledgerPath })
+    // A real failed syscall, not a mock that invents HISTORY_UNAVAILABLE.
+    await expect(ledger.listMissions()).rejects.toThrow()
+    const response = await throughPreload(await readMissionHistory(ledger, undefined, root))
+    expect(response).toEqual({ ok: false, error: {
+      code: 'HISTORY_UNAVAILABLE', message: 'Local mission history could not be read.'
+    } })
+    const html = renderHistory(response)
+    expect(html).toContain('0 local · the ledger could not be read')
+    expect(html).not.toContain('ledger verified')
+    expect(html).not.toContain('with an incomplete receipt')
+    expect((await stat(ledgerPath)).isFile()).toBe(true)
+    expect(await readFile(ledgerPath, 'utf8')).toBe('blocking file, not a directory')
+  })
+
+  it('mixed damage: two recovered incomplete receipts and one unreadable file remain separate', async () => {
+    const { ledger, root } = await file(prefix + '{broken\n')
+    await writeFile(join(root, 'mission_second.jsonl'), (prefix + '{broken\n').replaceAll(ID, 'mission_second'), 'utf8')
+    await writeFile(join(root, 'mission_header.jsonl'), '{"schemaVersion":', 'utf8')
+    const snapshot = await ledger.listMissions()
+    expect(snapshot.missions).toHaveLength(2)
+    expect(snapshot.issues.map((issue) => issue.code).sort()).toEqual([
+      'invalid-record', 'invalid-record', 'invalid-record', 'truncated-tail'
+    ])
+    const response = await throughPreload(await readMissionHistory(ledger, undefined, root))
+    expect(response.ok).toBe(true)
+    if (!response.ok) throw new Error('Mixed history unexpectedly unavailable')
+    expect(response.data.issueCount).toBe(4)
+    expect(response.data.unreadableCount).toBe(1)
+    expect(response.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([1, 1])
+    const html = renderHistory(response)
+    expect(html).toContain('2 with an incomplete receipt · 1 file could not be read')
+    expect(html).not.toContain('ledger verified')
+  })
+
+  // New characterization, not one of the five repaired cases: absence from
+  // the limited page is incorrectly treated as failure to recover a file.
+  it('KNOWN DEFECT — history limit mislabels an older recoverable receipt as unreadable', async () => {
+    const { ledger, root } = await file(prefix + '{broken\n')
+    // The older damaged BODY is readable. Twenty newer clean missions put it
+    // outside readMissionHistory's returned page, not outside recovery itself.
+    for (let index = 0; index < 20; index += 1) {
+      const id = `mission_new_${index}`
+      await writeFile(join(root, `${id}.jsonl`), clean.replaceAll(ID, id)
+        .replaceAll(NOW, '2026-09-09T12:00:00.000Z'), 'utf8')
+    }
+    const full = await ledger.listMissions({ limit: 30 })
+    expect(full.missions).toHaveLength(21)
+    expect(full.issues.map((issue) => issue.code)).toEqual(['invalid-record'])
+    const older = await ledger.getMission(ID)
+    expect(older?.events).toEqual(events.slice(0, 1))
+    const response = await throughPreload(await readMissionHistory(ledger, undefined, root))
+    expect(response.ok).toBe(true)
+    if (!response.ok) throw new Error('Paged history unexpectedly unavailable')
+    expect(response.data.missions).toHaveLength(20)
+    expect(response.data.missions.every((mission) => mission.integrityIssueCount === 0)).toBe(true)
+    // Desired zero went red (received one) against pinned main. Leave the
+    // production fix to its owner; keep the observed false wording explicit.
+    expect(response.data.unreadableCount).toBe(1)
+    expect(renderHistory(response)).toContain('20 local, 0 in this folder · 1 file could not be read')
   })
 })

@@ -119,6 +119,14 @@ Use this template:
 
 ## Handoff log
 
+### 2026-09-09 — pinned ledger-fix recheck and Codex question contract (astra/work)
+
+- Pinned main `2b60cab` merged as `9130f12`; both conflicted test-path files taken from main exactly. Main checkout untouched. Rebuilt mission-store before testing.
+- [Independent recheck](FINDING-ledger-fix-recheck-2026-09-09.md): all five former KNOWN DEFECT cases now require and render warnings; physical directory failure and mixed damage pass. Both requested mutations fail (5 and 6 assertions), plus directory-warning mutation (1). Both clean controls retained.
+- New measured defect, not fixed: body-damaged but recoverable mission outside the 20-entry page is miscounted as an unreadable file. Desired zero failed with one; explicitly characterized in the 22-test harness. Other refresh paths' stale damage state is source-only, not live-tested.
+- [Codex question answer contract](FINDING-codex-question-answers-2026-09-09.md): installed 0.153.0 accepts question-ID → answer-string-array content, selected options by literal label. Malformed payload becomes an empty answer map in version-matched upstream source. No approval-flow change and no model quota; schema inspector includes no-data and wrong-shape controls.
+- Validation: root pnpm test and full Vitest 1,996/1,996 (111 files); desktop pnpm test 1,544/1,544 (90 files), matching root's desktop portion. Recursive node/web typecheck green. Main's cwd prohibition passes; production diff from pinned merge is empty.
+
 ### 2026-09-08 — physical torn-ledger recovery proof (astra/work)
 
 - Tests/findings only: [torn-ledger finding](FINDING-torn-ledger-2026-09-08.md). Nineteen new physical-file reader/history/preload/component-rendering checks, with clean zero-issue controls and ten measured mutation failures.
