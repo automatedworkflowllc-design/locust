@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.55.2 - 2026-09-09
+
+- **Menus close when you click anywhere else.** The permission mode menu, the
+  effort panel and the model picker all stayed open until you pressed the
+  button that opened them a second time. Clicking away now closes them, and
+  Escape still does too.
+
 ## 0.55.1 - 2026-09-09
 
 - **The "Get it" links now open.** Cursor, Antigravity and Node.js each offered
