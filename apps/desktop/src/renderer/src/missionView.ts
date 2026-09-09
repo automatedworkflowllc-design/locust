@@ -517,7 +517,7 @@ function pluralize(count: number, singular: string): string {
  *
  * Runtimes reach a shell through a host, and the host is not the work: a
  * Codex run on Windows records every command as
- * `"C:\Windows\System32\WindowsPowerShell1.0\powershell.exe" -Command "npm test"`.
+ * `"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -Command "npm test"`.
  * The row is one line wide, so the host name and its escaped backslashes
  * filled it and the actual command was cut off -- measured 2026-09-03 by
  * reading the card after a real run and being unable to tell what had been

@@ -93,3 +93,51 @@ describe('no test can pass without checking anything', () => {
     expect(bare).toEqual([])
   })
 })
+
+/**
+ * And no test decides where its own sources are by asking the shell.
+ *
+ * Two tests built their paths as `join(process.cwd(), 'apps/desktop/src', ...)`.
+ * That is right only when vitest is started from the repository root. The ship
+ * gate starts it there and was green; `pnpm test` starts it inside
+ * apps/desktop, where the path doubles and all seven cases die on ENOENT.
+ *
+ * The failure mode is not that a test broke -- it is that the suite had two
+ * different answers depending on how it was invoked, and the invocation that
+ * gated releases was the one that passed. A green from the gate no longer
+ * meant the suite was green. That is the same disease as an assertion-free
+ * test, one level up, so it is pinned in the same file.
+ *
+ * `import.meta.url` is the fix and the rule: a test's sources sit at a fixed
+ * place relative to the test, never relative to whoever ran it.
+ */
+/*
+ * The needle is assembled rather than written, so that this file does not
+ * contain the very text it forbids. The first version did, and flagged
+ * itself along with the explanatory comment in the file it had just fixed --
+ * a detector that reads prose as code, which is the third time today a
+ * detector's own finding turned out to be the detector's.
+ */
+const CWD_CALL = `${'process'}.${'cwd'}()`
+
+/** Source with comments removed, so a note ABOUT the rule is not a breach of it. */
+function codeOnly(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[^\n]*?\/\/[^\n]*$/gm, ' ')
+}
+
+describe('no test resolves its sources from the working directory', () => {
+  it('found the tests, and can tell the call from a note about it', () => {
+    expect(files.length).toBeGreaterThan(50)
+    expect(codeOnly(`const p = join(${CWD_CALL}, 'src')`)).toContain(CWD_CALL)
+    expect(codeOnly(`// never use ${CWD_CALL} here`)).not.toContain(CWD_CALL)
+    expect(codeOnly(`/* a note about ${CWD_CALL} */`)).not.toContain(CWD_CALL)
+    expect(codeOnly("const SRC = fileURLToPath(new URL('../', import.meta.url))")).not.toContain(CWD_CALL)
+  })
+
+  it('every test file resolves from import.meta.url instead', () => {
+    const cwdBound = files
+      .filter((path) => codeOnly(readFileSync(path, 'utf8')).includes(CWD_CALL))
+      .map((path) => path.slice(ROOT.length))
+    expect(cwdBound).toEqual([])
+  })
+})

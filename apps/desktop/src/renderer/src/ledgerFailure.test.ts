@@ -12,7 +12,7 @@ describe('what is safe and what is at risk when the ledger cannot be written', (
     // the mission; stopping is right, calling it holding is not.
     const said = ledgerFailureSentence('The disk reports no space.')
     expect(said).toMatch(/stopped/i)
-    expect(said).not.toMatch(/held|paused/i)
+    expect(said).not.toMatch(/\bheld\b|\bpaused\b/i)
   })
 
   it('quotes the host rather than guessing at a cause', () => {

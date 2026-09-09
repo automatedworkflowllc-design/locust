@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
@@ -36,7 +37,10 @@ import { describe, expect, it } from 'vitest'
  * behaviour, only about the vocabulary the components are allowed to use.
  */
 
-const COMPONENTS = join(process.cwd(), 'apps/desktop/src/renderer/src/components')
+// Resolved from THIS file, not the working directory -- see the note in
+// block-placement.test.ts. A cwd-relative path made this file pass under the
+// ship gate and fail under `pnpm test`, which is the worst way round.
+const COMPONENTS = fileURLToPath(new URL('../renderer/src/components/', import.meta.url))
 
 const sourceOf = (file: string): string => readFileSync(join(COMPONENTS, file), 'utf8')
 

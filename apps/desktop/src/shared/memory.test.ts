@@ -35,7 +35,7 @@ describe('the memory block', () => {
     expect(parseMemoryBlocks(`<locust-memory>\n${lines.join('\n')}\n</locust-memory>`)).toHaveLength(MAX_MEMORY_OPS_PER_REPLY)
     const long = 'x'.repeat(MAX_MEMORY_TEXT_LENGTH + 40)
     expect(boundedMemoryText(long)).toHaveLength(MAX_MEMORY_TEXT_LENGTH)
-    expect(boundedMemoryText('ab   c\n')).toBe('ab c')
+    expect(boundedMemoryText('a\u0007b   c\n')).toBe('ab c')
   })
 
   it('matches memories case- and punctuation-blind', () => {
