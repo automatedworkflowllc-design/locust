@@ -6,6 +6,44 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.55.0 - 2026-09-09
+
+- **Eight missions can run at once, not four.** The old limit of four was a
+  guess: it was written as "a resource bound" and never measured. It has now
+  been measured — eight teammates answering at once, each producing a long
+  steady stream of output, finished in under twice the time one takes and used
+  4.2 GB of memory, with nothing dropped and no run cut short. Nothing the old
+  number was protecting against happened. What has not been measured, and may
+  change this again, is a machine with much less memory than the one it was
+  measured on.
+- **A room can no longer be built that it cannot answer.** A room holds up to
+  eight teammates, so with the new limit every member of a full room runs. This
+  was the cause of the next three fixes.
+- **A room no longer says "Everyone has answered" when some of them never
+  started.** Posting to six teammates while only four could run started four,
+  drew the other two as empty cards, and then told you everyone had answered.
+  It now says "4 of 6 in Standup answered; 2 never started."
+- **Someone the post could not reach gets a line, not an empty card.** They
+  used to get an answer card with no answer in it — a name, "did not start",
+  and a blank space where the reply belongs — and the reason was said in the
+  smallest text on the screen, far below, repeated once per person. It is now
+  one line under the answers: "Pike, Dell and Ember were not asked — up to 8
+  missions can run at once."
+- **And that reason no longer disappears.** It lived only in the moment of
+  posting, so waiting for the room to finish, or reopening it later, left the
+  absence unexplained. It is now kept with the post.
+- **Ticking a ninth teammate into a room now says so instead of failing.** The
+  picker offered every teammate and then refused the room when you pressed
+  Create room. It now says "A room holds 8 teammates. Untick 1 to make this
+  one." and does not offer the button until it would work.
+- **Long answers in a room stop squashing short ones.** Past six answers the
+  room lays them out one per line, so a teammate who writes twelve lines no
+  longer forces everyone beside them to be twelve lines tall.
+- **Warnings and errors that were meant to be amber or red were grey.** Text
+  asked to be coloured lost to whatever the surrounding component had already
+  set, so several notices — including a room form's own error messages — had
+  been rendering as ordinary grey text.
+
 ## 0.54.1 - 2026-09-09
 
 - **Two buttons on every teammate card were drawn on top of each other.** In a
