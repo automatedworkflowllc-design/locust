@@ -76,3 +76,19 @@ own assertions are live:
   renderer and requires it to be refused, and runs discovery with PATH reduced
   to `C:\Windows\System32` so a CLI found only because the dev shell knew where
   it was would report missing.
+
+## Run a sweep on a quiet machine
+
+`node _smoke/run-all.mjs` runs the smokes one at a time, but they drive a real
+Electron and real providers, and several have windows that widen under load:
+`cursor` waits on a live `cursor-agent --list-models`, `routine` reconciles a
+mission's phase against the ledger. Running the unit suite, a build or a drive
+alongside a sweep makes those go red for no product reason -- measured
+2026-09-11, where two of seven failures were exactly that and cost an hour to
+tell apart from the five that were real. A sweep that shares the machine
+reports the machine.
+
+Keep the previous `smoke-results.json` before starting: the runner overwrites
+it, and the old one is the only baseline for "was this already red". Its rows
+are keyed `code`, `failed`, `outOfQuota`, `seconds`, `tail` -- there is no
+`ok` or `pass`, and a parse that assumes one reports every row as failing.
