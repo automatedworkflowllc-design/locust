@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
-import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole } from '../../../shared/ipc.js'
+import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector} from '../../../shared/ipc.js'
 import { PixelFace } from './PixelFace.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 
@@ -63,7 +63,9 @@ export function NewTeammateDialog({
   initial,
   mode,
   onChooseFolder,
-  folderNotice
+  folderNotice,
+  connectors,
+  onSetConnectors
 }: {
   readonly onCancel: () => void
   readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }) => void
@@ -83,6 +85,13 @@ export function NewTeammateDialog({
   readonly onChooseFolder?: (clear: boolean) => void
   /** Why the last folder request did nothing. Absent when it worked, or was cancelled. */
   readonly folderNotice?: string
+  /**
+   * Every connector the person's Claude Code reports, for narrowing. Absent
+   * while it is being read, or where narrowing is not offered.
+   */
+  readonly connectors?: readonly PublicConnector[]
+  /** The whole list of ticked names; empty means every connector. Takes effect at once. */
+  readonly onSetConnectors?: (names: readonly string[]) => void
 }): ReactElement {
   const editing = initial !== undefined
   const [name, setName] = useState(initial?.name ?? '')
@@ -260,6 +269,55 @@ export function NewTeammateDialog({
                 to that folder. History and memory stay with the project either way.
               </span>
               {folderNotice !== undefined && <span className="lc-field__hint lc-tone-amber">{folderNotice}</span>}
+            </div>
+          )}
+
+          {/*
+            * Which connectors THIS teammate may use without asking.
+            *
+            * Nothing ticked is the ordinary state and means every connector
+            * the person has -- Colin's ruling. Ticking some NARROWS: a
+            * Finance Bro gets Robinhood and not Gmail, and a call to anything
+            * else stops the run and asks. Every name here was read off
+            * `claude mcp list`; none can be typed.
+            *
+            * Only when editing, like the folder: a teammate being created has
+            * nothing to write a list onto.
+            */}
+          {editing && onSetConnectors !== undefined && connectors !== undefined && connectors.length > 0 && (
+            <div className="lc-field lc-field--connectors">
+              <span className="lc-fieldlabel lc-mono">Connectors</span>
+              <div className="lc-connectorgrid" role="group" aria-label="Connectors this teammate may use">
+                {connectors.map((connector) => {
+                  const narrowed = initial?.connectors ?? []
+                  const on = narrowed.length === 0 || narrowed.includes(connector.name)
+                  const label = connector.name.replace(/^claude\.ai /, '')
+                  return (
+                    <button
+                      key={connector.name}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      className={`lc-connectorpick${on ? ' is-on' : ''}${connector.status === 'connected' ? '' : ' is-unready'}`}
+                      title={connector.status === 'connected' ? connector.location : `${connector.name} — ${connector.status === 'needs-auth' ? 'not signed in yet' : 'not responding'}`}
+                      onClick={() => {
+                        // From "everything" the first untick narrows to all-but-one;
+                        // unticking the last one widens back to everything.
+                        const current = narrowed.length === 0 ? connectors.map((entry) => entry.name) : [...narrowed]
+                        const next = on ? current.filter((name) => name !== connector.name) : [...current, connector.name]
+                        onSetConnectors(next.length === connectors.length ? [] : next)
+                      }}
+                    >
+                      <span>{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <span className="lc-field__hint">
+                {(initial?.connectors ?? []).length === 0
+                  ? 'All of them, without asking. Untick one and this teammate is limited to the rest; a call to anything else asks you first.'
+                  : `Only these, without asking. A call to any other connector stops the run and asks you.`}
+              </span>
             </div>
           )}
 

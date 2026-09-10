@@ -50,6 +50,8 @@ import {
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
   RUNTIME_SETUP_CHANNEL,
+  CONNECTOR_LIST_CHANNEL,
+  TEAMMATE_CONNECTORS_CHANNEL,
   TEAMMATE_FOLDER_CHANNEL,
   WORKTREE_LIST_CHANNEL,
   WORKTREE_REMOVE_CHANNEL
@@ -104,6 +106,7 @@ import type {
   MemoryListResponse,
   MemoryUpdateRequest,
   RuntimeSetupResponse,
+  ConnectorListResponse,
   TeammateFolderResponse,
   WorktreeListResponse,
   RuntimeInstallProgress,
@@ -224,6 +227,9 @@ const desktopApi: DesktopApi = {
   updateRoomTask: (request: RoomTaskRequest) => ipcRenderer.invoke(ROOM_TASK_CHANNEL, request) as Promise<RoomTaskResponse>,
   listMemories: () => ipcRenderer.invoke(MEMORY_LIST_CHANNEL) as Promise<MemoryListResponse>,
   readRuntimeSetup: () => ipcRenderer.invoke(RUNTIME_SETUP_CHANNEL) as Promise<RuntimeSetupResponse>,
+  listConnectors: () => ipcRenderer.invoke(CONNECTOR_LIST_CHANNEL) as Promise<ConnectorListResponse>,
+  setTeammateConnectors: (teammateId: string, names: readonly string[]) =>
+    ipcRenderer.invoke(TEAMMATE_CONNECTORS_CHANNEL, { teammateId, names }) as Promise<TeammateFolderResponse>,
   chooseTeammateFolder: (teammateId: string, clear?: boolean) =>
     ipcRenderer.invoke(TEAMMATE_FOLDER_CHANNEL, { teammateId, clear: clear === true }) as Promise<TeammateFolderResponse>,
   listWorktrees: () => ipcRenderer.invoke(WORKTREE_LIST_CHANNEL) as Promise<WorktreeListResponse>,

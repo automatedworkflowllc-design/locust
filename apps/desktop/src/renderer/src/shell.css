@@ -6265,6 +6265,50 @@ textarea {
   margin-top: var(--lc-space-5);
 }
 
+/* Which connectors a teammate may use without asking: one chip per known
+   connector, ticked by default (everything), unticked to narrow. The same
+   chip the composer uses for "who answers", because it is the same gesture:
+   a set with members in or out. */
+.lc-field--connectors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-5);
+}
+
+.lc-connectorgrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
+
+.lc-connectorpick {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-control);
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-connectorpick.is-on {
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+  color: var(--lc-text-primary);
+}
+
+/* Reported but not usable yet -- not signed in, or not answering. Offered
+   anyway, dimmed: it is still the person's, and ticking it costs nothing. */
+.lc-connectorpick.is-unready {
+  opacity: 0.55;
+  font-style: italic;
+}
+
 .lc-folderrow {
   display: flex;
   align-items: center;

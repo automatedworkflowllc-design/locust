@@ -379,6 +379,9 @@ export const MEMORY_UPDATE_CHANNEL = 'memory:update'
 export const MEMORY_REMOVE_CHANNEL = 'memory:remove'
 export const MEMORY_CLEAR_CHANNEL = 'memory:clear'
 export const RUNTIME_SETUP_CHANNEL = 'runtime:setup'
+/** Every connector the person's Claude Code reports, and which each teammate may use. */
+export const CONNECTOR_LIST_CHANNEL = 'connectors:list'
+export const TEAMMATE_CONNECTORS_CHANNEL = 'teammates:connectors'
 /** Pick, or clear, the folder one teammate works in. The host names the path. */
 export const TEAMMATE_FOLDER_CHANNEL = 'teammates:folder'
 export const WORKTREE_LIST_CHANNEL = 'worktrees:list'
@@ -439,6 +442,20 @@ export interface PublicTeammate {
    * History stays filed under the project folder either way.
    */
   readonly folder?: string
+  /**
+   * The connectors THIS teammate may use, by the name the CLI prints.
+   *
+   * Absent means every connector the person's own Claude Code can reach --
+   * Colin's ruling, and the ordinary state. Present, it NARROWS: only these
+   * are allowed without asking, and a call to any other stops the run and
+   * asks through the permission host. Never a grant of something the person
+   * does not have: a name that is not on the machine is simply a rule for a
+   * server that never appears.
+   *
+   * Written from the teammate dialog, from a list the host read off
+   * `claude mcp list`; never typed.
+   */
+  readonly connectors?: readonly string[]
   /**
    * The face, persisted with the record. Seeded from the immutable id when a
    * teammate is created without one, so a rename never changes it.
@@ -525,6 +542,19 @@ export type TeammateListResponse =
 export type TeammateMutationResponse =
   | { readonly ok: true; readonly data: { readonly teammate?: PublicTeammate } }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATE_REJECTED'; readonly message: string } }
+
+/** One MCP server the CLI reported, as the person would recognise it. */
+export interface PublicConnector {
+  readonly name: string
+  /** A URL for a remote connector, a command for a local one. */
+  readonly location: string
+  /** `needs-auth` is a real connector the person has not finished signing into. */
+  readonly status: 'connected' | 'needs-auth' | 'failed'
+}
+
+export type ConnectorListResponse =
+  | { readonly ok: true; readonly data: { readonly connectors: readonly PublicConnector[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'CONNECTORS_UNAVAILABLE'; readonly message: string } }
 
 /**
  * The answer to a folder request for one teammate.
@@ -1473,6 +1503,13 @@ export interface DesktopApi {
    * folder. Nothing reopens: only that teammate's next run moves.
    */
   chooseTeammateFolder(teammateId: string, clear?: boolean): Promise<TeammateFolderResponse>
+  /** Every connector the person's Claude Code reports. Cached by the host; slow to refresh. */
+  listConnectors(): Promise<ConnectorListResponse>
+  /**
+   * Which connectors one teammate may use without asking. The WHOLE list every
+   * time; an empty list means every connector, which is the default.
+   */
+  setTeammateConnectors(teammateId: string, names: readonly string[]): Promise<TeammateFolderResponse>
   /** The teammates' own worktrees under the folder, and whether the folder can have them. */
   listWorktrees(): Promise<WorktreeListResponse>
   /** Remove a teammate's worktree. The branch stays. Refused while a run is live in it. */

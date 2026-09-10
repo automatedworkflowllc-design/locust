@@ -262,10 +262,17 @@ export function namedTool(name: string): string {
  * "commands" is simply the wrong word.
  *
  * A connector refusal is also the one a person can act on, so it says how.
+ *
+ * It used to say "a printed run has no way to put that question to you",
+ * which was true until 0.63.0 and false after it: Locust is the permission
+ * host now, the question IS put to the person, and the first drive of a
+ * narrowed teammate saw this sentence claim otherwise right under the card
+ * they had just pressed Deny on. The CLI's record cannot say which of the two
+ * it was, so the sentence names both.
  */
 export function whyRefused(refused: readonly { readonly tool: string }[]): string {
   return refused.every((entry) => entry.tool.startsWith("mcp__"))
-    ? "A connector is not covered by the permission mode, so Claude Code asks before using one -- and a printed run has no way to put that question to you. Give this teammate the connector, or run it in Auto."
+    ? "Claude Code asks before using a connector, and this one was not allowed: either you said no when it asked, or it is not one of this teammate's connectors. Give this teammate the connector in its card, or run it in Auto."
     : "This route allows edits but asks for approval before running commands, and a printed run has no way to give it.";
 }
 

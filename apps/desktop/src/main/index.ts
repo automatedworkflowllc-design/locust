@@ -106,6 +106,8 @@ import {
   WORKTREE_REMOVE_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
+  CONNECTOR_LIST_CHANNEL,
+  TEAMMATE_CONNECTORS_CHANNEL,
   TEAMMATE_FOLDER_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
@@ -1016,6 +1018,7 @@ if (!ownsSingleInstanceLock) {
         others: roster.filter((other) => other.teammateId !== teammateId).map(entry),
         ...(cwd === undefined ? {} : { cwd }),
         ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
+        ...(self.connectors === undefined ? {} : { connectors: self.connectors }),
         ...(worktreeRefused === undefined ? {} : { worktreeRefused })
       }
     }
@@ -1322,6 +1325,40 @@ if (!ownsSingleInstanceLock) {
      * needs no dialog and takes the same route so there is one place that
      * decides what a teammate's folder may be.
      */
+    /*
+     * Every connector the person's Claude Code reports, for the teammate
+     * dialog to offer. Refreshed on the way, because a person opening this
+     * list has usually just connected something.
+     */
+    ipcMain.handle(CONNECTOR_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'CONNECTORS_UNAVAILABLE', message: 'That request was rejected.' } } as const
+      try {
+        return { ok: true, data: { connectors: await connectorReader.refresh() } } as const
+      } catch {
+        return { ok: true, data: { connectors: connectorReader.current() } } as const
+      }
+    })
+
+    /*
+     * Narrow one teammate to some of them, or widen it back. The names come
+     * from the list above, but the store reads them strictly either way: a
+     * name is an allow rule on a real command line.
+     */
+    ipcMain.handle(TEAMMATE_CONNECTORS_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'REJECTED', message: 'The connector request was rejected.' } } as const
+      }
+      const ask = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+      try {
+        return { ok: true, data: { teammate: await teammates.setConnectors(ask.teammateId, ask.names) } } as const
+      } catch (error) {
+        return {
+          ok: false,
+          error: { code: 'REJECTED', message: error instanceof Error ? error.message : 'That could not be changed.' }
+        } as const
+      }
+    })
+
     ipcMain.handle(TEAMMATE_FOLDER_CHANNEL, async (event, requested: unknown) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (owner === null || !fromOwnWindow(event)) {

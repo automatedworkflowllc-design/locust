@@ -55,6 +55,11 @@ export interface MissionPeerContext {
    * worktree.
    */
   readonly repositoryRoot?: string
+  /**
+   * The connectors this teammate is narrowed to, when it is. Host-only, never
+   * printed into a prompt. Absent means every connector the person has.
+   */
+  readonly connectors?: readonly string[]
   /** Why the worktree could not be made, when the teammate asked for one. */
   readonly worktreeRefused?: string
 }

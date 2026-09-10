@@ -36,7 +36,8 @@ import type {
   PublicMemory,
   PublicRuntimeSetup,
   PublicWorkspaceBrief,
-  PublicWorktree
+  PublicWorktree,
+  PublicConnector
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
@@ -2331,6 +2332,43 @@ export default function App(): ReactElement {
    * the row shows the new folder without a Save, which is honest -- the
    * change has already happened by then.
    */
+  /** Every connector the host reports, read when the edit dialog opens. */
+  const [connectorList, setConnectorList] = useState<readonly PublicConnector[]>()
+  useEffect(() => {
+    if (editingTeammate === undefined) return
+    let live = true
+    void window.desktop
+      ?.listConnectors()
+      .then((response) => {
+        if (live && response.ok) setConnectorList(response.data.connectors)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [editingTeammate?.teammateId])
+
+  /** Narrow one teammate to some connectors, or widen it back. The host answers with the teammate. */
+  const setTeammateConnectors = (teammateId: string, names: readonly string[]): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .setTeammateConnectors(teammateId, names)
+      .then((response) => {
+        if (!response.ok) {
+          setFolderNotice(response.error.message)
+          return
+        }
+        setEditingTeammate(response.data.teammate)
+        return bridge.listTeammates().then((listed) => {
+          if (!listed.ok) return
+          setTeammates(listed.data.teammates)
+          setMissionOwners(listed.data.missionOwners)
+        })
+      })
+      .catch(() => setFolderNotice('That could not be changed.'))
+  }
+
   const chooseTeammateFolder = (teammateId: string, clear: boolean): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -3847,6 +3885,8 @@ export default function App(): ReactElement {
           }}
           onCreate={(input) => updateTeammate(editingTeammate.teammateId, input)}
           onChooseFolder={(clear) => chooseTeammateFolder(editingTeammate.teammateId, clear)}
+          {...(connectorList === undefined ? {} : { connectors: connectorList })}
+          onSetConnectors={(names) => setTeammateConnectors(editingTeammate.teammateId, names)}
           {...(folderNotice === undefined ? {} : { folderNotice })}
         />
       )}

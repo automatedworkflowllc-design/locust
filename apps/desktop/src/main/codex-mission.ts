@@ -969,7 +969,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                    * the shape of a future "ask me each time" setting.
                    */
                   if (askEveryConnector) return {}
-                  const named = options.connectors?.() ?? []
+                  // The teammate's own list when it has one -- a NARROWING of
+                  // what the person has -- else everything the person has.
+                  const named = peer?.connectors ?? options.connectors?.() ?? []
                   return named.length === 0 ? {} : { connectors: named }
                 })(),
                 // Claude's containment IS this value: it picks the permission

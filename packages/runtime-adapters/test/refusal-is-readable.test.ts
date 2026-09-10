@@ -69,7 +69,12 @@ describe("what a refusal says", () => {
 
   it("gives a connector refusal a reason the person can act on", () => {
     const connectors = whyRefused([{ tool: "mcp__claude_ai_Robinhood__get_accounts" }]);
-    expect(connectors).toContain("Give this teammate the connector, or run it in Auto.");
+    expect(connectors).toContain("Give this teammate the connector in its card, or run it in Auto.");
+    // Never again the sentence that became false when Locust started asking:
+    // the question CAN be put to the person now, and this reason is read
+    // right under the card they answered.
+    expect(connectors).not.toContain("no way to put that question");
+    expect(connectors).toContain("either you said no when it asked");
     // A command refusal keeps its own reason -- "commands" is the right word
     // there and the wrong one for a connector.
     expect(whyRefused([{ tool: "Bash" }])).toContain("before running commands");

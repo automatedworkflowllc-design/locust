@@ -21,6 +21,12 @@ import { isMissionRuntime } from '../shared/runtimes.js'
  */
 
 export const MAX_TEAMMATES = 64
+/**
+ * How many connectors one teammate may be narrowed to. Each becomes an allow
+ * rule on a real command line; sixteen is above the ten a live account had
+ * on 2026-09-09 and far below anything that would trouble a command line.
+ */
+export const MAX_CONNECTORS = 16
 
 /**
  * How many mission-to-teammate assignments the roster will hold.
@@ -67,6 +73,12 @@ export interface TeammateStore {
    * refuses anything that is not an absolute path rather than storing it.
    */
   setFolder(teammateId: unknown, folder: string | undefined): Promise<PublicTeammate>
+  /**
+   * Narrow one teammate to these connectors, or widen it back to every one
+   * with an empty list. The whole list every time, so the dialog's ticks and
+   * the record cannot get out of step.
+   */
+  setConnectors(teammateId: unknown, names: unknown): Promise<PublicTeammate>
   /** Remember which teammate a mission belongs to. */
   assignMission(teammateId: unknown, missionId: unknown): Promise<void>
   /** Forget which teammate a mission belonged to, once the mission is gone. */
@@ -180,6 +192,25 @@ export function isTeammateFolder(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 4096 && isAbsolute(value)
 }
 
+/**
+ * Connector names a record may carry. Read strictly: each becomes an allow
+ * rule on a real command line, so a malformed record must not be able to
+ * widen anything. Anything that is not a plain, bounded string is dropped.
+ */
+export function parsedConnectors(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return []
+  const kept: string[] = []
+  for (const entry of value as readonly unknown[]) {
+    if (typeof entry !== 'string') continue
+    const name = entry.trim()
+    if (name.length === 0 || name.length > 120) continue
+    if (/[\u0000-\u001f]/.test(name)) continue
+    if (!kept.includes(name)) kept.push(name)
+    if (kept.length >= MAX_CONNECTORS) break
+  }
+  return kept
+}
+
 export function parsedTeammate(value: unknown): PublicTeammate | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const record = value as Record<string, unknown>
@@ -205,6 +236,7 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     // whatever the app's own process happens to be standing in, which is not
     // a folder anybody chose.
     ...(isTeammateFolder(record.folder) ? { folder: record.folder } : {}),
+    ...(parsedConnectors(record.connectors).length === 0 ? {} : { connectors: parsedConnectors(record.connectors) }),
     // A record from before faces were persisted gets the face its id seeds --
     // the same face every reader would derive, so nothing changes on upgrade.
     avatar: isAvatarSpec(record.avatar) ? record.avatar : seedAvatar(record.teammateId),
@@ -395,6 +427,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           // path, so an edit of the name or the face cannot move a teammate
           // out of the folder it works in.
           ...(existing.folder === undefined ? {} : { folder: existing.folder }),
+          // Carried like the folder: an edit of the name must not widen a
+          // teammate back to every connector.
+          ...(existing.connectors === undefined ? {} : { connectors: existing.connectors }),
           avatar: input.avatar,
           createdAt: existing.createdAt,
           ...(existing.route === undefined ? {} : { route: existing.route })
@@ -437,6 +472,27 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           folder === undefined
             ? (({ folder: _dropped, ...rest }) => rest)(existing)
             : { ...existing, folder }
+        await write({
+          ...file,
+          teammates: file.teammates.map((teammate) => (teammate.teammateId === teammateId ? updated : teammate))
+        })
+        return updated
+      })
+    },
+
+    setConnectors(teammateId, names): Promise<PublicTeammate> {
+      return serialize(async () => {
+        if (!safeId(teammateId)) throw new Error('Teammate id is invalid')
+        const kept = parsedConnectors(names)
+        const file = await read()
+        const existing = file.teammates.find((teammate) => teammate.teammateId === teammateId)
+        if (existing === undefined) throw new Error('Unknown teammate')
+        // Empty REMOVES the key: absent means everything, and a present empty
+        // list would read as "nothing", which is not a choice anyone offered.
+        const updated: PublicTeammate =
+          kept.length === 0
+            ? (({ connectors: _dropped, ...rest }) => rest)(existing)
+            : { ...existing, connectors: kept }
         await write({
           ...file,
           teammates: file.teammates.map((teammate) => (teammate.teammateId === teammateId ? updated : teammate))

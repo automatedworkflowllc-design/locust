@@ -552,3 +552,30 @@ describe('asking before every connector call', () => {
     expect((await teammates.readSettings()).askConnectors).toBe(true)
   })
 })
+
+
+/**
+ * A teammate narrowed to some connectors stays narrowed, and an empty list
+ * is "everything" -- the key goes, not a present-and-empty list that would
+ * read as nothing.
+ */
+describe("a teammate's own connectors", () => {
+  it('narrow, widen back, and never leave an empty key behind', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Jimothy', hue: 'lime', role: 'Custom' })
+    expect(made.connectors).toBeUndefined()
+    const narrowed = await teammates.setConnectors(made.teammateId, ['claude.ai Robinhood', 'claude.ai Robinhood', '  '])
+    expect(narrowed.connectors).toEqual(['claude.ai Robinhood'])
+    const widened = await teammates.setConnectors(made.teammateId, [])
+    expect('connectors' in widened).toBe(false)
+  })
+
+  it('survive an edit of the name, and drop anything that is not a plain name', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Jimothy', hue: 'lime', role: 'Custom' })
+    await teammates.setConnectors(made.teammateId, ['claude.ai Gmail', 12, 'x'.repeat(200), 'ok' + String.fromCharCode(7)] as never)
+    const edited = await teammates.update({ teammateId: made.teammateId, name: 'Jim', hue: 'blue', role: 'Custom', avatar: seedAvatar(made.teammateId) })
+    expect(edited.connectors).toEqual(['claude.ai Gmail'])
+    await expect(teammates.setConnectors('tm_nobody', ['claude.ai Gmail'])).rejects.toThrow()
+  })
+})

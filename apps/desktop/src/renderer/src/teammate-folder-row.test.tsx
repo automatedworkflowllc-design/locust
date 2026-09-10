@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { seedAvatar } from '../../shared/avatar.js'
 import type { MissionMode, PublicTeammate } from '../../shared/ipc.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
+import type { PublicConnector } from '../../shared/ipc.js'
 
 /**
  * The folder ONE teammate works in, said in the dialog.
@@ -96,5 +97,62 @@ describe('the folder a teammate works in', () => {
     // And absent when the host offers no way to choose one, rather than
     // drawing a control that does nothing.
     expect(draw(WREN, false)).not.toContain('lc-field--folder')
+  })
+})
+
+
+/**
+ * Which connectors a teammate may use without asking, offered in the dialog.
+ * Nothing ticked is "everything" and says so; a list narrows and says that.
+ */
+describe("a teammate's connectors", () => {
+  const KNOWN: readonly PublicConnector[] = [
+    { name: 'claude.ai Robinhood', location: 'https://agent.robinhood.com/mcp/trading', status: 'connected' },
+    { name: 'claude.ai Gmail', location: 'https://gmailmcp.googleapis.com/mcp/v1', status: 'connected' },
+    { name: 'claude.ai Notion', location: 'https://mcp.notion.com/mcp', status: 'needs-auth' }
+  ]
+  const drawWith = (teammate: PublicTeammate): string =>
+    renderToStaticMarkup(
+      <NewTeammateDialog
+        error={undefined}
+        mode="accept-edits"
+        onCancel={() => undefined}
+        onCreate={() => undefined}
+        initial={teammate}
+        onChooseFolder={() => undefined}
+        connectors={KNOWN}
+        onSetConnectors={() => undefined}
+      />
+    )
+
+  it('offers every connector the host reported, all ticked when the teammate has no list', () => {
+    const html = drawWith(WREN)
+    expect(html).toContain('lc-field--connectors')
+    expect((html.match(/role="checkbox" aria-checked="true"/g) ?? []).length).toBe(3)
+    expect(html).toContain('All of them, without asking')
+    // The claude.ai prefix is the account, not the connector; it is dropped.
+    expect(html).toContain('>Robinhood<')
+    expect(html).not.toContain('>claude.ai Robinhood<')
+  })
+
+  it('shows a narrowed teammate as exactly its list, and says the rest will ask', () => {
+    const html = drawWith({ ...WREN, connectors: ['claude.ai Robinhood'] })
+    expect((html.match(/role="checkbox" aria-checked="true"/g) ?? []).length).toBe(1)
+    expect((html.match(/role="checkbox" aria-checked="false"/g) ?? []).length).toBe(2)
+    expect(html).toContain('Only these, without asking')
+    expect(html).toContain('stops the run and asks you')
+  })
+
+  it('still offers a connector the person has not finished signing into, dimmed', () => {
+    const html = drawWith(WREN)
+    expect(html).toContain('is-unready')
+    expect(html).toContain('not signed in yet')
+  })
+
+  it('is absent while creating, and absent when the host reported nothing', () => {
+    const none = renderToStaticMarkup(
+      <NewTeammateDialog error={undefined} mode="ask" onCancel={() => undefined} onCreate={() => undefined} initial={WREN} onChooseFolder={() => undefined} connectors={[]} onSetConnectors={() => undefined} />
+    )
+    expect(none).not.toContain('lc-field--connectors')
   })
 })
