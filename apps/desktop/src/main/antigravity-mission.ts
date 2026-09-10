@@ -40,10 +40,11 @@ export type AntigravityTier = (typeof ANTIGRAVITY_TIERS)[number]
 /**
  * The same number as every other transport, because the cap is ONE pool.
  *
- * It was a literal 4 here, a literal 4 in app-server-mission.ts and a
- * literal 4 in codex-mission.ts -- three copies of one decision. When the
- * cap was measured and raised on 2026-09-09 only one of them moved, and the
- * transports disagreed until `approve-each-reaches-every-start` caught it.
+ * It was a literal 4 here, a literal 4 in codex-mission.ts and a literal 4
+ * in the approval transport that has since been folded into it -- three
+ * copies of one decision. When the cap was measured and raised on 2026-09-09
+ * only one of them moved, and the transports disagreed until
+ * `approve-each-reaches-every-start` caught it.
  * A re-export cannot drift.
  */
 import { MAX_LIVE_MISSIONS as MAX_LIVE_ANTIGRAVITY_MISSIONS } from '../shared/live-missions.js'
