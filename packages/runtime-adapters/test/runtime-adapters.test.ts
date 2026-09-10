@@ -139,11 +139,35 @@ describe("the Auto mode a person switches on", () => {
     // else, which the app saw as a run that ended without a result. Auto is
     // the one mode that drops it; every other mode keeps it.
     expect(claude.args).not.toContain("--restricted");
-    expect(claude.args.join(" ")).toContain("--disallowedTools mcp__*");
+    /*
+     * AND THAT IS WHY AUTO GETS THE PERSON'S CONNECTORS.
+     *
+     * Dropping `--restricted` is what lets a person's own Claude settings
+     * into the mission -- their hooks fire inside it, which is how Colin saw
+     * "Stop hook error occurred" three times in one conversation on
+     * 2026-09-09. Their MCP servers load with those same settings.
+     *
+     * This used to assert `--disallowedTools mcp__*` HERE, in the one mode
+     * where the servers actually load, so the run inherited the person's
+     * hooks and then refused the person's tools. The teammate, with no way
+     * to know why, reported "no such MCP tool is connected here" -- which
+     * reads as a broken connector rather than a deliberate denial.
+     */
+    expect(claude.args.join(" ")).toContain("Bash,Task,mcp__*");
+    expect(claude.args.join(" ")).not.toContain("--disallowedTools");
     expect(claude.args).not.toContain("--dangerously-skip-permissions");
     for (const sandbox of ["read-only", "workspace-write"] as const) {
       const other = createClaudePrintCommand({ ...nativeExecutable, commandName: "claude" }, { workspacePath, sandbox });
       expect(other.args).toContain("--restricted");
+      /*
+       * And they still deny MCP, which costs nothing: `--restricted` means
+       * the settings that define those servers were never read, so there is
+       * nothing to allow. The denial is belt and braces on a door that is
+       * already shut -- keep it, because it is the thing that makes the
+       * Auto-only allowance a decision rather than an oversight.
+       */
+      expect(other.args.join(" ")).toContain("--disallowedTools mcp__*");
+      expect(other.args.join(" ")).not.toContain("mcp__*,");
     }
   });
 

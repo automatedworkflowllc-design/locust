@@ -558,9 +558,34 @@ export function createClaudePrintCommand(
     "--permission-mode",
     auto ? "bypassPermissions" : editing ? "acceptEdits" : "default",
     "--tools",
-    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task" : "Read,Glob,Grep,Task",
-    "--disallowedTools",
-    "mcp__*",
+    editing
+      ? auto
+        ? // AUTO GETS THE PERSON'S CONNECTORS, because in Auto it already has
+          // everything else of theirs.
+          //
+          // `--restricted` is what keeps a person's own Claude settings out
+          // of a mission, and Auto is the one mode that drops it -- it cannot
+          // be combined with `bypassPermissions`. So in Auto their settings
+          // ARE loaded: their hooks fire inside a mission, which is how Colin
+          // saw "Stop hook error occurred" three times in one conversation
+          // (2026-09-09). Their MCP servers load with them.
+          //
+          // And then `--disallowedTools mcp__*` forbade every one of those
+          // tools. So the run inherited the person's hooks and refused the
+          // person's connectors -- and the teammate, having no way to know
+          // why, reported "no such MCP tool is connected here", which reads
+          // as the connector being broken. Colin: "it says its connected".
+          //
+          // In every other mode `--restricted` means the servers were never
+          // loaded at all, so there is nothing to allow; those modes keep the
+          // explicit list and the denial.
+          "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,mcp__*"
+        : "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task"
+      : "Read,Glob,Grep,Task",
+    // Not in Auto: see above. A run that has been told to act as the person,
+    // anywhere, without asking, has no business being told it may not use the
+    // tools that person connected.
+    ...(auto ? [] : ["--disallowedTools", "mcp__*"]),
   ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
