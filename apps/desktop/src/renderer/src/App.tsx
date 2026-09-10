@@ -772,6 +772,8 @@ export default function App(): ReactElement {
   }>()
   /** The teammate being edited in the same dialog, when it is open for editing. */
   const [editingTeammate, setEditingTeammate] = useState<PublicTeammate>()
+  /** Why a folder request for one teammate did nothing. */
+  const [folderNotice, setFolderNotice] = useState<string>()
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [screen, setScreen] = useState<Screen>('workroom')
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -2205,6 +2207,36 @@ export default function App(): ReactElement {
       .catch(() => setTeammateError('That teammate could not be updated.'))
   }
 
+  /**
+   * Point one teammate at its own folder, or put it back in the project one.
+   *
+   * The host opens the dialog and writes the record; what comes back is the
+   * teammate, never a path. The open dialog is refreshed from that answer so
+   * the row shows the new folder without a Save, which is honest -- the
+   * change has already happened by then.
+   */
+  const chooseTeammateFolder = (teammateId: string, clear: boolean): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    setFolderNotice(undefined)
+    void bridge
+      .chooseTeammateFolder(teammateId, clear)
+      .then((response) => {
+        if (!response.ok) {
+          // Closing the picker is not a failure and is not reported as one.
+          if (response.error.code !== 'CANCELLED') setFolderNotice(response.error.message)
+          return
+        }
+        setEditingTeammate(response.data.teammate)
+        return bridge.listTeammates().then((listed) => {
+          if (!listed.ok) return
+          setTeammates(listed.data.teammates)
+          setMissionOwners(listed.data.missionOwners)
+        })
+      })
+      .catch(() => setFolderNotice('That folder could not be chosen.'))
+  }
+
   const reloadRoutines = async (): Promise<void> => {
     const bridge = window.desktop
     if (!bridge) return
@@ -3533,8 +3565,13 @@ export default function App(): ReactElement {
           initial={editingTeammate}
           error={teammateError}
           mode={mode}
-          onCancel={() => setEditingTeammate(undefined)}
+          onCancel={() => {
+            setFolderNotice(undefined)
+            setEditingTeammate(undefined)
+          }}
           onCreate={(input) => updateTeammate(editingTeammate.teammateId, input)}
+          onChooseFolder={(clear) => chooseTeammateFolder(editingTeammate.teammateId, clear)}
+          {...(folderNotice === undefined ? {} : { folderNotice })}
         />
       )}
       {routineDialog !== undefined && (

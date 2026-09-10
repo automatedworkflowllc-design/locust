@@ -368,6 +368,8 @@ export const MEMORY_UPDATE_CHANNEL = 'memory:update'
 export const MEMORY_REMOVE_CHANNEL = 'memory:remove'
 export const MEMORY_CLEAR_CHANNEL = 'memory:clear'
 export const RUNTIME_SETUP_CHANNEL = 'runtime:setup'
+/** Pick, or clear, the folder one teammate works in. The host names the path. */
+export const TEAMMATE_FOLDER_CHANNEL = 'teammates:folder'
 export const WORKTREE_LIST_CHANNEL = 'worktrees:list'
 export const WORKTREE_REMOVE_CHANNEL = 'worktrees:remove'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
@@ -408,6 +410,24 @@ export interface PublicTeammate {
    * so two teammates editing one repository do not collide. Off by default.
    */
   readonly worktree?: boolean
+  /**
+   * The folder THIS teammate works in, when it is not the project folder.
+   *
+   * Colin, 2026-09-09: "it should only change the folder for that chat/
+   * teammate not the entire app." Switching the project folder reopens
+   * Locust, because the ledger, the memory store and the worktrees are all
+   * scoped by it; a teammate's own folder is a narrower thing that needs
+   * none of that, because it only decides where that teammate's runs stand.
+   *
+   * It is also the only way to reach a local MCP server, which Claude Code
+   * registers under a PROJECT KEY in `~/.claude.json`: a server declared for
+   * `C:/Users/<home>/claude` exists in that folder and nowhere else, so a
+   * teammate that needs it has to be standing there.
+   *
+   * Written by the HOST from a folder dialog, never named by the renderer.
+   * History stays filed under the project folder either way.
+   */
+  readonly folder?: string
   /**
    * The face, persisted with the record. Seeded from the immutable id when a
    * teammate is created without one, so a rename never changes it.
@@ -494,6 +514,22 @@ export type TeammateListResponse =
 export type TeammateMutationResponse =
   | { readonly ok: true; readonly data: { readonly teammate?: PublicTeammate } }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATE_REJECTED'; readonly message: string } }
+
+/**
+ * The answer to a folder request for one teammate.
+ *
+ * `CANCELLED` is the ordinary outcome -- the person closed the dialog -- and
+ * is never drawn as trouble.
+ */
+export type TeammateFolderResponse =
+  | { readonly ok: true; readonly data: { readonly teammate: PublicTeammate } }
+  | {
+      readonly ok: false
+      readonly error: {
+        readonly code: 'CANCELLED' | 'REJECTED'
+        readonly message: string
+      }
+    }
 
 /**
  * A routine: a conversation a person saved as steps a teammate can replay.
@@ -1387,6 +1423,11 @@ export interface DesktopApi {
   listMemories(): Promise<MemoryListResponse>
   /** Each runtime's own MCP servers and hooks, read-only. */
   readRuntimeSetup(): Promise<RuntimeSetupResponse>
+  /**
+   * Choose the folder one teammate works in, or clear it back to the project
+   * folder. Nothing reopens: only that teammate's next run moves.
+   */
+  chooseTeammateFolder(teammateId: string, clear?: boolean): Promise<TeammateFolderResponse>
   /** The teammates' own worktrees under the folder, and whether the folder can have them. */
   listWorktrees(): Promise<WorktreeListResponse>
   /** Remove a teammate's worktree. The branch stays. Refused while a run is live in it. */

@@ -43,7 +43,9 @@ export function NewTeammateDialog({
   onCreate,
   error,
   initial,
-  mode
+  mode,
+  onChooseFolder,
+  folderNotice
 }: {
   readonly onCancel: () => void
   readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }) => void
@@ -52,6 +54,17 @@ export function NewTeammateDialog({
   readonly initial?: PublicTeammate
   /** The mode the next mission would actually run in, so the card cannot promise another. */
   readonly mode: MissionMode
+  /**
+   * Ask the host for this teammate's own folder, or clear it.
+   *
+   * Takes effect at once rather than on Save, because the path is the HOST's
+   * to name -- the renderer is handed a teammate back, never a path it could
+   * have typed. Absent while creating: a teammate with no id yet has nothing
+   * to write the folder onto.
+   */
+  readonly onChooseFolder?: (clear: boolean) => void
+  /** Why the last folder request did nothing. Absent when it worked, or was cancelled. */
+  readonly folderNotice?: string
 }): ReactElement {
   const editing = initial !== undefined
   const [name, setName] = useState(initial?.name ?? '')
@@ -192,6 +205,45 @@ export function NewTeammateDialog({
               </span>
             </span>
           </div>
+
+          {/*
+            * The folder THIS teammate stands in.
+            *
+            * Not the project folder switch in Settings: that one reopens
+            * Locust, because history, memory and worktrees are all scoped by
+            * it. This moves one teammate and closes nothing. Colin,
+            * 2026-09-09: "it should only change the folder for that
+            * chat/teammate not the entire app."
+            *
+            * Only when editing. A teammate being created has no id yet, and
+            * the host writes the folder onto a record.
+            */}
+          {editing && onChooseFolder !== undefined && (
+            <div className="lc-field lc-field--folder">
+              <span className="lc-fieldlabel lc-mono">Works in</span>
+              <div className="lc-folderrow">
+                <span
+                  className={`lc-folderrow__path lc-mono${initial?.folder === undefined ? ' is-default' : ''}`}
+                  title={initial?.folder ?? 'The project folder'}
+                >
+                  {initial?.folder ?? 'The project folder'}
+                </span>
+                <button type="button" className="lc-button" onClick={() => onChooseFolder(false)}>
+                  {initial?.folder === undefined ? 'Choose folder' : 'Change'}
+                </button>
+                {initial?.folder !== undefined && (
+                  <button type="button" className="lc-button" onClick={() => onChooseFolder(true)}>
+                    Use the project folder
+                  </button>
+                )}
+              </div>
+              <span className="lc-field__hint">
+                Its missions run here instead of the project folder, which is also how it reaches an MCP server registered
+                to that folder. History and memory stay with the project either way.
+              </span>
+              {folderNotice !== undefined && <span className="lc-field__hint lc-tone-amber">{folderNotice}</span>}
+            </div>
+          )}
 
           {/*
             The reference shows a default route and approval mode here. Both are

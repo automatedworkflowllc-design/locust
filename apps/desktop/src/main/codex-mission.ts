@@ -859,6 +859,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // The teammate's own worktree when it has one, else the folder. The
         // ledger's workspace id stays the FOLDER's: history is per folder.
         const runCwd = peer?.cwd ?? options.workspacePath
+        // Named by whoever made the worktree, not inferred from this folder:
+        // a teammate with its own folder is in a worktree of a repository
+        // that is not this one. Absent unless the run really is in a
+        // worktree.
+        const repositoryRoot = peer?.repositoryRoot
         let command: RuntimeCommandSpec
         // OpenCode and Copilot take the prompt as an argument, not on stdin,
         // so their argv is built once now with the person's own words -- so a
@@ -878,7 +883,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               prompt: promptText,
               // Only when this run is in a worktree, which is exactly when
               // the folder it stands in is not the repository it belongs to.
-              ...(runCwd === options.workspacePath ? {} : { repositoryRoot: options.workspacePath }),
+              ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
               ...choice
             })
           }

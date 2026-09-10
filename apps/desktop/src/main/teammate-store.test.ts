@@ -447,3 +447,82 @@ describe('memory mode', () => {
     expect((await createTeammateStore({ rootDirectory: root }).readSettings()).memoryMode).toBe('auto')
   })
 })
+
+/**
+ * A teammate's own folder.
+ *
+ * Colin, 2026-09-09: "it should only change the folder for that chat/teammate
+ * not the entire app." The project folder switch reopens Locust because the
+ * ledger, memory and worktrees are all scoped by it; this is the narrower
+ * thing, and it has to survive every other edit made to the record.
+ */
+describe("a teammate's own folder", () => {
+  it('is kept, cleared, and never left behind as an empty key', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    expect(made.folder).toBeUndefined()
+
+    // A rooted POSIX path, which node calls absolute on Windows too, so one
+    // fixture reads the same sentence on both platforms.
+    const home = '/home/<home>/claude'
+    const pointed = await teammates.setFolder(made.teammateId, home)
+    expect(pointed.folder).toBe(home)
+    expect((await teammates.list())[0]?.folder).toBe(home)
+
+    const cleared = await teammates.setFolder(made.teammateId, undefined)
+    // The KEY has to go, not just its value: `{...record, folder: undefined}`
+    // writes `"folder": undefined`, which JSON drops on the way out and the
+    // next reader cannot tell from a folder that failed to save.
+    expect('folder' in cleared).toBe(false)
+  })
+
+  it('survives an edit of the name, the face and the branch switch', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    // A rooted POSIX path, which node calls absolute on Windows too, so one
+    // fixture reads the same sentence on both platforms.
+    const home = '/home/<home>/claude'
+    await teammates.setFolder(made.teammateId, home)
+    // The renderer never sends a folder, so an update that rebuilt the record
+    // from the request alone would silently move the teammate back.
+    const edited = await teammates.update({
+      teammateId: made.teammateId,
+      name: 'Wren the second',
+      hue: 'blue',
+      role: 'Code & Migrations',
+      worktree: true,
+      avatar: seedAvatar(made.teammateId)
+    })
+    expect(edited.name).toBe('Wren the second')
+    expect(edited.worktree).toBe(true)
+    expect(edited.folder).toBe(home)
+  })
+
+  it('refuses anything that is not an absolute path', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    // A relative path resolves against whatever the app's own process happens
+    // to be standing in, which is not a folder anybody chose.
+    await expect(teammates.setFolder(made.teammateId, 'claude')).rejects.toThrow()
+    await expect(teammates.setFolder(made.teammateId, '')).rejects.toThrow()
+    await expect(teammates.setFolder(made.teammateId, '   ')).rejects.toThrow()
+    await expect(teammates.setFolder('tm_nobody', '/tmp')).rejects.toThrow()
+    expect((await teammates.list())[0]?.folder).toBeUndefined()
+  })
+
+  it('drops a relative folder read back from a hand-edited file', () => {
+    const base = {
+      teammateId: 'tm_wren',
+      name: 'Wren',
+      hue: 'lime',
+      role: 'Code & Migrations',
+      createdAt: '2026-09-05T05:00:00.000Z'
+    }
+    expect(parsedTeammate({ ...base, folder: 'claude' })?.folder).toBeUndefined()
+    expect(parsedTeammate({ ...base, folder: 12 })?.folder).toBeUndefined()
+    // A rooted POSIX path, which node calls absolute on Windows too, so one
+    // fixture reads the same sentence on both platforms.
+    const home = '/home/<home>/claude'
+    expect(parsedTeammate({ ...base, folder: home })?.folder).toBe(home)
+  })
+})

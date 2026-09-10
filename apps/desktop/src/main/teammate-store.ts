@@ -61,6 +61,12 @@ export interface TeammateStore {
   update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar: unknown }): Promise<PublicTeammate>
   /** Record the route a person just started this teammate on. Unknown teammate or bad route: nothing changes. */
   rememberRoute(teammateId: unknown, route: unknown): Promise<void>
+  /**
+   * Point one teammate at its own folder, or `undefined` to put it back in
+   * the project folder. The path comes from the host's own dialog, so this
+   * refuses anything that is not an absolute path rather than storing it.
+   */
+  setFolder(teammateId: unknown, folder: string | undefined): Promise<PublicTeammate>
   /** Remember which teammate a mission belongs to. */
   assignMission(teammateId: unknown, missionId: unknown): Promise<void>
   /** Forget which teammate a mission belonged to, once the mission is gone. */
@@ -161,6 +167,19 @@ export function safeId(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value)
 }
 
+/**
+ * A folder a teammate may be pointed at.
+ *
+ * Absolute only, and short of the path limit both platforms enforce. The
+ * folder EXISTING is not checked here: a record is read at launch, and a
+ * teammate whose folder is on a drive that is not mounted this morning
+ * should still be a teammate -- the start says so, rather than the record
+ * quietly losing the setting.
+ */
+export function isTeammateFolder(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 4096 && isAbsolute(value)
+}
+
 export function parsedTeammate(value: unknown): PublicTeammate | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const record = value as Record<string, unknown>
@@ -182,6 +201,10 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     ...(roleTitleFor(record.role, record.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(record.role, record.roleTitle) }),
     // Only a literal true: a malformed record cannot move a teammate onto a branch.
     ...(record.worktree === true ? { worktree: true } : {}),
+    // An absolute path or nothing. A relative one would resolve against
+    // whatever the app's own process happens to be standing in, which is not
+    // a folder anybody chose.
+    ...(isTeammateFolder(record.folder) ? { folder: record.folder } : {}),
     // A record from before faces were persisted gets the face its id seeds --
     // the same face every reader would derive, so nothing changes on upgrade.
     avatar: isAvatarSpec(record.avatar) ? record.avatar : seedAvatar(record.teammateId),
@@ -363,6 +386,10 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           role: input.role,
           ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
           ...(input.worktree === true ? { worktree: true } : {}),
+          // Carried, not taken from the request: the renderer never names a
+          // path, so an edit of the name or the face cannot move a teammate
+          // out of the folder it works in.
+          ...(existing.folder === undefined ? {} : { folder: existing.folder }),
           avatar: input.avatar,
           createdAt: existing.createdAt,
           ...(existing.route === undefined ? {} : { route: existing.route })
@@ -388,6 +415,28 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             teammate.teammateId === teammateId ? { ...teammate, route: kept } : teammate
           )
         })
+      })
+    },
+
+    setFolder(teammateId, folder): Promise<PublicTeammate> {
+      return serialize(async () => {
+        if (!safeId(teammateId)) throw new Error('Teammate id is invalid')
+        if (folder !== undefined && !isTeammateFolder(folder)) throw new Error('That is not a folder Locust can use')
+        const file = await read()
+        const existing = file.teammates.find((teammate) => teammate.teammateId === teammateId)
+        if (existing === undefined) throw new Error('Unknown teammate')
+        // Spread-then-delete rather than a conditional spread: clearing has
+        // to REMOVE the key, and `{ ...existing, folder: undefined }` would
+        // leave `folder` present and undefined, which the file then carries.
+        const updated: PublicTeammate =
+          folder === undefined
+            ? (({ folder: _dropped, ...rest }) => rest)(existing)
+            : { ...existing, folder }
+        await write({
+          ...file,
+          teammates: file.teammates.map((teammate) => (teammate.teammateId === teammateId ? updated : teammate))
+        })
+        return updated
       })
     },
 

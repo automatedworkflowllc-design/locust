@@ -48,6 +48,7 @@ import {
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
   RUNTIME_SETUP_CHANNEL,
+  TEAMMATE_FOLDER_CHANNEL,
   WORKTREE_LIST_CHANNEL,
   WORKTREE_REMOVE_CHANNEL
 } from '../shared/ipc.js'
@@ -101,6 +102,7 @@ import type {
   MemoryListResponse,
   MemoryUpdateRequest,
   RuntimeSetupResponse,
+  TeammateFolderResponse,
   WorktreeListResponse,
   RuntimeInstallProgress,
   RuntimeInstallResponse
@@ -216,6 +218,8 @@ const desktopApi: DesktopApi = {
   updateRoomTask: (request: RoomTaskRequest) => ipcRenderer.invoke(ROOM_TASK_CHANNEL, request) as Promise<RoomTaskResponse>,
   listMemories: () => ipcRenderer.invoke(MEMORY_LIST_CHANNEL) as Promise<MemoryListResponse>,
   readRuntimeSetup: () => ipcRenderer.invoke(RUNTIME_SETUP_CHANNEL) as Promise<RuntimeSetupResponse>,
+  chooseTeammateFolder: (teammateId: string, clear?: boolean) =>
+    ipcRenderer.invoke(TEAMMATE_FOLDER_CHANNEL, { teammateId, clear: clear === true }) as Promise<TeammateFolderResponse>,
   listWorktrees: () => ipcRenderer.invoke(WORKTREE_LIST_CHANNEL) as Promise<WorktreeListResponse>,
   removeWorktree: (teammateId: string) => ipcRenderer.invoke(WORKTREE_REMOVE_CHANNEL, teammateId) as Promise<WorktreeListResponse>,
   addMemory: (request: MemoryAddRequest) => ipcRenderer.invoke(MEMORY_ADD_CHANNEL, request) as Promise<MemoryListResponse>,

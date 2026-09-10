@@ -61,6 +61,7 @@ import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createRelay } from './relay.js'
 import { createAttention } from './attention.js'
+import { boundedShutdown } from './bounded-shutdown.js'
 import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
@@ -103,6 +104,7 @@ import {
   WORKTREE_REMOVE_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
+  TEAMMATE_FOLDER_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
@@ -883,19 +885,57 @@ if (!ownsSingleInstanceLock) {
       })
       let cwd: string | undefined
       let worktreeRefused: string | undefined
+      /*
+       * Where this teammate stands.
+       *
+       * Three cases and they compose. A teammate with its own folder works
+       * there, and its own-branch worktree is cut from THAT folder's
+       * repository rather than the project's -- a worktree of a repository
+       * the teammate is not in would put it somewhere nobody asked for.
+       * With no folder of its own it is the project folder, as before.
+       *
+       * The folder is not checked for existence here. `ensure` says so for
+       * a worktree, and a run started in a folder that is gone fails with
+       * the runtime's own words, which name the path. A silent fallback to
+       * the project folder would be worse: the mission would succeed in the
+       * wrong place.
+       */
+      const home = self.folder
+      if (home !== undefined) cwd = home
+      let repositoryRoot: string | undefined
       // Antigravity works in the folder it has open; a worktree would be one it has not.
-      if (self.worktree === true && worktrees !== undefined && self.route?.runtime !== 'antigravity') {
-        try {
-          cwd = await worktrees.ensure(self)
-        } catch (error) {
-          worktreeRefused = `${self.name} is set to work on its own branch, but ${error instanceof Error ? error.message : 'the worktree could not be made.'}`
+      if (self.worktree === true && self.route?.runtime !== 'antigravity') {
+        const manager = home === undefined ? worktrees : createWorktreeManager({ workspacePath: home })
+        if (manager !== undefined) {
+          try {
+            cwd = await manager.ensure(self)
+            repositoryRoot = home ?? workspacePath
+          } catch (error) {
+            worktreeRefused = `${self.name} is set to work on its own branch, but ${error instanceof Error ? error.message : 'the worktree could not be made.'}`
+          }
         }
       }
       return {
         self: entry(self),
         others: roster.filter((other) => other.teammateId !== teammateId).map(entry),
         ...(cwd === undefined ? {} : { cwd }),
+        ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
         ...(worktreeRefused === undefined ? {} : { worktreeRefused })
+      }
+    }
+
+    /**
+     * Every folder a teammate has been pointed at, for the reveal allowlist.
+     *
+     * Read fresh rather than cached: a folder chosen a second ago has to be
+     * openable, and an unreadable roster is an empty list rather than a
+     * thrown reveal.
+     */
+    const teammateFolders = async (): Promise<readonly string[]> => {
+      try {
+        return (await teammates.list()).flatMap((teammate) => (teammate.folder === undefined ? [] : [teammate.folder]))
+      } catch {
+        return []
       }
     }
 
@@ -1167,6 +1207,76 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    /*
+     * The folder ONE teammate works in.
+     *
+     * Deliberately not the folder switch above. That one reopens Locust,
+     * because the ledger, the memory store and the worktrees are all scoped
+     * by the project folder; this one moves nothing but where a single
+     * teammate's next run stands, so nothing has to be rebound and nothing
+     * closes. Colin, 2026-09-09: "it should only change the folder for that
+     * chat/teammate not the entire app."
+     *
+     * The renderer names no path here either. It asks for a teammate; the
+     * HOST opens the dialog, checks what came back, and writes it. Clearing
+     * needs no dialog and takes the same route so there is one place that
+     * decides what a teammate's folder may be.
+     */
+    ipcMain.handle(TEAMMATE_FOLDER_CHANNEL, async (event, requested: unknown) => {
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (owner === null || !fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'REJECTED', message: 'The folder request was rejected.' } } as const
+      }
+      const ask = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+      const teammateId = typeof ask.teammateId === 'string' ? ask.teammateId : ''
+      if (ask.clear === true) {
+        try {
+          return { ok: true, data: { teammate: await teammates.setFolder(teammateId, undefined) } } as const
+        } catch (error) {
+          return {
+            ok: false,
+            error: { code: 'REJECTED', message: error instanceof Error ? error.message : 'That could not be changed.' }
+          } as const
+        }
+      }
+      let known
+      try {
+        known = (await teammates.list()).find((teammate) => teammate.teammateId === teammateId)
+      } catch {
+        known = undefined
+      }
+      if (known === undefined) {
+        return { ok: false, error: { code: 'REJECTED', message: 'That teammate is not on the roster.' } } as const
+      }
+      const picked = await dialog.showOpenDialog(owner, {
+        title: `Choose the folder ${known.name} works in`,
+        buttonLabel: 'Work here',
+        properties: ['openDirectory', 'createDirectory'],
+        defaultPath: known.folder ?? (workspaceChosen ? workspacePath : app.getPath('home'))
+      })
+      const next = picked.filePaths[0]
+      if (picked.canceled || next === undefined) {
+        return { ok: false, error: { code: 'CANCELLED', message: 'No folder chosen.' } } as const
+      }
+      // The same refusal the project folder gets: a teammate pointed at
+      // Locust's own installation would be editing the app it is running in,
+      // and an update would take its work with it.
+      if (isInsideDirectory(next, installDirectory, process.platform)) {
+        return {
+          ok: false,
+          error: { code: 'REJECTED', message: 'That is where Locust itself is installed. Pick a project folder instead.' }
+        } as const
+      }
+      try {
+        return { ok: true, data: { teammate: await teammates.setFolder(teammateId, next) } } as const
+      } catch (error) {
+        return {
+          ok: false,
+          error: { code: 'REJECTED', message: error instanceof Error ? error.message : 'That folder could not be saved.' }
+        } as const
+      }
+    })
+
     ipcMain.handle(WORKSPACE_CHOOSE_CHANNEL, async (event) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (owner === null || !fromOwnWindow(event)) {
@@ -1236,14 +1346,17 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
-    ipcMain.handle(WORKSPACE_REVEAL_CHANNEL, (event, requested: unknown) => {
+    ipcMain.handle(WORKSPACE_REVEAL_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
-      // The roots are the host's, never the renderer's. One workspace per
-      // launch, and every worktree lives inside it, so this is the whole list.
-      // The workspace, plus Locust's own ledger folder. Both are the HOST's
-      // paths; the renderer still names nothing it was not already shown.
+      // The roots are the host's, never the renderer's. The workspace and
+      // every worktree inside it, Locust's own ledger folder, and any folder
+      // a teammate has been pointed at -- a file that teammate wrote is a
+      // file this app showed you, and refusing to open it would be the app
+      // disowning its own work. All of them are the HOST's paths; the
+      // renderer still names nothing it was not already shown.
       const decision = decideReveal(requested, [
         ...(workspaceChosen ? [workspacePath] : []),
+        ...(await teammateFolders()),
         ledgerDirectory
       ])
       if (!decision.ok) {
@@ -2377,29 +2490,49 @@ app.on('window-all-closed', () => {
 let quitFinaliser: (() => void) | undefined
 let shutdownStarted = false
 let shutdownComplete = false
+/** How long the flush below is allowed to take -- see `boundedShutdown`. */
+const SHUTDOWN_DEADLINE_MS = 6_000
 if (ownsSingleInstanceLock) {
   app.on('before-quit', (event) => {
     if (shutdownComplete) return
     event.preventDefault()
     if (shutdownStarted) return
     shutdownStarted = true
-    void (async () => {
-      await missionServiceForShutdown?.dispose()
-      // Releases any pending approval and takes the app-server process tree
-      // with it, so nothing is left prompting for an app that has gone.
-      await appServerServiceForShutdown?.dispose()
-      await ledgerForShutdown?.flush()
-      await workroomForShutdown?.flush()
-      shutdownComplete = true
-      // Whoever asked for the quit gets the last word: the updater installs
-      // and starts the app again. Anything else is an ordinary quit.
-      const finalise = quitFinaliser
-      quitFinaliser = undefined
-      if (finalise !== undefined) finalise()
-      else app.quit()
-    })().catch((error: unknown) => {
-      console.error('Failed to flush the local mission ledger during shutdown', error)
-      app.exit(1)
+    boundedShutdown({
+      deadlineMs: SHUTDOWN_DEADLINE_MS,
+      work: async () => {
+        await missionServiceForShutdown?.dispose()
+        // Releases any pending approval and takes the app-server process tree
+        // with it, so nothing is left prompting for an app that has gone.
+        await appServerServiceForShutdown?.dispose()
+        await ledgerForShutdown?.flush()
+        await workroomForShutdown?.flush()
+      },
+      leave: (reason) => {
+        shutdownComplete = true
+        // Whoever asked for the quit gets the last word: the updater installs
+        // and starts the app again. Anything else is an ordinary quit.
+        const finalise = quitFinaliser
+        quitFinaliser = undefined
+        if (finalise !== undefined) {
+          finalise()
+          return
+        }
+        if (reason === 'finished') {
+          app.quit()
+          return
+        }
+        // The wait was abandoned, so re-entering the quit would only wait
+        // again. `app.exit` is the one way out that a stuck child process
+        // cannot hold, and the relaunch helper watches the process rather
+        // than its exit code, so a folder switch still reopens from here.
+        console.error(`Shutdown did not finish within ${String(SHUTDOWN_DEADLINE_MS)}ms; leaving anyway.`)
+        app.exit(0)
+      },
+      failed: (error) => {
+        console.error('Failed to flush the local mission ledger during shutdown', error)
+        app.exit(1)
+      }
     })
   })
 }
