@@ -1221,17 +1221,7 @@ export function SettingsScreen({
         </section>
 
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">What your team remembers</h2>
-          <p className="lc-settings__lede">
-            Teammates keep a shared memory per folder, plus a smaller set marked everywhere.
-          </p>
-          <More>
-            <p>
-              The way Claude Code and Cursor do, managed from here. A teammate writes one by ending a reply
-              with it; every teammate in the folder reads what is kept. Each memory says who wrote it, where,
-              and from which conversation, and you can edit, switch off, or remove any of them.
-            </p>
-          </More>
+          <h2 className="lc-settings__heading">Sidebar</h2>
           <div className="lc-settingrows">
           {/*
             * The shell layout. It was decided by window width alone, so the
@@ -1265,6 +1255,21 @@ export function SettingsScreen({
               ))}
             </div>
           </div>
+          </div>
+        </section>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">What your team remembers</h2>
+          <p className="lc-settings__lede">
+            Teammates keep a shared memory per folder, plus a smaller set marked everywhere.
+          </p>
+          <More>
+            <p>
+              The way Claude Code and Cursor do, managed from here. A teammate writes one by ending a reply
+              with it; every teammate in the folder reads what is kept. Each memory says who wrote it, where,
+              and from which conversation, and you can edit, switch off, or remove any of them.
+            </p>
+          </More>
+          <div className="lc-settingrows">
           <div className="lc-settingrow">
             <span className="lc-settings__note">When a teammate writes a memory</span>
             <div className="lc-segmented" role="radiogroup" aria-label="When a teammate writes a memory">
