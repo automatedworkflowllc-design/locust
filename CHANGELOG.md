@@ -23,6 +23,17 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.65.1 - 2026-09-10
+
+- **The home screen is addressed to nobody again.** The row of teammate
+  chips is gone from the composer, and with it the teammate it used to tick
+  for you before you had picked anyone. Write and send from the home screen
+  and you get a plain conversation on the model the bar shows; hand it to a
+  teammate afterwards with "Assign to ..." on its row, or pick a teammate in
+  the sidebar first and message them directly.
+- Picking several teammates at once lives in rooms, where it always did:
+  "New room" in the sidebar, and the room's form picks its members.
+
 ## 0.65.0 - 2026-09-10
 
 - **Codex replies stream now, in every mode.** A Codex teammate used to

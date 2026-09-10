@@ -42,14 +42,22 @@ try {
     await drive.ready()
     return drive.evaluate(`(() => {
       const field = document.querySelector('form.command-dock textarea')
+      // Asked of the composer's CONTENTS rather than of the class names the
+      // chips used to carry: a roster that came back wearing a different
+      // class would still be caught, and naming a dead selector is a thing
+      // this repo's own harness control refuses (rightly).
+      const dock = document.querySelector('form.command-dock')
+      const buttons = [...(dock?.querySelectorAll('button') ?? [])]
+      const named = buttons.filter(b => /(Wren|Gem|Jimothy|Everyone)/.test(b.innerText))
       return JSON.stringify({
         placeholder: field?.getAttribute('placeholder') ?? 'NO FIELD',
-        // The chips are gone entirely -- not merely unticked.
-        teammateChips: document.querySelectorAll('.lc-askwho__pick').length,
-        everyoneButton: document.querySelectorAll('.lc-askwho__all').length,
-        consequenceLine: document.querySelectorAll('.lc-askwho__says').length,
+        // No teammate is offered, ticked or otherwise, inside the box.
+        teammateButtonsInComposer: named.map(b => b.innerText.trim()),
+        // Nothing narrates a consequence, because sending has none beyond
+        // sending: no room is made, no fan-out happens.
+        checkboxesInComposer: dock?.querySelectorAll('[role="checkbox"]').length ?? -1,
         // The send control is the plain one again.
-        sendLabel: document.querySelector('form.command-dock button[type="submit"]')?.getAttribute('aria-label') ?? 'NO BUTTON',
+        sendLabel: dock?.querySelector('button[type="submit"]')?.getAttribute('aria-label') ?? 'NO BUTTON',
         // And the way INTO a room is still on screen, which is what the
         // chips were introduced to provide.
         newRoom: [...document.querySelectorAll('button')].some(b => /New room/.test(b.innerText))
