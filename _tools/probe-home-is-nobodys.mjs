@@ -48,7 +48,8 @@ try {
       // this repo's own harness control refuses (rightly).
       const dock = document.querySelector('form.command-dock')
       const buttons = [...(dock?.querySelectorAll('button') ?? [])]
-      const named = buttons.filter(b => /(Wren|Gem|Jimothy|Everyone)/.test(b.innerText))
+      const roster = ['Wren', 'Gem', 'Jimothy', 'Everyone']
+      const named = buttons.filter(b => roster.some(name => b.innerText.includes(name)))
       return JSON.stringify({
         placeholder: field?.getAttribute('placeholder') ?? 'NO FIELD',
         // No teammate is offered, ticked or otherwise, inside the box.
