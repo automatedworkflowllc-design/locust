@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.56.1 - 2026-09-09
+
+- **A room shows its work as it starts.** Posting to a room started everyone
+  in turn and only then drew any of it, so you watched an empty room while
+  teammates were already working — up to 45 seconds of it. Cards now appear as
+  each one begins, with the rest shown waiting for a slot underneath.
+- **A teammate in a room is now told its own name.** The briefing listed
+  everyone else in the room and never named the recipient, so a teammate asked
+  to write to its own file could not tell which name was its own — and wrote
+  nothing.
+
 ## 0.56.0 - 2026-09-09
 
 - **A room now asks everyone, even when it cannot run them all at once.** Only
