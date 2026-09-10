@@ -23,6 +23,16 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.64.0 - 2026-09-10
+
+- **A teammate can be limited to some of your connectors.** Open a teammate
+  and under "Works in" there is now a row of your connectors, all on. Untick
+  one and that teammate is limited to the rest: a Finance Bro gets Robinhood
+  and not Gmail. A call to anything outside its list stops and asks you, the
+  same card as before. Nothing ticked means everything, as it always did.
+- The refusal a teammate reads after you deny a connector no longer claims
+  there was no way to ask you.
+
 ## 0.63.1 - 2026-09-10
 
 - **Settings → Connectors: "ask before every connector call".** Off, a
