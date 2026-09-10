@@ -740,7 +740,7 @@ export default function App(): ReactElement {
     const before = layout
     setLayout(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode, layout: next })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode, askConnectors, layout: next })
       .then((settings) => setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto'))
       .catch(() => setLayout(before))
   }
@@ -1018,6 +1018,8 @@ export default function App(): ReactElement {
   // than remembered: this is the switch that decides whether a mode which can
   // write anywhere on the machine is offered at all.
   const [autoMode, setAutoMode] = useState(false)
+  /** Ask before every connector call. See WorkspaceSettings.askConnectors. */
+  const [askConnectors, setAskConnectors] = useState(false)
 
   // Switching Auto off takes it away from a window that was sitting on it,
   // rather than leaving a choice the host would refuse at the next send.
@@ -1422,6 +1424,7 @@ export default function App(): ReactElement {
           setSwarm(settings.swarm === true)
           setRelay(settings.relay === true)
           setAutoMode(settings.autoMode === true)
+          setAskConnectors(settings.askConnectors === true)
           setRelayHopCap(settings.relayHopCap)
           setMemoryMode(settings.memoryMode)
           setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto')
@@ -1790,7 +1793,7 @@ export default function App(): ReactElement {
     const before = memoryMode
     setMemoryMode(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next, autoMode, layout })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next, autoMode, askConnectors, layout })
       .then((settings) => setMemoryMode(settings.memoryMode))
       .catch(() => setMemoryMode(before))
   }
@@ -3123,7 +3126,7 @@ export default function App(): ReactElement {
                 // reconciled with what the store actually saved.
                 setSwarm(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
+                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, askConnectors, layout })
                   .then((settings) => setSwarm(settings.swarm === true))
                   .catch(() => setSwarm(!next))
               }}
@@ -3131,9 +3134,17 @@ export default function App(): ReactElement {
               onAutoModeChange={(next) => {
                 setAutoMode(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: next, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: next, askConnectors, layout })
                   .then((settings) => setAutoMode(settings.autoMode === true))
                   .catch(() => setAutoMode(!next))
+              }}
+              askConnectors={askConnectors}
+              onAskConnectorsChange={(next) => {
+                setAskConnectors(next)
+                void window.desktop
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode, askConnectors: next, layout })
+                  .then((settings) => setAskConnectors(settings.askConnectors === true))
+                  .catch(() => setAskConnectors(!next))
               }}
               relayHopCap={relayHopCap}
               memoryMode={memoryMode}
@@ -3147,14 +3158,14 @@ export default function App(): ReactElement {
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode, autoMode, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode, autoMode, askConnectors, layout })
                   .then((settings) => setRelayHopCap(settings.relayHopCap))
                   .catch(() => undefined)
               }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode, autoMode, layout })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode, autoMode, askConnectors, layout })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -3570,7 +3581,7 @@ export default function App(): ReactElement {
               // same answer the composer just showed.
               setAutoMode(true)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: true, layout: 'auto' })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: true, askConnectors, layout: 'auto' })
                 .then((settings) => setAutoMode(settings.autoMode === true))
                 .catch(() => setAutoMode(false))
             }}
@@ -3609,7 +3620,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, askConnectors, layout })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}
@@ -3759,7 +3770,7 @@ export default function App(): ReactElement {
                   const next = !swarm
                   setSwarm(next)
                   void window.desktop
-                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
+                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, askConnectors, layout })
                     .then((settings) => setSwarm(settings.swarm === true))
                     .catch(() => setSwarm(!next))
                 }

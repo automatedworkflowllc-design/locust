@@ -887,6 +887,18 @@ export interface WorkspaceSettings {
    */
   readonly autoMode: boolean
   /**
+   * Ask before every connector call, instead of allowing the ones the person
+   * already has.
+   *
+   * Off is Colin's ruling and the ordinary state: a connector the person's
+   * Claude Code can reach is allowed without asking. On sends no allow rules,
+   * so every connector call stops the run and raises the approval card --
+   * the way every other client behaves -- with "always" remembered per
+   * connector until the mission ends. Checked when a run starts, never
+   * cached; absent or malformed reads as off.
+   */
+  readonly askConnectors: boolean
+  /**
    * Which shell layout to draw: the full sidebar, the compact avatar rail, or
    * whichever the window width calls for. Colin asked for the layout to be a
    * choice as well as a consequence of window size (2026-09-07). Absent or

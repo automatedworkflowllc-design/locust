@@ -225,6 +225,12 @@ interface CodexMissionServiceOptions {
    */
   readonly autoModeAllowed?: () => Promise<boolean>
   /**
+   * Ask before every connector call: send no allow rules, so each one goes
+   * to the permission host. Read at run start, never cached. The env seam
+   * LOCUST_ASK_CONNECTORS=1 does the same for the drives.
+   */
+  readonly askConnectors?: () => Promise<boolean>
+  /**
    * How many missions are live on the OTHER transports right now.
    *
    * The cap is one pool, not one per transport. Each of the three services
@@ -907,6 +913,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
          * the run is registered with the host, which mints it a token and an
          * mcp.json, and the card the app already has answers.
          */
+        const askEveryConnector =
+          globalThis.process.env.LOCUST_ASK_CONNECTORS === '1' || (await options.askConnectors?.()) === true
         const permissionBridge =
           runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
             ? await options.permissionHost.register({ runId, missionId, cwd: runCwd })
@@ -960,7 +968,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                    * which is Colin's ruling and the normal state. It is also
                    * the shape of a future "ask me each time" setting.
                    */
-                  if (globalThis.process.env.LOCUST_ASK_CONNECTORS === '1') return {}
+                  if (askEveryConnector) return {}
                   const named = options.connectors?.() ?? []
                   return named.length === 0 ? {} : { connectors: named }
                 })(),

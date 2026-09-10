@@ -85,7 +85,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, layout: 'auto' }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, layout: 'auto' }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -282,6 +282,11 @@ function parsedFile(text: string): StoredFile {
     // an older version all read as off, which is the answer nobody regrets.
     autoMode: typeof rawSettings === 'object' && rawSettings !== null
       ? (rawSettings as Record<string, unknown>).autoMode === true
+      : false,
+    // Only a literal true, like Auto: a file from before this field reads as
+    // the ordinary state, which is not asking.
+    askConnectors: typeof rawSettings === 'object' && rawSettings !== null
+      ? (rawSettings as Record<string, unknown>).askConnectors === true
       : false,
     layout: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedLayout((rawSettings as Record<string, unknown>).layout)
@@ -516,6 +521,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           // must never be able to turn on.
           autoMode: typeof settings === 'object' && settings !== null
             ? (settings as Record<string, unknown>).autoMode === true
+            : false,
+          askConnectors: typeof settings === 'object' && settings !== null
+            ? (settings as Record<string, unknown>).askConnectors === true
             : false,
           layout: typeof settings === 'object' && settings !== null
             ? parsedLayout((settings as Record<string, unknown>).layout)

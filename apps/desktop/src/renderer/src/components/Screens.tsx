@@ -760,6 +760,8 @@ export function SettingsScreen({
   relay,
   onRelayChange,
   autoMode,
+  askConnectors,
+  onAskConnectorsChange,
   swarm,
   onSwarmChange,
   onAutoModeChange,
@@ -815,6 +817,8 @@ export function SettingsScreen({
   readonly swarm: boolean
   readonly onSwarmChange: (swarm: boolean) => void
   readonly onAutoModeChange: (autoMode: boolean) => void
+  readonly askConnectors: boolean
+  readonly onAskConnectorsChange: (askConnectors: boolean) => void
   /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
   readonly relayHopCap: number
   readonly onRelayHopCapChange: (cap: number) => void
@@ -1105,6 +1109,47 @@ export function SettingsScreen({
                 aria-checked={autoMode}
                 aria-label={autoMode ? 'Switch this off' : 'Switch this on'}
                 onClick={() => onAutoModeChange(!autoMode)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Connectors</h2>
+          <p className="lc-settings__lede">
+            {askConnectors
+              ? 'Asking. A Claude Code teammate stops and asks before every connector call.'
+              : 'Not asking. A teammate may use any connector your Claude Code can reach, without asking.'}
+          </p>
+          <More>
+            <p>
+              A connector is not on this machine: it acts on the service it reaches, so no permission mode
+              governs it. By default a teammate may use whichever connectors your own Claude Code has, the
+              way you can -- the question was answered when you connected them.
+            </p>
+            <p>
+              Switch this on and every connector call stops the run and asks you first, with the exact
+              input it would send. Approve once, allow that connector for the rest of the mission, or deny
+              with a reason the teammate reads. It is checked when a run starts, so the next mission
+              follows the switch without a restart. Auto never asks either way.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                {askConnectors
+                  ? 'On. Every connector call raises an approval card first.'
+                  : 'Off. Connectors you have are used without asking.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-switch${askConnectors ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={askConnectors}
+                aria-label={askConnectors ? 'Stop asking before connector calls' : 'Ask before every connector call'}
+                onClick={() => onAskConnectorsChange(!askConnectors)}
               >
                 <span className="lc-switch__knob" />
               </button>
