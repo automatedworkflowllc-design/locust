@@ -6,6 +6,33 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.60.0 - 2026-09-09
+
+- **A teammate can work in its own folder.** Open a teammate, and under Own
+  branch there is now a "Works in" row. Its missions run there instead of the
+  project folder, and nothing else moves: the app does not reopen, your
+  history and what the team remembers stay with the project. This is also how
+  a teammate reaches an MCP server you registered to one folder — Claude Code
+  keeps those per project, so a connector set up in `C:\Users\you\claude`
+  exists in that folder and nowhere else.
+- **The mode now tells you when it has taken your connectors away.** Only Auto
+  runs a Claude Code teammate with your own settings, so only Auto can reach
+  an MCP server. Every other mode now says so on the permission chip instead
+  of leaving the teammate to answer "I have no connection to that", which
+  reads as the connector being broken.
+- **Changing the project folder no longer closes Locust.** It reopens there,
+  as it always meant to. A runtime whose process ignored the shutdown could
+  leave the app with no window and nothing to come back to; the quit now has
+  a time limit and leaves anyway.
+- **A teammate no longer reports a message to itself as a missing teammate.**
+  "Jimothy addressed a message to Finance Bro, who is not on the roster" —
+  where Finance Bro was Jimothy's own role. A teammate can now be addressed by
+  their role as well as their name, and a message addressed home says that.
+- **The teammate dialog said "Ask · every write refused" while the composer
+  was in Auto.** It now names the mode the next mission will really run in.
+- **The Automations screen has its header back.** Its title had been sitting
+  flush against the window edge, with none of the bar every other screen has.
+
 ## 0.59.0 - 2026-09-09
 
 - **Your connectors now reach your teammates.** In Auto mode a Claude Code
