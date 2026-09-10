@@ -203,6 +203,50 @@ function RoomAnswerText({ text }: { readonly text: string }): ReactElement {
   )
 }
 
+/**
+ * One line about a post: what was asked, and what came of it.
+ *
+ * The design agent's rule, which is the trace line's rule: **count the
+ * ordinary, name the exceptional.** A state one or two members are in gets
+ * their names, because that is the fact you want; three or more goes back to
+ * being a number, because four names is a list and a list is not a glance.
+ *
+ *   8 asked · all answered
+ *   8 asked · 6 answered · Otto running · Sable failed
+ *   8 asked · 5 answered · 3 failed
+ *   6 asked · 2 answered · 4 running · 2 waiting for a slot
+ *
+ * A zero segment is absent rather than written as zero. And this is the
+ * whole of "is anything wrong" -- a question asked ONCE, on arrival, which
+ * needs a sentence that is true when you look rather than a view somebody
+ * has to watch. Nobody watches a room while it runs; that was the argument
+ * for the queue and it decides this too.
+ */
+export function postHeadline(
+  members: readonly { readonly name: string; readonly state: 'answered' | 'running' | 'failed' | 'waiting' }[]
+): string {
+  const asked = members.filter((member) => member.state !== 'waiting').length
+  const parts: string[] = [`${String(asked)} asked`]
+  const of = (state: string): readonly string[] =>
+    members.filter((member) => member.state === state).map((member) => member.name)
+
+  const answered = of('answered')
+  if (answered.length > 0 && answered.length === asked && asked > 0) parts.push('all answered')
+  else if (answered.length > 0) parts.push(`${String(answered.length)} answered`)
+
+  // Named at one or two, counted past that. `running` and `failed` are the
+  // exceptions a person is looking for; `waiting` is always a count because
+  // it is a queue position rather than something that happened.
+  for (const [state, word] of [['running', 'running'], ['failed', 'failed']] as const) {
+    const names = of(state)
+    if (names.length === 0) continue
+    parts.push(names.length <= 2 ? `${names.join(' and ')} ${word}` : `${String(names.length)} ${word}`)
+  }
+  const waiting = of('waiting')
+  if (waiting.length > 0) parts.push(`${String(waiting.length)} waiting for a slot`)
+  return parts.join(' · ')
+}
+
 export function waitingLine(names: readonly string[]): string | undefined {
   if (names.length === 0) return undefined
   return names.join(', ')
@@ -256,6 +300,29 @@ export function RoomScreen({
   const [formError, setFormError] = useState<string>()
 
   const members = room === undefined ? [] : room.teammateIds.map((id) => teammates.find((entry) => entry.teammateId === id))
+
+  /**
+   * Put one teammate's answer at the top of the room.
+   *
+   * The answer to "what did Booty actually say" was never a better preview
+   * -- the fold and Open were already right. What was missing was a way to
+   * GET to Booty among eight without scrolling and reading names.
+   *
+   * Arithmetic on `scrollTop` rather than `scrollIntoView`, which fights a
+   * scroll container: it scrolls every ancestor that can scroll, so in a
+   * pane inside a pane it moves the wrong one and the room jumps under the
+   * reader.
+   */
+  const jumpTo = (postId: string, teammateId: string): void => {
+    const card = document.querySelector(`[data-answer="${postId}:${teammateId}"]`)
+    const scroller = card?.closest('.lc-screen__scroll')
+    if (card === null || !(card instanceof HTMLElement) || !(scroller instanceof HTMLElement)) return
+    // The sticky header sits over the top of the scroll area, so the card
+    // has to clear it or it lands underneath the thing that sent you there.
+    const header = scroller.querySelector('.lc-posthead')
+    const clearance = header instanceof HTMLElement ? header.offsetHeight : 0
+    scroller.scrollTo({ top: card.offsetTop - scroller.offsetTop - clearance, behavior: 'smooth' })
+  }
 
   const create = async (): Promise<void> => {
     setFormError(undefined)
@@ -530,6 +597,62 @@ export function RoomScreen({
                   {new Date(entry.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
+              {/*
+                * One sticky line per post: the glance, and the way to one
+                * answer. Chrome on the section, the same relationship the
+                * workroom header has to its thread -- no card, no register,
+                * and nothing in it that is not already in the records the
+                * cards below are read from.
+                */}
+              <div className="lc-posthead">
+                <span className="lc-posthead__counts lc-mono">
+                  {postHeadline(
+                    room.teammateIds.map((id) => {
+                      const name = teammates.find((candidate) => candidate.teammateId === id)?.name ?? id
+                      if ((entry.queued ?? []).includes(id)) return { name, state: 'waiting' as const }
+                      const found = answers.find((candidate) => candidate.teammateId === id)
+                      if (found === undefined) return { name, state: 'failed' as const }
+                      if (found.phase === 'failed' || found.phase === 'cancelled') return { name, state: 'failed' as const }
+                      if (found.text !== undefined) return { name, state: 'answered' as const }
+                      return { name, state: 'running' as const }
+                    })
+                  )}
+                </span>
+                {/*
+                  * The members as an index. The strip IS the roster, so a
+                  * waiting member is here as a hollow pip rather than absent
+                  * -- a name missing from it reads as someone not in the room.
+                  */}
+                <span className="lc-posthead__index" role="group" aria-label="Jump to an answer">
+                  {room.teammateIds.map((id) => {
+                    const teammate = teammates.find((candidate) => candidate.teammateId === id)
+                    const found = answers.find((candidate) => candidate.teammateId === id)
+                    const waiting = (entry.queued ?? []).includes(id)
+                    const phase = waiting
+                      ? 'waiting'
+                      : found === undefined || found.phase === 'failed' || found.phase === 'cancelled'
+                        ? 'failed'
+                        : found.text !== undefined
+                          ? 'answered'
+                          : 'running'
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`lc-posthead__face is-${phase}`}
+                        title={`${teammate?.name ?? id} · ${phase}`}
+                        aria-label={`${teammate?.name ?? id}, ${phase}`}
+                        onClick={() => jumpTo(entry.postId, id)}
+                      >
+                        {teammate !== undefined && (
+                          <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={22} activity="idle" presence="none" />
+                        )}
+                        <span className="lc-posthead__pip" aria-hidden="true" />
+                      </button>
+                    )
+                  })}
+                </span>
+              </div>
               <div className={`lc-roompost__answers${answers.length > ANSWERS_BEFORE_A_LIST ? ' is-list' : ''}`}>
                 {room.teammateIds.map((teammateId) => {
                   const teammate = teammates.find((candidate) => candidate.teammateId === teammateId)
@@ -538,7 +661,7 @@ export function RoomScreen({
                   // No mission, no card. They are named together underneath.
                   if (answer === undefined) return null
                   return (
-                    <div key={teammateId} className="lc-roomanswer">
+                    <div key={teammateId} className="lc-roomanswer" data-answer={`${entry.postId}:${teammateId}`}>
                       <div className="lc-roomanswer__who">
                         {teammate !== undefined && (
                           <PixelFace

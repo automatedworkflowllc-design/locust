@@ -154,7 +154,9 @@ try {
       if (document.querySelector('.lc-roomanswer') !== null) { firstCardAt = Math.round(performance.now() - submitted); break }
     }
     await new Promise(r => setTimeout(r, 2500))
-    return 'first card after ' + firstCardAt + 'ms · cards: ' + document.querySelectorAll('.lc-roomanswer').length +
+    return 'head: ' + (document.querySelector('.lc-posthead__counts')?.innerText.trim() ?? 'NO HEADER') +
+      ' · faces: ' + document.querySelectorAll('.lc-posthead__face').length +
+      ' · first card after ' + firstCardAt + 'ms · cards: ' + document.querySelectorAll('.lc-roomanswer').length +
       ' · waiting: ' + (document.querySelector('.lc-roomwaiting')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'NONE') +
       ' · absent line: ' + (document.querySelector('.lc-roomabsent')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'NONE') +
       ' · note: ' + (document.querySelector('.lc-roomcompose__row .lc-settings__note')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'none')

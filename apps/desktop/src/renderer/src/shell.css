@@ -2183,6 +2183,94 @@ textarea {
   overflow: hidden;
 }
 
+/*
+ * One sticky line per post: the glance, and the way to one answer.
+ *
+ * Chrome on the section rather than a card -- the same relationship the
+ * workroom header has to its thread. Everything in it is derived from the
+ * records the cards below are read from, so it can never disagree with them.
+ */
+.lc-posthead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-4);
+  min-height: 38px;
+  margin: var(--lc-space-2) 0 0;
+  padding: 0 var(--lc-space-3);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-terminal);
+}
+
+.lc-posthead__counts {
+  min-width: 0;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Eight 22px faces is 216px, so it fits at any width the room has and never
+ * wraps -- which is the whole reason the index can be one line. */
+.lc-posthead__index {
+  display: flex;
+  flex: none;
+  gap: var(--lc-space-1);
+}
+
+.lc-posthead__face {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+  opacity: 0.85;
+}
+
+.lc-posthead__face:hover {
+  opacity: 1;
+}
+
+/* A waiting member is here as a hollow pip rather than absent: the strip IS
+ * the roster, and a name missing from it reads as someone not in the room. */
+.lc-posthead__face.is-waiting {
+  opacity: 0.45;
+}
+
+.lc-posthead__pip {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--lc-bg-terminal);
+  box-sizing: border-box;
+}
+
+.lc-posthead__face.is-answered .lc-posthead__pip {
+  background: var(--lc-green);
+}
+
+.lc-posthead__face.is-running .lc-posthead__pip {
+  background: var(--lc-amber);
+}
+
+.lc-posthead__face.is-failed .lc-posthead__pip {
+  background: var(--lc-red);
+}
+
+.lc-posthead__face.is-waiting .lc-posthead__pip {
+  background: none;
+  border-color: var(--lc-border-strong);
+}
+
 .lc-roomwaiting {
   display: flex;
   align-items: baseline;
