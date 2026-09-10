@@ -30,6 +30,12 @@ Then inspect the actual source tree and tests. The repository is authoritative f
 
 ## Stable product decisions
 
+Route-at-start decision (2026-09-10, `astra/work`): the host's saved teammate
+route outranks discovery/default composer choices, except for a real picker
+change this session for that teammate. Nobody's missions retain their
+composer route. Mode is not inherited. See
+`docs/FINDING-route-at-start-2026-09-10.md` for evidence and limitations.
+
 | Decision | Current direction |
 |---|---|
 | Product | Local-first, open-source platform for specialized autonomous AI teammates |
@@ -118,6 +124,39 @@ Use this template:
 ```
 
 ## Handoff log
+
+### 2026-09-09 — live-mission frontier, pinned e05ac6d (astra/work)
+
+- Main e05ac6d merged as d452f20; main checkout untouched. Both caps temporarily 16 for measurement, restored to 8 and rebuilt before validation. No production change.
+- [Frontier finding](FINDING-live-mission-frontier-2026-09-09.md): real 8/12/16-way OpenCode-free writes complete with exact files/replies and clean event/ledger coverage. No data-loss boundary through 16; read-only 10/12-member rooms actually peaked at seven processes, not 10/12.
+- Important findings: intermittent OpenCode-readiness launch refusals; room start notifications delayed 45–53 seconds; eight answers not comfortably visible; N=16 renderer heartbeat gap 11.994 seconds and max event lag 7.929 seconds despite correct receipts. Counting produces one text record, so it does not establish queue-saturation safety.
+- Recommendation: retain fixed 8 pending owner review, constrained by UX/responsiveness/readiness rather than a proven RAM ceiling. Smaller machines and heavier runtimes explicitly unmeasured; no memory squeeze or paid runtime calls.
+- Validation: root pnpm test/full Vitest 2,399 tests; desktop pnpm test 1,937 (same desktop portion); recursive node/web typechecks green. File recheck intentionally reports the original solo identity-refusal calibration as a missing file; 40 completed revision-2 files pass strict validation.
+- Next step: owner review/profiling, not an automatic cap increase or adapter fix. New measurement tools and evidence are isolated under _tools and docs.
+
+### 2026-09-09 — pinned ledger-fix recheck and Codex question contract (astra/work)
+
+- Pinned main `2b60cab` merged as `9130f12`; both conflicted test-path files taken from main exactly. Main checkout untouched. Rebuilt mission-store before testing.
+- [Independent recheck](FINDING-ledger-fix-recheck-2026-09-09.md): all five former KNOWN DEFECT cases now require and render warnings; physical directory failure and mixed damage pass. Both requested mutations fail (5 and 6 assertions), plus directory-warning mutation (1). Both clean controls retained.
+- New measured defect, not fixed: body-damaged but recoverable mission outside the 20-entry page is miscounted as an unreadable file. Desired zero failed with one; explicitly characterized in the 22-test harness. Other refresh paths' stale damage state is source-only, not live-tested.
+- [Codex question answer contract](FINDING-codex-question-answers-2026-09-09.md): installed 0.153.0 accepts question-ID → answer-string-array content, selected options by literal label. Malformed payload becomes an empty answer map in version-matched upstream source. No approval-flow change and no model quota; schema inspector includes no-data and wrong-shape controls.
+- Validation: root pnpm test and full Vitest 1,996/1,996 (111 files); desktop pnpm test 1,544/1,544 (90 files), matching root's desktop portion. Recursive node/web typecheck green. Main's cwd prohibition passes; production diff from pinned merge is empty.
+
+### 2026-09-08 — physical torn-ledger recovery proof (astra/work)
+
+- Tests/findings only: [torn-ledger finding](FINDING-torn-ledger-2026-09-08.md). Nineteen new physical-file reader/history/preload/component-rendering checks, with clean zero-issue controls and ten measured mutation failures.
+- Reader safely retains prefixes and raises issues for all six requested shapes. Body issues render incomplete-receipt wording. **Unfixed:** invalid headers/oversized files have global issues but no recovered mission, so Missions falsely says ledger verified; five tests explicitly characterize the defect.
+- Limits: actual React component HTML and mocked Electron transport; no live Electron relaunch or App mount. No production changes. Two existing source-inspection tests now resolve paths from import.meta.url so both test entry points agree.
+- Validation: root pnpm test and full Vitest 1,679/1,679; desktop pnpm test 1,227/1,227, matching root's desktop portion. Recursive typecheck green, including node and web.
+
+### 2026-09-08 — app-server receipt-failure hold measurement (astra/work)
+
+- Scope: measurement only, in the isolated locust-astra worktree; no runtime or UI changes.
+- Decision: close arbitrary ledger-failure pause as cannot with Codex 0.153.0's exposed protocol. Approval waits are not an all-work-stopped barrier.
+- Evidence and limits: [app-server hold finding](FINDING-app-server-hold-2026-09-08.md); generated experimental inventory plus six live dispatcher replies, no generation. Empty-data control exits nonzero.
+- Validation: recursive typecheck green; full root Vitest 1,660/1,660, 103 files.
+- Separate concern: app-server mission notification persistence rejection is swallowed in this snapshot; source-level finding only, left unchanged for the owning agent.
+- Next step: review the finding and merge the named documentation/probe commit from astra/work if accepted. No pause implementation is queued.
 
 ### 2026-08-30 — workspace and product baseline
 

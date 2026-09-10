@@ -1065,6 +1065,10 @@ export interface CodexMissionStartRequest {
    * cannot be resumed is refused rather than silently started blank.
    */
   readonly followUpOf?: string
+  /** Raw picker identity before an effort choice expands a model variant. */
+  readonly modelChoice?: string
+  /** Only a person's picker change this session, addressed to this teammate. */
+  readonly routeOverrideFor?: string
 }
 
 /**

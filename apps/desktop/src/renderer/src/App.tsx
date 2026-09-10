@@ -70,6 +70,7 @@ import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
 import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
 import type { RouteChoice } from './components/RoutePicker.js'
+import { composerRouteFor } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
@@ -800,6 +801,9 @@ export default function App(): ReactElement {
   /** The latest still-allowed rate-limit reading per runtime, by words. */
   const [usageWindows, setUsageWindows] = useState<ReadonlyMap<string, string>>(new Map())
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
+  // Intent belongs to the addressed teammate, not to discovery or the last
+  // thread visited. Session-only state deliberately clears on app restart.
+  const [pickerRoutes, setPickerRoutes] = useState<ReadonlyMap<string, RouteChoice>>(new Map())
   /**
    * Whether the route on screen is the person's own choice.
    *
@@ -1648,6 +1652,7 @@ export default function App(): ReactElement {
    * mission already is one, a teammate is a saved route with a face).
    */
   const pickedTeammate = selectedTeammateId === undefined ? undefined : selectedTeammate
+  const composerRoute = composerRouteFor(route, pickedTeammate, pickerRoutes)
 
   /** Who a run belongs to: what it was started with, or what the host recorded. */
   const ownerOf = (run: LiveRunState): string | undefined =>
@@ -1661,9 +1666,9 @@ export default function App(): ReactElement {
     liveRun !== undefined
     && shownData !== undefined
     && !liveRunIsActive(liveRun)
-    && shownData.runtime !== route.runtime
+    && shownData.runtime !== composerRoute.runtime
     && ownerOf(liveRun) === pickedTeammate?.teammateId
-      ? `Continues on ${runtimeNameOf(route.runtime)} from ${runtimeNameOf(shownData.runtime)}'s checkpoint -- briefed on what was done, not handed the memory.`
+      ? `Continues on ${runtimeNameOf(composerRoute.runtime)} from ${runtimeNameOf(shownData.runtime)}'s checkpoint -- briefed on what was done, not handed the memory.`
       : undefined
 
   /**
@@ -1901,6 +1906,7 @@ export default function App(): ReactElement {
   }
 
   const startMission = async (prompt: string, modeOverride?: MissionMode): Promise<boolean> => {
+    const route = composerRoute
     const bridge = window.desktop
     const teammateId = pickedTeammate?.teammateId
     // No folder, no run. The main process refuses this too; saying it here
@@ -1997,6 +2003,8 @@ export default function App(): ReactElement {
         // Where the effort lives inside the model id, it is sent as the id
         // alone (startRoute).
         ...startRoute(models, route.runtime, route.model, swarmEffortFor(models, route.model, swarm, effort, route.runtime)),
+        modelChoice: route.model,
+        ...(teammateId !== undefined && pickerRoutes.has(teammateId) ? { routeOverrideFor: teammateId } : {}),
         ...(teammateId === undefined ? {} : { teammateId }),
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId })
       })
@@ -2045,6 +2053,7 @@ export default function App(): ReactElement {
       setRuns((current) => {
         let next: LiveRunState = {
           ...starting,
+          runtime: response.data.runtime,
           data: response.data,
           phase: 'running',
           peerMessages: response.data.peerMessages,
@@ -2114,6 +2123,7 @@ export default function App(): ReactElement {
    * different is only that the host wrote its prompt from the checkpoint.
    */
   const resumeMission = async (missionId: string, epoch: number): Promise<void> => {
+    const route = composerRoute
     const bridge = window.desktop
     if (!bridge) return
     setHandingOff(true)
@@ -3617,9 +3627,9 @@ export default function App(): ReactElement {
             // (Claude Code kept on Accept edits from before), and showing it
             // would promise an edit the host is about to refuse.
             mode={
-              modeRunsOn(mode, route.runtime, build?.platform)
+              modeRunsOn(mode, composerRoute.runtime, build?.platform)
                 ? mode
-                : modesFor(route.runtime, build?.platform)[0] ?? mode
+                : modesFor(composerRoute.runtime, build?.platform)[0] ?? mode
             }
             onModeChange={setMode}
             autoMode={autoMode}
@@ -3634,12 +3644,15 @@ export default function App(): ReactElement {
                 .then((settings) => setAutoMode(settings.autoMode === true))
                 .catch(() => setAutoMode(false))
             }}
-            route={route}
+            route={composerRoute}
             onRouteChange={(next) => {
               // From here on this route is theirs, and discovery stops
               // moving it.
               routeChosen.current = true
               setRoute(next)
+              if (pickedTeammate !== undefined) {
+                setPickerRoutes((current) => new Map(current).set(pickedTeammate.teammateId, next))
+              }
               // Effort belongs to a model, so a level the new model never
               // advertised must not follow it across. But clearing to NOTHING
               // is what made picking a model empty the effort control --
