@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.60.1 - 2026-09-09
+
+- **Correction to what 0.60.0 told you about connectors.** It said they were
+  off in every mode but Auto because those modes ignore your Claude settings.
+  That reason was wrong — those modes never blocked your MCP servers — and
+  Locust was blocking them itself. That block is gone.
+- **What is actually true, measured:** Claude Code asks before using a
+  connector, and a mission has no way to put that question to you outside
+  Auto, so the call is refused there. The difference is that you now see the
+  refusal — `get_watchlists · Robinhood · failed` — instead of the teammate
+  improvising "I have no connection to that", which read as a broken
+  connector. The permission chip says which mode can and which cannot.
+- Per-connector permission, so a teammate can use one connector without being
+  given the whole machine, is next.
+
 ## 0.60.0 - 2026-09-09
 
 - **A teammate can work in its own folder.** Open a teammate, and under Own

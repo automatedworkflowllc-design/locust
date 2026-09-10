@@ -78,8 +78,12 @@ describe("runtime command specifications", () => {
     );
     expect(claude.args).toContain("--restricted");
     expect(claude.args.join(" ")).toContain("--permission-mode default");
-    expect(claude.args.join(" ")).toContain("--tools Read,Glob,Grep,Task ");
+    // The connectors ride along -- `--restricted` never kept them out, which
+    // was measured on 2026-09-09 -- but nothing that writes to this machine
+    // does.
+    expect(claude.args.join(" ")).toContain("--tools Read,Glob,Grep,Task,mcp__*");
     expect(claude.args.join(" ")).not.toContain("Edit");
+    expect(claude.args.join(" ")).not.toContain("Bash");
   });
 
   it("lets a Claude mission that may edit actually edit, and run what it changed", () => {
@@ -97,7 +101,10 @@ describe("runtime command specifications", () => {
     // Still restricted: the person's own Claude settings stay out of a
     // mission, and the tool list is explicit either way.
     expect(claude.args).toContain("--restricted");
-    expect(claude.args.join(" ")).toContain("--disallowedTools mcp__*");
+    // And it keeps the person's connectors, which `--restricted` was never
+    // keeping out: only `--strict-mcp-config` would, and nothing sends that.
+    expect(claude.args.join(" ")).not.toContain("--disallowedTools");
+    expect(claude.args.join(" ")).toContain("Bash,Task,mcp__*");
   });
 
   it("rejects permission bypass arguments", () => {
@@ -139,36 +146,49 @@ describe("the Auto mode a person switches on", () => {
     // else, which the app saw as a run that ended without a result. Auto is
     // the one mode that drops it; every other mode keeps it.
     expect(claude.args).not.toContain("--restricted");
-    /*
-     * AND THAT IS WHY AUTO GETS THE PERSON'S CONNECTORS.
-     *
-     * Dropping `--restricted` is what lets a person's own Claude settings
-     * into the mission -- their hooks fire inside it, which is how Colin saw
-     * "Stop hook error occurred" three times in one conversation on
-     * 2026-09-09. Their MCP servers load with those same settings.
-     *
-     * This used to assert `--disallowedTools mcp__*` HERE, in the one mode
-     * where the servers actually load, so the run inherited the person's
-     * hooks and then refused the person's tools. The teammate, with no way
-     * to know why, reported "no such MCP tool is connected here" -- which
-     * reads as a broken connector rather than a deliberate denial.
-     */
     expect(claude.args.join(" ")).toContain("Bash,Task,mcp__*");
-    expect(claude.args.join(" ")).not.toContain("--disallowedTools");
     expect(claude.args).not.toContain("--dangerously-skip-permissions");
+    /*
+     * EVERY MODE GETS THE PERSON'S CONNECTORS.
+     *
+     * This block used to assert the opposite -- `--disallowedTools mcp__*`
+     * in every mode but Auto -- and carried a comment saying the denial
+     * "costs nothing" because `--restricted` meant those servers were never
+     * read. That was wrong, and the CLI's own help says so:
+     *
+     *   --restricted ... ignores user, project and local settings files
+     *   (managed settings and --settings still apply; ADD --strict-mcp-config
+     *   TO SKIP MCP SERVERS TOO)
+     *
+     * MEASURED 2026-09-09 by running the argv by hand in an empty temp
+     * folder: `claude --restricted --print --tools "Read,Glob,Grep,Task,
+     * mcp__*"` listed every connector on the account. `--restricted` never
+     * blocked them; our denial did, and the app then told the person the
+     * MODE was the reason.
+     *
+     * Colin asked whether Auto-only was standard. It is not -- Claude Code
+     * makes connectors available in every permission mode -- and it made the
+     * only route to a READ-ONLY connector call a run that may edit anything
+     * on the machine.
+     *
+     * What the mode still decides is this machine. What it cannot decide is
+     * a connector, because a connector acts somewhere else; that is said on
+     * the mode menu instead of being enforced here.
+     */
     for (const sandbox of ["read-only", "workspace-write"] as const) {
       const other = createClaudePrintCommand({ ...nativeExecutable, commandName: "claude" }, { workspacePath, sandbox });
       expect(other.args).toContain("--restricted");
-      /*
-       * And they still deny MCP, which costs nothing: `--restricted` means
-       * the settings that define those servers were never read, so there is
-       * nothing to allow. The denial is belt and braces on a door that is
-       * already shut -- keep it, because it is the thing that makes the
-       * Auto-only allowance a decision rather than an oversight.
-       */
-      expect(other.args.join(" ")).toContain("--disallowedTools mcp__*");
-      expect(other.args.join(" ")).not.toContain("mcp__*,");
+      expect(other.args.join(" ")).not.toContain("--disallowedTools");
+      expect(other.args.join(" ")).toContain("Task,mcp__*");
+      // Never `--strict-mcp-config`: that IS the flag that would keep the
+      // person's servers out, and nothing here wants that.
+      expect(other.args).not.toContain("--strict-mcp-config");
     }
+    // Read-only keeps its read-only tool list. Reaching a connector is not a
+    // licence to run commands.
+    const asking = createClaudePrintCommand({ ...nativeExecutable, commandName: "claude" }, { workspacePath, sandbox: "read-only" });
+    expect(asking.args.join(" ")).not.toContain("Bash");
+    expect(asking.args.join(" ")).not.toContain("Write");
   });
 
   it("gives Codex danger-full-access, which is its own name for it", () => {

@@ -67,32 +67,46 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
 ]
 
 /**
- * What a mode has done to the person's connectors, in one sentence.
+ * What this mode does to a connector, in one sentence, measured.
  *
- * `--restricted` is what keeps a person's own Claude Code settings out of a
- * mission, and Auto is the one mode that drops it -- it cannot be combined
- * with `bypassPermissions`. So in every other mode the MCP servers are never
- * loaded, and the run denies `mcp__*` on top of that.
+ * Two wrong versions of this shipped on 2026-09-09 before the third was
+ * measured, and both were wrong in the reason rather than the effect.
  *
- * Nothing said so. Colin asked a teammate in Accept edits to check Robinhood
- * twice on 2026-09-09; it answered, correctly and uselessly, that it had no
- * connection to Robinhood and no tool that could reach one, and the only way
- * to learn why was to read the launcher. His question afterwards was "is it
- * just going to be impossible to call robinhood out of the locust folder?" --
- * which it is not, and that is a sentence the app owed him.
+ *  1. "Only Auto runs with your own Claude Code settings, so only Auto can
+ *     reach an MCP server." FALSE. `--restricted` never kept a person's MCP
+ *     servers out; its own help names `--strict-mcp-config` as the flag that
+ *     would, and `claude --restricted --print --tools "...,mcp__*"` in an
+ *     empty folder listed every connector on the account.
+ *  2. "Your connectors are available in every mode." Also false, in practice.
+ *     Removing our `--disallowedTools mcp__*` made the tools OFFERED, and
+ *     driving the built app in Ask showed what happens next: Claude Code
+ *     asks before using one, a `--print` run has nowhere to ask, and the call
+ *     is denied. The row read `get_watchlists / Robinhood / failed`.
+ *
+ * So the true sentence is about ASKING. Auto sends `bypassPermissions` and is
+ * the one mode that does not ask. Every other Claude Code mode runs printed,
+ * with no channel to answer a prompt, so a connector call is refused -- and
+ * that is now a refusal the person can read and attribute, rather than the
+ * model improvising "I have no connection to Robinhood", which is what it did
+ * to Colin twice.
+ *
+ * (Approve each action is not the way out here: it runs on Codex CLI only.)
+ *
+ * The way out being built is per-connector permission. An allow rule must
+ * name its server -- `mcp__claude_ai_Robinhood__*` is accepted, `mcp__*` is
+ * refused with "An allow pattern must name the scope it widens" -- so the app
+ * has to know which connectors a person wants a teammate to have. That is the
+ * connector UI, and it is now a known mechanism rather than a question.
  *
  * Claude Code only: it is the only runtime whose command builder mentions MCP
- * at all, so the same words on another would be a claim nothing behind it
- * makes. Said whatever the settings file holds, because an account connector
- * from claude.ai never appears in `~/.claude.json` -- a notice gated on the
- * number of configured servers would have stayed silent in exactly the case
- * that raised this.
+ * at all, so the same words on another would be a claim nothing behind them
+ * makes.
  */
 export function connectorsNote(runtime: string, mode: MissionMode): string | undefined {
   if (runtime !== 'claude') return undefined
   return mode === 'auto'
-    ? 'Auto is the only mode that reads your own Claude Code settings, so your connectors and hooks are live in it.'
-    : 'Your connectors are off in this mode. Only Auto runs with your own Claude Code settings, so only Auto can reach an MCP server.'
+    ? 'Your connectors work here. Auto is the one mode that never stops to ask, which is also why it can change anything on this machine.'
+    : 'A connector call will be refused in this mode. Claude Code asks before using one, and a mission has no way to put that question to you outside Auto.'
 }
 
 export interface ComposerProps {
@@ -931,11 +945,7 @@ export function Composer({
                   aria-haspopup="menu"
                   aria-expanded={modeOpen}
                   aria-label="Permission mode"
-                  title={
-                    effectiveMode === 'auto'
-                      ? 'Permission mode'
-                      : (connectorsNote(route.runtime, effectiveMode) ?? 'Permission mode')
-                  }
+                  title={connectorsNote(route.runtime, effectiveMode) ?? 'Permission mode'}
                   disabled={running}
                   onClick={() => setModeOpen(!modeOpen)}
                 >

@@ -557,35 +557,42 @@ export function createClaudePrintCommand(
     // helpers read only.
     "--permission-mode",
     auto ? "bypassPermissions" : editing ? "acceptEdits" : "default",
+    // THE PERSON'S CONNECTORS, IN EVERY MODE.
+    //
+    // This used to allow `mcp__*` in Auto only, and deny it everywhere else,
+    // on the belief that `--restricted` had already kept the person's MCP
+    // servers out of those runs and there was therefore nothing to allow.
+    //
+    // That belief was wrong, and the CLI says so in its own help:
+    //
+    //   --restricted  ... ignores user, project and local settings files
+    //                 (managed settings and --settings still apply; ADD
+    //                 --strict-mcp-config TO SKIP MCP SERVERS TOO)
+    //
+    // MEASURED 2026-09-09, running the argv by hand in an empty temp folder:
+    // `claude --restricted --print --tools "Read,Glob,Grep,Task,mcp__*"`
+    // listed every connector on the account. `--restricted` never blocked
+    // them. Locust's own `--disallowedTools mcp__*` was the entire reason a
+    // teammate outside Auto could not reach a connector, and the app then
+    // told the person it was the mode.
+    //
+    // So the denial is gone. Colin asked the right question -- "do you think
+    // thats acceptable for the user to only have access for mcp tools under
+    // auto or is that standard?" -- and it is neither. Claude Code itself
+    // makes connectors available in every permission mode, and welding them
+    // to Auto meant the only way to let a teammate READ a watchlist was to
+    // let it edit anything on the machine. That is backwards: it charges the
+    // most dangerous permission for the most harmless capability.
+    //
+    // What the mode still decides is this machine: Ask and Plan refuse every
+    // write to disk, Accept edits confines them to the folder. What it cannot
+    // decide is a connector, because a connector acts somewhere else. That is
+    // said on the mode menu rather than left to be discovered. Colin,
+    // 2026-09-09, ruling on exactly that: "we can let the user decide that
+    // with the model, i doubt these models are just gonna randomly start
+    // buying crypto."
     "--tools",
-    editing
-      ? auto
-        ? // AUTO GETS THE PERSON'S CONNECTORS, because in Auto it already has
-          // everything else of theirs.
-          //
-          // `--restricted` is what keeps a person's own Claude settings out
-          // of a mission, and Auto is the one mode that drops it -- it cannot
-          // be combined with `bypassPermissions`. So in Auto their settings
-          // ARE loaded: their hooks fire inside a mission, which is how Colin
-          // saw "Stop hook error occurred" three times in one conversation
-          // (2026-09-09). Their MCP servers load with them.
-          //
-          // And then `--disallowedTools mcp__*` forbade every one of those
-          // tools. So the run inherited the person's hooks and refused the
-          // person's connectors -- and the teammate, having no way to know
-          // why, reported "no such MCP tool is connected here", which reads
-          // as the connector being broken. Colin: "it says its connected".
-          //
-          // In every other mode `--restricted` means the servers were never
-          // loaded at all, so there is nothing to allow; those modes keep the
-          // explicit list and the denial.
-          "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,mcp__*"
-        : "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task"
-      : "Read,Glob,Grep,Task",
-    // Not in Auto: see above. A run that has been told to act as the person,
-    // anywhere, without asking, has no business being told it may not use the
-    // tools that person connected.
-    ...(auto ? [] : ["--disallowedTools", "mcp__*"]),
+    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,mcp__*" : "Read,Glob,Grep,Task,mcp__*",
   ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
