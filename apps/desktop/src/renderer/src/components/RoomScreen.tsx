@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
@@ -22,6 +22,8 @@ export interface RoomAnswer {
   readonly missionId: string
   /** What the record says: starting, running, completed, failed, cancelled, interrupted -- or unknown. */
   readonly phase: string
+  /** When the asking started: the first event, or the post for a run with none. */
+  readonly startedAt: string | undefined
   /** The teammate's final words in that mission, when there are any yet. */
   readonly text: string | undefined
   readonly runtime: string
@@ -200,6 +202,63 @@ function RoomAnswerText({ text }: { readonly text: string }): ReactElement {
         </button>
       )}
     </>
+  )
+}
+
+/**
+ * How long a member has been quiet, past which it is worth saying so.
+ *
+ * From Astra's numbers rather than a guess: the solo write baseline is a 70s
+ * process whose first record lands well inside twenty seconds, and the
+ * eight-way case put 45s between a process starting and its notification. So
+ * twenty is past normal and short of the observed bad case. Tune it once
+ * launches have been visible for a while.
+ */
+export const QUIET_SECONDS_BEFORE_SAYING_SO = 20
+
+/**
+ * What a member is doing, and for how long.
+ *
+ * The design agent's three facts, and the naming is the point: it says
+ * ASKED, not `starting`. "Starting" is the app's word for its own dispatch
+ * loop; the reader's fact is that we asked and nothing has come back.
+ *
+ *   asked · 2s
+ *   asked · 45s · no word back yet        (past 20s, amber)
+ *   running · 52s                          (at the first event)
+ *
+ * The elapsed count is the whole argument, and it is the same one as
+ * elapsed-seconds instead of a progress bar: two seconds of silence is
+ * normal, forty-five is alarming, and the only thing separating them is a
+ * number we already have. Without it both are the word "starting".
+ *
+ * Past twenty seconds it adds a SENTENCE rather than changing phase --
+ * nothing has changed, the run is not failing, it is quiet, and those are
+ * different claims. It never goes red on its own: a launch that never speaks
+ * ends as a failure through the normal path, with the runtime's own reason.
+ */
+function AnswerState({ phase, startedAt }: { readonly phase: string; readonly startedAt: string | undefined }): ReactElement {
+  const [now, setNow] = useState(() => Date.now())
+  const live = phase === 'running' || phase === 'starting'
+  useEffect(() => {
+    if (!live) return undefined
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [live])
+
+  if (!live) return <span className="lc-roomanswer__phase lc-mono">{phase}</span>
+  const began = startedAt === undefined ? undefined : Date.parse(startedAt)
+  const seconds = began === undefined || Number.isNaN(began) ? undefined : Math.max(0, Math.round((now - began) / 1000))
+  // `starting` means no event has arrived yet, which is the whole of "we
+  // asked and nothing came back".
+  const word = phase === 'starting' ? 'asked' : 'running'
+  const quiet = word === 'asked' && seconds !== undefined && seconds >= QUIET_SECONDS_BEFORE_SAYING_SO
+  return (
+    <span className={`lc-roomanswer__phase lc-mono${quiet ? ' lc-tone-amber' : ''}`}>
+      {word}
+      {seconds !== undefined && ` · ${String(seconds)}s`}
+      {quiet && ' · no word back yet'}
+    </span>
   )
 }
 
@@ -676,9 +735,11 @@ export function RoomScreen({
                         <span className="lc-roomanswer__route lc-mono">
                           {runtimeNameOf(answer.runtime)} / {answer.model === 'account-default' ? 'default' : answer.model}
                         </span>
-                        <span className={`lc-roomanswer__phase lc-mono${answer.phase === 'failed' ? ' lc-tone-red' : ''}`}>
-                          {answer.phase}
-                        </span>
+                        {answer.phase === 'failed' ? (
+                          <span className="lc-roomanswer__phase lc-mono lc-tone-red">{answer.phase}</span>
+                        ) : (
+                          <AnswerState phase={answer.phase} startedAt={answer.startedAt} />
+                        )}
                         <button type="button" className="lc-ghostbutton" onClick={() => onOpenMission(answer.missionId)}>
                           Open
                         </button>

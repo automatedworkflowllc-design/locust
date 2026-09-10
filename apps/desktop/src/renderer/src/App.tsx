@@ -1679,6 +1679,15 @@ export default function App(): ReactElement {
       answers.push({
         teammateId,
         missionId,
+        /*
+         * When the asking started, so the card can say how long it has been
+         * quiet. The first event is the honest mark for a run that has
+         * spoken; for one that has not, the post is -- which is exactly the
+         * window this is for. A queued member's clock starts when they were
+         * asked, not when the post was made, and their first event is the
+         * only record of that.
+         */
+        startedAt: events[0]?.occurredAt ?? post.at,
         phase,
         text: last === undefined || last.trim().length === 0 ? undefined : last,
         runtime,

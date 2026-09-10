@@ -303,11 +303,21 @@ export function Sidebar({
         {/*
           * Rooms sit above the roster: a room is where several teammates
           * are written to at once, so it reads before any one of them. Only
-          * drawn once a room exists -- the way in is the Rooms screen, one
+          * DRAWN EVEN WITH NO ROOMS, which is the opposite of what this
+          * comment used to say. It said the way in is the Rooms screen, "one
           * palette entry or Ctrl 4 away, so an empty section has nothing to
-          * say here.
+          * say here" -- and that is exactly backwards. An empty section's
+          * whole job is to say the feature exists.
+          *
+          * The result was a feature nobody could reach without already having
+          * used it: rooms appeared in the sidebar only once you had made one,
+          * and the only ways to make a first one were a keyboard shortcut and
+          * a palette entry. Colin, who owns the app and had watched a day of
+          * work go into rooms, 2026-09-09: "sorry if this is dumb but how
+          * does one create a room for teammates, i cant figure it out lol."
+          * Not dumb -- there was nothing on screen to find.
           */}
-        {rooms.length > 0 && (
+        {(
           <>
             <div className="lc-sectionlabel">Rooms</div>
             {rooms.map((room) => (
@@ -331,7 +341,9 @@ export function Sidebar({
             ))}
             <button type="button" className="lc-row lc-row--button lc-roomrow lc-roomrow--new" onClick={onOpenRooms} title="New room">
               <Icon name="plus" size={12} />
-              <span className="lc-row__text"><span className="lc-row__meta">New room</span></span>
+              <span className="lc-row__text">
+                <span className="lc-row__meta">{rooms.length === 0 ? 'New room — ask several teammates at once' : 'New room'}</span>
+              </span>
             </button>
           </>
         )}

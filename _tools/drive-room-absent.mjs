@@ -154,7 +154,11 @@ try {
       if (document.querySelector('.lc-roomanswer') !== null) { firstCardAt = Math.round(performance.now() - submitted); break }
     }
     await new Promise(r => setTimeout(r, 2500))
-    return 'head: ' + (document.querySelector('.lc-posthead__counts')?.innerText.trim() ?? 'NO HEADER') +
+    // The window the design agent asked for: a member asked and not yet
+    // heard from, with the seconds on it.
+    const phases = [...document.querySelectorAll('.lc-roomanswer__phase')].map(p => p.innerText.replace(/\\s+/g, ' ').trim())
+    return 'phases: ' + JSON.stringify(phases.slice(0, 4)) +
+      ' · head: ' + (document.querySelector('.lc-posthead__counts')?.innerText.trim() ?? 'NO HEADER') +
       ' · faces: ' + document.querySelectorAll('.lc-posthead__face').length +
       ' · first card after ' + firstCardAt + 'ms · cards: ' + document.querySelectorAll('.lc-roomanswer').length +
       ' · waiting: ' + (document.querySelector('.lc-roomwaiting')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'NONE') +
