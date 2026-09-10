@@ -56,6 +56,15 @@ export interface RoomStore {
    * again on the next slot.
    */
   startQueued(roomId: string, postId: string, teammateId: string, missionId: string): Promise<void>
+  /**
+   * A queued member will never start: move them out of the queue and into
+   * the post's refusals, with the host's words.
+   *
+   * The mirror of `startQueued`, and needed for the same reason -- the post
+   * now exists before anyone is asked, so a refusal has to be recorded onto
+   * it rather than handed to `addPost` at the end.
+   */
+  refuseQueued(roomId: string, postId: string, teammateId: string, message: string): Promise<void>
   /** A teammate who is gone leaves every room; a room left empty is removed. */
   removeTeammate(teammateId: unknown): Promise<void>
   /**
@@ -337,6 +346,30 @@ export function createRoomStore(options: {
           rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))
         })
         return added
+      })
+    },
+
+    refuseQueued(roomId, postId, teammateId, message): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(teammateId) || typeof message !== 'string' || message.length === 0) return
+        const file = await read()
+        const room = file.rooms.find((entry) => entry.roomId === roomId)
+        if (room === undefined) return
+        const posts = room.posts.map((post) => {
+          if (post.postId !== postId) return post
+          const queued = (post.queued ?? []).filter((id) => id !== teammateId)
+          const next = {
+            ...post,
+            refused: { ...(post.refused ?? {}), [teammateId]: message.slice(0, 200) },
+            ...(queued.length === 0 ? {} : { queued })
+          }
+          if (queued.length === 0) delete (next as { queued?: readonly string[] }).queued
+          return next
+        })
+        await write({
+          ...file,
+          rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))
+        })
       })
     },
 

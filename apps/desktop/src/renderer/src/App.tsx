@@ -1243,6 +1243,19 @@ export default function App(): ReactElement {
         // A routine that started on its own: the Team card's run count and
         // next run moved on disk, and nobody pressed anything to refresh them.
         if (update.startedBy?.kind === 'routine') void reloadRoutines()
+        /*
+         * A room start, so re-read the rooms NOW.
+         *
+         * The host writes the post before it asks anyone and announces each
+         * run as it begins -- but the room on screen is drawn from the rooms
+         * in renderer state, and those only arrived with the post's own
+         * response, which lands after every member has been tried. So the
+         * host could be three runs in and the room still showed nothing.
+         *
+         * This is the other half of the fix for the 45 seconds Astra
+         * measured between a process existing and its row appearing.
+         */
+        if (update.startedBy?.kind === 'room') refreshRooms()
         const queued = pendingUpdatesRef.current.get(update.runId) ?? []
         pendingUpdatesRef.current.delete(update.runId)
         setRuns((current) => {

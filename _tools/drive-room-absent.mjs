@@ -138,10 +138,23 @@ try {
     setter.call(box, 'Reply with exactly one word: READY. Nothing else.')
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 200))
+    /*
+     * How long until the FIRST row appears.
+     *
+     * The measurement Astra's finding asks for: a process ran 45,292 ms
+     * before its row did, because the post started everyone in sequence and
+     * announced them all afterwards. Polled at 100ms from the submit, so a
+     * regression to batch announcing is a number here rather than a shrug.
+     */
+    const submitted = performance.now()
     document.querySelector('.lc-roomcompose').requestSubmit()
-    // Long enough for the started runs to draw and the queue to render.
-    await new Promise(r => setTimeout(r, 6000))
-    return 'cards: ' + document.querySelectorAll('.lc-roomanswer').length +
+    let firstCardAt = -1
+    for (let i = 0; i < 400; i += 1) {
+      await new Promise(r => setTimeout(r, 100))
+      if (document.querySelector('.lc-roomanswer') !== null) { firstCardAt = Math.round(performance.now() - submitted); break }
+    }
+    await new Promise(r => setTimeout(r, 2500))
+    return 'first card after ' + firstCardAt + 'ms · cards: ' + document.querySelectorAll('.lc-roomanswer').length +
       ' · waiting: ' + (document.querySelector('.lc-roomwaiting')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'NONE') +
       ' · absent line: ' + (document.querySelector('.lc-roomabsent')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'NONE') +
       ' · note: ' + (document.querySelector('.lc-roomcompose__row .lc-settings__note')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'none')

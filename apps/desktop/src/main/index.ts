@@ -133,6 +133,7 @@ import type {
   CodexMissionUpdate,
   MissionMode,
   PublicRoom,
+  RoomPost,
   PublicTeammate,
   MissionHandoffRequest,
   MissionResumeRequest
@@ -1662,11 +1663,32 @@ ${taskSection({
       // One run per teammate, each on THEIR route. A teammate with no route
       // of their own yet -- never started by a person -- runs on Codex's
       // account default in read-only, the same as a fresh teammate would.
-      const started: Record<string, string> = {}
-      const startedData: { teammateId: string; data: CodexMissionStartData }[] = []
       const refusals: { teammateId: string; name: string; message: string }[] = []
-      const queued: string[] = []
       const roster = await teammates.list()
+
+      /*
+       * THE POST EXISTS BEFORE ANYONE IS ASKED.
+       *
+       * It used to be written at the END: start everyone in sequence, then
+       * record the post, then announce every run at once. So a person
+       * watched an empty room while work was already underway -- Astra
+       * measured a process running 45,292 ms before its own row appeared,
+       * and it is the cause of every "cards: 0" the room drives reported
+       * immediately after posting, which I had seen and not explained.
+       *
+       * Now everyone starts QUEUED, and each member leaves the queue the
+       * moment their run begins -- announced there and then. Which is
+       * exactly what `room-tasks` does when a slot frees, so the two paths
+       * are one path, and a post that cannot reach everyone at once is the
+       * same thing as a post that reaches them slowly.
+       */
+      let post: RoomPost
+      try {
+        post = await rooms.addPost(roomId, { text, missions: {}, queued: [...room.teammateIds] })
+      } catch (error) {
+        return roomRejected(error instanceof Error ? error.message : 'The post could not be recorded.')
+      }
+
       for (const teammateId of room.teammateIds) {
         const attempt = await startRoomMember(room, teammateId, text, roster)
         if (!attempt.ok) {
@@ -1680,44 +1702,27 @@ ${taskSection({
            * from the roster, a runtime a room cannot post to -- is recorded
            * as refused, because waiting will never fix it.
            */
-          if (attempt.retryable) queued.push(teammateId)
-          else refusals.push({ teammateId, name: attempt.name, message: attempt.message })
+          if (attempt.retryable) continue
+          refusals.push({ teammateId, name: attempt.name, message: attempt.message })
+          await rooms.refuseQueued(roomId, post.postId, teammateId, attempt.message).catch(() => undefined)
           continue
         }
-        started[teammateId] = attempt.data.missionId
-        startedData.push({ teammateId, data: attempt.data })
-      }
-      let post
-      try {
-        post = await rooms.addPost(roomId, {
-          text,
-          missions: started,
-          // The reasons, kept with the post. They used to live only in this
-          // response -- said once in the composer note and then overwritten
-          // by whatever the room said next -- so the absence outlived its
-          // own explanation.
-          refused: Object.fromEntries(refusals.map((entry) => [entry.teammateId, entry.message])),
-          // Everyone who had no slot, in room order, which is the order
-          // they will get one.
-          queued
-        })
-      } catch (error) {
-        return roomRejected(error instanceof Error ? error.message : 'The post could not be recorded.')
-      }
-      // Now that the post has an id, tell the window which runs it started,
-      // the way the relay and routines do, so the sidebar shows them working
-      // at once and the room can file each run under its post.
-      for (const entry of startedData) {
+        await rooms.startQueued(roomId, post.postId, teammateId, attempt.data.missionId).catch(() => undefined)
+        // Said HERE, not after the loop: this is the moment the row can
+        // appear, and every member after this one is still to be asked.
         sendToWindow({
           kind: 'mission-started',
-          runId: entry.data.runId,
-          missionId: entry.data.missionId,
-          teammateId: entry.teammateId,
+          runId: attempt.data.runId,
+          missionId: attempt.data.missionId,
+          teammateId,
           prompt: text,
-          data: entry.data,
+          data: attempt.data,
           startedBy: { kind: 'room', roomId, postId: post.postId }
         })
       }
+      // The post as it now stands, so the answer carries who started, who is
+      // waiting and who was refused rather than the empty one written above.
+      post = (await rooms.get(roomId))?.posts.find((entry) => entry.postId === post.postId) ?? post
       return { ok: true, data: { post, refused: refusals } } as const
     })
 
