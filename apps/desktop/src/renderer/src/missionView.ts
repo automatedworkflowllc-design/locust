@@ -925,10 +925,34 @@ function subagentVerb(tool: string | undefined): string {
   }
 }
 
+/**
+ * Whether a tool call is a command, whatever the runtime calls its shell.
+ *
+ * This asked for the name `shell` or the kind `command_execution`, which
+ * between them describe exactly ONE runtime: Codex. Claude Code names the
+ * tool `Bash` and OpenCode names it `bash`, so every shell call either of
+ * them made fell through to a generic tool row -- no exit-code badge,
+ * nothing to expand, and counted under "other" in the turn summary rather
+ * than as a command.
+ *
+ * Found trying to see 0.56.0's intent line on screen (2026-09-09). That
+ * feature reads the model's own `description` for a Bash call, and both
+ * those adapters carry it -- but the line is drawn by the COMMAND ROW, and
+ * neither runtime ever produced one. So the feature was invisible on every
+ * runtime: the two that send a description had no row, and the one with a
+ * row sends no description. A test of the adapters passed the whole time.
+ *
+ * Matched case-blind, because the two spellings differ only in case and the
+ * next runtime will pick one of them.
+ */
+export function isShellTool(name: string, toolKind: string | undefined): boolean {
+  return /^(bash|shell)$/i.test(name) || toolKind === 'command_execution'
+}
+
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {
   const name = event.payload.name
   const command = event.payload.command
-  if (name === 'shell' || event.payload.toolKind === 'command_execution') {
+  if (isShellTool(name, event.payload.toolKind)) {
     return command !== undefined && EDIT_COMMANDS.test(command.trim()) ? 'edit' : 'shell'
   }
   // A runtime's own sub-agent: Claude Code's `Task`, OpenCode's `task`.

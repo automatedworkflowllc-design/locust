@@ -68,11 +68,15 @@ describe('what a Bash row says it was doing', () => {
      * reports it -- Claude Code and OpenCode do". Only Claude Code did. The
      * claim was false in a published changelog for about an hour.
      *
-     * OpenCode's bash tool does carry a description, and openCodeToolTarget
-     * already reaches for it -- but only after filePath and command, so a
-     * shell call never got there. Fixed rather than the claim, because
-     * OpenCode is the free runtime and therefore the only one this can be
-     * verified on without spending anything.
+     * And it is STILL wrong, for a second reason found by driving it: I have
+     * never seen OpenCode send a description. `openCodeToolTarget` reaches
+     * for one, but the comment beside that line attributes it to the TASK
+     * tool, and a driven `ls -a` produced a command row with none.
+     *
+     * So this tests that the adapter would carry the field if it arrived. It
+     * is not evidence that it does. Claude Code is the only runtime where
+     * the intent line has a proven source, and proving it on screen costs
+     * Codex-quota-equivalent spend on a paid runtime.
      */
     expect(openCodeToolTitle('bash', { command: 'ls -la', description: 'List the release assets' })).toBe(
       'List the release assets'
@@ -85,4 +89,3 @@ describe('what a Bash row says it was doing', () => {
     expect(openCodeToolTitle('task', { description: 'go and look' })).toBeUndefined()
   })
 })
-

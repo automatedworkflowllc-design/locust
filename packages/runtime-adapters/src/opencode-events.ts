@@ -123,11 +123,18 @@ export function openCodeToolOutcome(state: JsonObject): {
 /**
  * What the model SAID it was doing, for a shell call.
  *
- * OpenCode's bash tool carries a `description` next to the command, the way
- * Claude Code's does, and it is the sentence a person should read instead of
- * a pipeline. `openCodeToolTarget` already reaches for `description` -- but
- * only AFTER `filePath` and `command`, so a shell call never got there and
- * every command row drew the pipeline.
+ * UNVERIFIED, and say so: I have not seen OpenCode send one.
+ *
+ * I assumed OpenCode's bash tool carried a `description` beside the command
+ * the way Claude Code's does, because `openCodeToolTarget` reaches for
+ * `description` -- but the comment beside that line attributes it to the
+ * TASK tool, which names its ask rather than a path, and a driven `ls -a`
+ * on 2026-09-09 produced a command row with no description on it.
+ *
+ * So this reads a field that may never be populated. It is kept because it
+ * costs nothing and is correct IF the field appears, and because removing it
+ * would leave the same wrong assumption in a commit message with no code to
+ * contradict it. What it is not is evidence that OpenCode has the field.
  *
  * Kept apart from the target rather than reordering it. The command is
  * evidence of what ran on this machine; the description is a claim about it
