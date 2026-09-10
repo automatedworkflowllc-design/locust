@@ -83,10 +83,15 @@ own assertions are live:
 Electron and real providers, and several have windows that widen under load:
 `cursor` waits on a live `cursor-agent --list-models`, `routine` reconciles a
 mission's phase against the ledger. Running the unit suite, a build or a drive
-alongside a sweep makes those go red for no product reason -- measured
-2026-09-11, where two of seven failures were exactly that and cost an hour to
-tell apart from the five that were real. A sweep that shares the machine
-reports the machine.
+alongside a sweep makes those go red for no product reason. A sweep that
+shares the machine reports the machine.
+
+That is worth doing and is NOT enough. Measured 2026-09-11 on a quiet
+machine: four of thirty-two are red on any given run and it is not the same
+four -- three smokes that passed one sweep failed the next. **A single run is
+not evidence about any one smoke.** Re-run anything red before believing it,
+and read a green sweep as weather rather than a gate. See
+`docs/FINDING-smoke-sweep-2026-09-11.md`.
 
 Keep the previous `smoke-results.json` before starting: the runner overwrites
 it, and the old one is the only baseline for "was this already red". Its rows
