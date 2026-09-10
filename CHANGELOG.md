@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.57.0 - 2026-09-09
+
+- **The up arrow brings back what you last sent.** Press it on an empty
+  message box to get your previous message, again to go further back, and
+  down to return to the empty box. Handy for sending the same thing with one
+  word changed.
+- **Escape stops a running mission.** From the message box, when no menu is
+  open.
+
 ## 0.56.2 - 2026-09-09
 
 - **Commands your teammate ran now show as commands.** Only one of the
