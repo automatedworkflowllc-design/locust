@@ -3251,7 +3251,12 @@ export default function App(): ReactElement {
                           // will. Leaving "Starting…" over a red error card
                           // said the opposite of what happened.
                           ? `Mission · not started · ${liveRun.phase}`
-                          : 'Starting…'
+                          // Not "Starting…": the thread already says
+                          // "Starting · 3s" five hundred pixels below, and
+                          // two places stating one fact is how they come to
+                          // disagree. The thread's is the one that stays --
+                          // it carries the clock (design agent, 2026-09-10).
+                          : 'Mission'
                         // The MODEL, not just the runtime. This app exists to
                         // put two models on the same work, and the header
                         // named only the runtime -- so two missions from

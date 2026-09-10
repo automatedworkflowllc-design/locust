@@ -23,6 +23,19 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.62.2 - 2026-09-10
+
+- **The message-box row is one family of controls.** The `+` and the swarm
+  mark are boxed like their neighbours, and the context ring moved to the
+  mission line in the header, beside the cost it belongs with.
+- **Lime means one thing again.** A selected teammate's card and its open
+  conversation sit on the neutral selected ground; lime is kept for what is
+  happening right now. In the sidebar, only the state word — *thinking*,
+  *done* — takes the colour; the role stays quiet.
+- The header no longer says `Starting…` while the thread says it too.
+- The Rooms section folds and counts like Teammates and Routines, and its
+  door just says `New room` instead of a sentence the rail cut mid-word.
+
 ## 0.62.1 - 2026-09-10
 
 - **Replies stream smoothly.** Text used to arrive in jolts and, worse, change
