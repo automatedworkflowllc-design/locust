@@ -23,6 +23,17 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.65.0 - 2026-09-10
+
+- **Codex replies stream now, in every mode.** A Codex teammate used to
+  think in silence and then drop the whole reply in one paint; only
+  Approve-each streamed. Ask, Accept edits, Plan and Auto now run over the
+  same transport Approve-each always used, and the reply arrives as it is
+  written -- measured 2 paints before, 33 after, on the same prompt.
+- A Codex run's header shows what it cost again (`40k in · 275 out`), and
+  counts up while it runs. Approve-each never showed this and does now.
+- Follow-ups on Codex keep the earlier turns, as before.
+
 ## 0.64.0 - 2026-09-10
 
 - **A teammate can be limited to some of your connectors.** Open a teammate
