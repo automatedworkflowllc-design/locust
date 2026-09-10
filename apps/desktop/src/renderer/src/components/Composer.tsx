@@ -207,6 +207,9 @@ export function Composer({
   const [refusal, setRefusal] = useState<{ readonly text: string; readonly plain?: boolean }>()
   const type = (next: string): void => {
     setValue(next)
+    // Typing leaves the history. Without this, editing a recalled message and
+    // then pressing up again would walk further back and throw the edit away.
+    if (recallAt >= 0) setRecallAt(-1)
     // The refusal was about the press, not about the text. Typing again is
     // the person trying something; leaving the old sentence up implies it
     // still applies.
@@ -257,6 +260,21 @@ export function Composer({
    * opens it, so a press on the control still toggles rather than being
    * swallowed by the close.
    */
+  /*
+   * What you have sent, so the up arrow can bring it back.
+   *
+   * Claude Code recalls the previous message on an empty prompt and it is one
+   * of the highest-frequency things in the whole program -- resend, tweak a
+   * word, resend. Locust's composer bound the arrows only while the slash
+   * menu was open, so on an empty box they did nothing at all.
+   *
+   * Kept in the composer rather than the record because it is a property of
+   * this box in this session, the same as it is there: it recalls what YOU
+   * typed, not what the mission holds.
+   */
+  const sent = useRef<string[]>([])
+  const [recallAt, setRecallAt] = useState(-1)
+
   const modeAnchor = useRef<HTMLSpanElement>(null)
   const pickerAnchor = useRef<HTMLSpanElement>(null)
   const effortAnchor = useRef<HTMLSpanElement>(null)
@@ -407,6 +425,11 @@ export function Composer({
       return
     }
     setRefusal(undefined)
+    // Newest last, and never the same line twice running -- pressing up
+    // after sending the same thing twice should go back one message, not
+    // one keystroke.
+    if (sent.current[sent.current.length - 1] !== prompt) sent.current = [...sent.current, prompt].slice(-50)
+    setRecallAt(-1)
     // Cleared NOW, not when the host answers. The turn is already on screen as
     // a bubble the instant it is sent, so waiting for the round trip left the
     // same sentence in two places for the whole "Starting..." window and read
@@ -449,6 +472,47 @@ export function Composer({
         setValue('')
         return
       }
+    }
+    /*
+     * Escape stops the run, the way it does in Claude Code.
+     *
+     * Only while this box has focus and no panel is open. A panel's own
+     * Escape closes it -- and a keystroke that both dismissed a menu and
+     * killed a mission would be the worst kind of surprise, since one of
+     * those is free and the other is not.
+     */
+    if (keyEvent.key === 'Escape' && running && !modeOpen && !pickerOpen && !effortOpen) {
+      keyEvent.preventDefault()
+      onCancel()
+      return
+    }
+    /*
+     * The up arrow brings back what you sent.
+     *
+     * Only from an empty box, or once already walking the history. This is a
+     * TEXTAREA and messages here are often several lines, so an up arrow in
+     * the middle of one has to keep moving the caret -- which is also what
+     * Claude Code does.
+     */
+    if (keyEvent.key === 'ArrowUp' && sent.current.length > 0 && (value.length === 0 || recallAt >= 0)) {
+      keyEvent.preventDefault()
+      const next = recallAt < 0 ? sent.current.length - 1 : Math.max(0, recallAt - 1)
+      setRecallAt(next)
+      setValue(sent.current[next] ?? '')
+      return
+    }
+    if (keyEvent.key === 'ArrowDown' && recallAt >= 0) {
+      keyEvent.preventDefault()
+      const next = recallAt + 1
+      // Past the newest is the empty box you started from, not a wrap.
+      if (next >= sent.current.length) {
+        setRecallAt(-1)
+        setValue('')
+        return
+      }
+      setRecallAt(next)
+      setValue(sent.current[next] ?? '')
+      return
     }
     if (keyEvent.key === 'Enter' && !keyEvent.shiftKey) {
       keyEvent.preventDefault()
