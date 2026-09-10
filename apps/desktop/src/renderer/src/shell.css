@@ -2143,6 +2143,45 @@ textarea {
  * name wrapping in a neighbouring cell. Nothing is wrong and nothing is
  * wanted from the reader, so it is the quiet left rule, not a container.
  */
+/*
+ * Who is still waiting for a slot.
+ *
+ * A roster line, not a card: there is no answer in it and there is not going
+ * to be one yet, and an answer-shaped box with nothing inside is the thing
+ * this replaced. Standing register -- nothing is wrong and nothing is being
+ * asked of the reader.
+ */
+.lc-roomwaiting {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-3);
+  margin: var(--lc-space-3) 0 0;
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-terminal);
+  font-size: var(--lc-text-description);
+}
+
+.lc-roomwaiting__label {
+  flex: none;
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-roomwaiting__names {
+  flex: 1;
+  min-width: 0;
+  color: var(--lc-text-secondary);
+}
+
+.lc-roomwaiting__count {
+  flex: none;
+  color: var(--lc-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .lc-roomabsent {
   margin: var(--lc-space-3) 0 0;
   padding-left: var(--lc-space-3);

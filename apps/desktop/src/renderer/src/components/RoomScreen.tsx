@@ -138,6 +138,29 @@ export function absentLine(absent: readonly { readonly name: string; readonly re
  */
 export const ANSWERS_BEFORE_A_LIST = 6
 
+/**
+ * Who is still waiting for a slot, as one recessed line.
+ *
+ * The design agent's answer to "queue, or don't", and the part of it that
+ * makes the queue cheap: it needs ONE new state, not three.
+ *
+ * Waiting is the only real one -- nothing is happening, nothing is wrong,
+ * nothing wants the reader -- so it is a roster line in the standing
+ * register, not a card. No avatar, no box per person, no answer-shaped
+ * container, because there is no answer and there is not going to be one
+ * YET. A name leaves this line and becomes a card the moment its mission
+ * starts, and that is the only transition the queue has to draw.
+ *
+ * "Next" is not a state, it is a position, and it changes with no action by
+ * the reader -- drawing it would make the screen mutate to say which of two
+ * identical waits is fractionally sooner. So the line is ordered and
+ * position is left to be position.
+ */
+export function waitingLine(names: readonly string[]): string | undefined {
+  if (names.length === 0) return undefined
+  return names.join(', ')
+}
+
 export function refusalNotice(refused: readonly { readonly name: string; readonly message: string }[]): string | undefined {
   if (refused.length === 0) return undefined
   const byReason = new Map<string, string[]>()
@@ -441,9 +464,12 @@ export function RoomScreen({
         )}
         {room.posts.map((entry) => {
           const answers = answersFor(room, entry.postId)
+          const waiting = waitingLine(
+            (entry.queued ?? []).map((id) => teammates.find((candidate) => candidate.teammateId === id)?.name ?? id)
+          )
           const absent = absentLine(
             room.teammateIds
-              .filter((id) => answers.every((candidate) => candidate.teammateId !== id))
+              .filter((id) => answers.every((candidate) => candidate.teammateId !== id) && !(entry.queued ?? []).includes(id))
               .map((id) => ({
                 name: teammates.find((candidate) => candidate.teammateId === id)?.name ?? id,
                 ...(entry.refused?.[id] === undefined ? {} : { reason: entry.refused[id] })
@@ -495,6 +521,13 @@ export function RoomScreen({
                   )
                 })}
               </div>
+              {waiting !== undefined && (
+                <p className="lc-roomwaiting">
+                  <span className="lc-roomwaiting__label lc-mono">Waiting for a slot</span>
+                  <span className="lc-roomwaiting__names">{waiting}</span>
+                  <span className="lc-roomwaiting__count lc-mono">{(entry.queued ?? []).length}</span>
+                </p>
+              )}
               {absent !== undefined && <p className="lc-roomabsent">{absent}</p>}
             </section>
           )

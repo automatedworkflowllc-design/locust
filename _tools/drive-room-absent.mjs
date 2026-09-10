@@ -139,8 +139,10 @@ try {
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 200))
     document.querySelector('.lc-roomcompose').requestSubmit()
-    await new Promise(r => setTimeout(r, 2500))
+    // Long enough for the started runs to draw and the queue to render.
+    await new Promise(r => setTimeout(r, 6000))
     return 'cards: ' + document.querySelectorAll('.lc-roomanswer').length +
+      ' · waiting: ' + (document.querySelector('.lc-roomwaiting')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'NONE') +
       ' · absent line: ' + (document.querySelector('.lc-roomabsent')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'NONE') +
       ' · note: ' + (document.querySelector('.lc-roomcompose__row .lc-settings__note')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'none')
   })()`))
@@ -154,10 +156,17 @@ try {
   })()`))
 
   await drive.capture('the room once the busy three free their slots', () => drive.evaluate(`(async () => {
-    for (let i = 0; i < 600; i += 1) {
+    /*
+     * Waits for the QUEUE to empty too, not just for the started cards to
+     * finish. With a queue, five cards all reading completed is a moment
+     * partway through -- three more are still to start. Breaking there
+     * reported five of eight and read as the queue not draining.
+     */
+    for (let i = 0; i < 900; i += 1) {
       await new Promise(r => setTimeout(r, 500))
       const phases = [...document.querySelectorAll('.lc-roomanswer__phase')].map(p => p.textContent.trim())
-      if (phases.length > 0 && phases.every(p => /completed|failed|cancelled/i.test(p))) break
+      const stillWaiting = document.querySelector('.lc-roomwaiting') !== null
+      if (!stillWaiting && phases.length > 0 && phases.every(p => /completed|failed|cancelled/i.test(p))) break
     }
     return 'cards: ' + document.querySelectorAll('.lc-roomanswer').length +
       ' · absent line: ' + (document.querySelector('.lc-roomabsent')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'NONE') +

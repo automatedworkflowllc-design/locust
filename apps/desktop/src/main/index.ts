@@ -1089,6 +1089,33 @@ if (!ownsSingleInstanceLock) {
       rooms,
       ledger: missionLedger,
       teammates,
+      /*
+       * Start one member who has been waiting for a slot.
+       *
+       * Same path the post itself uses, so a queued member is briefed with
+       * the board as it stands NOW and runs on their own route -- they are
+       * answering the same post, just later. The window is told the same
+       * way the post tells it, or the run would be live with no row.
+       *
+       * `startRoomMember` is declared further down this scope; this closure
+       * only reads it when a run ends, long after.
+       */
+      startQueued: async (room, postId, teammateId) => {
+        const post = room.posts.find((entry) => entry.postId === postId)
+        if (post === undefined) return 'refused'
+        const attempt = await startRoomMember(room, teammateId, post.text, await teammates.list())
+        if (!attempt.ok) return attempt.retryable ? 'no-slot' : 'refused'
+        sendToWindow({
+          kind: 'mission-started',
+          runId: attempt.data.runId,
+          missionId: attempt.data.missionId,
+          teammateId,
+          prompt: post.text,
+          data: attempt.data,
+          startedBy: { kind: 'room', roomId: room.roomId, postId }
+        })
+        return { missionId: attempt.data.missionId }
+      },
       notify: (update) => {
         sendToWindow(update)
         // Also to the desk, when the person is elsewhere: gathered per room
@@ -1644,18 +1671,17 @@ ${taskSection({
         const attempt = await startRoomMember(room, teammateId, text, roster)
         if (!attempt.ok) {
           /*
-           * Everything is a refusal until something drains the queue.
+           * "Not now" is not a refusal.
            *
-           * `attempt.retryable` marks the two the queue is for -- the live
-           * cap is full, or that teammate is already working, both of which
-           * waiting fixes. The record and the store can already carry a
-           * queue, but nothing starts from it yet, so routing anyone into
-           * one here would lose them: no mission, no line naming them, and
-           * nobody to come back for them. Worse than what it replaces.
-           *
-           * The branch lands with the drain, in one change.
+           * `attempt.retryable` marks the two cases waiting fixes -- the
+           * live cap is full, or that teammate is already working. Those
+           * members wait in the post's queue and are started by
+           * `room-tasks` the moment a slot frees. Everything else -- gone
+           * from the roster, a runtime a room cannot post to -- is recorded
+           * as refused, because waiting will never fix it.
            */
-          refusals.push({ teammateId, name: attempt.name, message: attempt.message })
+          if (attempt.retryable) queued.push(teammateId)
+          else refusals.push({ teammateId, name: attempt.name, message: attempt.message })
           continue
         }
         started[teammateId] = attempt.data.missionId
@@ -1671,8 +1697,8 @@ ${taskSection({
           // by whatever the room said next -- so the absence outlived its
           // own explanation.
           refused: Object.fromEntries(refusals.map((entry) => [entry.teammateId, entry.message])),
-          // Nobody yet -- see the note above. The field is here so the store
-          // and the record can carry a queue before anything fills one.
+          // Everyone who had no slot, in room order, which is the order
+          // they will get one.
           queued
         })
       } catch (error) {

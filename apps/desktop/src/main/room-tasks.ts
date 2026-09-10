@@ -17,10 +17,23 @@ import type { RoomStore } from './room-store.js'
  * the window in one line, so the room can show it.
  */
 export interface RoomTasksOptions {
-  readonly rooms: Pick<RoomStore, 'list' | 'applyTaskOps'>
+  readonly rooms: Pick<RoomStore, 'list' | 'applyTaskOps' | 'startQueued'>
   readonly ledger: Pick<MissionLedger, 'getMission'>
   readonly teammates: { list(): Promise<readonly PublicTeammate[]> }
   readonly notify: (update: CodexMissionUpdate) => void
+  /**
+   * Start one member who has been waiting for a slot.
+   *
+   * The host owns this: it knows the routes, the briefing and the three
+   * transports. Answers the mission id when the run started, `'no-slot'`
+   * when there is still no room for it -- which ends the drain rather than
+   * spinning -- and `'refused'` when waiting will never fix it.
+   */
+  readonly startQueued?: (
+    room: PublicRoom,
+    postId: string,
+    teammateId: string
+  ) => Promise<{ readonly missionId: string } | 'no-slot' | 'refused'>
 }
 
 export interface RoomTasks {
@@ -42,6 +55,17 @@ export function roomMissionOf(
   return undefined
 }
 
+/**
+ * How many waiting members one ending run may start.
+ *
+ * A run ending frees exactly one slot, so one start is the honest number --
+ * but a run can end while several are queued and the pool has room for more
+ * than one (a person stopped three at once). This is the ceiling on that,
+ * not the target: the start itself answers 'no-slot' as soon as the pool is
+ * full, and that is what actually ends the drain.
+ */
+const MAX_DRAIN_PER_RUN = 8
+
 export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
   return {
     async onRunEnded(mission) {
@@ -50,6 +74,47 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
         rooms = await options.rooms.list()
       } catch {
         return
+      }
+      /*
+       * A slot just freed, so start whoever has been waiting for one.
+       *
+       * FIRST, before anything below reads the record: this fires on EVERY
+       * mission ending, not just a room's, because the cap is one pool
+       * across the whole app -- a teammate finishing their own work is what
+       * lets a room post reach the rest of its members.
+       *
+       * Room order is queue order, and one start per freed slot: the start
+       * answers 'no-slot' the moment the pool is full again, which is what
+       * ends this rather than a count. Bounded anyway, because a drain that
+       * cannot end is worse than a queue that does not move.
+       */
+      if (options.startQueued !== undefined) {
+        let started = 0
+        for (const room of rooms) {
+          for (const post of room.posts) {
+            for (const teammateId of post.queued ?? []) {
+              if (started >= MAX_DRAIN_PER_RUN) break
+              let outcome
+              try {
+                outcome = await options.startQueued(room, post.postId, teammateId)
+              } catch {
+                continue
+              }
+              // Still full. Nothing else in any queue can start either, so
+              // stop asking.
+              if (outcome === 'no-slot') return
+              if (outcome === 'refused') continue
+              started += 1
+              try {
+                await options.rooms.startQueued(room.roomId, post.postId, teammateId, outcome.missionId)
+              } catch {
+                // The run is live and the post did not record it. Left to
+                // the next drain rather than stopped: a queue entry that
+                // outlives its start is visible, a lost run is not.
+              }
+            }
+          }
+        }
       }
       const found = roomMissionOf(rooms, mission.missionId)
       if (found === undefined) return
@@ -108,12 +173,22 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
          * Seen on 2026-09-09 driving a six-member room, with four answers
          * on screen and two empty cards beside them.
          */
-        const missing = found.room.teammateIds.filter((id) => post?.missions[id] === undefined).length
+        // Anyone still waiting has not answered, and is not "never started"
+        // either -- their turn is coming. Saying everyone has answered while
+        // a queue is draining would be the same false claim in a new shape.
+        const waiting = (post.queued ?? []).length
+        const missing = found.room.teammateIds.filter(
+          (id) => post?.missions[id] === undefined && !(post?.queued ?? []).includes(id)
+        ).length
         if (allDone && Object.keys(post.missions).length > 1) {
+          const answered = String(Object.keys(post.missions).length)
+          const total = String(found.room.teammateIds.length)
           say(
-            missing === 0
-              ? `Everyone in ${found.room.name} has answered.`
-              : `${String(Object.keys(post.missions).length)} of ${String(found.room.teammateIds.length)} in ${found.room.name} answered; ${String(missing)} never started.`
+            waiting > 0
+              ? `${answered} of ${total} in ${found.room.name} answered; ${String(waiting)} still waiting for a slot.`
+              : missing === 0
+                ? `Everyone in ${found.room.name} has answered.`
+                : `${answered} of ${total} in ${found.room.name} answered; ${String(missing)} never started.`
           )
         }
       }
