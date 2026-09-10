@@ -274,7 +274,7 @@ export function assertSafeRuntimeCommand(
 
 interface SpecTransport {
   /** Omitted means the prompt goes on stdin, which is what most CLIs read. */
-  readonly stdin?: "prompt" | "none";
+  readonly stdin?: "prompt" | "none" | "protocol";
   /** What the mission was allowed, so the guard can judge the argv it is given. */
   readonly sandbox?: MissionSandbox;
   readonly env?: Readonly<Record<string, string>>;
@@ -493,6 +493,62 @@ function sandboxArgument(sandbox: MissionSandbox | undefined): MissionSandbox {
 function codexSandboxArgument(sandbox: MissionSandbox | undefined): string {
   const chosen = sandboxArgument(sandbox);
   return chosen === "full-access" ? "danger-full-access" : chosen;
+}
+
+/**
+ * What a Codex thread is started with on the app-server transport.
+ *
+ * The exec transport carries these as argv, where `assertSafeRuntimeCommand`
+ * can see them; here they are JSON on a socket, so the same two rules are
+ * enforced at the point they are chosen instead. `danger-full-access` needs a
+ * mission that really was granted full access, and nothing else may ask for
+ * it -- the reading a person gets from the mode chip is the reading the
+ * runtime is given.
+ */
+export interface CodexAppServerPolicy {
+  readonly sandbox: string;
+  readonly approvalPolicy: string;
+}
+
+/**
+ * MEASURED 2026-09-10 against `codex app-server` 0.153.0: all three sandboxes
+ * start a thread with `approvalPolicy: "never"`, and every one of them streams
+ * `item/agentMessage/delta` (41-57 deltas on a three-sentence reply). `never`
+ * is what the exec transport already does by being non-interactive -- it is
+ * not a widening, it is the same run without the silence.
+ */
+export function codexAppServerPolicy(
+  sandbox: MissionSandbox | undefined,
+): CodexAppServerPolicy {
+  const chosen = sandboxArgument(sandbox);
+  if (chosen === "full-access") {
+    return { sandbox: "danger-full-access", approvalPolicy: "never" };
+  }
+  return { sandbox: chosen, approvalPolicy: "never" };
+}
+
+/**
+ * `codex app-server`: the transport that streams.
+ *
+ * MEASURED 2026-09-10: `codex exec --json` sends an agent message ONCE, whole,
+ * as a single `item.completed` -- there is no delta in that JSONL at all. So a
+ * Codex teammate outside Approve-each sat silent and then dropped the whole
+ * reply in one paint, which is the opposite of what Codex's own TUI does.
+ * app-server sends the same reply as dozens of deltas.
+ *
+ * Nothing about the run travels in this argv: the folder, the sandbox, the
+ * model, the effort and the prompt are all parameters of `thread/start` and
+ * `turn/start`. The spec exists so the ledger records what was launched and so
+ * the ordinary runner refuses to launch it -- hence `stdin: "protocol"`.
+ */
+export function createCodexAppServerCommand(
+  executable: ExecutableLaunch,
+  options: { readonly workspacePath: string; readonly sandbox?: MissionSandbox },
+): RuntimeCommandSpec {
+  return baseSpec("codex", executable, options.workspacePath, ["app-server"], {
+    sandbox: sandboxArgument(options.sandbox),
+    stdin: "protocol",
+  });
 }
 
 export function createCodexExecCommand(

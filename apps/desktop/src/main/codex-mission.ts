@@ -1,6 +1,10 @@
 import {
+  asProcessNormalizer,
+  codexAppServerPolicy,
+  createAppServerEventNormalizer,
   createClaudeEventNormalizer,
   createClaudePrintCommand,
+  createCodexAppServerCommand,
   createCodexEventNormalizer,
   createCodexExecCommand,
   createCopilotEventNormalizer,
@@ -9,9 +13,11 @@ import {
   createCursorPrintCommand,
   createOpenCodeEventNormalizer,
   createOpenCodeRunCommand,
-  cursorCanEnforceReadOnly
+  cursorCanEnforceReadOnly,
+  startCodexAppServerRun
 } from '@teammate/runtime-adapters'
 import type {
+  AppServerRunProcess,
   ClaudeEventNormalizer,
   CodexEventNormalizer,
   MissionRuntimeId,
@@ -195,6 +201,16 @@ interface CodexMissionServiceOptions {
   readonly platform?: NodeJS.Platform
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
   readonly runner: RuntimeProcessRunner
+  /**
+   * How to start `codex app-server`, which is the transport every Codex mode
+   * runs on. Without it Codex falls back to `codex exec --json`, which works
+   * but never streams -- see `startCodexAppServerRun` for the measurement.
+   * Absent in tests that only exercise the exec path.
+   */
+  readonly appServerSpawn?: (
+    executablePath: string,
+    args: readonly string[]
+  ) => AppServerRunProcess
   readonly ledger: MissionLedger
   /** The teammate channel. Optional: a service without one runs missions that belong to nobody. */
   readonly workroom?: Workroom
@@ -878,7 +894,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // receipt then names a session that can really be resumed even if the
         // stream never echoes it back.
         const copilotSessionId = runtime === 'copilot' ? (resumeThreadId ?? randomUUID()) : undefined
-        const normalizer = runtime === 'claude'
+        // Codex speaks app-server whenever the host can start one. The two
+        // normalizers read different protocols, so this decision and the
+        // command built below are the same decision and are made from the
+        // same value.
+        const codexStreams = runtime === 'codex' && options.appServerSpawn !== undefined
+        const normalizer = codexStreams
+          ? asProcessNormalizer(createAppServerEventNormalizer({ ...normalizerContext, runtime: 'codex' }))
+          : runtime === 'claude'
           ? createClaudeEventNormalizer(normalizerContext)
           : runtime === 'cursor'
             ? createCursorEventNormalizer(normalizerContext)
@@ -987,6 +1010,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                   workspacePath: runCwd,
                   sandbox: effectiveSandbox,
                   ...choice
+                })
+              : codexStreams
+              ? createCodexAppServerCommand(executable, {
+                  workspacePath: runCwd,
+                  sandbox: effectiveSandbox
                 })
               : createCodexExecCommand(executable, {
                   workspacePath: runCwd,
@@ -1153,7 +1181,27 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // a read-only run has nothing to observe, and asking git for every
           // question would be paying for an answer nobody reads.
           diskBefore = effectiveSandbox === 'read-only' ? undefined : await (options.observeDisk ?? snapshotWorkspace)(runCwd)
-          process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
+          if (codexStreams) {
+            // The policy is chosen here, not carried in the argv, because on
+            // this transport it is JSON on a socket -- so the rule that only
+            // a full-access mission may say `danger-full-access` is enforced
+            // at the point it is chosen. See `codexAppServerPolicy`.
+            const policy = codexAppServerPolicy(effectiveSandbox)
+            process = startCodexAppServerRun({
+              spawn: options.appServerSpawn!,
+              command,
+              prompt: runtimePrompt,
+              sandbox: policy.sandbox,
+              approvalPolicy: policy.approvalPolicy,
+              ...(chosenModel === undefined ? {} : { model: chosenModel }),
+              ...(route.effort === undefined ? {} : { effort: route.effort }),
+              ...(resumeThreadId === undefined ? {} : { resumeThreadId }),
+              signal: controller.signal,
+              now
+            })
+          } else {
+            process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
+          }
         } catch (startError) {
           // A refusal this file raised knows WHY; anything else does not, and
           // must not borrow a specific-sounding reason it cannot back.

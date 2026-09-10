@@ -3,7 +3,9 @@ export {
   CLAUDE_REQUIRED_FEATURES,
   CODEX_REQUIRED_FEATURES,
   createClaudePrintCommand,
+  createCodexAppServerCommand,
   createCodexExecCommand,
+  codexAppServerPolicy,
   detectSupportedFeatures,
   OMNIROUTE_REQUIRED_FEATURES,
 } from "./commands.js";
@@ -18,6 +20,12 @@ export {
   toolNameOf,
 } from "./app-server-events.js";
 export { createCodexEventNormalizer } from "./codex-events.js";
+export { asProcessNormalizer, startCodexAppServerRun } from "./codex-app-server-run.js";
+export type {
+  AppServerRunProcess,
+  CodexAppServerRun,
+  CodexAppServerRunOptions,
+} from "./codex-app-server-run.js";
 export {
   claudeToolTitle,
   createClaudeEventNormalizer,

@@ -702,6 +702,12 @@ if (!ownsSingleInstanceLock) {
     const codexMissions = createCodexMissionService({
       workspacePath,
       permissionHost,
+      // Every Codex mode rides `codex app-server`, because `codex exec --json`
+      // never streams an agent message -- measured 2026-09-10, the whole reply
+      // arrives as one `item.completed`. Called lazily for the same reason
+      // `liveElsewhere` is: the spawner is defined further down this same
+      // setup, and nothing starts a mission until all of it has run.
+      appServerSpawn: (executablePath, args) => spawnAppServer(executablePath, args),
       /*
        * Asked at the start of every run, never captured: a connector signed
        * into after launch reaches the next mission without a restart.

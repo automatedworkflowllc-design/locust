@@ -191,8 +191,12 @@ export interface RuntimeCommandSpec {
    * is what Codex, Claude Code and Gemini read. `none` means it is already in
    * `args`, because the CLI takes it as a positional and reading stdin was
    * never measured working -- see the OpenCode and Copilot builders.
+   * `protocol` means it is in neither: the process is a server spoken to over
+   * a request/response protocol, and the prompt travels inside a request.
+   * The ordinary process runner refuses that spec rather than guessing, so a
+   * protocol command can only be run by something that speaks the protocol.
    */
-  readonly stdin: "prompt" | "none";
+  readonly stdin: "prompt" | "none" | "protocol";
   readonly stdout: "jsonl";
   /**
    * What this mission was allowed. Absent reads as `read-only` everywhere it
