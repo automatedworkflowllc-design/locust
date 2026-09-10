@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.57.1 - 2026-09-09
+
+- **Shift+Tab cycles the permission mode.** The mode is the difference between
+  a teammate that only explains and one that edits your files, and reaching it
+  meant opening a menu every time. It steps only through the modes the
+  selected route can actually run.
+
 ## 0.57.0 - 2026-09-09
 
 - **The up arrow brings back what you last sent.** Press it on an empty
