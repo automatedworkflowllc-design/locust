@@ -130,6 +130,7 @@ import {
 } from '../shared/ipc.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
+import { routeAtStart } from '../shared/route-at-start.js'
 import { roleLabelOf } from '../shared/ipc.js'
 import { isOutboundLink } from '../shared/outbound-links.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
@@ -2394,9 +2395,10 @@ ${taskSection({
         || payload.mode === 'plan'
           ? payload.mode
           : 'ask'
-      // Same shape as the mode: an unrecognized runtime falls back to Codex
-      // rather than being passed through to discovery as-is.
-      const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
+      // Resolve before choosing a transport: discovery in the renderer may
+      // still be partial, but the host already knows this teammate's route.
+      const peer = await peerContextFor(payload.teammateId)
+      const { runtime, model, effort } = routeAtStart(payload, peer?.self)
       // `approve-each` is the only mode that needs a runtime able to stop and
       // ask, so it is the only one routed to the experimental transport --
       // which is Codex's app-server. Another runtime asked for it would have
@@ -2414,8 +2416,6 @@ ${taskSection({
             }
           } as const
         }
-        const peer = await peerContextFor(payload.teammateId)
-        const model = typeof payload.model === 'string' ? payload.model : undefined
         const followUpOf = typeof payload.followUpOf === 'string' ? payload.followUpOf : undefined
         try {
           const mission = await antigravityMissions.start(prompt, peer, {
@@ -2451,12 +2451,11 @@ ${taskSection({
         if (typeof prompt !== 'string' || prompt.trim().length === 0) {
           return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const
         }
-        const peer = await peerContextFor(payload.teammateId)
         if (peer?.worktreeRefused !== undefined) {
           return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: peer.worktreeRefused } } as const
         }
-        const approveModel = typeof payload.model === 'string' ? payload.model : undefined
-        const approveEffort = typeof payload.effort === 'string' ? payload.effort : undefined
+        const approveModel = model
+        const approveEffort = effort
         try {
           const mission = await appServerMissions.start(prompt, peer, {
             ...(approveModel === undefined ? {} : { model: approveModel }),
@@ -2492,10 +2491,7 @@ ${taskSection({
         }
       }
 
-      const model = typeof payload.model === 'string' ? payload.model : undefined
-      const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       try {
-        const peer = await peerContextFor(payload.teammateId)
         if (peer?.worktreeRefused !== undefined) {
           return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: peer.worktreeRefused } } as const
         }

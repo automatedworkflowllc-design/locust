@@ -30,6 +30,12 @@ Then inspect the actual source tree and tests. The repository is authoritative f
 
 ## Stable product decisions
 
+Route-at-start decision (2026-09-10, `astra/work`): the host's saved teammate
+route outranks discovery/default composer choices, except for a real picker
+change this session for that teammate. Nobody's missions retain their
+composer route. Mode is not inherited. See
+`docs/FINDING-route-at-start-2026-09-10.md` for evidence and limitations.
+
 | Decision | Current direction |
 |---|---|
 | Product | Local-first, open-source platform for specialized autonomous AI teammates |
