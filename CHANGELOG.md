@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.61.0 - 2026-09-10
+
+- **Your teammates can now use your connectors, in every mode.** Whatever your
+  Claude Code can reach, they can reach — no list to set up. Driven and
+  verified in Accept edits: the row reads `get_watchlists · Robinhood · done`
+  and the teammate answers with the number.
+- **Worth knowing, and the permission chip now says it:** a connector is not
+  on this machine. "Ask · every write is refused" is a promise about *files*.
+  A teammate in Ask can still send mail or place an order through a connector,
+  because no sandbox here reaches the far end of one.
+- **A refused tool is named the way you would say it.** It read
+  `mcp__claude_ai_Robinhood__get_accounts`; it now reads `get_accounts on
+  Robinhood`, and the reason it gives is one you can act on rather than a
+  sentence about running commands.
+- A connector you sign into after Locust is open reaches the next mission
+  without restarting anything.
+
 ## 0.60.1 - 2026-09-09
 
 - **Correction to what 0.60.0 told you about connectors.** It said they were
