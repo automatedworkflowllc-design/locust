@@ -1,0 +1,64 @@
+/**
+ * What a CONVERSATION taught the team, not what one turn did.
+ *
+ * Colin, 2026-09-10: "after an agent 'remembers something' it disappears in
+ * chat, might be worth keeping that around for the user to see."
+ *
+ * It was not a rendering problem. A reply is its own mission -- one run, one
+ * receipt -- so a thread you have replied in twice is three missions wearing
+ * one row. The memory card matched `memory.missionId` against the mission the
+ * workroom happens to be showing, which is the LAST turn; a memory saved on
+ * turn one stopped matching the moment turn two started, and the card
+ * vanished from a conversation whose memories were all still there.
+ *
+ * The sidebar already knows the turns of a conversation -- `memberIds` -- and
+ * the header's Delete already had to learn this exact lesson: it deleted the
+ * shown turn and left the row, which read as the control doing nothing
+ * (Colin, 2026-09-05). Same fix, one layer up.
+ */
+
+export interface ConversationMemory {
+  readonly missionId?: string
+  readonly by: { readonly name: string }
+  readonly text: string
+  readonly status: 'kept' | 'proposed'
+}
+
+export interface MemoryLine {
+  readonly by: string
+  readonly text: string
+  readonly status: 'kept' | 'proposed'
+}
+
+/**
+ * Every turn of the conversation the shown mission belongs to.
+ *
+ * Falls back to the shown mission alone, which is what a single-run mission
+ * is anyway -- and is also the honest answer while the sidebar has not caught
+ * up with a conversation that started a moment ago.
+ */
+export function turnsOfConversation(
+  shownMissionId: string | undefined,
+  rows: readonly { readonly missionId: string; readonly memberIds?: readonly string[] }[]
+): ReadonlySet<string> {
+  if (shownMissionId === undefined) return new Set()
+  const row = rows.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(shownMissionId))
+  return new Set(row?.memberIds ?? [shownMissionId])
+}
+
+/**
+ * The memory lines belonging to a conversation, oldest first.
+ *
+ * Order is the order they were learned, which is the order the turns
+ * happened, so a card opened on a long conversation reads as a history rather
+ * than as a set.
+ */
+export function memoriesOfConversation(
+  memories: readonly ConversationMemory[],
+  turns: ReadonlySet<string>
+): readonly MemoryLine[] {
+  if (turns.size === 0) return []
+  return memories
+    .filter((memory) => memory.missionId !== undefined && turns.has(memory.missionId))
+    .map((memory) => ({ by: memory.by.name, text: memory.text, status: memory.status }))
+}

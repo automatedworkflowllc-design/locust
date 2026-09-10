@@ -108,6 +108,7 @@ import {
   TEAMMATE_FOLDER_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
+  WORKSPACE_PASTE_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
   OPEN_LINK_CHANNEL,
@@ -143,6 +144,17 @@ import type {
 } from '../shared/ipc.js'
 import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
 import { decideRoutineRecovery } from './routine-recovery-ipc.js'
+
+/**
+ * How large a single paste may be.
+ *
+ * It crosses IPC in one message, so this is a bound on what the renderer can
+ * hand the host at once. Generous for a screenshot -- a full 4K PNG is well
+ * under it -- and short of anything that would stall a window. Bigger things
+ * still go through the + button, which streams from a path rather than
+ * carrying bytes.
+ */
+const MAX_PASTED_BYTES = 24 * 1024 * 1024
 
 const probeRunner = createNodeProbeRunner()
 // `LOCUST_HIDE_RUNTIMES=1` is a test seam: the first-run drive needs a
@@ -1464,6 +1476,59 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, dataUrl: `data:${mediaType};base64,${bytes.toString('base64')}` } as const
       } catch {
         return { ok: false, message: 'Could not be read.' } as const
+      }
+    })
+
+    /*
+     * Ctrl+V, which the picker cannot serve.
+     *
+     * Colin, 2026-09-10: "lets add the ability to ctrl+v a file or photo into
+     * the chat." A pasted SCREENSHOT is the case that decides the shape --
+     * the clipboard holds a bitmap, not a file, so there is no path anywhere
+     * for the picker's route to take. The bytes come across and the host
+     * writes them.
+     *
+     * The renderer suggests a name and the host does not trust it:
+     * `attachmentDestination` already refuses anything that is not a plain
+     * file name -- no separators, no colon, not `.` or `..` -- and always
+     * returns a path inside the one folder Locust owns. So the worst a
+     * renderer can do here is choose which name inside that folder it gets,
+     * which is what a person choosing a file does anyway.
+     */
+    ipcMain.handle(WORKSPACE_PASTE_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      if (!workspaceChosen) {
+        return { ok: false, message: 'Choose the folder your teammates work in first.' } as const
+      }
+      const asked = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+      const bytes = asked.bytes
+      const name = typeof asked.name === 'string' ? asked.name : ''
+      if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+        return { ok: false, message: 'There was nothing on the clipboard to attach.' } as const
+      }
+      // A bound, because this crosses IPC in one message and a clipboard can
+      // hold something very large. Generous for a screenshot or a document,
+      // and far short of anything that would stall the renderer.
+      if (bytes.byteLength > MAX_PASTED_BYTES) {
+        return {
+          ok: false,
+          message: 'That is too large to paste. Attach it with the + button instead.'
+        } as const
+      }
+      try {
+        const taken = new Set(await readAttachmentNames(workspacePath))
+        const destination = attachmentDestination(name, taken)
+        await mkdir(join(workspacePath, ATTACHMENT_DIR), { recursive: true })
+        await writeFile(join(workspacePath, destination), bytes)
+        await keepAttachmentsOutOfGit(workspacePath)
+        // Copied in, like any file from outside: it never was in the folder,
+        // and the tile says so for the same reason.
+        return { ok: true, paths: [destination], copied: [destination] } as const
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : 'That could not be attached.'
+        } as const
       }
     })
 

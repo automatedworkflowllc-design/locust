@@ -218,6 +218,34 @@ export function resetsAtIso(value: unknown): string | undefined {
  * no renderer. The split is one rule and it is checked against real tool
  * names in `connectors.test.ts`.
  */
+/**
+ * What was refused, short enough to read.
+ *
+ * The refusal names the thing it would not do, and for Bash that thing is a
+ * whole command line. Colin sent a capture on 2026-09-10 of one that ran to
+ * eight wrapped lines inside the amber register -- a `cd` into a long Windows
+ * path, `&&`, and an entire `python3 -c` program with embedded JSON parsing.
+ * The register is for a sentence a person can act on; a program printed into
+ * it buries the sentence it came with.
+ *
+ * The first line, bounded. A command's first line is the part that says what
+ * it was trying to do, and the whole of it is in the activity row and the
+ * receipt, where a command belongs.
+ */
+export function brieflyPut(detail: string): string {
+  const firstLine = detail.split(/\r?\n/)[0]?.trim() ?? '';
+  const said = firstLine.length === 0 ? detail.trim() : firstLine;
+  if (said.length <= REFUSAL_DETAIL_LIMIT) return said;
+  // Cut on a space where there is one near the end, so the tail is not half
+  // a word -- a path or a flag broken mid-token reads as corruption.
+  const cut = said.slice(0, REFUSAL_DETAIL_LIMIT);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > REFUSAL_DETAIL_LIMIT - 24 ? cut.slice(0, space) : cut).trimEnd()}...`;
+}
+
+/** Long enough for an ordinary command, short enough to stay one line. */
+export const REFUSAL_DETAIL_LIMIT = 96;
+
 export function namedTool(name: string): string {
   const match = /^mcp__([A-Za-z0-9_]+?)__(.+)$/.exec(name);
   if (match === null) return name;
@@ -630,7 +658,8 @@ export function createClaudeEventNormalizer(
           const input = isObject(denial.tool_input) ? denial.tool_input : {};
           const detail = stringValue(input.command) ?? stringValue(input.file_path) ?? stringValue(input.description);
           const said = namedTool(tool);
-          return { tool, text: detail === undefined ? said : `${said} \`${detail}\`` };
+          const brief = detail === undefined ? undefined : brieflyPut(detail);
+          return { tool, text: brief === undefined ? said : `${said} \`${brief}\`` };
         });
       if (refused.length > 0) {
         return [

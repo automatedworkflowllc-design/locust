@@ -44,6 +44,7 @@ import { queuedVerdict, requeuedTo } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
+import { memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
@@ -3344,12 +3345,22 @@ export default function App(): ReactElement {
                   teammates,
                   messages: liveRun.peerMessages ?? [],
                   notices: liveRun.peerNotices ?? [],
-                  // What this conversation taught the team is read from the
-                  // memory list, not from a notice that would be gone once
-                  // the thread is drawn from the record.
-                  memories: memories
-                    .filter((memory) => memory.missionId !== undefined && memory.missionId === liveRun.data?.missionId)
-                    .map((memory) => ({ by: memory.by.name, text: memory.text, status: memory.status }))
+                  /*
+                   * What this CONVERSATION taught the team, read from the
+                   * memory list rather than from a notice that would be gone
+                   * once the thread is drawn from the record.
+                   *
+                   * Every turn of it, not the turn on screen. A reply is its
+                   * own mission, so matching the shown missionId lost every
+                   * memory learned earlier the moment a later turn began --
+                   * Colin, 2026-09-10: "after an agent 'remembers something'
+                   * it disappears in chat". The header's Delete had to learn
+                   * the same lesson about the same shape.
+                   */
+                  memories: memoriesOfConversation(
+                    memories,
+                    turnsOfConversation(liveRun.data?.missionId, sidebarMissions)
+                  )
                 }}
                 startedAt={
                   liveRun.restoredMission === undefined

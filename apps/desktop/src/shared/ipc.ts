@@ -305,6 +305,15 @@ export const WORKSPACE_REVEAL_CHANNEL = 'workspace:reveal'
  * the same containment `main/reveal-file.ts` enforces on the way out, applied
  * on the way in. The renderer never names a folder to open.
  */
+/**
+ * Attach what is on the clipboard, as bytes.
+ *
+ * A pasted screenshot has no path -- the clipboard holds a bitmap, not a file
+ * -- so there is nothing for the picker's path-based route to take. The
+ * renderer sends the bytes and a suggested name; the host decides where they
+ * land, exactly as it does for a file chosen from outside the folder.
+ */
+export const WORKSPACE_PASTE_CHANNEL = 'workspace:paste'
 export const WORKSPACE_ATTACH_CHANNEL = 'workspace:attach'
 
 /** Files chosen to attach, workspace-relative, or why none were. */
@@ -1414,6 +1423,12 @@ export interface DesktopApi {
   openLink(url: string): Promise<OpenLinkResponse>
   /** Open the picker for files to attach; answers workspace-relative paths. */
   attachFiles(): Promise<AttachFilesResponse>
+  /**
+   * Attach one thing from the clipboard. `bytes` is the file's contents; the
+   * name is a suggestion the host sanitises and may change to avoid a
+   * collision.
+   */
+  attachPasted(name: string, bytes: Uint8Array): Promise<AttachFilesResponse>
   readWorkspaceImage(path: string): Promise<WorkspaceImageResponse>
   listRooms(): Promise<RoomListResponse>
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>

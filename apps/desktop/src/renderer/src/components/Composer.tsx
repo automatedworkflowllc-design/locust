@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { ContextReading } from '../cost.js'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
-import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
+import type { ClipboardEvent, FormEvent, KeyboardEvent, ReactElement } from 'react'
 
 import type {
   MissionMode,
@@ -486,6 +486,52 @@ export function Composer({
     })
   }
 
+  /**
+   * Ctrl+V a file or a screenshot straight into the message.
+   *
+   * Colin, 2026-09-10: "lets add the ability to ctrl+v a file or photo into
+   * the chat."
+   *
+   * A pasted SCREENSHOT is what decides the shape. The clipboard holds a
+   * bitmap, not a file, so there is no path anywhere for the + button's route
+   * to take -- the bytes have to travel. Electron also stopped exposing
+   * `File.path` some versions ago, so a real file copied out of Explorer
+   * arrives with no path either. One route serves both: read the bytes, let
+   * the host name and place them.
+   *
+   * Text pastes fall through untouched. `clipboardData.files` is empty for
+   * those, so pasting a paragraph still just types it.
+   */
+  const paste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
+    const bridge = window.desktop
+    const files = [...(event.clipboardData?.files ?? [])]
+    if (bridge === undefined || files.length === 0 || running) return
+    // Only once there is something to attach: calling this on every text
+    // paste would swallow the paste.
+    event.preventDefault()
+    setAttaching(true)
+    void (async () => {
+      for (const file of files.slice(0, MAX_ATTACHMENTS)) {
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        // A pasted bitmap has no name of its own -- the browser calls it
+        // `image.png` at best -- so it gets one that says where it came from
+        // and cannot collide with a file the person chose.
+        const named = file.name.length > 0 ? file.name : `pasted-${String(Date.now())}.png`
+        const answer = await bridge.attachPasted(named, bytes)
+        if (answer.ok) {
+          setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
+          if (answer.copied !== undefined && answer.copied.length > 0) {
+            setCopiedIn((current) => new Set([...current, ...(answer.copied ?? [])]))
+          }
+        } else if (answer.message.length > 0) {
+          setNote(answer.message)
+        }
+      }
+    })()
+      .catch(() => setNote('That could not be attached.'))
+      .finally(() => setAttaching(false))
+  }
+
   const keyDown = (keyEvent: KeyboardEvent<HTMLTextAreaElement>): void => {
     // While the slash menu is open the arrows and Enter belong to it. Enter
     // must NOT fall through to submit: sending "/plan" as a message to a
@@ -814,6 +860,7 @@ export function Composer({
               value={value}
               onChange={(changeEvent) => type(changeEvent.target.value)}
               onKeyDown={keyDown}
+              onPaste={paste}
               placeholder={placeholder}
               aria-label="Mission instruction"
               rows={1}

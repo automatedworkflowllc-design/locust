@@ -609,7 +609,15 @@ function cursorMirrorRelative(full: string, root: string): string | undefined {
   if (mirror === null) return undefined
   const [, , project, rest] = mirror
   if (project === undefined || rest === undefined) return undefined
-  const flattened = root.replace(/[:\/]+/g, '-').replace(/^-+|-+$/g, '')
+  // Colons AND both separators. The class here was one backslash short --
+  // it named the forward slash and the escape, not the backslash -- so a
+  // Windows root flattened to `C-Users` plus its remaining separators,
+  // and never matched Cursor's own project name. The mirror
+  // then went unrecognised and every Cursor file row wore the full path
+  // this function exists to remove. Found 2026-09-10 by
+  // `escapes-survived-the-shell`; `relativePath` below had it right all
+  // along, four lines away.
+  const flattened = root.replace(/[:\\/]+/g, '-').replace(/^-+|-+$/g, '')
   return project.toLowerCase() === flattened.toLowerCase() ? rest : undefined
 }
 
@@ -2378,7 +2386,11 @@ export function producedFiles(
 ): readonly { readonly path: string; readonly shown: string; readonly status: string | undefined }[] {
   const entries = activityEntries(details, workspacePath)
   const key = (path: string): string =>
-    relativePath(path, workspacePath).replace(/[\/]+/g, '/').replace(/^\.\//, '').toLowerCase()
+    // No separator normalising here: `relativePath` already collapsed both
+    // kinds to `/`. This step used to repeat it, with the same one-backslash
+    // -short class as the flattener above -- which cost nothing, because
+    // there was nothing left for it to do. Removed rather than fixed.
+    relativePath(path, workspacePath).replace(/^\.\//, '').toLowerCase()
   const seen = new Set<string>()
   const rows: { path: string; shown: string; status: string | undefined }[] = []
   for (const entry of entries) {
