@@ -160,6 +160,32 @@ if (!existsSync(asarPath)) {
     bad(`latest.yml points at ${version}`, 'the update feed would offer the wrong build')
   }
 
+  /*
+   * The files BESIDE the archive, not just inside it.
+   *
+   * `extraResources` are laid down next to app.asar because something has
+   * to open them as real files: the window icon, and since 0.63.0 the
+   * permission bridge that Claude Code spawns as a process. A missing one
+   * fails silently in the installed app -- the icon falls back to Electron's
+   * emblem, the bridge never starts and every connector call is refused --
+   * and nothing in the asar check would notice, because they are not in it.
+   * Read from the builder config so a new entry is checked without anybody
+   * remembering to add it here.
+   */
+  const builderConfig = readFileSync(join(DESKTOP, 'electron-builder.yml'), 'utf8')
+  const extra = [...builderConfig.matchAll(/^\s*-\s*from:\s*(\S+)\s+to:\s*(\S+)/gm)]
+  for (const [, from, to] of extra) {
+    const shipped = join(DESKTOP, 'release', 'win-unpacked', 'resources', to)
+    const source = join(DESKTOP, from)
+    if (!existsSync(shipped)) {
+      bad(`beside the asar: ${to}`, 'named in extraResources and not laid down')
+    } else if (!existsSync(source) || !readFileSync(shipped).equals(readFileSync(source))) {
+      bad(`beside the asar: ${to}`, 'differs from its source')
+    } else {
+      ok(`beside the asar: ${to}`)
+    }
+  }
+
   for (const marker of markers) {
     if (asar.includes(marker)) ok(`shipped: ${JSON.stringify(marker)}`)
     else bad(`shipped: ${JSON.stringify(marker)}`, 'the changelog claims it and the artefact does not have it')
