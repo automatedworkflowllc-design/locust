@@ -120,6 +120,29 @@ export function openCodeToolOutcome(state: JsonObject): {
   return { failed: true, status: status ?? "unknown" };
 }
 
+/**
+ * What the model SAID it was doing, for a shell call.
+ *
+ * OpenCode's bash tool carries a `description` next to the command, the way
+ * Claude Code's does, and it is the sentence a person should read instead of
+ * a pipeline. `openCodeToolTarget` already reaches for `description` -- but
+ * only AFTER `filePath` and `command`, so a shell call never got there and
+ * every command row drew the pipeline.
+ *
+ * Kept apart from the target rather than reordering it. The command is
+ * evidence of what ran on this machine; the description is a claim about it
+ * by the thing that ran it. Reordering would have replaced the evidence with
+ * the claim; this puts the claim on top of it.
+ *
+ * Only for the shell tool: a file tool's row is already the path, which
+ * reads better than any sentence about it, and `task` has used the
+ * description as its own text since before this existed.
+ */
+export function openCodeToolTitle(tool: string, input: JsonObject): string | undefined {
+  if (!/^(bash|shell)$/i.test(tool)) return undefined;
+  return stringValue(input.description);
+}
+
 /** What a tool acted on, in the order OpenCode reports it. */
 export function openCodeToolTarget(input: JsonObject, metadata: JsonObject): string | undefined {
   return stringValue(input.filePath)
@@ -261,11 +284,13 @@ export function createOpenCodeEventNormalizer(
         : kind === "write" && filePath !== undefined && content !== undefined
           ? addedFilePatch(filePath, content, metadata.exists)
           : undefined;
+      const title = openCodeToolTitle(kind, input);
       const common = {
         itemId,
         toolKind: kind,
         name: kind,
         ...(target === undefined ? {} : { command: boundedMessageText(target) }),
+        ...(title === undefined ? {} : { title: boundedMessageText(title) }),
       };
       return [
         emit("tool.started", { ...common, phase: "started", evidence }),

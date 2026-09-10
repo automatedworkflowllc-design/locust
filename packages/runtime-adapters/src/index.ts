@@ -130,6 +130,7 @@ export {
   createOpenCodeEventNormalizer,
   openCodeToolOutcome,
   openCodeToolTarget,
+  openCodeToolTitle,
 } from "./opencode-events.js";
 export type {
   OpenCodeEventNormalizer,

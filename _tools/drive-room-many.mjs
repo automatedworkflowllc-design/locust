@@ -120,8 +120,23 @@ try {
   })()`))
 
   await drive.capture('six cards on screen at once', () => drive.evaluate(`(async () => {
-    const cards = [...document.querySelectorAll('.lc-roomanswer')]
-    if (cards.length < 6) return 'NOT A FAN-OUT TEST: only ' + cards.length + ' cards came up for a six-member room'
+    /*
+     * Waits for the six rather than demanding them at an instant.
+     *
+     * Cards used to appear in a batch, because the post announced every run
+     * only after starting them all -- so "are there six right now" was a
+     * fair question. Since 0.56.1 a card appears as each run begins, which
+     * is the point, and this read five mid-fan-out and called it NOT A
+     * FAN-OUT TEST. The assertion had quietly encoded the defect as the
+     * expected shape.
+     */
+    let cards = []
+    for (let i = 0; i < 240; i += 1) {
+      cards = [...document.querySelectorAll('.lc-roomanswer')]
+      if (cards.length >= 6) break
+      await new Promise(r => setTimeout(r, 500))
+    }
+    if (cards.length < 6) return 'NOT A FAN-OUT TEST: only ' + cards.length + ' cards came up for a six-member room in two minutes'
     /*
      * Do any two cards actually overlap on screen. A card that renders is
      * not the same as a card you can read.

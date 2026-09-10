@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { claudeToolTitle } from '@teammate/runtime-adapters'
+import { claudeToolTitle, openCodeToolTitle } from '@teammate/runtime-adapters'
 
 /**
  * A command row leads with what the model said it was doing.
@@ -61,4 +61,28 @@ describe('what a Bash row says it was doing', () => {
     expect(claudeToolTitle('Read', { file_path: '/x', description: 'read it' })).toBeUndefined()
     expect(claudeToolTitle('Task', { description: 'go and look' })).toBeUndefined()
   })
+
+  it('reaches OpenCode too, which is the runtime anyone can actually run', () => {
+    /*
+     * I shipped 0.56.0 saying command rows read as intent "where the runtime
+     * reports it -- Claude Code and OpenCode do". Only Claude Code did. The
+     * claim was false in a published changelog for about an hour.
+     *
+     * OpenCode's bash tool does carry a description, and openCodeToolTarget
+     * already reaches for it -- but only after filePath and command, so a
+     * shell call never got there. Fixed rather than the claim, because
+     * OpenCode is the free runtime and therefore the only one this can be
+     * verified on without spending anything.
+     */
+    expect(openCodeToolTitle('bash', { command: 'ls -la', description: 'List the release assets' })).toBe(
+      'List the release assets'
+    )
+    expect(openCodeToolTitle('bash', { command: 'ls -la' })).toBeUndefined()
+    // A file tool's row is already the path, which reads better than a
+    // sentence about it; `task` has used the description as its own text
+    // since before this existed.
+    expect(openCodeToolTitle('read', { filePath: '/x', description: 'read it' })).toBeUndefined()
+    expect(openCodeToolTitle('task', { description: 'go and look' })).toBeUndefined()
+  })
 })
+
