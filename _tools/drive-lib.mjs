@@ -312,7 +312,25 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     return { out, profile, step }
   }
 
-  return { evaluate, send, capture, ready, finish, profile, out, record }
+  /**
+   * Resize the window, so a claim about how the layout answers the window can
+   * be measured at more than one size rather than asserted at one.
+   *
+   * `Emulation.setDeviceMetricsOverride` is what CDP gives a page; the OS
+   * window around it does not move, which is fine -- everything measured here
+   * is inside the page.
+   */
+  const resize = async (width, height) => {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width,
+      height,
+      deviceScaleFactor: 1,
+      mobile: false
+    })
+    return { width, height }
+  }
+
+  return { evaluate, send, capture, ready, finish, profile, out, record, resize }
 }
 
 /**

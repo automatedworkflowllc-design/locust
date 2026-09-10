@@ -617,7 +617,28 @@ textarea {
   margin: 0;
   /* The teammate's voice, not the app's. See the Plex note in tokens.css. */
   font-family: var(--lc-font-prose);
-  max-width: 54ch;
+  font-size: var(--lc-text-prose);
+  /*
+   * FITS THE WINDOW, up to a measure that is still readable.
+   *
+   * `54ch` was a fixed measure, and a fixed measure on a window that grows is
+   * dead space that grows with it. MEASURED 2026-09-10 with
+   * `_tools/measure-reply-width.mjs`: the paragraph used 437px no matter the
+   * window, leaving 529px unused at 1280 wide, 895px at 1600 and 1215px at
+   * 1920 -- three quarters of the column empty on a big screen.
+   *
+   * Colin, the same day: "it seems way too small with too much dead space
+   * especially on your larger testing app, i was looking into how you 'claude
+   * code' does it and it auto fits the text to the size of the window."
+   *
+   * So: fill the column, with a cap. The cap is what Claude Code does too --
+   * measured off its own window at two sizes, its prose runs about 710px at a
+   * 1088px window and 775px at 1431px, so it grows with the window and then
+   * stops. `92ch` is that width in this face, about 110 characters, and
+   * `min()` is what makes the first term win on a narrow window instead of
+   * overflowing it.
+   */
+  max-width: min(100%, 92ch);
   line-height: 1.65;
   text-wrap: pretty;
 }

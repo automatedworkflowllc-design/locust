@@ -240,6 +240,16 @@
   --lc-text-screen-title: 20px;
   --lc-text-teammate-name: 14.5px;
   --lc-text-body: 13.5px;
+  /*
+   * The teammate's reply, and only that.
+   *
+   * The app's own chrome stays at 13.5px -- it is dense on purpose, and 12
+   * rules share that token. A REPLY is the one thing on screen a person reads
+   * rather than scans, and at 13.5px Colin read it as "way too small"
+   * (2026-09-10) beside Claude Code, whose prose measures about 14.2px.
+   * Paired with the prose family, which is already the reply's alone.
+   */
+  --lc-text-prose: 15px;
   --lc-text-control: 13px;
   --lc-text-description: 12px;
 
@@ -299,7 +309,22 @@
   --lc-sidebar-width: 268px;
   --lc-sidebar-rail-width: 64px;
   --lc-inspector-width: 344px;
-  --lc-thread-max-width: 760px;
+  /*
+   * The reading column GROWS with the window, instead of standing still.
+   *
+   * 760px was fixed, so a 1920px window read a 760px column and about 900px
+   * of margin either side -- measured 2026-09-10 with
+   * `_tools/probe-reply-fills-the-window.mjs`, and the thing Colin meant by
+   * "too much dead space especially on your larger testing app".
+   *
+   * The floor keeps every window that is 1650px or narrower exactly as it was
+   * (46vw only overtakes 760px above that), so nothing a person is used to
+   * moves on an ordinary laptop. The ceiling is where the measure stops being
+   * comfortable to read; past it the extra space stays as margin, which is
+   * what Claude Code does too -- its own prose measures about 775px at a
+   * 1431px window.
+   */
+  --lc-thread-max-width: clamp(760px, 46vw, 980px);
   --lc-thread-max-width-compact: 700px;
 
   /* --- Interaction ----------------------------------------------------- */
