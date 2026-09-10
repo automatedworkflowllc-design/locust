@@ -1923,7 +1923,7 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     ]
     const activity = buildThread(events, { running: false }).find((item) => item.type === 'activity')
     const notices = activity?.type === 'activity' ? activity.notices : undefined
-    expect(notices).toEqual([{ level: 'info', message: 'Skill descriptions were shortened.' }])
+    expect(notices).toEqual([{ level: 'info', message: 'Skill descriptions were shortened.', source: 'claude' }])
     // And it is NOT also drawn as a thread diagnostic, which would say it twice.
     expect(buildThread(events, { running: false }).some((item) => item.type === 'diagnostic')).toBe(false)
   })

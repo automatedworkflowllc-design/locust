@@ -445,7 +445,7 @@ export type ThreadItem =
        * the trace line as `1 notice` and shown nowhere. The count is gone; the
        * sentence is here.
        */
-      readonly notices?: readonly { readonly level: 'info' | 'warning' | 'error'; readonly message: string }[]
+      readonly notices?: readonly { readonly level: 'info' | 'warning' | 'error'; readonly message: string; readonly source: MissionRuntimeId }[]
       /** The plan this run stated, drawn as the fold's first rows. */
       readonly plan?: { readonly steps: readonly PlanStep[]; readonly doneCount: number }
       readonly summary: string
@@ -1135,7 +1135,7 @@ export function buildThread(
   // notices raised while the work was under way.
   let workBegan = false
   /** Diagnostics the thread gate drops, drawn at the foot of the fold instead. */
-  const foldNotices: { readonly level: 'info' | 'warning' | 'error'; readonly message: string }[] = []
+  const foldNotices: { readonly level: 'info' | 'warning' | 'error'; readonly message: string; readonly source: MissionRuntimeId }[] = []
 
   for (const event of events) {
     switch (event.type) {
@@ -1281,7 +1281,9 @@ export function buildThread(
            * re-derived by a second function -- two filters over one set is
            * how the count and the sentence disagreed in the first place.
            */
-          foldNotices.push({ level: event.payload.level, message: event.payload.message })
+          // With its source: the fold names who said it, so a runtime's
+          // remark about itself is never read as a command's output.
+          foldNotices.push({ level: event.payload.level, message: event.payload.message, source: event.sourceAdapter })
           break
         }
         // Said once. A quota failure arrives as a limit event AND as the
