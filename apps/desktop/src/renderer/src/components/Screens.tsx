@@ -8,6 +8,7 @@ import type {
   MissionPruneResponse,
   PublicRecoveredMission,
   PublicRoutine,
+  PublicRuntimeArtifact,
   PublicRuntimeStatus,
   PublicStorageReport,
   PublicTeammate,
@@ -26,6 +27,7 @@ import {
   prunePreviewSummary,
   routeRowStatus
 } from '../status.js'
+import { CliArtifacts } from './CliArtifacts.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
 import { costLine, runCostOf, sumCosts } from '../cost.js'
@@ -742,6 +744,7 @@ export function SettingsScreen({
   limitedRuntimes,
   usageWindows,
   runtimeSetup,
+  cliArtifacts,
   workspaceBrief,
   worktrees,
   onRemoveWorktree,
@@ -780,6 +783,11 @@ export function SettingsScreen({
   readonly usageWindows?: ReadonlyMap<string, string>
   /** Each runtime's own MCP servers and hooks, by runtime id; undefined until read. */
   readonly runtimeSetup: Readonly<Record<string, PublicRuntimeSetup>> | undefined
+  /**
+   * What the person configured inside the CLIs themselves, shown under the
+   * runtime each belongs to. Locust neither made nor runs these.
+   */
+  readonly cliArtifacts?: readonly PublicRuntimeArtifact[]
   /** The folder's LOCUST.md as last read: null when none, undefined until the host has answered. */
   readonly workspaceBrief: PublicWorkspaceBrief | null | undefined
   /** The teammates' own worktrees under the folder, and why there can be none; undefined until read. */
@@ -974,6 +982,15 @@ export function SettingsScreen({
                       <InstallCommand command={installCommand(runtime.id)!} />
                     )}
                     {runtimeSetup?.[runtime.id] !== undefined && <RuntimeSetupLine setup={runtimeSetup[runtime.id]!} />}
+                    {/*
+                      * What the person set up inside THIS CLI. It used to sit
+                      * on the Automations screen under a heading that
+                      * otherwise meant "things you can run", which is what
+                      * made its inertness read as brokenness. An agent file
+                      * in Codex's config directory is a fact about Codex, and
+                      * under Codex it needs no apology.
+                      */}
+                    <CliArtifacts artifacts={(cliArtifacts ?? []).filter((entry) => entry.runtime === runtime.id)} />
                   </div>
                   <span
                     className={`lc-tag${

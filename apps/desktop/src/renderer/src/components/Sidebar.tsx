@@ -183,7 +183,7 @@ export function Sidebar({
   readonly onOpenTeammates: () => void
   /** Rooms a person can write to at once; the one open now is highlighted. */
   readonly rooms: readonly PublicRoom[]
-  /** Saved routines, listed under Automations. */
+  /** Saved routines, listed under Routines. */
   readonly routines: readonly PublicRoutine[]
   readonly currentRoomId: string | undefined
   readonly onOpenRoom: (roomId: string) => void
@@ -645,21 +645,33 @@ export function Sidebar({
         )}
 
         <SidebarSection
-          label="Automations"
+          label="Routines"
           count={routines.length}
           open={openSections.automations}
           onToggle={() => setOpenSections((current) => ({ ...current, automations: !current.automations }))}
         >
           {routines.length === 0 ? (
+            /*
+              * The empty row is a DOOR, not a status.
+              *
+              * It read "Nothing saved yet", which is a fact about the shelf
+              * and tells nobody that pressing it goes anywhere -- the same
+              * mistake the Rooms row made until 0.60.0. It now says what is
+              * behind it, which is the screen that lists the finished
+              * conversations you can save.
+              *
+              * Not "New routine": a routine cannot be made from nothing, so a
+              * button promising a blank one would lie about what it is.
+              */
             <button
               type="button"
               className="lc-row lc-row--button lc-roomrow lc-roomrow--new"
               onClick={onOpenAutomations}
-              title="What automations are"
+              title="Save a finished conversation so a teammate can replay it"
             >
               <Icon name="clock" size={12} />
               <span className="lc-row__text">
-                <span className="lc-row__meta">Nothing saved yet</span>
+                <span className="lc-row__meta">Save one from a finished conversation</span>
               </span>
             </button>
           ) : (
@@ -668,7 +680,7 @@ export function Sidebar({
                 key={routine.routineId}
                 type="button"
                 className="lc-row lc-row--button"
-                title={`Open Automations · ${routine.name}`}
+                title={`Open Routines · ${routine.name}`}
                 onClick={onOpenAutomations}
               >
                 <Icon name="clock" size={14} />

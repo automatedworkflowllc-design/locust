@@ -1385,35 +1385,30 @@ textarea {
    Recessed against the routines above it on purpose: those are Locust's to
    run and these are not, and the card-weight rule says a thing that wants
    nothing from you sits back. */
+/* What a person configured inside one runtime's own CLI.
+ *
+ * These used to be a section of their own on the Automations screen, under a
+ * heading that otherwise meant "things you can run" -- which is what made
+ * their inertness read as brokenness. They now sit inside the Settings
+ * runtime row they are facts about, so the block is indented under that row
+ * rather than ruled off from a screen, and the runtime is no longer named
+ * again: it is directly above.
+ */
 .lc-cliartifacts {
   /* The rows are one line each and must never widen the screen. The padding
      keeps the right-hand path off the window edge, where it was being clipped
      mid-word. */
   overflow: hidden;
   padding-right: var(--lc-space-6);
-  margin-top: var(--lc-space-7);
-  padding-top: var(--lc-space-6);
-  border-top: 1px solid var(--lc-border-hairline);
+  margin-top: var(--lc-space-4);
 }
 
 .lc-cliartifacts__note {
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-description);
-  line-height: 1.6;
-  max-width: 62ch;
-  margin: var(--lc-space-3) 0 var(--lc-space-5);
-}
-
-.lc-cliartifacts__group {
-  margin-bottom: var(--lc-space-5);
-}
-
-.lc-cliartifacts__runtime {
-  color: var(--lc-text-muted);
-  font-size: var(--lc-text-mono-label);
-  letter-spacing: 0.06em;
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  margin-bottom: var(--lc-space-3);
+  margin-bottom: var(--lc-space-2);
 }
 
 .lc-cliartifacts__row {
@@ -1421,8 +1416,7 @@ textarea {
   max-width: 100%;
   align-items: baseline;
   gap: var(--lc-space-4);
-  padding: var(--lc-space-3) 0;
-  border-bottom: 1px solid var(--lc-border-hairline);
+  padding: var(--lc-space-2) 0;
 }
 
 .lc-cliartifacts__kind {
@@ -1476,6 +1470,85 @@ textarea {
 .lc-empty__how strong {
   color: var(--lc-text-secondary);
   font-weight: 500;
+}
+
+/* ----------------------------------------------------------------------
+ * The finished conversations an empty Routines screen offers to save.
+ *
+ * The rule this answers (design agent, 2026-09-10): a feature needs an
+ * entrance where its material is, and an entrance where its absence is felt,
+ * and the SECOND MUST CONTAIN THE FIRST rather than describe it. This screen
+ * used to describe a right-click; Colin read it and still reported routines
+ * as a feature he had never seen.
+ *
+ * Sized to sit inside `lc-empty`'s centred column rather than to fill it: it
+ * is an offer under a definition, not a mission list.
+ * -------------------------------------------------------------------- */
+.lc-savable {
+  width: 100%;
+  max-width: 46ch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+  margin-top: var(--lc-space-5);
+  text-align: left;
+}
+
+.lc-savable__head {
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+  margin-bottom: var(--lc-space-2);
+}
+
+/* The half that names the material stays in sentence case: it is the noun,
+   and shouting it would make the label read as two labels. */
+.lc-savable__from {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--lc-text-secondary);
+}
+
+.lc-savable__row {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-radius: var(--lc-radius-control);
+}
+
+.lc-savable__row:hover {
+  background: var(--lc-hover-surface);
+}
+
+/* The title opens the conversation, so it is a button wearing text. */
+.lc-savable__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+  cursor: pointer;
+}
+
+.lc-savable__name:hover {
+  text-decoration: underline;
+}
+
+.lc-savable__turns,
+.lc-savable__at {
+  flex: none;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .lc-empty {
@@ -2804,7 +2877,12 @@ textarea {
 
 .lc-runtimerow {
   display: flex;
-  align-items: center;
+  /* Top, not centre. The row used to be two lines tall and centring read as
+     aligned with the runtime's name; once the CLI artifacts moved in under it
+     (2026-09-10) the row grew to six or more, and the READY tag floated in
+     the middle of a list it says nothing about. It is a fact about the
+     runtime, so it sits beside the runtime. */
+  align-items: flex-start;
   gap: var(--lc-space-5);
   padding: var(--lc-space-5);
   border: 1px solid var(--lc-border-card);
@@ -3885,6 +3963,27 @@ textarea {
 
 .lc-ghostbutton:hover {
   background: var(--lc-hover-surface-strong);
+  border-color: var(--lc-hover-border);
+}
+
+/* `Save as routine` in the workroom header.
+ *
+ * A ghost button, and deliberately quieter than `Activity` beside it: the
+ * drawing gives it no border at all, because it is an offer and Activity is
+ * a control you use every mission. `.lc-ghostbutton` pushes itself right with
+ * `margin-left: auto`, which is correct where it is alone and wrong in a row
+ * of header actions, so that is taken back here. */
+.lc-saveroutine {
+  margin-left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  border-color: transparent;
+  color: var(--lc-text-muted);
+}
+
+.lc-saveroutine:hover {
+  color: var(--lc-text-secondary);
   border-color: var(--lc-hover-border);
 }
 

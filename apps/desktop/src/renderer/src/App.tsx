@@ -44,6 +44,7 @@ import { queuedVerdict, requeuedTo } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
+import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
@@ -2555,6 +2556,20 @@ export default function App(): ReactElement {
    * showing a thread whose record is gone would be showing a ghost.
    */
   const [deleteArmed, setDeleteArmed] = useState(false)
+  /**
+   * The conversation on screen, when it can be saved as a routine.
+   *
+   * Absent rather than disabled -- see `savableMissionId`. The draft check is
+   * the same one the right-click menu makes, so the two entrances can never
+   * disagree about whether there is anything to save.
+   */
+  const saveAsRoutineId = savableMissionId({
+    missionId: liveRun?.data?.missionId,
+    phase: liveRun?.phase,
+    running,
+    hasDraft:
+      liveRun?.data?.missionId !== undefined && routineDraftFor(liveRun.data.missionId) !== undefined
+  })
   const [deleteError, setDeleteError] = useState<string>()
   /**
    * What a row action just did, when it worked.
@@ -2946,7 +2961,10 @@ export default function App(): ReactElement {
               onRemoveRoutine={removeRoutine}
               notice={automationNotice}
               onDismissNotice={() => setAutomationNotice(undefined)}
-              cliArtifacts={cliArtifacts}
+              // The same rows the sidebar draws. An empty screen offers the
+              // finished ones rather than describing how to save one.
+              missions={sidebarMissions}
+              onSaveRoutine={openSaveRoutine}
             />
           ) : screen === 'rooms' ? (
             <RoomScreen
@@ -2975,6 +2993,7 @@ export default function App(): ReactElement {
               limitedRuntimes={limitedRuntimes}
               usageWindows={usageWindows}
               runtimeSetup={runtimeSetup}
+              cliArtifacts={cliArtifacts}
               workspaceBrief={workspaceBrief}
               worktrees={worktrees}
               onRemoveWorktree={removeWorktree}
@@ -3189,6 +3208,39 @@ export default function App(): ReactElement {
                       onBlur={() => setDeleteArmed(false)}
                     >
                       {deleteArmed ? 'Delete for good?' : 'Delete'}
+                    </button>
+                  )}
+                  {/*
+                    * Where the material IS -- the other half of the routines
+                    * answer (design agent, 2026-09-10).
+                    *
+                    * This is the entrance the app already chose, made
+                    * visible. `Save as routine` lived only in a right-click,
+                    * and a menu is where you look once you know an action
+                    * exists; the header is how you find out it does. The
+                    * menus keep it.
+                    *
+                    * Chrome, not a card: it does not arrive, animate or take
+                    * a line in the thread, so it is not the nag that was
+                    * ruled out -- a card asking to be saved would be a
+                    * pending-register card for something nobody is waiting
+                    * on.
+                    *
+                    * Only where it is true. Absent while running, absent on
+                    * a run that failed or was cancelled, absent when nothing
+                    * in the conversation was typed by the person: a routine
+                    * is turns worth repeating and those are not. ABSENT
+                    * rather than disabled -- there is nothing to explain
+                    * about an action with no material.
+                    */}
+                  {saveAsRoutineId !== undefined && (
+                    <button
+                      type="button"
+                      className="lc-ghostbutton lc-saveroutine"
+                      title="Save this conversation as a routine this teammate can replay"
+                      onClick={() => openSaveRoutine(saveAsRoutineId)}
+                    >
+                      <Icon name="clock" size={12} /> Save as routine
                     </button>
                   )}
                   <button

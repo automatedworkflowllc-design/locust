@@ -24,7 +24,7 @@ describe('recovery where a person looks for routines', () => {
     const persisted = JSON.parse(JSON.stringify(routine)) as PublicRoutine
     const automations = renderToStaticMarkup(<AutomationsScreen routines={[persisted]} teammates={[teammate]}
       routineStepByTeammate={{}} onRunRoutine={nothing} onEditRoutine={nothing} onRemoveRoutine={nothing}
-      notice={undefined} onDismissNotice={nothing} cliArtifacts={[]} />)
+      notice={undefined} onDismissNotice={nothing}  />)
     const team = renderToStaticMarkup(<TeammatesScreen teammates={[teammate]} missions={[]} missionOwners={{}} activityByTeammate={{}}
       titleOf={() => ''} onOpenMission={nothing} onNewTeammate={nothing} onEdit={nothing} onRemove={nothing}
       routines={[persisted]} routineStepByTeammate={{}} onRunRoutine={nothing} onEditRoutine={nothing} onRemoveRoutine={nothing} />)
