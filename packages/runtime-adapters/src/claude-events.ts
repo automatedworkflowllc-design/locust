@@ -102,6 +102,33 @@ export function summarizeInit(value: unknown): JsonObject {
  * warning, and anything else (a rejection) is the real thing.
  */
 /**
+ * What the model SAID it was doing, when it said.
+ *
+ * Claude Code's Bash tool takes a `description` alongside the command --
+ * "Clear, concise description of what this command does in active voice" --
+ * and the model fills it in on every call. That sentence is why Claude
+ * Code's own transcript reads "Checked what the app says about the free
+ * route" where a lesser one would read a shell pipeline.
+ *
+ * Locust threw it away. `claudeToolTarget` answered the COMMAND for Bash and
+ * nothing else looked at the input again, so every command row showed the
+ * pipeline. The `Task` case two lines below it already prefers the
+ * description and says in its own comment that "the description is the row's
+ * text" -- the pattern was known and simply not applied to the tool that
+ * runs most often.
+ *
+ * It is kept SEPARATE from the target rather than replacing it. The command
+ * is evidence of what ran on this machine; the description is a claim about
+ * it, written by the thing that ran it. A row may lead with the claim, but
+ * the evidence cannot stop being recorded.
+ */
+export function claudeToolTitle(name: string, input: unknown): string | undefined {
+  if (name !== "Bash") return undefined;
+  if (!isObject(input)) return undefined;
+  return stringValue(input.description);
+}
+
+/**
  * What a Claude tool acted on, for the activity row to name.
  *
  * MEASURED 2026-09-03 by reading the card after a real run: every row said
@@ -189,7 +216,7 @@ export function createClaudeEventNormalizer(
   const now = context.now ?? (() => new Date());
 
   /** Text buffers per content block index, so a replace can be recognised. */
-  const openTools = new Map<string, { name: string; target?: string }>();
+  const openTools = new Map<string, { name: string; target?: string; title?: string }>();
   /** A subagent's type and one-line summary, by the Agent tool call that started it. */
   const subagentKinds = new Map<string, string>();
   const subagentSummaries = new Map<string, string>();
@@ -432,7 +459,10 @@ export function createClaudeEventNormalizer(
         const open = openTools.get(itemId);
         if (open === undefined) continue;
         const target = claudeToolTarget(open.name, block.input);
-        if (target !== undefined) openTools.set(itemId, { ...open, target });
+        const title = claudeToolTitle(open.name, block.input);
+        if (target !== undefined || title !== undefined) {
+          openTools.set(itemId, { ...open, ...(target === undefined ? {} : { target }), ...(title === undefined ? {} : { title }) });
+        }
       }
       const text = content
         .map((block) => (isObject(block) ? stringValue(block.text) : undefined))
@@ -472,6 +502,7 @@ export function createClaudeEventNormalizer(
             toolKind: "tool_use",
             name: open?.name ?? "tool",
             ...(open?.target === undefined ? {} : { command: open.target }),
+            ...(open?.title === undefined ? {} : { title: open.title }),
             phase: "completed",
             ...(failed ? { status: "error" } : subagentKind === undefined ? {} : { status: subagentKind }),
             // What the subagent came back with, in its own words: the row

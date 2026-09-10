@@ -361,7 +361,9 @@ export function ActivityCard({
                   <div className="lc-filerow is-shell is-static">
                     <Icon name="terminal" size={14} />
                     <span className={`lc-shellbadge ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
-                    <span className="lc-filerow__path">{entry.command}</span>
+                    {/* Nothing printed, so nothing to open onto -- the command
+                      * stays on the row itself, under the sentence. */}
+                    <span className="lc-filerow__path">{entry.title ?? entry.command}</span>
                     {entry.output !== undefined && entry.settled && (
                       <span className="lc-filerow__result is-muted">no output</span>
                     )}
@@ -371,12 +373,32 @@ export function ActivityCard({
                     <button type="button" className="lc-filerow is-shell" onClick={() => toggle(entry)}>
                       <Icon name="terminal" size={14} />
                       <span className={`lc-shellbadge ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
-                      <span className="lc-filerow__path">{entry.command}</span>
+                      {/*
+                        * What it was DOING, where the runtime says so.
+                        *
+                        * Claude Code's Bash tool takes a description on every
+                        * call and the model writes it; that is the whole
+                        * reason its own transcript reads "Checked what the
+                        * app says about the free route" instead of a shell
+                        * pipeline. Locust had the field and drew the pipeline.
+                        *
+                        * The command does not go away -- it moves under the
+                        * fold. It is the evidence of what ran on this machine
+                        * and the sentence is only a claim about it, so the row
+                        * may lead with the claim and must not lose the
+                        * evidence.
+                        */}
+                      <span className="lc-filerow__path">{entry.title ?? entry.command}</span>
                       <span className="lc-activity__chev" aria-hidden="true">
                         <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
                       </span>
                     </button>
-                    {isOpen(entry) && <ShellOutput output={entry.output} failed={entry.failed === true} />}
+                    {isOpen(entry) && (
+                      <>
+                        {entry.title !== undefined && <pre className="lc-shellcommand lc-mono">{entry.command}</pre>}
+                        <ShellOutput output={entry.output} failed={entry.failed === true} />
+                      </>
+                    )}
                   </>
                 )
               ) : (

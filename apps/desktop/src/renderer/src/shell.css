@@ -2151,6 +2151,23 @@ textarea {
  * this replaced. Standing register -- nothing is wrong and nothing is being
  * asked of the reader.
  */
+/*
+ * The command itself, under a row that leads with what it was for.
+ *
+ * A row headed by the model's own sentence has to keep the command
+ * reachable: it is what actually ran on this machine, and a claim about a
+ * command is not a substitute for the command.
+ */
+.lc-shellcommand {
+  margin: 0;
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-card);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .lc-roomwaiting {
   display: flex;
   align-items: baseline;

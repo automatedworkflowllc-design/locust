@@ -17,6 +17,7 @@ export {
 } from "./app-server-events.js";
 export { createCodexEventNormalizer } from "./codex-events.js";
 export {
+  claudeToolTitle,
   createClaudeEventNormalizer,
   limitKindFor,
   resetsAtIso,

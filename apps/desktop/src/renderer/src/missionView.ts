@@ -32,6 +32,8 @@ export interface ActivityDetail {
    * the same path twice with nothing to tell them apart.
    */
   readonly tool?: string
+  /** What the model said it was doing, on the runtimes that carry one. */
+  readonly title?: string
   readonly settled: boolean
   /** True only for a tool the runtime itself reported as failed. */
   readonly failed?: boolean
@@ -65,6 +67,21 @@ export type ActivityEntry =
       readonly kind: 'shell'
       readonly key: string
       readonly command: string
+      /**
+       * What the model said it was doing, where the runtime carries it.
+       *
+       * Claude Code's Bash tool takes a `description` on every call and the
+       * model fills it in; it is the whole reason its own transcript reads
+       * "Checked what the app says about the free route" rather than a shell
+       * pipeline. Locust dropped it and drew the pipeline.
+       *
+       * The row leads with this and keeps the command underneath, because
+       * the command is evidence of what ran on this machine and the
+       * description is only a claim about it. Undefined on the runtimes that
+       * send none -- Codex has no such field at all -- and those rows read
+       * exactly as they did.
+       */
+      readonly title: string | undefined
       readonly settled: boolean
       readonly failed: boolean
       readonly exitCode: number | undefined
@@ -148,6 +165,7 @@ export function activityEntries(
         kind: 'shell',
         key: `shell_${String(index)}`,
         command: shellCommandText(detail.name),
+        title: detail.title,
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode,
@@ -1072,6 +1090,11 @@ export function buildThread(
           kind: toolKindOf(event),
           name: event.payload.command ?? event.payload.name,
           tool: event.payload.name,
+          // Only Claude Code and OpenCode send one; the others leave it
+          // undefined and their rows read exactly as they always have.
+          ...(typeof event.payload.title === 'string' && event.payload.title.length > 0
+            ? { title: event.payload.title }
+            : {}),
           settled: false
         }
         openTools.set(event.payload.itemId, detail)

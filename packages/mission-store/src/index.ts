@@ -826,6 +826,11 @@ function isToolPayload(value: JsonObject): boolean {
     && isNonemptyText(value.toolKind, 512)
     && isNonemptyText(value.name, 512)
     && isOptionalText(value.command)
+    // What the model said it was doing, when the runtime carries one. Claude
+    // Code's Bash tool takes a description on every call and it is the whole
+    // reason its own transcript reads in sentences. Optional, so every record
+    // written before this stays valid.
+    && isOptionalText(value.title)
     && (value.output === undefined || isRedactedJson(value.output))
     && (value.exitCode === undefined || Number.isSafeInteger(value.exitCode))
     && isOptionalText(value.status, 512)
