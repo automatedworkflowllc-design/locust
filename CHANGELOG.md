@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.55.3 - 2026-09-09
+
+- **Right-click menus work again.** Pressing any item in a right-click menu
+  closed the menu before the press registered, so nothing in it ever ran —
+  Delete, Assign to, Copy mission id and Save as routine were all dead. The
+  Delete button at the top of a conversation was unaffected, which is what
+  made this look like a delete problem rather than a menu one.
+
 ## 0.55.2 - 2026-09-09
 
 - **Menus close when you click anywhere else.** The permission mode menu, the
