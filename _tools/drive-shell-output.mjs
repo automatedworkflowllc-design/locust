@@ -34,7 +34,7 @@ const drive = await startDrive({
       hue: 'lime',
       role: 'Code & Migrations',
       createdAt: '2026-09-05T05:00:00.000Z',
-      route: { runtime: 'codex', model: 'gpt-6-astra', mode: 'accept-edits', effort: 'low' }
+      route: { runtime: 'codex', model: 'gpt-5.6-luna', mode: 'accept-edits', effort: 'low' }
     }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
@@ -83,9 +83,21 @@ try {
     if (!shell || shell.tagName !== 'BUTTON') return 'the row does not open'
     shell.click()
     await new Promise(r => setTimeout(r, 600))
-    const out = document.querySelector('.lc-shellout__text')
-    if (!out) return 'NO OUTPUT DRAWN'
-    const lines = (out.textContent ?? '').split(String.fromCharCode(10))
+    /*
+     * BOTH halves, and the control between them.
+     *
+     * The output is drawn as two pre blocks -- the head, the elision
+     * control, then the tail -- so querySelector returned only the head.
+     * (No backticks in this comment: it sits inside a template literal and
+     * one would end it. harness-backticks catches that, and just did.)
+     * This read "8 lines, kept the start, did NOT keep the end, said nothing
+     * about what it omitted" against a screen that plainly showed 1-8, "284
+     * more lines", 293-300 and "Copy all 300 lines". The drive was measuring
+     * a third of the feature and reporting the other two thirds missing.
+     */
+    const blocks = [...document.querySelectorAll('.lc-shellout pre')]
+    if (blocks.length === 0) return 'NO OUTPUT DRAWN'
+    const lines = blocks.flatMap((block) => (block.textContent ?? '').split(String.fromCharCode(10)))
     return JSON.stringify({
       linesDrawn: lines.length,
       first: lines[0],
@@ -93,7 +105,10 @@ try {
       // Both ends, which is the whole rule.
       keptStart: lines.includes('1'),
       keptEnd: lines.includes('300'),
-      saysWhatItOmitted: (document.querySelector('.lc-shellout__note')?.textContent ?? '').replace(/\\s+/g, ' ').slice(0, 100)
+      // The elision is a CONTROL, not a note -- lc-shellout__note has not
+      // been a class in this app for some time, so this always read empty.
+      saysWhatItOmitted: (document.querySelector('.lc-shellout__more')?.textContent ?? '').replace(/\\s+/g, ' ').slice(0, 100),
+      canCopyAll: document.querySelector('.lc-shellout__copy') !== null
     }, null, 1)
   })()`))
 
