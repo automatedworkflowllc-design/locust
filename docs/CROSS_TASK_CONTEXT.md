@@ -119,6 +119,15 @@ Use this template:
 
 ## Handoff log
 
+### 2026-09-09 — live-mission frontier, pinned e05ac6d (astra/work)
+
+- Main e05ac6d merged as d452f20; main checkout untouched. Both caps temporarily 16 for measurement, restored to 8 and rebuilt before validation. No production change.
+- [Frontier finding](FINDING-live-mission-frontier-2026-09-09.md): real 8/12/16-way OpenCode-free writes complete with exact files/replies and clean event/ledger coverage. No data-loss boundary through 16; read-only 10/12-member rooms actually peaked at seven processes, not 10/12.
+- Important findings: intermittent OpenCode-readiness launch refusals; room start notifications delayed 45–53 seconds; eight answers not comfortably visible; N=16 renderer heartbeat gap 11.994 seconds and max event lag 7.929 seconds despite correct receipts. Counting produces one text record, so it does not establish queue-saturation safety.
+- Recommendation: retain fixed 8 pending owner review, constrained by UX/responsiveness/readiness rather than a proven RAM ceiling. Smaller machines and heavier runtimes explicitly unmeasured; no memory squeeze or paid runtime calls.
+- Validation: root pnpm test/full Vitest 2,399 tests; desktop pnpm test 1,937 (same desktop portion); recursive node/web typechecks green. File recheck intentionally reports the original solo identity-refusal calibration as a missing file; 40 completed revision-2 files pass strict validation.
+- Next step: owner review/profiling, not an automatic cap increase or adapter fix. New measurement tools and evidence are isolated under _tools and docs.
+
 ### 2026-09-09 — pinned ledger-fix recheck and Codex question contract (astra/work)
 
 - Pinned main `2b60cab` merged as `9130f12`; both conflicted test-path files taken from main exactly. Main checkout untouched. Rebuilt mission-store before testing.
