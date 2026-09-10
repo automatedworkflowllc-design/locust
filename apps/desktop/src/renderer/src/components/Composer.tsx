@@ -66,6 +66,35 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
   }
 ]
 
+/**
+ * What a mode has done to the person's connectors, in one sentence.
+ *
+ * `--restricted` is what keeps a person's own Claude Code settings out of a
+ * mission, and Auto is the one mode that drops it -- it cannot be combined
+ * with `bypassPermissions`. So in every other mode the MCP servers are never
+ * loaded, and the run denies `mcp__*` on top of that.
+ *
+ * Nothing said so. Colin asked a teammate in Accept edits to check Robinhood
+ * twice on 2026-09-09; it answered, correctly and uselessly, that it had no
+ * connection to Robinhood and no tool that could reach one, and the only way
+ * to learn why was to read the launcher. His question afterwards was "is it
+ * just going to be impossible to call robinhood out of the locust folder?" --
+ * which it is not, and that is a sentence the app owed him.
+ *
+ * Claude Code only: it is the only runtime whose command builder mentions MCP
+ * at all, so the same words on another would be a claim nothing behind it
+ * makes. Said whatever the settings file holds, because an account connector
+ * from claude.ai never appears in `~/.claude.json` -- a notice gated on the
+ * number of configured servers would have stayed silent in exactly the case
+ * that raised this.
+ */
+export function connectorsNote(runtime: string, mode: MissionMode): string | undefined {
+  if (runtime !== 'claude') return undefined
+  return mode === 'auto'
+    ? 'Auto is the only mode that reads your own Claude Code settings, so your connectors and hooks are live in it.'
+    : 'Your connectors are off in this mode. Only Auto runs with your own Claude Code settings, so only Auto can reach an MCP server.'
+}
+
 export interface ComposerProps {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -864,6 +893,33 @@ export function Composer({
                         </button>
                       )
                     })}
+                    {/*
+                      * Say when a mode has taken the person's connectors away.
+                      *
+                      * `--restricted` is what keeps a person's own Claude Code
+                      * settings out of a mission, and Auto is the one mode that
+                      * drops it -- it cannot be combined with
+                      * `bypassPermissions`. So in every other mode the MCP
+                      * servers are never loaded, and the run then also denies
+                      * `mcp__*` outright.
+                      *
+                      * Nothing said so. Colin asked a teammate in Accept edits
+                      * to check Robinhood twice on 2026-09-09; it answered,
+                      * correctly and unhelpfully, that it had no connection --
+                      * and the only way to learn why was to read the launcher.
+                      * A refusal a person cannot act on is the app's fault, not
+                      * the model's.
+                      *
+                      * Claude Code only, because it is the only runtime whose
+                      * command builder touches MCP at all. Said whatever the
+                      * settings hold: an account connector from claude.ai never
+                      * appears in `~/.claude.json`, so counting configured
+                      * servers would have hidden this in exactly the case that
+                      * raised it.
+                      */}
+                    {connectorsNote(route.runtime, mode) !== undefined && (
+                      <p className="lc-menu__foot">{connectorsNote(route.runtime, mode)}</p>
+                    )}
                   </div>
                 )}
                 {/* The permission mode is the most consequential control on
@@ -875,7 +931,11 @@ export function Composer({
                   aria-haspopup="menu"
                   aria-expanded={modeOpen}
                   aria-label="Permission mode"
-                  title="Permission mode"
+                  title={
+                    effectiveMode === 'auto'
+                      ? 'Permission mode'
+                      : (connectorsNote(route.runtime, effectiveMode) ?? 'Permission mode')
+                  }
                   disabled={running}
                   onClick={() => setModeOpen(!modeOpen)}
                 >

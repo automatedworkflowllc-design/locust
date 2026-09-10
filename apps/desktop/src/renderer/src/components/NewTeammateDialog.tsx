@@ -30,12 +30,30 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
  * on the preview when they create is what gets persisted with the record.
  * Never derived from the name -- a rename must not change a face.
  */
-/** What the next mission may do, in the words the mode menu uses. */
+/**
+ * What the next mission may do, in the words the mode menu uses.
+ *
+ * A `switch` with no default, so the union is exhausted and a mode added
+ * later cannot fall through. It used to end in a bare `return 'Ask ...'`,
+ * and `auto` -- added after this was written -- landed there: a composer
+ * reading "may edit anything on this machine" opened a dialog promising
+ * "every write refused". Caught 2026-09-09 in the folder drive's capture,
+ * which is the THIRD time this dialog has claimed a permission the run did
+ * not have, and the first time in the direction that understates it.
+ */
 function modeSummary(mode: MissionMode): string {
-  if (mode === 'accept-edits') return 'Accept edits · may change files in this workspace'
-  if (mode === 'approve-each') return 'Approve each action · asks before every command or change'
-  if (mode === 'plan') return 'Plan · answers with the steps it would take, changes nothing'
-  return 'Ask · reads and explains, every write refused'
+  switch (mode) {
+    case 'accept-edits':
+      return 'Accept edits · may change files in this workspace'
+    case 'approve-each':
+      return 'Approve each action · asks before every command or change'
+    case 'plan':
+      return 'Plan · answers with the steps it would take, changes nothing'
+    case 'auto':
+      return 'Auto · may edit anything on this machine'
+    case 'ask':
+      return 'Ask · reads and explains, every write refused'
+  }
 }
 
 export function NewTeammateDialog({

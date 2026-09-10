@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { seedAvatar } from '../../shared/avatar.js'
-import type { PublicTeammate } from '../../shared/ipc.js'
+import type { MissionMode, PublicTeammate } from '../../shared/ipc.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 
 /**
@@ -31,11 +31,11 @@ const WREN: PublicTeammate = {
   createdAt: '2026-09-05T05:00:00.000Z'
 }
 
-const draw = (teammate: PublicTeammate | undefined, folder: boolean): string =>
+const draw = (teammate: PublicTeammate | undefined, folder: boolean, mode: MissionMode = 'auto'): string =>
   renderToStaticMarkup(
     <NewTeammateDialog
       error={undefined}
-      mode="auto"
+      mode={mode}
       onCancel={() => undefined}
       onCreate={() => undefined}
       {...(teammate === undefined ? {} : { initial: teammate })}
@@ -73,6 +73,22 @@ describe('the folder a teammate works in', () => {
     const html = draw(WREN, true)
     expect(html).toContain('MCP server')
     expect(html).toContain('History and memory stay with the project')
+  })
+
+  it('does not promise a permission the next mission will not have', () => {
+    /*
+     * Every mode, said in its own words. The `Approvals` card used to end in
+     * a bare fallthrough, so `auto` -- the one mode that can touch the whole
+     * machine -- read as "every write refused". Caught in the folder drive's
+     * own capture: the composer said "may edit anything on this machine" and
+     * the dialog four inches above it said the opposite.
+     */
+    expect(draw(WREN, true, 'auto')).toContain('may edit anything on this machine')
+    expect(draw(WREN, true, 'auto')).not.toContain('every write refused')
+    expect(draw(WREN, true, 'ask')).toContain('every write refused')
+    expect(draw(WREN, true, 'accept-edits')).toContain('may change files in this workspace')
+    expect(draw(WREN, true, 'approve-each')).toContain('asks before every command')
+    expect(draw(WREN, true, 'plan')).toContain('changes nothing')
   })
 
   it('is absent while a teammate is being created, because there is nothing to write it onto', () => {
