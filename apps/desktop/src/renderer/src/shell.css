@@ -575,9 +575,57 @@ textarea {
   align-items: flex-start;
 }
 
+/*
+ * THE MEASURE. A teammate's reply is prose and has to be read as prose.
+ *
+ * Colin, 2026-09-10, on the chat: "slightly clunky or out of place, can't put
+ * my finger on it." Half of that is not the typeface. MEASURED off the
+ * rendered line boxes -- character by character, reading the first line back
+ * verbatim rather than estimating from an average width, because text has no
+ * mean character width -- a reply ran to 111 characters a line.
+ *
+ * Comfortable reading is 60-75. Past about 85 the eye loses its place on the
+ * return sweep, and the symptom is exactly "clunky, nothing visibly wrong",
+ * because nothing IS wrong with any single line.
+ *
+ * The design agent's figure was 97 and their direction was right; measured
+ * here it is worse. On the paragraphs only: a fenced diff has its own
+ * horizontal scroll and capping it would hide code rather than help anyone
+ * read it.
+ *
+ * 48ch AND NOT 68ch, which is the same trap one level down. `ch` is the width
+ * of a ZERO, and their own note says a digit is wider than average prose --
+ * that is why their first probe reported 80 for a 100-character string. It
+ * understates by more than they allowed for: measured on the built app,
+ * `max-width: 68ch` rendered 99 to 102 characters a line, barely better than
+ * the 111 it replaced.
+ *
+ * So the number comes from the measurement rather than from the unit. `ch` is
+ * still the right unit because it moves with the face -- a narrower face gets
+ * more words at the same setting, which is the whole argument for changing
+ * the face -- but the value has to be calibrated against prose, once, on
+ * screen, IN THE FACE THAT WEARS IT. 48ch measured 66-73 characters in Geist
+ * and 61-66 in Plex: Plex's zero is wider relative to its prose, so the same
+ * ch is fewer words. Colin's reaction to 61-66 was that the text "was not
+ * properly filling the chat box", and he was right to notice -- a 390px
+ * column in a 760px thread reads as stopping short. 56ch measured 71-79,
+ * a hair over the top; 54ch, interpolated between the two readings, lands
+ * at about 73 -- the top of the comfortable range, which is where a reply
+ * that has to share a screen with a sidebar belongs.
+ */
 .lc-agentline p {
   margin: 0;
+  /* The teammate's voice, not the app's. See the Plex note in tokens.css. */
+  font-family: var(--lc-font-prose);
+  max-width: 54ch;
+  line-height: 1.65;
   text-wrap: pretty;
+}
+
+/* Emphasis in the reply is the real 500, not a faux-bold of the 400; and
+   italics are the real italic, not a sheared upright. Both are bundled. */
+.lc-agentline p strong {
+  font-weight: 500;
 }
 
 /*

@@ -36,18 +36,21 @@ export const git = (args, cwd) => new Promise((resolve, reject) => {
  * A scratch git repository with a README and a LOCUST.md, committed.
  *
  * `brief` is that LOCUST.md, and Locust carries it to EVERY teammate started
- * in this folder -- it is not decoration. The default asks for one
- * paragraph, which keeps most drives' output small and readable.
+ * in this folder -- it is not decoration. The default says only what the
+ * folder is.
  *
- * A drive whose whole point is long output has to pass its own, because the
- * default actively fights it. The cap probe asked eight teammates to count
- * to 250 and watched them answer "Your 1-to-250 count conflicts with the
- * one-paragraph rule -- checking the workspace before I answer" instead
- * (2026-09-09). The runs completed and the numbers looked fine, but they
- * measured deliberation rather than the throughput they were meant to
- * measure. A fixture that argues with the prompt is a silent confound.
+ * It USED to say "Keep answers to one paragraph." That was there to keep
+ * drive output short, and it kept confounding the drives instead: the cap
+ * probe asked eight teammates to count to 250 and watched them answer "Your
+ * 1-to-250 count conflicts with the one-paragraph rule" (2026-09-09); the
+ * measure probe asked for three paragraphs and got a decision card asking
+ * which instruction to follow (2026-09-10). Colin, the same day: "remove the
+ * portion of keeps answers to one paragraph, thats a bit arbitrary." A
+ * fixture that argues with the prompt is a silent confound, and one that
+ * argues with the prompt by DEFAULT is a confound in every drive at once. A
+ * drive that wants short answers can ask for them in its own prompt.
  */
-export async function scratchRepository(prefix = 'locust-drive-ws-', brief = 'Keep answers to one paragraph.\n') {
+export async function scratchRepository(prefix = 'locust-drive-ws-', brief = 'A scratch project for a user session.\n') {
   const workspace = await mkdtemp(join(tmpdir(), prefix))
   await git(['init', '-q', '-b', 'main'], workspace)
   await git(['config', 'user.email', 'drive@locust.test'], workspace)

@@ -11,6 +11,60 @@
  * Geist is SIL OFL 1.1 -- see assets/fonts/GEIST-LICENSE.txt.
  */
 
+/*
+ * IBM Plex Sans: the TEAMMATE'S voice, and only that.
+ *
+ * This app already assigns type by who is speaking. Mono is the machine --
+ * paths, ids, phases, receipts. Geist is the app's own voice -- chrome,
+ * labels, controls -- and it is excellent at that: even, geometric, no
+ * distracting rhythm in a 13px chip. Those are exactly the properties that
+ * make a nine-line paragraph read as an even grey field. A teammate's prose
+ * is a third speaker, and it was borrowing the app's voice (design agent,
+ * 2026-09-10, on Colin's "slightly clunky, can't put my finger on it").
+ *
+ * Plex because it was drawn as a family with a mono sibling, so it sits
+ * beside Geist Mono without clashing; it is narrower, so a comfortable
+ * measure holds more words; it is humanist, so a long paragraph has a rhythm
+ * to follow; and it ships a real 500, the only weight used for emphasis.
+ *
+ * Three files, not two: replies can carry `<em>` (agentText.ts turns *text*
+ * into one), and without a real italic Chromium shears the upright, which
+ * looks worse than what it replaces. The unsubsetted build, because replies
+ * carry em dashes, curly quotes, arrows and accented names, and one accented
+ * filename falling back mid-paragraph is a worse defect than the one this
+ * fixes. `font-display: block`, as for Geist: the file is on disk, there is
+ * nothing to swap from, and `swap` can flash the wrong face for a frame.
+ *
+ * SIL Open Font License 1.1, the same as Geist -- IBM-Plex-LICENSE.txt sits
+ * beside the files. Fetched 2026-09-10 from github.com/IBM/plex, master,
+ * packages/plex-sans/fonts/complete/woff2. Bundled, never fetched at run
+ * time: this app's whole claim is that nothing leaves the machine, and a font
+ * request would be the one network call on a screen that promises none.
+ */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('./assets/fonts/IBMPlexSans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('./assets/fonts/IBMPlexSans-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('./assets/fonts/IBMPlexSans-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
 @font-face {
   font-family: 'Geist';
   src: url('./assets/fonts/Geist-Regular.woff2') format('woff2');
@@ -175,6 +229,8 @@
    */
   --lc-font-ui: 'Geist', Helvetica, ui-sans-serif, system-ui, sans-serif;
   --lc-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* The teammate's voice. Only the reply prose wears it; everything the app says stays in Geist. */
+  --lc-font-prose: 'IBM Plex Sans', 'Geist', Helvetica, sans-serif;
 
   /*
    * Two display moments only. Everything was <= 15px before, which read as
