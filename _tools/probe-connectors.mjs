@@ -25,8 +25,15 @@
 // Auto mode, because Auto is the one mode that drops `--restricted` and so
 // the only one where the person's settings are read at all.
 //
-// SPENDS: one short Claude Code turn on sonnet. Nothing is edited -- the
-// mission is asked to list, not to act.
+// SPENDS: two short Claude Code turns on sonnet, ~$0.79 measured. Nothing is
+// edited and nothing is placed: the second turn calls `get_watchlists`, which
+// reads.
+//
+// Both turns are needed and they answer different things. Listing proves the
+// tools are REACHABLE; only a call draws the activity row, and the row is the
+// half that was unreadable. Note that a model may answer "NONE" to the
+// listing and then call one anyway -- it did on 2026-09-09 -- so the listing
+// alone is not evidence either way.
 
 import { say, scratchRepository, startDrive } from './drive-lib.mjs'
 
@@ -91,9 +98,37 @@ try {
     return (document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-700) ?? 'no thread')
   })()`))
 
+  await drive.capture('call one, read-only, and read the row it draws', () => drive.evaluate(`(async () => {
+    /*
+     * A LISTING is not a CALL. The step above proves the tools are reachable;
+     * only calling one draws the activity row, and the row is the thing that
+     * was unreadable. Twice today a passing test has hidden a feature that
+     * was invisible on screen, so this looks at the screen.
+     *
+     * get_watchlists reads. Nothing here places anything.
+     */
+    const field = document.querySelector('form.command-dock textarea')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(field, 'Call the Robinhood connector tool get_watchlists once, and reply with just the number of watchlists it returned. Do not call anything else.')
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 200))
+    field.form.requestSubmit()
+    for (let i = 0; i < 360; i += 1) {
+      await new Promise(r => setTimeout(r, 500))
+      if (i > 8 && !document.querySelector('button[aria-label^="Stop the running"]')) break
+    }
+    await new Promise(r => setTimeout(r, 1500))
+    const fold = document.querySelector('.lc-activity')
+    if (fold && fold.getAttribute('aria-expanded') !== 'true') fold.click()
+    await new Promise(r => setTimeout(r, 500))
+    const rows = [...document.querySelectorAll('.lc-filerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim().slice(0, 70))
+    return 'rows: ' + JSON.stringify(rows) +
+      ' · any raw mcp__ left on screen: ' + /mcp__/.test(document.body.innerText)
+  })()`))
+
   await drive.capture('and whether the hook noise is gone', () => drive.evaluate(`'stop hook rows: ' + [...document.querySelectorAll('[role=alert], .lc-diagnostic')].filter(n => /stop hook/i.test(n.innerText)).length`))
 } catch (error) {
   say(`probe failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: 'Build: whatever `pnpm build` last wrote to out/. One teammate on Claude Code / sonnet in AUTO, asked to name its own mcp__ tools. Nothing edited.' })
+  await drive.finish({ intro: 'Build: whatever `pnpm build` last wrote to out/. One teammate on Claude Code / sonnet in AUTO, asked to name its own connector tools and then to call one that reads. Nothing edited, nothing placed.' })
 }

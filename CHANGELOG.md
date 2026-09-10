@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.59.0 - 2026-09-09
+
+- **Your connectors now reach your teammates.** In Auto mode a Claude Code
+  teammate can use the MCP tools you have connected — Locust was blocking all
+  of them, so a teammate would say the connector was not available and there
+  was no way to tell that we had refused it rather than that it was broken.
+  The other modes cannot reach connectors at all, because they deliberately
+  ignore your Claude settings.
+- **A connector call reads as one.** It appeared as a single machine name like
+  `mcp__claude_ai_Robinhood__get_watchlists`; it now shows the tool and the
+  connector it belongs to, the same way every other tool row does.
+
 ## 0.58.0 - 2026-09-09
 
 - **A room post now has one line at the top telling you where it stands.**
