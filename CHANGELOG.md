@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.58.0 - 2026-09-09
+
+- **A room post now has one line at the top telling you where it stands.**
+  "8 asked · all answered", or "8 asked · 6 answered · Otto running · Sable
+  failed" — names when one or two are in a state, a number when more are.
+- **And the members as a row of faces beside it.** Click one to jump straight
+  to that teammate's answer instead of scrolling for their name. Anyone still
+  waiting for a slot appears there too, dimmed.
+- **A long answer folds by how tall it is, not by how many line breaks it
+  has.** A three-paragraph reply has two line breaks, so it was never folding
+  — it just looked right against answers that were one line per number. The
+  control now reads "Show the rest".
+
 ## 0.57.1 - 2026-09-09
 
 - **Shift+Tab cycles the permission mode.** The mode is the difference between
