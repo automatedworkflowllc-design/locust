@@ -23,6 +23,15 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.68.0 - 2026-09-11
+
+- **A teammate runs on the route you gave it, even in the first seconds after
+  launch.** While Locust was still finding your runtimes, a message sent
+  straight away could start on whichever one happened to be ready first -- a
+  teammate set to Codex CLI running on OpenCode, and failing. Its own saved
+  route decides now. Changing the model in the bar still wins, and a
+  conversation with no teammate is unchanged.
+
 ## 0.67.0 - 2026-09-11
 
 - **A conversation in "approve each action" continues.** A reply used to
