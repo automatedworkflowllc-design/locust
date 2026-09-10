@@ -23,6 +23,24 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.66.1 - 2026-09-10
+
+- **Approve-each conversations continue.** A second message to a teammate in
+  Approve-each was refused with "The approval-capable runtime could not be
+  started" while the sidebar showed the teammate idle: a finished turn was
+  never let go. Four of them would have filled the pool and refused every
+  mission until a restart. A finished turn releases its run now. The reply
+  still starts without the earlier turn's memory on this mode; that is next.
+- **What a runtime says about itself is no longer dressed as a command's
+  output.** Notices like "Skill descriptions were shortened" sit in the fold's
+  footer behind a hairline, labelled with who said it, and in the quiet tone:
+  amber is for things you can act on, and there is nothing to act on there.
+- Reply prose is capped at 90 characters of its own face with a little more
+  leading; the receipt's value column and tool rows no longer stretch across
+  a wide window.
+- In the sidebar, the role never takes the state's colour, and a conversation
+  row inside a selected card no longer gets a second highlight.
+
 ## 0.66.0 - 2026-09-10
 
 - **Replies fit the window they are read in.** A reply used to sit at a fixed
