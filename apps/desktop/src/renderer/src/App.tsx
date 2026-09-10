@@ -95,6 +95,7 @@ import {
   typedPrompt, assistantMessages } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
+import { isStoppable, stopPress } from './stopPress.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
@@ -205,7 +206,9 @@ type RuntimeDiscoveryState =
 type RunMap = ReadonlyMap<string, LiveRunState>
 
 function liveRunIsActive(run: LiveRunState | undefined): boolean {
-  return run !== undefined && (run.phase === 'starting' || run.phase === 'running' || run.phase === 'cancelling')
+  // The same set `stopPress` reads. Kept in one place because the button and
+  // the press disagreeing is exactly how a stop came to do nothing.
+  return run !== undefined && isStoppable(run.phase)
 }
 
 function isTerminal(phase: LiveRunPhase): boolean {
@@ -1058,6 +1061,25 @@ export default function App(): ReactElement {
    * workroom messages it is shown, and under whose name it may share.
    */
   const [selectedTeammateId, setSelectedTeammateId] = useState<string>()
+  /**
+   * Stops pressed before the run had a name, by the key it had at the time.
+   *
+   * A run is `starting` from the moment the person presses send until the
+   * host answers with its run id, and the box draws the stop button for the
+   * whole of it -- correctly, because the runtime is already going. But there
+   * was nothing to cancel BY: `cancelMission` reads the run id off the shown
+   * run, found none, and returned without a word.
+   *
+   * MEASURED 2026-09-10, on the second turn of a conversation: `shownKey`
+   * was still `pending:2` six seconds after send, so the press did nothing at
+   * all and the mission ran to completion -- 200 of 200 numbers, on both
+   * Claude Code and Codex, which is how it was told apart from the transport
+   * change that day. A first turn resolves fast enough to hide it.
+   *
+   * A ref rather than state: it is read inside the async start that is
+   * already in flight, where a re-render would not reach it.
+   */
+  const cancelWhenNamedRef = useRef(new Set<string>())
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const pendingKeyCounter = useRef(0)
 
@@ -2036,6 +2058,30 @@ export default function App(): ReactElement {
       // Follow the run under its real key only if the person is still looking
       // at it; they may have moved to another teammate's thread meanwhile.
       setShownKey((current) => (current === key ? runId : current))
+      // Stopped while it was still starting: the person pressed the button
+      // and meant it, so the run is cancelled the moment it can be named.
+      if (cancelWhenNamedRef.current.delete(key)) {
+        setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+        void bridge
+          .cancelCodexMission({ runId })
+          .then((answer) => {
+            if (answer.ok) return
+            setRuns((all) =>
+              withRun(all, runId, (run) =>
+                liveRunIsActive(run) ? { ...run, phase: 'running', error: answer.error.message } : run
+              )
+            )
+          })
+          .catch(() => {
+            setRuns((all) =>
+              withRun(all, runId, (run) =>
+                liveRunIsActive(run)
+                  ? { ...run, phase: 'running', error: 'The cancellation request could not be delivered.' }
+                  : run
+              )
+            )
+          })
+      }
       // And so does anything queued against it. The temporary key was just
       // deleted above, so a message typed while the host was still answering
       // pointed at nothing and was held as "that conversation is no longer
@@ -2209,8 +2255,19 @@ export default function App(): ReactElement {
 
   const cancelMission = (): void => {
     const bridge = window.desktop
-    const runId = liveRun?.data?.runId
-    if (!bridge || runId === undefined || !liveRunIsActive(liveRun)) return
+    const press = stopPress(liveRun, shownKey)
+    if (!bridge || press.kind === 'nothing') return
+    // Pressed before the host has answered with a run id. The runtime is
+    // already going, so this is not a press to ignore -- it is remembered
+    // against the key the run has right now, and the start honours it as
+    // soon as there is something to name. Silently returning here let a
+    // stopped mission run to completion (measured 2026-09-10).
+    if (press.kind === 'cancel-when-named') {
+      cancelWhenNamedRef.current.add(press.key)
+      setRuns((all) => withRun(all, press.key, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+      return
+    }
+    const runId = press.runId
     setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
     void bridge
       .cancelCodexMission({ runId })
