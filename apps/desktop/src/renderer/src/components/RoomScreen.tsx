@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
@@ -157,40 +157,48 @@ export const ANSWERS_BEFORE_A_LIST = 6
  * position is left to be position.
  */
 /**
- * How many lines of an answer a room card shows before it folds.
- *
- * A room is read at a glance -- the whole point is seeing what everyone
- * said. One teammate who writes five hundred lines takes the screen and
- * every other answer with it: Colin, 2026-09-09, driving a twelve-member
- * room, "maybe have a dropdown or read more option for when it goes down
- * this far".
- *
- * Twelve is about a paragraph and a half, which is what a room answer
- * usually is. Anything past that is a thing to open, not a thing to scroll
- * past on the way to the next person.
- */
-const ANSWER_LINES_BEFORE_FOLDING = 12
-
-/**
  * An answer, folded when it is long.
  *
- * The elision is a CONTROL, not a sentence -- the same shape the shell
- * output already uses, down to the class, because this app ships that
- * pattern and a second one would just be a second one.
+ * MEASURED, not counted. The first version split on newlines -- and the
+ * design agent caught what my own fixture hid: a three-paragraph prose
+ * answer has TWO newlines, so `3 <= 12` and it rendered whole, seventeen or
+ * more rendered lines of it. The counting workload I tested with is one
+ * number per line with 499 newlines, which folds perfectly. That is why it
+ * looked right, and every real answer is the case that did not fold.
+ *
+ * So the clamp is on rendered line boxes and the control is drawn only when
+ * the text actually overflows its clamp. The label loses its count with it:
+ * "28 more lines" was a number I would otherwise defend, but it was only
+ * ever knowable in the case that needed folding least.
+ *
+ * The elision stays a CONTROL rather than a sentence -- the shell output's
+ * pattern, down to the class, because this app already ships that one.
  */
 function RoomAnswerText({ text }: { readonly text: string }): ReactElement {
   const [open, setOpen] = useState(false)
-  const lines = text.split('\n')
-  if (open || lines.length <= ANSWER_LINES_BEFORE_FOLDING) {
-    return <p className="lc-roomanswer__text lc-para">{text}</p>
-  }
-  const hidden = lines.length - ANSWER_LINES_BEFORE_FOLDING
+  const [overflows, setOverflows] = useState(false)
+  const body = useRef<HTMLParagraphElement>(null)
+
+  useLayoutEffect(() => {
+    // Only while folded: once open the clamp is gone and scrollHeight equals
+    // clientHeight, which would answer "no overflow" and retract the control
+    // the reader just used.
+    if (open) return
+    const element = body.current
+    if (element === null) return
+    setOverflows(element.scrollHeight > element.clientHeight + 1)
+  }, [text, open])
+
   return (
     <>
-      <p className="lc-roomanswer__text lc-para">{lines.slice(0, ANSWER_LINES_BEFORE_FOLDING).join('\n')}</p>
-      <button type="button" className="lc-shellout__more" onClick={() => setOpen(true)}>
-        {`${String(hidden)} more line${hidden === 1 ? '' : 's'}`}
-      </button>
+      <p ref={body} className={`lc-roomanswer__text lc-para${open ? '' : ' is-folded'}`}>
+        {text}
+      </p>
+      {overflows && !open && (
+        <button type="button" className="lc-shellout__more" onClick={() => setOpen(true)}>
+          Show the rest
+        </button>
+      )}
     </>
   )
 }

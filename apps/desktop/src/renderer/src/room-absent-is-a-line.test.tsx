@@ -209,8 +209,14 @@ describe('the members a post did not reach', () => {
    * it goes down this far". The elision is a control, not a sentence, and it
    * is the shape the shell output already ships.
    */
-  it('folds a long answer behind a control, and says how much is folded', () => {
-    const long = Array.from({ length: 40 }, (_unused, i) => `line ${String(i + 1)}`).join('\n')
+  it('renders the whole answer in the markup, folded or not', () => {
+    /*
+     * The clamp hides overflow; it does not truncate the text. A person who
+     * opens the fold, or copies the card, gets everything -- and a server
+     * render has no layout at all, so the control cannot appear there and
+     * the words must not depend on it.
+     */
+    const long = ['First paragraph.', 'Second paragraph.', 'Third paragraph.'].join('\n')
     const room: PublicRoom = {
       roomId: 'room_standup',
       name: 'Standup',
@@ -235,14 +241,15 @@ describe('the members a post did not reach', () => {
         notice={undefined}
       />
     )
-    expect(markup).toContain('28 more lines')
-    expect(markup).toContain('line 12')
-    // THE regression: the whole answer drawn, pushing every other card off.
-    expect(markup).not.toContain('line 13')
+    expect(markup).toContain('Third paragraph.')
+    expect(markup).toContain('is-folded')
+    // No count in the label any more: it was only ever knowable in the case
+    // that needed folding least.
+    expect(markup).not.toContain('more lines')
   })
 
   it('leaves a short answer alone', () => {
-    expect(screen(1)).not.toContain('more lines')
+    expect(screen(1)).not.toContain('Show the rest')
   })
 })
 
