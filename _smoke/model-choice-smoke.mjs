@@ -4,10 +4,15 @@
 //   node _smoke/model-choice-smoke.mjs
 //
 // Codex's models come from a live `model/list`; Claude Code's from the aliases
-// its CLI advertises in its own help. This picks Claude Code / fable at high
-// effort through the UI, runs a one-line mission, and checks the ledger
-// recorded that model. If the account cannot run fable, the run fails and
-// this says so -- which is the truthful outcome, not a smoke bug.
+// its CLI advertises in its own help. This picks a Claude Code model through
+// the UI, runs a one-line mission, and checks the ledger recorded THAT model.
+//
+// It used to pick `fable` at HIGH effort, ungated, which is the most
+// expensive combination on the menu -- and the thing being tested is that
+// what you pick is what runs, which any model proves equally well. Colin,
+// 2026-09-09: "use cheap claude models, please no fable". Sonnet at low
+// effort. The picker is still checked for fable and opus by READING it,
+// which costs nothing.
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -165,7 +170,7 @@ try {
   check('Claude aliases carry effort levels', claudeRows.some((row) => /effort levels/.test(row.text) && /max/.test(row.text)), claudeRows[0]?.text)
   check('no Codex model is offered under Claude', !claudeRows.some((row) => /gpt-5/i.test(row.text)))
 
-  say('3. pick Claude Code / fable at high effort and run')
+  say('3. pick Claude Code / sonnet at low effort and run')
   const chosen = await cdp.eval(`(async () => {
     const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
     control.click()
@@ -177,7 +182,7 @@ try {
       const header = node.querySelector('.lc-picker__group')
       if (header) group = header.innerText
       const row = node.querySelector('.lc-picker__row')
-      if (row && !row.disabled && /claude/i.test(group) && /^fable/i.test(row.innerText.trim())) { target = row; break }
+      if (row && !row.disabled && /claude/i.test(group) && /^sonnet/i.test(row.innerText.trim())) { target = row; break }
     }
     if (!target) return JSON.stringify({ picked: false })
     target.click()
@@ -197,9 +202,9 @@ try {
     return JSON.stringify({ picked: true, effortPicked, controls })
   })()`)
   const chosenState = JSON.parse(chosen)
-  check('fable is selectable under Claude Code', chosenState.picked === true, chosen)
+  check('sonnet is selectable under Claude Code', chosenState.picked === true, chosen)
   say(`       controls: ${JSON.stringify(chosenState.controls)} · effort: ${chosenState.effortPicked}`)
-  check('the route control shows Claude Code / fable', (chosenState.controls ?? []).some((text) => /claude/i.test(text) && /fable/i.test(text)), JSON.stringify(chosenState.controls))
+  check('the route control shows Claude Code / sonnet', (chosenState.controls ?? []).some((text) => /claude/i.test(text) && /sonnet/i.test(text)), JSON.stringify(chosenState.controls))
 
   const submitted = await cdp.eval(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
@@ -245,7 +250,7 @@ try {
   const records = names.length === 1 ? (await readFile(join(LEDGER_DIR, names[0]), 'utf8')).split('\n').filter((l) => l).map((l) => JSON.parse(l)) : []
   const header = records[0]?.metadata
   check('one mission ledger exists', names.length === 1, `ledgers: ${names.length}`)
-  check('it records runtime claude and model fable', header?.runtime === 'claude' && header?.model === 'fable', JSON.stringify({ runtime: header?.runtime, model: header?.model }))
+  check('it records runtime claude and model sonnet', header?.runtime === 'claude' && header?.model === 'sonnet', JSON.stringify({ runtime: header?.runtime, model: header?.model }))
   const completed = records.some((r) => r.recordType === 'mission.event' && r.event?.type === 'run.completed')
   check('and a run.completed receipt', completed)
 } finally {

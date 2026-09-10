@@ -926,6 +926,50 @@ function subagentVerb(tool: string | undefined): string {
 }
 
 /**
+ * An MCP tool call, split into the two things a person recognises.
+ *
+ * A connector's tool arrives as one machine name --
+ * `mcp__claude_ai_Robinhood__get_watchlists` -- and the row drew it whole.
+ * Colin, seeing the first one that ever reached a teammate (2026-09-09):
+ * "the mcp tool calls came out a little messy, might need to make that part
+ * of the ui".
+ *
+ * The shape is `mcp__<server>__<tool>`, and both halves are worth having
+ * separately: the SERVER is the thing a person connected and thinks in
+ * ("Robinhood"), the TOOL is what was done with it ("get_watchlists"). That
+ * is the same split the row already draws for every other tool -- the name
+ * it acted on, and the tool that acted -- so an MCP call stops being a
+ * special case and becomes an ordinary row.
+ *
+ * `claude_ai_` is stripped because it is a transport detail. An account
+ * connector and a local server for the same product are the same product to
+ * the person who connected it, and neither of them calls it "claude ai
+ * Robinhood".
+ *
+ * Codex already sends `server.tool` for its own MCP calls, so that shape is
+ * read too rather than left as the one runtime this does not help.
+ */
+export function mcpToolParts(name: string): { readonly server: string; readonly tool: string } | undefined {
+  const doubled = /^mcp__(.+?)__(.+)$/.exec(name)
+  if (doubled !== null) {
+    return { server: prettyServer(doubled[1] ?? ''), tool: doubled[2] ?? '' }
+  }
+  // Codex's own join, and only when it really is one: a dot in a file path
+  // is not a server.
+  const dotted = /^mcp[_.]?(?:tool)?[_.](.+)$/.exec(name)
+  if (dotted !== null && dotted[1] !== undefined && dotted[1].includes('.')) {
+    const at = dotted[1].indexOf('.')
+    return { server: prettyServer(dotted[1].slice(0, at)), tool: dotted[1].slice(at + 1) }
+  }
+  return undefined
+}
+
+/** The name a person connected, not the transport that carries it. */
+function prettyServer(raw: string): string {
+  return raw.replace(/^claude_ai_/, '').replace(/[_-]+/g, ' ').trim()
+}
+
+/**
  * Whether a tool call is a command, whatever the runtime calls its shell.
  *
  * This asked for the name `shell` or the kind `command_execution`, which
@@ -1110,10 +1154,13 @@ export function buildThread(
             break
           }
         }
+        // A connector call names the SERVER as its tool and the tool as its
+        // name, which is the split every other row already uses.
+        const mcp = mcpToolParts(event.payload.name)
         const detail: ActivityDetail = {
           kind: toolKindOf(event),
-          name: event.payload.command ?? event.payload.name,
-          tool: event.payload.name,
+          name: mcp?.tool ?? event.payload.command ?? event.payload.name,
+          tool: mcp?.server ?? event.payload.name,
           // Only Claude Code and OpenCode send one; the others leave it
           // undefined and their rows read exactly as they always have.
           ...(typeof event.payload.title === 'string' && event.payload.title.length > 0
