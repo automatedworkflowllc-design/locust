@@ -325,16 +325,16 @@ describe('workspace settings', () => {
       expect((await teammates.readSettings()).relay).toBe(true)
     }
     await teammates.writeSettings({ swarm: false, relay: false })
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto', autoMode: false, layout: 'auto' })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
   })
 
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, layout: 'auto' })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, layout: 'auto' })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
   })
 
   it('only a literal true turns it on', async () => {
@@ -342,7 +342,7 @@ describe('workspace settings', () => {
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
       await teammates.writeSettings({ swarm: value, relay: false })
-      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto', autoMode: false, layout: 'auto' })
+      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
     }
   })
 
@@ -355,7 +355,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, layout: 'auto' })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 
@@ -445,5 +445,137 @@ describe('memory mode', () => {
     expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'off' })).memoryMode).toBe('off')
     expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'sometimes' } as never)).memoryMode).toBe('auto')
     expect((await createTeammateStore({ rootDirectory: root }).readSettings()).memoryMode).toBe('auto')
+  })
+})
+
+/**
+ * A teammate's own folder.
+ *
+ * Colin, 2026-09-09: "it should only change the folder for that chat/teammate
+ * not the entire app." The project folder switch reopens Locust because the
+ * ledger, memory and worktrees are all scoped by it; this is the narrower
+ * thing, and it has to survive every other edit made to the record.
+ */
+describe("a teammate's own folder", () => {
+  it('is kept, cleared, and never left behind as an empty key', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    expect(made.folder).toBeUndefined()
+
+    // A rooted POSIX path, which node calls absolute on Windows too, so one
+    // fixture reads the same sentence on both platforms.
+    const home = '/home/<home>/claude'
+    const pointed = await teammates.setFolder(made.teammateId, home)
+    expect(pointed.folder).toBe(home)
+    expect((await teammates.list())[0]?.folder).toBe(home)
+
+    const cleared = await teammates.setFolder(made.teammateId, undefined)
+    // The KEY has to go, not just its value: `{...record, folder: undefined}`
+    // writes `"folder": undefined`, which JSON drops on the way out and the
+    // next reader cannot tell from a folder that failed to save.
+    expect('folder' in cleared).toBe(false)
+  })
+
+  it('survives an edit of the name, the face and the branch switch', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    // A rooted POSIX path, which node calls absolute on Windows too, so one
+    // fixture reads the same sentence on both platforms.
+    const home = '/home/<home>/claude'
+    await teammates.setFolder(made.teammateId, home)
+    // The renderer never sends a folder, so an update that rebuilt the record
+    // from the request alone would silently move the teammate back.
+    const edited = await teammates.update({
+      teammateId: made.teammateId,
+      name: 'Wren the second',
+      hue: 'blue',
+      role: 'Code & Migrations',
+      worktree: true,
+      avatar: seedAvatar(made.teammateId)
+    })
+    expect(edited.name).toBe('Wren the second')
+    expect(edited.worktree).toBe(true)
+    expect(edited.folder).toBe(home)
+  })
+
+  it('refuses anything that is not an absolute path', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    // A relative path resolves against whatever the app's own process happens
+    // to be standing in, which is not a folder anybody chose.
+    await expect(teammates.setFolder(made.teammateId, 'claude')).rejects.toThrow()
+    await expect(teammates.setFolder(made.teammateId, '')).rejects.toThrow()
+    await expect(teammates.setFolder(made.teammateId, '   ')).rejects.toThrow()
+    await expect(teammates.setFolder('tm_nobody', '/tmp')).rejects.toThrow()
+    expect((await teammates.list())[0]?.folder).toBeUndefined()
+  })
+
+  it('drops a relative folder read back from a hand-edited file', () => {
+    const base = {
+      teammateId: 'tm_wren',
+      name: 'Wren',
+      hue: 'lime',
+      role: 'Code & Migrations',
+      createdAt: '2026-09-05T05:00:00.000Z'
+    }
+    expect(parsedTeammate({ ...base, folder: 'claude' })?.folder).toBeUndefined()
+    expect(parsedTeammate({ ...base, folder: 12 })?.folder).toBeUndefined()
+    // A rooted POSIX path, which node calls absolute on Windows too, so one
+    // fixture reads the same sentence on both platforms.
+    const home = '/home/<home>/claude'
+    expect(parsedTeammate({ ...base, folder: home })?.folder).toBe(home)
+  })
+})
+
+/**
+ * "Ask before every connector call" is a switch a person turns on, and only
+ * a person: a file from before the field, a malformed value, or a string
+ * that merely looks like true all read as the ordinary state.
+ */
+describe('asking before every connector call', () => {
+  it('is off unless the file says exactly true', async () => {
+    const { store: teammates } = await store()
+    expect((await teammates.readSettings()).askConnectors).toBe(false)
+    for (const wrong of ['true', 1, 'yes', {}] as const) {
+      const written = await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, askConnectors: wrong as never, layout: 'auto' })
+      expect(written.askConnectors, String(wrong)).toBe(false)
+    }
+  })
+
+  it('stays on across a write of some other setting', async () => {
+    // Every write carries the whole object; a caller that forgot this field
+    // would switch it off as a side effect of changing the layout.
+    const { store: teammates } = await store()
+    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'auto' })
+    const after = await teammates.writeSettings({ swarm: true, relay: true, relayHopCap: 6, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'rail' })
+    expect(after.askConnectors).toBe(true)
+    expect((await teammates.readSettings()).askConnectors).toBe(true)
+  })
+})
+
+
+/**
+ * A teammate narrowed to some connectors stays narrowed, and an empty list
+ * is "everything" -- the key goes, not a present-and-empty list that would
+ * read as nothing.
+ */
+describe("a teammate's own connectors", () => {
+  it('narrow, widen back, and never leave an empty key behind', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Jimothy', hue: 'lime', role: 'Custom' })
+    expect(made.connectors).toBeUndefined()
+    const narrowed = await teammates.setConnectors(made.teammateId, ['claude.ai Robinhood', 'claude.ai Robinhood', '  '])
+    expect(narrowed.connectors).toEqual(['claude.ai Robinhood'])
+    const widened = await teammates.setConnectors(made.teammateId, [])
+    expect('connectors' in widened).toBe(false)
+  })
+
+  it('survive an edit of the name, and drop anything that is not a plain name', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ name: 'Jimothy', hue: 'lime', role: 'Custom' })
+    await teammates.setConnectors(made.teammateId, ['claude.ai Gmail', 12, 'x'.repeat(200), 'ok' + String.fromCharCode(7)] as never)
+    const edited = await teammates.update({ teammateId: made.teammateId, name: 'Jim', hue: 'blue', role: 'Custom', avatar: seedAvatar(made.teammateId) })
+    expect(edited.connectors).toEqual(['claude.ai Gmail'])
+    await expect(teammates.setConnectors('tm_nobody', ['claude.ai Gmail'])).rejects.toThrow()
   })
 })

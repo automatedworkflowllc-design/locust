@@ -120,6 +120,36 @@ export function openCodeToolOutcome(state: JsonObject): {
   return { failed: true, status: status ?? "unknown" };
 }
 
+/**
+ * What the model SAID it was doing, for a shell call.
+ *
+ * UNVERIFIED, and say so: I have not seen OpenCode send one.
+ *
+ * I assumed OpenCode's bash tool carried a `description` beside the command
+ * the way Claude Code's does, because `openCodeToolTarget` reaches for
+ * `description` -- but the comment beside that line attributes it to the
+ * TASK tool, which names its ask rather than a path, and a driven `ls -a`
+ * on 2026-09-09 produced a command row with no description on it.
+ *
+ * So this reads a field that may never be populated. It is kept because it
+ * costs nothing and is correct IF the field appears, and because removing it
+ * would leave the same wrong assumption in a commit message with no code to
+ * contradict it. What it is not is evidence that OpenCode has the field.
+ *
+ * Kept apart from the target rather than reordering it. The command is
+ * evidence of what ran on this machine; the description is a claim about it
+ * by the thing that ran it. Reordering would have replaced the evidence with
+ * the claim; this puts the claim on top of it.
+ *
+ * Only for the shell tool: a file tool's row is already the path, which
+ * reads better than any sentence about it, and `task` has used the
+ * description as its own text since before this existed.
+ */
+export function openCodeToolTitle(tool: string, input: JsonObject): string | undefined {
+  if (!/^(bash|shell)$/i.test(tool)) return undefined;
+  return stringValue(input.description);
+}
+
 /** What a tool acted on, in the order OpenCode reports it. */
 export function openCodeToolTarget(input: JsonObject, metadata: JsonObject): string | undefined {
   return stringValue(input.filePath)
@@ -261,11 +291,13 @@ export function createOpenCodeEventNormalizer(
         : kind === "write" && filePath !== undefined && content !== undefined
           ? addedFilePatch(filePath, content, metadata.exists)
           : undefined;
+      const title = openCodeToolTitle(kind, input);
       const common = {
         itemId,
         toolKind: kind,
         name: kind,
         ...(target === undefined ? {} : { command: boundedMessageText(target) }),
+        ...(title === undefined ? {} : { title: boundedMessageText(title) }),
       };
       return [
         emit("tool.started", { ...common, phase: "started", evidence }),

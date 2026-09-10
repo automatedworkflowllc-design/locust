@@ -2279,3 +2279,208 @@ describe('what a run changed on disk that it never said', () => {
     expect(readOnly).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * Codex on the transport that STREAMS.
+ *
+ * `codex exec --json` sends an agent message once and whole -- measured
+ * 2026-09-10 by running it -- so a Codex teammate outside Approve-each said
+ * nothing and then dropped the entire reply in one paint. Every mode rides
+ * `codex app-server` instead, which sends the same reply as deltas. These
+ * hold the switch in place: that Codex asks for a server rather than an exec,
+ * that the deltas become message events, and that the two dangerous knobs on
+ * this transport -- which are JSON rather than argv, and so out of reach of
+ * the argv guard -- still cannot be widened by a mode that was not granted it.
+ */
+describe('Codex over app-server', () => {
+  /** A fake `codex app-server` that answers the handshake and then streams. */
+  function fakeAppServer(script: ReadonlyArray<readonly [string, unknown]>) {
+    const written: Array<Record<string, unknown>> = []
+    let emit: (chunk: string) => void = () => undefined
+    const spawn = vi.fn((_executablePath: string, _args: readonly string[]) => ({
+      write: (line: string) => {
+        for (const part of line.split('\n')) {
+          if (part.trim().length === 0) continue
+          const message = JSON.parse(part) as Record<string, unknown>
+          written.push(message)
+          if (typeof message.id !== 'number') continue
+          // Answer each request the way the real server does, then -- once the
+          // turn is accepted -- play the script out.
+          const answer = message.method === 'thread/start' || message.method === 'thread/resume'
+            ? { thread: { id: 'thread-live' } }
+            : message.method === 'turn/start'
+              ? { turn: { id: 'turn-1' } }
+              : { userAgent: 'codex' }
+          queueMicrotask(() => {
+            emit(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: answer })}\n`)
+            if (message.method !== 'turn/start') return
+            queueMicrotask(() => {
+              for (const [method, params] of script) {
+                emit(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`)
+              }
+            })
+          })
+        }
+      },
+      kill: () => undefined,
+      onData: (listener: (chunk: string) => void) => {
+        emit = listener
+      },
+      onExit: () => undefined
+    }))
+    return { spawn, written }
+  }
+
+  const REPLY = [
+    ['item/started', { item: { id: 'm1', type: 'agentMessage', text: '' } }],
+    ['item/agentMessage/delta', { itemId: 'm1', delta: 'Two ' }],
+    ['item/agentMessage/delta', { itemId: 'm1', delta: 'files.' }],
+    ['item/completed', { item: { id: 'm1', type: 'agentMessage', text: 'Two files.' } }],
+    ['turn/completed', { threadId: 'thread-live' }]
+  ] as const
+
+  it('launches a server rather than an exec, and turns its deltas into message events', async () => {
+    const { spawn, written } = fakeAppServer(REPLY)
+    const start = vi.fn() satisfies RuntimeProcessRunner['start']
+    const appendEvents = vi.fn<MissionLedger['appendEvents']>(async () => undefined)
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const { service, scheduled } = scheduledService(
+      { start },
+      fakeLedger({ appendEvents, createMission }),
+      { appServerSpawn: spawn }
+    )
+    const updates: CodexMissionUpdate[] = []
+
+    const response = await service.start('How many files?', 'codex', 'accept-edits', {}, (update) => {
+      updates.push(update)
+    })
+    expect(response.ok).toBe(true)
+    // The exec transport is not reached at all.
+    expect(start).not.toHaveBeenCalled()
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(spawn.mock.calls[0]?.[1]).toEqual(['app-server'])
+    // And what ran is what the record says ran.
+    expect(createMission).toHaveBeenCalledWith(expect.objectContaining({
+      command: expect.objectContaining({ args: ['app-server'] })
+    }))
+
+    scheduled[0]?.()
+    await vi.waitFor(() => {
+      expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.completed')).toBe(true)
+    })
+    const types = appendEvents.mock.calls.flatMap(([, events]) => events).map(({ type }) => type)
+    expect(types).toContain('message.delta')
+    expect(types.filter((type) => type === 'message.delta').length).toBeGreaterThan(1)
+    expect(JSON.stringify(updates)).toContain('Two ')
+    // The folder and the policy the mode earns, on the calls that take them.
+    const threadStart = written.find((message) => message.method === 'thread/start')
+    expect(threadStart?.params).toMatchObject({
+      cwd: WORKSPACE,
+      sandbox: 'workspace-write',
+      approvalPolicy: 'never'
+    })
+  })
+
+  it('holds a read-only mode read-only, and never asks for full access on its behalf', async () => {
+    const { spawn, written } = fakeAppServer(REPLY)
+    const { service } = scheduledService({ start: vi.fn() }, fakeLedger(), { appServerSpawn: spawn })
+    await service.start('Just look.', 'codex', 'ask', {}, () => undefined)
+    // The handshake runs on its own microtasks after the start resolves.
+    await vi.waitFor(() => {
+      expect(written.some((message) => message.method === 'thread/start')).toBe(true)
+    })
+    const threadStart = written.find((message) => message.method === 'thread/start')
+    expect(threadStart?.params).toMatchObject({ sandbox: 'read-only' })
+    expect(JSON.stringify(written)).not.toContain('danger-full-access')
+  })
+
+  it('leaves every other runtime on the transport it already had', async () => {
+    const { spawn } = fakeAppServer(REPLY)
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService(
+      { start },
+      fakeLedger(),
+      {
+        appServerSpawn: spawn,
+        discover: async () => [
+          codexRuntime(),
+          {
+            ...codexRuntime(),
+            id: 'claude' as const,
+            displayName: 'Claude Code',
+            executable: {
+              commandName: 'claude',
+              discoveredPath: process.platform === 'win32' ? 'C:\tools\claude.exe' : '/tools/claude',
+              executablePath: process.platform === 'win32' ? 'C:\tools\claude.exe' : '/tools/claude',
+              prefixArgs: [],
+              kind: 'native' as const
+            }
+          }
+        ]
+      }
+    )
+    await service.start('Read this.', 'claude', 'ask', {}, () => undefined)
+    expect(spawn).not.toHaveBeenCalled()
+    expect(start).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('stopping a Codex run over app-server', () => {
+  it('ends the run when the person presses stop, and says it was cancelled', async () => {
+    let emit: (chunk: string) => void = () => undefined
+    let killed = false
+    const spawn = vi.fn(() => ({
+      write: (line: string) => {
+        for (const part of line.split('\n')) {
+          if (part.trim().length === 0) continue
+          const message = JSON.parse(part) as Record<string, unknown>
+          if (typeof message.id !== 'number') continue
+          const answer = message.method === 'thread/start'
+            ? { thread: { id: 'thread-live' } }
+            : message.method === 'turn/start'
+              ? { turn: { id: 'turn-1' } }
+              : { userAgent: 'codex' }
+          queueMicrotask(() => {
+            emit(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: answer })}\n`)
+            if (message.method !== 'turn/start') return
+            // A turn that keeps talking and never completes: the case the
+            // stop button exists for.
+            queueMicrotask(() => {
+              emit(`${JSON.stringify({ jsonrpc: '2.0', method: 'item/agentMessage/delta', params: { itemId: 'm1', delta: '1. ' } })}\n`)
+            })
+          })
+        }
+      },
+      kill: () => {
+        killed = true
+      },
+      onData: (listener: (chunk: string) => void) => {
+        emit = listener
+      },
+      onExit: () => undefined
+    }))
+    const { service, scheduled } = scheduledService({ start: vi.fn() }, fakeLedger(), {
+      appServerSpawn: spawn
+    })
+    const updates: CodexMissionUpdate[] = []
+    const response = await service.start('Count to 200.', 'codex', 'accept-edits', {}, (update) => {
+      updates.push(update)
+    })
+    expect(response.ok).toBe(true)
+    scheduled[0]?.()
+    await vi.waitFor(() => {
+      expect(updates.some((update) => update.kind === 'event' && update.event.type === 'message.delta')).toBe(true)
+    })
+
+    const runId = response.ok ? response.data.runId : ''
+    expect(service.cancel(runId)).toMatchObject({ ok: true })
+    await vi.waitFor(() => {
+      expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.cancelled')).toBe(true)
+    })
+    expect(killed).toBe(true)
+    expect(service.liveMissionIds()).toEqual([])
+  })
+})

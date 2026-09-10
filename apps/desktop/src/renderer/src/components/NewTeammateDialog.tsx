@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
-import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole } from '../../../shared/ipc.js'
+import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector} from '../../../shared/ipc.js'
 import { PixelFace } from './PixelFace.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 
@@ -30,12 +30,30 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
  * on the preview when they create is what gets persisted with the record.
  * Never derived from the name -- a rename must not change a face.
  */
-/** What the next mission may do, in the words the mode menu uses. */
+/**
+ * What the next mission may do, in the words the mode menu uses.
+ *
+ * A `switch` with no default, so the union is exhausted and a mode added
+ * later cannot fall through. It used to end in a bare `return 'Ask ...'`,
+ * and `auto` -- added after this was written -- landed there: a composer
+ * reading "may edit anything on this machine" opened a dialog promising
+ * "every write refused". Caught 2026-09-09 in the folder drive's capture,
+ * which is the THIRD time this dialog has claimed a permission the run did
+ * not have, and the first time in the direction that understates it.
+ */
 function modeSummary(mode: MissionMode): string {
-  if (mode === 'accept-edits') return 'Accept edits · may change files in this workspace'
-  if (mode === 'approve-each') return 'Approve each action · asks before every command or change'
-  if (mode === 'plan') return 'Plan · answers with the steps it would take, changes nothing'
-  return 'Ask · reads and explains, every write refused'
+  switch (mode) {
+    case 'accept-edits':
+      return 'Accept edits · may change files in this workspace'
+    case 'approve-each':
+      return 'Approve each action · asks before every command or change'
+    case 'plan':
+      return 'Plan · answers with the steps it would take, changes nothing'
+    case 'auto':
+      return 'Auto · may edit anything on this machine'
+    case 'ask':
+      return 'Ask · reads and explains, every write refused'
+  }
 }
 
 export function NewTeammateDialog({
@@ -43,7 +61,11 @@ export function NewTeammateDialog({
   onCreate,
   error,
   initial,
-  mode
+  mode,
+  onChooseFolder,
+  folderNotice,
+  connectors,
+  onSetConnectors
 }: {
   readonly onCancel: () => void
   readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }) => void
@@ -52,6 +74,24 @@ export function NewTeammateDialog({
   readonly initial?: PublicTeammate
   /** The mode the next mission would actually run in, so the card cannot promise another. */
   readonly mode: MissionMode
+  /**
+   * Ask the host for this teammate's own folder, or clear it.
+   *
+   * Takes effect at once rather than on Save, because the path is the HOST's
+   * to name -- the renderer is handed a teammate back, never a path it could
+   * have typed. Absent while creating: a teammate with no id yet has nothing
+   * to write the folder onto.
+   */
+  readonly onChooseFolder?: (clear: boolean) => void
+  /** Why the last folder request did nothing. Absent when it worked, or was cancelled. */
+  readonly folderNotice?: string
+  /**
+   * Every connector the person's Claude Code reports, for narrowing. Absent
+   * while it is being read, or where narrowing is not offered.
+   */
+  readonly connectors?: readonly PublicConnector[]
+  /** The whole list of ticked names; empty means every connector. Takes effect at once. */
+  readonly onSetConnectors?: (names: readonly string[]) => void
 }): ReactElement {
   const editing = initial !== undefined
   const [name, setName] = useState(initial?.name ?? '')
@@ -192,6 +232,94 @@ export function NewTeammateDialog({
               </span>
             </span>
           </div>
+
+          {/*
+            * The folder THIS teammate stands in.
+            *
+            * Not the project folder switch in Settings: that one reopens
+            * Locust, because history, memory and worktrees are all scoped by
+            * it. This moves one teammate and closes nothing. Colin,
+            * 2026-09-09: "it should only change the folder for that
+            * chat/teammate not the entire app."
+            *
+            * Only when editing. A teammate being created has no id yet, and
+            * the host writes the folder onto a record.
+            */}
+          {editing && onChooseFolder !== undefined && (
+            <div className="lc-field lc-field--folder">
+              <span className="lc-fieldlabel lc-mono">Works in</span>
+              <div className="lc-folderrow">
+                <span
+                  className={`lc-folderrow__path lc-mono${initial?.folder === undefined ? ' is-default' : ''}`}
+                  title={initial?.folder ?? 'The project folder'}
+                >
+                  {initial?.folder ?? 'The project folder'}
+                </span>
+                <button type="button" className="lc-button" onClick={() => onChooseFolder(false)}>
+                  {initial?.folder === undefined ? 'Choose folder' : 'Change'}
+                </button>
+                {initial?.folder !== undefined && (
+                  <button type="button" className="lc-button" onClick={() => onChooseFolder(true)}>
+                    Use the project folder
+                  </button>
+                )}
+              </div>
+              <span className="lc-field__hint">
+                Its missions run here instead of the project folder, which is also how it reaches an MCP server registered
+                to that folder. History and memory stay with the project either way.
+              </span>
+              {folderNotice !== undefined && <span className="lc-field__hint lc-tone-amber">{folderNotice}</span>}
+            </div>
+          )}
+
+          {/*
+            * Which connectors THIS teammate may use without asking.
+            *
+            * Nothing ticked is the ordinary state and means every connector
+            * the person has -- Colin's ruling. Ticking some NARROWS: a
+            * Finance Bro gets Robinhood and not Gmail, and a call to anything
+            * else stops the run and asks. Every name here was read off
+            * `claude mcp list`; none can be typed.
+            *
+            * Only when editing, like the folder: a teammate being created has
+            * nothing to write a list onto.
+            */}
+          {editing && onSetConnectors !== undefined && connectors !== undefined && connectors.length > 0 && (
+            <div className="lc-field lc-field--connectors">
+              <span className="lc-fieldlabel lc-mono">Connectors</span>
+              <div className="lc-connectorgrid" role="group" aria-label="Connectors this teammate may use">
+                {connectors.map((connector) => {
+                  const narrowed = initial?.connectors ?? []
+                  const on = narrowed.length === 0 || narrowed.includes(connector.name)
+                  const label = connector.name.replace(/^claude\.ai /, '')
+                  return (
+                    <button
+                      key={connector.name}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      className={`lc-connectorpick${on ? ' is-on' : ''}${connector.status === 'connected' ? '' : ' is-unready'}`}
+                      title={connector.status === 'connected' ? connector.location : `${connector.name} — ${connector.status === 'needs-auth' ? 'not signed in yet' : 'not responding'}`}
+                      onClick={() => {
+                        // From "everything" the first untick narrows to all-but-one;
+                        // unticking the last one widens back to everything.
+                        const current = narrowed.length === 0 ? connectors.map((entry) => entry.name) : [...narrowed]
+                        const next = on ? current.filter((name) => name !== connector.name) : [...current, connector.name]
+                        onSetConnectors(next.length === connectors.length ? [] : next)
+                      }}
+                    >
+                      <span>{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <span className="lc-field__hint">
+                {(initial?.connectors ?? []).length === 0
+                  ? 'All of them, without asking. Untick one and this teammate is limited to the rest; a call to anything else asks you first.'
+                  : `Only these, without asking. A call to any other connector stops the run and asks you.`}
+              </span>
+            </div>
+          )}
 
           {/*
             The reference shows a default route and approval mode here. Both are

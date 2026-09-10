@@ -1,8 +1,8 @@
 import mark from '../assets/locust-mark.svg'
-import { useState } from 'react'
-import type { ContextReading } from '../cost.js'
+import { useCallback, useRef, useState } from 'react'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
-import type { FormEvent, KeyboardEvent, ReactElement } from 'react'
+import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
+import type { ClipboardEvent, FormEvent, KeyboardEvent, ReactElement } from 'react'
 
 import type {
   MissionMode,
@@ -20,7 +20,6 @@ import {
   modelFamily,
   runtimeIsUsable
 } from '../status.js'
-import { ContextRing } from './ContextRing.js'
 import { defaultEffort, modelLabelFor } from '../status.js'
 import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
@@ -65,6 +64,46 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
   }
 ]
 
+/**
+ * What this mode does to a connector, in one sentence, measured.
+ *
+ * THREE wrong versions of this shipped on 2026-09-09 before the facts were
+ * all in, and the history is kept because each was wrong in an instructive
+ * way.
+ *
+ *  1. "Only Auto can reach an MCP server." The reason given was
+ *     `--restricted`, which never blocked MCP at all -- its own help names
+ *     `--strict-mcp-config` as the flag that would.
+ *  2. "Your connectors are available in every mode." Removing our
+ *     `--disallowedTools mcp__*` made them OFFERED, and driving the built app
+ *     in Ask showed the rest: Claude Code asks before using one, and a
+ *     printed run has nowhere to put that question, so the call was denied.
+ *  3. "A connector call will be refused in this mode." True at the time, and
+ *     wrong the moment Locust began passing an allow rule per connector.
+ *
+ * What is true now, measured by running the argv by hand and then by driving
+ * the built app: every connector the person's own Claude Code can reach is
+ * named in an allow rule on every run, so it is used without asking. Colin,
+ * 2026-09-10: "honestly just let them have access to the mcp tools if the
+ * client have access to it -- it only makes sense and is way less muddy."
+ *
+ * Which leaves the one thing a person genuinely cannot infer, and it is the
+ * thing worth the line: a connector acts somewhere that is not this machine.
+ * "Ask -- reads and explains, every write is refused" is a promise about
+ * DISK. A teammate in Ask can still send mail or place an order through a
+ * connector, because no sandbox on this machine reaches the far end of one.
+ *
+ * Claude Code only: it is the only runtime whose command builder mentions MCP
+ * at all, so the same words elsewhere would be a claim nothing behind them
+ * makes.
+ */
+export function connectorsNote(runtime: string, mode: MissionMode): string | undefined {
+  if (runtime !== 'claude') return undefined
+  return mode === 'auto'
+    ? 'Your connectors work here, and so does everything else on this machine.'
+    : 'Your connectors work in this mode too. What this mode limits is this machine — a connector acts on the service it reaches, so it is outside the sandbox either way.'
+}
+
 export interface ComposerProps {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -79,7 +118,6 @@ export interface ComposerProps {
   readonly mode: MissionMode
   readonly onModeChange: (mode: MissionMode) => void
   /** How full the model's context is, when the runtime reported its size. */
-  readonly context?: ContextReading
   /** Whether this workspace has Auto switched on. Picking Auto here switches it on. */
   readonly autoMode?: boolean
   /** Turn Auto on for the workspace, because the person just chose it. */
@@ -167,7 +205,6 @@ export function Composer({
   mode,
   onModeChange,
   autoMode,
-  context,
   onEnableAutoMode,
   route,
   onRouteChange,
@@ -206,6 +243,9 @@ export function Composer({
   const [refusal, setRefusal] = useState<{ readonly text: string; readonly plain?: boolean }>()
   const type = (next: string): void => {
     setValue(next)
+    // Typing leaves the history. Without this, editing a recalled message and
+    // then pressing up again would walk further back and throw the edit away.
+    if (recallAt >= 0) setRecallAt(-1)
     // The refusal was about the press, not about the text. Typing again is
     // the person trying something; leaving the old sentence up implies it
     // still applies.
@@ -244,6 +284,42 @@ export function Composer({
   const [slashAt, setSlashAt] = useState(0)
   const [effortOpen, setEffortOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+
+  /*
+   * These three panels closed only by pressing their own control again,
+   * which is not how a menu behaves anywhere else in this app or on the
+   * machine. Reported by the first outside tester on 0.55.0: "you to click
+   * out of it you have to click the button again instead of just clicking
+   * anywhere on the page."
+   *
+   * The ref is on the ANCHOR, which holds the panel and the control that
+   * opens it, so a press on the control still toggles rather than being
+   * swallowed by the close.
+   */
+  /*
+   * What you have sent, so the up arrow can bring it back.
+   *
+   * Claude Code recalls the previous message on an empty prompt and it is one
+   * of the highest-frequency things in the whole program -- resend, tweak a
+   * word, resend. Locust's composer bound the arrows only while the slash
+   * menu was open, so on an empty box they did nothing at all.
+   *
+   * Kept in the composer rather than the record because it is a property of
+   * this box in this session, the same as it is there: it recalls what YOU
+   * typed, not what the mission holds.
+   */
+  const sent = useRef<string[]>([])
+  const [recallAt, setRecallAt] = useState(-1)
+
+  const modeAnchor = useRef<HTMLSpanElement>(null)
+  const pickerAnchor = useRef<HTMLSpanElement>(null)
+  const effortAnchor = useRef<HTMLSpanElement>(null)
+  const closeMode = useCallback(() => setModeOpen(false), [])
+  const closePicker = useCallback(() => setPickerOpen(false), [])
+  const closeEffort = useCallback(() => setEffortOpen(false), [])
+  useDismissOnOutsidePress(modeOpen, closeMode, modeAnchor)
+  useDismissOnOutsidePress(pickerOpen, closePicker, pickerAnchor)
+  useDismissOnOutsidePress(effortOpen, closeEffort, effortAnchor)
 
   // A mode the chosen route cannot run is not the mode a mission would start
   // in, so it is not the mode the control shows either. Switching route used
@@ -344,9 +420,8 @@ export function Composer({
           // box was the second voice saying the same thing (Colin,
           // 2026-09-05). Every OTHER line here survives, because each says
           // something no other part of the screen does.
-          teammateName === undefined
-          ? 'Write a message…'
-          : `Message ${teammateName}…`
+          // Asking several says so; asking one is the sentence it always was.
+          teammateName === undefined ? 'Write a message…' : `Message ${teammateName}…`
         : discoveryPhase === 'loading'
           ? 'Checking local runtimes…'
           : discoveryPhase === 'error'
@@ -385,6 +460,11 @@ export function Composer({
       return
     }
     setRefusal(undefined)
+    // Newest last, and never the same line twice running -- pressing up
+    // after sending the same thing twice should go back one message, not
+    // one keystroke.
+    if (sent.current[sent.current.length - 1] !== prompt) sent.current = [...sent.current, prompt].slice(-50)
+    setRecallAt(-1)
     // Cleared NOW, not when the host answers. The turn is already on screen as
     // a bubble the instant it is sent, so waiting for the round trip left the
     // same sentence in two places for the whole "Starting..." window and read
@@ -399,6 +479,52 @@ export function Composer({
         setAttached(sending)
       }
     })
+  }
+
+  /**
+   * Ctrl+V a file or a screenshot straight into the message.
+   *
+   * Colin, 2026-09-10: "lets add the ability to ctrl+v a file or photo into
+   * the chat."
+   *
+   * A pasted SCREENSHOT is what decides the shape. The clipboard holds a
+   * bitmap, not a file, so there is no path anywhere for the + button's route
+   * to take -- the bytes have to travel. Electron also stopped exposing
+   * `File.path` some versions ago, so a real file copied out of Explorer
+   * arrives with no path either. One route serves both: read the bytes, let
+   * the host name and place them.
+   *
+   * Text pastes fall through untouched. `clipboardData.files` is empty for
+   * those, so pasting a paragraph still just types it.
+   */
+  const paste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
+    const bridge = window.desktop
+    const files = [...(event.clipboardData?.files ?? [])]
+    if (bridge === undefined || files.length === 0 || running) return
+    // Only once there is something to attach: calling this on every text
+    // paste would swallow the paste.
+    event.preventDefault()
+    setAttaching(true)
+    void (async () => {
+      for (const file of files.slice(0, MAX_ATTACHMENTS)) {
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        // A pasted bitmap has no name of its own -- the browser calls it
+        // `image.png` at best -- so it gets one that says where it came from
+        // and cannot collide with a file the person chose.
+        const named = file.name.length > 0 ? file.name : `pasted-${String(Date.now())}.png`
+        const answer = await bridge.attachPasted(named, bytes)
+        if (answer.ok) {
+          setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
+          if (answer.copied !== undefined && answer.copied.length > 0) {
+            setCopiedIn((current) => new Set([...current, ...(answer.copied ?? [])]))
+          }
+        } else if (answer.message.length > 0) {
+          setNote(answer.message)
+        }
+      }
+    })()
+      .catch(() => setNote('That could not be attached.'))
+      .finally(() => setAttaching(false))
   }
 
   const keyDown = (keyEvent: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -427,6 +553,75 @@ export function Composer({
         setValue('')
         return
       }
+    }
+    /*
+     * Shift+Tab cycles the permission mode, the way it does in Claude Code.
+     *
+     * The mode is the highest-consequence control on this screen -- it is
+     * the difference between a teammate that explains and one that writes --
+     * and reaching it meant a menu every time. Tab alone is left alone,
+     * because moving focus out of a text box is what Tab is for everywhere.
+     *
+     * Only through modes this route can ACTUALLY run. `modeUnavailableReason`
+     * is what the menu greys an option out with, so cycling past those keeps
+     * the key from landing somewhere the menu would have refused -- offered
+     * and then refused is the pattern this app keeps paying for.
+     */
+    if (keyEvent.key === 'Tab' && keyEvent.shiftKey) {
+      const usable = MODES.filter(
+        (option) => modeUnavailableReason(option.mode, route.runtime, platform) === undefined
+      )
+      if (usable.length > 1) {
+        keyEvent.preventDefault()
+        const at = usable.findIndex((option) => option.mode === mode)
+        const next = usable[(at + 1) % usable.length]
+        if (next !== undefined) {
+          if (next.mode === 'auto' && autoMode !== true) onEnableAutoMode?.()
+          onModeChange(next.mode)
+        }
+        return
+      }
+    }
+    /*
+     * Escape stops the run, the way it does in Claude Code.
+     *
+     * Only while this box has focus and no panel is open. A panel's own
+     * Escape closes it -- and a keystroke that both dismissed a menu and
+     * killed a mission would be the worst kind of surprise, since one of
+     * those is free and the other is not.
+     */
+    if (keyEvent.key === 'Escape' && running && !modeOpen && !pickerOpen && !effortOpen) {
+      keyEvent.preventDefault()
+      onCancel()
+      return
+    }
+    /*
+     * The up arrow brings back what you sent.
+     *
+     * Only from an empty box, or once already walking the history. This is a
+     * TEXTAREA and messages here are often several lines, so an up arrow in
+     * the middle of one has to keep moving the caret -- which is also what
+     * Claude Code does.
+     */
+    if (keyEvent.key === 'ArrowUp' && sent.current.length > 0 && (value.length === 0 || recallAt >= 0)) {
+      keyEvent.preventDefault()
+      const next = recallAt < 0 ? sent.current.length - 1 : Math.max(0, recallAt - 1)
+      setRecallAt(next)
+      setValue(sent.current[next] ?? '')
+      return
+    }
+    if (keyEvent.key === 'ArrowDown' && recallAt >= 0) {
+      keyEvent.preventDefault()
+      const next = recallAt + 1
+      // Past the newest is the empty box you started from, not a wrap.
+      if (next >= sent.current.length) {
+        setRecallAt(-1)
+        setValue('')
+        return
+      }
+      setRecallAt(next)
+      setValue(sent.current[next] ?? '')
+      return
     }
     if (keyEvent.key === 'Enter' && !keyEvent.shiftKey) {
       keyEvent.preventDefault()
@@ -660,6 +855,7 @@ export function Composer({
               value={value}
               onChange={(changeEvent) => type(changeEvent.target.value)}
               onKeyDown={keyDown}
+              onPaste={paste}
               placeholder={placeholder}
               aria-label="Mission instruction"
               rows={1}
@@ -701,6 +897,12 @@ export function Composer({
                 <Icon name="arrow-up" size={15} />
               </button>
             ) : (
+              /*
+               * ONE send control, which grows a label when it is about to
+               * do more than send.
+               *
+               * The drawing gives the multi-teammate case a button reading
+               */
               <button
                 type="submit"
                 className="send-button lc-send"
@@ -714,7 +916,7 @@ export function Composer({
           </div>
           <div className="lc-composer__controls">
             <div className="lc-composer__group">
-              <span className="lc-control__anchor">
+              <span className="lc-control__anchor" ref={modeAnchor}>
                 {modeOpen && (
                   <div className="lc-menu" role="menu" aria-label="Permission mode">
                     {MODES.map((option) => {
@@ -750,6 +952,33 @@ export function Composer({
                         </button>
                       )
                     })}
+                    {/*
+                      * Say when a mode has taken the person's connectors away.
+                      *
+                      * `--restricted` is what keeps a person's own Claude Code
+                      * settings out of a mission, and Auto is the one mode that
+                      * drops it -- it cannot be combined with
+                      * `bypassPermissions`. So in every other mode the MCP
+                      * servers are never loaded, and the run then also denies
+                      * `mcp__*` outright.
+                      *
+                      * Nothing said so. Colin asked a teammate in Accept edits
+                      * to check Robinhood twice on 2026-09-09; it answered,
+                      * correctly and unhelpfully, that it had no connection --
+                      * and the only way to learn why was to read the launcher.
+                      * A refusal a person cannot act on is the app's fault, not
+                      * the model's.
+                      *
+                      * Claude Code only, because it is the only runtime whose
+                      * command builder touches MCP at all. Said whatever the
+                      * settings hold: an account connector from claude.ai never
+                      * appears in `~/.claude.json`, so counting configured
+                      * servers would have hidden this in exactly the case that
+                      * raised it.
+                      */}
+                    {connectorsNote(route.runtime, mode) !== undefined && (
+                      <p className="lc-menu__foot">{connectorsNote(route.runtime, mode)}</p>
+                    )}
                   </div>
                 )}
                 {/* The permission mode is the most consequential control on
@@ -761,7 +990,7 @@ export function Composer({
                   aria-haspopup="menu"
                   aria-expanded={modeOpen}
                   aria-label="Permission mode"
-                  title="Permission mode"
+                  title={connectorsNote(route.runtime, effectiveMode) ?? 'Permission mode'}
                   disabled={running}
                   onClick={() => setModeOpen(!modeOpen)}
                 >
@@ -806,7 +1035,14 @@ export function Composer({
                 */}
               <button
                 type="button"
-                className="lc-control lc-control--icon"
+                /*
+                 * Boxed like every other control on this row. It was the one
+                 * bare item in a row of chips, and the design agent's app-wide
+                 * read (2026-09-10) counted the row as "seven items, four
+                 * looks" -- the most-seen row in the app, and the most
+                 * visible clunk after the type.
+                 */
+                className="lc-control lc-control--boxed lc-control--icon"
                 aria-label="Attach files"
                 title="Attach a file — anywhere on this machine"
                 disabled={running || attaching}
@@ -852,7 +1088,7 @@ export function Composer({
               </button>
             </div>
             <div className="lc-composer__group">
-              <span className="lc-control__anchor">
+              <span className="lc-control__anchor" ref={pickerAnchor}>
                 {pickerOpen && (
                   <RoutePicker
                     runtimes={runtimes}
@@ -942,7 +1178,7 @@ export function Composer({
                 * choice that does not exist.
                 */}
               {shownEffort !== undefined && supportedEfforts.length > 0 && (
-                <span className="lc-control__anchor">
+                <span className="lc-control__anchor" ref={effortAnchor}>
                   {effortOpen && (
                     /*
                       * A SLIDER and a switch, not a list.
@@ -1100,7 +1336,6 @@ export function Composer({
               >
                 <img src={mark} alt="" aria-hidden="true" />
               </button>
-              {context !== undefined && <ContextRing reading={context} />}
             </div>
           </div>
         </form>

@@ -112,6 +112,20 @@ export interface ToolPayload {
   readonly toolKind: string;
   readonly name: string;
   readonly command?: string;
+  /**
+   * What the model said it was doing, on the runtimes that carry one.
+   *
+   * Claude Code's Bash tool takes a `description` on every call, and that
+   * sentence is why its own transcript reads in intentions rather than shell
+   * pipelines. Separate from `command` on purpose: the command is evidence
+   * of what ran on this machine, the description is a claim about it by the
+   * thing that ran it, and a row may lead with the claim only if the
+   * evidence is still there underneath.
+   *
+   * Codex sends no such field, so this is undefined on that transport and
+   * those rows are unchanged.
+   */
+  readonly title?: string;
   readonly output?: RedactedJsonValue;
   readonly exitCode?: number;
   readonly status?: string;

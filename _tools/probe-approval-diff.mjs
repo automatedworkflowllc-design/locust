@@ -91,7 +91,7 @@ try {
     return false
   })()`)
   check('discovery finished', ready === true)
-  if (ready !== true) say(`       body: ${String(await evaluate(`document.body.innerText.replace(/\s+/g, ' ').slice(0, 400)`))}`)
+  if (ready !== true) say(`       body: ${String(await evaluate(`document.body.innerText.replace(/\\s+/g, ' ').slice(0, 400)`))}`)
 
   say('2. Wren on Codex, approve-each, is asked to create a file')
   const mode = await evaluate(`(async () => {
@@ -135,7 +135,7 @@ try {
   check('an approval card stopped the run', c.summary !== undefined, String(card).slice(0, 120))
   check('the card names the change: 1 file', /Change 1 file/.test(String(c.summary)), String(c.summary))
   check('the card carries the diff with the new line', c.patch !== null && /SMOKE\.txt/.test(String(c.patch)) && /smoke ok/.test(String(c.patch)), String(c.patch))
-  check('and counts one added line', Array.isArray(c.adds) && c.adds.some((a) => /\+1\b/.test(a)), JSON.stringify(c.adds))
+  check('and counts one added line', Array.isArray(c.adds) && c.adds.some((a) => /\+1\\b/.test(a)), JSON.stringify(c.adds))
 
   say('3. Deny, and nothing is written')
   const denied = await evaluate(`(async () => {

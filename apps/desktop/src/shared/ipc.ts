@@ -305,6 +305,15 @@ export const WORKSPACE_REVEAL_CHANNEL = 'workspace:reveal'
  * the same containment `main/reveal-file.ts` enforces on the way out, applied
  * on the way in. The renderer never names a folder to open.
  */
+/**
+ * Attach what is on the clipboard, as bytes.
+ *
+ * A pasted screenshot has no path -- the clipboard holds a bitmap, not a file
+ * -- so there is nothing for the picker's path-based route to take. The
+ * renderer sends the bytes and a suggested name; the host decides where they
+ * land, exactly as it does for a file chosen from outside the folder.
+ */
+export const WORKSPACE_PASTE_CHANNEL = 'workspace:paste'
 export const WORKSPACE_ATTACH_CHANNEL = 'workspace:attach'
 
 /** Files chosen to attach, workspace-relative, or why none were. */
@@ -346,9 +355,22 @@ export type WorkspaceImageResponse =
 export type RevealFileResponse =
   | { readonly ok: true }
   | { readonly ok: false; readonly message: string }
+export const OPEN_LINK_CHANNEL = 'shell:open-link'
+/**
+ * What came of opening a link. A refusal names why, the same as a reveal.
+ *
+ * The host opens only the addresses on its own list; a URL that is not one
+ * of them is refused rather than opened, which is what keeps `openExternal`
+ * from being a hole through the packaged build's egress rules.
+ */
+export type OpenLinkResponse =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string }
 export const ROOM_LIST_CHANNEL = 'rooms:list'
 export const ROOM_CREATE_CHANNEL = 'rooms:create'
 export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
+/** Name a room that was made from an ask, and so began as `Untitled room`. */
+export const ROOM_RENAME_CHANNEL = 'rooms:rename'
 export const ROOM_POST_CHANNEL = 'rooms:post'
 export const ROOM_TASK_CHANNEL = 'rooms:task'
 export const MEMORY_LIST_CHANNEL = 'memory:list'
@@ -357,6 +379,11 @@ export const MEMORY_UPDATE_CHANNEL = 'memory:update'
 export const MEMORY_REMOVE_CHANNEL = 'memory:remove'
 export const MEMORY_CLEAR_CHANNEL = 'memory:clear'
 export const RUNTIME_SETUP_CHANNEL = 'runtime:setup'
+/** Every connector the person's Claude Code reports, and which each teammate may use. */
+export const CONNECTOR_LIST_CHANNEL = 'connectors:list'
+export const TEAMMATE_CONNECTORS_CHANNEL = 'teammates:connectors'
+/** Pick, or clear, the folder one teammate works in. The host names the path. */
+export const TEAMMATE_FOLDER_CHANNEL = 'teammates:folder'
 export const WORKTREE_LIST_CHANNEL = 'worktrees:list'
 export const WORKTREE_REMOVE_CHANNEL = 'worktrees:remove'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
@@ -397,6 +424,38 @@ export interface PublicTeammate {
    * so two teammates editing one repository do not collide. Off by default.
    */
   readonly worktree?: boolean
+  /**
+   * The folder THIS teammate works in, when it is not the project folder.
+   *
+   * Colin, 2026-09-09: "it should only change the folder for that chat/
+   * teammate not the entire app." Switching the project folder reopens
+   * Locust, because the ledger, the memory store and the worktrees are all
+   * scoped by it; a teammate's own folder is a narrower thing that needs
+   * none of that, because it only decides where that teammate's runs stand.
+   *
+   * It is also the only way to reach a local MCP server, which Claude Code
+   * registers under a PROJECT KEY in `~/.claude.json`: a server declared for
+   * `C:/Users/<home>/claude` exists in that folder and nowhere else, so a
+   * teammate that needs it has to be standing there.
+   *
+   * Written by the HOST from a folder dialog, never named by the renderer.
+   * History stays filed under the project folder either way.
+   */
+  readonly folder?: string
+  /**
+   * The connectors THIS teammate may use, by the name the CLI prints.
+   *
+   * Absent means every connector the person's own Claude Code can reach --
+   * Colin's ruling, and the ordinary state. Present, it NARROWS: only these
+   * are allowed without asking, and a call to any other stops the run and
+   * asks through the permission host. Never a grant of something the person
+   * does not have: a name that is not on the machine is simply a rule for a
+   * server that never appears.
+   *
+   * Written from the teammate dialog, from a list the host read off
+   * `claude mcp list`; never typed.
+   */
+  readonly connectors?: readonly string[]
   /**
    * The face, persisted with the record. Seeded from the immutable id when a
    * teammate is created without one, so a rename never changes it.
@@ -484,6 +543,35 @@ export type TeammateMutationResponse =
   | { readonly ok: true; readonly data: { readonly teammate?: PublicTeammate } }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATE_REJECTED'; readonly message: string } }
 
+/** One MCP server the CLI reported, as the person would recognise it. */
+export interface PublicConnector {
+  readonly name: string
+  /** A URL for a remote connector, a command for a local one. */
+  readonly location: string
+  /** `needs-auth` is a real connector the person has not finished signing into. */
+  readonly status: 'connected' | 'needs-auth' | 'failed'
+}
+
+export type ConnectorListResponse =
+  | { readonly ok: true; readonly data: { readonly connectors: readonly PublicConnector[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'CONNECTORS_UNAVAILABLE'; readonly message: string } }
+
+/**
+ * The answer to a folder request for one teammate.
+ *
+ * `CANCELLED` is the ordinary outcome -- the person closed the dialog -- and
+ * is never drawn as trouble.
+ */
+export type TeammateFolderResponse =
+  | { readonly ok: true; readonly data: { readonly teammate: PublicTeammate } }
+  | {
+      readonly ok: false
+      readonly error: {
+        readonly code: 'CANCELLED' | 'REJECTED'
+        readonly message: string
+      }
+    }
+
 /**
  * A routine: a conversation a person saved as steps a teammate can replay.
  * The teammate cannot watch a person work outside the app; what it can learn
@@ -550,6 +638,35 @@ export interface RoomPost {
   readonly at: string
   /** The mission each teammate answered in, by teammate id. A teammate whose run could not start is absent. */
   readonly missions: Readonly<Record<string, string>>
+  /**
+   * Who is still waiting for a slot, in the order they will get one.
+   *
+   * A post asks everyone in the room, but only `MAX_LIVE_MISSIONS` can run
+   * at once and a teammate already working cannot take a second mission. A
+   * member in that position is not refused -- waiting fixes it -- so they
+   * wait here and start when a slot frees.
+   *
+   * Before this existed they were simply never asked, and the room said so
+   * and moved on. That cost was permanent and it was paid by the RECORD:
+   * a teammate who never started left no mission at all, so the next day
+   * nothing showed they had been asked.
+   *
+   * A name leaves this list the moment its mission starts, and appears in
+   * `missions` instead. Absent on posts written before this existed.
+   */
+  readonly queued?: readonly string[]
+  /**
+   * Why a member was not asked at all, by teammate id, in the host's own
+   * words. Only reasons waiting cannot fix -- gone from the roster, a
+   * runtime a room cannot post to. Anything retryable queues instead.
+   *
+   * Recorded because the reason is a fact about the PAST. It used to live
+   * only in the response to the post -- shown once in the composer note,
+   * then overwritten by the next thing the room had to say -- so a reload,
+   * or simply waiting for the room to finish, left the absence with no
+   * explanation at all. Absent on posts written before this existed.
+   */
+  readonly refused?: Readonly<Record<string, string>>
 }
 
 /**
@@ -800,6 +917,18 @@ export interface WorkspaceSettings {
    */
   readonly autoMode: boolean
   /**
+   * Ask before every connector call, instead of allowing the ones the person
+   * already has.
+   *
+   * Off is Colin's ruling and the ordinary state: a connector the person's
+   * Claude Code can reach is allowed without asking. On sends no allow rules,
+   * so every connector call stops the run and raises the approval card --
+   * the way every other client behaves -- with "always" remembered per
+   * connector until the mission ends. Checked when a run starts, never
+   * cached; absent or malformed reads as off.
+   */
+  readonly askConnectors: boolean
+  /**
    * Which shell layout to draw: the full sidebar, the compact avatar rail, or
    * whichever the window width calls for. Colin asked for the layout to be a
    * choice as well as a consequence of window size (2026-09-07). Absent or
@@ -813,7 +942,14 @@ export const MIN_RELAY_HOP_CAP = 1
 export const MAX_RELAY_HOP_CAP = 12
 
 /** What the runtime is asking permission to do. */
-export type MissionApprovalKind = 'command' | 'file-change' | 'question'
+/**
+ * `connector` is a Claude Code run asking to use one of the person's MCP
+ * tools. It arrives through Locust's own permission host rather than the
+ * app-server protocol, but it is answered by the same card, with the same
+ * three decisions -- and "always" is remembered for that connector on that
+ * run, the way every other client does it.
+ */
+export type MissionApprovalKind = 'command' | 'file-change' | 'question' | 'connector'
 
 export interface MissionApprovalRequest {
   readonly approvalId: string
@@ -827,6 +963,13 @@ export interface MissionApprovalRequest {
   /** Where it would happen. */
   readonly cwd: string | null
   readonly requestedAt: string
+  /**
+   * Who is asking. The card used to print "Codex CLI" as a constant, which
+   * was true for as long as Codex was the only runtime that could ask; a
+   * Claude Code connector permission wore the wrong name in its first drive
+   * (2026-09-10). Absent on a record from before this field: read as Codex.
+   */
+  readonly runtime?: MissionRuntimeId
   /**
    * For a file change: the unified diff Codex attached to the item the
    * approval is about, bounded like a ledger patch. Absent when the runtime
@@ -1334,17 +1477,39 @@ export interface DesktopApi {
    * card can say something rather than appear to do nothing.
    */
   revealFile(path: string): Promise<RevealFileResponse>
+  /** Open one of the addresses the host allows, in the person's browser. */
+  openLink(url: string): Promise<OpenLinkResponse>
   /** Open the picker for files to attach; answers workspace-relative paths. */
   attachFiles(): Promise<AttachFilesResponse>
+  /**
+   * Attach one thing from the clipboard. `bytes` is the file's contents; the
+   * name is a suggestion the host sanitises and may change to avoid a
+   * collision.
+   */
+  attachPasted(name: string, bytes: Uint8Array): Promise<AttachFilesResponse>
   readWorkspaceImage(path: string): Promise<WorkspaceImageResponse>
   listRooms(): Promise<RoomListResponse>
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>
   removeRoom(roomId: string): Promise<RoomMutationResponse>
+  /** Give a room a name. A room made from an ask starts as `Untitled room`. */
+  renameRoom(roomId: string, name: string): Promise<RoomMutationResponse>
   postToRoom(request: RoomPostRequest): Promise<RoomPostResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   listMemories(): Promise<MemoryListResponse>
   /** Each runtime's own MCP servers and hooks, read-only. */
   readRuntimeSetup(): Promise<RuntimeSetupResponse>
+  /**
+   * Choose the folder one teammate works in, or clear it back to the project
+   * folder. Nothing reopens: only that teammate's next run moves.
+   */
+  chooseTeammateFolder(teammateId: string, clear?: boolean): Promise<TeammateFolderResponse>
+  /** Every connector the person's Claude Code reports. Cached by the host; slow to refresh. */
+  listConnectors(): Promise<ConnectorListResponse>
+  /**
+   * Which connectors one teammate may use without asking. The WHOLE list every
+   * time; an empty list means every connector, which is the default.
+   */
+  setTeammateConnectors(teammateId: string, names: readonly string[]): Promise<TeammateFolderResponse>
   /** The teammates' own worktrees under the folder, and whether the folder can have them. */
   listWorktrees(): Promise<WorktreeListResponse>
   /** Remove a teammate's worktree. The branch stays. Refused while a run is live in it. */

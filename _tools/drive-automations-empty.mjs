@@ -30,7 +30,7 @@ const drive = await startDrive({
 })
 
 const OPEN_AUTOMATIONS = `(async () => {
-  const flat = (el) => el.innerText.split(/\s+/).join(' ').trim()
+  const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
   // The sidebar's Automations section header opens the screen; its title is
   // the stable handle ("What automations are").
   const tab = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title') === 'What automations are')
@@ -54,7 +54,7 @@ try {
 
   await drive.capture('and the gesture it names, performed', () =>
     drive.evaluate(`(async () => {
-      const flat = (el) => el.innerText.split(/\s+/).join(' ').trim()
+      const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
       const row = document.querySelector('.lc-teammate__mission')
       if (!row) return 'no conversation row in the sidebar to right-click'
       row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 260 }))

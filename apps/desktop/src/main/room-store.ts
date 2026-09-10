@@ -3,6 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
+import { MAX_ROOM_TEAMMATES } from '../shared/live-missions.js'
 import type { PublicRoom, RoomPost, RoomTask, RoomTaskRequest } from '../shared/ipc.js'
 import { boundedTaskText, taskKey } from '../shared/room-task.js'
 import type { TaskOp } from '../shared/room-task.js'
@@ -23,7 +24,7 @@ import { safeId } from './teammate-store.js'
 const SCHEMA_VERSION = 1 as const
 const MAX_FILE_BYTES = 4 * 1024 * 1024
 export const MAX_ROOMS = 32
-export const MAX_ROOM_TEAMMATES = 8
+export { MAX_ROOM_TEAMMATES }
 export const MAX_ROOM_POSTS = 200
 export const MAX_ROOM_NAME_LENGTH = 60
 export const MAX_POST_LENGTH = 8_000
@@ -33,9 +34,46 @@ export interface RoomStore {
   list(): Promise<readonly PublicRoom[]>
   get(roomId: unknown): Promise<PublicRoom | undefined>
   create(input: { readonly name: unknown; readonly teammateIds: unknown }): Promise<PublicRoom>
+  /**
+   * Give a room a different name.
+   *
+   * A room made from the ask starts as `Untitled room`, because a first room
+   * used to cost a name before it had a purpose and that is most of why
+   * nobody made one. So a name it can be given AFTERWARDS is not a nicety
+   * here -- it is the other half of that decision.
+   */
+  rename(roomId: unknown, name: unknown): Promise<PublicRoom>
   remove(roomId: unknown): Promise<void>
   /** Record a post and the missions it started. The newest post is last. */
-  addPost(roomId: unknown, post: { readonly text: string; readonly missions: Readonly<Record<string, string>> }): Promise<RoomPost>
+  addPost(
+    roomId: unknown,
+    post: {
+      readonly text: string
+      readonly missions: Readonly<Record<string, string>>
+      /** Why a member was not asked, by teammate id. The reason outlives the response that carried it. */
+      readonly refused?: Readonly<Record<string, string>>
+      /** Who is waiting for a slot, in the order they will get one. */
+      readonly queued?: readonly string[]
+    }
+  ): Promise<RoomPost>
+  /**
+   * A queued member's mission has started: move them out of the queue and
+   * into the post's missions, in one write.
+   *
+   * One operation rather than two, because a crash between them would leave
+   * a member both waiting and running -- and the drain would start them
+   * again on the next slot.
+   */
+  startQueued(roomId: string, postId: string, teammateId: string, missionId: string): Promise<void>
+  /**
+   * A queued member will never start: move them out of the queue and into
+   * the post's refusals, with the host's words.
+   *
+   * The mirror of `startQueued`, and needed for the same reason -- the post
+   * now exists before anyone is asked, so a refusal has to be recorded onto
+   * it rather than handed to `addPost` at the end.
+   */
+  refuseQueued(roomId: string, postId: string, teammateId: string, message: string): Promise<void>
   /** A teammate who is gone leaves every room; a room left empty is removed. */
   removeTeammate(teammateId: unknown): Promise<void>
   /**
@@ -117,7 +155,27 @@ function parsedPost(value: unknown): RoomPost | undefined {
     if (!safeId(teammateId) || !safeId(missionId)) return undefined
     missions[teammateId] = missionId
   }
-  return { postId: record.postId, text: record.text, at: record.at, missions }
+  // Posts written before refusals were recorded have none, and a malformed
+  // one costs the reasons rather than the post -- losing a post would lose
+  // the answers with it, which is the durable part.
+  // A queue written before this existed is none, and a malformed one costs
+  // the queue rather than the post -- losing a post would lose the answers
+  // with it, which is the durable part.
+  const queued = Array.isArray(record.queued) ? record.queued.filter((id): id is string => typeof id === 'string' && safeId(id)) : []
+  const refused: Record<string, string> = {}
+  if (typeof record.refused === 'object' && record.refused !== null) {
+    for (const [teammateId, reason] of Object.entries(record.refused as Record<string, unknown>)) {
+      if (safeId(teammateId) && typeof reason === 'string' && reason.length > 0) refused[teammateId] = reason.slice(0, 200)
+    }
+  }
+  return {
+    postId: record.postId,
+    text: record.text,
+    at: record.at,
+    missions,
+    ...(queued.length === 0 ? {} : { queued: queued.filter((id) => missions[id] === undefined) }),
+    ...(Object.keys(refused).length === 0 ? {} : { refused })
+  }
 }
 
 export function parsedRoom(value: unknown): PublicRoom | undefined {
@@ -255,6 +313,21 @@ export function createRoomStore(options: {
       })
     },
 
+    rename(roomId, name): Promise<PublicRoom> {
+      return serialize(async () => {
+        if (!validRoomName(name)) throw new Error('Give the room a name of up to 60 characters.')
+        const file = await read()
+        const room = file.rooms.find((entry) => entry.roomId === roomId)
+        if (room === undefined) throw new Error('That room does not exist.')
+        const renamed: PublicRoom = { ...room, name: name.trim() }
+        await write({
+          ...file,
+          rooms: file.rooms.map((entry) => (entry.roomId === roomId ? renamed : entry))
+        })
+        return renamed
+      })
+    },
+
     remove(roomId): Promise<void> {
       return serialize(async () => {
         const file = await read()
@@ -273,7 +346,22 @@ export function createRoomStore(options: {
         for (const [teammateId, missionId] of Object.entries(post.missions)) {
           if (safeId(teammateId) && safeId(missionId)) missions[teammateId] = missionId
         }
-        const added: RoomPost = { postId: `post_${createId()}`, text: post.text, at: now().toISOString(), missions }
+        // Bounded the same way the messages are: a teammate id that is not
+        // an id, or a reason longer than one sentence's worth, is dropped
+        // rather than written into the room file.
+        const refused: Record<string, string> = {}
+        for (const [teammateId, reason] of Object.entries(post.refused ?? {})) {
+          if (safeId(teammateId) && typeof reason === 'string' && reason.length > 0) refused[teammateId] = reason.slice(0, 200)
+        }
+        const queued = (post.queued ?? []).filter((teammateId) => safeId(teammateId) && missions[teammateId] === undefined)
+        const added: RoomPost = {
+          postId: `post_${createId()}`,
+          text: post.text,
+          at: now().toISOString(),
+          missions,
+          ...(queued.length === 0 ? {} : { queued }),
+          ...(Object.keys(refused).length === 0 ? {} : { refused })
+        }
         // The newest MAX_ROOM_POSTS posts; the missions themselves are the
         // durable record, so an old post dropping off the room loses nothing.
         const posts = [...room.posts, added].slice(-MAX_ROOM_POSTS)
@@ -282,6 +370,55 @@ export function createRoomStore(options: {
           rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))
         })
         return added
+      })
+    },
+
+    refuseQueued(roomId, postId, teammateId, message): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(teammateId) || typeof message !== 'string' || message.length === 0) return
+        const file = await read()
+        const room = file.rooms.find((entry) => entry.roomId === roomId)
+        if (room === undefined) return
+        const posts = room.posts.map((post) => {
+          if (post.postId !== postId) return post
+          const queued = (post.queued ?? []).filter((id) => id !== teammateId)
+          const next = {
+            ...post,
+            refused: { ...(post.refused ?? {}), [teammateId]: message.slice(0, 200) },
+            ...(queued.length === 0 ? {} : { queued })
+          }
+          if (queued.length === 0) delete (next as { queued?: readonly string[] }).queued
+          return next
+        })
+        await write({
+          ...file,
+          rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))
+        })
+      })
+    },
+
+    startQueued(roomId, postId, teammateId, missionId): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(teammateId) || !safeId(missionId)) return
+        const file = await read()
+        const room = file.rooms.find((entry) => entry.roomId === roomId)
+        if (room === undefined) return
+        const posts = room.posts.map((post) => {
+          if (post.postId !== postId) return post
+          const queued = (post.queued ?? []).filter((id) => id !== teammateId)
+          return {
+            ...post,
+            missions: { ...post.missions, [teammateId]: missionId },
+            ...(queued.length === 0 ? {} : { queued })
+          }
+        })
+        // Dropped rather than kept empty, so a room file never carries an
+        // empty queue that reads as "someone is waiting".
+        for (const post of posts) if (post.postId === postId && (post.queued?.length ?? 0) === 0) delete (post as { queued?: readonly string[] }).queued
+        await write({
+          ...file,
+          rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))
+        })
       })
     },
 

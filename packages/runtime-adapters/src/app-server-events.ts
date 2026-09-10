@@ -173,6 +173,17 @@ export function createAppServerEventNormalizer(
   const runtime: MissionRuntimeId = context.runtime ?? "codex";
 
   const openTools = new Map<string, string>();
+  /**
+   * What the turn has cost so far.
+   *
+   * This transport reports usage in its own notification -- `turn/completed`
+   * carries none at all -- so the latest reading is held here and attached to
+   * the receipt at the end. Without it a Codex run showed no `40k in / 275
+   * out` line, which is the reading a person uses to judge what a teammate is
+   * spending. Names are translated to the ones every other runtime's receipt
+   * uses, because the cost line reads one vocabulary.
+   */
+  let latestUsage: Record<string, number> | undefined;
   const messageBuffers = new Map<string, string>();
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
@@ -293,6 +304,28 @@ export function createAppServerEventNormalizer(
       const params = isObject(notification.params) ? (notification.params as Record<string, unknown>) : {};
 
       switch (notification.method) {
+        case "thread/tokenUsage/updated": {
+          const usage = isObject(params.tokenUsage) ? params.tokenUsage : undefined;
+          // `total` is the thread's running count and `last` only the most
+          // recent turn; the receipt is for the run, so the total is the one
+          // that answers "what did this cost".
+          const total = isObject(usage?.total) ? usage.total : undefined;
+          if (total === undefined) return [];
+          const held: Record<string, number> = {};
+          const carry = (from: string, to: string): void => {
+            const value = total[from];
+            if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+              held[to] = value;
+            }
+          };
+          carry("inputTokens", "inputTokens");
+          carry("outputTokens", "outputTokens");
+          carry("cachedInputTokens", "cacheReadTokens");
+          carry("cacheWriteInputTokens", "cacheWriteTokens");
+          if (Object.keys(held).length > 0) latestUsage = held;
+          return [];
+        }
+
         case "thread/started": {
           const thread = isObject(params.thread) ? params.thread : undefined;
           runtimeThreadId = identityValue(thread?.id) ?? identityValue(params.threadId);
@@ -313,6 +346,7 @@ export function createAppServerEventNormalizer(
           return [
             emit("run.completed", {
               ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
+              ...(latestUsage === undefined ? {} : { usage: latestUsage }),
               process: {
                 exitCode: 0,
                 signal: null,

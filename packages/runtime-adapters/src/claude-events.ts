@@ -102,6 +102,33 @@ export function summarizeInit(value: unknown): JsonObject {
  * warning, and anything else (a rejection) is the real thing.
  */
 /**
+ * What the model SAID it was doing, when it said.
+ *
+ * Claude Code's Bash tool takes a `description` alongside the command --
+ * "Clear, concise description of what this command does in active voice" --
+ * and the model fills it in on every call. That sentence is why Claude
+ * Code's own transcript reads "Checked what the app says about the free
+ * route" where a lesser one would read a shell pipeline.
+ *
+ * Locust threw it away. `claudeToolTarget` answered the COMMAND for Bash and
+ * nothing else looked at the input again, so every command row showed the
+ * pipeline. The `Task` case two lines below it already prefers the
+ * description and says in its own comment that "the description is the row's
+ * text" -- the pattern was known and simply not applied to the tool that
+ * runs most often.
+ *
+ * It is kept SEPARATE from the target rather than replacing it. The command
+ * is evidence of what ran on this machine; the description is a claim about
+ * it, written by the thing that ran it. A row may lead with the claim, but
+ * the evidence cannot stop being recorded.
+ */
+export function claudeToolTitle(name: string, input: unknown): string | undefined {
+  if (name !== "Bash") return undefined;
+  if (!isObject(input)) return undefined;
+  return stringValue(input.description);
+}
+
+/**
  * What a Claude tool acted on, for the activity row to name.
  *
  * MEASURED 2026-09-03 by reading the card after a real run: every row said
@@ -179,6 +206,76 @@ export function resetsAtIso(value: unknown): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+/**
+ * A tool named the way the activity rows name it.
+ *
+ * `mcp__claude_ai_Robinhood__get_accounts` is a machine name and reads as
+ * one. The rows already split it into the tool and the connector it belongs
+ * to, and a sentence about the same call has no business doing worse -- Colin
+ * sent a capture of exactly that on 2026-09-09.
+ *
+ * Kept here rather than imported from the renderer, because this package has
+ * no renderer. The split is one rule and it is checked against real tool
+ * names in `connectors.test.ts`.
+ */
+/**
+ * What was refused, short enough to read.
+ *
+ * The refusal names the thing it would not do, and for Bash that thing is a
+ * whole command line. Colin sent a capture on 2026-09-10 of one that ran to
+ * eight wrapped lines inside the amber register -- a `cd` into a long Windows
+ * path, `&&`, and an entire `python3 -c` program with embedded JSON parsing.
+ * The register is for a sentence a person can act on; a program printed into
+ * it buries the sentence it came with.
+ *
+ * The first line, bounded. A command's first line is the part that says what
+ * it was trying to do, and the whole of it is in the activity row and the
+ * receipt, where a command belongs.
+ */
+export function brieflyPut(detail: string): string {
+  const firstLine = detail.split(/\r?\n/)[0]?.trim() ?? '';
+  const said = firstLine.length === 0 ? detail.trim() : firstLine;
+  if (said.length <= REFUSAL_DETAIL_LIMIT) return said;
+  // Cut on a space where there is one near the end, so the tail is not half
+  // a word -- a path or a flag broken mid-token reads as corruption.
+  const cut = said.slice(0, REFUSAL_DETAIL_LIMIT);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > REFUSAL_DETAIL_LIMIT - 24 ? cut.slice(0, space) : cut).trimEnd()}...`;
+}
+
+/** Long enough for an ordinary command, short enough to stay one line. */
+export const REFUSAL_DETAIL_LIMIT = 96;
+
+export function namedTool(name: string): string {
+  const match = /^mcp__([A-Za-z0-9_]+?)__(.+)$/.exec(name);
+  if (match === null) return name;
+  const server = match[1]!.replace(/^claude_ai_/, "").replace(/_/g, " ");
+  return `${match[2]!} on ${server}`;
+}
+
+/**
+ * Why a run was refused, which is not one reason.
+ *
+ * This sentence was written for Bash and said "asks for approval before
+ * running commands". Once Locust stopped denying `mcp__*` outright
+ * (2026-09-09) the same line began firing for connector calls, where
+ * "commands" is simply the wrong word.
+ *
+ * A connector refusal is also the one a person can act on, so it says how.
+ *
+ * It used to say "a printed run has no way to put that question to you",
+ * which was true until 0.63.0 and false after it: Locust is the permission
+ * host now, the question IS put to the person, and the first drive of a
+ * narrowed teammate saw this sentence claim otherwise right under the card
+ * they had just pressed Deny on. The CLI's record cannot say which of the two
+ * it was, so the sentence names both.
+ */
+export function whyRefused(refused: readonly { readonly tool: string }[]): string {
+  return refused.every((entry) => entry.tool.startsWith("mcp__"))
+    ? "Claude Code asks before using a connector, and this one was not allowed: either you said no when it asked, or it is not one of this teammate's connectors. Give this teammate the connector in its card, or run it in Auto."
+    : "This route allows edits but asks for approval before running commands, and a printed run has no way to give it.";
+}
+
 export function createClaudeEventNormalizer(
   context: ClaudeInvocationContext,
 ): ClaudeEventNormalizer {
@@ -189,7 +286,7 @@ export function createClaudeEventNormalizer(
   const now = context.now ?? (() => new Date());
 
   /** Text buffers per content block index, so a replace can be recognised. */
-  const openTools = new Map<string, { name: string; target?: string }>();
+  const openTools = new Map<string, { name: string; target?: string; title?: string }>();
   /** A subagent's type and one-line summary, by the Agent tool call that started it. */
   const subagentKinds = new Map<string, string>();
   const subagentSummaries = new Map<string, string>();
@@ -432,7 +529,10 @@ export function createClaudeEventNormalizer(
         const open = openTools.get(itemId);
         if (open === undefined) continue;
         const target = claudeToolTarget(open.name, block.input);
-        if (target !== undefined) openTools.set(itemId, { ...open, target });
+        const title = claudeToolTitle(open.name, block.input);
+        if (target !== undefined || title !== undefined) {
+          openTools.set(itemId, { ...open, ...(target === undefined ? {} : { target }), ...(title === undefined ? {} : { title }) });
+        }
       }
       const text = content
         .map((block) => (isObject(block) ? stringValue(block.text) : undefined))
@@ -472,6 +572,7 @@ export function createClaudeEventNormalizer(
             toolKind: "tool_use",
             name: open?.name ?? "tool",
             ...(open?.target === undefined ? {} : { command: open.target }),
+            ...(open?.title === undefined ? {} : { title: open.title }),
             phase: "completed",
             ...(failed ? { status: "error" } : subagentKind === undefined ? {} : { status: subagentKind }),
             // What the subagent came back with, in its own words: the row
@@ -563,7 +664,9 @@ export function createClaudeEventNormalizer(
           const tool = stringValue(denial.tool_name) ?? "a tool";
           const input = isObject(denial.tool_input) ? denial.tool_input : {};
           const detail = stringValue(input.command) ?? stringValue(input.file_path) ?? stringValue(input.description);
-          return detail === undefined ? tool : `${tool} \`${detail}\``;
+          const said = namedTool(tool);
+          const brief = detail === undefined ? undefined : brieflyPut(detail);
+          return { tool, text: brief === undefined ? said : `${said} \`${brief}\`` };
         });
       if (refused.length > 0) {
         return [
@@ -571,8 +674,8 @@ export function createClaudeEventNormalizer(
             "warning",
             "claude.permission_denied",
             refused.length === 1
-              ? `Claude Code was not permitted to run ${refused[0]}, so it did not. This route allows edits but asks for approval before running commands, and a printed run has no way to give it.`
-              : `Claude Code was not permitted to run ${String(refused.length)} actions, so it did not: ${refused.join("; ")}. This route allows edits but asks for approval before running commands, and a printed run has no way to give it.`,
+              ? `Claude Code was not permitted to use ${refused[0]!.text}, so it did not. ${whyRefused(refused)}`
+              : `Claude Code was not permitted to use ${String(refused.length)} tools, so it did not: ${refused.map((entry) => entry.text).join("; ")}. ${whyRefused(refused)}`,
             evidence,
           ),
         ];

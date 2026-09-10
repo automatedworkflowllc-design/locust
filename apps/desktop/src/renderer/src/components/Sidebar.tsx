@@ -183,7 +183,7 @@ export function Sidebar({
   readonly onOpenTeammates: () => void
   /** Rooms a person can write to at once; the one open now is highlighted. */
   readonly rooms: readonly PublicRoom[]
-  /** Saved routines, listed under Automations. */
+  /** Saved routines, listed under Routines. */
   readonly routines: readonly PublicRoutine[]
   readonly currentRoomId: string | undefined
   readonly onOpenRoom: (roomId: string) => void
@@ -264,7 +264,7 @@ export function Sidebar({
   const railOpenFor = compact ? (railPinned ?? railHovered) : undefined
   // Which groups are open. All three start open, which is how the sidebar
   // has always read; folding is for making room, not a new default.
-  const [openSections, setOpenSections] = useState({ teammates: true, missions: true, automations: true })
+  const [openSections, setOpenSections] = useState({ rooms: true, teammates: true, missions: true, automations: true })
   const connected = connectedRuntimeCount(runtimes)
   const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
   const shownUnowned = missionsMatching(unowned, query)
@@ -303,13 +303,34 @@ export function Sidebar({
         {/*
           * Rooms sit above the roster: a room is where several teammates
           * are written to at once, so it reads before any one of them. Only
-          * drawn once a room exists -- the way in is the Rooms screen, one
+          * DRAWN EVEN WITH NO ROOMS, which is the opposite of what this
+          * comment used to say. It said the way in is the Rooms screen, "one
           * palette entry or Ctrl 4 away, so an empty section has nothing to
-          * say here.
+          * say here" -- and that is exactly backwards. An empty section's
+          * whole job is to say the feature exists.
+          *
+          * The result was a feature nobody could reach without already having
+          * used it: rooms appeared in the sidebar only once you had made one,
+          * and the only ways to make a first one were a keyboard shortcut and
+          * a palette entry. Colin, who owns the app and had watched a day of
+          * work go into rooms, 2026-09-09: "sorry if this is dumb but how
+          * does one create a room for teammates, i cant figure it out lol."
+          * Not dumb -- there was nothing on screen to find.
           */}
-        {rooms.length > 0 && (
+        {/*
+          * The same section as its neighbours: a fold and a count. It was a
+          * bare label over the rows, so TEAMMATES 3 and ROUTINES 0 folded and
+          * counted while ROOMS did neither (design agent, 2026-09-10).
+          * Always drawn and foldable are not in tension -- the section is
+          * always THERE; whether it is open is the person's.
+          */}
+        <SidebarSection
+          label="Rooms"
+          count={rooms.length}
+          open={openSections.rooms}
+          onToggle={() => setOpenSections((current) => ({ ...current, rooms: !current.rooms }))}
+        >
           <>
-            <div className="lc-sectionlabel">Rooms</div>
             {rooms.map((room) => (
               <button
                 key={room.roomId}
@@ -329,12 +350,22 @@ export function Sidebar({
                 </span>
               </button>
             ))}
-            <button type="button" className="lc-row lc-row--button lc-roomrow lc-roomrow--new" onClick={onOpenRooms} title="New room">
+            {/*
+              * Two words, and the sentence on hover. It read "New room — ask
+              * several teammates at once", which the rail ellipsised mid-word
+              * -- on the one sentence carrying a feature nobody could find
+              * (design agent, 2026-09-10). Since 0.62.0 a room is made from
+              * the ask, so this row is the way BACK to rooms, not the way in,
+              * and it no longer has to carry the whole explanation.
+              */}
+            <button type="button" className="lc-row lc-row--button lc-roomrow lc-roomrow--new" onClick={onOpenRooms} title="New room — ask several teammates at once, or tick two names in the message box">
               <Icon name="plus" size={12} />
-              <span className="lc-row__text"><span className="lc-row__meta">New room</span></span>
+              <span className="lc-row__text">
+                <span className="lc-row__meta">New room</span>
+              </span>
             </button>
           </>
-        )}
+        </SidebarSection>
         <SidebarSection
           label="Teammates"
           count={teammates.length}
@@ -435,7 +466,21 @@ export function Sidebar({
                       <span className="lc-row__metastate">{labelState(status.label)}</span>
                     </span>
                   ) : (
-                    <span className={`lc-row__meta lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>{status.label}</span>
+                    /*
+                     * The role in muted, the STATE in the tone -- never the
+                     * whole line. "Finance Bro · thinking" was lime end to
+                     * end, so the role was wearing the state's colour and a
+                     * reader could not tell which word the lime was about
+                     * (design agent, 2026-09-10). The delegating branch above
+                     * already split it this way; the ordinary line now does
+                     * too, through the same two helpers.
+                     */
+                    <span className="lc-row__meta">
+                      <span className="lc-row__metarole">{labelRole(status.label)}</span>
+                      <span className={`lc-row__metastate lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
+                        {labelState(status.label)}
+                      </span>
+                    </span>
                   )}
                   {/*
                     * Which step of which routine is running. Derived in the
@@ -633,21 +678,33 @@ export function Sidebar({
         )}
 
         <SidebarSection
-          label="Automations"
+          label="Routines"
           count={routines.length}
           open={openSections.automations}
           onToggle={() => setOpenSections((current) => ({ ...current, automations: !current.automations }))}
         >
           {routines.length === 0 ? (
+            /*
+              * The empty row is a DOOR, not a status.
+              *
+              * It read "Nothing saved yet", which is a fact about the shelf
+              * and tells nobody that pressing it goes anywhere -- the same
+              * mistake the Rooms row made until 0.60.0. It now says what is
+              * behind it, which is the screen that lists the finished
+              * conversations you can save.
+              *
+              * Not "New routine": a routine cannot be made from nothing, so a
+              * button promising a blank one would lie about what it is.
+              */
             <button
               type="button"
               className="lc-row lc-row--button lc-roomrow lc-roomrow--new"
               onClick={onOpenAutomations}
-              title="What automations are"
+              title="Save a finished conversation so a teammate can replay it"
             >
               <Icon name="clock" size={12} />
               <span className="lc-row__text">
-                <span className="lc-row__meta">Nothing saved yet</span>
+                <span className="lc-row__meta">Save one from a finished conversation</span>
               </span>
             </button>
           ) : (
@@ -656,7 +713,7 @@ export function Sidebar({
                 key={routine.routineId}
                 type="button"
                 className="lc-row lc-row--button"
-                title={`Open Automations · ${routine.name}`}
+                title={`Open Routines · ${routine.name}`}
                 onClick={onOpenAutomations}
               >
                 <Icon name="clock" size={14} />

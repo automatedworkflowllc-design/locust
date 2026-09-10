@@ -1,6 +1,10 @@
 import {
+  asProcessNormalizer,
+  codexAppServerPolicy,
+  createAppServerEventNormalizer,
   createClaudeEventNormalizer,
   createClaudePrintCommand,
+  createCodexAppServerCommand,
   createCodexEventNormalizer,
   createCodexExecCommand,
   createCopilotEventNormalizer,
@@ -9,9 +13,11 @@ import {
   createCursorPrintCommand,
   createOpenCodeEventNormalizer,
   createOpenCodeRunCommand,
-  cursorCanEnforceReadOnly
+  cursorCanEnforceReadOnly,
+  startCodexAppServerRun
 } from '@teammate/runtime-adapters'
 import type {
+  AppServerRunProcess,
   ClaudeEventNormalizer,
   CodexEventNormalizer,
   MissionRuntimeId,
@@ -195,6 +201,16 @@ interface CodexMissionServiceOptions {
   readonly platform?: NodeJS.Platform
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
   readonly runner: RuntimeProcessRunner
+  /**
+   * How to start `codex app-server`, which is the transport every Codex mode
+   * runs on. Without it Codex falls back to `codex exec --json`, which works
+   * but never streams -- see `startCodexAppServerRun` for the measurement.
+   * Absent in tests that only exercise the exec path.
+   */
+  readonly appServerSpawn?: (
+    executablePath: string,
+    args: readonly string[]
+  ) => AppServerRunProcess
   readonly ledger: MissionLedger
   /** The teammate channel. Optional: a service without one runs missions that belong to nobody. */
   readonly workroom?: Workroom
@@ -225,6 +241,12 @@ interface CodexMissionServiceOptions {
    */
   readonly autoModeAllowed?: () => Promise<boolean>
   /**
+   * Ask before every connector call: send no allow rules, so each one goes
+   * to the permission host. Read at run start, never cached. The env seam
+   * LOCUST_ASK_CONNECTORS=1 does the same for the drives.
+   */
+  readonly askConnectors?: () => Promise<boolean>
+  /**
    * How many missions are live on the OTHER transports right now.
    *
    * The cap is one pool, not one per transport. Each of the three services
@@ -237,6 +259,37 @@ interface CodexMissionServiceOptions {
    * Defaults to zero so a service constructed alone behaves as before.
    */
   readonly liveElsewhere?: () => number
+  /**
+   * The connectors this machine has, by name, asked at the moment a run
+   * starts rather than captured.
+   *
+   * Colin, 2026-09-10: "honestly just let them have access to the mcp tools
+   * if the client have access to it -- it only makes sense and is way less
+   * muddy." So there is nothing per-teammate here: every name becomes an
+   * allow rule on every Claude Code run.
+   *
+   * Read live because the list is taken in the background and may not have
+   * landed when the first run starts. A run that begins before it does gets
+   * no rules, and its connector calls are refused with the sentence the
+   * adapter writes -- which is what every build before today did, said out
+   * loud, rather than a mission that waits on a health check.
+   */
+  readonly connectors?: () => readonly string[]
+  /**
+   * Locust as Claude Code's permission host. See permission-host.ts.
+   *
+   * Registered per run before the command is built, so the config path is
+   * on the command line; released when the run ends, so a question nobody
+   * answered is refused rather than left hanging and the run's token dies
+   * with it. Claude Code only, and never in Auto.
+   */
+  readonly permissionHost?: {
+    register(run: { readonly runId: string; readonly missionId: string; readonly cwd: string | null }): Promise<{
+      readonly configPath: string
+      readonly toolName: string
+    }>
+    release(runId: string): Promise<void>
+  }
 }
 
 function error(
@@ -384,6 +437,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
   const clearActive = (candidate: ActiveCodexMission): void => {
     if (active.get(candidate.runId) === candidate) active.delete(candidate.runId)
+    // The run is over, so nobody can answer a permission it was still asking:
+    // refuse what is waiting, forget its token, remove its config.
+    void options.permissionHost?.release(candidate.runId).catch(() => undefined)
     // Whatever ended this run, anyone waiting on it is told. Fire and forget:
     // a meeting's bookkeeping must never hold a slot open.
     if (options.onRunEnded !== undefined) {
@@ -838,7 +894,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // receipt then names a session that can really be resumed even if the
         // stream never echoes it back.
         const copilotSessionId = runtime === 'copilot' ? (resumeThreadId ?? randomUUID()) : undefined
-        const normalizer = runtime === 'claude'
+        // Codex speaks app-server whenever the host can start one. The two
+        // normalizers read different protocols, so this decision and the
+        // command built below are the same decision and are made from the
+        // same value.
+        const codexStreams = runtime === 'codex' && options.appServerSpawn !== undefined
+        const normalizer = codexStreams
+          ? asProcessNormalizer(createAppServerEventNormalizer({ ...normalizerContext, runtime: 'codex' }))
+          : runtime === 'claude'
           ? createClaudeEventNormalizer(normalizerContext)
           : runtime === 'cursor'
             ? createCursorEventNormalizer(normalizerContext)
@@ -859,6 +922,26 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // The teammate's own worktree when it has one, else the folder. The
         // ledger's workspace id stays the FOLDER's: history is per folder.
         const runCwd = peer?.cwd ?? options.workspacePath
+        // Named by whoever made the worktree, not inferred from this folder:
+        // a teammate with its own folder is in a worktree of a repository
+        // that is not this one. Absent unless the run really is in a
+        // worktree.
+        const repositoryRoot = peer?.repositoryRoot
+        /*
+         * Somewhere for a Claude Code run to ASK before using a connector.
+         *
+         * Auto asks nothing, so it gets no bridge. Every other mode used to
+         * have nowhere to put the question and refused every connector call;
+         * then 0.61.0 allowed them all without asking. This is the asking:
+         * the run is registered with the host, which mints it a token and an
+         * mcp.json, and the card the app already has answers.
+         */
+        const askEveryConnector =
+          globalThis.process.env.LOCUST_ASK_CONNECTORS === '1' || (await options.askConnectors?.()) === true
+        const permissionBridge =
+          runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
+            ? await options.permissionHost.register({ runId, missionId, cwd: runCwd })
+            : undefined
         let command: RuntimeCommandSpec
         // OpenCode and Copilot take the prompt as an argument, not on stdin,
         // so their argv is built once now with the person's own words -- so a
@@ -878,7 +961,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               prompt: promptText,
               // Only when this run is in a worktree, which is exactly when
               // the folder it stands in is not the repository it belongs to.
-              ...(runCwd === options.workspacePath ? {} : { repositoryRoot: options.workspacePath }),
+              ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
               ...choice
             })
           }
@@ -894,6 +977,26 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           return runtime === 'claude'
             ? createClaudePrintCommand(executable, {
                 workspacePath: runCwd,
+                ...(permissionBridge === undefined ? {} : { permissionBridge }),
+                // Every connector the person's own Claude Code can reach.
+                // Without a named allow rule the tools are offered and every
+                // call is refused, because a printed run has nowhere to put
+                // the approval question.
+                ...(() => {
+                  /*
+                   * `LOCUST_ASK_CONNECTORS=1` sends NO allow rules, so every
+                   * connector call goes to the permission host and the person
+                   * is asked. Today it is the seam the host is driven through
+                   * -- with the rules in place a covered connector never asks,
+                   * which is Colin's ruling and the normal state. It is also
+                   * the shape of a future "ask me each time" setting.
+                   */
+                  if (askEveryConnector) return {}
+                  // The teammate's own list when it has one -- a NARROWING of
+                  // what the person has -- else everything the person has.
+                  const named = peer?.connectors ?? options.connectors?.() ?? []
+                  return named.length === 0 ? {} : { connectors: named }
+                })(),
                 // Claude's containment IS this value: it picks the permission
                 // mode and the tool list. Leaving it out defaulted every
                 // Claude run to read-only, so a mission started in Accept
@@ -907,6 +1010,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                   workspacePath: runCwd,
                   sandbox: effectiveSandbox,
                   ...choice
+                })
+              : codexStreams
+              ? createCodexAppServerCommand(executable, {
+                  workspacePath: runCwd,
+                  sandbox: effectiveSandbox
                 })
               : createCodexExecCommand(executable, {
                   workspacePath: runCwd,
@@ -1073,13 +1181,35 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // a read-only run has nothing to observe, and asking git for every
           // question would be paying for an answer nobody reads.
           diskBefore = effectiveSandbox === 'read-only' ? undefined : await (options.observeDisk ?? snapshotWorkspace)(runCwd)
-          process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
+          if (codexStreams) {
+            // The policy is chosen here, not carried in the argv, because on
+            // this transport it is JSON on a socket -- so the rule that only
+            // a full-access mission may say `danger-full-access` is enforced
+            // at the point it is chosen. See `codexAppServerPolicy`.
+            const policy = codexAppServerPolicy(effectiveSandbox)
+            process = startCodexAppServerRun({
+              spawn: options.appServerSpawn!,
+              command,
+              prompt: runtimePrompt,
+              sandbox: policy.sandbox,
+              approvalPolicy: policy.approvalPolicy,
+              ...(chosenModel === undefined ? {} : { model: chosenModel }),
+              ...(route.effort === undefined ? {} : { effort: route.effort }),
+              ...(resumeThreadId === undefined ? {} : { resumeThreadId }),
+              signal: controller.signal,
+              now
+            })
+          } else {
+            process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
+          }
         } catch (startError) {
           // A refusal this file raised knows WHY; anything else does not, and
           // must not borrow a specific-sounding reason it cannot back.
           const why = startError instanceof Error && startError.message.length > 0
             ? startError.message
             : 'The Codex process could not be started safely.'
+          // A run that never started still registered a token. Let it go.
+          void options.permissionHost?.release(runId).catch(() => undefined)
           try {
             await options.ledger.appendHostFailure(missionId, {
               code: 'runtime-start-failed',

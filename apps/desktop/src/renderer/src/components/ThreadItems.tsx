@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 
 import { seedAvatar } from '../../../shared/avatar.js'
 import { parseAgentText, splitInlineCode } from '../agentText.js'
+import { splitSettled } from '../settledText.js'
 import type { PlanStep } from '../missionView.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
@@ -90,7 +91,19 @@ export function AgentText({
   readonly text: string
   readonly streaming: boolean
 }): ReactElement {
-  const blocks = parseAgentText(text)
+  /*
+   * While streaming, only what has SETTLED is parsed as Markdown.
+   *
+   * Re-parsing the whole reply on every delta meant a delta that completed
+   * a token -- the closing `*`, the closing fence -- reclassified text a
+   * person had already read: a plain sentence turned bold, a paragraph
+   * became a code block. Text changing shape after it was read is the
+   * "glitchy" in Colin's report (2026-09-10). Claude Code lands formatting
+   * when a block closes; so does this. The tail is one plain paragraph at
+   * most, which is exactly the part still being written. See settledText.ts.
+   */
+  const { settled, tail } = streaming ? splitSettled(text) : { settled: text, tail: '' }
+  const blocks = parseAgentText(settled)
   return (
     <>
       {blocks.map((block, index) => {
@@ -137,12 +150,20 @@ export function AgentText({
         return (
           <p className="lc-para" key={`b${String(index)}`}>
             {inline(block.text)}
-            {streaming && last && <span className="lc-caret" />}
+            {streaming && last && tail.length === 0 && <span className="lc-caret" />}
           </p>
         )
       })}
+      {/* The part still being written, as plain text. It becomes Markdown the
+          moment it settles, and nothing above it changes shape. */}
+      {tail.trim().length > 0 && (
+        <p className="lc-para lc-para--arriving">
+          {tail.trimStart()}
+          <span className="lc-caret" />
+        </p>
+      )}
       {/* A reply that has arrived with nothing in it yet still shows it is coming. */}
-      {blocks.length === 0 && streaming && (
+      {blocks.length === 0 && tail.trim().length === 0 && streaming && (
         <p>
           <span className="lc-caret" />
         </p>

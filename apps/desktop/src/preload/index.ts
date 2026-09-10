@@ -24,11 +24,14 @@ import {
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
+  WORKSPACE_PASTE_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
+  OPEN_LINK_CHANNEL,
   ROOM_LIST_CHANNEL,
   ROOM_CREATE_CHANNEL,
   ROOM_REMOVE_CHANNEL,
+  ROOM_RENAME_CHANNEL,
   ROOM_POST_CHANNEL,
   ROOM_TASK_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
@@ -47,6 +50,9 @@ import {
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
   RUNTIME_SETUP_CHANNEL,
+  CONNECTOR_LIST_CHANNEL,
+  TEAMMATE_CONNECTORS_CHANNEL,
+  TEAMMATE_FOLDER_CHANNEL,
   WORKTREE_LIST_CHANNEL,
   WORKTREE_REMOVE_CHANNEL
 } from '../shared/ipc.js'
@@ -76,6 +82,7 @@ import type {
   WorkspaceSettings,
   WorkspaceChooseResponse,
   AttachFilesResponse,
+  OpenLinkResponse,
   RevealFileResponse,
   WorkspaceImageResponse,
   RoomListResponse,
@@ -99,6 +106,8 @@ import type {
   MemoryListResponse,
   MemoryUpdateRequest,
   RuntimeSetupResponse,
+  ConnectorListResponse,
+  TeammateFolderResponse,
   WorktreeListResponse,
   RuntimeInstallProgress,
   RuntimeInstallResponse
@@ -203,16 +212,26 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(WORKSPACE_SETTINGS_READ_CHANNEL) as Promise<WorkspaceSettings>,
   chooseWorkspace: () => ipcRenderer.invoke(WORKSPACE_CHOOSE_CHANNEL) as Promise<WorkspaceChooseResponse>,
   revealFile: (path: string) => ipcRenderer.invoke(WORKSPACE_REVEAL_CHANNEL, path) as Promise<RevealFileResponse>,
+  openLink: (url: string) => ipcRenderer.invoke(OPEN_LINK_CHANNEL, url) as Promise<OpenLinkResponse>,
   readWorkspaceImage: (path: string) =>
     ipcRenderer.invoke(WORKSPACE_IMAGE_CHANNEL, path) as Promise<WorkspaceImageResponse>,
   attachFiles: () => ipcRenderer.invoke(WORKSPACE_ATTACH_CHANNEL) as Promise<AttachFilesResponse>,
+  attachPasted: (name: string, bytes: Uint8Array) =>
+    ipcRenderer.invoke(WORKSPACE_PASTE_CHANNEL, { name, bytes }) as Promise<AttachFilesResponse>,
   listRooms: () => ipcRenderer.invoke(ROOM_LIST_CHANNEL) as Promise<RoomListResponse>,
   createRoom: (request: RoomCreateRequest) => ipcRenderer.invoke(ROOM_CREATE_CHANNEL, request) as Promise<RoomMutationResponse>,
   removeRoom: (roomId: string) => ipcRenderer.invoke(ROOM_REMOVE_CHANNEL, roomId) as Promise<RoomMutationResponse>,
+  renameRoom: (roomId: string, name: string) =>
+    ipcRenderer.invoke(ROOM_RENAME_CHANNEL, { roomId, name }) as Promise<RoomMutationResponse>,
   postToRoom: (request: RoomPostRequest) => ipcRenderer.invoke(ROOM_POST_CHANNEL, request) as Promise<RoomPostResponse>,
   updateRoomTask: (request: RoomTaskRequest) => ipcRenderer.invoke(ROOM_TASK_CHANNEL, request) as Promise<RoomTaskResponse>,
   listMemories: () => ipcRenderer.invoke(MEMORY_LIST_CHANNEL) as Promise<MemoryListResponse>,
   readRuntimeSetup: () => ipcRenderer.invoke(RUNTIME_SETUP_CHANNEL) as Promise<RuntimeSetupResponse>,
+  listConnectors: () => ipcRenderer.invoke(CONNECTOR_LIST_CHANNEL) as Promise<ConnectorListResponse>,
+  setTeammateConnectors: (teammateId: string, names: readonly string[]) =>
+    ipcRenderer.invoke(TEAMMATE_CONNECTORS_CHANNEL, { teammateId, names }) as Promise<TeammateFolderResponse>,
+  chooseTeammateFolder: (teammateId: string, clear?: boolean) =>
+    ipcRenderer.invoke(TEAMMATE_FOLDER_CHANNEL, { teammateId, clear: clear === true }) as Promise<TeammateFolderResponse>,
   listWorktrees: () => ipcRenderer.invoke(WORKTREE_LIST_CHANNEL) as Promise<WorktreeListResponse>,
   removeWorktree: (teammateId: string) => ipcRenderer.invoke(WORKTREE_REMOVE_CHANNEL, teammateId) as Promise<WorktreeListResponse>,
   addMemory: (request: MemoryAddRequest) => ipcRenderer.invoke(MEMORY_ADD_CHANNEL, request) as Promise<MemoryListResponse>,

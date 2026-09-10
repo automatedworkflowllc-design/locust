@@ -83,6 +83,13 @@ export function dataSentLine(kind: string, command: string): string | undefined 
   if (kind === 'file-change') {
     return 'Nothing. The change is written to this machine and sent nowhere.'
   }
+  // A connector is the one kind whose whole point is to leave this machine.
+  // The input on the card IS what goes; the service it goes to is named in
+  // the summary. No sandbox here reaches the far end of a connector, which
+  // is why the mode never governed one and why this card exists.
+  if (kind === 'connector') {
+    return 'The input above, to the service the connector reaches. It acts there, not on this machine.'
+  }
   if (kind !== 'command') return undefined
   return commandReachesNetwork(command)
     ? 'This command can reach the network. Locust cannot see what it would send — read it above.'

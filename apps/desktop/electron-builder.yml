@@ -40,6 +40,10 @@ files:
 extraResources:
   - from: resources/icon.ico
     to: icon.ico
+  # Claude Code spawns this as a stdio MCP server, so it has to be a real
+  # file on disk, never a path inside the archive (permission-host.ts).
+  - from: resources/locust-permission-bridge.mjs
+    to: locust-permission-bridge.mjs
 
 # Never ship the caller's mission ledger, smoke profiles, or source maps.
 asar: true

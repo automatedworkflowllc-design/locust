@@ -59,8 +59,11 @@ import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
+import { createConnectorReader } from './connector-reader.js'
 import { createRelay } from './relay.js'
 import { createAttention } from './attention.js'
+import { boundedShutdown } from './bounded-shutdown.js'
+import { createPermissionHost } from './permission-host.js'
 import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
@@ -103,15 +106,21 @@ import {
   WORKTREE_REMOVE_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
+  CONNECTOR_LIST_CHANNEL,
+  TEAMMATE_CONNECTORS_CHANNEL,
+  TEAMMATE_FOLDER_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
+  WORKSPACE_PASTE_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
+  OPEN_LINK_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
   ROOM_LIST_CHANNEL,
   ROOM_CREATE_CHANNEL,
   ROOM_REMOVE_CHANNEL,
+  ROOM_RENAME_CHANNEL,
   ROOM_POST_CHANNEL,
   ROOM_TASK_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
@@ -122,6 +131,7 @@ import {
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { roleLabelOf } from '../shared/ipc.js'
+import { isOutboundLink } from '../shared/outbound-links.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { createUpdateService } from './updates.js'
 import type {
@@ -130,12 +140,26 @@ import type {
   CodexMissionStartRequest,
   CodexMissionUpdate,
   MissionMode,
+  PublicRoom,
+  RoomPost,
   PublicTeammate,
+  MissionApprovalRequest,
   MissionHandoffRequest,
   MissionResumeRequest
 } from '../shared/ipc.js'
 import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
 import { decideRoutineRecovery } from './routine-recovery-ipc.js'
+
+/**
+ * How large a single paste may be.
+ *
+ * It crosses IPC in one message, so this is a bound on what the renderer can
+ * hand the host at once. Generous for a screenshot -- a full 4K PNG is well
+ * under it -- and short of anything that would stall a window. Bigger things
+ * still go through the + button, which streams from a path rather than
+ * carrying bytes.
+ */
+const MAX_PASTED_BYTES = 24 * 1024 * 1024
 
 const probeRunner = createNodeProbeRunner()
 // `LOCUST_HIDE_RUNTIMES=1` is a test seam: the first-run drive needs a
@@ -169,6 +193,39 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
   ])
   return antigravity === undefined ? found : [...found, antigravity]
 }
+/**
+ * The connectors this machine has, read in the background and held.
+ *
+ * Colin, 2026-09-10: "honestly just let them have access to the mcp tools if
+ * the client have access to it -- it only makes sense and is way less muddy."
+ * So there is no per-teammate grant: what the person's Claude Code can reach,
+ * their teammates can reach.
+ *
+ * The names are needed because an allow rule must NAME its server -- `mcp__*`
+ * is refused outright -- and the account connectors from claude.ai never
+ * appear in `~/.claude.json`, so they cannot be read off disk at all.
+ * `claude mcp list` is the only source that has all of them, and it is slow
+ * because it health-checks each one, so nothing ever waits for it.
+ */
+const connectorReader = createConnectorReader({
+  read: async (timeoutMs) => {
+    const claude = await executableLocator.find('claude').catch(() => undefined)
+    if (claude === undefined) return undefined
+    const result = await probeRunner.run({
+      purpose: 'capabilities',
+      executablePath: claude.executablePath,
+      args: [...claude.prefixArgs, 'mcp', 'list'],
+      timeoutMs
+    })
+    // The listing prints on stdout; a machine with none says so there too.
+    // Both streams are joined because a warning on stderr has never been a
+    // reason to throw the list away.
+    if (result.timedOut === true) return undefined
+    return `${result.stdout}
+${result.stderr}`
+  }
+})
+
 /**
  * One probe sweep, shared.
  *
@@ -234,6 +291,7 @@ let missionServiceForShutdown: CodexMissionService | undefined
 let appServerServiceForShutdown: AppServerMissionService | undefined
 let ledgerForShutdown: MissionLedger | undefined
 let workroomForShutdown: Workroom | undefined
+let permissionHostForShutdown: { dispose(): Promise<void> } | undefined
 
 /**
  * The renderer names no destinations.
@@ -602,8 +660,68 @@ if (!ownsSingleInstanceLock) {
     let attentionReader: AttentionReader | undefined
     // Bound late for the same reason: it reads the ledger the service writes.
     let roomTasks: RoomTasks | undefined
+    /**
+     * Raise the approval card, and tell the OS by name if the person is
+     * looking elsewhere. Shared: Codex's app-server approvals and Claude
+     * Code's permission host are the same card, answered the same way.
+     */
+    const raiseApproval = (request: MissionApprovalRequest): void => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(MISSION_APPROVAL_CHANNEL, request)
+        }
+        // A run stopped waiting on a person who is looking elsewhere is told
+        // through the OS, by name, and the click brings the window back.
+        void teammates
+          .missionOwners()
+          .then(async (owners) => {
+            const ownerId = owners[request.missionId]
+            const roster = ownerId === undefined ? [] : await teammates.list()
+            attention.approvalArrived(request, roster.find((entry) => entry.teammateId === ownerId)?.name)
+          })
+          .catch(() => attention.approvalArrived(request, undefined))
+      }
+
+    /*
+     * Locust as Claude Code's permission host. See permission-host.ts for
+     * what was measured. The bridge script ships BESIDE app.asar, because
+     * Claude Code spawns it as a process and cannot spawn a path inside
+     * an archive -- the same reason the window icon lives there.
+     */
+    const permissionHost = createPermissionHost({
+      bridgePath: app.isPackaged
+        ? join(process.resourcesPath, 'locust-permission-bridge.mjs')
+        : join(__dirname, '../../resources/locust-permission-bridge.mjs'),
+      // Electron's own binary, run as node (ELECTRON_RUN_AS_NODE is set in
+      // the server's env): guaranteed present, whatever is on PATH.
+      node: process.execPath,
+      emitApproval: raiseApproval
+    })
+    permissionHostForShutdown = permissionHost
+
     const codexMissions = createCodexMissionService({
       workspacePath,
+      permissionHost,
+      // Every Codex mode rides `codex app-server`, because `codex exec --json`
+      // never streams an agent message -- measured 2026-09-10, the whole reply
+      // arrives as one `item.completed`. Called lazily for the same reason
+      // `liveElsewhere` is: the spawner is defined further down this same
+      // setup, and nothing starts a mission until all of it has run.
+      appServerSpawn: (executablePath, args) => spawnAppServer(executablePath, args),
+      /*
+       * Asked at the start of every run, never captured: a connector signed
+       * into after launch reaches the next mission without a restart.
+       *
+       * The refresh is kicked and NOT awaited. `claude mcp list` health-checks
+       * every server, so awaiting it would put seconds between pressing send
+       * and anything happening. The reading it takes lands for the next run;
+       * this one uses whatever is already held, which after the warm below is
+       * almost always the current list.
+       */
+      connectors: () => {
+        void connectorReader.refresh().catch(() => undefined)
+        return connectorReader.names()
+      },
       /*
        * The cap is ONE pool across all three transports.
        *
@@ -621,6 +739,9 @@ if (!ownsSingleInstanceLock) {
       // Settings has to reach the next run, including one a relay or a saved
       // routine is about to start.
       autoModeAllowed: async () => (await teammates.readSettings()).autoMode === true,
+      // Same shape, same reason: read when the run starts, so flipping the
+      // switch reaches the next mission without a restart.
+      askConnectors: async () => (await teammates.readSettings()).askConnectors === true,
       discover: discoverForWork,
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,
@@ -741,22 +862,7 @@ if (!ownsSingleInstanceLock) {
       liveElsewhere: () => codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       discover: discoverForWork,
       spawn: spawnAppServer,
-      emitApproval: (request) => {
-        const target = approvalWindow
-        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
-          target.webContents.send(MISSION_APPROVAL_CHANNEL, request)
-        }
-        // A run stopped waiting on a person who is looking elsewhere is told
-        // through the OS, by name, and the click brings the window back.
-        void teammates
-          .missionOwners()
-          .then(async (owners) => {
-            const ownerId = owners[request.missionId]
-            const roster = ownerId === undefined ? [] : await teammates.list()
-            attention.approvalArrived(request, roster.find((entry) => entry.teammateId === ownerId)?.name)
-          })
-          .catch(() => attention.approvalArrived(request, undefined))
-      },
+      emitApproval: raiseApproval,
       emitEvent: (runId, missionId, event) => {
         const target = approvalWindow
         if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
@@ -839,7 +945,11 @@ if (!ownsSingleInstanceLock) {
       const normalized =
         decision === 'approve-once' || decision === 'approve-always' ? decision : 'deny'
       if (typeof payload.approvalId !== 'string') return { ok: false } as const
-      return { ok: appServerMissions.decide({ approvalId: payload.approvalId, decision: normalized }) } as const
+      // Whichever service is holding this id. A Codex approval lives in the
+      // app-server service; a Claude Code connector permission lives in the
+      // permission host. An id is minted by exactly one of them.
+      const decided = { approvalId: payload.approvalId, decision: normalized } as const
+      return { ok: appServerMissions.decide(decided) || permissionHost.decide(decided) } as const
     })
 
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })
@@ -879,19 +989,58 @@ if (!ownsSingleInstanceLock) {
       })
       let cwd: string | undefined
       let worktreeRefused: string | undefined
+      /*
+       * Where this teammate stands.
+       *
+       * Three cases and they compose. A teammate with its own folder works
+       * there, and its own-branch worktree is cut from THAT folder's
+       * repository rather than the project's -- a worktree of a repository
+       * the teammate is not in would put it somewhere nobody asked for.
+       * With no folder of its own it is the project folder, as before.
+       *
+       * The folder is not checked for existence here. `ensure` says so for
+       * a worktree, and a run started in a folder that is gone fails with
+       * the runtime's own words, which name the path. A silent fallback to
+       * the project folder would be worse: the mission would succeed in the
+       * wrong place.
+       */
+      const home = self.folder
+      if (home !== undefined) cwd = home
+      let repositoryRoot: string | undefined
       // Antigravity works in the folder it has open; a worktree would be one it has not.
-      if (self.worktree === true && worktrees !== undefined && self.route?.runtime !== 'antigravity') {
-        try {
-          cwd = await worktrees.ensure(self)
-        } catch (error) {
-          worktreeRefused = `${self.name} is set to work on its own branch, but ${error instanceof Error ? error.message : 'the worktree could not be made.'}`
+      if (self.worktree === true && self.route?.runtime !== 'antigravity') {
+        const manager = home === undefined ? worktrees : createWorktreeManager({ workspacePath: home })
+        if (manager !== undefined) {
+          try {
+            cwd = await manager.ensure(self)
+            repositoryRoot = home ?? workspacePath
+          } catch (error) {
+            worktreeRefused = `${self.name} is set to work on its own branch, but ${error instanceof Error ? error.message : 'the worktree could not be made.'}`
+          }
         }
       }
       return {
         self: entry(self),
         others: roster.filter((other) => other.teammateId !== teammateId).map(entry),
         ...(cwd === undefined ? {} : { cwd }),
+        ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
+        ...(self.connectors === undefined ? {} : { connectors: self.connectors }),
         ...(worktreeRefused === undefined ? {} : { worktreeRefused })
+      }
+    }
+
+    /**
+     * Every folder a teammate has been pointed at, for the reveal allowlist.
+     *
+     * Read fresh rather than cached: a folder chosen a second ago has to be
+     * openable, and an unreadable roster is an empty list rather than a
+     * thrown reveal.
+     */
+    const teammateFolders = async (): Promise<readonly string[]> => {
+      try {
+        return (await teammates.list()).flatMap((teammate) => (teammate.folder === undefined ? [] : [teammate.folder]))
+      } catch {
+        return []
       }
     }
 
@@ -1056,6 +1205,10 @@ if (!ownsSingleInstanceLock) {
       if (!workspaceChosen || routineRunner === undefined) return
       void routineRunner.tick(new Date()).catch(() => undefined)
     }
+    // Warmed here rather than at import: it spawns Claude Code, and doing
+    // that before the window exists would put a health check in front of the
+    // first paint.
+    void connectorReader.refresh().catch(() => undefined)
     const firstRoutineTick = setTimeout(tickRoutines, ROUTINE_FIRST_TICK_MS)
     firstRoutineTick.unref()
     const routineTicks = setInterval(tickRoutines, ROUTINE_TICK_MS)
@@ -1086,6 +1239,33 @@ if (!ownsSingleInstanceLock) {
       rooms,
       ledger: missionLedger,
       teammates,
+      /*
+       * Start one member who has been waiting for a slot.
+       *
+       * Same path the post itself uses, so a queued member is briefed with
+       * the board as it stands NOW and runs on their own route -- they are
+       * answering the same post, just later. The window is told the same
+       * way the post tells it, or the run would be live with no row.
+       *
+       * `startRoomMember` is declared further down this scope; this closure
+       * only reads it when a run ends, long after.
+       */
+      startQueued: async (room, postId, teammateId) => {
+        const post = room.posts.find((entry) => entry.postId === postId)
+        if (post === undefined) return 'refused'
+        const attempt = await startRoomMember(room, teammateId, post.text, await teammates.list())
+        if (!attempt.ok) return attempt.retryable ? 'no-slot' : 'refused'
+        sendToWindow({
+          kind: 'mission-started',
+          runId: attempt.data.runId,
+          missionId: attempt.data.missionId,
+          teammateId,
+          prompt: post.text,
+          data: attempt.data,
+          startedBy: { kind: 'room', roomId: room.roomId, postId }
+        })
+        return { missionId: attempt.data.missionId }
+      },
       notify: (update) => {
         sendToWindow(update)
         // Also to the desk, when the person is elsewhere: gathered per room
@@ -1127,12 +1307,116 @@ if (!ownsSingleInstanceLock) {
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
 
     ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, layout: 'auto' } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, layout: 'auto' } as const
       try {
         return await teammates.readSettings()
       } catch {
         // An unreadable switch reads as its default: swarm off, replies on.
-        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, layout: 'auto' } as const
+        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, layout: 'auto' } as const
+      }
+    })
+
+    /*
+     * The folder ONE teammate works in.
+     *
+     * Deliberately not the folder switch above. That one reopens Locust,
+     * because the ledger, the memory store and the worktrees are all scoped
+     * by the project folder; this one moves nothing but where a single
+     * teammate's next run stands, so nothing has to be rebound and nothing
+     * closes. Colin, 2026-09-09: "it should only change the folder for that
+     * chat/teammate not the entire app."
+     *
+     * The renderer names no path here either. It asks for a teammate; the
+     * HOST opens the dialog, checks what came back, and writes it. Clearing
+     * needs no dialog and takes the same route so there is one place that
+     * decides what a teammate's folder may be.
+     */
+    /*
+     * Every connector the person's Claude Code reports, for the teammate
+     * dialog to offer. Refreshed on the way, because a person opening this
+     * list has usually just connected something.
+     */
+    ipcMain.handle(CONNECTOR_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'CONNECTORS_UNAVAILABLE', message: 'That request was rejected.' } } as const
+      try {
+        return { ok: true, data: { connectors: await connectorReader.refresh() } } as const
+      } catch {
+        return { ok: true, data: { connectors: connectorReader.current() } } as const
+      }
+    })
+
+    /*
+     * Narrow one teammate to some of them, or widen it back. The names come
+     * from the list above, but the store reads them strictly either way: a
+     * name is an allow rule on a real command line.
+     */
+    ipcMain.handle(TEAMMATE_CONNECTORS_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'REJECTED', message: 'The connector request was rejected.' } } as const
+      }
+      const ask = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+      try {
+        return { ok: true, data: { teammate: await teammates.setConnectors(ask.teammateId, ask.names) } } as const
+      } catch (error) {
+        return {
+          ok: false,
+          error: { code: 'REJECTED', message: error instanceof Error ? error.message : 'That could not be changed.' }
+        } as const
+      }
+    })
+
+    ipcMain.handle(TEAMMATE_FOLDER_CHANNEL, async (event, requested: unknown) => {
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (owner === null || !fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'REJECTED', message: 'The folder request was rejected.' } } as const
+      }
+      const ask = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+      const teammateId = typeof ask.teammateId === 'string' ? ask.teammateId : ''
+      if (ask.clear === true) {
+        try {
+          return { ok: true, data: { teammate: await teammates.setFolder(teammateId, undefined) } } as const
+        } catch (error) {
+          return {
+            ok: false,
+            error: { code: 'REJECTED', message: error instanceof Error ? error.message : 'That could not be changed.' }
+          } as const
+        }
+      }
+      let known
+      try {
+        known = (await teammates.list()).find((teammate) => teammate.teammateId === teammateId)
+      } catch {
+        known = undefined
+      }
+      if (known === undefined) {
+        return { ok: false, error: { code: 'REJECTED', message: 'That teammate is not on the roster.' } } as const
+      }
+      const picked = await dialog.showOpenDialog(owner, {
+        title: `Choose the folder ${known.name} works in`,
+        buttonLabel: 'Work here',
+        properties: ['openDirectory', 'createDirectory'],
+        defaultPath: known.folder ?? (workspaceChosen ? workspacePath : app.getPath('home'))
+      })
+      const next = picked.filePaths[0]
+      if (picked.canceled || next === undefined) {
+        return { ok: false, error: { code: 'CANCELLED', message: 'No folder chosen.' } } as const
+      }
+      // The same refusal the project folder gets: a teammate pointed at
+      // Locust's own installation would be editing the app it is running in,
+      // and an update would take its work with it.
+      if (isInsideDirectory(next, installDirectory, process.platform)) {
+        return {
+          ok: false,
+          error: { code: 'REJECTED', message: 'That is where Locust itself is installed. Pick a project folder instead.' }
+        } as const
+      }
+      try {
+        return { ok: true, data: { teammate: await teammates.setFolder(teammateId, next) } } as const
+      } catch (error) {
+        return {
+          ok: false,
+          error: { code: 'REJECTED', message: error instanceof Error ? error.message : 'That folder could not be saved.' }
+        } as const
       }
     })
 
@@ -1179,14 +1463,43 @@ if (!ownsSingleInstanceLock) {
       return { ok: true, data: { path: next, reopening: true } } as const
     })
 
-    ipcMain.handle(WORKSPACE_REVEAL_CHANNEL, (event, requested: unknown) => {
+    /*
+     * Open one of the addresses this app is allowed to open, and no other.
+     *
+     * The policy above still holds -- `window.open` is denied and navigation
+     * away from the app's URL is cancelled -- and it asked that a feature
+     * needing a link name the exact URL in the HOST. The first-run panel
+     * grew three links and nobody did, so every "Get it" in every shipped
+     * build was dead: it looked like a link, it had a cursor, and clicking
+     * it did nothing at all. Found by the first outside tester on 0.55.0,
+     * who had no Node.js and whose only offered way out was one of them.
+     *
+     * The renderer names a URL; the host opens it only if it is on the
+     * host's own list, so a renderer turned against the person can still
+     * reach nowhere else.
+     */
+    ipcMain.handle(OPEN_LINK_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
-      // The roots are the host's, never the renderer's. One workspace per
-      // launch, and every worktree lives inside it, so this is the whole list.
-      // The workspace, plus Locust's own ledger folder. Both are the HOST's
-      // paths; the renderer still names nothing it was not already shown.
+      if (!isOutboundLink(requested)) return { ok: false, message: 'Locust does not open that address.' } as const
+      try {
+        await shell.openExternal(requested)
+        return { ok: true } as const
+      } catch {
+        return { ok: false, message: 'Your browser could not be opened.' } as const
+      }
+    })
+
+    ipcMain.handle(WORKSPACE_REVEAL_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      // The roots are the host's, never the renderer's. The workspace and
+      // every worktree inside it, Locust's own ledger folder, and any folder
+      // a teammate has been pointed at -- a file that teammate wrote is a
+      // file this app showed you, and refusing to open it would be the app
+      // disowning its own work. All of them are the HOST's paths; the
+      // renderer still names nothing it was not already shown.
       const decision = decideReveal(requested, [
         ...(workspaceChosen ? [workspacePath] : []),
+        ...(await teammateFolders()),
         ledgerDirectory
       ])
       if (!decision.ok) {
@@ -1242,6 +1555,59 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, dataUrl: `data:${mediaType};base64,${bytes.toString('base64')}` } as const
       } catch {
         return { ok: false, message: 'Could not be read.' } as const
+      }
+    })
+
+    /*
+     * Ctrl+V, which the picker cannot serve.
+     *
+     * Colin, 2026-09-10: "lets add the ability to ctrl+v a file or photo into
+     * the chat." A pasted SCREENSHOT is the case that decides the shape --
+     * the clipboard holds a bitmap, not a file, so there is no path anywhere
+     * for the picker's route to take. The bytes come across and the host
+     * writes them.
+     *
+     * The renderer suggests a name and the host does not trust it:
+     * `attachmentDestination` already refuses anything that is not a plain
+     * file name -- no separators, no colon, not `.` or `..` -- and always
+     * returns a path inside the one folder Locust owns. So the worst a
+     * renderer can do here is choose which name inside that folder it gets,
+     * which is what a person choosing a file does anyway.
+     */
+    ipcMain.handle(WORKSPACE_PASTE_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      if (!workspaceChosen) {
+        return { ok: false, message: 'Choose the folder your teammates work in first.' } as const
+      }
+      const asked = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+      const bytes = asked.bytes
+      const name = typeof asked.name === 'string' ? asked.name : ''
+      if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+        return { ok: false, message: 'There was nothing on the clipboard to attach.' } as const
+      }
+      // A bound, because this crosses IPC in one message and a clipboard can
+      // hold something very large. Generous for a screenshot or a document,
+      // and far short of anything that would stall the renderer.
+      if (bytes.byteLength > MAX_PASTED_BYTES) {
+        return {
+          ok: false,
+          message: 'That is too large to paste. Attach it with the + button instead.'
+        } as const
+      }
+      try {
+        const taken = new Set(await readAttachmentNames(workspacePath))
+        const destination = attachmentDestination(name, taken)
+        await mkdir(join(workspacePath, ATTACHMENT_DIR), { recursive: true })
+        await writeFile(join(workspacePath, destination), bytes)
+        await keepAttachmentsOutOfGit(workspacePath)
+        // Copied in, like any file from outside: it never was in the folder,
+        // and the tile says so for the same reason.
+        return { ok: true, paths: [destination], copied: [destination] } as const
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : 'That could not be attached.'
+        } as const
       }
     })
 
@@ -1340,7 +1706,7 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, layout: 'auto' } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, layout: 'auto' } as const
       try {
         return await teammates.writeSettings(settings)
       } catch {
@@ -1365,6 +1731,7 @@ if (!ownsSingleInstanceLock) {
           relayHopCap: DEFAULT_RELAY_HOP_CAP,
           memoryMode: DEFAULT_MEMORY_MODE,
           autoMode: false,
+          askConnectors: false,
           layout: 'auto'
         } as const))
       }
@@ -1484,6 +1851,19 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    ipcMain.handle(ROOM_RENAME_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return roomRejected('The room could not be renamed.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      if (typeof input.roomId !== 'string') return roomRejected('That room could not be renamed.')
+      try {
+        // The store validates the name and says what is wrong with it, so its
+        // words reach the person rather than a sentence made up here.
+        return { ok: true, data: { room: await rooms.rename(input.roomId, input.name) } } as const
+      } catch (error) {
+        return roomRejected(error instanceof Error ? error.message : 'That room could not be renamed.')
+      }
+    })
+
     ipcMain.handle(ROOM_TASK_CHANNEL, async (event, request: unknown) => {
       if (!fromOwnWindow(event)) return roomRejected('The board could not be changed.')
       const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
@@ -1506,6 +1886,91 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    /**
+     * Start one room member's mission, or say why not.
+     *
+     * Pulled out of the post handler so the QUEUE can use it too: a member
+     * who had no slot when the post went out is started by exactly this
+     * path when one frees, on the same route, with the same briefing.
+     *
+     * `retryable` is the whole point of the split. RUN_ALREADY_ACTIVE means
+     * "not now" -- the live cap is full, or that teammate is already working
+     * -- and waiting fixes both. Everything else (gone from the roster,
+     * Antigravity, approve-each) is a refusal that waiting will not fix, and
+     * only those are recorded against the post as refused.
+     */
+    const startRoomMember = async (
+      room: PublicRoom,
+      teammateId: string,
+      text: string,
+      roster: readonly PublicTeammate[]
+    ): Promise<
+      | { readonly ok: true; readonly data: CodexMissionStartData }
+      | { readonly ok: false; readonly name: string; readonly message: string; readonly retryable: boolean }
+    > => {
+      const teammate = roster.find((entry) => entry.teammateId === teammateId)
+      const peer = await peerContextFor(teammateId)
+      if (teammate === undefined || peer === undefined) {
+        return { ok: false, name: teammate?.name ?? teammateId, message: 'No longer on the roster.', retryable: false }
+      }
+      const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
+      // The person's words, then the board: which room this is, who else
+      // is in it, every task as it stands, and how to move one. The room
+      // keeps only the person's words as the post; this trailer is what
+      // the mission is briefed with. Read fresh, so a member started from
+      // the queue is briefed with the board as it stands NOW.
+      const memberNames = room.teammateIds.map((id: string) => roster.find((entry) => entry.teammateId === id)?.name ?? id)
+      const briefed = `${text}
+
+${taskSection({
+        roomName: room.name,
+        selfName: teammate.name,
+        memberNames,
+        tasks: room.tasks.map((task: PublicRoom['tasks'][number]) => ({
+          text: task.text,
+          state: task.state,
+          ownerName: task.ownerId === undefined ? undefined : roster.find((entry) => entry.teammateId === task.ownerId)?.name ?? task.ownerId
+        }))
+      })}`
+      if (route.runtime === 'antigravity') {
+        return { ok: false, name: teammate.name, message: 'Antigravity cannot be posted to from a room yet.', retryable: false }
+      }
+      // Per-action approvals only exist on the app-server transport, which a
+      // room post does not use. Without this the post ran read-only with no
+      // cards while the chip said approvals.
+      if (route.mode === 'approve-each') {
+        return {
+          ok: false,
+          name: teammate.name,
+          message: 'This teammate is set to "approve each action", and a room post cannot show per-action approvals. Message them directly instead.',
+          retryable: false
+        }
+      }
+      const response = await codexMissions.start(
+        briefed,
+        route.runtime,
+        route.mode,
+        route.model === 'account-default' ? {} : { model: route.model },
+        sendToWindow,
+        undefined,
+        peer,
+        undefined,
+        undefined,
+        undefined
+      )
+      if (!response.ok) {
+        return {
+          ok: false,
+          name: teammate.name,
+          message: response.error.message,
+          retryable: response.error.code === 'RUN_ALREADY_ACTIVE'
+        }
+      }
+      await assignOwner(teammateId, response.data.missionId)
+      return { ok: true, data: response.data }
+    }
+
+
     ipcMain.handle(ROOM_POST_CHANNEL, async (event, request: unknown) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (owner === null || !fromOwnWindow(event)) return roomRejected('The post could not be made.')
@@ -1521,83 +1986,66 @@ if (!ownsSingleInstanceLock) {
       // One run per teammate, each on THEIR route. A teammate with no route
       // of their own yet -- never started by a person -- runs on Codex's
       // account default in read-only, the same as a fresh teammate would.
-      const started: Record<string, string> = {}
-      const startedData: { teammateId: string; data: CodexMissionStartData }[] = []
       const refusals: { teammateId: string; name: string; message: string }[] = []
       const roster = await teammates.list()
-      for (const teammateId of room.teammateIds) {
-        const teammate = roster.find((entry) => entry.teammateId === teammateId)
-        const peer = await peerContextFor(teammateId)
-        if (teammate === undefined || peer === undefined) {
-          refusals.push({ teammateId, name: teammate?.name ?? teammateId, message: 'No longer on the roster.' })
-          continue
-        }
-        const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
-        // The person's words, then the board: which room this is, who else
-        // is in it, every task as it stands, and how to move one. The room
-        // keeps only the person's words as the post; this trailer is what
-        // the mission is briefed with.
-        const memberNames = room.teammateIds.map((id) => roster.find((entry) => entry.teammateId === id)?.name ?? id)
-        const briefed = `${text}\n\n${taskSection({
-          roomName: room.name,
-          selfName: teammate.name,
-          memberNames,
-          tasks: room.tasks.map((task) => ({
-            text: task.text,
-            state: task.state,
-            ownerName: task.ownerId === undefined ? undefined : roster.find((entry) => entry.teammateId === task.ownerId)?.name ?? task.ownerId
-          }))
-        })}`
-        const response =
-          route.runtime === 'antigravity'
-            ? roomRejected('Antigravity cannot be posted to from a room yet.')
-            : // Per-action approvals only exist on the app-server transport,
-              // which a room post does not use. Without this the post ran
-              // read-only with no cards while the chip said approvals.
-              route.mode === 'approve-each'
-              ? roomRejected(
-                  'This teammate is set to "approve each action", and a room post cannot show per-action approvals. Message them directly instead.'
-                )
-              : await codexMissions.start(
-                briefed,
-                route.runtime,
-                route.mode,
-                route.model === 'account-default' ? {} : { model: route.model },
-                sendToWindow,
-                undefined,
-                peer,
-                undefined,
-                undefined,
-                undefined
-              )
-        if (!response.ok) {
-          refusals.push({ teammateId, name: teammate.name, message: response.error.message })
-          continue
-        }
-        started[teammateId] = response.data.missionId
-        startedData.push({ teammateId, data: response.data })
-        await assignOwner(teammateId, response.data.missionId)
-      }
-      let post
+
+      /*
+       * THE POST EXISTS BEFORE ANYONE IS ASKED.
+       *
+       * It used to be written at the END: start everyone in sequence, then
+       * record the post, then announce every run at once. So a person
+       * watched an empty room while work was already underway -- Astra
+       * measured a process running 45,292 ms before its own row appeared,
+       * and it is the cause of every "cards: 0" the room drives reported
+       * immediately after posting, which I had seen and not explained.
+       *
+       * Now everyone starts QUEUED, and each member leaves the queue the
+       * moment their run begins -- announced there and then. Which is
+       * exactly what `room-tasks` does when a slot frees, so the two paths
+       * are one path, and a post that cannot reach everyone at once is the
+       * same thing as a post that reaches them slowly.
+       */
+      let post: RoomPost
       try {
-        post = await rooms.addPost(roomId, { text, missions: started })
+        post = await rooms.addPost(roomId, { text, missions: {}, queued: [...room.teammateIds] })
       } catch (error) {
         return roomRejected(error instanceof Error ? error.message : 'The post could not be recorded.')
       }
-      // Now that the post has an id, tell the window which runs it started,
-      // the way the relay and routines do, so the sidebar shows them working
-      // at once and the room can file each run under its post.
-      for (const entry of startedData) {
+
+      for (const teammateId of room.teammateIds) {
+        const attempt = await startRoomMember(room, teammateId, text, roster)
+        if (!attempt.ok) {
+          /*
+           * "Not now" is not a refusal.
+           *
+           * `attempt.retryable` marks the two cases waiting fixes -- the
+           * live cap is full, or that teammate is already working. Those
+           * members wait in the post's queue and are started by
+           * `room-tasks` the moment a slot frees. Everything else -- gone
+           * from the roster, a runtime a room cannot post to -- is recorded
+           * as refused, because waiting will never fix it.
+           */
+          if (attempt.retryable) continue
+          refusals.push({ teammateId, name: attempt.name, message: attempt.message })
+          await rooms.refuseQueued(roomId, post.postId, teammateId, attempt.message).catch(() => undefined)
+          continue
+        }
+        await rooms.startQueued(roomId, post.postId, teammateId, attempt.data.missionId).catch(() => undefined)
+        // Said HERE, not after the loop: this is the moment the row can
+        // appear, and every member after this one is still to be asked.
         sendToWindow({
           kind: 'mission-started',
-          runId: entry.data.runId,
-          missionId: entry.data.missionId,
-          teammateId: entry.teammateId,
+          runId: attempt.data.runId,
+          missionId: attempt.data.missionId,
+          teammateId,
           prompt: text,
-          data: entry.data,
+          data: attempt.data,
           startedBy: { kind: 'room', roomId, postId: post.postId }
         })
       }
+      // The post as it now stands, so the answer carries who started, who is
+      // waiting and who was refused rather than the empty one written above.
+      post = (await rooms.get(roomId))?.posts.find((entry) => entry.postId === post.postId) ?? post
       return { ok: true, data: { post, refused: refusals } } as const
     })
 
@@ -2252,29 +2700,51 @@ app.on('window-all-closed', () => {
 let quitFinaliser: (() => void) | undefined
 let shutdownStarted = false
 let shutdownComplete = false
+/** How long the flush below is allowed to take -- see `boundedShutdown`. */
+const SHUTDOWN_DEADLINE_MS = 6_000
 if (ownsSingleInstanceLock) {
   app.on('before-quit', (event) => {
     if (shutdownComplete) return
     event.preventDefault()
     if (shutdownStarted) return
     shutdownStarted = true
-    void (async () => {
-      await missionServiceForShutdown?.dispose()
-      // Releases any pending approval and takes the app-server process tree
-      // with it, so nothing is left prompting for an app that has gone.
-      await appServerServiceForShutdown?.dispose()
-      await ledgerForShutdown?.flush()
-      await workroomForShutdown?.flush()
-      shutdownComplete = true
-      // Whoever asked for the quit gets the last word: the updater installs
-      // and starts the app again. Anything else is an ordinary quit.
-      const finalise = quitFinaliser
-      quitFinaliser = undefined
-      if (finalise !== undefined) finalise()
-      else app.quit()
-    })().catch((error: unknown) => {
-      console.error('Failed to flush the local mission ledger during shutdown', error)
-      app.exit(1)
+    boundedShutdown({
+      deadlineMs: SHUTDOWN_DEADLINE_MS,
+      work: async () => {
+        await missionServiceForShutdown?.dispose()
+        // Releases any pending approval and takes the app-server process tree
+        // with it, so nothing is left prompting for an app that has gone.
+        await appServerServiceForShutdown?.dispose()
+        await ledgerForShutdown?.flush()
+        await workroomForShutdown?.flush()
+        // Refuses whatever a run was still asking, and closes the loopback door.
+        await permissionHostForShutdown?.dispose()
+      },
+      leave: (reason) => {
+        shutdownComplete = true
+        // Whoever asked for the quit gets the last word: the updater installs
+        // and starts the app again. Anything else is an ordinary quit.
+        const finalise = quitFinaliser
+        quitFinaliser = undefined
+        if (finalise !== undefined) {
+          finalise()
+          return
+        }
+        if (reason === 'finished') {
+          app.quit()
+          return
+        }
+        // The wait was abandoned, so re-entering the quit would only wait
+        // again. `app.exit` is the one way out that a stuck child process
+        // cannot hold, and the relaunch helper watches the process rather
+        // than its exit code, so a folder switch still reopens from here.
+        console.error(`Shutdown did not finish within ${String(SHUTDOWN_DEADLINE_MS)}ms; leaving anyway.`)
+        app.exit(0)
+      },
+      failed: (error) => {
+        console.error('Failed to flush the local mission ledger during shutdown', error)
+        app.exit(1)
+      }
     })
   })
 }

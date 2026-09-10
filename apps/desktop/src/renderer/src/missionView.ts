@@ -32,6 +32,8 @@ export interface ActivityDetail {
    * the same path twice with nothing to tell them apart.
    */
   readonly tool?: string
+  /** What the model said it was doing, on the runtimes that carry one. */
+  readonly title?: string
   readonly settled: boolean
   /** True only for a tool the runtime itself reported as failed. */
   readonly failed?: boolean
@@ -65,6 +67,21 @@ export type ActivityEntry =
       readonly kind: 'shell'
       readonly key: string
       readonly command: string
+      /**
+       * What the model said it was doing, where the runtime carries it.
+       *
+       * Claude Code's Bash tool takes a `description` on every call and the
+       * model fills it in; it is the whole reason its own transcript reads
+       * "Checked what the app says about the free route" rather than a shell
+       * pipeline. Locust dropped it and drew the pipeline.
+       *
+       * The row leads with this and keeps the command underneath, because
+       * the command is evidence of what ran on this machine and the
+       * description is only a claim about it. Undefined on the runtimes that
+       * send none -- Codex has no such field at all -- and those rows read
+       * exactly as they did.
+       */
+      readonly title: string | undefined
       readonly settled: boolean
       readonly failed: boolean
       readonly exitCode: number | undefined
@@ -148,6 +165,7 @@ export function activityEntries(
         kind: 'shell',
         key: `shell_${String(index)}`,
         command: shellCommandText(detail.name),
+        title: detail.title,
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode,
@@ -591,7 +609,15 @@ function cursorMirrorRelative(full: string, root: string): string | undefined {
   if (mirror === null) return undefined
   const [, , project, rest] = mirror
   if (project === undefined || rest === undefined) return undefined
-  const flattened = root.replace(/[:\/]+/g, '-').replace(/^-+|-+$/g, '')
+  // Colons AND both separators. The class here was one backslash short --
+  // it named the forward slash and the escape, not the backslash -- so a
+  // Windows root flattened to `C-Users` plus its remaining separators,
+  // and never matched Cursor's own project name. The mirror
+  // then went unrecognised and every Cursor file row wore the full path
+  // this function exists to remove. Found 2026-09-10 by
+  // `escapes-survived-the-shell`; `relativePath` below had it right all
+  // along, four lines away.
+  const flattened = root.replace(/[:\\/]+/g, '-').replace(/^-+|-+$/g, '')
   return project.toLowerCase() === flattened.toLowerCase() ? rest : undefined
 }
 
@@ -907,10 +933,78 @@ function subagentVerb(tool: string | undefined): string {
   }
 }
 
+/**
+ * An MCP tool call, split into the two things a person recognises.
+ *
+ * A connector's tool arrives as one machine name --
+ * `mcp__claude_ai_Robinhood__get_watchlists` -- and the row drew it whole.
+ * Colin, seeing the first one that ever reached a teammate (2026-09-09):
+ * "the mcp tool calls came out a little messy, might need to make that part
+ * of the ui".
+ *
+ * The shape is `mcp__<server>__<tool>`, and both halves are worth having
+ * separately: the SERVER is the thing a person connected and thinks in
+ * ("Robinhood"), the TOOL is what was done with it ("get_watchlists"). That
+ * is the same split the row already draws for every other tool -- the name
+ * it acted on, and the tool that acted -- so an MCP call stops being a
+ * special case and becomes an ordinary row.
+ *
+ * `claude_ai_` is stripped because it is a transport detail. An account
+ * connector and a local server for the same product are the same product to
+ * the person who connected it, and neither of them calls it "claude ai
+ * Robinhood".
+ *
+ * Codex already sends `server.tool` for its own MCP calls, so that shape is
+ * read too rather than left as the one runtime this does not help.
+ */
+export function mcpToolParts(name: string): { readonly server: string; readonly tool: string } | undefined {
+  const doubled = /^mcp__(.+?)__(.+)$/.exec(name)
+  if (doubled !== null) {
+    return { server: prettyServer(doubled[1] ?? ''), tool: doubled[2] ?? '' }
+  }
+  // Codex's own join, and only when it really is one: a dot in a file path
+  // is not a server.
+  const dotted = /^mcp[_.]?(?:tool)?[_.](.+)$/.exec(name)
+  if (dotted !== null && dotted[1] !== undefined && dotted[1].includes('.')) {
+    const at = dotted[1].indexOf('.')
+    return { server: prettyServer(dotted[1].slice(0, at)), tool: dotted[1].slice(at + 1) }
+  }
+  return undefined
+}
+
+/** The name a person connected, not the transport that carries it. */
+function prettyServer(raw: string): string {
+  return raw.replace(/^claude_ai_/, '').replace(/[_-]+/g, ' ').trim()
+}
+
+/**
+ * Whether a tool call is a command, whatever the runtime calls its shell.
+ *
+ * This asked for the name `shell` or the kind `command_execution`, which
+ * between them describe exactly ONE runtime: Codex. Claude Code names the
+ * tool `Bash` and OpenCode names it `bash`, so every shell call either of
+ * them made fell through to a generic tool row -- no exit-code badge,
+ * nothing to expand, and counted under "other" in the turn summary rather
+ * than as a command.
+ *
+ * Found trying to see 0.56.0's intent line on screen (2026-09-09). That
+ * feature reads the model's own `description` for a Bash call, and both
+ * those adapters carry it -- but the line is drawn by the COMMAND ROW, and
+ * neither runtime ever produced one. So the feature was invisible on every
+ * runtime: the two that send a description had no row, and the one with a
+ * row sends no description. A test of the adapters passed the whole time.
+ *
+ * Matched case-blind, because the two spellings differ only in case and the
+ * next runtime will pick one of them.
+ */
+export function isShellTool(name: string, toolKind: string | undefined): boolean {
+  return /^(bash|shell)$/i.test(name) || toolKind === 'command_execution'
+}
+
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {
   const name = event.payload.name
   const command = event.payload.command
-  if (name === 'shell' || event.payload.toolKind === 'command_execution') {
+  if (isShellTool(name, event.payload.toolKind)) {
     return command !== undefined && EDIT_COMMANDS.test(command.trim()) ? 'edit' : 'shell'
   }
   // A runtime's own sub-agent: Claude Code's `Task`, OpenCode's `task`.
@@ -1068,10 +1162,18 @@ export function buildThread(
             break
           }
         }
+        // A connector call names the SERVER as its tool and the tool as its
+        // name, which is the split every other row already uses.
+        const mcp = mcpToolParts(event.payload.name)
         const detail: ActivityDetail = {
           kind: toolKindOf(event),
-          name: event.payload.command ?? event.payload.name,
-          tool: event.payload.name,
+          name: mcp?.tool ?? event.payload.command ?? event.payload.name,
+          tool: mcp?.server ?? event.payload.name,
+          // Only Claude Code and OpenCode send one; the others leave it
+          // undefined and their rows read exactly as they always have.
+          ...(typeof event.payload.title === 'string' && event.payload.title.length > 0
+            ? { title: event.payload.title }
+            : {}),
           settled: false
         }
         openTools.set(event.payload.itemId, detail)
@@ -2284,7 +2386,11 @@ export function producedFiles(
 ): readonly { readonly path: string; readonly shown: string; readonly status: string | undefined }[] {
   const entries = activityEntries(details, workspacePath)
   const key = (path: string): string =>
-    relativePath(path, workspacePath).replace(/[\/]+/g, '/').replace(/^\.\//, '').toLowerCase()
+    // No separator normalising here: `relativePath` already collapsed both
+    // kinds to `/`. This step used to repeat it, with the same one-backslash
+    // -short class as the flattener above -- which cost nothing, because
+    // there was nothing left for it to do. Removed rather than fixed.
+    relativePath(path, workspacePath).replace(/^\.\//, '').toLowerCase()
   const seen = new Set<string>()
   const rows: { path: string; shown: string; status: string | undefined }[] = []
   for (const entry of entries) {

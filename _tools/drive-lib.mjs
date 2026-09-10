@@ -36,18 +36,21 @@ export const git = (args, cwd) => new Promise((resolve, reject) => {
  * A scratch git repository with a README and a LOCUST.md, committed.
  *
  * `brief` is that LOCUST.md, and Locust carries it to EVERY teammate started
- * in this folder -- it is not decoration. The default asks for one
- * paragraph, which keeps most drives' output small and readable.
+ * in this folder -- it is not decoration. The default says only what the
+ * folder is.
  *
- * A drive whose whole point is long output has to pass its own, because the
- * default actively fights it. The cap probe asked eight teammates to count
- * to 250 and watched them answer "Your 1-to-250 count conflicts with the
- * one-paragraph rule -- checking the workspace before I answer" instead
- * (2026-09-09). The runs completed and the numbers looked fine, but they
- * measured deliberation rather than the throughput they were meant to
- * measure. A fixture that argues with the prompt is a silent confound.
+ * It USED to say "Keep answers to one paragraph." That was there to keep
+ * drive output short, and it kept confounding the drives instead: the cap
+ * probe asked eight teammates to count to 250 and watched them answer "Your
+ * 1-to-250 count conflicts with the one-paragraph rule" (2026-09-09); the
+ * measure probe asked for three paragraphs and got a decision card asking
+ * which instruction to follow (2026-09-10). Colin, the same day: "remove the
+ * portion of keeps answers to one paragraph, thats a bit arbitrary." A
+ * fixture that argues with the prompt is a silent confound, and one that
+ * argues with the prompt by DEFAULT is a confound in every drive at once. A
+ * drive that wants short answers can ask for them in its own prompt.
  */
-export async function scratchRepository(prefix = 'locust-drive-ws-', brief = 'Keep answers to one paragraph.\n') {
+export async function scratchRepository(prefix = 'locust-drive-ws-', brief = 'A scratch project for a user session.\n') {
   const workspace = await mkdtemp(join(tmpdir(), prefix))
   await git(['init', '-q', '-b', 'main'], workspace)
   await git(['config', 'user.email', 'drive@locust.test'], workspace)
@@ -224,10 +227,33 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     const settled = await evaluate(`(async () => {
       for (let i = 0; i < 240; i += 1) {
         const field = document.querySelector('form.command-dock textarea')
-        if (field && !/Checking local runtimes/.test(field.placeholder)) return 'discovery finished; ' + (document.querySelector('.lc-connected')?.innerText ?? '')
+        if (field && !/Checking local runtimes/.test(field.placeholder)) break
+        await new Promise(r => setTimeout(r, 250))
+        if (i === 239) return 'discovery never finished'
+      }
+      /*
+       * And then until the COUNT stops moving.
+       *
+       * The placeholder changes when the first runtime is ready, not when the
+       * sweep is done, and the composer's route is still settling behind it.
+       * A probe that sent at that moment started its mission on whichever
+       * runtime happened to be ready first: measured 2026-09-10, a teammate
+       * routed to Codex CLI ran on OpenCode and failed with "OpenCode is not
+       * ready", with the footer still reading "4 runtimes connected". The
+       * drive reported it as the teammate saying nothing.
+       */
+      let seen = ''
+      let stable = 0
+      for (let i = 0; i < 240; i += 1) {
+        const now = document.querySelector('.lc-connected')?.innerText ?? ''
+        stable = now === seen ? stable + 1 : 0
+        seen = now
+        // Six quarter-seconds of no change: long enough that a sweep still
+        // arriving is caught, short enough not to pad every drive.
+        if (stable >= 6) return 'discovery finished; ' + seen
         await new Promise(r => setTimeout(r, 250))
       }
-      return 'discovery never finished'
+      return 'discovery never settled; ' + seen
     })()`)
 
     /*
@@ -286,7 +312,25 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     return { out, profile, step }
   }
 
-  return { evaluate, send, capture, ready, finish, profile, out, record }
+  /**
+   * Resize the window, so a claim about how the layout answers the window can
+   * be measured at more than one size rather than asserted at one.
+   *
+   * `Emulation.setDeviceMetricsOverride` is what CDP gives a page; the OS
+   * window around it does not move, which is fine -- everything measured here
+   * is inside the page.
+   */
+  const resize = async (width, height) => {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width,
+      height,
+      deviceScaleFactor: 1,
+      mobile: false
+    })
+    return { width, height }
+  }
+
+  return { evaluate, send, capture, ready, finish, profile, out, record, resize }
 }
 
 /**

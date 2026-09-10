@@ -3,11 +3,15 @@ export {
   CLAUDE_REQUIRED_FEATURES,
   CODEX_REQUIRED_FEATURES,
   createClaudePrintCommand,
+  createCodexAppServerCommand,
   createCodexExecCommand,
+  codexAppServerPolicy,
   detectSupportedFeatures,
   OMNIROUTE_REQUIRED_FEATURES,
 } from "./commands.js";
 export { discoverInstalledRuntimes } from "./discovery.js";
+export { allowRuleFor, parseClaudeConnectors, toolPrefixFor } from "./connectors.js";
+export type { ClaudeConnector } from "./connectors.js";
 export { createAppServerClient } from "./app-server.js";
 export {
   createAppServerEventNormalizer,
@@ -16,7 +20,14 @@ export {
   toolNameOf,
 } from "./app-server-events.js";
 export { createCodexEventNormalizer } from "./codex-events.js";
+export { asProcessNormalizer, startCodexAppServerRun } from "./codex-app-server-run.js";
+export type {
+  AppServerRunProcess,
+  CodexAppServerRun,
+  CodexAppServerRunOptions,
+} from "./codex-app-server-run.js";
 export {
+  claudeToolTitle,
   createClaudeEventNormalizer,
   limitKindFor,
   resetsAtIso,
@@ -129,6 +140,7 @@ export {
   createOpenCodeEventNormalizer,
   openCodeToolOutcome,
   openCodeToolTarget,
+  openCodeToolTitle,
 } from "./opencode-events.js";
 export type {
   OpenCodeEventNormalizer,

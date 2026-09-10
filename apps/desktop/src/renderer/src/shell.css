@@ -575,9 +575,78 @@ textarea {
   align-items: flex-start;
 }
 
+/*
+ * THE MEASURE. A teammate's reply is prose and has to be read as prose.
+ *
+ * Colin, 2026-09-10, on the chat: "slightly clunky or out of place, can't put
+ * my finger on it." Half of that is not the typeface. MEASURED off the
+ * rendered line boxes -- character by character, reading the first line back
+ * verbatim rather than estimating from an average width, because text has no
+ * mean character width -- a reply ran to 111 characters a line.
+ *
+ * Comfortable reading is 60-75. Past about 85 the eye loses its place on the
+ * return sweep, and the symptom is exactly "clunky, nothing visibly wrong",
+ * because nothing IS wrong with any single line.
+ *
+ * The design agent's figure was 97 and their direction was right; measured
+ * here it is worse. On the paragraphs only: a fenced diff has its own
+ * horizontal scroll and capping it would hide code rather than help anyone
+ * read it.
+ *
+ * 48ch AND NOT 68ch, which is the same trap one level down. `ch` is the width
+ * of a ZERO, and their own note says a digit is wider than average prose --
+ * that is why their first probe reported 80 for a 100-character string. It
+ * understates by more than they allowed for: measured on the built app,
+ * `max-width: 68ch` rendered 99 to 102 characters a line, barely better than
+ * the 111 it replaced.
+ *
+ * So the number comes from the measurement rather than from the unit. `ch` is
+ * still the right unit because it moves with the face -- a narrower face gets
+ * more words at the same setting, which is the whole argument for changing
+ * the face -- but the value has to be calibrated against prose, once, on
+ * screen, IN THE FACE THAT WEARS IT. 48ch measured 66-73 characters in Geist
+ * and 61-66 in Plex: Plex's zero is wider relative to its prose, so the same
+ * ch is fewer words. Colin's reaction to 61-66 was that the text "was not
+ * properly filling the chat box", and he was right to notice -- a 390px
+ * column in a 760px thread reads as stopping short. 56ch measured 71-79,
+ * a hair over the top; 54ch, interpolated between the two readings, lands
+ * at about 73 -- the top of the comfortable range, which is where a reply
+ * that has to share a screen with a sidebar belongs.
+ */
 .lc-agentline p {
   margin: 0;
+  /* The teammate's voice, not the app's. See the Plex note in tokens.css. */
+  font-family: var(--lc-font-prose);
+  font-size: var(--lc-text-prose);
+  /*
+   * FITS THE WINDOW, up to a measure that is still readable.
+   *
+   * `54ch` was a fixed measure, and a fixed measure on a window that grows is
+   * dead space that grows with it. MEASURED 2026-09-10 with
+   * `_tools/measure-reply-width.mjs`: the paragraph used 437px no matter the
+   * window, leaving 529px unused at 1280 wide, 895px at 1600 and 1215px at
+   * 1920 -- three quarters of the column empty on a big screen.
+   *
+   * Colin, the same day: "it seems way too small with too much dead space
+   * especially on your larger testing app, i was looking into how you 'claude
+   * code' does it and it auto fits the text to the size of the window."
+   *
+   * So: fill the column, with a cap. The cap is what Claude Code does too --
+   * measured off its own window at two sizes, its prose runs about 710px at a
+   * 1088px window and 775px at 1431px, so it grows with the window and then
+   * stops. `92ch` is that width in this face, about 110 characters, and
+   * `min()` is what makes the first term win on a narrow window instead of
+   * overflowing it.
+   */
+  max-width: min(100%, 92ch);
+  line-height: 1.65;
   text-wrap: pretty;
+}
+
+/* Emphasis in the reply is the real 500, not a faux-bold of the 400; and
+   italics are the real italic, not a sheared upright. Both are bundled. */
+.lc-agentline p strong {
+  font-weight: 500;
 }
 
 /*
@@ -1385,35 +1454,30 @@ textarea {
    Recessed against the routines above it on purpose: those are Locust's to
    run and these are not, and the card-weight rule says a thing that wants
    nothing from you sits back. */
+/* What a person configured inside one runtime's own CLI.
+ *
+ * These used to be a section of their own on the Automations screen, under a
+ * heading that otherwise meant "things you can run" -- which is what made
+ * their inertness read as brokenness. They now sit inside the Settings
+ * runtime row they are facts about, so the block is indented under that row
+ * rather than ruled off from a screen, and the runtime is no longer named
+ * again: it is directly above.
+ */
 .lc-cliartifacts {
   /* The rows are one line each and must never widen the screen. The padding
      keeps the right-hand path off the window edge, where it was being clipped
      mid-word. */
   overflow: hidden;
   padding-right: var(--lc-space-6);
-  margin-top: var(--lc-space-7);
-  padding-top: var(--lc-space-6);
-  border-top: 1px solid var(--lc-border-hairline);
+  margin-top: var(--lc-space-4);
 }
 
 .lc-cliartifacts__note {
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-description);
-  line-height: 1.6;
-  max-width: 62ch;
-  margin: var(--lc-space-3) 0 var(--lc-space-5);
-}
-
-.lc-cliartifacts__group {
-  margin-bottom: var(--lc-space-5);
-}
-
-.lc-cliartifacts__runtime {
-  color: var(--lc-text-muted);
-  font-size: var(--lc-text-mono-label);
-  letter-spacing: 0.06em;
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
-  margin-bottom: var(--lc-space-3);
+  margin-bottom: var(--lc-space-2);
 }
 
 .lc-cliartifacts__row {
@@ -1421,8 +1485,7 @@ textarea {
   max-width: 100%;
   align-items: baseline;
   gap: var(--lc-space-4);
-  padding: var(--lc-space-3) 0;
-  border-bottom: 1px solid var(--lc-border-hairline);
+  padding: var(--lc-space-2) 0;
 }
 
 .lc-cliartifacts__kind {
@@ -1476,6 +1539,118 @@ textarea {
 .lc-empty__how strong {
   color: var(--lc-text-secondary);
   font-weight: 500;
+}
+
+/* ----------------------------------------------------------------------
+ * The finished conversations an empty Routines screen offers to save.
+ *
+ * The rule this answers (design agent, 2026-09-10): a feature needs an
+ * entrance where its material is, and an entrance where its absence is felt,
+ * and the SECOND MUST CONTAIN THE FIRST rather than describe it. This screen
+ * used to describe a right-click; Colin read it and still reported routines
+ * as a feature he had never seen.
+ *
+ * Sized to sit inside `lc-empty`'s centred column rather than to fill it: it
+ * is an offer under a definition, not a mission list.
+ * -------------------------------------------------------------------- */
+.lc-savable {
+  width: 100%;
+  max-width: 46ch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+  margin-top: var(--lc-space-5);
+  text-align: left;
+}
+
+.lc-savable__head {
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+  margin-bottom: var(--lc-space-2);
+}
+
+/* The half that names the material stays in sentence case: it is the noun,
+   and shouting it would make the label read as two labels. */
+.lc-savable__from {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--lc-text-secondary);
+}
+
+.lc-savable__row {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-radius: var(--lc-radius-control);
+}
+
+.lc-savable__row:hover {
+  background: var(--lc-hover-surface);
+}
+
+/* The title opens the conversation, so it is a button wearing text. */
+.lc-savable__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+  cursor: pointer;
+}
+
+.lc-savable__name:hover {
+  text-decoration: underline;
+}
+
+.lc-savable__turns,
+.lc-savable__at {
+  flex: none;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------------------
+ * WHO ANSWERS: the teammate chips inside the composer box.
+ *
+ * A room is the consequence of the ask, not its prerequisite (design agent,
+ * 2026-09-10). These sit in the box with the words they will answer, because
+ * who is being asked is a property of the message rather than of the app.
+ * -------------------------------------------------------------------- */
+/* The room's name, which is also the control that changes it. A room made
+   from an ask starts as `Untitled room`, so this is not decoration -- it is
+   the other half of not charging a name up front. */
+.lc-room__name {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lc-room__name:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.lc-room__name:disabled {
+  cursor: default;
+}
+
+.lc-room__rename {
+  max-width: 22ch;
+  font-size: var(--lc-text-screen-title);
 }
 
 .lc-empty {
@@ -1959,7 +2134,6 @@ textarea {
   text-decoration: underline;
 }
 
-
 /* A routine's schedule: the three-way choice, then the one detail the
    choice needs (hours, or a time). The card shows the rule and the next
    run on its own line so the name stays a name. */
@@ -2108,6 +2282,21 @@ textarea {
   gap: var(--lc-space-3);
 }
 
+/*
+ * Past six answers the grid stops earning its keep.
+ *
+ * Equal-height cells against unequal-length answers means every row is as
+ * tall as its longest cell, paid in whitespace, and worse the wider the row
+ * gets. At six a row is three cells and one glance; past that it scrolls,
+ * and a grid that scrolls is no longer showing you the room at once.
+ *
+ * One column, so every answer has its own height -- the shape the thread
+ * already uses for a long reply.
+ */
+.lc-roompost__answers.is-list {
+  grid-template-columns: 1fr;
+}
+
 .lc-roomanswer {
   display: flex;
   flex-direction: column;
@@ -2118,9 +2307,182 @@ textarea {
   background: var(--lc-bg-bubble-peer);
 }
 
-.lc-roomanswer.is-absent {
-  border-style: dashed;
+/*
+ * Who a post did not reach: one standing line under the answers.
+ *
+ * This was `.lc-roomanswer.is-absent`, a dashed ANSWER CARD with no answer
+ * in it -- and in a grid of answers a card is a promise that an answer is
+ * inside. Two of them sat beside four real ones reading "did not start" with
+ * about 90px of nothing underneath, and took their height from the model
+ * name wrapping in a neighbouring cell. Nothing is wrong and nothing is
+ * wanted from the reader, so it is the quiet left rule, not a container.
+ */
+/*
+ * Who is still waiting for a slot.
+ *
+ * A roster line, not a card: there is no answer in it and there is not going
+ * to be one yet, and an answer-shaped box with nothing inside is the thing
+ * this replaced. Standing register -- nothing is wrong and nothing is being
+ * asked of the reader.
+ */
+/*
+ * The command itself, under a row that leads with what it was for.
+ *
+ * A row headed by the model's own sentence has to keep the command
+ * reachable: it is what actually ran on this machine, and a claim about a
+ * command is not a substitute for the command.
+ */
+.lc-shellcommand {
+  margin: 0;
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-card);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/*
+ * A folded answer, bounded by RENDERED LINES rather than newlines.
+ *
+ * Counting newlines folded exactly the wrong answers: prose has few of them
+ * and wraps to many lines, so a three-paragraph reply counted as three and
+ * rendered whole. `line-clamp` counts what the reader actually sees, which
+ * is the only number that was ever meant.
+ */
+.lc-roomanswer__text.is-folded {
+  display: -webkit-box;
+  -webkit-line-clamp: 12;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/*
+ * One sticky line per post: the glance, and the way to one answer.
+ *
+ * Chrome on the section rather than a card -- the same relationship the
+ * workroom header has to its thread. Everything in it is derived from the
+ * records the cards below are read from, so it can never disagree with them.
+ */
+.lc-posthead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-4);
+  min-height: 38px;
+  margin: var(--lc-space-2) 0 0;
+  padding: 0 var(--lc-space-3);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-terminal);
+}
+
+.lc-posthead__counts {
+  min-width: 0;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Eight 22px faces is 216px, so it fits at any width the room has and never
+ * wraps -- which is the whole reason the index can be one line. */
+.lc-posthead__index {
+  display: flex;
+  flex: none;
+  gap: var(--lc-space-1);
+}
+
+.lc-posthead__face {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+  opacity: 0.85;
+}
+
+.lc-posthead__face:hover {
+  opacity: 1;
+}
+
+/* A waiting member is here as a hollow pip rather than absent: the strip IS
+ * the roster, and a name missing from it reads as someone not in the room. */
+.lc-posthead__face.is-waiting {
+  opacity: 0.45;
+}
+
+.lc-posthead__pip {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--lc-bg-terminal);
+  box-sizing: border-box;
+}
+
+.lc-posthead__face.is-answered .lc-posthead__pip {
+  background: var(--lc-green);
+}
+
+.lc-posthead__face.is-running .lc-posthead__pip {
+  background: var(--lc-amber);
+}
+
+.lc-posthead__face.is-failed .lc-posthead__pip {
+  background: var(--lc-red);
+}
+
+.lc-posthead__face.is-waiting .lc-posthead__pip {
+  background: none;
+  border-color: var(--lc-border-strong);
+}
+
+.lc-roomwaiting {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-3);
+  margin: var(--lc-space-3) 0 0;
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-terminal);
+  font-size: var(--lc-text-description);
+}
+
+.lc-roomwaiting__label {
+  flex: none;
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--lc-text-muted);
+}
+
+.lc-roomwaiting__names {
+  flex: 1;
+  min-width: 0;
+  color: var(--lc-text-secondary);
+}
+
+.lc-roomwaiting__count {
+  flex: none;
+  color: var(--lc-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-roomabsent {
+  margin: var(--lc-space-3) 0 0;
+  padding-left: var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-card);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
 }
 
 .lc-roomanswer__who {
@@ -2616,7 +2978,12 @@ textarea {
 
 .lc-runtimerow {
   display: flex;
-  align-items: center;
+  /* Top, not centre. The row used to be two lines tall and centring read as
+     aligned with the runtime's name; once the CLI artifacts moved in under it
+     (2026-09-10) the row grew to six or more, and the READY tag floated in
+     the middle of a list it says nothing about. It is a fact about the
+     runtime, so it sits beside the runtime. */
+  align-items: flex-start;
   gap: var(--lc-space-5);
   padding: var(--lc-space-5);
   border: 1px solid var(--lc-border-card);
@@ -2766,6 +3133,10 @@ textarea {
 .lc-composer__box {
   display: flex;
   align-items: center;
+  /* Wraps, so the who-answers row can take a line of its own under the
+     field instead of being squeezed into it beside the send control. With
+     nothing to wrap this is the row it always was. */
+  flex-wrap: wrap;
   gap: var(--lc-space-4);
   min-height: 50px;
   padding: 0 var(--lc-space-4) 0 15px;
@@ -2945,6 +3316,16 @@ textarea {
 }
 
 /* The context ring sits in the controls row beside the route chip. */
+/* The ring's seat on the mission line: inline with the text, a space after
+   the last fact, and vertically on the line's centre rather than its baseline
+   so a 14px circle does not hang below 11px mono text. */
+.lc-workroom__context {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: var(--lc-space-3);
+}
+
 .lc-contextring {
   display: inline-flex;
   align-items: center;
@@ -3700,6 +4081,27 @@ textarea {
   border-color: var(--lc-hover-border);
 }
 
+/* `Save as routine` in the workroom header.
+ *
+ * A ghost button, and deliberately quieter than `Activity` beside it: the
+ * drawing gives it no border at all, because it is an offer and Activity is
+ * a control you use every mission. `.lc-ghostbutton` pushes itself right with
+ * `margin-left: auto`, which is correct where it is alone and wrong in a row
+ * of header actions, so that is taken back here. */
+.lc-saveroutine {
+  margin-left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  border-color: transparent;
+  color: var(--lc-text-muted);
+}
+
+.lc-saveroutine:hover {
+  color: var(--lc-text-secondary);
+  border-color: var(--lc-hover-border);
+}
+
 .lc-primarybutton {
   height: 32px;
   padding: 0 var(--lc-space-6);
@@ -3812,9 +4214,15 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* The conversation on screen, inside its teammate's card. This is SELECTION
+   -- which row the workroom is showing -- and it was drawn in lime, the same
+   colour as "this teammate is working", so a selected card that was also
+   thinking was two nested lime surfaces and the lime meant nothing (design
+   agent, 2026-09-10). Selection is the neutral selected ground everywhere
+   else in the app; lime stays for the thing that is happening. */
 .lc-teammate__mission.is-active {
-  background: var(--lc-lime-tint);
-  color: var(--lc-lime-text);
+  background: var(--lc-bg-selected);
+  color: var(--lc-text-primary);
 }
 
 /* The title, by name: as `span:last-child` it lost the ellipsis the moment a
@@ -3879,6 +4287,58 @@ textarea {
   padding: 0 var(--lc-space-7);
   border-bottom: 1px solid var(--lc-border-hairline);
   background: var(--lc-bg-chrome);
+}
+
+/* ----------------------------------------------------------------------
+ * The Automations screen's own header, and the three names under it.
+ *
+ * Written against `lc-screen__head`, `lc-screen__lede`, `lc-screen__note` and
+ * `lc-section__title` -- four names this stylesheet never defined. A class
+ * with no rule does not warn and does not fail; it simply draws nothing. So
+ * the one screen in the app that has a lede was also the only screen with no
+ * chrome bar, no hairline and no side padding: its title sat flush against
+ * the window edge and its lede was body text at body size.
+ *
+ * Found 2026-09-09 by `classes-are-styled`, the control written the same day
+ * after `lc-button--quiet` was styled in a component and defined nowhere.
+ * It is the same defect class as the undefined `--lc-border` token: silent,
+ * and it reads as a choice.
+ *
+ * A column rather than the 60px row every other screen uses, because this
+ * header carries a second line and the row form would clip it.
+ * -------------------------------------------------------------------- */
+.lc-screen__head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  padding: var(--lc-space-5) var(--lc-space-7);
+  border-bottom: 1px solid var(--lc-border-hairline);
+  background: var(--lc-bg-chrome);
+}
+
+.lc-screen__lede {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/* The closing note under the routines: quiet, and kept off the window edge
+   the way every other block on this screen is. */
+.lc-screen__note {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-6);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+.lc-section__title {
+  font-size: var(--lc-text-control);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--lc-text-primary);
+  margin: 0;
 }
 
 .lc-screen__title {
@@ -5046,11 +5506,20 @@ textarea {
   width: 28px;
   height: 24px;
   padding: 0;
-  border: 1px solid transparent;
+  /* Boxed, the same border and ground as the chips beside it. It was a bare
+     glyph at the right edge and read as an artifact rather than a control --
+     the design agent's app-wide read, 2026-09-10. A control that reads as
+     decoration is one nobody presses. */
+  border: 1px solid var(--lc-border-control);
   border-radius: var(--lc-radius-control);
-  background: transparent;
+  background: var(--lc-bg-control);
   cursor: pointer;
   transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-swarm:hover:not(:disabled) {
+  border-color: var(--lc-border-hover);
+  background: var(--lc-hover-surface);
 }
 
 .lc-swarm img {
@@ -5699,6 +6168,94 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* The folder one teammate works in, in the teammate dialog.
+ *
+ * A path is the widest thing this dialog ever shows, so it takes the row it
+ * needs and wraps rather than pushing the two controls off the edge -- the
+ * controls are what the row is FOR. `break-all` because a Windows path has no
+ * spaces to break at, and two lines because a third would be a path nobody
+ * reads anyway; the full text is on the element's title. */
+.lc-field--folder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-5);
+}
+
+/* Which connectors a teammate may use without asking: one chip per known
+   connector, ticked by default (everything), unticked to narrow. The same
+   chip the composer uses for "who answers", because it is the same gesture:
+   a set with members in or out. */
+.lc-field--connectors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-5);
+}
+
+.lc-connectorgrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
+
+.lc-connectorpick {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-control);
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-connectorpick.is-on {
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+  color: var(--lc-text-primary);
+}
+
+/* Reported but not usable yet -- not signed in, or not answering. Offered
+   anyway, dimmed: it is still the person's, and ticking it costs nothing. */
+.lc-connectorpick.is-unready {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.lc-folderrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
+
+.lc-folderrow__path {
+  flex: 1 1 12rem;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-description);
+  word-break: break-all;
+}
+
+/* No folder of its own is the ordinary state, not a value: it reads as the
+ * sentence it is rather than as a path somebody typed. */
+.lc-folderrow__path.is-default {
+  color: var(--lc-text-muted);
+  font-style: italic;
+}
+
 /* ======================================================================
  * Visual pass, 2026-09-03 (design agent).
  *
@@ -6132,7 +6689,6 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
-
 
 /* ======================================================================
  * Touch-up, 2026-09-04 (design agent).

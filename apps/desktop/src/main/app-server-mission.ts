@@ -392,6 +392,37 @@ export function createAppServerMissionService(
     }
   }
 
+/**
+ * A turn that ended ON ITS OWN TERMS, which had no ending at all.
+ *
+ * Three things removed a run from `runs`: a stop, a lost transport, and a
+ * ledger that could not be written. A turn that simply FINISHED was not among
+ * them -- and unlike `codex exec`, an app-server process does not exit when
+ * its turn is over, so `onExit` never fired either. The run stayed live
+ * forever.
+ *
+ * MEASURED 2026-09-10: a second message to the same teammate in Approve-each
+ * was refused before it started -- "Wren already has a mission running" --
+ * and reached the person as "The approval-capable runtime could not be
+ * started", while the sidebar said Wren was idle. So Approve-each was a
+ * one-turn mode and the reason was invisible.
+ *
+ * The cap made it worse than that. `liveElsewhere` sums all three transports,
+ * so four finished Approve-each turns fill the whole pool and every mission
+ * in the app is refused until a restart. And each one left a `codex
+ * app-server` process alive.
+ *
+ * Nothing here is emitted: the terminal receipt was already persisted by the
+ * notification that finalized the normalizer. This only lets the run go.
+ */
+  const released = (run: LiveRun): void => {
+    if (runs.get(run.runId) !== run) return
+    runs.delete(run.runId)
+    releaseApprovals(run.runId)
+    run.client?.dispose('The turn ended.')
+    run.process?.kill()
+  }
+
   const stop = (run: LiveRun, reason: 'cancelled' | 'transport-lost', why: string): void => {
     if (runs.get(run.runId) !== run) return
     runs.delete(run.runId)
@@ -593,8 +624,18 @@ export function createAppServerMissionService(
               if (changes !== undefined) changesByItem.set(found.id, changes)
             }
             const produced = normalizer.accept(notification)
+            // Released only AFTER the receipt is written: the terminal event
+            // is persisted by this same call, and letting the run go first
+            // would race the thing that records how it ended. The rejection
+            // handler is passed to `then` rather than chained, so a throw
+            // from the release cannot be mistaken for a ledger failure.
             void persistAndEmit(run, withFileChanges(produced, changesByItem, peer?.cwd ?? options.workspacePath))
-              .catch(() => receiptsFailed(run))
+              .then(
+                () => {
+                  if (normalizer.finalized) released(run)
+                },
+                () => receiptsFailed(run)
+              )
           },
           onRequest: async (request) => {
             /*
@@ -638,6 +679,7 @@ export function createAppServerMissionService(
                 approvalId,
                 runId,
                 missionId,
+                runtime: 'codex',
                 kind: described.kind,
                 // What was actually asked, structured, so the card can offer
                 // the options rather than a sentence about them.

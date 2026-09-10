@@ -110,7 +110,7 @@ try {
   // "effort · fixed" could be removed at all.
   await drive.capture('choose high, and read the composer chip', () =>
     drive.evaluate(`(async () => {
-      const flat = (el) => el.innerText.split(/\s+/).join(' ').trim()
+      const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
       const chips = [...document.querySelectorAll('.lc-picker__effort')]
       const high = chips.find((c) => flat(c) === 'high')
       if (!high) return 'no high chip among ' + chips.map(flat).join(' ')

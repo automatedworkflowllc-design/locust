@@ -104,6 +104,36 @@ export interface MemoryBriefing {
   section(peer: MissionPeerContext): Promise<string | undefined>
 }
 
+/**
+ * Who a share block meant, read the way a person would read it.
+ *
+ * A model writes `to=` from the roster the briefing printed, and the roster
+ * prints `Name (Role)`. It has taken the role half twice now, so the role is
+ * a way in -- but only when exactly one teammate answers to it. Several
+ * teammates can be `Custom`, and a message delivered to whichever of them
+ * happened to be first would be worse than one refused out loud.
+ *
+ * `'self'` is its own answer rather than `undefined`: addressing yourself is
+ * not a roster you should go and fix.
+ */
+export function recipientOf(
+  to: string,
+  peer: MissionPeerContext
+): MissionPeerContext['others'][number] | 'self' | undefined {
+  const wanted = to.trim().toLowerCase()
+  if (wanted.length === 0) return undefined
+  const byName = peer.others.filter((entry) => entry.name.toLowerCase() === wanted)
+  if (byName.length === 1) return byName[0]
+  if (peer.self.name.toLowerCase() === wanted) return 'self'
+  // Ambiguous by name is not resolved by role: two teammates really do share
+  // that name, and the app cannot pick one for the person.
+  if (byName.length > 1) return undefined
+  const byRole = peer.others.filter((entry) => entry.role.toLowerCase() === wanted)
+  if (byRole.length === 1) return byRole[0]
+  if (byRole.length === 0 && peer.self.role.toLowerCase() === wanted) return 'self'
+  return undefined
+}
+
 export function createPeerExchange(options: {
   readonly workroom: Workroom
   readonly ledger: MissionLedger
@@ -166,7 +196,31 @@ export function createPeerExchange(options: {
         )
       }
       for (const block of blocks.slice(0, MAX_SHARES_PER_MISSION)) {
-        const target = peer.others.find((entry) => entry.name.toLowerCase() === block.to.toLowerCase())
+        const target = recipientOf(block.to, peer)
+        if (target === 'self') {
+          /*
+           * It addressed ITSELF, and by its own role.
+           *
+           * The briefing prints the roster as `Jimothy (Finance Bro)`, and
+           * on 2026-09-09 Jimothy wrote `to="Finance Bro"` -- his own role
+           * label, not another teammate. The old matcher looked at names
+           * only, found nothing, and reported "who is not on the roster",
+           * which reads as a roster problem the person could go and fix.
+           * There was nothing to fix: the message had nowhere to go because
+           * it was addressed home.
+           *
+           * Third variation of one defect. The first two -- single quotes,
+           * and the printed `(role)` suffix -- are handled in the parser and
+           * documented there. All three are the app failing to read
+           * something unambiguous.
+           */
+          failed(
+            `${peer.self.name} addressed a message to "${block.to}", which is ${peer.self.name}'s own ${
+              peer.self.name.toLowerCase() === block.to.toLowerCase() ? 'name' : 'role'
+            } rather than another teammate. Nothing was sent.`
+          )
+          continue
+        }
         if (target === undefined) {
           // Said out loud: a runtime that addressed someone who is not here
           // was probably working from a stale or invented name, and the

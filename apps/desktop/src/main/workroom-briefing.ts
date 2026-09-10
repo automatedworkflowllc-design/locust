@@ -44,6 +44,22 @@ export interface MissionPeerContext {
    * into a prompt. Absent means the folder.
    */
   readonly cwd?: string
+  /**
+   * The repository `cwd` was cut from, when `cwd` is a worktree.
+   *
+   * OpenCode needs it to find the project it is working on. It used to be
+   * assumed to be the app's folder, which held while a worktree was the only
+   * reason a run stood anywhere else; a teammate with its own folder gets a
+   * worktree of THAT repository, and the assumption would have named the
+   * wrong one. Absent whenever `cwd` is a plain folder rather than a
+   * worktree.
+   */
+  readonly repositoryRoot?: string
+  /**
+   * The connectors this teammate is narrowed to, when it is. Host-only, never
+   * printed into a prompt. Absent means every connector the person has.
+   */
+  readonly connectors?: readonly string[]
   /** Why the worktree could not be made, when the teammate asked for one. */
   readonly worktreeRefused?: string
 }

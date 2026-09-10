@@ -8,7 +8,14 @@
 // the file on disk.
 //
 // Spends one short Codex run on Colin's account, at the cheapest setting the
-// runtime offers. `model/list` reports exactly one model -- `gpt-6-astra` --
+// runtime offers. THAT COMMENT WAS WRONG and it cost real money: it said
+// `model/list` reports exactly one model, so every Codex drive pinned
+// `gpt-6-astra` -- which the picker describes as "our most capable model for
+// complex, demanding work". Codex lists SIX, including `gpt-5.6-luna`,
+// "fast and affordable agentic coding model". Colin, 2026-09-09, watching me
+// spend it: "astra is very expensive brother, they have a ton of other models
+// to use." Read from the picker with probe-codex-models.mjs, which sends
+// nothing to any model. The drives run on the affordable one now --
 // so there is no cheaper model to pick and the only lever is reasoning
 // effort, which is pinned to `low` here. Colin, 2026-09-08: "use cheap models
 // especially for codex". The prompt is deliberately one file and no shell.
@@ -31,7 +38,7 @@ const drive = await startDrive({
   workspace,
   seed: {
     schemaVersion: 1,
-    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-05T05:00:00.000Z', route: { runtime: 'codex', model: 'gpt-6-astra', mode: 'approve-each', effort: 'low' } }],
+    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-05T05:00:00.000Z', route: { runtime: 'codex', model: 'gpt-5.6-luna', mode: 'approve-each', effort: 'low' } }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 6, memoryMode: 'off' }
   }

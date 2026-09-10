@@ -36,7 +36,8 @@ import type {
   PublicMemory,
   PublicRuntimeSetup,
   PublicWorkspaceBrief,
-  PublicWorktree
+  PublicWorktree,
+  PublicConnector
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
@@ -44,6 +45,10 @@ import { queuedVerdict, requeuedTo } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
+import { ContextRing } from './components/ContextRing.js'
+import { memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
+import { createFrameBatcher } from './streamFrames.js'
+import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
@@ -55,6 +60,7 @@ import { Composer } from './components/Composer.js'
 import { ExchangeStrip } from './components/ExchangeStrip.js'
 import { RoomScreen } from './components/RoomScreen.js'
 import type { RoomAnswer } from './components/RoomScreen.js'
+import { refusalNotice } from './components/RoomScreen.js'
 import { exchangeOf } from './exchange.js'
 import type { ExchangeMission } from './exchange.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
@@ -89,6 +95,7 @@ import {
   typedPrompt, assistantMessages } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
+import { isStoppable, stopPress } from './stopPress.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
@@ -199,7 +206,9 @@ type RuntimeDiscoveryState =
 type RunMap = ReadonlyMap<string, LiveRunState>
 
 function liveRunIsActive(run: LiveRunState | undefined): boolean {
-  return run !== undefined && (run.phase === 'starting' || run.phase === 'running' || run.phase === 'cancelling')
+  // The same set `stopPress` reads. Kept in one place because the button and
+  // the press disagreeing is exactly how a stop came to do nothing.
+  return run !== undefined && isStoppable(run.phase)
 }
 
 function isTerminal(phase: LiveRunPhase): boolean {
@@ -734,7 +743,7 @@ export default function App(): ReactElement {
     const before = layout
     setLayout(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode, layout: next })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode, askConnectors, layout: next })
       .then((settings) => setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto'))
       .catch(() => setLayout(before))
   }
@@ -771,6 +780,8 @@ export default function App(): ReactElement {
   }>()
   /** The teammate being edited in the same dialog, when it is open for editing. */
   const [editingTeammate, setEditingTeammate] = useState<PublicTeammate>()
+  /** Why a folder request for one teammate did nothing. */
+  const [folderNotice, setFolderNotice] = useState<string>()
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [screen, setScreen] = useState<Screen>('workroom')
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -1010,6 +1021,8 @@ export default function App(): ReactElement {
   // than remembered: this is the switch that decides whether a mode which can
   // write anywhere on the machine is offered at all.
   const [autoMode, setAutoMode] = useState(false)
+  /** Ask before every connector call. See WorkspaceSettings.askConnectors. */
+  const [askConnectors, setAskConnectors] = useState(false)
 
   // Switching Auto off takes it away from a window that was sitting on it,
   // rather than leaving a choice the host would refuse at the next send.
@@ -1048,6 +1061,25 @@ export default function App(): ReactElement {
    * workroom messages it is shown, and under whose name it may share.
    */
   const [selectedTeammateId, setSelectedTeammateId] = useState<string>()
+  /**
+   * Stops pressed before the run had a name, by the key it had at the time.
+   *
+   * A run is `starting` from the moment the person presses send until the
+   * host answers with its run id, and the box draws the stop button for the
+   * whole of it -- correctly, because the runtime is already going. But there
+   * was nothing to cancel BY: `cancelMission` reads the run id off the shown
+   * run, found none, and returned without a word.
+   *
+   * MEASURED 2026-09-10, on the second turn of a conversation: `shownKey`
+   * was still `pending:2` six seconds after send, so the press did nothing at
+   * all and the mission ran to completion -- 200 of 200 numbers, on both
+   * Claude Code and Codex, which is how it was told apart from the transport
+   * change that day. A first turn resolves fast enough to hide it.
+   *
+   * A ref rather than state: it is read inside the async start that is
+   * already in flight, where a re-render would not reach it.
+   */
+  const cancelWhenNamedRef = useRef(new Set<string>())
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const pendingKeyCounter = useRef(0)
 
@@ -1149,6 +1181,29 @@ export default function App(): ReactElement {
       .catch(() => undefined)
   }
 
+  /**
+   * One commit for every update held in a frame, in the order they came.
+   * See streamFrames.ts, and the note where updates are pushed into it.
+   */
+  const frameBatcher = useRef(
+    createFrameBatcher<Extract<CodexMissionUpdate, { readonly runId: string }>>((updates) => {
+      setRuns((current) => {
+        let next = current
+        for (const update of updates) {
+          if (next.has(update.runId)) {
+            next = withRun(next, update.runId, (run) => applyMissionUpdate(run, update))
+            continue
+          }
+          // A run whose start receipt has not come back yet: hold its updates
+          // until the receipt names its runId, then replay them in order.
+          const queued = pendingUpdatesRef.current.get(update.runId) ?? []
+          pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
+        }
+        return next
+      })
+    })
+  )
+
   useEffect(() => {
     let active = true
     const bridge = window.desktop
@@ -1242,6 +1297,19 @@ export default function App(): ReactElement {
         // A routine that started on its own: the Team card's run count and
         // next run moved on disk, and nobody pressed anything to refresh them.
         if (update.startedBy?.kind === 'routine') void reloadRoutines()
+        /*
+         * A room start, so re-read the rooms NOW.
+         *
+         * The host writes the post before it asks anyone and announces each
+         * run as it begins -- but the room on screen is drawn from the rooms
+         * in renderer state, and those only arrived with the post's own
+         * response, which lands after every member has been tried. So the
+         * host could be three runs in and the room still showed nothing.
+         *
+         * This is the other half of the fix for the 45 seconds Astra
+         * measured between a process existing and its row appearing.
+         */
+        if (update.startedBy?.kind === 'room') refreshRooms()
         const queued = pendingUpdatesRef.current.get(update.runId) ?? []
         pendingUpdatesRef.current.delete(update.runId)
         setRuns((current) => {
@@ -1272,16 +1340,24 @@ export default function App(): ReactElement {
         }
         return
       }
-      setRuns((current) => {
-        if (current.has(update.runId)) {
-          return withRun(current, update.runId, (run) => applyMissionUpdate(run, update))
-        }
-        // A run whose start receipt has not come back yet: hold its updates
-        // until the receipt names its runId, then replay them in order.
-        const queued = pendingUpdatesRef.current.get(update.runId) ?? []
-        pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
-        return current
-      })
+      /*
+       * Deltas land once per FRAME, not once per token.
+       *
+       * Each update is its own IPC message and so its own task, and React
+       * batches within a task, not across them -- so every `message.delta`
+       * was a full re-render of the thread, and a burst of twenty read as
+       * twenty jolts. Colin, 2026-09-10: "the text seems to come out rather
+       * aggressively or glitchy." Claude Code's own renderer coalesces; this
+       * is that. Only deltas are held; anything else flushes at once with
+       * whatever was ahead of it, so order never changes and a run finishing
+       * is never a frame late. See streamFrames.ts.
+       */
+      // Only an update that belongs to a run goes to a run. The kinds without
+      // a runId were all handled and returned above; this is the same fact
+      // said where the type checker can see it.
+      if (!('runId' in update)) return
+      const isDelta = update.kind === 'event' && update.event.type === 'message.delta'
+      frameBatcher.current.push(update, !isDelta)
     })
 
     const stopUpdates = bridge.onUpdateState((state) => {
@@ -1358,6 +1434,7 @@ export default function App(): ReactElement {
           setSwarm(settings.swarm === true)
           setRelay(settings.relay === true)
           setAutoMode(settings.autoMode === true)
+          setAskConnectors(settings.askConnectors === true)
           setRelayHopCap(settings.relayHopCap)
           setMemoryMode(settings.memoryMode)
           setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto')
@@ -1489,6 +1566,7 @@ export default function App(): ReactElement {
       clearTimeout(firstRecheck)
       window.removeEventListener('focus', onFocus)
       removeMissionListener()
+      frameBatcher.current.dispose()
       removeApprovalListener()
       stopUpdates()
     }
@@ -1665,6 +1743,15 @@ export default function App(): ReactElement {
       answers.push({
         teammateId,
         missionId,
+        /*
+         * When the asking started, so the card can say how long it has been
+         * quiet. The first event is the honest mark for a run that has
+         * spoken; for one that has not, the post is -- which is exactly the
+         * window this is for. A queued member's clock starts when they were
+         * asked, not when the post was made, and their first event is the
+         * only record of that.
+         */
+        startedAt: events[0]?.occurredAt ?? post.at,
         phase,
         text: last === undefined || last.trim().length === 0 ? undefined : last,
         runtime,
@@ -1716,20 +1803,51 @@ export default function App(): ReactElement {
     const before = memoryMode
     setMemoryMode(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next, autoMode, layout })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode: next, autoMode, askConnectors, layout })
       .then((settings) => setMemoryMode(settings.memoryMode))
       .catch(() => setMemoryMode(before))
   }
 
-  const createRoom = async (name: string, teammateIds: readonly string[]): Promise<string | undefined> => {
+  /**
+   * Make a room and say which one, because the caller usually wants to post
+   * to it next.
+   *
+   * `createRoom` below keeps the old shape -- an error string or nothing --
+   * for the Rooms screen's own form, which has nothing to do afterwards.
+   */
+  const makeRoom = async (
+    name: string,
+    teammateIds: readonly string[]
+  ): Promise<{ readonly roomId: string } | { readonly message: string }> => {
     const bridge = window.desktop
-    if (bridge === undefined) return 'The secure desktop bridge is unavailable.'
+    if (bridge === undefined) return { message: 'The secure desktop bridge is unavailable.' }
     const response = await bridge.createRoom({ name, teammateIds }).catch(() => undefined)
-    if (response === undefined) return 'The room could not be created.'
-    if (!response.ok) return response.error.message
+    if (response === undefined) return { message: 'The room could not be created.' }
+    if (!response.ok) return { message: response.error.message }
     refreshRooms()
-    if (response.data.room !== undefined) setCurrentRoomId(response.data.room.roomId)
-    return undefined
+    const made = response.data.room
+    if (made === undefined) return { message: 'The room could not be created.' }
+    setCurrentRoomId(made.roomId)
+    return { roomId: made.roomId }
+  }
+
+  const createRoom = async (name: string, teammateIds: readonly string[]): Promise<string | undefined> => {
+    const made = await makeRoom(name, teammateIds)
+    return 'roomId' in made ? undefined : made.message
+  }
+
+  const renameRoom = (roomId: string, name: string): void => {
+    void window.desktop
+      ?.renameRoom(roomId, name)
+      .then((response) => {
+        if (!response.ok) {
+          setRoomNotice(response.error.message)
+          return
+        }
+        setRoomNotice(undefined)
+        refreshRooms()
+      })
+      .catch(() => setRoomNotice('That room could not be renamed.'))
   }
 
   const removeRoom = (roomId: string): void => {
@@ -1753,12 +1871,8 @@ export default function App(): ReactElement {
     if (response === undefined) return 'The post could not be made.'
     if (!response.ok) return response.error.message
     refreshRooms()
-    // Who could not be started is said once, by name, in the host's words.
-    setRoomNotice(
-      response.data.refused.length === 0
-        ? undefined
-        : response.data.refused.map((entry) => `${entry.name}: ${entry.message}`).join(' · ')
-    )
+    // Who could not be started, in the host's words, said once per reason.
+    setRoomNotice(refusalNotice(response.data.refused))
     return undefined
   }
 
@@ -1944,6 +2058,30 @@ export default function App(): ReactElement {
       // Follow the run under its real key only if the person is still looking
       // at it; they may have moved to another teammate's thread meanwhile.
       setShownKey((current) => (current === key ? runId : current))
+      // Stopped while it was still starting: the person pressed the button
+      // and meant it, so the run is cancelled the moment it can be named.
+      if (cancelWhenNamedRef.current.delete(key)) {
+        setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+        void bridge
+          .cancelCodexMission({ runId })
+          .then((answer) => {
+            if (answer.ok) return
+            setRuns((all) =>
+              withRun(all, runId, (run) =>
+                liveRunIsActive(run) ? { ...run, phase: 'running', error: answer.error.message } : run
+              )
+            )
+          })
+          .catch(() => {
+            setRuns((all) =>
+              withRun(all, runId, (run) =>
+                liveRunIsActive(run)
+                  ? { ...run, phase: 'running', error: 'The cancellation request could not be delivered.' }
+                  : run
+              )
+            )
+          })
+      }
       // And so does anything queued against it. The temporary key was just
       // deleted above, so a message typed while the host was still answering
       // pointed at nothing and was held as "that conversation is no longer
@@ -2117,8 +2255,19 @@ export default function App(): ReactElement {
 
   const cancelMission = (): void => {
     const bridge = window.desktop
-    const runId = liveRun?.data?.runId
-    if (!bridge || runId === undefined || !liveRunIsActive(liveRun)) return
+    const press = stopPress(liveRun, shownKey)
+    if (!bridge || press.kind === 'nothing') return
+    // Pressed before the host has answered with a run id. The runtime is
+    // already going, so this is not a press to ignore -- it is remembered
+    // against the key the run has right now, and the start honours it as
+    // soon as there is something to name. Silently returning here let a
+    // stopped mission run to completion (measured 2026-09-10).
+    if (press.kind === 'cancel-when-named') {
+      cancelWhenNamedRef.current.add(press.key)
+      setRuns((all) => withRun(all, press.key, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+      return
+    }
+    const runId = press.runId
     setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
     void bridge
       .cancelCodexMission({ runId })
@@ -2184,6 +2333,73 @@ export default function App(): ReactElement {
         })
       })
       .catch(() => setTeammateError('That teammate could not be updated.'))
+  }
+
+  /**
+   * Point one teammate at its own folder, or put it back in the project one.
+   *
+   * The host opens the dialog and writes the record; what comes back is the
+   * teammate, never a path. The open dialog is refreshed from that answer so
+   * the row shows the new folder without a Save, which is honest -- the
+   * change has already happened by then.
+   */
+  /** Every connector the host reports, read when the edit dialog opens. */
+  const [connectorList, setConnectorList] = useState<readonly PublicConnector[]>()
+  useEffect(() => {
+    if (editingTeammate === undefined) return
+    let live = true
+    void window.desktop
+      ?.listConnectors()
+      .then((response) => {
+        if (live && response.ok) setConnectorList(response.data.connectors)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [editingTeammate?.teammateId])
+
+  /** Narrow one teammate to some connectors, or widen it back. The host answers with the teammate. */
+  const setTeammateConnectors = (teammateId: string, names: readonly string[]): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    void bridge
+      .setTeammateConnectors(teammateId, names)
+      .then((response) => {
+        if (!response.ok) {
+          setFolderNotice(response.error.message)
+          return
+        }
+        setEditingTeammate(response.data.teammate)
+        return bridge.listTeammates().then((listed) => {
+          if (!listed.ok) return
+          setTeammates(listed.data.teammates)
+          setMissionOwners(listed.data.missionOwners)
+        })
+      })
+      .catch(() => setFolderNotice('That could not be changed.'))
+  }
+
+  const chooseTeammateFolder = (teammateId: string, clear: boolean): void => {
+    const bridge = window.desktop
+    if (!bridge) return
+    setFolderNotice(undefined)
+    void bridge
+      .chooseTeammateFolder(teammateId, clear)
+      .then((response) => {
+        if (!response.ok) {
+          // Closing the picker is not a failure and is not reported as one.
+          if (response.error.code !== 'CANCELLED') setFolderNotice(response.error.message)
+          return
+        }
+        setEditingTeammate(response.data.teammate)
+        return bridge.listTeammates().then((listed) => {
+          if (!listed.ok) return
+          setTeammates(listed.data.teammates)
+          setMissionOwners(listed.data.missionOwners)
+        })
+      })
+      .catch(() => setFolderNotice('That folder could not be chosen.'))
   }
 
   const reloadRoutines = async (): Promise<void> => {
@@ -2504,6 +2720,20 @@ export default function App(): ReactElement {
    * showing a thread whose record is gone would be showing a ghost.
    */
   const [deleteArmed, setDeleteArmed] = useState(false)
+  /**
+   * The conversation on screen, when it can be saved as a routine.
+   *
+   * Absent rather than disabled -- see `savableMissionId`. The draft check is
+   * the same one the right-click menu makes, so the two entrances can never
+   * disagree about whether there is anything to save.
+   */
+  const saveAsRoutineId = savableMissionId({
+    missionId: liveRun?.data?.missionId,
+    phase: liveRun?.phase,
+    running,
+    hasDraft:
+      liveRun?.data?.missionId !== undefined && routineDraftFor(liveRun.data.missionId) !== undefined
+  })
   const [deleteError, setDeleteError] = useState<string>()
   /**
    * What a row action just did, when it worked.
@@ -2895,7 +3125,10 @@ export default function App(): ReactElement {
               onRemoveRoutine={removeRoutine}
               notice={automationNotice}
               onDismissNotice={() => setAutomationNotice(undefined)}
-              cliArtifacts={cliArtifacts}
+              // The same rows the sidebar draws. An empty screen offers the
+              // finished ones rather than describing how to save one.
+              missions={sidebarMissions}
+              onSaveRoutine={openSaveRoutine}
             />
           ) : screen === 'rooms' ? (
             <RoomScreen
@@ -2910,6 +3143,7 @@ export default function App(): ReactElement {
               }}
               onCreateRoom={createRoom}
               onRemoveRoom={removeRoom}
+              onRenameRoom={renameRoom}
               onPost={postToRoom}
               onTask={updateRoomTask}
               onOpenMission={openMission}
@@ -2924,6 +3158,7 @@ export default function App(): ReactElement {
               limitedRuntimes={limitedRuntimes}
               usageWindows={usageWindows}
               runtimeSetup={runtimeSetup}
+              cliArtifacts={cliArtifacts}
               workspaceBrief={workspaceBrief}
               worktrees={worktrees}
               onRemoveWorktree={removeWorktree}
@@ -2940,7 +3175,7 @@ export default function App(): ReactElement {
                 // reconciled with what the store actually saved.
                 setSwarm(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
+                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, askConnectors, layout })
                   .then((settings) => setSwarm(settings.swarm === true))
                   .catch(() => setSwarm(!next))
               }}
@@ -2948,9 +3183,17 @@ export default function App(): ReactElement {
               onAutoModeChange={(next) => {
                 setAutoMode(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: next, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: next, askConnectors, layout })
                   .then((settings) => setAutoMode(settings.autoMode === true))
                   .catch(() => setAutoMode(!next))
+              }}
+              askConnectors={askConnectors}
+              onAskConnectorsChange={(next) => {
+                setAskConnectors(next)
+                void window.desktop
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode, askConnectors: next, layout })
+                  .then((settings) => setAskConnectors(settings.askConnectors === true))
+                  .catch(() => setAskConnectors(!next))
               }}
               relayHopCap={relayHopCap}
               memoryMode={memoryMode}
@@ -2964,14 +3207,14 @@ export default function App(): ReactElement {
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode, autoMode, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, memoryMode, autoMode, askConnectors, layout })
                   .then((settings) => setRelayHopCap(settings.relayHopCap))
                   .catch(() => undefined)
               }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode, autoMode, layout })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, memoryMode, autoMode, askConnectors, layout })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -3068,7 +3311,12 @@ export default function App(): ReactElement {
                           // will. Leaving "Starting…" over a red error card
                           // said the opposite of what happened.
                           ? `Mission · not started · ${liveRun.phase}`
-                          : 'Starting…'
+                          // Not "Starting…": the thread already says
+                          // "Starting · 3s" five hundred pixels below, and
+                          // two places stating one fact is how they come to
+                          // disagree. The thread's is the one that stays --
+                          // it carries the clock (design agent, 2026-09-10).
+                          : 'Mission'
                         // The MODEL, not just the runtime. This app exists to
                         // put two models on the same work, and the header
                         // named only the runtime -- so two missions from
@@ -3091,6 +3339,20 @@ export default function App(): ReactElement {
                             // number -- never a zero, which would read as free.
                             shownCost === undefined ? '' : ` · ${running ? 'so far ' : ''}${shownCost}`
                           }`}
+                      {/*
+                        * How full the context is, beside the cost it belongs
+                        * with. It sat on the composer bar as a bare 14px glyph
+                        * next to the swarm mark, and the two read as artifacts
+                        * rather than controls -- "seven items, four looks"
+                        * (design agent, 2026-09-10). It is a fact about THIS
+                        * conversation, and this line is where the
+                        * conversation's other facts are.
+                        */}
+                      {shownContext !== undefined && (
+                        <span className="lc-workroom__context">
+                          <ContextRing reading={shownContext} />
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3138,6 +3400,39 @@ export default function App(): ReactElement {
                       onBlur={() => setDeleteArmed(false)}
                     >
                       {deleteArmed ? 'Delete for good?' : 'Delete'}
+                    </button>
+                  )}
+                  {/*
+                    * Where the material IS -- the other half of the routines
+                    * answer (design agent, 2026-09-10).
+                    *
+                    * This is the entrance the app already chose, made
+                    * visible. `Save as routine` lived only in a right-click,
+                    * and a menu is where you look once you know an action
+                    * exists; the header is how you find out it does. The
+                    * menus keep it.
+                    *
+                    * Chrome, not a card: it does not arrive, animate or take
+                    * a line in the thread, so it is not the nag that was
+                    * ruled out -- a card asking to be saved would be a
+                    * pending-register card for something nobody is waiting
+                    * on.
+                    *
+                    * Only where it is true. Absent while running, absent on
+                    * a run that failed or was cancelled, absent when nothing
+                    * in the conversation was typed by the person: a routine
+                    * is turns worth repeating and those are not. ABSENT
+                    * rather than disabled -- there is nothing to explain
+                    * about an action with no material.
+                    */}
+                  {saveAsRoutineId !== undefined && (
+                    <button
+                      type="button"
+                      className="lc-ghostbutton lc-saveroutine"
+                      title="Save this conversation as a routine this teammate can replay"
+                      onClick={() => openSaveRoutine(saveAsRoutineId)}
+                    >
+                      <Icon name="clock" size={12} /> Save as routine
                     </button>
                   )}
                   <button
@@ -3241,12 +3536,22 @@ export default function App(): ReactElement {
                   teammates,
                   messages: liveRun.peerMessages ?? [],
                   notices: liveRun.peerNotices ?? [],
-                  // What this conversation taught the team is read from the
-                  // memory list, not from a notice that would be gone once
-                  // the thread is drawn from the record.
-                  memories: memories
-                    .filter((memory) => memory.missionId !== undefined && memory.missionId === liveRun.data?.missionId)
-                    .map((memory) => ({ by: memory.by.name, text: memory.text, status: memory.status }))
+                  /*
+                   * What this CONVERSATION taught the team, read from the
+                   * memory list rather than from a notice that would be gone
+                   * once the thread is drawn from the record.
+                   *
+                   * Every turn of it, not the turn on screen. A reply is its
+                   * own mission, so matching the shown missionId lost every
+                   * memory learned earlier the moment a later turn began --
+                   * Colin, 2026-09-10: "after an agent 'remembers something'
+                   * it disappears in chat". The header's Delete had to learn
+                   * the same lesson about the same shape.
+                   */
+                  memories: memoriesOfConversation(
+                    memories,
+                    turnsOfConversation(liveRun.data?.missionId, sidebarMissions)
+                  )
                 }}
                 startedAt={
                   liveRun.restoredMission === undefined
@@ -3318,7 +3623,6 @@ export default function App(): ReactElement {
             }
             onModeChange={setMode}
             autoMode={autoMode}
-            {...(shownContext === undefined ? {} : { context: shownContext })}
             onEnableAutoMode={() => {
               // Picking Auto in the composer IS the person switching it on.
               // Written through the host like any other settings change, so
@@ -3326,7 +3630,7 @@ export default function App(): ReactElement {
               // same answer the composer just showed.
               setAutoMode(true)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: true, layout: 'auto' })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, memoryMode, autoMode: true, askConnectors, layout: 'auto' })
                 .then((settings) => setAutoMode(settings.autoMode === true))
                 .catch(() => setAutoMode(false))
             }}
@@ -3365,7 +3669,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, askConnectors, layout })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}
@@ -3443,7 +3747,7 @@ export default function App(): ReactElement {
                   const next = !swarm
                   setSwarm(next)
                   void window.desktop
-                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, layout })
+                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, memoryMode, autoMode, askConnectors, layout })
                     .then((settings) => setSwarm(settings.swarm === true))
                     .catch(() => setSwarm(!next))
                 }
@@ -3514,8 +3818,15 @@ export default function App(): ReactElement {
           initial={editingTeammate}
           error={teammateError}
           mode={mode}
-          onCancel={() => setEditingTeammate(undefined)}
+          onCancel={() => {
+            setFolderNotice(undefined)
+            setEditingTeammate(undefined)
+          }}
           onCreate={(input) => updateTeammate(editingTeammate.teammateId, input)}
+          onChooseFolder={(clear) => chooseTeammateFolder(editingTeammate.teammateId, clear)}
+          {...(connectorList === undefined ? {} : { connectors: connectorList })}
+          onSetConnectors={(names) => setTeammateConnectors(editingTeammate.teammateId, names)}
+          {...(folderNotice === undefined ? {} : { folderNotice })}
         />
       )}
       {routineDialog !== undefined && (

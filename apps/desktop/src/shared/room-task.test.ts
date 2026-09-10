@@ -98,4 +98,37 @@ describe('what a room mission is told about the board', () => {
     expect(text).toContain('The board is empty.')
     expect(text).toContain('handoff Name :: the task text')
   })
+
+  it('tells a teammate its own name', () => {
+    /*
+     * THE regression. It opened "You are answering in the room X with A, B,
+     * C" -- every name in the sentence belonged to somebody else, and the
+     * recipient had no way to know which one it was.
+     *
+     * Astra hit the consequence measuring the live-mission frontier
+     * (2026-09-09): asked to write to its own named file, a teammate said it
+     * was Muse Spark and could not identify its assigned filename. No file
+     * was written. A task failure at N=1, with nothing concurrent about it.
+     */
+    const said = taskSection({
+      roomName: 'Standup',
+      selfName: 'Wren',
+      memberNames: ['Wren', 'Booty', 'Gem'],
+      tasks: []
+    })
+    expect(said).toContain('You are Wren,')
+    // And still says who else is there, which is what it was for.
+    expect(said).toContain('Booty, Gem')
+    // Never lists the recipient among the others.
+    expect(said).not.toContain('Wren, Booty, Gem')
+  })
+
+  it('names a teammate who is alone in the room', () => {
+    // The exact shape of Astra's failure: one member, so the old sentence
+    // read "with nobody else" and named no one at all.
+    const said = taskSection({ roomName: 'Standup', selfName: 'Wren', memberNames: ['Wren'], tasks: [] })
+    expect(said).toContain('You are Wren,')
+    expect(said).toContain('nobody else')
+  })
 })
+

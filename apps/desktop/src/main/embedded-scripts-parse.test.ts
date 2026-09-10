@@ -101,6 +101,80 @@ export function embeddedScripts(source: string): readonly string[] {
   return scripts
 }
 
+/**
+ * The RAW template text of each embedded script, before the engine eats it.
+ *
+ * `embeddedScripts` returns what the page receives. This returns what the
+ * author typed, which is where the escape mistake is visible: by the time
+ * the template has been resolved, a mangled `\s` is just the letter `s` and
+ * there is nothing left to find.
+ */
+export function embeddedSources(source: string): readonly string[] {
+  const raw: string[] = []
+  for (const match of source.matchAll(/evaluate\(\s*`/g)) {
+    const from = (match.index ?? 0) + match[0].length
+    let index = from
+    let depth = 0
+    let end = -1
+    while (index < source.length) {
+      const char = source[index]
+      if (char === BACKSLASH) {
+        index += 2
+        continue
+      }
+      if (char === '$' && source[index + 1] === '{') {
+        depth += 1
+        index += 2
+        continue
+      }
+      if (char === '}' && depth > 0) {
+        depth -= 1
+        index += 1
+        continue
+      }
+      if (char === '`' && depth === 0) {
+        end = index
+        break
+      }
+      index += 1
+    }
+    if (end >= 0) raw.push(source.slice(from, end))
+  }
+  return raw
+}
+
+/**
+ * Single backslashes the template will swallow, with the line they are on.
+ *
+ * `\s` inside a template literal is not an escape the language knows, so it
+ * resolves to the bare letter `s` -- and `/\s+/g` becomes `/s+/g`, a regex
+ * that deletes every letter s in the text. It is silent: the harness parses,
+ * the emitted script parses, and the only symptom is output with letters
+ * missing from it.
+ *
+ * It has cost this session TEN separate times, including twice while writing
+ * the controls meant to stop it. `\b` is worse -- that one resolves to a
+ * BACKSPACE character.
+ *
+ * Only the letters that mean nothing as a string escape, so a deliberate
+ * `\n` for a real newline is left alone.
+ */
+export function swallowedEscapes(raw: string): readonly number[] {
+  const found: number[] = []
+  let line = 1
+  for (let i = 0; i < raw.length; i += 1) {
+    if (raw[i] === String.fromCharCode(10)) line += 1
+    if (raw[i] !== BACKSLASH) continue
+    // A doubled backslash is the author being correct; step over both.
+    if (raw[i + 1] === BACKSLASH) {
+      i += 1
+      continue
+    }
+    if (/[sdwSDWb]/.test(raw[i + 1] ?? '')) found.push(line)
+  }
+  return found
+}
+
 const files = harnesses()
 const total = files.reduce((count, path) => count + embeddedScripts(readFileSync(path, 'utf8')).length, 0)
 
@@ -127,11 +201,18 @@ describe('the browser scripts the harnesses send', () => {
   it.each(files.map((path) => path.slice(path.lastIndexOf('\\') + 1)))('%s', (name: string) => {
     const path = files.find((entry) => entry.endsWith(`${BACKSLASH}${name}`))
     expect(path).toBeDefined()
-    for (const script of embeddedScripts(readFileSync(path ?? '', 'utf8'))) {
+    const source = readFileSync(path ?? '', 'utf8')
+    for (const script of embeddedScripts(source)) {
       expect(
         () => new vm.Script(script),
         `this is sent to the page as written: ${script.replace(/\s+/g, ' ').slice(0, 120)}`
       ).not.toThrow()
+    }
+    for (const raw of embeddedSources(source)) {
+      expect(
+        swallowedEscapes(raw),
+        `a single backslash the template will swallow -- \s becomes the letter s, and /\s+/g becomes /s+/g`
+      ).toEqual([])
     }
   })
 })

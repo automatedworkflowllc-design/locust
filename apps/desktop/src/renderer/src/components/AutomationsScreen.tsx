@@ -1,8 +1,10 @@
 import type { ReactElement } from 'react'
 
-import type { PublicRoutine, PublicRuntimeArtifact, PublicTeammate } from '../../../shared/ipc.js'
-import { runtimeDisplayName } from '../../../shared/runtimes.js'
+import type { PublicRoutine, PublicTeammate } from '../../../shared/ipc.js'
+import { shortAgo } from '../railFlyout.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
+import { NOTHING_TO_SAVE_YET, savableConversations, turnsLabel } from '../savableConversations.js'
+import type { SavableConversation } from '../savableConversations.js'
 import { Icon } from './Icon.js'
 import { PixelFace } from './PixelFace.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
@@ -35,7 +37,8 @@ export function AutomationsScreen({
   onRemoveRoutine,
   notice,
   onDismissNotice,
-  cliArtifacts
+  missions,
+  onSaveRoutine
 }: {
   readonly routines: readonly PublicRoutine[]
   readonly teammates: readonly PublicTeammate[]
@@ -52,15 +55,17 @@ export function AutomationsScreen({
   readonly notice: string | undefined
   readonly onDismissNotice: () => void
   /**
-   * What the person set up inside the CLIs themselves. Locust neither made
-   * nor runs these -- it lists them, because a machine with nine agents and
-   * commands on it read "Nothing saved yet" (Colin, 2026-09-07: "It would
-   * just be nice for them to be able to see the routines/automations they've
-   * setup on their models").
+   * The conversations this screen can offer to save, when it has no routines
+   * yet. The same rows the sidebar draws; this screen filters and sorts them.
    */
-  readonly cliArtifacts: readonly PublicRuntimeArtifact[]
+  readonly missions?: readonly (SavableConversation & { readonly ownerId?: string })[]
+  /** Open the Save as routine dialog on one of them. */
+  readonly onSaveRoutine?: (missionId: string) => void
 }): ReactElement {
   const now = new Date()
+  const savable = savableConversations(missions ?? []) as readonly (SavableConversation & {
+    readonly ownerId?: string
+  })[]
   // Scheduled first: those are the ones that happen without anybody here,
   // and so the ones a person came to this screen to check.
   const ordered = [...routines].sort((first, second) => {
@@ -76,9 +81,21 @@ export function AutomationsScreen({
     teammates.find((teammate) => teammate.teammateId === routine.teammateId)
 
   return (
-    <section className="lc-screen lc-automations" aria-label="Automations">
+    <section className="lc-screen lc-automations" aria-label="Routines">
       <header className="lc-screen__head">
-        <h1 className="lc-screen__title">Automations</h1>
+        {/*
+          * Called what every control on it already calls the object.
+          *
+          * `Save as routine`, `Edit routine`, `routineRunSummary` -- the app
+          * says routine everywhere except the one place a person reads first.
+          * "Automations" was the right word for a shelf holding two kinds of
+          * thing: routines you can run, and a read-only inventory of what you
+          * configured in the CLIs themselves. That second list has moved to
+          * Settings, under the runtime each fact belongs to, and Colin's
+          * reason for the broader word left with it (design agent,
+          * 2026-09-10).
+          */}
+        <h1 className="lc-screen__title">Routines</h1>
         <p className="lc-screen__lede">
           {routines.length === 0
             ? 'Nothing saved yet.'
@@ -98,25 +115,75 @@ export function AutomationsScreen({
       )}
 
       {routines.length === 0 ? (
+        /*
+         * The empty screen CONTAINS the entrance rather than describing it.
+         *
+         * It used to name the gesture in prose -- finish a conversation,
+         * right-click it under its teammate, choose Save as routine. That was
+         * the right floor when the row had no visible affordance, and it was
+         * still not enough: Colin read this screen and reported the feature as
+         * missing, and so did the outside tester before him.
+         *
+         * The design agent's rule (2026-09-10) says why. A feature needs an
+         * entrance where its material is and an entrance where its absence is
+         * felt, and the second must contain the first. A shelf cannot fill
+         * itself, and a routine -- unlike a room -- cannot be made from
+         * nothing, so a New routine button would be a blank form lying about
+         * what a routine is.
+         *
+         * So: the real material, listed. The same rows the sidebar draws,
+         * finished ones only, newest first, Save on each opening the dialog
+         * that already exists.
+         */
         <div className="lc-empty">
           <p>
             A routine is a conversation a teammate has been taught: the turns you typed, saved so they can be
             replayed.
           </p>
-          {/*
-            * Name the GESTURE. This used to say "save it from that teammate's
-            * card" under a button reading "Open the team", and both sent
-            * people to the one screen the control is not on -- an outside
-            * tester followed it exactly, found Edit / Remove on the card, and
-            * filed the whole feature as missing (2026-09-07).
-            *
-            * Right-click is the only way in: the row has no visible
-            * affordance, which is what makes saying so out loud the job.
-            */}
-          <p className="lc-empty__how">
-            Finish a conversation worth repeating, then right-click it under its teammate in the sidebar and
-            choose <strong>Save as routine</strong>. You can give it a schedule there.
-          </p>
+          {savable.length === 0 ? (
+            /*
+             * A brand-new workspace has no finished conversations either, and
+             * only then is the old sentence's job gone: there is no gesture to
+             * name because there is nothing to name it about.
+             */
+            <p className="lc-empty__how">{NOTHING_TO_SAVE_YET}</p>
+          ) : (
+            <div className="lc-savable">
+              <p className="lc-savable__head lc-mono">
+                Save one from <span className="lc-savable__from">your finished conversations</span>
+              </p>
+              {savable.map((mission) => {
+                const owner =
+                  mission.ownerId === undefined
+                    ? undefined
+                    : teammates.find((teammate) => teammate.teammateId === mission.ownerId)
+                return (
+                  <div className="lc-savable__row" key={mission.missionId}>
+                    {owner !== undefined && (
+                      <PixelFace hue={owner.hue} avatar={owner.avatar} size={16} teammateId={owner.teammateId} />
+                    )}
+                    <button
+                      type="button"
+                      className="lc-savable__name"
+                      onClick={() => onOpenMission?.(mission.missionId)}
+                      title={mission.title}
+                    >
+                      {mission.title}
+                    </button>
+                    <span className="lc-savable__turns lc-mono">{turnsLabel(mission.turns)}</span>
+                    <span className="lc-savable__at lc-mono">{shortAgo(mission.lastAt, now) ?? ''}</span>
+                    <button
+                      type="button"
+                      className="lc-button"
+                      onClick={() => onSaveRoutine?.(mission.missionId)}
+                    >
+                      Save
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       ) : (
         <div className="lc-routinelist">
@@ -211,42 +278,6 @@ export function AutomationsScreen({
         * the answer to the only question this list raises -- where do I change
         * it.
         */}
-      {cliArtifacts.length > 0 && (
-        <section className="lc-cliartifacts">
-          <h3 className="lc-section__title">Set up in your CLIs</h3>
-          <p className="lc-cliartifacts__note">
-            Locust did not make these and does not run them. They are what you configured in the coding agents
-            themselves, listed so you can see them in one place.
-          </p>
-          {[...new Set(cliArtifacts.map((entry) => entry.runtime))].map((runtime) => (
-            <div className="lc-cliartifacts__group" key={runtime}>
-              <div className="lc-cliartifacts__runtime lc-mono">{runtimeDisplayName(runtime as never)}</div>
-              {cliArtifacts
-                .filter((entry) => entry.runtime === runtime)
-                .map((entry) => (
-                  <div className="lc-cliartifacts__row" key={`${entry.runtime}/${entry.kind}/${entry.path}`}>
-                    <span className="lc-cliartifacts__kind lc-mono">{entry.kind}</span>
-                    <span className="lc-cliartifacts__name">{entry.name}</span>
-                    {entry.description !== undefined && (
-                      <span className="lc-cliartifacts__desc">{entry.description}</span>
-                    )}
-                    {/*
-                      * The last two segments, not the whole path. A full
-                      * Windows path is far wider than this row and ran off
-                      * the right edge of the window (screenshot, 2026-09-07);
-                      * `agents\gig-scout.md` is the part that answers "where
-                      * do I change it", and the whole thing is on hover.
-                      */}
-                    <span className="lc-cliartifacts__path lc-mono" title={entry.path}>
-                      {entry.path.split(/[\\/]/).slice(-2).join('/')}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          ))}
-        </section>
-      )}
-
     </section>
   )
 }

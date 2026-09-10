@@ -8,6 +8,7 @@ import type {
   MissionPruneResponse,
   PublicRecoveredMission,
   PublicRoutine,
+  PublicRuntimeArtifact,
   PublicRuntimeStatus,
   PublicStorageReport,
   PublicTeammate,
@@ -26,6 +27,7 @@ import {
   prunePreviewSummary,
   routeRowStatus
 } from '../status.js'
+import { CliArtifacts } from './CliArtifacts.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
 import { costLine, runCostOf, sumCosts } from '../cost.js'
@@ -742,6 +744,7 @@ export function SettingsScreen({
   limitedRuntimes,
   usageWindows,
   runtimeSetup,
+  cliArtifacts,
   workspaceBrief,
   worktrees,
   onRemoveWorktree,
@@ -757,6 +760,8 @@ export function SettingsScreen({
   relay,
   onRelayChange,
   autoMode,
+  askConnectors,
+  onAskConnectorsChange,
   swarm,
   onSwarmChange,
   onAutoModeChange,
@@ -780,6 +785,11 @@ export function SettingsScreen({
   readonly usageWindows?: ReadonlyMap<string, string>
   /** Each runtime's own MCP servers and hooks, by runtime id; undefined until read. */
   readonly runtimeSetup: Readonly<Record<string, PublicRuntimeSetup>> | undefined
+  /**
+   * What the person configured inside the CLIs themselves, shown under the
+   * runtime each belongs to. Locust neither made nor runs these.
+   */
+  readonly cliArtifacts?: readonly PublicRuntimeArtifact[]
   /** The folder's LOCUST.md as last read: null when none, undefined until the host has answered. */
   readonly workspaceBrief: PublicWorkspaceBrief | null | undefined
   /** The teammates' own worktrees under the folder, and why there can be none; undefined until read. */
@@ -807,6 +817,8 @@ export function SettingsScreen({
   readonly swarm: boolean
   readonly onSwarmChange: (swarm: boolean) => void
   readonly onAutoModeChange: (autoMode: boolean) => void
+  readonly askConnectors: boolean
+  readonly onAskConnectorsChange: (askConnectors: boolean) => void
   /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
   readonly relayHopCap: number
   readonly onRelayHopCapChange: (cap: number) => void
@@ -974,6 +986,15 @@ export function SettingsScreen({
                       <InstallCommand command={installCommand(runtime.id)!} />
                     )}
                     {runtimeSetup?.[runtime.id] !== undefined && <RuntimeSetupLine setup={runtimeSetup[runtime.id]!} />}
+                    {/*
+                      * What the person set up inside THIS CLI. It used to sit
+                      * on the Automations screen under a heading that
+                      * otherwise meant "things you can run", which is what
+                      * made its inertness read as brokenness. An agent file
+                      * in Codex's config directory is a fact about Codex, and
+                      * under Codex it needs no apology.
+                      */}
+                    <CliArtifacts artifacts={(cliArtifacts ?? []).filter((entry) => entry.runtime === runtime.id)} />
                   </div>
                   <span
                     className={`lc-tag${
@@ -1088,6 +1109,47 @@ export function SettingsScreen({
                 aria-checked={autoMode}
                 aria-label={autoMode ? 'Switch this off' : 'Switch this on'}
                 onClick={() => onAutoModeChange(!autoMode)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Connectors</h2>
+          <p className="lc-settings__lede">
+            {askConnectors
+              ? 'Asking. A Claude Code teammate stops and asks before every connector call.'
+              : 'Not asking. A teammate may use any connector your Claude Code can reach, without asking.'}
+          </p>
+          <More>
+            <p>
+              A connector is not on this machine: it acts on the service it reaches, so no permission mode
+              governs it. By default a teammate may use whichever connectors your own Claude Code has, the
+              way you can -- the question was answered when you connected them.
+            </p>
+            <p>
+              Switch this on and every connector call stops the run and asks you first, with the exact
+              input it would send. Approve once, allow that connector for the rest of the mission, or deny
+              with a reason the teammate reads. It is checked when a run starts, so the next mission
+              follows the switch without a restart. Auto never asks either way.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                {askConnectors
+                  ? 'On. Every connector call raises an approval card first.'
+                  : 'Off. Connectors you have are used without asking.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-switch${askConnectors ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={askConnectors}
+                aria-label={askConnectors ? 'Stop asking before connector calls' : 'Ask before every connector call'}
+                onClick={() => onAskConnectorsChange(!askConnectors)}
               >
                 <span className="lc-switch__knob" />
               </button>

@@ -6,6 +6,347 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.61.0 - 2026-09-10
+
+- **Your teammates can now use your connectors, in every mode.** Whatever your
+  Claude Code can reach, they can reach — no list to set up. Driven and
+  verified in Accept edits: the row reads `get_watchlists · Robinhood · done`
+  and the teammate answers with the number.
+- **Worth knowing, and the permission chip now says it:** a connector is not
+  on this machine. "Ask · every write is refused" is a promise about *files*.
+  A teammate in Ask can still send mail or place an order through a connector,
+  because no sandbox here reaches the far end of one.
+- **A refused tool is named the way you would say it.** It read
+  `mcp__claude_ai_Robinhood__get_accounts`; it now reads `get_accounts on
+  Robinhood`, and the reason it gives is one you can act on rather than a
+  sentence about running commands.
+- A connector you sign into after Locust is open reaches the next mission
+  without restarting anything.
+
+## 0.66.0 - 2026-09-10
+
+- **Replies fit the window they are read in.** A reply used to sit at a fixed
+  width in the app's smallest type, using a little over half the column it
+  already had. It now fills that column, at a larger size meant for reading
+  rather than scanning, and on windows wider than about 1650px the column
+  itself grows with the window.
+- **Stop works on the second turn of a conversation.** Pressing stop while a
+  turn was still starting did nothing at all, silently, and the mission ran to
+  completion. It is now remembered and takes effect the moment the run can be
+  named. A first turn always worked, which is why this went unnoticed.
+
+## 0.65.1 - 2026-09-10
+
+- **The home screen is addressed to nobody again.** The row of teammate
+  chips is gone from the composer, and with it the teammate it used to tick
+  for you before you had picked anyone. Write and send from the home screen
+  and you get a plain conversation on the model the bar shows; hand it to a
+  teammate afterwards with "Assign to ..." on its row, or pick a teammate in
+  the sidebar first and message them directly.
+- Picking several teammates at once lives in rooms, where it always did:
+  "New room" in the sidebar, and the room's form picks its members.
+
+## 0.65.0 - 2026-09-10
+
+- **Codex replies stream now, in every mode.** A Codex teammate used to
+  think in silence and then drop the whole reply in one paint; only
+  Approve-each streamed. Ask, Accept edits, Plan and Auto now run over the
+  same transport Approve-each always used, and the reply arrives as it is
+  written -- measured 2 paints before, 33 after, on the same prompt.
+- A Codex run's header shows what it cost again (`40k in · 275 out`), and
+  counts up while it runs. Approve-each never showed this and does now.
+- Follow-ups on Codex keep the earlier turns, as before.
+
+## 0.64.0 - 2026-09-10
+
+- **A teammate can be limited to some of your connectors.** Open a teammate
+  and under "Works in" there is now a row of your connectors, all on. Untick
+  one and that teammate is limited to the rest: a Finance Bro gets Robinhood
+  and not Gmail. A call to anything outside its list stops and asks you, the
+  same card as before. Nothing ticked means everything, as it always did.
+- The refusal a teammate reads after you deny a connector no longer claims
+  there was no way to ask you.
+
+## 0.63.1 - 2026-09-10
+
+- **Settings → Connectors: "ask before every connector call".** Off, a
+  teammate uses any connector your Claude Code can reach without asking, as
+  before. On, every connector call stops the run and shows you the exact
+  input first, with Approve once, Always allow this session, and Deny. Takes
+  effect on the next mission; Auto never asks either way.
+
+## 0.63.0 - 2026-09-10
+
+- **A Claude Code teammate asks before using a connector nothing has
+  pre-approved.** The same approval card as Codex — *Use get_watchlists on
+  Robinhood*, what is sent, whether it can be undone — with Approve once,
+  Always allow this session, and Deny. "Always" lasts for that connector until
+  the mission ends. A denial reaches the teammate with your reason.
+- Your own connectors still never ask, as before. This is for the call that
+  no rule covered.
+- The approval card names the runtime that is asking instead of assuming
+  Codex.
+
+## 0.62.2 - 2026-09-10
+
+- **The message-box row is one family of controls.** The `+` and the swarm
+  mark are boxed like their neighbours, and the context ring moved to the
+  mission line in the header, beside the cost it belongs with.
+- **Lime means one thing again.** A selected teammate's card and its open
+  conversation sit on the neutral selected ground; lime is kept for what is
+  happening right now. In the sidebar, only the state word — *thinking*,
+  *done* — takes the colour; the role stays quiet.
+- The header no longer says `Starting…` while the thread says it too.
+- The Rooms section folds and counts like Teammates and Routines, and its
+  door just says `New room` instead of a sentence the rail cut mid-word.
+
+## 0.62.1 - 2026-09-10
+
+- **Replies stream smoothly.** Text used to arrive in jolts and, worse, change
+  shape after you had read it - a sentence turning bold, a paragraph becoming
+  a code block - because every token re-rendered and re-parsed the whole
+  reply. Now tokens land once per frame, and formatting is applied only to
+  what has finished arriving; the part still being written is plain until it
+  settles, the way Claude Code does it. Measured: zero changes to already-shown
+  text across a whole streamed reply.
+- The plan for what comes next is written down in `docs/PLAN-2026-09-10-NEXT.md`.
+
+## 0.62.0 - 2026-09-10
+
+- **Ask several teammates at once, from the message box.** Tick a second name
+  and the post fans out; the room is where the answers land. Nobody has to
+  know rooms exist to make their first one. The box says what sending will do
+  before you press it.
+- **A room made that way starts as "Untitled room" and is renamed from the
+  room** — click its title. Naming it up front was most of why nobody made
+  one.
+- **Replies are easier to read.** A teammate's reply now runs about 73
+  characters a line instead of 111, with more space between lines. Past
+  about 85 the eye loses its place on the way back, and it felt "clunky"
+  without anything looking wrong.
+- **Replies are set in IBM Plex Sans.** Only the reply — every label, chip
+  and control stays as it was. The teammate's prose was borrowing the app's
+  own typeface, which is built for 13px chips, not nine-line paragraphs.
+  Bundled with the app; nothing is fetched.
+- The scratch project the testing drives use no longer tells teammates to
+  keep answers to one paragraph.
+
+## 0.61.1 - 2026-09-10
+
+- **The Automations screen is now Routines, and it shows you how to make one.**
+  It used to describe a right-click. It now lists your most recent finished
+  conversations with a Save on each — the actual thing a routine is made from.
+- **Save as routine is on the mission header**, beside Activity, on a finished
+  conversation. It was only ever in a right-click menu, which is where you look
+  once you know an action exists rather than how you find out.
+- **What you set up inside a CLI moved to Settings, under that runtime.** Your
+  agents, commands and MCP servers are facts about Codex or Claude Code, and
+  under them they need no apology — sitting on a screen that otherwise means
+  "things you can run" made them read as broken.
+- **Ctrl+V a file or a screenshot into the message.** A pasted screenshot has
+  no file behind it, so Locust writes it into the same attachments folder the
+  + button uses.
+- **A teammate's memories stay visible after you reply.** Each reply is its own
+  run, and the card was only showing what the latest one learned.
+- **A refused command no longer prints itself into the warning.** One line, not
+  a whole program; the full command is in the activity row where it belongs.
+- **Cursor file rows lose their long paths again.** A Windows path was being
+  flattened with one separator left in, so Locust stopped recognising its own
+  mirror folder.
+
+## 0.60.1 - 2026-09-09
+
+- **Correction to what 0.60.0 told you about connectors.** It said they were
+  off in every mode but Auto because those modes ignore your Claude settings.
+  That reason was wrong — those modes never blocked your MCP servers — and
+  Locust was blocking them itself. That block is gone.
+- **What is actually true, measured:** Claude Code asks before using a
+  connector, and a mission has no way to put that question to you outside
+  Auto, so the call is refused there. The difference is that you now see the
+  refusal — `get_watchlists · Robinhood · failed` — instead of the teammate
+  improvising "I have no connection to that", which read as a broken
+  connector. The permission chip says which mode can and which cannot.
+- Per-connector permission, so a teammate can use one connector without being
+  given the whole machine, is next.
+
+## 0.60.0 - 2026-09-09
+
+- **A teammate can work in its own folder.** Open a teammate, and under Own
+  branch there is now a "Works in" row. Its missions run there instead of the
+  project folder, and nothing else moves: the app does not reopen, your
+  history and what the team remembers stay with the project. This is also how
+  a teammate reaches an MCP server you registered to one folder — Claude Code
+  keeps those per project, so a connector set up in `C:\Users\you\claude`
+  exists in that folder and nowhere else.
+- **The mode now tells you when it has taken your connectors away.** Only Auto
+  runs a Claude Code teammate with your own settings, so only Auto can reach
+  an MCP server. Every other mode now says so on the permission chip instead
+  of leaving the teammate to answer "I have no connection to that", which
+  reads as the connector being broken.
+- **Changing the project folder no longer closes Locust.** It reopens there,
+  as it always meant to. A runtime whose process ignored the shutdown could
+  leave the app with no window and nothing to come back to; the quit now has
+  a time limit and leaves anyway.
+- **A teammate no longer reports a message to itself as a missing teammate.**
+  "Jimothy addressed a message to Finance Bro, who is not on the roster" —
+  where Finance Bro was Jimothy's own role. A teammate can now be addressed by
+  their role as well as their name, and a message addressed home says that.
+- **The teammate dialog said "Ask · every write refused" while the composer
+  was in Auto.** It now names the mode the next mission will really run in.
+- **The Automations screen has its header back.** Its title had been sitting
+  flush against the window edge, with none of the bar every other screen has.
+
+## 0.59.0 - 2026-09-09
+
+- **Your connectors now reach your teammates.** In Auto mode a Claude Code
+  teammate can use the MCP tools you have connected — Locust was blocking all
+  of them, so a teammate would say the connector was not available and there
+  was no way to tell that we had refused it rather than that it was broken.
+  The other modes cannot reach connectors at all, because they deliberately
+  ignore your Claude settings.
+- **A connector call reads as one.** It appeared as a single machine name like
+  `mcp__claude_ai_Robinhood__get_watchlists`; it now shows the tool and the
+  connector it belongs to, the same way every other tool row does.
+
+## 0.58.0 - 2026-09-09
+
+- **A room post now has one line at the top telling you where it stands.**
+  "8 asked · all answered", or "8 asked · 6 answered · Otto running · Sable
+  failed" — names when one or two are in a state, a number when more are.
+- **And the members as a row of faces beside it.** Click one to jump straight
+  to that teammate's answer instead of scrolling for their name. Anyone still
+  waiting for a slot appears there too, dimmed.
+- **A long answer folds by how tall it is, not by how many line breaks it
+  has.** A three-paragraph reply has two line breaks, so it was never folding
+  — it just looked right against answers that were one line per number. The
+  control now reads "Show the rest".
+
+## 0.57.1 - 2026-09-09
+
+- **Shift+Tab cycles the permission mode.** The mode is the difference between
+  a teammate that only explains and one that edits your files, and reaching it
+  meant opening a menu every time. It steps only through the modes the
+  selected route can actually run.
+
+## 0.57.0 - 2026-09-09
+
+- **The up arrow brings back what you last sent.** Press it on an empty
+  message box to get your previous message, again to go further back, and
+  down to return to the empty box. Handy for sending the same thing with one
+  word changed.
+- **Escape stops a running mission.** From the message box, when no menu is
+  open.
+
+## 0.56.2 - 2026-09-09
+
+- **Commands your teammate ran now show as commands.** Only one of the
+  runtimes was recognised as running a shell, so on Claude Code and OpenCode
+  every command appeared as a plain tool row — no result badge, nothing to
+  open, and left out of the "commands" count in the turn summary.
+- **Correction to 0.56.0.** That release said command rows read as what the
+  teammate was doing "where the runtime reports it — Claude Code and OpenCode
+  do". The row it appears on did not exist on either of those runtimes, so
+  nothing changed on screen; it should work on Claude Code now. On OpenCode it
+  is still unconfirmed — we have not seen it send that description at all.
+
+## 0.56.1 - 2026-09-09
+
+- **A room shows its work as it starts.** Posting to a room started everyone
+  in turn and only then drew any of it, so you watched an empty room while
+  teammates were already working — up to 45 seconds of it. Cards now appear as
+  each one begins, with the rest shown waiting for a slot underneath.
+- **A teammate in a room is now told its own name.** The briefing listed
+  everyone else in the room and never named the recipient, so a teammate asked
+  to write to its own file could not tell which name was its own — and wrote
+  nothing.
+
+## 0.56.0 - 2026-09-09
+
+- **A room now asks everyone, even when it cannot run them all at once.** Only
+  eight missions run at a time, so posting to a full room while other work was
+  going left some members simply never asked — no answer, no record, nothing
+  the next day to show they had been included. They now wait in line, shown as
+  "Waiting for a slot", and start on their own as slots free.
+- **"Everyone has answered" waits for them.** It used to be true of whoever
+  happened to start.
+- **A long answer no longer takes the whole room.** Twelve lines, then "28 more
+  lines" to open the rest. One teammate writing at length was pushing every
+  other answer off the screen.
+- **Past six answers, a room lays them out one per line.** In a grid every row
+  is as tall as its longest answer, so two short replies beside a long one were
+  paid for in blank space.
+- **Command rows say what the teammate was doing, not just what it ran.** Where
+  the runtime reports it — Claude Code and OpenCode do — the row reads "Checked
+  what the app says about the free route" rather than a shell pipeline. The
+  command is still there, one press away.
+- **Ticking a ninth teammate into a room says so.** The picker offered everyone
+  and then refused the room when you pressed Create room.
+
+## 0.55.3 - 2026-09-09
+
+- **Right-click menus work again.** Pressing any item in a right-click menu
+  closed the menu before the press registered, so nothing in it ever ran —
+  Delete, Assign to, Copy mission id and Save as routine were all dead. The
+  Delete button at the top of a conversation was unaffected, which is what
+  made this look like a delete problem rather than a menu one.
+
+## 0.55.2 - 2026-09-09
+
+- **Menus close when you click anywhere else.** The permission mode menu, the
+  effort panel and the model picker all stayed open until you pressed the
+  button that opened them a second time. Clicking away now closes them, and
+  Escape still does too.
+
+## 0.55.1 - 2026-09-09
+
+- **The "Get it" links now open.** Cursor, Antigravity and Node.js each offered
+  a link to where you get them, and none of them did anything — in every build
+  that had them. They looked like links, and clicking one was silent. Found by
+  the first person outside this machine to install Locust.
+- **A greyed-out Install button now says why on the screen.** With no Node.js
+  installed, four of the five runtimes cannot be installed at all, and the
+  sentence explaining that disappeared the moment any one runtime connected —
+  which Codex often does by itself. What was left was a panel of buttons that
+  did nothing, with the reason only visible if you hovered over one.
+
+## 0.55.0 - 2026-09-09
+
+- **Eight missions can run at once, not four.** The old limit of four was a
+  guess: it was written as "a resource bound" and never measured. It has now
+  been measured — eight teammates answering at once, each producing a long
+  steady stream of output, finished in under twice the time one takes and used
+  4.2 GB of memory, with nothing dropped and no run cut short. Nothing the old
+  number was protecting against happened. What has not been measured, and may
+  change this again, is a machine with much less memory than the one it was
+  measured on.
+- **A room can no longer be built that it cannot answer.** A room holds up to
+  eight teammates, so with the new limit every member of a full room runs. This
+  was the cause of the next three fixes.
+- **A room no longer says "Everyone has answered" when some of them never
+  started.** Posting to six teammates while only four could run started four,
+  drew the other two as empty cards, and then told you everyone had answered.
+  It now says "4 of 6 in Standup answered; 2 never started."
+- **Someone the post could not reach gets a line, not an empty card.** They
+  used to get an answer card with no answer in it — a name, "did not start",
+  and a blank space where the reply belongs — and the reason was said in the
+  smallest text on the screen, far below, repeated once per person. It is now
+  one line under the answers: "Pike, Dell and Ember were not asked — up to 8
+  missions can run at once."
+- **And that reason no longer disappears.** It lived only in the moment of
+  posting, so waiting for the room to finish, or reopening it later, left the
+  absence unexplained. It is now kept with the post.
+- **Ticking a ninth teammate into a room now says so instead of failing.** The
+  picker offered every teammate and then refused the room when you pressed
+  Create room. It now says "A room holds 8 teammates. Untick 1 to make this
+  one." and does not offer the button until it would work.
+- **Long answers in a room stop squashing short ones.** Past six answers the
+  room lays them out one per line, so a teammate who writes twelve lines no
+  longer forces everyone beside them to be twelve lines tall.
+- **Warnings and errors that were meant to be amber or red were grey.** Text
+  asked to be coloured lost to whatever the surrounding component had already
+  set, so several notices — including a room form's own error messages — had
+  been rendering as ordinary grey text.
+
 ## 0.54.1 - 2026-09-09
 
 - **Two buttons on every teammate card were drawn on top of each other.** In a

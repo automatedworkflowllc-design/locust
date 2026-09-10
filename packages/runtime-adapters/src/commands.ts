@@ -1,3 +1,4 @@
+import { allowRuleFor } from "./connectors.js";
 import type { MissionSandbox, RuntimeModelHints, RuntimeModelName } from "./types.js";
 import type {
   ExecutableLaunch,
@@ -273,7 +274,7 @@ export function assertSafeRuntimeCommand(
 
 interface SpecTransport {
   /** Omitted means the prompt goes on stdin, which is what most CLIs read. */
-  readonly stdin?: "prompt" | "none";
+  readonly stdin?: "prompt" | "none" | "protocol";
   /** What the mission was allowed, so the guard can judge the argv it is given. */
   readonly sandbox?: MissionSandbox;
   readonly env?: Readonly<Record<string, string>>;
@@ -358,6 +359,45 @@ export interface RuntimeCommandOptions {
    * up front is what makes a follow-up possible at all.
    */
   readonly sessionId?: string;
+  /**
+   * The connectors this teammate has been given, by the name the CLI prints.
+   *
+   * Each becomes an allow rule -- `mcp__claude_ai_Robinhood__*` -- so the run
+   * may use that connector's tools without stopping to ask. Without one, the
+   * tools are still OFFERED and every call prompts; a printed run has nowhere
+   * to put the question, so it is denied. So this is the difference between a
+   * connector a teammate can use and one it can only fail at.
+   *
+   * Named, never wildcarded: the CLI refuses `mcp__*` in an allow rule, and
+   * naming is also the point -- a teammate given Robinhood is not thereby
+   * given Gmail. Claude Code only; every other builder ignores it.
+   */
+  readonly connectors?: readonly string[];
+  /**
+   * Locust as the permission host for this run.
+   *
+   * `configPath` is an mcp.json naming Locust's bridge as a stdio server;
+   * `toolName` is the bridge's one tool. Claude Code calls it before using a
+   * connector and waits for the answer, which is the person's, from the card
+   * the app already has. Without this a printed run has nowhere to ask and
+   * every connector call is refused -- or, with `connectors` above, allowed
+   * without asking. This is the asking.
+   *
+   * Never sent in Auto: `bypassPermissions` asks nothing, and a prompt tool
+   * there would be a question nobody is asked. Claude Code only.
+   */
+  readonly permissionBridge?: { readonly configPath: string; readonly toolName: string };
+}
+
+/** `--allowedTools` and its rules, or nothing at all when there are none. */
+function connectorRules(names: readonly string[] | undefined): readonly string[] {
+  if (names === undefined || names.length === 0) return [];
+  const rules: string[] = [];
+  for (const name of names) {
+    const rule = allowRuleFor(name);
+    if (rule !== undefined && !rules.includes(rule)) rules.push(rule);
+  }
+  return rules.length === 0 ? [] : ["--allowedTools", rules.join(",")];
 }
 
 const EFFORT = /^[a-z]{1,16}$/;
@@ -453,6 +493,62 @@ function sandboxArgument(sandbox: MissionSandbox | undefined): MissionSandbox {
 function codexSandboxArgument(sandbox: MissionSandbox | undefined): string {
   const chosen = sandboxArgument(sandbox);
   return chosen === "full-access" ? "danger-full-access" : chosen;
+}
+
+/**
+ * What a Codex thread is started with on the app-server transport.
+ *
+ * The exec transport carries these as argv, where `assertSafeRuntimeCommand`
+ * can see them; here they are JSON on a socket, so the same two rules are
+ * enforced at the point they are chosen instead. `danger-full-access` needs a
+ * mission that really was granted full access, and nothing else may ask for
+ * it -- the reading a person gets from the mode chip is the reading the
+ * runtime is given.
+ */
+export interface CodexAppServerPolicy {
+  readonly sandbox: string;
+  readonly approvalPolicy: string;
+}
+
+/**
+ * MEASURED 2026-09-10 against `codex app-server` 0.153.0: all three sandboxes
+ * start a thread with `approvalPolicy: "never"`, and every one of them streams
+ * `item/agentMessage/delta` (41-57 deltas on a three-sentence reply). `never`
+ * is what the exec transport already does by being non-interactive -- it is
+ * not a widening, it is the same run without the silence.
+ */
+export function codexAppServerPolicy(
+  sandbox: MissionSandbox | undefined,
+): CodexAppServerPolicy {
+  const chosen = sandboxArgument(sandbox);
+  if (chosen === "full-access") {
+    return { sandbox: "danger-full-access", approvalPolicy: "never" };
+  }
+  return { sandbox: chosen, approvalPolicy: "never" };
+}
+
+/**
+ * `codex app-server`: the transport that streams.
+ *
+ * MEASURED 2026-09-10: `codex exec --json` sends an agent message ONCE, whole,
+ * as a single `item.completed` -- there is no delta in that JSONL at all. So a
+ * Codex teammate outside Approve-each sat silent and then dropped the whole
+ * reply in one paint, which is the opposite of what Codex's own TUI does.
+ * app-server sends the same reply as dozens of deltas.
+ *
+ * Nothing about the run travels in this argv: the folder, the sandbox, the
+ * model, the effort and the prompt are all parameters of `thread/start` and
+ * `turn/start`. The spec exists so the ledger records what was launched and so
+ * the ordinary runner refuses to launch it -- hence `stdin: "protocol"`.
+ */
+export function createCodexAppServerCommand(
+  executable: ExecutableLaunch,
+  options: { readonly workspacePath: string; readonly sandbox?: MissionSandbox },
+): RuntimeCommandSpec {
+  return baseSpec("codex", executable, options.workspacePath, ["app-server"], {
+    sandbox: sandboxArgument(options.sandbox),
+    stdin: "protocol",
+  });
 }
 
 export function createCodexExecCommand(
@@ -557,10 +653,79 @@ export function createClaudePrintCommand(
     // helpers read only.
     "--permission-mode",
     auto ? "bypassPermissions" : editing ? "acceptEdits" : "default",
+    // THE PERSON'S CONNECTORS, IN EVERY MODE.
+    //
+    // This used to allow `mcp__*` in Auto only, and deny it everywhere else,
+    // on the belief that `--restricted` had already kept the person's MCP
+    // servers out of those runs and there was therefore nothing to allow.
+    //
+    // That belief was wrong, and the CLI says so in its own help:
+    //
+    //   --restricted  ... ignores user, project and local settings files
+    //                 (managed settings and --settings still apply; ADD
+    //                 --strict-mcp-config TO SKIP MCP SERVERS TOO)
+    //
+    // MEASURED 2026-09-09, running the argv by hand in an empty temp folder:
+    // `claude --restricted --print --tools "Read,Glob,Grep,Task,mcp__*"`
+    // listed every connector on the account. `--restricted` never blocked
+    // them. Locust's own `--disallowedTools mcp__*` was the entire reason a
+    // teammate outside Auto could not reach a connector, and the app then
+    // told the person it was the mode.
+    //
+    // So the denial is gone. Colin asked the right question -- "do you think
+    // thats acceptable for the user to only have access for mcp tools under
+    // auto or is that standard?" -- and it is neither. Claude Code itself
+    // makes connectors available in every permission mode, and welding them
+    // to Auto meant the only way to let a teammate READ a watchlist was to
+    // let it edit anything on the machine. That is backwards: it charges the
+    // most dangerous permission for the most harmless capability.
+    //
+    // What the mode still decides is this machine: Ask and Plan refuse every
+    // write to disk, Accept edits confines them to the folder. What it cannot
+    // decide is a connector, because a connector acts somewhere else. That is
+    // said on the mode menu rather than left to be discovered. Colin,
+    // 2026-09-09, ruling on exactly that: "we can let the user decide that
+    // with the model, i doubt these models are just gonna randomly start
+    // buying crypto."
     "--tools",
-    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task" : "Read,Glob,Grep,Task",
-    "--disallowedTools",
-    "mcp__*",
+    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,mcp__*" : "Read,Glob,Grep,Task,mcp__*",
+    /*
+     * The connectors this teammate was given, one allow rule each.
+     *
+     * Removing the denial above only got as far as the tools being offered:
+     * Claude Code asks before using one and a printed run cannot answer, so
+     * the call is denied and the row reads `failed`. An allow rule is what
+     * turns that into a call.
+     *
+     * Not sent in Auto, where `bypassPermissions` already asks nothing, and
+     * where a rule would be a second, weaker statement of the same thing.
+     * Empty in every other mode until a person ticks a connector, so the
+     * default stays "asks, and therefore cannot" rather than "may".
+     *
+     * `allowRuleFor` returns nothing for a name that sanitises to nothing --
+     * that would produce `mcp____*`, which the CLI ACCEPTS and which widens
+     * a scope nobody chose. Failing closed there is deliberate.
+     */
+    ...(auto ? [] : connectorRules(options.connectors)),
+    /*
+     * And somewhere to ASK, for everything the rules above did not cover.
+     *
+     * MEASURED 2026-09-10: with `--mcp-config` naming Locust's bridge and
+     * `--permission-prompt-tool` naming its tool, a `--print` run under
+     * `--restricted` in the strictest mode called the tool before using a
+     * connector, waited, and honoured the answer; a denial's message reached
+     * the model verbatim. Bash and Edit never route through it -- they are
+     * granted by `--tools` -- so this is connectors only, which is the one
+     * thing the mode was never able to govern.
+     */
+    ...(auto || options.permissionBridge === undefined
+      ? []
+      : [
+          "--mcp-config",
+          requireText(options.permissionBridge.configPath, "Permission bridge config"),
+          "--permission-prompt-tool",
+          requireText(options.permissionBridge.toolName, "Permission tool"),
+        ]),
   ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
