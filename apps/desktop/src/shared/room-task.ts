@@ -139,7 +139,24 @@ export function taskSection(input: {
           .join('\n')
   const handoffExample = others[0] ?? 'Name'
   return [
-    `You are answering in the room "${input.roomName}" with ${others.length === 0 ? 'nobody else' : others.join(', ')}. The room keeps a task board:`,
+    /*
+     * It says WHO YOU ARE first.
+     *
+     * This opened with "You are answering in the room X with A, B, C" -- it
+     * listed everyone else and never named the recipient. A teammate had no
+     * way to know which of the names in that sentence was its own.
+     *
+     * Astra hit the consequence measuring the frontier (2026-09-09): asked
+     * to write to its own named file, a teammate answered that it was Muse
+     * Spark and could not identify which filename was assigned to it. No
+     * file was written. That is a task failure at N=1, from a briefing that
+     * addressed a person by describing their colleagues.
+     *
+     * They worked around it in the fixture by naming the teammate in the
+     * prompt, and said plainly that this was a fixture workaround and not a
+     * production fix. This is the production fix.
+     */
+    `You are ${input.selfName}, answering in the room "${input.roomName}" with ${others.length === 0 ? 'nobody else' : others.join(', ')}. The room keeps a task board:`,
     board,
     `If your work claims, finishes, hands off or adds a task on that board, use exactly this block and ${BLOCK_PLACEMENT} -- one line per task, quoting the task text as it appears above:`,
     `<${TASK_TAG}>`,
