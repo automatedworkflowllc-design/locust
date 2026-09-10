@@ -519,8 +519,17 @@ export interface CodexAppServerPolicy {
  */
 export function codexAppServerPolicy(
   sandbox: MissionSandbox | undefined,
+  mode?: string,
 ): CodexAppServerPolicy {
   const chosen = sandboxArgument(sandbox);
+  // Approve-each is the one mode that STOPS: `untrusted` makes the server ask
+  // before every consequential action, and the approval channel answers. It
+  // is never paired with full access -- a run that may do anything has
+  // nothing to ask -- so the sandbox here is whatever the mode earned, which
+  // for Approve-each is workspace-write.
+  if (mode === "approve-each") {
+    return { sandbox: chosen === "full-access" ? "workspace-write" : chosen, approvalPolicy: "untrusted" };
+  }
   if (chosen === "full-access") {
     return { sandbox: "danger-full-access", approvalPolicy: "never" };
   }

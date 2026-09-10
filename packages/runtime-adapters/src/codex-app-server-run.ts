@@ -1,5 +1,5 @@
 import { createAppServerClient } from "./app-server.js";
-import type { AppServerNotification, JsonValue } from "./app-server.js";
+import type { AppServerNotification, AppServerRequest, JsonValue } from "./app-server.js";
 import type { AppServerEventNormalizer } from "./app-server-events.js";
 import type { CodexEventNormalizer, NormalizedRuntimeEvent } from "./codex-events.js";
 import type { RuntimeCommandSpec } from "./types.js";
@@ -57,6 +57,13 @@ export interface CodexAppServerRunOptions {
   readonly effort?: string;
   /** A prior thread to carry on, which keeps its turns. */
   readonly resumeThreadId?: string;
+  /**
+   * What answers the server when it ASKS -- the approval channel. Only a
+   * policy that stops for approval (`untrusted`) ever produces a request;
+   * without a handler every request is refused, which under `never` is the
+   * same as never being asked.
+   */
+  readonly onRequest?: (request: AppServerRequest) => Promise<JsonValue>;
   readonly signal?: AbortSignal;
   readonly now?: () => Date;
   /** How long the handshake may take before the run is called lost. */
@@ -220,11 +227,12 @@ export function startCodexAppServerRun(
       });
       if (ENDING_METHODS.has(notification.method)) finish();
     },
-    // Nothing asks in these modes -- the policy is `never`, measured to raise
-    // no approval request at all. A server that asks anyway is answered with a
-    // refusal rather than left waiting, because an unanswered request stalls
-    // the turn forever and the person would see a run that never ends.
-    onRequest: async () => ({ decision: "reject" }) as JsonValue,
+    // The approval channel, when the mode has one. Under `never` nothing
+    // asks -- measured to raise no request at all -- and a server that asks
+    // anyway is answered with a refusal rather than left waiting, because an
+    // unanswered request stalls the turn forever and the person would see a
+    // run that never ends.
+    onRequest: options.onRequest ?? (async () => ({ decision: "reject" }) as JsonValue),
     onDiagnostic: (diagnostic) => {
       if (diagnostic.code === "buffer-overflow" || diagnostic.code === "line-too-long") {
         lose(diagnostic.message);
@@ -338,6 +346,29 @@ export function startCodexAppServerRun(
  * `turn/completed`, and the normalizer's own `finalized` flag makes the second
  * call empty.
  */
+/**
+ * The notification a record on this transport was written from, or nothing.
+ *
+ * Shared by the normalizer below and by anyone else reading the stream -- the
+ * mission loop reads file changes off the same records, so the parse lives in
+ * one place rather than being done twice with two chances to differ.
+ */
+export function notificationOfRecord(record: RuntimeJsonlRecord): AppServerNotification | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(record.raw);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null) return undefined;
+  const notification = parsed as { method?: unknown; params?: unknown };
+  if (typeof notification.method !== "string") return undefined;
+  return {
+    method: notification.method,
+    params: (notification.params ?? undefined) as AppServerNotification["params"],
+  };
+}
+
 export function asProcessNormalizer(
   normalizer: AppServerEventNormalizer,
 ): CodexEventNormalizer {
@@ -352,19 +383,8 @@ export function asProcessNormalizer(
       // Every record on this transport is a notification the runner wrote out
       // as a line. A line that is not one -- which nothing here produces --
       // is dropped rather than guessed at.
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(record.raw);
-      } catch {
-        return [];
-      }
-      if (typeof parsed !== "object" || parsed === null) return [];
-      const notification = parsed as { method?: unknown; params?: unknown };
-      if (typeof notification.method !== "string") return [];
-      return normalizer.accept({
-        method: notification.method,
-        params: (notification.params ?? undefined) as AppServerNotification["params"],
-      });
+      const notification = notificationOfRecord(record);
+      return notification === undefined ? [] : normalizer.accept(notification);
     },
     finish(completion: RuntimeProcessCompletion): readonly NormalizedRuntimeEvent[] {
       return normalizer.finish(completion.cancelled ? "cancelled" : "transport-lost");

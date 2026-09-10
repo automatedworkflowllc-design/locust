@@ -20,7 +20,7 @@ export {
   toolNameOf,
 } from "./app-server-events.js";
 export { createCodexEventNormalizer } from "./codex-events.js";
-export { asProcessNormalizer, startCodexAppServerRun } from "./codex-app-server-run.js";
+export { asProcessNormalizer, notificationOfRecord, startCodexAppServerRun } from "./codex-app-server-run.js";
 export type {
   AppServerRunProcess,
   CodexAppServerRun,

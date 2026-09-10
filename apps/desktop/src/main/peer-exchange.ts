@@ -266,3 +266,10 @@ export function createPeerExchange(options: {
     }
   }
 }
+
+/**
+ * A mission that could not record the messages it was shown. Raised before
+ * anything runs on them: a mission must not run on messages its own record
+ * cannot name.
+ */
+export class PeerRecordError extends Error {}
