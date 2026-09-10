@@ -23,6 +23,19 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.67.0 - 2026-09-11
+
+- **A conversation in "approve each action" continues.** A reply used to
+  start over with no memory of the turn before it -- ask a teammate to
+  remember a word and it could not tell you the word. It keeps the thread now,
+  like every other mode.
+- **Routines, room posts and relayed messages can use "approve each action".**
+  All three used to refuse it outright, because the cards could not be shown
+  from those paths. They run it, and the cards appear.
+- Under the hood the mode stopped being a separate machine and became an
+  ordinary mode of the one that runs everything else, which is what made both
+  of the above possible.
+
 ## 0.66.1 - 2026-09-10
 
 - **Approve-each conversations continue.** A second message to a teammate in
