@@ -69,44 +69,41 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
 /**
  * What this mode does to a connector, in one sentence, measured.
  *
- * Two wrong versions of this shipped on 2026-09-09 before the third was
- * measured, and both were wrong in the reason rather than the effect.
+ * THREE wrong versions of this shipped on 2026-09-09 before the facts were
+ * all in, and the history is kept because each was wrong in an instructive
+ * way.
  *
- *  1. "Only Auto runs with your own Claude Code settings, so only Auto can
- *     reach an MCP server." FALSE. `--restricted` never kept a person's MCP
- *     servers out; its own help names `--strict-mcp-config` as the flag that
- *     would, and `claude --restricted --print --tools "...,mcp__*"` in an
- *     empty folder listed every connector on the account.
- *  2. "Your connectors are available in every mode." Also false, in practice.
- *     Removing our `--disallowedTools mcp__*` made the tools OFFERED, and
- *     driving the built app in Ask showed what happens next: Claude Code
- *     asks before using one, a `--print` run has nowhere to ask, and the call
- *     is denied. The row read `get_watchlists / Robinhood / failed`.
+ *  1. "Only Auto can reach an MCP server." The reason given was
+ *     `--restricted`, which never blocked MCP at all -- its own help names
+ *     `--strict-mcp-config` as the flag that would.
+ *  2. "Your connectors are available in every mode." Removing our
+ *     `--disallowedTools mcp__*` made them OFFERED, and driving the built app
+ *     in Ask showed the rest: Claude Code asks before using one, and a
+ *     printed run has nowhere to put that question, so the call was denied.
+ *  3. "A connector call will be refused in this mode." True at the time, and
+ *     wrong the moment Locust began passing an allow rule per connector.
  *
- * So the true sentence is about ASKING. Auto sends `bypassPermissions` and is
- * the one mode that does not ask. Every other Claude Code mode runs printed,
- * with no channel to answer a prompt, so a connector call is refused -- and
- * that is now a refusal the person can read and attribute, rather than the
- * model improvising "I have no connection to Robinhood", which is what it did
- * to Colin twice.
+ * What is true now, measured by running the argv by hand and then by driving
+ * the built app: every connector the person's own Claude Code can reach is
+ * named in an allow rule on every run, so it is used without asking. Colin,
+ * 2026-09-10: "honestly just let them have access to the mcp tools if the
+ * client have access to it -- it only makes sense and is way less muddy."
  *
- * (Approve each action is not the way out here: it runs on Codex CLI only.)
- *
- * The way out being built is per-connector permission. An allow rule must
- * name its server -- `mcp__claude_ai_Robinhood__*` is accepted, `mcp__*` is
- * refused with "An allow pattern must name the scope it widens" -- so the app
- * has to know which connectors a person wants a teammate to have. That is the
- * connector UI, and it is now a known mechanism rather than a question.
+ * Which leaves the one thing a person genuinely cannot infer, and it is the
+ * thing worth the line: a connector acts somewhere that is not this machine.
+ * "Ask -- reads and explains, every write is refused" is a promise about
+ * DISK. A teammate in Ask can still send mail or place an order through a
+ * connector, because no sandbox on this machine reaches the far end of one.
  *
  * Claude Code only: it is the only runtime whose command builder mentions MCP
- * at all, so the same words on another would be a claim nothing behind them
+ * at all, so the same words elsewhere would be a claim nothing behind them
  * makes.
  */
 export function connectorsNote(runtime: string, mode: MissionMode): string | undefined {
   if (runtime !== 'claude') return undefined
   return mode === 'auto'
-    ? 'Your connectors work here. Auto is the one mode that never stops to ask, which is also why it can change anything on this machine.'
-    : 'A connector call will be refused in this mode. Claude Code asks before using one, and a mission has no way to put that question to you outside Auto.'
+    ? 'Your connectors work here, and so does everything else on this machine.'
+    : 'Your connectors work in this mode too. What this mode limits is this machine — a connector acts on the service it reaches, so it is outside the sandbox either way.'
 }
 
 export interface ComposerProps {

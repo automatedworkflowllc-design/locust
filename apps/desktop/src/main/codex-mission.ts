@@ -237,6 +237,22 @@ interface CodexMissionServiceOptions {
    * Defaults to zero so a service constructed alone behaves as before.
    */
   readonly liveElsewhere?: () => number
+  /**
+   * The connectors this machine has, by name, asked at the moment a run
+   * starts rather than captured.
+   *
+   * Colin, 2026-09-10: "honestly just let them have access to the mcp tools
+   * if the client have access to it -- it only makes sense and is way less
+   * muddy." So there is nothing per-teammate here: every name becomes an
+   * allow rule on every Claude Code run.
+   *
+   * Read live because the list is taken in the background and may not have
+   * landed when the first run starts. A run that begins before it does gets
+   * no rules, and its connector calls are refused with the sentence the
+   * adapter writes -- which is what every build before today did, said out
+   * loud, rather than a mission that waits on a health check.
+   */
+  readonly connectors?: () => readonly string[]
 }
 
 function error(
@@ -899,6 +915,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           return runtime === 'claude'
             ? createClaudePrintCommand(executable, {
                 workspacePath: runCwd,
+                // Every connector the person's own Claude Code can reach.
+                // Without a named allow rule the tools are offered and every
+                // call is refused, because a printed run has nowhere to put
+                // the approval question.
+                ...(() => {
+                  const named = options.connectors?.() ?? []
+                  return named.length === 0 ? {} : { connectors: named }
+                })(),
                 // Claude's containment IS this value: it picks the permission
                 // mode and the tool list. Leaving it out defaulted every
                 // Claude run to read-only, so a mission started in Accept

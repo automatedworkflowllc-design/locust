@@ -206,6 +206,41 @@ export function resetsAtIso(value: unknown): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+/**
+ * A tool named the way the activity rows name it.
+ *
+ * `mcp__claude_ai_Robinhood__get_accounts` is a machine name and reads as
+ * one. The rows already split it into the tool and the connector it belongs
+ * to, and a sentence about the same call has no business doing worse -- Colin
+ * sent a capture of exactly that on 2026-09-09.
+ *
+ * Kept here rather than imported from the renderer, because this package has
+ * no renderer. The split is one rule and it is checked against real tool
+ * names in `connectors.test.ts`.
+ */
+export function namedTool(name: string): string {
+  const match = /^mcp__([A-Za-z0-9_]+?)__(.+)$/.exec(name);
+  if (match === null) return name;
+  const server = match[1]!.replace(/^claude_ai_/, "").replace(/_/g, " ");
+  return `${match[2]!} on ${server}`;
+}
+
+/**
+ * Why a run was refused, which is not one reason.
+ *
+ * This sentence was written for Bash and said "asks for approval before
+ * running commands". Once Locust stopped denying `mcp__*` outright
+ * (2026-09-09) the same line began firing for connector calls, where
+ * "commands" is simply the wrong word.
+ *
+ * A connector refusal is also the one a person can act on, so it says how.
+ */
+export function whyRefused(refused: readonly { readonly tool: string }[]): string {
+  return refused.every((entry) => entry.tool.startsWith("mcp__"))
+    ? "A connector is not covered by the permission mode, so Claude Code asks before using one -- and a printed run has no way to put that question to you. Give this teammate the connector, or run it in Auto."
+    : "This route allows edits but asks for approval before running commands, and a printed run has no way to give it.";
+}
+
 export function createClaudeEventNormalizer(
   context: ClaudeInvocationContext,
 ): ClaudeEventNormalizer {
@@ -594,7 +629,8 @@ export function createClaudeEventNormalizer(
           const tool = stringValue(denial.tool_name) ?? "a tool";
           const input = isObject(denial.tool_input) ? denial.tool_input : {};
           const detail = stringValue(input.command) ?? stringValue(input.file_path) ?? stringValue(input.description);
-          return detail === undefined ? tool : `${tool} \`${detail}\``;
+          const said = namedTool(tool);
+          return { tool, text: detail === undefined ? said : `${said} \`${detail}\`` };
         });
       if (refused.length > 0) {
         return [
@@ -602,8 +638,8 @@ export function createClaudeEventNormalizer(
             "warning",
             "claude.permission_denied",
             refused.length === 1
-              ? `Claude Code was not permitted to run ${refused[0]}, so it did not. This route allows edits but asks for approval before running commands, and a printed run has no way to give it.`
-              : `Claude Code was not permitted to run ${String(refused.length)} actions, so it did not: ${refused.join("; ")}. This route allows edits but asks for approval before running commands, and a printed run has no way to give it.`,
+              ? `Claude Code was not permitted to use ${refused[0]!.text}, so it did not. ${whyRefused(refused)}`
+              : `Claude Code was not permitted to use ${String(refused.length)} tools, so it did not: ${refused.map((entry) => entry.text).join("; ")}. ${whyRefused(refused)}`,
             evidence,
           ),
         ];

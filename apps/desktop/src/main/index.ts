@@ -59,6 +59,7 @@ import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
+import { createConnectorReader } from './connector-reader.js'
 import { createRelay } from './relay.js'
 import { createAttention } from './attention.js'
 import { boundedShutdown } from './bounded-shutdown.js'
@@ -175,6 +176,39 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
   ])
   return antigravity === undefined ? found : [...found, antigravity]
 }
+/**
+ * The connectors this machine has, read in the background and held.
+ *
+ * Colin, 2026-09-10: "honestly just let them have access to the mcp tools if
+ * the client have access to it -- it only makes sense and is way less muddy."
+ * So there is no per-teammate grant: what the person's Claude Code can reach,
+ * their teammates can reach.
+ *
+ * The names are needed because an allow rule must NAME its server -- `mcp__*`
+ * is refused outright -- and the account connectors from claude.ai never
+ * appear in `~/.claude.json`, so they cannot be read off disk at all.
+ * `claude mcp list` is the only source that has all of them, and it is slow
+ * because it health-checks each one, so nothing ever waits for it.
+ */
+const connectorReader = createConnectorReader({
+  read: async (timeoutMs) => {
+    const claude = await executableLocator.find('claude').catch(() => undefined)
+    if (claude === undefined) return undefined
+    const result = await probeRunner.run({
+      purpose: 'capabilities',
+      executablePath: claude.executablePath,
+      args: [...claude.prefixArgs, 'mcp', 'list'],
+      timeoutMs
+    })
+    // The listing prints on stdout; a machine with none says so there too.
+    // Both streams are joined because a warning on stderr has never been a
+    // reason to throw the list away.
+    if (result.timedOut === true) return undefined
+    return `${result.stdout}
+${result.stderr}`
+  }
+})
+
 /**
  * One probe sweep, shared.
  *
@@ -610,6 +644,20 @@ if (!ownsSingleInstanceLock) {
     let roomTasks: RoomTasks | undefined
     const codexMissions = createCodexMissionService({
       workspacePath,
+      /*
+       * Asked at the start of every run, never captured: a connector signed
+       * into after launch reaches the next mission without a restart.
+       *
+       * The refresh is kicked and NOT awaited. `claude mcp list` health-checks
+       * every server, so awaiting it would put seconds between pressing send
+       * and anything happening. The reading it takes lands for the next run;
+       * this one uses whatever is already held, which after the warm below is
+       * almost always the current list.
+       */
+      connectors: () => {
+        void connectorReader.refresh().catch(() => undefined)
+        return connectorReader.names()
+      },
       /*
        * The cap is ONE pool across all three transports.
        *
@@ -1100,6 +1148,10 @@ if (!ownsSingleInstanceLock) {
       if (!workspaceChosen || routineRunner === undefined) return
       void routineRunner.tick(new Date()).catch(() => undefined)
     }
+    // Warmed here rather than at import: it spawns Claude Code, and doing
+    // that before the window exists would put a health check in front of the
+    // first paint.
+    void connectorReader.refresh().catch(() => undefined)
     const firstRoutineTick = setTimeout(tickRoutines, ROUTINE_FIRST_TICK_MS)
     firstRoutineTick.unref()
     const routineTicks = setInterval(tickRoutines, ROUTINE_TICK_MS)

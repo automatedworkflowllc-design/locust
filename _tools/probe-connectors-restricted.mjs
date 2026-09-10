@@ -40,7 +40,7 @@ const drive = await startDrive({
         hue: 'lime',
         role: 'Code & Migrations',
         createdAt: '2026-09-05T05:00:00.000Z',
-        route: { runtime: 'claude', model: 'sonnet', mode: 'ask', effort: 'low' }
+        route: { runtime: 'claude', model: 'sonnet', mode: 'accept-edits', effort: 'low' }
       }
     ],
     missionOwners: {},
@@ -49,7 +49,7 @@ const drive = await startDrive({
 })
 
 try {
-  await drive.capture('launch on Claude Code in Ask', async () => {
+  await drive.capture('launch on Claude Code in Accept edits', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
       [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
@@ -62,7 +62,7 @@ try {
   // The premise, OUTSIDE capture(): Ask is the point. Any other mode answers
   // a question that was never in doubt.
   const mode = String(await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Permission mode')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`))
-  if (!/ask/i.test(mode)) throw new Error(`NOT THE TEST: the composer is in "${mode}", and the claim is about the RESTRICTED modes`)
+  if (/auto/i.test(mode)) throw new Error(`NOT THE TEST: the composer is in "${mode}", and Auto never had to ask in the first place`)
   say(`  mode is ${mode}`)
 
   await drive.capture('call a connector that reads, from a run that may not write', () => drive.evaluate(`(async () => {
@@ -86,12 +86,23 @@ try {
     }, null, 1)
   })()`))
 
-  const thread = String(await drive.evaluate(`document.querySelector('.lc-thread')?.innerText ?? ''`))
-  say(/NO TOOL/.test(thread)
-    ? '  STILL BLOCKED: the teammate reported no such tool'
-    : '  REACHED IT: a run that may not write to disk called a connector')
+  /*
+   * The verdict is read off the activity ROW, not off the thread text.
+   *
+   * It used to grep the whole thread for "NO TOOL" -- which is a phrase the
+   * PROMPT itself contains, so the probe reported "STILL BLOCKED" over a
+   * screenshot showing `get_watchlists / Robinhood / done` and "15
+   * watchlists." A check that matches the question instead of the answer is
+   * worse than no check: it is a confident wrong one.
+   */
+  const verdict = String(await drive.evaluate(`(() => {
+    const row = [...document.querySelectorAll('.lc-filerow')].find(r => /get_watchlists/.test(r.innerText))
+    if (!row) return 'NO ROW: the connector was never called'
+    return row.innerText.replace(/\\s+/g, ' ').trim()
+  })()`))
+  say(/done/.test(verdict) ? `  REACHED IT: ${verdict}` : `  STILL BLOCKED: ${verdict}`)
 } catch (error) {
   say(`probe failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: 'Build: whatever `pnpm build` last wrote to out/. One teammate on Claude Code / sonnet in ASK, the mode that refuses every write to disk. Nothing edited, nothing placed.' })
+  await drive.finish({ intro: 'Build: whatever `pnpm build` last wrote to out/. One teammate on Claude Code / sonnet in ACCEPT EDITS -- the mode Colin was using when a connector call was refused. Nothing edited, nothing placed.' })
 }

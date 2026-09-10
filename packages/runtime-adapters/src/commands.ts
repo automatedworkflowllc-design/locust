@@ -1,3 +1,4 @@
+import { allowRuleFor } from "./connectors.js";
 import type { MissionSandbox, RuntimeModelHints, RuntimeModelName } from "./types.js";
 import type {
   ExecutableLaunch,
@@ -358,6 +359,31 @@ export interface RuntimeCommandOptions {
    * up front is what makes a follow-up possible at all.
    */
   readonly sessionId?: string;
+  /**
+   * The connectors this teammate has been given, by the name the CLI prints.
+   *
+   * Each becomes an allow rule -- `mcp__claude_ai_Robinhood__*` -- so the run
+   * may use that connector's tools without stopping to ask. Without one, the
+   * tools are still OFFERED and every call prompts; a printed run has nowhere
+   * to put the question, so it is denied. So this is the difference between a
+   * connector a teammate can use and one it can only fail at.
+   *
+   * Named, never wildcarded: the CLI refuses `mcp__*` in an allow rule, and
+   * naming is also the point -- a teammate given Robinhood is not thereby
+   * given Gmail. Claude Code only; every other builder ignores it.
+   */
+  readonly connectors?: readonly string[];
+}
+
+/** `--allowedTools` and its rules, or nothing at all when there are none. */
+function connectorRules(names: readonly string[] | undefined): readonly string[] {
+  if (names === undefined || names.length === 0) return [];
+  const rules: string[] = [];
+  for (const name of names) {
+    const rule = allowRuleFor(name);
+    if (rule !== undefined && !rules.includes(rule)) rules.push(rule);
+  }
+  return rules.length === 0 ? [] : ["--allowedTools", rules.join(",")];
 }
 
 const EFFORT = /^[a-z]{1,16}$/;
@@ -593,6 +619,24 @@ export function createClaudePrintCommand(
     // buying crypto."
     "--tools",
     editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,mcp__*" : "Read,Glob,Grep,Task,mcp__*",
+    /*
+     * The connectors this teammate was given, one allow rule each.
+     *
+     * Removing the denial above only got as far as the tools being offered:
+     * Claude Code asks before using one and a printed run cannot answer, so
+     * the call is denied and the row reads `failed`. An allow rule is what
+     * turns that into a call.
+     *
+     * Not sent in Auto, where `bypassPermissions` already asks nothing, and
+     * where a rule would be a second, weaker statement of the same thing.
+     * Empty in every other mode until a person ticks a connector, so the
+     * default stays "asks, and therefore cannot" rather than "may".
+     *
+     * `allowRuleFor` returns nothing for a name that sanitises to nothing --
+     * that would produce `mcp____*`, which the CLI ACCEPTS and which widens
+     * a scope nobody chose. Failing closed there is deliberate.
+     */
+    ...(auto ? [] : connectorRules(options.connectors)),
   ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));

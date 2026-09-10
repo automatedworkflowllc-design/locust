@@ -6,25 +6,23 @@ import type { ComposerProps } from './components/Composer.js'
 import type { MissionMode } from '../../shared/ipc.js'
 
 /**
- * What a mode does to a connector, said in the words that survived measuring.
+ * The mode governs this machine. A connector is not on this machine.
  *
- * Two wrong sentences shipped before this one, both wrong about the reason:
+ * Three wrong sentences shipped before this one, and each is worth keeping as
+ * a thing this control now forbids by name:
  *
- *  1. "Only Auto can reach an MCP server." `--restricted` never blocked them;
- *     `--strict-mcp-config` is the flag that would, and running the argv by
- *     hand listed every connector on the account.
- *  2. "Your connectors are available in every mode." Removing our own
- *     `--disallowedTools mcp__*` made them OFFERED, and driving the built app
- *     in Ask showed the rest: Claude Code asks before using one, a printed
- *     run has nowhere to ask, and the call is denied. The activity row read
- *     `get_watchlists / Robinhood / failed`.
+ *  1. "Only Auto can reach an MCP server" -- blamed `--restricted`, which
+ *     never blocked MCP; `--strict-mcp-config` is the flag that would.
+ *  2. "Your connectors are available in every mode" -- they were offered, and
+ *     every call was then denied for want of anyone to approve it.
+ *  3. "A connector call will be refused in this mode" -- true until Locust
+ *     began passing a named allow rule per connector.
  *
- * Colin's question was "do you think thats acceptable for the user to only
- * have access for mcp tools under auto or is that standard?" It is not
- * standard, and the real answer is per-connector permission rather than a
- * mode: an allow rule must name its server (`mcp__claude_ai_Robinhood__*` is
- * accepted, `mcp__*` is refused). Until that exists, the app says which mode
- * can and which cannot, rather than letting the model improvise a reason.
+ * Colin, 2026-09-10: "honestly just let them have access to the mcp tools if
+ * the client have access to it -- it only makes sense and is way less muddy."
+ * So they all work, and the line says the thing a person cannot infer from
+ * the mode's own words: "every write is refused" is a promise about DISK, and
+ * a connector reaches past this machine.
  */
 
 const ROUTE = (runtime: string): ComposerProps['route'] =>
@@ -52,29 +50,28 @@ function chip(mode: MissionMode, runtime = 'claude'): string {
 }
 
 describe('what a mode does to a connector', () => {
-  it('says a call will be refused, in every mode that cannot ask', () => {
-    for (const mode of RESTRICTED) {
-      expect(connectorsNote('claude', mode), mode).toContain('will be refused in this mode')
-      expect(connectorsNote('claude', mode), mode).toContain('no way to put that question to you')
+  it('says they work, in every mode', () => {
+    for (const mode of EVERY_MODE) {
+      expect(connectorsNote('claude', mode), mode).toContain('Your connectors work')
     }
   })
 
-  it('says they work in Auto, and why that is not free', () => {
-    const note = connectorsNote('claude', 'auto')
-    expect(note).toContain('Your connectors work here')
-    // Never sold as a pure win: the same flag that stops it asking is the one
-    // that lets it change anything on this machine.
-    expect(note).toContain('change anything on this machine')
-    expect(note).not.toContain('refused')
+  it('says the one thing the mode cannot tell you: a connector is not this machine', () => {
+    for (const mode of RESTRICTED) {
+      expect(connectorsNote('claude', mode), mode).toContain('limits is this machine')
+      expect(connectorsNote('claude', mode), mode).toContain('outside the sandbox')
+    }
+    // Auto has nothing to distinguish -- it covers the machine as well.
+    expect(connectorsNote('claude', 'auto')).toContain('everything else on this machine')
   })
 
-  it('never repeats either sentence that turned out to be wrong', () => {
+  it('never repeats any of the three sentences that turned out to be wrong', () => {
     for (const mode of EVERY_MODE) {
       const note = connectorsNote('claude', mode) ?? ''
-      // v1: the reason given was `--restricted`, which never blocked MCP.
       expect(note, mode).not.toContain('own Claude Code settings')
-      // v2: "available in every mode", which the Ask drive disproved.
       expect(note, mode).not.toContain('available in every mode')
+      expect(note, mode).not.toContain('will be refused')
+      expect(note, mode).not.toContain('Only Auto')
     }
   })
 
@@ -88,9 +85,8 @@ describe('what a mode does to a connector', () => {
   it('reaches the screen without opening the menu', () => {
     // The chip is always drawn; the menu is not. A person who never opens it
     // still has to be able to read this.
-    for (const mode of RESTRICTED) {
-      expect(chip(mode), mode).toContain('will be refused in this mode')
+    for (const mode of EVERY_MODE) {
+      expect(chip(mode), mode).toContain('Your connectors work')
     }
-    expect(chip('auto')).toContain('Your connectors work here')
   })
 })
