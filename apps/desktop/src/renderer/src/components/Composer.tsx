@@ -2,16 +2,13 @@ import mark from '../assets/locust-mark.svg'
 import { useCallback, useRef, useState } from 'react'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
-import { PixelFace } from './PixelFace.js'
 import type { ClipboardEvent, FormEvent, KeyboardEvent, ReactElement } from 'react'
 
-import type { AvatarSpec } from '../../../shared/avatar.js'
 import type {
   MissionMode,
   MissionRouteSummary,
   PublicModel,
-  PublicRuntimeStatus,
-  TeammateHue
+  PublicRuntimeStatus
 } from '../../../shared/ipc.js'
 import { hostCanRunMission, isMissionRuntime, runtimeDisplayName } from '../../../shared/runtimes.js'
 import {
@@ -159,35 +156,6 @@ export interface ComposerProps {
   /** Who the next mission is messaged to; the placeholder says so. */
   readonly teammateName: string | undefined
   /**
-   * Picking who answers, when more than one answer is possible.
-   *
-   * Present only where there is no conversation open -- the home screen --
-   * because that is the one place the question "who" has not been settled by
-   * the thread you are looking at. A room is the CONSEQUENCE of ticking two
-   * names, not something you have to go and make first (design agent,
-   * 2026-09-10).
-   */
-  readonly askWho?: {
-    readonly picks: readonly {
-      readonly teammateId: string
-      readonly name: string
-      readonly hue: TeammateHue
-      readonly avatar: AvatarSpec
-      readonly on: boolean
-    }[]
-    readonly onToggle: (teammateId: string) => void
-    /** Tick everyone, or put it back to one. */
-    readonly onEveryone: () => void
-    readonly everyoneOn: boolean
-    /** What sending will do, when that is more than sending a message. */
-    readonly consequence: string | undefined
-    /** Why this set cannot be asked, said before the press. */
-    readonly refusal: string | undefined
-    readonly sendLabel: string
-    /** What the empty box should say, when it is not "Message <one name>". */
-    readonly placeholder: string | undefined
-  }
-  /**
    * Set when the addressed teammate already has a live mission somewhere.
    * Starting is refused for THEM, not for the workspace: another teammate's
    * run being on screen does not block this one.
@@ -254,7 +222,6 @@ export function Composer({
   onHandOff,
   handingOff,
   teammateName,
-  askWho,
   busyWith,
   queued,
   queuedNote,
@@ -454,7 +421,7 @@ export function Composer({
           // 2026-09-05). Every OTHER line here survives, because each says
           // something no other part of the screen does.
           // Asking several says so; asking one is the sentence it always was.
-          askWho?.placeholder ?? (teammateName === undefined ? 'Write a message…' : `Message ${teammateName}…`)
+          teammateName === undefined ? 'Write a message…' : `Message ${teammateName}…`
         : discoveryPhase === 'loading'
           ? 'Checking local runtimes…'
           : discoveryPhase === 'error'
@@ -935,84 +902,18 @@ export function Composer({
                * do more than send.
                *
                * The drawing gives the multi-teammate case a button reading
-               * "Ask all" beside the chips. Drawn as a second control it
-               * would be two sends in one box, so the label lands on the
-               * one that is already there.
                */
               <button
                 type="submit"
-                className={`send-button lc-send${askWho !== undefined && askWho.sendLabel !== 'Send' ? ' lc-send--labelled' : ''}`}
-                disabled={!canStart || askWho?.refusal !== undefined}
-                aria-label={askWho === undefined ? 'Start mission' : askWho.sendLabel}
-                title={askWho?.consequence ?? "Start mission — Shift+Enter for a new line"}
+                className="send-button lc-send"
+                disabled={!canStart}
+                aria-label="Start mission"
+                title="Start mission — Shift+Enter for a new line"
               >
-                {askWho !== undefined && askWho.sendLabel !== 'Send' && <span>{askWho.sendLabel}</span>}
                 <Icon name="arrow-up" size={15} />
               </button>
             )}
-            {/*
-              * WHO ANSWERS, inside the box with the words they will answer.
-              *
-              * Colin, 2026-09-09: "how does one create a room for teammates, i
-              * cant figure it out lol." The answer is not a better Rooms
-              * screen. A room is the consequence of the ask -- tick two names
-              * and the post fans out, the room is what the answers land in --
-              * so nobody has to know rooms exist in order to make their first
-              * one, and a first room stops costing a name before it has a
-              * purpose (design agent, 2026-09-10).
-              *
-              * Only on the home screen. Inside a conversation the question
-              * "who" is already answered by the thread you are looking at.
-              */}
-            {askWho !== undefined && askWho.picks.length > 0 && (
-              <div className="lc-askwho" role="group" aria-label="Who answers">
-                {askWho.picks.map((pick) => (
-                  <button
-                    key={pick.teammateId}
-                    type="button"
-                    role="checkbox"
-                    aria-checked={pick.on}
-                    className={`lc-askwho__pick${pick.on ? ' is-on' : ''}`}
-                    onClick={() => askWho.onToggle(pick.teammateId)}
-                  >
-                    <PixelFace hue={pick.hue} avatar={pick.avatar} size={16} teammateId={pick.teammateId} />
-                    <span>{pick.name}</span>
-                  </button>
-                ))}
-                {/* Only where it would change anything: with two teammates on
-                    the roster, "Everyone" and ticking both are the same press. */}
-                {askWho.picks.length > 2 && (
-                  <button
-                    type="button"
-                    className={`lc-askwho__all${askWho.everyoneOn ? ' is-on' : ''}`}
-                    aria-pressed={askWho.everyoneOn}
-                    onClick={askWho.onEveryone}
-                  >
-                    Everyone
-                  </button>
-                )}
-              </div>
-            )}
           </div>
-          {/*
-            * What sending will do, before it is pressed.
-            *
-            * The standing register: a quiet left rule, no icon, nothing to
-            * answer. Starting three conversations and creating a durable
-            * object is a lot to happen from one keypress, and a person is
-            * owed the consequence before the click rather than a surprise
-            * after it. A refusal takes its place, in amber, because a set
-            * too big to be a room should say so before the press and not
-            * after -- `createRoom` would answer with a sentence about a
-            * thing the person never asked to make.
-            */}
-          {askWho?.refusal !== undefined ? (
-            <p className="lc-askwho__says lc-tone-amber">{askWho.refusal}</p>
-          ) : askWho?.consequence !== undefined ? (
-            <p className="lc-askwho__says">
-              <span className="lc-askwho__will lc-mono">Sending will</span> {askWho.consequence}
-            </p>
-          ) : null}
           <div className="lc-composer__controls">
             <div className="lc-composer__group">
               <span className="lc-control__anchor" ref={modeAnchor}>

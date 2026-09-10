@@ -1632,94 +1632,6 @@ textarea {
   font-size: var(--lc-text-screen-title);
 }
 
-.lc-askwho {
-  /* Its own line inside the box: the field and the send control keep the
-     first one. `100%` is what forces the wrap. */
-  flex: 0 0 100%;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--lc-space-3);
-  padding: 0 0 var(--lc-space-4);
-  /* Sits under the field it belongs to, hairlined off so the box does not
-     read as one tall undifferentiated well. */
-  margin-top: calc(-1 * var(--lc-space-2));
-  border-top: 1px solid var(--lc-border-hairline);
-  padding-top: var(--lc-space-4);
-}
-
-.lc-askwho__pick {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--lc-space-3);
-  height: 26px;
-  padding: 0 10px 0 6px;
-  border: 1px solid var(--lc-border-control);
-  border-radius: var(--lc-radius-control);
-  background: var(--lc-bg-control);
-  color: var(--lc-text-muted);
-  font: inherit;
-  font-size: var(--lc-text-description);
-  cursor: pointer;
-  transition: background var(--lc-motion-hover) var(--lc-ease);
-}
-
-.lc-askwho__pick:hover {
-  background: var(--lc-hover-surface-strong);
-}
-
-/* Ticked is the teammate's own presence colour, the same lime the roster
-   uses for "this one" -- not a new state colour invented for this row. */
-.lc-askwho__pick.is-on {
-  border-color: var(--lc-lime-border);
-  background: var(--lc-lime-tint);
-  color: var(--lc-text-primary);
-}
-
-.lc-askwho__all {
-  margin-left: auto;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--lc-border-control);
-  border-radius: var(--lc-radius-control);
-  background: transparent;
-  color: var(--lc-text-muted);
-  font: inherit;
-  font-size: var(--lc-text-description);
-  cursor: pointer;
-}
-
-.lc-askwho__all.is-on,
-.lc-askwho__all:hover {
-  color: var(--lc-text-secondary);
-  border-color: var(--lc-hover-border);
-}
-
-/* The consequence, in the standing register: a quiet left rule, no icon,
-   nothing to answer. */
-.lc-askwho__says {
-  display: flex;
-  gap: var(--lc-space-4);
-  margin: var(--lc-space-3) 0 0;
-  padding-left: var(--lc-space-4);
-  border-left: 2px solid var(--lc-border-hairline);
-  color: var(--lc-text-secondary);
-  font-size: var(--lc-text-description);
-  line-height: 1.55;
-  text-wrap: pretty;
-}
-
-.lc-askwho__will {
-  flex: none;
-  font-size: var(--lc-text-mono-caption);
-  letter-spacing: var(--lc-tracking-label);
-  text-transform: uppercase;
-  color: var(--lc-text-muted);
-}
-
-/* The one send control, wearing a label when it is about to do more than
-   send. Width comes from the text, so the arrow keeps its own breathing
-   room instead of being crushed against it. */
 .lc-empty {
   flex: 1;
   display: grid;
@@ -2200,7 +2112,6 @@ textarea {
   font: inherit;
   text-decoration: underline;
 }
-
 
 /* A routine's schedule: the three-way choice, then the one detail the
    choice needs (hours, or a time). The card shows the rule and the next
@@ -3263,21 +3174,6 @@ textarea {
   cursor: pointer;
   transition: background var(--lc-motion-hover) var(--lc-ease),
     border-color var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease);
-}
-
-/* The send control wearing a label. `lc-send` is a 30px square with
-   `place-items: center`, so a word inside it wrapped to two lines in a circle
-   -- seen in the drive's own screenshot. Width follows the text, and the
-   contents lay out in a row. */
-.lc-send--labelled {
-  width: auto;
-  min-width: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--lc-space-3);
-  padding: 0 var(--lc-space-4);
-  white-space: nowrap;
-  font-size: var(--lc-text-description);
 }
 
 .lc-send:not(:disabled):hover {
@@ -6772,7 +6668,6 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
-
 
 /* ======================================================================
  * Touch-up, 2026-09-04 (design agent).
