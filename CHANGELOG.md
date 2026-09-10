@@ -23,6 +23,29 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.61.1 - 2026-09-10
+
+- **The Automations screen is now Routines, and it shows you how to make one.**
+  It used to describe a right-click. It now lists your most recent finished
+  conversations with a Save on each — the actual thing a routine is made from.
+- **Save as routine is on the mission header**, beside Activity, on a finished
+  conversation. It was only ever in a right-click menu, which is where you look
+  once you know an action exists rather than how you find out.
+- **What you set up inside a CLI moved to Settings, under that runtime.** Your
+  agents, commands and MCP servers are facts about Codex or Claude Code, and
+  under them they need no apology — sitting on a screen that otherwise means
+  "things you can run" made them read as broken.
+- **Ctrl+V a file or a screenshot into the message.** A pasted screenshot has
+  no file behind it, so Locust writes it into the same attachments folder the
+  + button uses.
+- **A teammate's memories stay visible after you reply.** Each reply is its own
+  run, and the card was only showing what the latest one learned.
+- **A refused command no longer prints itself into the warning.** One line, not
+  a whole program; the full command is in the activity row where it belongs.
+- **Cursor file rows lose their long paths again.** A Windows path was being
+  flattened with one separator left in, so Locust stopped recognising its own
+  mirror folder.
+
 ## 0.60.1 - 2026-09-09
 
 - **Correction to what 0.60.0 told you about connectors.** It said they were
