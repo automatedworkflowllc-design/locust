@@ -23,6 +23,17 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.62.1 - 2026-09-10
+
+- **Replies stream smoothly.** Text used to arrive in jolts and, worse, change
+  shape after you had read it - a sentence turning bold, a paragraph becoming
+  a code block - because every token re-rendered and re-parsed the whole
+  reply. Now tokens land once per frame, and formatting is applied only to
+  what has finished arriving; the part still being written is plain until it
+  settles, the way Claude Code does it. Measured: zero changes to already-shown
+  text across a whole streamed reply.
+- The plan for what comes next is written down in `docs/PLAN-2026-09-10-NEXT.md`.
+
 ## 0.62.0 - 2026-09-10
 
 - **Ask several teammates at once, from the message box.** Tick a second name
