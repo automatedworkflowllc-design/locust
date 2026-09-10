@@ -634,12 +634,22 @@ textarea {
    * So: fill the column, with a cap. The cap is what Claude Code does too --
    * measured off its own window at two sizes, its prose runs about 710px at a
    * 1088px window and 775px at 1431px, so it grows with the window and then
-   * stops. `92ch` is that width in this face, about 110 characters, and
-   * `min()` is what makes the first term win on a narrow window instead of
-   * overflowing it.
+   * stops.
+   *
+   * THE CEILING IS HERE, ON THE PARAGRAPH, IN ch -- not on the column in px
+   * (design agent, RULINGS 2026-09-10). The column includes the avatar
+   * gutter, so a px cap on it governs reading only by subtraction, and the
+   * measure would move whenever the gutter did. `ch` is this face's own `0`,
+   * so it means the same thing if the face ever changes. 90ch at 15px is
+   * about 670px of paragraph.
+   *
+   * And the leading moves with it. A long measure and tight leading fail
+   * together -- the return sweep is what breaks past ~85 characters, and
+   * leading is what makes the sweep findable -- so 90ch is held at 1.7. At
+   * 1.65 the same width read as too long; it was the pairing, not the width.
    */
-  max-width: min(100%, 92ch);
-  line-height: 1.65;
+  max-width: 90ch;
+  line-height: 1.7;
   text-wrap: pretty;
 }
 
@@ -1130,6 +1140,10 @@ textarea {
 }
 
 .lc-filerow__path {
+  /* Shrinks with an ellipsis when the row is short; keeps its own width when
+     it is not. Without `min-width: 0` a flex item will not shrink below its
+     content, and the ellipsis never fires. */
+  min-width: 0;
   color: var(--lc-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1149,7 +1163,10 @@ textarea {
 
 .lc-filerow__result {
   flex: none;
-  margin-left: auto;
+  /* Adjacent to the path, not pushed to the far edge. `margin-left: auto`
+     put `path ... result` at opposite ends of a row that now grows with the
+     window, and the gap between them became a canyon (design agent,
+     2026-09-10). */
   display: flex;
   gap: var(--lc-space-3);
 }
@@ -1382,7 +1399,11 @@ textarea {
 
 .lc-receipt {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  /* The value column is capped: the thread column grows with the window
+     now, and a two-column list at 900px put `verified` a screen away from
+     `Ledger`. The approval card's data reads through this same rule, and it
+     is the one card where a misread matters (design agent, 2026-09-10). */
+  grid-template-columns: max-content minmax(0, 60ch);
   gap: var(--lc-space-3) var(--lc-space-6);
   padding: 0 var(--lc-space-5) var(--lc-space-5);
   font-size: var(--lc-text-description);
@@ -4225,6 +4246,13 @@ textarea {
   color: var(--lc-text-primary);
 }
 
+/* Selected-within-selected: a row inside a selected card gets no second
+   surface, because it says nothing the first did not. The text weight alone
+   marks which conversation is open (design agent, RULINGS 2026-09-10). */
+.lc-teammate.is-selected .lc-teammate__mission.is-active {
+  background: transparent;
+}
+
 /* The title, by name: as `span:last-child` it lost the ellipsis the moment a
    turn count sat after it, and a two-turn conversation wrapped to three
    lines (seen driving the app, 2026-09-05). */
@@ -5021,12 +5049,40 @@ textarea {
  * What the runtime said about the turn, at the foot of the fold. Standing
  * register -- a left rule, no box, no new species on the census.
  */
+/*
+ * The fold's footer: what the RUN said, separated from what its last command
+ * printed.
+ *
+ * A notice used to sit directly under the last command block with nothing
+ * between them, and so read as that command's output -- "Skill descriptions
+ * were shortened..." looked like what `Get-Content` had printed. That is a
+ * false attribution, wrong even when the tone is right, and the design agent
+ * ranked it above the tone (RULINGS 2026-09-10). The fold's own hairline
+ * separates the two, and each notice carries who said it.
+ */
+.lc-activity__foot {
+  border-top: 1px solid var(--lc-border-hairline);
+  padding: var(--lc-space-3) var(--lc-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
 .lc-shellnotice {
-  margin: var(--lc-space-2) 0 0 34px;
+  margin: 0;
   padding-left: var(--lc-space-3);
   border-left: 2px solid var(--lc-border-card);
   font-size: var(--lc-text-description);
   text-wrap: pretty;
+}
+
+/* Who said it, the way the untrusted-input label carries its own source. */
+.lc-shellnotice__source {
+  margin-right: var(--lc-space-3);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
 }
 
 /* --- Attached files ----------------------------------------------------- */

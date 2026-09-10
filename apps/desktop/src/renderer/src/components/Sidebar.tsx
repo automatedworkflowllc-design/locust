@@ -457,13 +457,18 @@ export function Sidebar({
                   {status.activity === 'delegating' ? (
                     // "subagent working" is the news; the role gives way to it
                     // when the line is short, instead of the other way round.
-                    <span className={`lc-row__meta is-delegating lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
+                    <span className="lc-row__meta is-delegating">
                       {/* One glyph app-wide for "there is another agent in this" -- the same one the helper row uses. */}
                       <span className="lc-teammate__delegating" aria-hidden="true">
                         <Icon name="users" size={11} />
                       </span>
+                      {/* The role stays muted here too: it is identity and has no
+                          state to borrow. This branch tinted the whole line while
+                          the ordinary one had already been split (RULINGS 2026-09-10). */}
                       <span className="lc-row__metarole">{labelRole(status.label)}</span>
-                      <span className="lc-row__metastate">{labelState(status.label)}</span>
+                      <span className={`lc-row__metastate lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
+                        {labelState(status.label)}
+                      </span>
                     </span>
                   ) : (
                     /*

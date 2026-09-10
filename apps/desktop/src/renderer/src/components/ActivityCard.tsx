@@ -3,9 +3,11 @@ import type { ReactElement } from 'react'
 
 import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, relativePath } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
+import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 import { PlanSteps } from './ThreadItems.js'
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 /**
  * The disclosure chain for what a teammate did, three rungs deep:
@@ -162,7 +164,12 @@ export function ActivityCard({
    * point, which is inside the branch that drops them so the two can never
    * describe different sets again.
    */
-  readonly notices?: readonly { readonly level: 'info' | 'warning' | 'error'; readonly message: string }[]
+  readonly notices?: readonly {
+    readonly level: 'info' | 'warning' | 'error'
+    readonly message: string
+    /** Which runtime said it: the source the footer names. */
+    readonly source: MissionRuntimeId
+  }[]
   /**
    * Open on arrival, for the newest finished turn. See `openByDefault` on the
    * activity item for why: the live narration disappears when a run ends, and
@@ -424,8 +431,9 @@ export function ActivityCard({
           ))}
           {revealNotice !== undefined && <p className="lc-filerow__notice">{revealNotice}</p>}
           {/*
-            * What the runtime said about this turn, at the foot of the work it
-            * is about.
+            * What the runtime said about this turn, in the fold's FOOTER --
+            * behind the fold's own hairline, so it cannot read as the last
+            * command's output, and each line naming who said it.
             *
             * These arrive before the first tool call, so the thread's own gate
             * drops them -- Codex comments on its own setup as every turn opens
@@ -433,19 +441,30 @@ export function ActivityCard({
             * trace line counted them anyway, as `1 notice`, which meant a
             * number for a sentence that was on no screen at all.
             *
-            * Standing register: a left rule, no box, no new species. Amber
-            * only where a person may need to act, which is what `level`
-            * already distinguishes -- an `info` notice about shortened skill
-            * descriptions is not a warning and must not be dressed as one.
+            * THE TONE IS NOT THE RUNTIME'S LEVEL. Amber in this app means "a
+            * person may need to act" -- the pending register's own rule, that
+            * pending must contain a control -- and a notice here contains
+            * none. So a notice is amber only if the reader has something to
+            * decide, which none of these do, whatever level the runtime sent
+            * (design agent, RULINGS 2026-09-10). Codex's `warning` is a true
+            * statement about Codex's situation; amber would be a statement
+            * about the reader's. The level is kept on the title -- this
+            * changes presentation, not provenance.
             */}
-          {notices.map((notice, index) => (
-            <p
-              key={`notice_${String(index)}`}
-              className={`lc-shellnotice lc-tone-${notice.level === 'error' ? 'red' : notice.level === 'warning' ? 'amber' : 'muted'}`}
-            >
-              {notice.message}
-            </p>
-          ))}
+          {notices.length > 0 && (
+            <div className="lc-activity__foot">
+              {notices.map((notice, index) => (
+                <p
+                  key={`notice_${String(index)}`}
+                  className="lc-shellnotice lc-tone-muted"
+                  title={`${runtimeDisplayName(notice.source)} called this ${notice.level === 'info' ? 'a note' : `a ${notice.level}`}`}
+                >
+                  <span className="lc-shellnotice__source lc-mono">{runtimeDisplayName(notice.source)}</span>
+                  {notice.message}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
