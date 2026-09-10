@@ -23,6 +23,18 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.66.0 - 2026-09-10
+
+- **Replies fit the window they are read in.** A reply used to sit at a fixed
+  width in the app's smallest type, using a little over half the column it
+  already had. It now fills that column, at a larger size meant for reading
+  rather than scanning, and on windows wider than about 1650px the column
+  itself grows with the window.
+- **Stop works on the second turn of a conversation.** Pressing stop while a
+  turn was still starting did nothing at all, silently, and the mission ran to
+  completion. It is now remembered and takes effect the moment the run can be
+  named. A first turn always worked, which is why this went unnoticed.
+
 ## 0.65.1 - 2026-09-10
 
 - **The home screen is addressed to nobody again.** The row of teammate
