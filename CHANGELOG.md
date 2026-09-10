@@ -23,6 +23,26 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.62.0 - 2026-09-10
+
+- **Ask several teammates at once, from the message box.** Tick a second name
+  and the post fans out; the room is where the answers land. Nobody has to
+  know rooms exist to make their first one. The box says what sending will do
+  before you press it.
+- **A room made that way starts as "Untitled room" and is renamed from the
+  room** — click its title. Naming it up front was most of why nobody made
+  one.
+- **Replies are easier to read.** A teammate's reply now runs about 73
+  characters a line instead of 111, with more space between lines. Past
+  about 85 the eye loses its place on the way back, and it felt "clunky"
+  without anything looking wrong.
+- **Replies are set in IBM Plex Sans.** Only the reply — every label, chip
+  and control stays as it was. The teammate's prose was borrowing the app's
+  own typeface, which is built for 13px chips, not nine-line paragraphs.
+  Bundled with the app; nothing is fetched.
+- The scratch project the testing drives use no longer tells teammates to
+  keep answers to one paragraph.
+
 ## 0.61.1 - 2026-09-10
 
 - **The Automations screen is now Routines, and it shows you how to make one.**
