@@ -579,3 +579,66 @@ describe('when the CLOSING receipt cannot be written', () => {
     expect(harness.updates.some((update) => (update as { kind?: string }).kind === 'persistence-error')).toBe(false)
   })
 })
+
+/**
+ * A turn that finishes must let its run go.
+ *
+ * Nothing did that. A stop, a lost transport and a failed ledger each removed
+ * the run; a turn that simply ENDED did not, and an app-server process does
+ * not exit when its turn is over, so `onExit` never fired either.
+ *
+ * DRIVEN 2026-09-10 before the fix: the second message to a teammate in
+ * Approve-each was refused before it started, and reached the person as "The
+ * approval-capable runtime could not be started" while the sidebar showed the
+ * teammate idle. Approve-each was a one-turn mode.
+ */
+describe('a finished turn', () => {
+  const finish = (fake: ReturnType<typeof fakeProcess>) => {
+    fake.push({ jsonrpc: '2.0', method: 'turn/completed', params: { threadId: 'th_1' } })
+  }
+
+  it('stops counting as live, so the same teammate can be asked again', async () => {
+    const { instance, fake } = service()
+    const first = await instance.start('Do something.')
+    expect(instance.liveMissionIds()).toEqual([first.missionId])
+
+    finish(fake)
+    await vi.waitFor(() => {
+      expect(instance.liveMissionIds()).toEqual([])
+    })
+
+    // The whole point: a second turn is accepted rather than refused.
+    const second = await instance.start('And another thing.')
+    expect(second.missionId).not.toBe(first.missionId)
+  })
+
+  it('takes its server with it, rather than leaving one alive per turn', async () => {
+    const { instance, fake } = service()
+    await instance.start('Do something.')
+    expect(fake.isKilled()).toBe(false)
+    finish(fake)
+    await vi.waitFor(() => {
+      expect(fake.isKilled()).toBe(true)
+    })
+  })
+
+  it('does not free the run until its closing receipt is written', async () => {
+    // The terminal event is persisted by the same notification that finalizes
+    // the normalizer. Releasing first would race the record of how it ended.
+    let settleAppend: (() => void) | undefined
+    const appendEvents = vi.fn<MissionLedger['appendEvents']>(
+      () => new Promise<void>((resolve) => {
+        settleAppend = resolve
+      })
+    )
+    const { instance, fake } = service({ ledger: fakeLedger({ appendEvents }) })
+    const mission = await instance.start('Do something.')
+    finish(fake)
+    // The ledger has not answered yet, so the run is still live.
+    expect(instance.liveMissionIds()).toEqual([mission.missionId])
+    settleAppend?.()
+    await vi.waitFor(() => {
+      expect(instance.liveMissionIds()).toEqual([])
+    })
+  })
+})
