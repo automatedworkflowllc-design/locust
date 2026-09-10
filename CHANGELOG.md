@@ -6,6 +6,28 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.56.0 - 2026-09-09
+
+- **A room now asks everyone, even when it cannot run them all at once.** Only
+  eight missions run at a time, so posting to a full room while other work was
+  going left some members simply never asked — no answer, no record, nothing
+  the next day to show they had been included. They now wait in line, shown as
+  "Waiting for a slot", and start on their own as slots free.
+- **"Everyone has answered" waits for them.** It used to be true of whoever
+  happened to start.
+- **A long answer no longer takes the whole room.** Twelve lines, then "28 more
+  lines" to open the rest. One teammate writing at length was pushing every
+  other answer off the screen.
+- **Past six answers, a room lays them out one per line.** In a grid every row
+  is as tall as its longest answer, so two short replies beside a long one were
+  paid for in blank space.
+- **Command rows say what the teammate was doing, not just what it ran.** Where
+  the runtime reports it — Claude Code and OpenCode do — the row reads "Checked
+  what the app says about the free route" rather than a shell pipeline. The
+  command is still there, one press away.
+- **Ticking a ninth teammate into a room says so.** The picker offered everyone
+  and then refused the room when you pressed Create room.
+
 ## 0.55.3 - 2026-09-09
 
 - **Right-click menus work again.** Pressing any item in a right-click menu

@@ -52,7 +52,13 @@ const tick = (count) => drive.evaluate(`(async () => {
 })()`)
 
 try {
-  await drive.capture('launch, and open Rooms with a roster of eleven', () => drive.evaluate(`(async () => {
+  // ready() first: it waits for launch and discovery. Without it this pressed
+  // Ctrl+4 before the screen existed and found no name field -- which the
+  // premise guard then reported as "the picker offered 0 teammates". It
+  // passed for days on timing alone. Second probe this session to miss it.
+  await drive.capture('launch, and open Rooms with a roster of eleven', async () => {
+    await drive.ready()
+    return drive.evaluate(`(async () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '4', ctrlKey: true, bubbles: true }))
     await new Promise(r => setTimeout(r, 800))
     const input = document.querySelector('input[aria-label="Room name"]')
@@ -61,7 +67,8 @@ try {
     set.call(input, 'Standup'); input.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 200))
     return 'offered: ' + document.querySelectorAll('[role=group][aria-label="Teammates in the room"] [role=checkbox]').length
-  })()`))
+  })()`)
+  })
 
   // The premise, outside capture(): a roster smaller than the room limit
   // cannot reach this state at all, and the probe would report a missing
