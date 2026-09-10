@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionApprovalDecision, MissionApprovalRequest, MissionQuestion } from '../../../shared/ipc.js'
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { dataSentLine } from '../../../shared/approval-data.js'
 import { Icon } from './Icon.js'
 import { DiffView } from './DiffView.js'
@@ -158,7 +159,9 @@ export function ApprovalCard({
       ? 'Unknown — a command can do anything the workspace sandbox allows.'
       : request.kind === 'file-change'
         ? 'Yes for tracked files, if the workspace is under version control.'
-        : 'Nothing is changed by answering.'
+        : request.kind === 'connector'
+          ? 'Unknown — a connector acts on the service it reaches, and Locust cannot undo what happens there.'
+          : 'Nothing is changed by answering.'
 
   // A card that waits on the person is brought into view when it appears.
   // Its buttons sat below the fold while the run said "waiting on you"
@@ -197,7 +200,12 @@ export function ApprovalCard({
           * request names a folder the header defers to the Where row rather
           * than restating it wrongly.
           */}
-        <span className="lc-rail__meta">{request.cwd === null ? 'Codex CLI · this workspace' : 'Codex CLI'}</span>
+        {/* Named by the request, not assumed: a Claude Code connector
+            permission wore "Codex CLI" in its first drive (2026-09-10). */}
+        <span className="lc-rail__meta">
+          {runtimeDisplayName(request.runtime ?? 'codex')}
+          {request.cwd === null ? ' · this workspace' : ''}
+        </span>
       </div>
 
       <dl className="lc-receipt">

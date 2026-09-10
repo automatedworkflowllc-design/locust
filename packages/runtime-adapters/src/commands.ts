@@ -373,6 +373,20 @@ export interface RuntimeCommandOptions {
    * given Gmail. Claude Code only; every other builder ignores it.
    */
   readonly connectors?: readonly string[];
+  /**
+   * Locust as the permission host for this run.
+   *
+   * `configPath` is an mcp.json naming Locust's bridge as a stdio server;
+   * `toolName` is the bridge's one tool. Claude Code calls it before using a
+   * connector and waits for the answer, which is the person's, from the card
+   * the app already has. Without this a printed run has nowhere to ask and
+   * every connector call is refused -- or, with `connectors` above, allowed
+   * without asking. This is the asking.
+   *
+   * Never sent in Auto: `bypassPermissions` asks nothing, and a prompt tool
+   * there would be a question nobody is asked. Claude Code only.
+   */
+  readonly permissionBridge?: { readonly configPath: string; readonly toolName: string };
 }
 
 /** `--allowedTools` and its rules, or nothing at all when there are none. */
@@ -637,6 +651,25 @@ export function createClaudePrintCommand(
      * a scope nobody chose. Failing closed there is deliberate.
      */
     ...(auto ? [] : connectorRules(options.connectors)),
+    /*
+     * And somewhere to ASK, for everything the rules above did not cover.
+     *
+     * MEASURED 2026-09-10: with `--mcp-config` naming Locust's bridge and
+     * `--permission-prompt-tool` naming its tool, a `--print` run under
+     * `--restricted` in the strictest mode called the tool before using a
+     * connector, waited, and honoured the answer; a denial's message reached
+     * the model verbatim. Bash and Edit never route through it -- they are
+     * granted by `--tools` -- so this is connectors only, which is the one
+     * thing the mode was never able to govern.
+     */
+    ...(auto || options.permissionBridge === undefined
+      ? []
+      : [
+          "--mcp-config",
+          requireText(options.permissionBridge.configPath, "Permission bridge config"),
+          "--permission-prompt-tool",
+          requireText(options.permissionBridge.toolName, "Permission tool"),
+        ]),
   ];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));

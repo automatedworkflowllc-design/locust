@@ -23,6 +23,18 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.63.0 - 2026-09-10
+
+- **A Claude Code teammate asks before using a connector nothing has
+  pre-approved.** The same approval card as Codex — *Use get_watchlists on
+  Robinhood*, what is sent, whether it can be undone — with Approve once,
+  Always allow this session, and Deny. "Always" lasts for that connector until
+  the mission ends. A denial reaches the teammate with your reason.
+- Your own connectors still never ask, as before. This is for the call that
+  no rule covered.
+- The approval card names the runtime that is asking instead of assuming
+  Codex.
+
 ## 0.62.2 - 2026-09-10
 
 - **The message-box row is one family of controls.** The `+` and the swarm

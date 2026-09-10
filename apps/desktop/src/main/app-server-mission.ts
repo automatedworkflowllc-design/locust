@@ -638,6 +638,7 @@ export function createAppServerMissionService(
                 approvalId,
                 runId,
                 missionId,
+                runtime: 'codex',
                 kind: described.kind,
                 // What was actually asked, structured, so the card can offer
                 // the options rather than a sentence about them.

@@ -253,6 +253,21 @@ interface CodexMissionServiceOptions {
    * loud, rather than a mission that waits on a health check.
    */
   readonly connectors?: () => readonly string[]
+  /**
+   * Locust as Claude Code's permission host. See permission-host.ts.
+   *
+   * Registered per run before the command is built, so the config path is
+   * on the command line; released when the run ends, so a question nobody
+   * answered is refused rather than left hanging and the run's token dies
+   * with it. Claude Code only, and never in Auto.
+   */
+  readonly permissionHost?: {
+    register(run: { readonly runId: string; readonly missionId: string; readonly cwd: string | null }): Promise<{
+      readonly configPath: string
+      readonly toolName: string
+    }>
+    release(runId: string): Promise<void>
+  }
 }
 
 function error(
@@ -400,6 +415,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
   const clearActive = (candidate: ActiveCodexMission): void => {
     if (active.get(candidate.runId) === candidate) active.delete(candidate.runId)
+    // The run is over, so nobody can answer a permission it was still asking:
+    // refuse what is waiting, forget its token, remove its config.
+    void options.permissionHost?.release(candidate.runId).catch(() => undefined)
     // Whatever ended this run, anyone waiting on it is told. Fire and forget:
     // a meeting's bookkeeping must never hold a slot open.
     if (options.onRunEnded !== undefined) {
@@ -880,6 +898,19 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // that is not this one. Absent unless the run really is in a
         // worktree.
         const repositoryRoot = peer?.repositoryRoot
+        /*
+         * Somewhere for a Claude Code run to ASK before using a connector.
+         *
+         * Auto asks nothing, so it gets no bridge. Every other mode used to
+         * have nowhere to put the question and refused every connector call;
+         * then 0.61.0 allowed them all without asking. This is the asking:
+         * the run is registered with the host, which mints it a token and an
+         * mcp.json, and the card the app already has answers.
+         */
+        const permissionBridge =
+          runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
+            ? await options.permissionHost.register({ runId, missionId, cwd: runCwd })
+            : undefined
         let command: RuntimeCommandSpec
         // OpenCode and Copilot take the prompt as an argument, not on stdin,
         // so their argv is built once now with the person's own words -- so a
@@ -915,11 +946,21 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           return runtime === 'claude'
             ? createClaudePrintCommand(executable, {
                 workspacePath: runCwd,
+                ...(permissionBridge === undefined ? {} : { permissionBridge }),
                 // Every connector the person's own Claude Code can reach.
                 // Without a named allow rule the tools are offered and every
                 // call is refused, because a printed run has nowhere to put
                 // the approval question.
                 ...(() => {
+                  /*
+                   * `LOCUST_ASK_CONNECTORS=1` sends NO allow rules, so every
+                   * connector call goes to the permission host and the person
+                   * is asked. Today it is the seam the host is driven through
+                   * -- with the rules in place a covered connector never asks,
+                   * which is Colin's ruling and the normal state. It is also
+                   * the shape of a future "ask me each time" setting.
+                   */
+                  if (globalThis.process.env.LOCUST_ASK_CONNECTORS === '1') return {}
                   const named = options.connectors?.() ?? []
                   return named.length === 0 ? {} : { connectors: named }
                 })(),
@@ -1109,6 +1150,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const why = startError instanceof Error && startError.message.length > 0
             ? startError.message
             : 'The Codex process could not be started safely.'
+          // A run that never started still registered a token. Let it go.
+          void options.permissionHost?.release(runId).catch(() => undefined)
           try {
             await options.ledger.appendHostFailure(missionId, {
               code: 'runtime-start-failed',

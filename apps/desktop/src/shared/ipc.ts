@@ -900,7 +900,14 @@ export const MIN_RELAY_HOP_CAP = 1
 export const MAX_RELAY_HOP_CAP = 12
 
 /** What the runtime is asking permission to do. */
-export type MissionApprovalKind = 'command' | 'file-change' | 'question'
+/**
+ * `connector` is a Claude Code run asking to use one of the person's MCP
+ * tools. It arrives through Locust's own permission host rather than the
+ * app-server protocol, but it is answered by the same card, with the same
+ * three decisions -- and "always" is remembered for that connector on that
+ * run, the way every other client does it.
+ */
+export type MissionApprovalKind = 'command' | 'file-change' | 'question' | 'connector'
 
 export interface MissionApprovalRequest {
   readonly approvalId: string
@@ -914,6 +921,13 @@ export interface MissionApprovalRequest {
   /** Where it would happen. */
   readonly cwd: string | null
   readonly requestedAt: string
+  /**
+   * Who is asking. The card used to print "Codex CLI" as a constant, which
+   * was true for as long as Codex was the only runtime that could ask; a
+   * Claude Code connector permission wore the wrong name in its first drive
+   * (2026-09-10). Absent on a record from before this field: read as Codex.
+   */
+  readonly runtime?: MissionRuntimeId
   /**
    * For a file change: the unified diff Codex attached to the item the
    * approval is about, bounded like a ledger patch. Absent when the runtime

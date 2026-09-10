@@ -63,6 +63,7 @@ import { createConnectorReader } from './connector-reader.js'
 import { createRelay } from './relay.js'
 import { createAttention } from './attention.js'
 import { boundedShutdown } from './bounded-shutdown.js'
+import { createPermissionHost } from './permission-host.js'
 import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
@@ -140,6 +141,7 @@ import type {
   PublicRoom,
   RoomPost,
   PublicTeammate,
+  MissionApprovalRequest,
   MissionHandoffRequest,
   MissionResumeRequest
 } from '../shared/ipc.js'
@@ -287,6 +289,7 @@ let missionServiceForShutdown: CodexMissionService | undefined
 let appServerServiceForShutdown: AppServerMissionService | undefined
 let ledgerForShutdown: MissionLedger | undefined
 let workroomForShutdown: Workroom | undefined
+let permissionHostForShutdown: { dispose(): Promise<void> } | undefined
 
 /**
  * The renderer names no destinations.
@@ -655,8 +658,48 @@ if (!ownsSingleInstanceLock) {
     let attentionReader: AttentionReader | undefined
     // Bound late for the same reason: it reads the ledger the service writes.
     let roomTasks: RoomTasks | undefined
+    /**
+     * Raise the approval card, and tell the OS by name if the person is
+     * looking elsewhere. Shared: Codex's app-server approvals and Claude
+     * Code's permission host are the same card, answered the same way.
+     */
+    const raiseApproval = (request: MissionApprovalRequest): void => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(MISSION_APPROVAL_CHANNEL, request)
+        }
+        // A run stopped waiting on a person who is looking elsewhere is told
+        // through the OS, by name, and the click brings the window back.
+        void teammates
+          .missionOwners()
+          .then(async (owners) => {
+            const ownerId = owners[request.missionId]
+            const roster = ownerId === undefined ? [] : await teammates.list()
+            attention.approvalArrived(request, roster.find((entry) => entry.teammateId === ownerId)?.name)
+          })
+          .catch(() => attention.approvalArrived(request, undefined))
+      }
+
+    /*
+     * Locust as Claude Code's permission host. See permission-host.ts for
+     * what was measured. The bridge script ships BESIDE app.asar, because
+     * Claude Code spawns it as a process and cannot spawn a path inside
+     * an archive -- the same reason the window icon lives there.
+     */
+    const permissionHost = createPermissionHost({
+      bridgePath: app.isPackaged
+        ? join(process.resourcesPath, 'locust-permission-bridge.mjs')
+        : join(__dirname, '../../resources/locust-permission-bridge.mjs'),
+      // Electron's own binary, run as node (ELECTRON_RUN_AS_NODE is set in
+      // the server's env): guaranteed present, whatever is on PATH.
+      node: process.execPath,
+      emitApproval: raiseApproval
+    })
+    permissionHostForShutdown = permissionHost
+
     const codexMissions = createCodexMissionService({
       workspacePath,
+      permissionHost,
       /*
        * Asked at the start of every run, never captured: a connector signed
        * into after launch reaches the next mission without a restart.
@@ -808,22 +851,7 @@ if (!ownsSingleInstanceLock) {
       liveElsewhere: () => codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       discover: discoverForWork,
       spawn: spawnAppServer,
-      emitApproval: (request) => {
-        const target = approvalWindow
-        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
-          target.webContents.send(MISSION_APPROVAL_CHANNEL, request)
-        }
-        // A run stopped waiting on a person who is looking elsewhere is told
-        // through the OS, by name, and the click brings the window back.
-        void teammates
-          .missionOwners()
-          .then(async (owners) => {
-            const ownerId = owners[request.missionId]
-            const roster = ownerId === undefined ? [] : await teammates.list()
-            attention.approvalArrived(request, roster.find((entry) => entry.teammateId === ownerId)?.name)
-          })
-          .catch(() => attention.approvalArrived(request, undefined))
-      },
+      emitApproval: raiseApproval,
       emitEvent: (runId, missionId, event) => {
         const target = approvalWindow
         if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
@@ -906,7 +934,11 @@ if (!ownsSingleInstanceLock) {
       const normalized =
         decision === 'approve-once' || decision === 'approve-always' ? decision : 'deny'
       if (typeof payload.approvalId !== 'string') return { ok: false } as const
-      return { ok: appServerMissions.decide({ approvalId: payload.approvalId, decision: normalized }) } as const
+      // Whichever service is holding this id. A Codex approval lives in the
+      // app-server service; a Claude Code connector permission lives in the
+      // permission host. An id is minted by exactly one of them.
+      const decided = { approvalId: payload.approvalId, decision: normalized } as const
+      return { ok: appServerMissions.decide(decided) || permissionHost.decide(decided) } as const
     })
 
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })
@@ -2638,6 +2670,8 @@ if (ownsSingleInstanceLock) {
         await appServerServiceForShutdown?.dispose()
         await ledgerForShutdown?.flush()
         await workroomForShutdown?.flush()
+        // Refuses whatever a run was still asking, and closes the loopback door.
+        await permissionHostForShutdown?.dispose()
       },
       leave: (reason) => {
         shutdownComplete = true
