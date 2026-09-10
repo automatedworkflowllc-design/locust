@@ -46,6 +46,7 @@ import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
 import { askConsequence, askPlaceholder, askRefusal, askSendLabel, UNTITLED_ROOM } from './askWho.js'
+import { createFrameBatcher } from './streamFrames.js'
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
@@ -1167,6 +1168,29 @@ export default function App(): ReactElement {
       .catch(() => undefined)
   }
 
+  /**
+   * One commit for every update held in a frame, in the order they came.
+   * See streamFrames.ts, and the note where updates are pushed into it.
+   */
+  const frameBatcher = useRef(
+    createFrameBatcher<Extract<CodexMissionUpdate, { readonly runId: string }>>((updates) => {
+      setRuns((current) => {
+        let next = current
+        for (const update of updates) {
+          if (next.has(update.runId)) {
+            next = withRun(next, update.runId, (run) => applyMissionUpdate(run, update))
+            continue
+          }
+          // A run whose start receipt has not come back yet: hold its updates
+          // until the receipt names its runId, then replay them in order.
+          const queued = pendingUpdatesRef.current.get(update.runId) ?? []
+          pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
+        }
+        return next
+      })
+    })
+  )
+
   useEffect(() => {
     let active = true
     const bridge = window.desktop
@@ -1303,16 +1327,24 @@ export default function App(): ReactElement {
         }
         return
       }
-      setRuns((current) => {
-        if (current.has(update.runId)) {
-          return withRun(current, update.runId, (run) => applyMissionUpdate(run, update))
-        }
-        // A run whose start receipt has not come back yet: hold its updates
-        // until the receipt names its runId, then replay them in order.
-        const queued = pendingUpdatesRef.current.get(update.runId) ?? []
-        pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
-        return current
-      })
+      /*
+       * Deltas land once per FRAME, not once per token.
+       *
+       * Each update is its own IPC message and so its own task, and React
+       * batches within a task, not across them -- so every `message.delta`
+       * was a full re-render of the thread, and a burst of twenty read as
+       * twenty jolts. Colin, 2026-09-10: "the text seems to come out rather
+       * aggressively or glitchy." Claude Code's own renderer coalesces; this
+       * is that. Only deltas are held; anything else flushes at once with
+       * whatever was ahead of it, so order never changes and a run finishing
+       * is never a frame late. See streamFrames.ts.
+       */
+      // Only an update that belongs to a run goes to a run. The kinds without
+      // a runId were all handled and returned above; this is the same fact
+      // said where the type checker can see it.
+      if (!('runId' in update)) return
+      const isDelta = update.kind === 'event' && update.event.type === 'message.delta'
+      frameBatcher.current.push(update, !isDelta)
     })
 
     const stopUpdates = bridge.onUpdateState((state) => {
@@ -1520,6 +1552,7 @@ export default function App(): ReactElement {
       clearTimeout(firstRecheck)
       window.removeEventListener('focus', onFocus)
       removeMissionListener()
+      frameBatcher.current.dispose()
       removeApprovalListener()
       stopUpdates()
     }

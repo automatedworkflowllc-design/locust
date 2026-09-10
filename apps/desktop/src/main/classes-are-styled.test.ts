@@ -54,7 +54,12 @@ const REACHED_NOT_STYLED: ReadonlySet<string> = new Set([
   // `lc-runtimerow__detail` -- and name what the row IS so a drive can find
   // it.
   'lc-task__state',
-  'lc-runtimerow__usage'
+  'lc-runtimerow__usage',
+  // The paragraph still being written. It draws EXACTLY as `lc-para` on
+  // purpose -- the whole point is that nothing changes shape when it settles
+  // -- so a rule of its own would be a rule that must stay empty. Named so a
+  // drive can find the arriving tail.
+  'lc-para--arriving'
 ])
 
 function sources(): readonly string[] {
