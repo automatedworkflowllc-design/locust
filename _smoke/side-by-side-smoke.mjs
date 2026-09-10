@@ -143,7 +143,13 @@ const submit = (prompt) => `(async () => {
 })()`
 
 const selectTeammate = (name) => `(async () => {
-  const row = [...document.querySelectorAll('.lc-row--button')].find(b => b.title === 'Message ${name}')
+  // The title LEADS with the action and then says who they are and what
+  // they run -- 'Message Wren - Code & Migrations - Cursor Agent / model'
+  // (see teammateTooltip). It was an exact match, so every row went
+  // unfindable the day the hover learned to say more, and this smoke
+  // reported it as 'no row' -- a missing teammate rather than a stale
+  // selector. Matched on the part that is the identity.
+  const row = [...document.querySelectorAll('.lc-row--button')].find(b => b.title.startsWith('Message ${name}'))
   if (!row) return 'no row'
   row.click()
   await new Promise(r => setTimeout(r, 300))

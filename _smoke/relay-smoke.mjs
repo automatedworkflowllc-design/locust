@@ -436,7 +436,20 @@ try {
   check("the second mission's prompt is the host's brief naming Wren", (second?.prompt ?? '').includes('Wren (Code & Migrations) sent you a message'), (second?.prompt ?? '').slice(0, 120))
   check("the third mission is Wren's and follows up the first", owners[third?.missionId] === 'tm_wren' && third?.continuesFrom?.missionId === first?.missionId && third?.continuesFrom?.reason === 'follow-up', JSON.stringify({ owner: owners[third?.missionId], continuesFrom: third?.continuesFrom }))
   check("Booty's reply ran on Booty's own route, Claude Code / sonnet", second?.runtime === 'claude' && second?.model === 'sonnet', JSON.stringify([second?.runtime, second?.model]))
-  check("Wren's turns ran on Wren's route, Cursor / composer-2.5", first?.runtime === 'cursor' && first?.model === 'composer-2.5' && third?.runtime === 'cursor' && third?.model === 'composer-2.5', JSON.stringify(headers.map((h) => [h.runtime, h.model])))
+  /*
+   * The FAMILY, not one concrete id.
+   *
+   * Cursor encodes effort in the model id -- `composer-2.5`, `composer-2.5-fast`
+   * -- and the picker groups those into one family with an effort control
+   * beside it. This smoke picks the family row and never touches the effort,
+   * so which variant it gets is the composer's default and not something the
+   * smoke chose. Pinning `composer-2.5` exactly asserted a choice nobody made,
+   * and went red the day the default landed on `-fast`. The claim worth
+   * holding is that both of Wren's turns ran on WREN's route rather than
+   * inheriting Booty's Claude Code, which is what the relay could get wrong.
+   */
+  const wrensRoute = (header) => header?.runtime === 'cursor' && String(header?.model ?? '').startsWith('composer-2.5')
+  check("Wren's turns ran on Wren's route, Cursor / Composer 2.5", wrensRoute(first) && wrensRoute(third), JSON.stringify(headers.map((h) => [h.runtime, h.model])))
   check("a relayed run did not overwrite Booty's own route", (JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8')).teammates.find((t) => t.teammateId === 'tm_booty')?.route ?? {}).runtime === 'claude')
 } finally {
   child.kill()

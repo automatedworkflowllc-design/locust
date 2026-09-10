@@ -198,7 +198,12 @@ try {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true, bubbles: true }))
     await new Promise(r => setTimeout(r, 200))
     // Back to the workroom so the sidebar and composer are the ones under test.
-    const row = [...document.querySelectorAll('.lc-row--button')][0]
+    // The first TEAMMATE, not the first row-button: Rooms draws a 'New
+    // room' row above the roster, so index 0 stopped being a teammate.
+    // Clicking it opened the Rooms screen, where there is no composer, and
+    // the next line called a setter on null -- the smoke died with
+    // 'Illegal invocation' and reported nothing about faces at all.
+    const row = [...document.querySelectorAll('.lc-teammate .lc-row--button')][0]
     row.click()
     await new Promise(r => setTimeout(r, 300))
     const after = [...document.querySelectorAll('.lc-teammate .lc-face__layer')].map(l => getComputedStyle(l).boxShadow).join('|')
@@ -212,7 +217,12 @@ try {
 
   say('4. while the first Wren works, only their face moves')
   await cdp.eval(`(async () => {
-    const row = [...document.querySelectorAll('.lc-row--button')][0]
+    // The first TEAMMATE, not the first row-button: Rooms draws a 'New
+    // room' row above the roster, so index 0 stopped being a teammate.
+    // Clicking it opened the Rooms screen, where there is no composer, and
+    // the next line called a setter on null -- the smoke died with
+    // 'Illegal invocation' and reported nothing about faces at all.
+    const row = [...document.querySelectorAll('.lc-teammate .lc-row--button')][0]
     row.click()
     await new Promise(r => setTimeout(r, 300))
     const field = document.querySelector('form.command-dock textarea')
