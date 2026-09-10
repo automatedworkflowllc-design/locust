@@ -369,6 +369,8 @@ export type OpenLinkResponse =
 export const ROOM_LIST_CHANNEL = 'rooms:list'
 export const ROOM_CREATE_CHANNEL = 'rooms:create'
 export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
+/** Name a room that was made from an ask, and so began as `Untitled room`. */
+export const ROOM_RENAME_CHANNEL = 'rooms:rename'
 export const ROOM_POST_CHANNEL = 'rooms:post'
 export const ROOM_TASK_CHANNEL = 'rooms:task'
 export const MEMORY_LIST_CHANNEL = 'memory:list'
@@ -1433,6 +1435,8 @@ export interface DesktopApi {
   listRooms(): Promise<RoomListResponse>
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>
   removeRoom(roomId: string): Promise<RoomMutationResponse>
+  /** Give a room a name. A room made from an ask starts as `Untitled room`. */
+  renameRoom(roomId: string, name: string): Promise<RoomMutationResponse>
   postToRoom(request: RoomPostRequest): Promise<RoomPostResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   listMemories(): Promise<MemoryListResponse>

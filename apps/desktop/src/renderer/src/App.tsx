@@ -45,6 +45,7 @@ import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
+import { askConsequence, askPlaceholder, askRefusal, askSendLabel, UNTITLED_ROOM } from './askWho.js'
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
@@ -1053,6 +1054,18 @@ export default function App(): ReactElement {
    * workroom messages it is shown, and under whose name it may share.
    */
   const [selectedTeammateId, setSelectedTeammateId] = useState<string>()
+  /**
+   * Everyone the next message goes to, when that is more than one.
+   *
+   * Empty is the ordinary case and means "whoever is selected" -- the home
+   * composer has always had a single addressee and still does. A tick puts a
+   * second name in here, and that is the whole of the difference between
+   * starting a mission and making a room.
+   *
+   * Cleared whenever a conversation opens, because inside a thread the
+   * question is already answered by the thread.
+   */
+  const [askIds, setAskIds] = useState<readonly string[]>([])
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
   const pendingKeyCounter = useRef(0)
 
@@ -1748,15 +1761,46 @@ export default function App(): ReactElement {
       .catch(() => setMemoryMode(before))
   }
 
-  const createRoom = async (name: string, teammateIds: readonly string[]): Promise<string | undefined> => {
+  /**
+   * Make a room and say which one, because the caller usually wants to post
+   * to it next.
+   *
+   * `createRoom` below keeps the old shape -- an error string or nothing --
+   * for the Rooms screen's own form, which has nothing to do afterwards.
+   */
+  const makeRoom = async (
+    name: string,
+    teammateIds: readonly string[]
+  ): Promise<{ readonly roomId: string } | { readonly message: string }> => {
     const bridge = window.desktop
-    if (bridge === undefined) return 'The secure desktop bridge is unavailable.'
+    if (bridge === undefined) return { message: 'The secure desktop bridge is unavailable.' }
     const response = await bridge.createRoom({ name, teammateIds }).catch(() => undefined)
-    if (response === undefined) return 'The room could not be created.'
-    if (!response.ok) return response.error.message
+    if (response === undefined) return { message: 'The room could not be created.' }
+    if (!response.ok) return { message: response.error.message }
     refreshRooms()
-    if (response.data.room !== undefined) setCurrentRoomId(response.data.room.roomId)
-    return undefined
+    const made = response.data.room
+    if (made === undefined) return { message: 'The room could not be created.' }
+    setCurrentRoomId(made.roomId)
+    return { roomId: made.roomId }
+  }
+
+  const createRoom = async (name: string, teammateIds: readonly string[]): Promise<string | undefined> => {
+    const made = await makeRoom(name, teammateIds)
+    return 'roomId' in made ? undefined : made.message
+  }
+
+  const renameRoom = (roomId: string, name: string): void => {
+    void window.desktop
+      ?.renameRoom(roomId, name)
+      .then((response) => {
+        if (!response.ok) {
+          setRoomNotice(response.error.message)
+          return
+        }
+        setRoomNotice(undefined)
+        refreshRooms()
+      })
+      .catch(() => setRoomNotice('That room could not be renamed.'))
   }
 
   const removeRoom = (roomId: string): void => {
@@ -1807,6 +1851,39 @@ export default function App(): ReactElement {
         return bridge.cancelCodexMission({ runId }).catch(() => undefined)
       })
     ).finally(() => setStoppingExchange(false))
+  }
+
+  /**
+   * Send, whoever is being asked.
+   *
+   * One teammate is `startMission`, exactly as it always was. Two or more is
+   * a room: make it, post the message into it, and the room fans the post out
+   * to its members -- which is the machinery rooms already had. Nothing new
+   * runs; what is new is that a person never had to go and find it.
+   *
+   * The room is named `Untitled room` and renamed from the room itself. Today
+   * a first room costs a name before it has a purpose, and that is most of
+   * why nobody made one (design agent, 2026-09-10).
+   */
+  const sendToWhoever = async (prompt: string): Promise<boolean> => {
+    if (askIds.length < 2) return startMission(prompt)
+    const made = await makeRoom(UNTITLED_ROOM, askIds)
+    if ('message' in made) {
+      setRoomNotice(made.message)
+      return false
+    }
+    const failed = await postToRoom(made.roomId, prompt)
+    if (failed !== undefined) {
+      setRoomNotice(failed)
+      return false
+    }
+    // The room is where the answers land, so that is where the person goes.
+    setScreen('rooms')
+    // The set has done its job. Leaving it ticked would make the NEXT message
+    // silently make a second room, which is the surprise this whole change
+    // exists to remove.
+    setAskIds([])
+    return true
   }
 
   const startMission = async (prompt: string, modeOverride?: MissionMode): Promise<boolean> => {
@@ -2980,6 +3057,7 @@ export default function App(): ReactElement {
               }}
               onCreateRoom={createRoom}
               onRemoveRoom={removeRoom}
+              onRenameRoom={renameRoom}
               onPost={postToRoom}
               onTask={updateRoomTask}
               onOpenMission={openMission}
@@ -3488,7 +3566,7 @@ export default function App(): ReactElement {
                 ? 'No runtime can run a mission yet. Locust runs the coding-agent CLIs on this machine — Settings shows what to install, and OpenCode needs no account.'
                 : undefined
             }
-            onStart={startMission}
+            onStart={sendToWhoever}
             onCancel={cancelMission}
             onOpenRoutePicker={() => {
               // Opening the picker is the moment the list matters most, and
@@ -3498,6 +3576,78 @@ export default function App(): ReactElement {
             onHandOff={(choice) => { void handOffMission(choice) }}
             handingOff={handingOff}
             teammateName={pickedTeammate?.name}
+            {...(() => {
+              /*
+               * WHO ANSWERS -- only where the question is open.
+               *
+               * Inside a conversation the thread has already answered it, and
+               * a picker there would be offering to change something that is
+               * not changeable. So: the home screen, a roster of at least
+               * two, and nothing running.
+               */
+              if (liveRun !== undefined || screen !== 'workroom' || teammates.length < 2) return {}
+              /*
+               * Whoever a message would ACTUALLY go to is ticked, always.
+               *
+               * The first drive of this had nothing ticked before a teammate
+               * was chosen, so the first tick read as "switch to Atlas"
+               * rather than "and Atlas too" -- which is the opposite of what
+               * this control is for. The home screen already falls back to
+               * the first teammate so a message always has someone to go to;
+               * the chips show that same person rather than an empty row.
+               */
+              const addressee = pickedTeammate ?? selectedTeammate ?? teammates[0]
+              const ticked =
+                askIds.length > 0 ? askIds : addressee === undefined ? [] : [addressee.teammateId]
+              const nameOf = (id: string): string =>
+                teammates.find((entry) => entry.teammateId === id)?.name ?? 'someone'
+              const names = ticked.map(nameOf)
+              return {
+                askWho: {
+                  picks: teammates.map((teammate) => ({
+                    teammateId: teammate.teammateId,
+                    name: teammate.name,
+                    hue: teammate.hue,
+                    avatar: teammate.avatar,
+                    on: ticked.includes(teammate.teammateId)
+                  })),
+                  onToggle: (teammateId: string) => {
+                    setAskIds((current) => {
+                      const from = current.length > 0 ? current : ticked
+                      const next = from.includes(teammateId)
+                        ? from.filter((entry) => entry !== teammateId)
+                        : [...from, teammateId]
+                      // Untick to nothing and the last one stands: a composer
+                      // addressed to nobody has no send at all, and silently
+                      // disabling it is the failure mode this box is most
+                      // careful about. The sidebar's selection is the floor.
+                      if (next.length === 0) return []
+                      // One left is the ordinary single-teammate app, so the
+                      // selection moves with it rather than being shadowed.
+                      if (next.length === 1) {
+                        setSelectedTeammateId(next[0])
+                        return []
+                      }
+                      return next
+                    })
+                  },
+                  onEveryone: () => {
+                    setAskIds((current) =>
+                      current.length === teammates.length ? [] : teammates.map((entry) => entry.teammateId)
+                    )
+                  },
+                  everyoneOn: ticked.length === teammates.length && teammates.length > 1,
+                  // Always, not only when several are ticked: the chips show
+                  // whoever a message would go to, and the box saying "Write a
+                  // message" beside a ticked name is the two of them
+                  // disagreeing about the same fact.
+                  placeholder: askPlaceholder(names),
+                  consequence: askConsequence(names),
+                  refusal: askRefusal(ticked.length),
+                  sendLabel: askSendLabel(ticked.length)
+                }
+              }
+            })()}
             busyWith={busyRun === undefined ? undefined : (pickedTeammate?.name ?? 'This teammate')}
             queued={queued?.text}
             queuedNote={queuedNote}

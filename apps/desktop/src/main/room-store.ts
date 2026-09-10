@@ -34,6 +34,15 @@ export interface RoomStore {
   list(): Promise<readonly PublicRoom[]>
   get(roomId: unknown): Promise<PublicRoom | undefined>
   create(input: { readonly name: unknown; readonly teammateIds: unknown }): Promise<PublicRoom>
+  /**
+   * Give a room a different name.
+   *
+   * A room made from the ask starts as `Untitled room`, because a first room
+   * used to cost a name before it had a purpose and that is most of why
+   * nobody made one. So a name it can be given AFTERWARDS is not a nicety
+   * here -- it is the other half of that decision.
+   */
+  rename(roomId: unknown, name: unknown): Promise<PublicRoom>
   remove(roomId: unknown): Promise<void>
   /** Record a post and the missions it started. The newest post is last. */
   addPost(
@@ -301,6 +310,21 @@ export function createRoomStore(options: {
         }
         await write({ ...file, rooms: [...file.rooms, room] })
         return room
+      })
+    },
+
+    rename(roomId, name): Promise<PublicRoom> {
+      return serialize(async () => {
+        if (!validRoomName(name)) throw new Error('Give the room a name of up to 60 characters.')
+        const file = await read()
+        const room = file.rooms.find((entry) => entry.roomId === roomId)
+        if (room === undefined) throw new Error('That room does not exist.')
+        const renamed: PublicRoom = { ...room, name: name.trim() }
+        await write({
+          ...file,
+          rooms: file.rooms.map((entry) => (entry.roomId === roomId ? renamed : entry))
+        })
+        return renamed
       })
     },
 

@@ -327,6 +327,7 @@ export function RoomScreen({
   onSelectRoom,
   onCreateRoom,
   onRemoveRoom,
+  onRenameRoom,
   onPost,
   onOpenMission,
   onTask,
@@ -341,6 +342,8 @@ export function RoomScreen({
   readonly onSelectRoom: (roomId: string | undefined) => void
   readonly onCreateRoom: (name: string, teammateIds: readonly string[]) => Promise<string | undefined>
   readonly onRemoveRoom: (roomId: string) => void
+  /** Give the room a name. Absent where renaming is not offered. */
+  readonly onRenameRoom?: (roomId: string, name: string) => void
   readonly onPost: (roomId: string, text: string) => Promise<string | undefined>
   readonly onOpenMission: (missionId: string) => void
   /** A person moving the board. Resolves with the host's refusal, if any. */
@@ -350,6 +353,8 @@ export function RoomScreen({
 }): ReactElement {
   const room = rooms.find((entry) => entry.roomId === currentRoomId)
   const [draftName, setDraftName] = useState('')
+  /** The title is an input while this is on. */
+  const [renaming, setRenaming] = useState(false)
   const [draftMembers, setDraftMembers] = useState<readonly string[]>([])
   const [draftText, setDraftText] = useState('')
   const [draftTask, setDraftTask] = useState('')
@@ -526,7 +531,46 @@ export function RoomScreen({
         <button type="button" className="lc-ghostbutton" onClick={() => onSelectRoom(undefined)} title="All rooms">
           ← Rooms
         </button>
-        <span className="lc-screen__title">{room.name}</span>
+        {/*
+          * The name, which is also where it is changed.
+          *
+          * A room made from an ask starts as `Untitled room` on purpose --
+          * charging a name before a room has a purpose is most of why nobody
+          * made one (design agent, 2026-09-10) -- so the composer promises
+          * "you can rename it there", and this is there. Click the title.
+          */}
+        {renaming ? (
+          <input
+            className="lc-input lc-room__rename"
+            defaultValue={room.name}
+            maxLength={60}
+            aria-label="Room name"
+            autoFocus
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setRenaming(false)
+              if (event.key === 'Enter') {
+                const next = event.currentTarget.value.trim()
+                setRenaming(false)
+                if (next.length > 0 && next !== room.name) onRenameRoom?.(room.roomId, next)
+              }
+            }}
+            onBlur={(event) => {
+              const next = event.currentTarget.value.trim()
+              setRenaming(false)
+              if (next.length > 0 && next !== room.name) onRenameRoom?.(room.roomId, next)
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="lc-screen__title lc-room__name"
+            onClick={() => setRenaming(true)}
+            title="Rename this room"
+            disabled={onRenameRoom === undefined}
+          >
+            {room.name}
+          </button>
+        )}
         <span className="lc-screen__meta lc-mono">
           {members.filter((entry) => entry !== undefined).map((entry) => entry!.name).join(' · ')}
         </span>

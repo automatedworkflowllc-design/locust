@@ -117,6 +117,7 @@ import {
   ROOM_LIST_CHANNEL,
   ROOM_CREATE_CHANNEL,
   ROOM_REMOVE_CHANNEL,
+  ROOM_RENAME_CHANNEL,
   ROOM_POST_CHANNEL,
   ROOM_TASK_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
@@ -1768,6 +1769,19 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch {
         return roomRejected('That room could not be removed.')
+      }
+    })
+
+    ipcMain.handle(ROOM_RENAME_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return roomRejected('The room could not be renamed.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      if (typeof input.roomId !== 'string') return roomRejected('That room could not be renamed.')
+      try {
+        // The store validates the name and says what is wrong with it, so its
+        // words reach the person rather than a sentence made up here.
+        return { ok: true, data: { room: await rooms.rename(input.roomId, input.name) } } as const
+      } catch (error) {
+        return roomRejected(error instanceof Error ? error.message : 'That room could not be renamed.')
       }
     })
 
