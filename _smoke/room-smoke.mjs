@@ -201,7 +201,7 @@ try {
   // clicked: the two facts a failure here needs.
   const before = await evaluate(`window.desktop.listRooms().then(r => JSON.stringify({ rooms: r.ok ? r.data.rooms.map(x => [x.name, x.teammateIds.length, x.posts.length]) : r, roomRows: document.querySelectorAll('.lc-roomrow').length, sidebar: (document.querySelector('.lc-sidebar')?.innerText ?? '(no sidebar)').replace(/\\s+/g, ' ').slice(0, 160) }))`)
   say(`       before: ${before}`)
-  say(`       body: ${await evaluate(`document.body.innerText.replace(/\s+/g, ' ').slice(0, 200)`)}`)
+  say(`       body: ${await evaluate(`document.body.innerText.replace(/\\s+/g, ' ').slice(0, 200)`)}`)
   if (rendererErrors.length > 0) say(`       renderer errors: ${rendererErrors.slice(0, 3).join(' || ').slice(0, 600)}`)
   let opened
   try {

@@ -164,7 +164,7 @@ try {
     const said = await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
     const chip = await drive.evaluate(`(() => {
       const c = [...document.querySelectorAll('button.lc-control')].find((b) => (b.textContent ?? '').includes('/'))
-      return (c?.textContent ?? '').replace(/\s+/g, ' ').trim()
+      return (c?.textContent ?? '').replace(/\\s+/g, ' ').trim()
     })()`)
     return `pickRouteScript said ${JSON.stringify(String(said))}; the chip now reads ${JSON.stringify(String(chip))}`
   })
@@ -172,7 +172,7 @@ try {
     return drive.evaluate(`(async () => {
       const chipText = () => {
         const c = [...document.querySelectorAll('button.lc-control')].find((b) => (b.textContent ?? '').includes('/'))
-        return (c?.textContent ?? '').replace(/\s+/g, ' ').trim()
+        return (c?.textContent ?? '').replace(/\\s+/g, ' ').trim()
       }
       const before = chipText()
       if (document.querySelector('.lc-picker') === null) {
@@ -231,8 +231,8 @@ try {
         if (!candidate) continue
         rows.push({
           groupInnerText: current,
-          rowInnerText: (candidate.innerText ?? '').replace(/\s+/g, ' ').slice(0, 60),
-          rowTextContent: (candidate.textContent ?? '').replace(/\s+/g, ' ').slice(0, 60),
+          rowInnerText: (candidate.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 60),
+          rowTextContent: (candidate.textContent ?? '').replace(/\\s+/g, ' ').slice(0, 60),
           groupMatches: /opencode/i.test(current),
           rowMatches: /free/i.test(candidate.innerText ?? '')
         })

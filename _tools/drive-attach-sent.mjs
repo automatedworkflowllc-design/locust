@@ -95,7 +95,7 @@ try {
     const text = document.body.innerText
     return text.includes('ORCHID-4417')
       ? 'the file was read: ORCHID-4417 came back'
-      : 'NO PASSPHRASE -- ' + (document.querySelector('.lc-workroom__head, header')?.textContent?.replace(/\s+/g, ' ').trim() ?? 'no header')
+      : 'NO PASSPHRASE -- ' + (document.querySelector('.lc-workroom__head, header')?.textContent?.replace(/\\s+/g, ' ').trim() ?? 'no header')
   })()`))
 
 } finally {

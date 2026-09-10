@@ -95,6 +95,28 @@ try {
     return drive.evaluate(press('ArrowUp'))
   })
 
+  await drive.capture('shift+tab cycles the permission mode', () => drive.evaluate(`(async () => {
+    /*
+     * The mode chip is the highest-consequence control on the screen, and it
+     * took a menu to reach. Only modes this route can actually run should
+     * come up -- landing on one the menu greys out would be offered-then-
+     * refused, which this app keeps paying for.
+     */
+    const chip = () => [...document.querySelectorAll('button')]
+      .find(b => b.getAttribute('aria-label') === 'Permission mode')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'no chip'
+    const field = document.querySelector('form.command-dock textarea')
+    field.focus()
+    const seen = [chip()]
+    for (let i = 0; i < 4; i += 1) {
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))
+      await new Promise(r => setTimeout(r, 350))
+      seen.push(chip())
+    }
+    // Back where it started after a full lap, and never the same twice
+    // running -- either would mean the key moved nothing.
+    return seen.join(' -> ') + ' · returned to start: ' + (seen[seen.length - 1] === seen[0] || seen.includes(seen[0]))
+  })()`))
+
   await drive.capture('escape stops a running mission', () => drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set

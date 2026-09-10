@@ -474,6 +474,34 @@ export function Composer({
       }
     }
     /*
+     * Shift+Tab cycles the permission mode, the way it does in Claude Code.
+     *
+     * The mode is the highest-consequence control on this screen -- it is
+     * the difference between a teammate that explains and one that writes --
+     * and reaching it meant a menu every time. Tab alone is left alone,
+     * because moving focus out of a text box is what Tab is for everywhere.
+     *
+     * Only through modes this route can ACTUALLY run. `modeUnavailableReason`
+     * is what the menu greys an option out with, so cycling past those keeps
+     * the key from landing somewhere the menu would have refused -- offered
+     * and then refused is the pattern this app keeps paying for.
+     */
+    if (keyEvent.key === 'Tab' && keyEvent.shiftKey) {
+      const usable = MODES.filter(
+        (option) => modeUnavailableReason(option.mode, route.runtime, platform) === undefined
+      )
+      if (usable.length > 1) {
+        keyEvent.preventDefault()
+        const at = usable.findIndex((option) => option.mode === mode)
+        const next = usable[(at + 1) % usable.length]
+        if (next !== undefined) {
+          if (next.mode === 'auto' && autoMode !== true) onEnableAutoMode?.()
+          onModeChange(next.mode)
+        }
+        return
+      }
+    }
+    /*
      * Escape stops the run, the way it does in Claude Code.
      *
      * Only while this box has focus and no panel is open. A panel's own
