@@ -1,6 +1,5 @@
 import mark from '../assets/locust-mark.svg'
 import { useCallback, useRef, useState } from 'react'
-import type { ContextReading } from '../cost.js'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
 import { PixelFace } from './PixelFace.js'
@@ -24,7 +23,6 @@ import {
   modelFamily,
   runtimeIsUsable
 } from '../status.js'
-import { ContextRing } from './ContextRing.js'
 import { defaultEffort, modelLabelFor } from '../status.js'
 import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
@@ -123,7 +121,6 @@ export interface ComposerProps {
   readonly mode: MissionMode
   readonly onModeChange: (mode: MissionMode) => void
   /** How full the model's context is, when the runtime reported its size. */
-  readonly context?: ContextReading
   /** Whether this workspace has Auto switched on. Picking Auto here switches it on. */
   readonly autoMode?: boolean
   /** Turn Auto on for the workspace, because the person just chose it. */
@@ -240,7 +237,6 @@ export function Composer({
   mode,
   onModeChange,
   autoMode,
-  context,
   onEnableAutoMode,
   route,
   onRouteChange,
@@ -1138,7 +1134,14 @@ export function Composer({
                 */}
               <button
                 type="button"
-                className="lc-control lc-control--icon"
+                /*
+                 * Boxed like every other control on this row. It was the one
+                 * bare item in a row of chips, and the design agent's app-wide
+                 * read (2026-09-10) counted the row as "seven items, four
+                 * looks" -- the most-seen row in the app, and the most
+                 * visible clunk after the type.
+                 */
+                className="lc-control lc-control--boxed lc-control--icon"
                 aria-label="Attach files"
                 title="Attach a file — anywhere on this machine"
                 disabled={running || attaching}
@@ -1432,7 +1435,6 @@ export function Composer({
               >
                 <img src={mark} alt="" aria-hidden="true" />
               </button>
-              {context !== undefined && <ContextRing reading={context} />}
             </div>
           </div>
         </form>

@@ -44,6 +44,7 @@ import { queuedVerdict, requeuedTo } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
+import { ContextRing } from './components/ContextRing.js'
 import { memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
 import { askConsequence, askPlaceholder, askRefusal, askSendLabel, UNTITLED_ROOM } from './askWho.js'
 import { createFrameBatcher } from './streamFrames.js'
@@ -3273,6 +3274,20 @@ export default function App(): ReactElement {
                             // number -- never a zero, which would read as free.
                             shownCost === undefined ? '' : ` · ${running ? 'so far ' : ''}${shownCost}`
                           }`}
+                      {/*
+                        * How full the context is, beside the cost it belongs
+                        * with. It sat on the composer bar as a bare 14px glyph
+                        * next to the swarm mark, and the two read as artifacts
+                        * rather than controls -- "seven items, four looks"
+                        * (design agent, 2026-09-10). It is a fact about THIS
+                        * conversation, and this line is where the
+                        * conversation's other facts are.
+                        */}
+                      {shownContext !== undefined && (
+                        <span className="lc-workroom__context">
+                          <ContextRing reading={shownContext} />
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3543,7 +3558,6 @@ export default function App(): ReactElement {
             }
             onModeChange={setMode}
             autoMode={autoMode}
-            {...(shownContext === undefined ? {} : { context: shownContext })}
             onEnableAutoMode={() => {
               // Picking Auto in the composer IS the person switching it on.
               // Written through the host like any other settings change, so

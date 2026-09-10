@@ -3399,6 +3399,16 @@ textarea {
 }
 
 /* The context ring sits in the controls row beside the route chip. */
+/* The ring's seat on the mission line: inline with the text, a space after
+   the last fact, and vertically on the line's centre rather than its baseline
+   so a 14px circle does not hang below 11px mono text. */
+.lc-workroom__context {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: var(--lc-space-3);
+}
+
 .lc-contextring {
   display: inline-flex;
   align-items: center;
@@ -5573,11 +5583,20 @@ textarea {
   width: 28px;
   height: 24px;
   padding: 0;
-  border: 1px solid transparent;
+  /* Boxed, the same border and ground as the chips beside it. It was a bare
+     glyph at the right edge and read as an artifact rather than a control --
+     the design agent's app-wide read, 2026-09-10. A control that reads as
+     decoration is one nobody presses. */
+  border: 1px solid var(--lc-border-control);
   border-radius: var(--lc-radius-control);
-  background: transparent;
+  background: var(--lc-bg-control);
   cursor: pointer;
   transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-swarm:hover:not(:disabled) {
+  border-color: var(--lc-border-hover);
+  background: var(--lc-hover-surface);
 }
 
 .lc-swarm img {
