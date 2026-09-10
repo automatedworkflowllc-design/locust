@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.56.2 - 2026-09-09
+
+- **Commands your teammate ran now show as commands.** Only one of the
+  runtimes was recognised as running a shell, so on Claude Code and OpenCode
+  every command appeared as a plain tool row — no result badge, nothing to
+  open, and left out of the "commands" count in the turn summary.
+- **Correction to 0.56.0.** That release said command rows read as what the
+  teammate was doing "where the runtime reports it — Claude Code and OpenCode
+  do". The row it appears on did not exist on either of those runtimes, so
+  nothing changed on screen; it should work on Claude Code now. On OpenCode it
+  is still unconfirmed — we have not seen it send that description at all.
+
 ## 0.56.1 - 2026-09-09
 
 - **A room shows its work as it starts.** Posting to a room started everyone
