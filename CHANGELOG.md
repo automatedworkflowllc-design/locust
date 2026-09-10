@@ -23,6 +23,14 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - A connector you sign into after Locust is open reaches the next mission
   without restarting anything.
 
+## 0.63.1 - 2026-09-10
+
+- **Settings → Connectors: "ask before every connector call".** Off, a
+  teammate uses any connector your Claude Code can reach without asking, as
+  before. On, every connector call stops the run and shows you the exact
+  input first, with Approve once, Always allow this session, and Deny. Takes
+  effect on the next mission; Auto never asks either way.
+
 ## 0.63.0 - 2026-09-10
 
 - **A Claude Code teammate asks before using a connector nothing has
