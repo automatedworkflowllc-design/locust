@@ -156,6 +156,45 @@ export const ANSWERS_BEFORE_A_LIST = 6
  * identical waits is fractionally sooner. So the line is ordered and
  * position is left to be position.
  */
+/**
+ * How many lines of an answer a room card shows before it folds.
+ *
+ * A room is read at a glance -- the whole point is seeing what everyone
+ * said. One teammate who writes five hundred lines takes the screen and
+ * every other answer with it: Colin, 2026-09-09, driving a twelve-member
+ * room, "maybe have a dropdown or read more option for when it goes down
+ * this far".
+ *
+ * Twelve is about a paragraph and a half, which is what a room answer
+ * usually is. Anything past that is a thing to open, not a thing to scroll
+ * past on the way to the next person.
+ */
+const ANSWER_LINES_BEFORE_FOLDING = 12
+
+/**
+ * An answer, folded when it is long.
+ *
+ * The elision is a CONTROL, not a sentence -- the same shape the shell
+ * output already uses, down to the class, because this app ships that
+ * pattern and a second one would just be a second one.
+ */
+function RoomAnswerText({ text }: { readonly text: string }): ReactElement {
+  const [open, setOpen] = useState(false)
+  const lines = text.split('\n')
+  if (open || lines.length <= ANSWER_LINES_BEFORE_FOLDING) {
+    return <p className="lc-roomanswer__text lc-para">{text}</p>
+  }
+  const hidden = lines.length - ANSWER_LINES_BEFORE_FOLDING
+  return (
+    <>
+      <p className="lc-roomanswer__text lc-para">{lines.slice(0, ANSWER_LINES_BEFORE_FOLDING).join('\n')}</p>
+      <button type="button" className="lc-shellout__more" onClick={() => setOpen(true)}>
+        {`${String(hidden)} more line${hidden === 1 ? '' : 's'}`}
+      </button>
+    </>
+  )
+}
+
 export function waitingLine(names: readonly string[]): string | undefined {
   if (names.length === 0) return undefined
   return names.join(', ')
@@ -513,7 +552,7 @@ export function RoomScreen({
                           Open
                         </button>
                       </div>
-                      {answer.text !== undefined && <p className="lc-roomanswer__text lc-para">{answer.text}</p>}
+                      {answer.text !== undefined && <RoomAnswerText text={answer.text} />}
                       {answer.text === undefined && (answer.phase === 'running' || answer.phase === 'starting') && (
                         <p className="lc-roomanswer__text lc-settings__note">working…</p>
                       )}

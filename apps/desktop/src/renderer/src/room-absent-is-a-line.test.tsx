@@ -201,4 +201,48 @@ describe('the members a post did not reach', () => {
     expect(room).not.toContain('is-list')
     expect([...room.matchAll(/lc-roomanswer"/g)]).toHaveLength(5)
   })
+
+  /*
+   * A room is read at a glance. One teammate writing five hundred lines
+   * takes the screen and every other answer with it -- Colin, driving a
+   * twelve-member room: "maybe have a dropdown or read more option for when
+   * it goes down this far". The elision is a control, not a sentence, and it
+   * is the shape the shell output already ships.
+   */
+  it('folds a long answer behind a control, and says how much is folded', () => {
+    const long = Array.from({ length: 40 }, (_unused, i) => `line ${String(i + 1)}`).join('\n')
+    const room: PublicRoom = {
+      roomId: 'room_standup',
+      name: 'Standup',
+      teammateIds: [ROSTER[0]!.teammateId],
+      createdAt: '2026-09-05T05:00:00.000Z',
+      posts: [{ postId: 'post_1', text: 'Say your word', at: '2026-09-05T05:00:00.000Z', missions: {} }],
+      tasks: []
+    }
+    const markup = renderToStaticMarkup(
+      <RoomScreen
+        rooms={[room]}
+        teammates={ROSTER}
+        currentRoomId="room_standup"
+        answersFor={() => [{ ...answer(ROSTER[0]!.teammateId), text: long }]}
+        runtimeNameOf={(id) => id}
+        onSelectRoom={() => undefined}
+        onCreateRoom={async () => undefined}
+        onRemoveRoom={() => undefined}
+        onPost={async () => undefined}
+        onOpenMission={() => undefined}
+        onTask={async () => undefined}
+        notice={undefined}
+      />
+    )
+    expect(markup).toContain('28 more lines')
+    expect(markup).toContain('line 12')
+    // THE regression: the whole answer drawn, pushing every other card off.
+    expect(markup).not.toContain('line 13')
+  })
+
+  it('leaves a short answer alone', () => {
+    expect(screen(1)).not.toContain('more lines')
+  })
 })
+
