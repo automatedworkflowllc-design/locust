@@ -28,6 +28,10 @@ const COMPOSER = readFileSync(
   fileURLToPath(new URL('../renderer/src/components/Composer.tsx', import.meta.url)),
   'utf8'
 )
+const CONTEXT_MENU = readFileSync(
+  fileURLToPath(new URL('../renderer/src/components/ContextMenu.tsx', import.meta.url)),
+  'utf8'
+)
 
 /** Source with comments removed: prose naming a panel is not a panel. */
 function codeOnly(source: string): string {
@@ -71,5 +75,32 @@ describe('the composer’s pop-open panels', () => {
         new RegExp(`ref=\\{${ref}\\}`)
       )
     }
+  })
+
+  it('the right-click menu is not elsewhere from itself', () => {
+    /*
+     * THE regression, and it broke every right-click action in the app --
+     * Delete, Assign to, Copy mission id, Save as routine.
+     *
+     * ContextMenu closed on any mousedown in the capture phase and asked
+     * nothing about where the press landed, so pressing one of its own items
+     * closed the menu before the press became a click and the item never
+     * ran. Reported twice: Colin on 2026-09-06 ("the right click, assign to
+     * teammate isnt work, along with the right click delete conversation"),
+     * and the first outside tester on 2026-09-09 ("It's the right click
+     * delete issue I was having, the delete button on the actual convo is
+     * working"). The first investigation blamed disabled items whose reason
+     * was only in a tooltip -- a real defect, and not this one.
+     *
+     * No harness caught it because a drive presses with `.click()`, which
+     * sends no mousedown at all. The one event that breaks it was the one
+     * event no test sent. `_tools/probe-rightclick-delete.mjs` now sends a
+     * real mousedown/mouseup/click, and measured it both ways.
+     */
+    const code = codeOnly(CONTEXT_MENU)
+    expect(code).toContain('useDismissOnOutsidePress')
+    // A bare listener is the shape that had no containment check. The hook
+    // is the one place that decides what "elsewhere" means.
+    expect(code, 'ContextMenu closes on its own presses again').not.toMatch(/addEventListener\('mousedown'/)
   })
 })

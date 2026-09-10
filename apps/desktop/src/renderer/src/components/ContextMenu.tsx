@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+
+import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
 import type { ReactElement } from 'react'
 
 /**
@@ -47,23 +49,34 @@ export function ContextMenu({
 
   useEffect(() => {
     ref.current?.focus()
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
-    }
-    const onElsewhere = (): void => {
-      onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    // `true` so a press anywhere closes this before that press does its own
-    // work; without it a right-click on a second row would stack two menus.
-    window.addEventListener('mousedown', onElsewhere, true)
-    window.addEventListener('scroll', onElsewhere, true)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('mousedown', onElsewhere, true)
-      window.removeEventListener('scroll', onElsewhere, true)
-    }
-  }, [onClose])
+  }, [])
+
+  /*
+   * ELSEWHERE, and this menu is not elsewhere.
+   *
+   * The close listened for any mousedown in the capture phase and asked
+   * nothing about where it landed -- so pressing an item in this menu closed
+   * the menu before the press became a click, and the item never ran. Every
+   * right-click action in the app did nothing at all: Delete, Assign,
+   * Copy mission id, Save as routine.
+   *
+   * It was reported twice. Colin, 2026-09-06: "the right click, assign to
+   * teammate isnt work, along with the right click delete conversation." The
+   * first outside tester, 2026-09-09: "It's the right click delete issue I
+   * was having, the delete button on the actual convo is working." The first
+   * investigation blamed disabled items whose reason was only in a tooltip,
+   * which was a real defect and not this one.
+   *
+   * No drive caught it because a drive presses with `.click()`, which sends
+   * no mousedown at all. The harness could not reproduce the one event that
+   * breaks it -- so probe-rightclick-delete.mjs now sends a real
+   * mousedown/mouseup/click, which is what a mouse sends.
+   *
+   * Capture is still right: a press anywhere else must close this before
+   * that press does its own work, or a right-click on a second row stacks
+   * two menus.
+   */
+  useDismissOnOutsidePress(true, onClose, ref)
 
   return (
     <div
