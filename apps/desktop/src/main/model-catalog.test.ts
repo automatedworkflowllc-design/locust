@@ -13,7 +13,7 @@ import {
   parseModels,
   splitCursorModelId
 } from './model-catalog.js'
-import type { AppServerProcess } from './app-server-mission.js'
+import type { AppServerRunProcess as AppServerProcess } from '@teammate/runtime-adapters'
 
 const REAL_RESULT = {
   data: [

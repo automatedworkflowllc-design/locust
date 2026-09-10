@@ -9,9 +9,10 @@ import type {
 } from '@teammate/runtime-adapters'
 import type { MissionLedger, MissionPeerLink, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import { describe, expect, it, vi } from 'vitest'
-import type { CodexMissionUpdate } from '../shared/ipc.js'
+import type { CodexMissionUpdate, MissionApprovalRequest } from '../shared/ipc.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { createCodexMissionService } from './codex-mission.js'
+import { createApprovalChannel } from './approval-channel.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
@@ -2292,45 +2293,54 @@ describe('what a run changed on disk that it never said', () => {
  * this transport -- which are JSON rather than argv, and so out of reach of
  * the argv guard -- still cannot be widened by a mode that was not granted it.
  */
-describe('Codex over app-server', () => {
-  /** A fake `codex app-server` that answers the handshake and then streams. */
-  function fakeAppServer(script: ReadonlyArray<readonly [string, unknown]>) {
-    const written: Array<Record<string, unknown>> = []
-    let emit: (chunk: string) => void = () => undefined
-    const spawn = vi.fn((_executablePath: string, _args: readonly string[]) => ({
-      write: (line: string) => {
-        for (const part of line.split('\n')) {
-          if (part.trim().length === 0) continue
-          const message = JSON.parse(part) as Record<string, unknown>
-          written.push(message)
-          if (typeof message.id !== 'number') continue
-          // Answer each request the way the real server does, then -- once the
-          // turn is accepted -- play the script out.
-          const answer = message.method === 'thread/start' || message.method === 'thread/resume'
-            ? { thread: { id: 'thread-live' } }
-            : message.method === 'turn/start'
-              ? { turn: { id: 'turn-1' } }
-              : { userAgent: 'codex' }
+/** A fake `codex app-server` that answers the handshake and then streams. */
+function fakeAppServer(script: ReadonlyArray<readonly [string, unknown]>) {
+  const written: Array<Record<string, unknown>> = []
+  let emit: (chunk: string) => void = () => undefined
+  const spawn = vi.fn((_executablePath: string, _args: readonly string[]) => ({
+    write: (line: string) => {
+      for (const part of line.split('\n')) {
+        if (part.trim().length === 0) continue
+        const message = JSON.parse(part) as Record<string, unknown>
+        written.push(message)
+        if (typeof message.id !== 'number') continue
+        // Answer each request the way the real server does, then -- once the
+        // turn is accepted -- play the script out.
+        const answer = message.method === 'thread/start' || message.method === 'thread/resume'
+          ? { thread: { id: 'thread-live' } }
+          : message.method === 'turn/start'
+            ? { turn: { id: 'turn-1' } }
+            : { userAgent: 'codex' }
+        queueMicrotask(() => {
+          emit(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: answer })}\n`)
+          if (message.method !== 'turn/start') return
           queueMicrotask(() => {
-            emit(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: answer })}\n`)
-            if (message.method !== 'turn/start') return
-            queueMicrotask(() => {
-              for (const [method, params] of script) {
-                emit(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`)
-              }
-            })
+            for (const [method, params] of script) {
+              emit(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`)
+            }
           })
-        }
-      },
-      kill: () => undefined,
-      onData: (listener: (chunk: string) => void) => {
-        emit = listener
-      },
-      onExit: () => undefined
-    }))
-    return { spawn, written }
+        })
+      }
+    },
+    kill: () => undefined,
+    onData: (listener: (chunk: string) => void) => {
+      emit = listener
+    },
+    onExit: () => undefined
+  }))
+  return {
+    spawn,
+    written,
+    /** The server ASKS -- the approval channel's whole reason to exist. */
+    ask: (id: string, method: string, params: unknown) =>
+      emit(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}
+`),
+    /** What was written back to that request, once something answers it. */
+    replyTo: (id: string) => written.find((message) => message.id === id)
   }
+}
 
+describe('Codex over app-server', () => {
   const REPLY = [
     ['item/started', { item: { id: 'm1', type: 'agentMessage', text: '' } }],
     ['item/agentMessage/delta', { itemId: 'm1', delta: 'Two ' }],
@@ -2482,5 +2492,128 @@ describe('stopping a Codex run over app-server', () => {
     })
     expect(killed).toBe(true)
     expect(service.liveMissionIds()).toEqual([])
+  })
+})
+
+/**
+ * Approve-each, on the same loop as every other mode.
+ *
+ * It used to have a mission service of its own -- 771 lines duplicating this
+ * one -- because it was the only mode whose transport could stop and ask.
+ * Every Codex mode rides that transport now, so the duplicate is gone and the
+ * mode is ordinary: the same start, the same ledger, the same follow-up
+ * rules, plus a channel that answers when the server asks.
+ *
+ * The channel's own behaviour is in `approval-channel.test.ts`. What is held
+ * here is the wiring: that a card is raised from inside a live mission, that
+ * the person's answer reaches the runtime, and that a run which ends with a
+ * question outstanding does not leave it outstanding.
+ */
+describe('Approve-each is a mode of this service', () => {
+  function withApprovals() {
+    const raised: MissionApprovalRequest[] = []
+    const approvals = createApprovalChannel({
+      emitApproval: (request) => raised.push(request),
+      createId: (() => {
+        let n = 0
+        return () => String(++n)
+      })()
+    })
+    return { approvals, raised }
+  }
+
+  it('runs write-capable and stops to ask, rather than falling through to read-only', async () => {
+    const { approvals } = withApprovals()
+    const server = fakeAppServer([])
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const { service, scheduled } = scheduledService({ start: vi.fn() }, fakeLedger({ createMission }), {
+      appServerSpawn: server.spawn,
+      approvals
+    })
+    const response = await service.start('Do something consequential.', 'codex', 'approve-each', {}, () => undefined)
+    expect(response).toMatchObject({ ok: true, data: { sandbox: 'workspace-write' } })
+    // The record says what it was allowed, and approvals only mean something
+    // when the run could otherwise act.
+    expect(createMission).toHaveBeenCalledWith(expect.objectContaining({ sandbox: 'workspace-write', mode: 'approve-each' }))
+    scheduled[0]?.()
+
+    // The policy that makes the server ask at all.
+    await vi.waitFor(() => {
+      expect(server.written.some((message) => message.method === 'turn/start')).toBe(true)
+    })
+    const thread = server.written.find((message) => message.method === 'thread/start')
+    expect(thread?.params).toMatchObject({ sandbox: 'workspace-write', approvalPolicy: 'untrusted' })
+  })
+
+  it('raises a card mid-run and sends the person\u2019s answer back to the runtime', async () => {
+    const { approvals, raised } = withApprovals()
+    const server = fakeAppServer([])
+    const { service, scheduled } = scheduledService({ start: vi.fn() }, fakeLedger(), {
+      appServerSpawn: server.spawn,
+      approvals
+    })
+    const response = await service.start('Build it.', 'codex', 'approve-each', {}, () => undefined)
+    expect(response.ok).toBe(true)
+    scheduled[0]?.()
+    await vi.waitFor(() => {
+      expect(server.written.some((message) => message.method === 'turn/start')).toBe(true)
+    })
+
+    server.ask('srv-1', 'item/commandExecution/requestApproval', { command: 'pnpm build', cwd: 'C:\work' })
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
+    expect(raised[0]).toMatchObject({ kind: 'command', detail: 'pnpm build', runtime: 'codex' })
+    // The run it belongs to, so the card can be filed under the conversation.
+    expect(raised[0]?.runId).toBe(response.ok ? response.data.runId : '')
+
+    // Answered through the service, the way the IPC handler does it.
+    expect(service.decide({ approvalId: raised[0]!.approvalId, decision: 'approve-once' })).toBe(true)
+    await vi.waitFor(() => {
+      expect(server.replyTo('srv-1')).toMatchObject({ result: { decision: 'accept' } })
+    })
+  })
+
+  it('refuses what a stopped run was still asking, so no card waits on a run that has gone', async () => {
+    const { approvals, raised } = withApprovals()
+    const server = fakeAppServer([])
+    const { service, scheduled } = scheduledService({ start: vi.fn() }, fakeLedger(), {
+      appServerSpawn: server.spawn,
+      approvals
+    })
+    const response = await service.start('Build it.', 'codex', 'approve-each', {}, () => undefined)
+    scheduled[0]?.()
+    await vi.waitFor(() => {
+      expect(server.written.some((message) => message.method === 'turn/start')).toBe(true)
+    })
+    server.ask('srv-9', 'item/fileChange/requestApproval', { changes: [1] })
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
+
+    expect(approvals.pendingCount).toBe(1)
+
+    service.cancel(response.ok ? response.data.runId : '')
+
+    /*
+     * What is asserted is that nothing is LEFT WAITING, not that a refusal
+     * reached the wire.
+     *
+     * Stopping kills the server, so whether the `reject` wins the race to a
+     * dying pipe is immaterial -- and it is a real race: the channel's handler
+     * is async, so resolving its promise takes two microtask hops to reach the
+     * client's send, while disposing that client takes one. The old approval
+     * service had the same ordering and asserted the same two things.
+     *
+     * What would be a defect is a promise nobody ever settles (the run hangs)
+     * or a card that outlives its run (the person answers into nothing).
+     */
+    expect(approvals.pendingCount).toBe(0)
+    expect(service.decide({ approvalId: raised[0]!.approvalId, decision: 'approve-once' })).toBe(false)
+  })
+
+  it('answers nothing when no channel is wired, rather than pretending it did', () => {
+    const { service } = scheduledService({ start: vi.fn() }, fakeLedger())
+    expect(service.decide({ approvalId: 'ap_1', decision: 'approve-once' })).toBe(false)
   })
 })

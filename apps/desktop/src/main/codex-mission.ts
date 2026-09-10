@@ -14,6 +14,7 @@ import {
   createOpenCodeEventNormalizer,
   createOpenCodeRunCommand,
   cursorCanEnforceReadOnly,
+  notificationOfRecord,
   startCodexAppServerRun
 } from '@teammate/runtime-adapters'
 import type {
@@ -33,9 +34,14 @@ import type {
   CodexMissionCancelResponse,
   CodexMissionStartResponse,
   CodexMissionUpdate,
+  MissionApprovalAnswer,
   MissionHandoffResponse,
   MissionMode
 } from '../shared/ipc.js'
+import { withFileChanges } from './approval-channel.js'
+import type { ApprovalChannel } from './approval-channel.js'
+import { fileChangesOf, itemOf } from './approval-patch.js'
+import type { FileChangeRecord } from './approval-patch.js'
 import { composeHandoffPrompt } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
@@ -165,6 +171,11 @@ export interface CodexMissionService {
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   /**
+   * The person's answer to something a run asked. False when no run of this
+   * service was waiting under that id -- another host may hold it.
+   */
+  decide(answer: MissionApprovalAnswer): boolean
+  /**
    * Pick a stopped mission back up from its last checkpoint.
    *
    * Unlike `handOff` this works on a mission that is NOT active -- that is the
@@ -290,6 +301,11 @@ interface CodexMissionServiceOptions {
     }>
     release(runId: string): Promise<void>
   }
+  /**
+   * What answers a Codex run that stops to ask -- Approve-each's whole point.
+   * Without it that mode has nobody to ask, and every request is refused.
+   */
+  readonly approvals?: ApprovalChannel
 }
 
 function error(
@@ -440,6 +456,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     // The run is over, so nobody can answer a permission it was still asking:
     // refuse what is waiting, forget its token, remove its config.
     void options.permissionHost?.release(candidate.runId).catch(() => undefined)
+    options.approvals?.release(candidate.runId)
     // Whatever ended this run, anyone waiting on it is told. Fire and forget:
     // a meeting's bookkeeping must never hold a slot open.
     if (options.onRunEnded !== undefined) {
@@ -673,8 +690,17 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           'Auto mode is switched off for this workspace. Turn it on in Settings to let a run work outside the workspace folder. Nothing was recorded.'
         ) as CodexMissionStartResponse
       }
+      // Approve-each is workspace-write: approvals only mean something when
+      // the run could otherwise act, and the server stops it before each act.
+      // It used to fall through to read-only here because it never reached
+      // this loop at all -- it had a service of its own -- and three other
+      // start paths refused it rather than run it wrong. It runs here now.
       const sandbox: MissionSandbox =
-        mode === 'auto' ? 'full-access' : mode === 'accept-edits' ? 'workspace-write' : 'read-only'
+        mode === 'auto'
+          ? 'full-access'
+          : mode === 'accept-edits' || mode === 'approve-each'
+            ? 'workspace-write'
+            : 'read-only'
       let resolveStartOperation!: () => void
       const startOperation = new Promise<void>((resolve) => {
         resolveStartOperation = resolve
@@ -899,8 +925,33 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // command built below are the same decision and are made from the
         // same value.
         const codexStreams = runtime === 'codex' && options.appServerSpawn !== undefined
+        // What the run has announced it will change, by item id. Read off the
+        // stream so a file-change tool row can carry its diff, and so an
+        // approval card for that item can show what it is about.
+        const changesByItem = new Map<string, readonly FileChangeRecord[]>()
+        const appServerNormalizer = (): CodexEventNormalizer => {
+          const inner = asProcessNormalizer(createAppServerEventNormalizer({ ...normalizerContext, runtime: 'codex' }))
+          return {
+            get runtimeThreadId() {
+              return inner.runtimeThreadId
+            },
+            get finalized() {
+              return inner.finalized
+            },
+            accept: (record) => {
+              const notification = notificationOfRecord(record)
+              const found = notification === undefined ? undefined : itemOf(notification.params)
+              if (found !== undefined) {
+                const changes = fileChangesOf(found.item)
+                if (changes !== undefined) changesByItem.set(found.id, changes)
+              }
+              return withFileChanges(inner.accept(record), changesByItem, runCwd)
+            },
+            finish: (completion) => inner.finish(completion)
+          }
+        }
         const normalizer = codexStreams
-          ? asProcessNormalizer(createAppServerEventNormalizer({ ...normalizerContext, runtime: 'codex' }))
+          ? appServerNormalizer()
           : runtime === 'claude'
           ? createClaudeEventNormalizer(normalizerContext)
           : runtime === 'cursor'
@@ -1186,13 +1237,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             // this transport it is JSON on a socket -- so the rule that only
             // a full-access mission may say `danger-full-access` is enforced
             // at the point it is chosen. See `codexAppServerPolicy`.
-            const policy = codexAppServerPolicy(effectiveSandbox)
+            const policy = codexAppServerPolicy(effectiveSandbox, mode)
+            // Approve-each stops to ask, and this is who answers. Any other
+            // mode never asks, and the run's default refuses just in case.
+            const onRequest =
+              mode === 'approve-each' && options.approvals !== undefined
+                ? options.approvals.requestHandlerFor({ runId, missionId, cwd: runCwd, changesByItem })
+                : undefined
             process = startCodexAppServerRun({
               spawn: options.appServerSpawn!,
               command,
               prompt: runtimePrompt,
               sandbox: policy.sandbox,
               approvalPolicy: policy.approvalPolicy,
+              ...(onRequest === undefined ? {} : { onRequest }),
               ...(chosenModel === undefined ? {} : { model: chosenModel }),
               ...(route.effort === undefined ? {} : { effort: route.effort }),
               ...(resumeThreadId === undefined ? {} : { resumeThreadId }),
@@ -1307,6 +1365,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           'That Codex mission is no longer active.'
         ) as CodexMissionCancelResponse
       }
+      // Refused BEFORE the abort, while the run's client is still alive, so
+      // the runtime hears the refusal rather than only losing its pipe. The
+      // same release happens again in `clearActive` for every other way a run
+      // can end, and is idempotent; doing it only there would resolve the
+      // pending promise after the client had been disposed, and the answer
+      // would go nowhere. The old approval service released in this order too.
+      options.approvals?.release(mission.runId)
       mission.controller.abort()
       return {
         ok: true,
@@ -1315,6 +1380,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           state: 'cancellation-requested'
         }
       }
+    },
+
+    decide(answer: MissionApprovalAnswer): boolean {
+      return options.approvals?.decide(answer) ?? false
     },
 
     async handOff(

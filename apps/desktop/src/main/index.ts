@@ -22,7 +22,8 @@ import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
-import { createAppServerMissionService, PeerRecordError } from './app-server-mission.js'
+import { createApprovalChannel } from './approval-channel.js'
+import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
 import { createModelCatalog } from './model-catalog.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
@@ -57,7 +58,6 @@ const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
 import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
 import type { CodexMissionService } from './codex-mission.js'
-import type { AppServerMissionService } from './app-server-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createConnectorReader } from './connector-reader.js'
 import { createRelay } from './relay.js'
@@ -288,7 +288,6 @@ const runtimeDiscovery = createRuntimeDiscoveryService({
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
-let appServerServiceForShutdown: AppServerMissionService | undefined
 let ledgerForShutdown: MissionLedger | undefined
 let workroomForShutdown: Workroom | undefined
 let permissionHostForShutdown: { dispose(): Promise<void> } | undefined
@@ -441,13 +440,14 @@ const createWindow = (
   })
 
   window.once('closed', () => {
+    // macOS does not quit when the last window closes, and a run whose window
+    // is gone can no longer be answered: an approval reaches nobody, so the
+    // run cannot finish, cannot be stopped, and pins a ledger record that then
+    // refuses to be deleted. This used to need a second call because the
+    // approval transport was a service of its own; every mode runs here now,
+    // and `interrupt` aborts each live run -- which kills its app-server
+    // process -- while `clearActive` refuses whatever it was still asking.
     codexMissions.interrupt()
-    // The app-server transport was only ever stopped on quit, and macOS does
-    // not quit when the last window closes. Its runs are the write-capable
-    // ones, and once the window is gone their approval requests reach nobody:
-    // the run cannot finish, cannot be stopped, and pins a ledger record that
-    // then refuses to be deleted.
-    void appServerServiceForShutdown?.dispose().catch(() => undefined)
   })
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
@@ -699,9 +699,26 @@ if (!ownsSingleInstanceLock) {
     })
     permissionHostForShutdown = permissionHost
 
+    /*
+     * What answers a run that stops to ask. Approve-each used to have a whole
+     * second mission service for this; since every Codex mode runs on
+     * app-server through the one loop, the channel is all that mode still
+     * needs of its own.
+     */
+    const approvals = createApprovalChannel({
+      emitApproval: raiseApproval,
+      emitUpdate: (update) => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
+        }
+      }
+    })
+
     const codexMissions = createCodexMissionService({
       workspacePath,
       permissionHost,
+      approvals,
       // Every Codex mode rides `codex app-server`, because `codex exec --json`
       // never streams an agent message -- measured 2026-09-10, the whole reply
       // arrives as one `item.completed`. Called lazily for the same reason
@@ -734,7 +751,7 @@ if (!ownsSingleInstanceLock) {
        * Read lazily rather than captured, because these three are constructed
        * in sequence and each needs the other two.
        */
-      liveElsewhere: () => appServerMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
+      liveElsewhere: () => antigravityMissions.liveMissionIds().length,
       // Asked at the moment a run starts, never cached: switching Auto off in
       // Settings has to reach the next run, including one a relay or a saved
       // routine is about to start.
@@ -787,7 +804,7 @@ if (!ownsSingleInstanceLock) {
       workspacePath,
       ledger: missionLedger,
       // One pool -- see the note on codexMissions above.
-      liveElsewhere: () => codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length,
+      liveElsewhere: () => codexMissions.liveMissionIds().length,
       workroom,
       memory: memoryBriefing,
       probe: () => antigravityProbe.probe(),
@@ -855,29 +872,6 @@ if (!ownsSingleInstanceLock) {
       spawn: spawnAppServer
     })
 
-    const appServerMissions = createAppServerMissionService({
-      workspacePath,
-      ledger: missionLedger,
-      // One pool -- see the note on codexMissions above.
-      liveElsewhere: () => codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
-      discover: discoverForWork,
-      spawn: spawnAppServer,
-      emitApproval: raiseApproval,
-      emitEvent: (runId, missionId, event) => {
-        const target = approvalWindow
-        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
-          target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, { kind: 'event', runId, missionId, event })
-        }
-      },
-      emitUpdate: (update) => {
-        const target = approvalWindow
-        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
-          target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
-        }
-      },
-      workroom,
-      memory: memoryBriefing
-    })
 
     /**
      * Install a runtime, streaming npm's output to the window that asked.
@@ -945,16 +939,15 @@ if (!ownsSingleInstanceLock) {
       const normalized =
         decision === 'approve-once' || decision === 'approve-always' ? decision : 'deny'
       if (typeof payload.approvalId !== 'string') return { ok: false } as const
-      // Whichever service is holding this id. A Codex approval lives in the
-      // app-server service; a Claude Code connector permission lives in the
-      // permission host. An id is minted by exactly one of them.
+      // Whichever host is holding this id. A Codex approval lives in the
+      // mission service's approval channel; a Claude Code connector permission
+      // lives in the permission host. An id is minted by exactly one of them.
       const decided = { approvalId: payload.approvalId, decision: normalized } as const
-      return { ok: appServerMissions.decide(decided) || permissionHost.decide(decided) } as const
+      return { ok: codexMissions.decide(decided) || permissionHost.decide(decided) } as const
     })
 
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })
     missionServiceForShutdown = codexMissions
-    appServerServiceForShutdown = appServerMissions
     ledgerForShutdown = missionLedger
     workroomForShutdown = workroom
 
@@ -1106,20 +1099,6 @@ if (!ownsSingleInstanceLock) {
             } as const
           }
         }
-        // Same silent degrade as routines and room posts: a relay goes through
-        // exec, where approve-each falls through to read-only and no card is
-        // ever drawn. A teammate relaying to a teammate saved on that mode ran
-        // with no approvals and no mention of it.
-        if (input.mode === 'approve-each') {
-          return {
-            ok: false,
-            error: {
-              code: 'RUN_MODE_UNSUPPORTED',
-              message:
-                'That teammate is set to "approve each action", and a relayed message cannot show per-action approvals. Nothing was started.'
-            }
-          } as const
-        }
         return codexMissions.start(
           input.prompt,
           input.runtime,
@@ -1192,7 +1171,7 @@ if (!ownsSingleInstanceLock) {
       // A scheduled routine waits for any live run of the teammate's, whoever started it.
       teammateBusy: async (teammateId) => {
         const owners = await teammates.missionOwners()
-        const live = [...codexMissions.liveMissionIds(), ...appServerMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
+        const live = [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
         return live.some((missionId) => owners[missionId] === teammateId)
       },
       notify: sendToWindow
@@ -1935,17 +1914,6 @@ ${taskSection({
       if (route.runtime === 'antigravity') {
         return { ok: false, name: teammate.name, message: 'Antigravity cannot be posted to from a room yet.', retryable: false }
       }
-      // Per-action approvals only exist on the app-server transport, which a
-      // room post does not use. Without this the post ran read-only with no
-      // cards while the chip said approvals.
-      if (route.mode === 'approve-each') {
-        return {
-          ok: false,
-          name: teammate.name,
-          message: 'This teammate is set to "approve each action", and a room post cannot show per-action approvals. Message them directly instead.',
-          retryable: false
-        }
-      }
       const response = await codexMissions.start(
         briefed,
         route.runtime,
@@ -2213,7 +2181,7 @@ ${taskSection({
       currentVersion: app.getVersion(),
       supported: app.isPackaged,
       liveMissionCount: () =>
-        codexMissions.liveMissionIds().length + appServerMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
+        codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       requestQuit: (finalise) => {
         // Held for the shutdown handler: an installer can only be launched
         // once the ledger is safely on disk.
@@ -2254,7 +2222,7 @@ ${taskSection({
       const probe = await worktrees.probe()
       const [roster, owners] = await Promise.all([teammates.list(), teammates.missionOwners()])
       const live = new Set(
-        [...codexMissions.liveMissionIds(), ...appServerMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
+        [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
           .map((missionId) => owners[missionId])
           .filter((owner): owner is string => owner !== undefined)
       )
@@ -2327,7 +2295,7 @@ ${taskSection({
       const response = await pruneMissionRecords(
         missionLedger,
         request,
-        () => [...codexMissions.liveMissionIds(), ...appServerMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()],
+        () => [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()],
         () => new Date()
       )
       // Ownership follows the records out, exactly as it does for a single
@@ -2347,7 +2315,7 @@ ${taskSection({
       const response = await deleteMissionRecord(
         missionLedger,
         missionId,
-        (id) => codexMissions.hasMission(id) || appServerMissions.hasMission(id) || antigravityMissions.hasMission(id)
+        (id) => codexMissions.hasMission(id) || antigravityMissions.hasMission(id)
       )
       // Ownership follows the record out, so the roster never lists a
       // mission that no longer exists.
@@ -2397,10 +2365,9 @@ ${taskSection({
       // Same shape as the mode: an unrecognized runtime falls back to Codex
       // rather than being passed through to discovery as-is.
       const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
-      // `approve-each` is the only mode that needs a runtime able to stop and
-      // ask, so it is the only one routed to the experimental transport --
-      // which is Codex's app-server. Another runtime asked for it would have
-      // been started on Codex without a word; it is refused instead.
+      // `approve-each` needs a runtime able to stop and ask, and only Codex
+      // has one. Another runtime asked for it would have been started on
+      // Codex without a word; it is refused instead.
       if (runtime === 'antigravity') {
         if (typeof prompt !== 'string' || prompt.trim().length === 0) {
           return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const
@@ -2447,51 +2414,6 @@ ${taskSection({
           }
         } as const
       }
-      if (mode === 'approve-each') {
-        if (typeof prompt !== 'string' || prompt.trim().length === 0) {
-          return { ok: false, error: { code: 'INVALID_PROMPT', message: 'Enter a mission first.' } } as const
-        }
-        const peer = await peerContextFor(payload.teammateId)
-        if (peer?.worktreeRefused !== undefined) {
-          return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: peer.worktreeRefused } } as const
-        }
-        const approveModel = typeof payload.model === 'string' ? payload.model : undefined
-        const approveEffort = typeof payload.effort === 'string' ? payload.effort : undefined
-        try {
-          const mission = await appServerMissions.start(prompt, peer, {
-            ...(approveModel === undefined ? {} : { model: approveModel }),
-            ...(approveEffort === undefined ? {} : { effort: approveEffort })
-          })
-          await assignOwner(peer?.self.teammateId, mission.missionId)
-          await rememberRoute(peer?.self.teammateId, { runtime: 'codex', model: approveModel ?? 'account-default', mode })
-          return {
-            ok: true,
-            data: {
-              runId: mission.runId,
-              missionId: mission.missionId,
-              runtime: 'codex',
-              model: approveModel !== undefined && approveModel !== 'account-default' ? approveModel : 'account-default',
-              resolvedRouteId: 'codex-app-server:default',
-              cliVersion: null,
-              sandbox: 'workspace-write',
-              peerMessages: mission.peerMessages,
-              peerDeliveryFailed: mission.peerDeliveryFailed
-            }
-          } as const
-        } catch (error) {
-          if (error instanceof PeerRecordError) {
-            return { ok: false, error: { code: 'PERSISTENCE_FAILED', message: error.message } } as const
-          }
-          return {
-            ok: false,
-            error: {
-              code: 'RUNTIME_START_FAILED',
-              message: 'The approval-capable runtime could not be started.'
-            }
-          } as const
-        }
-      }
-
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       try {
@@ -2546,10 +2468,10 @@ ${taskSection({
         : undefined
       const viaExec = codexMissions.cancel(runId)
       if (viaExec.ok || typeof runId !== 'string') return viaExec
-      // Not an exec run: the approval transport owns its own runs, and a stop
-      // control that only knew one transport reported "no longer active" at a
-      // run that was very much still going.
-      if (appServerMissions.cancel(runId) || antigravityMissions.cancel(runId)) {
+      // Not one of the mission service's runs: Antigravity owns its own, and a
+      // stop control that only knew one transport reported "no longer active"
+      // at a run that was very much still going.
+      if (antigravityMissions.cancel(runId)) {
         return { ok: true, data: { runId, state: 'cancellation-requested' } } as const
       }
       return viaExec
@@ -2611,18 +2533,6 @@ ${taskSection({
       const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
-      // An approve-each run cannot be handed off yet, and saying "no longer
-      // active" about a run that is still going would be a lie. Refused
-      // without touching the run.
-      if (typeof payload.runId === 'string' && appServerMissions.has(payload.runId)) {
-        return {
-          ok: false,
-          error: {
-            code: 'HANDOFF_REFUSED',
-            message: 'A mission running with per-action approvals cannot be handed to another runtime yet. It is still running.'
-          }
-        } as const
-      }
       try {
         const response = await codexMissions.handOff(
           payload.runId,
@@ -2712,9 +2622,6 @@ if (ownsSingleInstanceLock) {
       deadlineMs: SHUTDOWN_DEADLINE_MS,
       work: async () => {
         await missionServiceForShutdown?.dispose()
-        // Releases any pending approval and takes the app-server process tree
-        // with it, so nothing is left prompting for an app that has gone.
-        await appServerServiceForShutdown?.dispose()
         await ledgerForShutdown?.flush()
         await workroomForShutdown?.flush()
         // Refuses whatever a run was still asking, and closes the loopback door.

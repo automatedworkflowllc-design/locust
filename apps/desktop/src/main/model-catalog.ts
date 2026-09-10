@@ -2,7 +2,7 @@ import { createAppServerClient } from '@teammate/runtime-adapters'
 import type { MissionRuntimeId, RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 import type { PublicModel, ModelCatalogResponse } from '../shared/ipc.js'
-import type { AppServerProcess } from './app-server-mission.js'
+import type { AppServerRunProcess as AppServerProcess } from '@teammate/runtime-adapters'
 
 /**
  * The model catalog.

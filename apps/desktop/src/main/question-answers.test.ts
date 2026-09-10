@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { describeApproval, protocolAnswerFor, questionsOf } from './app-server-mission.js'
+import { describeApproval, protocolAnswerFor, questionsOf } from './approval-channel.js'
 
 /**
  * A Codex question is ANSWERED. It was being authorized, and the answer was

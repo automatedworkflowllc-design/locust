@@ -796,21 +796,6 @@ export type CodexMissionErrorCode =
    */
   | 'HANDOFF_REFUSED'
   /**
-   * The saved route asks for a mode this way of starting cannot honour.
-   *
-   * Per-action approvals live only on the app-server transport, which only the
-   * composer's own start reaches. A routine, a room post and a relay all go
-   * through the exec transport, where the mode falls through to `read-only` --
-   * so a teammate saved on "approve each action" ran with no cards, no writes
-   * and no mention of either, while the chip still said approvals. Safer than
-   * silent writes, and still a lie about what happened.
-   *
-   * Refused before anything is dispatched or persisted. The same argument the
-   * routine runner already makes about effort applies harder to permission: a
-   * replay at a mode the person did not teach is not the same routine.
-   */
-  | 'RUN_MODE_UNSUPPORTED'
-  /**
    * No folder is chosen for the teammates to work in. The installed app is
    * launched from its own install folder, which is never a workspace, so a
    * start there is refused until a folder is picked -- it must not quietly
