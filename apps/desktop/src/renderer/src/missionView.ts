@@ -969,18 +969,27 @@ function subagentVerb(tool: string | undefined): string {
  * read too rather than left as the one runtime this does not help.
  */
 export function mcpToolParts(name: string): { readonly server: string; readonly tool: string } | undefined {
-  // The LAST `__` is the separator, not the first.
-  //
-  // `mcp__claude_ai_Robinhood__get_watchlists` splits the same either way,
-  // but a server whose own name carries a double underscore --
-  // `mcp__claude_ai__Google_Drive__create_file` -- gave server `claude_ai`
-  // and tool `Google_Drive__create_file`, so a connector call read as an
-  // ordinary tool with a strange name (MEASURED 2026-09-11:
-  // `using a tool · Google_Drive__create_file`). A tool name is the final
-  // segment; everything between `mcp__` and it is who it belongs to.
-  const doubled = /^mcp__(.+)__(.+)$/.exec(name)
+  const doubled = /^mcp__(.+?)__(.+)$/.exec(name)
   if (doubled !== null) {
     return { server: prettyServer(doubled[1] ?? ''), tool: doubled[2] ?? '' }
+  }
+  /*
+   * `Google_Drive__create_file` -- a connector tool with no `mcp__` prefix.
+   *
+   * MEASURED 2026-09-11, driving a real run: it read as `using a tool ·
+   * Google_Drive__create_file`, an ordinary tool with a strange name. Every
+   * connector name this app had ever been shown carried the prefix, so the
+   * split required it; this one does not, and the shape is still unambiguous.
+   *
+   * Deliberately narrow. The left part must look like a name -- letters,
+   * digits and single underscores, nothing that could be a path, a flag or a
+   * sentence -- because the only thing separating this from a false positive
+   * is that no ordinary tool is called `Read__something`. Read, Write, Bash,
+   * Grep, Task and WebFetch carry no double underscore at all.
+   */
+  const bare = /^([A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*)__([A-Za-z][A-Za-z0-9_-]*)$/.exec(name)
+  if (bare !== null) {
+    return { server: prettyServer(bare[1] ?? ''), tool: bare[2] ?? '' }
   }
   // Codex's own join, and only when it really is one: a dot in a file path
   // is not a server.

@@ -1124,16 +1124,37 @@ describe('which register a live line is', () => {
     expect(line).toMatchObject({ register: 'tool', label: 'README.md' })
   })
 
-  it('splits a connector name at its LAST separator, not its first', () => {
-    // A server whose own name carries a double underscore gave server
-    // `claude_ai` and tool `Google_Drive__create_file`, so a connector call
-    // read as an ordinary tool with a strange name (MEASURED 2026-09-11:
-    // `using a tool · Google_Drive__create_file`).
+  it('reads a connector name that carries no mcp__ prefix', () => {
+    // MEASURED 2026-09-11, driving a real run: `using a tool ·
+    // Google_Drive__create_file`. Every connector name this app had been
+    // shown carried the prefix, so the split required one.
     const line = buildThread(
-      [event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'mcp__claude_ai__Google_Drive__create_file', phase: 'started' })],
+      [event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'Google_Drive__create_file', phase: 'started' })],
       { running: true }
     ).find((item) => item.type === 'live-step')
     expect(line).toMatchObject({ register: 'connector', label: 'create_file', detail: 'Google Drive' })
+  })
+
+  it('does not mistake an ordinary tool for a connector', () => {
+    // The rule's whole safety is that no ordinary tool carries a double
+    // underscore. These are the ones a run actually uses.
+    for (const name of ['Read', 'Write', 'Bash', 'Grep', 'Task', 'WebFetch', 'shell', 'apply_patch']) {
+      const line = buildThread(
+        [event('tool.started', { itemId: 't1', toolKind: 'tool_use', name, phase: 'started' })],
+        { running: true }
+      ).find((item) => item.type === 'live-step')
+      expect(line, name).toMatchObject({ register: 'tool' })
+    }
+  })
+
+  it('keeps a tool name that contains a double underscore with the server', () => {
+    // Non-greedy on purpose: the FIRST `__` after the prefix ends the server,
+    // so a tool whose own name carries one stays whole.
+    const line = buildThread(
+      [event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'mcp__claude_ai_Zapier__run__action', phase: 'started' })],
+      { running: true }
+    ).find((item) => item.type === 'live-step')
+    expect(line).toMatchObject({ register: 'connector', label: 'run__action', detail: 'Zapier' })
   })
 
   it('names a connector as a connector, because it reaches off this machine', () => {

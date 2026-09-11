@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.72.1 - 2026-09-11
+
+- **A connector call is named as one even without the `mcp__` prefix.** A
+  Google Drive call read as `using a tool · Google_Drive__create_file` — an
+  ordinary tool with a strange name. Every connector name this app had been
+  shown carried the prefix, so the split required one; this one does not.
+  Ordinary tools are untouched: none of Read, Write, Bash, Grep, Task or
+  WebFetch carries a double underscore, which is the whole safety of the rule.
+
 ## 0.72.0 - 2026-09-11
 
 - **The Missions screen shows what is happening now.** It listed only recorded
