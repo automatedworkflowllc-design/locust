@@ -80,7 +80,7 @@ import type { SidebarMission } from './components/Sidebar.js'
 import { ContextMenu } from './components/ContextMenu.js'
 import type { ContextMenuState } from './components/ContextMenu.js'
 import { Thread } from './components/Thread.js'
-import { AgentAvatar } from './components/ThreadItems.js'
+import { AgentAvatar, REGISTER_WORD } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
 import {
   conversationTurns,
@@ -93,7 +93,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  typedPrompt, assistantMessages } from './missionView.js'
+  typedPrompt, assistantMessages, buildThread } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { sequenceOfPost } from './roomExchange.js'
@@ -3046,6 +3046,87 @@ export default function App(): ReactElement {
       ? undefined
       : teammates.find((teammate) => teammate.teammateId === ownerOf(liveRun))
   const shownRunId = liveRun?.data?.runId
+  /**
+   * The one line under a mission's title on the Missions screen.
+   *
+   * Read from the same places the thread reads: the run's pending approval,
+   * then its live line. Nothing invented for it, and nothing at all for a
+   * mission that has settled -- a list where every row carries a sentence is
+   * a list nobody scans.
+   *
+   * Grok Build's dashboard row does the same thing and says why in its own
+   * source: the secondary line holds "the last tool call, the last assistant
+   * message, or a 'Pending: ...' preview of the front-most permission
+   * request". Twelve rows reading RUNNING tell you which to open only by
+   * opening them.
+   */
+  const missionDoing = (missionId: string): string | undefined => {
+    const waiting = approvals.find((request) => request.missionId === missionId)
+    // What it wants beats what it is doing: a run that stopped to ask is not
+    // doing anything, and that is the row a person is looking for.
+    if (waiting !== undefined) return `Pending: ${waiting.summary}`
+    const run = [...runs.values()].find((entry) => entry.data?.missionId === missionId)
+    if (run === undefined || !liveRunIsActive(run)) return undefined
+    const live = buildThread(run.events, { running: true, ...(run.startedAtIso === undefined ? {} : { startedAt: run.startedAtIso }) })
+      .find((item) => item.type === 'live-step')
+    if (live === undefined || live.type !== 'live-step') return undefined
+    const word = REGISTER_WORD[live.register]
+    const said = /^(thinking|working|starting)$/i.test(live.label.trim()) ? undefined : live.label.trim()
+    return [word, said, live.detail].filter((part) => part !== undefined && part.length > 0).join(' · ')
+  }
+
+  /**
+   * Every mission the Missions screen should list: the recorded ones, and the
+   * ones happening RIGHT NOW.
+   *
+   * MEASURED 2026-09-11 (`probe-missions-say-what-they-want`): for 49
+   * consecutive samples a teammate was visibly working in the sidebar and
+   * this screen was empty. The list is built from the ledger, and a mission
+   * reaches the ledger when it is recovered -- so the one screen in the app
+   * whose job is "what is going on" was the last place to hear about it.
+   *
+   * A live run is not a recovered mission and cannot pretend to be one: it
+   * has no checkpoints, no integrity count and no terminal phase. What it
+   * does have is everything a ROW needs -- who, what was asked, which route,
+   * when it started -- so that is what is filled in, and the fields a row
+   * never reads stay empty rather than being invented.
+   */
+  const missionsToList = useMemo((): readonly PublicRecoveredMission[] => {
+    const recorded = new Set(history.map((mission) => mission.missionId))
+    const live: PublicRecoveredMission[] = []
+    for (const run of runs.values()) {
+      const data = run.data
+      if (data === undefined || !liveRunIsActive(run) || recorded.has(data.missionId)) continue
+      const startedAt = run.startedAtIso ?? run.events[0]?.occurredAt ?? new Date().toISOString()
+      live.push({
+        missionId: data.missionId,
+        runId: data.runId,
+        workspaceId: workspaceId ?? '',
+        prompt: run.prompt,
+        runtime: data.runtime,
+        model: data.model ?? 'account-default',
+        requestedRouteId: data.resolvedRouteId,
+        resolvedRouteId: data.resolvedRouteId,
+        cliVersion: data.cliVersion ?? null,
+        createdAt: startedAt,
+        lastUpdatedAt: run.events.at(-1)?.occurredAt ?? startedAt,
+        // A live run has not ended, and every value this field can take is an
+        // ending. `interrupted` is the one that does not claim it finished;
+        // the row's own tag comes from `runningMissionIds` regardless.
+        phase: 'interrupted',
+        events: run.events,
+        eventCount: run.events.length,
+        eventsTruncated: false,
+        integrityIssueCount: 0,
+        sandbox: data.sandbox,
+        checkpoints: [],
+        peerMessages: run.peerMessages ?? []
+      })
+    }
+    // Newest first, as the recorded list is.
+    return [...live.sort((a, b) => b.createdAt.localeCompare(a.createdAt)), ...history]
+  }, [history, runs, workspaceId])
+
   const shownApprovals = approvals.filter((request) => request.runId === shownRunId)
   const pendingApprovalsByOwner = new Map<string, number>()
   for (const request of approvals) {
@@ -3171,7 +3252,7 @@ export default function App(): ReactElement {
         <main className="lc-workroom">
           {screen === 'missions' ? (
             <MissionsScreen
-              missions={history}
+              missions={missionsToList}
               unreadableLedgers={unreadableLedgers}
               ledgerUnreadable={ledgerUnreadable}
               workspaceId={workspaceId}
@@ -3183,6 +3264,7 @@ export default function App(): ReactElement {
                 )
               }
               titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
+              secondaryOf={missionDoing}
               teammates={teammates}
               missionOwners={missionOwners}
               onOpen={openMission}

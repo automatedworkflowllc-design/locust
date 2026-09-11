@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.72.0 - 2026-09-11
+
+- **The Missions screen shows what is happening now.** It listed only recorded
+  missions, and a mission reaches the record when it finishes — so the one
+  screen whose job is "what is going on" was the last place to hear about it.
+  Measured: for 49 straight samples a teammate was visibly working in the
+  sidebar and this screen was empty. Live runs are listed as they run.
+- **A live mission says RUNNING.** It wore INTERRUPTED, which is the right
+  reading of a record with no ending and the wrong word for a run still going.
+  The screen knew; the row never asked.
+- **Each row says what it is doing, or what it wants.** Under the title:
+  `using a tool · Read` while it works, `Pending: …` when it stopped to ask
+  you something, and nothing at all once it has settled — so a list of twelve
+  tells you which one to open without opening them.
+
 ## 0.71.0 - 2026-09-11
 
 - **A teammate can ask to be taken now.** A message that arrives while its

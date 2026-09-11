@@ -119,6 +119,7 @@ export function MissionsScreen({
   missionOwners,
   runningMissionIds,
   titleOf,
+  secondaryOf,
   onOpen,
   unreadableLedgers = 0,
   ledgerUnreadable = false
@@ -130,6 +131,16 @@ export function MissionsScreen({
   readonly missionOwners: Readonly<Record<string, string>>
   /** The missions the host is running now; the ledger cannot know this. */
   readonly runningMissionIds: ReadonlySet<string>
+  /**
+   * The one line under the title: what this mission is doing right now, or
+   * what it is waiting on you for.
+   *
+   * A list of twelve missions all reading COMPLETED or RUNNING tells you
+   * which to open only by opening them. Undefined collapses the row to the
+   * single line it has always been -- a settled mission has nothing live to
+   * say, and inventing something for it would be noise on every row.
+   */
+  readonly secondaryOf?: (missionId: string) => string | undefined
   /**
    * What to call a mission. A continuation's own prompt can be the host's
    * briefing, and the sidebar already names such a row by the words a person
@@ -234,7 +245,22 @@ export function MissionsScreen({
         ) : (
           <div className="lc-missionrows">
             {shown.map((mission) => {
-              const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
+              /*
+                * RUNNING comes from the host, not the ledger.
+                *
+                * `missionRowPhase` has existed for exactly this since the
+                * screen was written, and only the FILTER ever called it --
+                * the row read `mission.phase` straight, so a live mission
+                * wore INTERRUPTED, which is the correct reading of a file
+                * with no terminal receipt and the wrong word for a run that
+                * is still going. It never showed, because until the live
+                * runs were listed at all there was no row to be wrong
+                * (MEASURED 2026-09-11: `INTERRUPTED || using a tool · Read`).
+                */
+              const view = missionPhaseView(
+                missionRowPhase(mission, runningMissionIds),
+                mission.integrityIssueCount > 0
+              )
               const owner = teammates.find(
                 (teammate) => teammate.teammateId === missionOwners[mission.missionId]
               )
@@ -242,6 +268,7 @@ export function MissionsScreen({
                 0,
                 Math.round((Date.parse(mission.lastUpdatedAt) - Date.parse(mission.createdAt)) / 60000)
               )
+              const secondary = secondaryOf?.(mission.missionId)
               return (
                 <button
                   type="button"
@@ -250,7 +277,17 @@ export function MissionsScreen({
                   onClick={() => onOpen(mission.missionId)}
                 >
                   <span className={`lc-rail__dot lc-tone-${view.tone}`} />
-                  <span className="lc-missionrow__title">{titleOf(mission)}</span>
+                  {/*
+                    * Title, and under it the live word.
+                    *
+                    * `Pending: …` on a mission waiting for you is the whole
+                    * point: amber already says a person may need to act, and
+                    * this says what for, without opening it.
+                    */}
+                  <span className="lc-missionrow__name">
+                    <span className="lc-missionrow__title">{titleOf(mission)}</span>
+                    {secondary !== undefined && <span className="lc-missionrow__doing">{secondary}</span>}
+                  </span>
                   <span className="lc-missionrow__owner">{owner?.name ?? '—'}</span>
                   <span className="lc-missionrow__route lc-mono">
                     {mission.runtime} / {mission.model}

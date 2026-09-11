@@ -1124,6 +1124,18 @@ describe('which register a live line is', () => {
     expect(line).toMatchObject({ register: 'tool', label: 'README.md' })
   })
 
+  it('splits a connector name at its LAST separator, not its first', () => {
+    // A server whose own name carries a double underscore gave server
+    // `claude_ai` and tool `Google_Drive__create_file`, so a connector call
+    // read as an ordinary tool with a strange name (MEASURED 2026-09-11:
+    // `using a tool · Google_Drive__create_file`).
+    const line = buildThread(
+      [event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'mcp__claude_ai__Google_Drive__create_file', phase: 'started' })],
+      { running: true }
+    ).find((item) => item.type === 'live-step')
+    expect(line).toMatchObject({ register: 'connector', label: 'create_file', detail: 'Google Drive' })
+  })
+
   it('names a connector as a connector, because it reaches off this machine', () => {
     const line = buildThread(
       [event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'mcp__claude_ai_Robinhood__get_accounts', phase: 'started' })],

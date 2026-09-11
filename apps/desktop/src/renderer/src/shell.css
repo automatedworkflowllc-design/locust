@@ -4657,9 +4657,28 @@ textarea {
   border-color: var(--lc-border-button);
 }
 
+/* Title over the live word. One grid cell, two lines -- the row keeps its
+   columns, and a settled mission keeps its single line. */
+.lc-missionrow__name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .lc-missionrow__title {
   font-size: var(--lc-text-body);
   color: var(--lc-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* What it is doing, or what it wants. Quiet: it changes every second on a
+   live row, and a list of twelve of them must stay scannable. */
+.lc-missionrow__doing {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

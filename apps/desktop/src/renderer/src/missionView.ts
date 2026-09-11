@@ -969,7 +969,16 @@ function subagentVerb(tool: string | undefined): string {
  * read too rather than left as the one runtime this does not help.
  */
 export function mcpToolParts(name: string): { readonly server: string; readonly tool: string } | undefined {
-  const doubled = /^mcp__(.+?)__(.+)$/.exec(name)
+  // The LAST `__` is the separator, not the first.
+  //
+  // `mcp__claude_ai_Robinhood__get_watchlists` splits the same either way,
+  // but a server whose own name carries a double underscore --
+  // `mcp__claude_ai__Google_Drive__create_file` -- gave server `claude_ai`
+  // and tool `Google_Drive__create_file`, so a connector call read as an
+  // ordinary tool with a strange name (MEASURED 2026-09-11:
+  // `using a tool · Google_Drive__create_file`). A tool name is the final
+  // segment; everything between `mcp__` and it is who it belongs to.
+  const doubled = /^mcp__(.+)__(.+)$/.exec(name)
   if (doubled !== null) {
     return { server: prettyServer(doubled[1] ?? ''), tool: doubled[2] ?? '' }
   }

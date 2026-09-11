@@ -261,7 +261,7 @@ function elapsedLabel(startedAt: string, now: number): string {
 }
 
 /** What a live line IS, in the words a person would use for it. */
-const REGISTER_WORD: Record<LiveRegister, string> = {
+export const REGISTER_WORD: Record<LiveRegister, string> = {
   starting: 'starting',
   working: 'working',
   thinking: 'thinking',
