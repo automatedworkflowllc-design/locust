@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.76.0 - 2026-09-11
+
+- **"Build this plan" no longer sometimes starts a stranger.** Clicking it
+  while the plan run was still settling recorded the build turn with no link
+  back, so it began a fresh conversation instead of following the plan it was
+  offered from. Intermittent by construction — a run's last event lands on the
+  next frame, so for a few tens of milliseconds the window had not heard that
+  the mission was over. The host settles it now, and settles it stricter.
+
 ## 0.75.0 - 2026-09-11
 
 - **A finished turn says what it ran, not only what it changed.** The line

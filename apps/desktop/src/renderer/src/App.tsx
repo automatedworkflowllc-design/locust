@@ -2046,13 +2046,25 @@ export default function App(): ReactElement {
     // checkpointed continuation now (the host briefs the new runtime from the
     // old run's record), so it is still the same conversation on screen. The
     // 0.21.2 QA pass had to start a stranger and retype the task instead.
+    /*
+     * Whether the run is still LIVE is not this decision to make.
+     *
+     * It was, and it cost the thread: "Build this plan" clicked while the plan
+     * run was still settling recorded the build turn with no `continuesFrom`
+     * at all, so it started a stranger instead of following the plan it was
+     * offered from. Intermittent by construction -- terminal events land once
+     * per frame, so for a few tens of milliseconds the host has released the
+     * mission and this has not heard (`docs/FINDING-smoke-sweep-2026-09-11.md`,
+     * the `steering` smoke: PASS, FAIL, FAIL, PASS).
+     *
+     * The host settles it, and settles it STRICTER: `ownerBusy` is checked
+     * and returns before `followUpOf` is so much as read, so a follow-up on a
+     * genuinely running mission cannot be honoured -- the start is refused
+     * first, and a refusal now queues the message and asks again when the run
+     * in front of it ends. There is no window left in which this is wrong.
+     */
     const continuing =
-      shown !== undefined
-      && shown.data !== undefined
-      && !liveRunIsActive(shown)
-      && ownerOf(shown) === teammateId
-        ? shown
-        : undefined
+      shown !== undefined && shown.data !== undefined && ownerOf(shown) === teammateId ? shown : undefined
     const coldStart = continuing !== undefined && resumableSessionOf(continuing.events) === undefined
     const earlierTurns = continuing === undefined
       ? []
