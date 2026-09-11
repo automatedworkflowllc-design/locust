@@ -112,6 +112,27 @@ export function relayPrompt(input: {
     : `${who} replied to you; it is quoted below.`
   return [
     opening,
+    // Said only to a REPLY, where the whole failure lives.
+    //
+    // MEASURED 2026-09-11, `relay-smoke`, five runs: Wren asks Booty for one
+    // word, Booty says it -- and then the pair acknowledge each other for 6,
+    // 6, 3, 6 and 7 hops. Four of five ran to the budget on a question with a
+    // one-word answer. An exchange is SUPPOSED to end when a reply has
+    // nothing more to say; in practice it almost never did.
+    //
+    // The brief said "write back only if that helps finish the work", which a
+    // polite model reads as permission rather than as a cost. What it never
+    // said is what a reply actually COSTS: a whole mission, on a real model,
+    // billed -- and read by nobody, because the thing at the other end is
+    // another model that will feel the same pull to answer. Naming the cost
+    // is the honest version of the instruction, and it is a fact rather than
+    // a plea.
+    ...(input.hop <= 1
+      ? []
+      : [
+          `${input.sender.name} is a MODEL, not a person, and every reply you send starts another whole mission that costs money.`,
+          'If their message answers you, or needs nothing from you, END HERE with no share block. Do not thank them, do not confirm receipt, do not summarise what you both agreed -- none of that reaches a person and each one costs a run.'
+        ]),
     'Do what it asks if that is within your role and this workspace, using what you actually know; if you cannot help, say so briefly.',
     `Write back only if that helps finish the work: end with one <locust-share to="${input.sender.name}"> block holding your reply.`,
     // The one case where waiting is worse than interrupting, said as a rule

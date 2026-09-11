@@ -703,6 +703,37 @@ describe('a meeting: one asks several, and the next turn waits for all of them',
  * The host knows how much budget is left; the teammate did not. Same shape as
  * everything else fixed today: the app holding a fact the reader needed.
  */
+describe('telling a reply what a reply costs', () => {
+  const brief = (hop: number): string =>
+    relayPrompt({
+      sender: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' },
+      recipient: { teammateId: 'tm_booty', name: 'Booty', role: 'Custom' },
+      hop,
+      cap: 6
+    })
+
+  it('says nothing about it on the FIRST hop, where there is work to do', () => {
+    // The first message is the one that has a job. Telling it not to reply
+    // would be telling it not to do the thing it was started for.
+    expect(brief(1)).not.toContain('costs money')
+  })
+
+  it('tells a reply that the other end is a model and a reply costs a run', () => {
+    // MEASURED, `relay-smoke`, five runs: 6, 6, 3, 6, 7 hops for a question
+    // whose answer is one word. "Write back only if that helps finish the
+    // work" reads as permission; what it never said is what a reply COSTS.
+    expect(brief(2)).toContain('is a MODEL, not a person')
+    expect(brief(2)).toContain('costs money')
+  })
+
+  it('names the acknowledgements by name, because those are the ones that happen', () => {
+    const said = brief(3)
+    expect(said).toContain('END HERE with no share block')
+    expect(said).toContain('Do not thank them')
+    expect(said).toContain('do not confirm receipt')
+  })
+})
+
 describe('telling a teammate where in the budget it is', () => {
   it('names the reply and the budget, plainly, in the middle of an exchange', () => {
     expect(budgetSentence(1, 6)).toBe('This is automatic reply 1 of 6.')

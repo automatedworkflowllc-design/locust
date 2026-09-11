@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.79.0 - 2026-09-11
+
+- **Teammates stop thanking each other.** An exchange is meant to end when a
+  reply has nothing more to say; measured across five runs of a question whose
+  answer is one word, it ran to the budget four times out of five. The brief
+  told a replying teammate "write back only if that helps finish the work",
+  which a polite model reads as permission. It now says the plain fact: the
+  other end is a **model, not a person**, every reply starts another whole
+  billed mission, and thanking, confirming receipt or summarising what you
+  both agreed reaches nobody and costs a run each.
+- A relayed brief also says where in the budget it is — *"This is automatic
+  reply 3 of 6"* — and on the last one, that anything sent back waits for a
+  person rather than reaching them, which is what actually happens.
+
 ## 0.78.0 - 2026-09-11
 
 - **Ask another teammate to review a finished mission.** A new action on any
