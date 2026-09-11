@@ -3385,6 +3385,35 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/*
+ * A bare control on the composer row: a glyph that does a thing, not a chip
+ * that holds a state.
+ *
+ * The other items on this row are MODES -- the permission mode, the folder,
+ * the route, the effort -- and a chip is the right shape for a mode because
+ * it shows what is currently set. Attaching a file sets nothing. Colin,
+ * 2026-09-11, reversing the 2026-09-10 read that boxed it for consistency:
+ * "it can just be the + like it is on claude code ... claude code is just so
+ * clean though and people will be used to that feel, we want it to be cozy."
+ */
+.lc-control--bare {
+  border-color: transparent;
+  background: transparent;
+}
+
+.lc-control--bare:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--lc-hover-surface-strong);
+}
+
+/* The context ring, left of the route it belongs to. */
+.lc-composer__context {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--lc-space-2);
+}
+
 .lc-send {
   width: 30px;
   height: 30px;

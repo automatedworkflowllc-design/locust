@@ -45,7 +45,6 @@ import { queuedVerdict, requeuedTo } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
-import { ContextRing } from './components/ContextRing.js'
 import { memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
 import { createFrameBatcher } from './streamFrames.js'
 import { savableMissionId } from './savableConversations.js'
@@ -3614,19 +3613,23 @@ export default function App(): ReactElement {
                             shownCost === undefined ? '' : ` · ${running ? 'so far ' : ''}${shownCost}`
                           }`}
                       {/*
-                        * How full the context is, beside the cost it belongs
-                        * with. It sat on the composer bar as a bare 14px glyph
-                        * next to the swarm mark, and the two read as artifacts
-                        * rather than controls -- "seven items, four looks"
-                        * (design agent, 2026-09-10). It is a fact about THIS
+                        * The context ring is NOT here.
+                        *
+                        * It was, from 2026-09-10 -- "a fact about THIS
                         * conversation, and this line is where the
-                        * conversation's other facts are.
+                        * conversation's other facts are" (design agent), after
+                        * it had sat on the composer as a bare glyph beside the
+                        * swarm mark and read as an artifact rather than a
+                        * control. Colin, 2026-09-11: "theres no more
+                        * context/usage circle, we can just put it on the left
+                        * of the model picker."
+                        *
+                        * It is there now, and in ONE place: drawing it here as
+                        * well would put one fact in two registers. Beside the
+                        * route it is no longer loose on the row either -- it
+                        * belongs to the control it is about, which is what the
+                        * 2026-09-10 objection was really about.
                         */}
-                      {shownContext !== undefined && (
-                        <span className="lc-workroom__context">
-                          <ContextRing reading={shownContext} />
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -3884,6 +3887,7 @@ export default function App(): ReactElement {
             limitedRuntimes={limitedRuntimes}
               usageWindows={usageWindows}
             discoveryPhase={runtimeState.phase}
+            {...(shownContext === undefined ? {} : { context: shownContext })}
             running={running}
             cancelling={liveRun?.phase === 'cancelling'}
             activeRoute={liveRun?.data}

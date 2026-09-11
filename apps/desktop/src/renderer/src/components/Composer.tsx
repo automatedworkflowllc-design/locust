@@ -23,6 +23,8 @@ import {
 import { defaultEffort, modelLabelFor } from '../status.js'
 import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
+import { ContextRing } from './ContextRing.js'
+import type { ContextReading } from '../cost.js'
 import { Icon } from './Icon.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
@@ -110,6 +112,18 @@ export interface ComposerProps {
   readonly limitedRuntimes: ReadonlyMap<string, string>
   /** The latest still-allowed rate-limit reading per runtime, for the route chip's tooltip. */
   readonly usageWindows?: ReadonlyMap<string, string>
+  /**
+   * How full this conversation's context is, drawn left of the route.
+   *
+   * It lived here as a bare glyph beside the swarm mark, moved to the mission
+   * header on the design agent's read (2026-09-10) -- "a fact about THIS
+   * conversation, and that line is where the conversation's other facts are"
+   * -- and is back, at Colin's word on 2026-09-11: "theres no more
+   * context/usage circle, we can just put it on the left of the model
+   * picker." Left of the ROUTE, not loose on the row, which is the part that
+   * answers the original objection: it now belongs to the control it is about.
+   */
+  readonly context?: ContextReading
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
   readonly running: boolean
   readonly cancelling: boolean
@@ -197,6 +211,7 @@ export function Composer({
   runtimes,
   limitedRuntimes,
   usageWindows,
+  context,
   discoveryPhase,
   running,
   cancelling,
@@ -1049,13 +1064,19 @@ export function Composer({
               <button
                 type="button"
                 /*
-                 * Boxed like every other control on this row. It was the one
-                 * bare item in a row of chips, and the design agent's app-wide
-                 * read (2026-09-10) counted the row as "seven items, four
-                 * looks" -- the most-seen row in the app, and the most
-                 * visible clunk after the type.
+                 * A bare `+`, not a chip.
+                 *
+                 * It WAS bare, and the design agent's app-wide read
+                 * (2026-09-10) boxed it to stop the row being "seven items,
+                 * four looks". Colin, 2026-09-11, reversing that on purpose:
+                 * "the + for attachments probably doesnt need its own button,
+                 * it can just be the + like it is on claude code." He has the
+                 * final say and this is the reference the app follows. The
+                 * consistency argument was real; it is outranked by the one
+                 * that attaching a file is not a mode you switch, which is
+                 * what the other chips on this row are.
                  */
-                className="lc-control lc-control--boxed lc-control--icon"
+                className="lc-control lc-control--icon lc-control--bare"
                 aria-label="Attach files"
                 title="Attach a file — anywhere on this machine"
                 disabled={running || attaching}
@@ -1101,6 +1122,11 @@ export function Composer({
               </button>
             </div>
             <div className="lc-composer__group">
+              {context !== undefined && (
+                <span className="lc-composer__context">
+                  <ContextRing reading={context} />
+                </span>
+              )}
               <span className="lc-control__anchor" ref={pickerAnchor}>
                 {pickerOpen && (
                   <RoutePicker

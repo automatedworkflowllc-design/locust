@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.77.0 - 2026-09-11
+
+- **The context ring is back, beside the route it belongs to.** It had moved
+  to the mission header, where a run whose runtime reports no context window
+  left nothing at all — so it read as gone. It sits immediately left of the
+  model picker now, and in one place only.
+- **The attach `+` is a `+` again, not a chip.** The other controls on that
+  row are modes — permission, folder, route, effort — and a chip is the right
+  shape for something that shows what is currently set. Attaching a file sets
+  nothing.
+
 ## 0.76.0 - 2026-09-11
 
 - **"Build this plan" no longer sometimes starts a stranger.** Clicking it
