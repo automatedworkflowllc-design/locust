@@ -103,6 +103,8 @@ export function relayPrompt(input: {
   readonly sender: PeerRosterEntry
   readonly recipient: PeerRosterEntry
   readonly hop: number
+  /** The exchange's budget, so the brief can say where in it this reply is. */
+  readonly cap?: number
 }): string {
   const who = `${input.sender.name} (${input.sender.role})`
   const opening = input.hop <= 1
@@ -125,8 +127,47 @@ export function relayPrompt(input: {
     // teammate who asked, and the share block is how to reach them.
     noPersonHere(input.sender.name),
     'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
+    budgetSentence(input.hop, input.cap),
     'Do not start unrelated work.'
   ].join(' ')
+}
+
+/**
+ * Where this reply sits in the budget, said to the teammate spending it.
+ *
+ * MEASURED 2026-09-11, `relay-smoke`: Wren asks Booty for one word, Booty
+ * says it -- and the pair then acknowledged each other until the cap fired.
+ * Six relayed runs for a question with a one-word answer. The brief already
+ * says "if nothing more is needed, end with no share block", and every hop
+ * got that same sentence whether it was the first or the fifth.
+ *
+ * The host knows how much budget is left and the teammate does not. That is
+ * the same shape as everything else fixed today: the app holding a fact the
+ * reader needed. It is not a cure for politeness, but a model told it is on
+ * the last automatic reply has a reason to stop that "if nothing more is
+ * needed" does not give it.
+ *
+ * The last hop says the thing that is actually true and actually load-
+ * bearing: a share written HERE starts nothing. `decideRelay` refuses at the
+ * cap, so a teammate that writes one has written to a person who may not
+ * look for hours -- and it has no way to know that unless it is told.
+ */
+export function budgetSentence(hop: number, cap: number | undefined): string {
+  const budget = cap ?? MAX_RELAY_HOPS
+  const left = budget - hop
+  if (left <= 0) {
+    return (
+      'This is the LAST automatic reply in this exchange: anything you send back now waits for a person '
+      + 'rather than reaching them, so finish what you can say here.'
+    )
+  }
+  if (left === 1) {
+    return (
+      `This is automatic reply ${String(hop)} of ${String(budget)}. One more would be the last, so do not write back `
+      + 'unless it genuinely needs saying.'
+    )
+  }
+  return `This is automatic reply ${String(hop)} of ${String(budget)}.`
 }
 
 /**
@@ -597,7 +638,7 @@ export function createRelay(options: RelayOptions): Relay {
             hop: decision.hop,
             lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
           }
-          const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop })
+          const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap })
           const result = await startFor({ recipient, prompt, from: mission, origin, notice })
           if (result.kind === 'busy') {
             defer({

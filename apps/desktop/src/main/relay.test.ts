@@ -2,7 +2,7 @@ import type { WorkroomMessage } from '@teammate/mission-store'
 import { describe, expect, it } from 'vitest'
 
 import type { CodexMissionStartResponse, CodexMissionUpdate } from '../shared/ipc.js'
-import { MAX_RELAY_HOPS, createRelay, decideRelay, meetingPrompt, relayPrompt } from './relay.js'
+import { MAX_RELAY_HOPS, budgetSentence, createRelay, decideRelay, meetingPrompt, relayPrompt } from './relay.js'
 import type { RelayOptions, SharingMission } from './relay.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
@@ -690,5 +690,58 @@ describe('a meeting: one asks several, and the next turn waits for all of them',
   it('names everyone in the minutes', () => {
     expect(meetingPrompt({ repliers: ['Booty', 'Atlas', 'Juno'], silent: [] })).toContain('Booty, Atlas and Juno replied')
     expect(meetingPrompt({ repliers: ['Booty'], silent: ['Atlas'] })).toContain('Atlas finished without replying')
+  })
+})
+
+/*
+ * MEASURED 2026-09-11, `relay-smoke`: Wren asks Booty for one word, Booty says
+ * it -- and the pair acknowledged each other until the cap fired. Six relayed
+ * runs for a question with a one-word answer.
+ *
+ * The brief already said "if nothing more is needed, end with no share block",
+ * and every hop got that same sentence whether it was the first or the fifth.
+ * The host knows how much budget is left; the teammate did not. Same shape as
+ * everything else fixed today: the app holding a fact the reader needed.
+ */
+describe('telling a teammate where in the budget it is', () => {
+  it('names the reply and the budget, plainly, in the middle of an exchange', () => {
+    expect(budgetSentence(1, 6)).toBe('This is automatic reply 1 of 6.')
+    expect(budgetSentence(3, 6)).toBe('This is automatic reply 3 of 6.')
+  })
+
+  it('warns on the one before the last, where the warning can still change something', () => {
+    expect(budgetSentence(5, 6)).toContain('One more would be the last')
+    expect(budgetSentence(5, 6)).toContain('5 of 6')
+  })
+
+  it('says what is actually true on the last: a reply written here reaches nobody', () => {
+    // `decideRelay` refuses at the cap, so a share written on the last hop
+    // starts nothing -- it waits for a person who may not look for hours, and
+    // the teammate has no way to know that unless it is told.
+    const last = budgetSentence(6, 6)
+    expect(last).toContain('LAST automatic reply')
+    expect(last).toContain('waits for a person')
+  })
+
+  it('treats anything past the cap as the last, never as a negative count', () => {
+    expect(budgetSentence(9, 6)).toContain('LAST automatic reply')
+  })
+
+  it('falls back to the default budget when none was given', () => {
+    expect(budgetSentence(1, undefined)).toBe(`This is automatic reply 1 of ${String(MAX_RELAY_HOPS)}.`)
+  })
+
+  it('handles a budget of one, where the first reply is also the last', () => {
+    expect(budgetSentence(1, 1)).toContain('LAST automatic reply')
+  })
+
+  it('is in the brief a relayed run is actually started with', () => {
+    const brief = relayPrompt({
+      sender: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' },
+      recipient: { teammateId: 'tm_booty', name: 'Booty', role: 'Custom' },
+      hop: 5,
+      cap: 6
+    })
+    expect(brief).toContain('One more would be the last')
   })
 })

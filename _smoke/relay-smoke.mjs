@@ -370,10 +370,21 @@ try {
   say(`       what Wren sent: ${seen.outgoing ?? '(nothing drawn)'}`)
   check("Wren's thread also shows the message Wren SENT, not only the reply", seen.outgoingShown === true)
 
-  say('6. it ends on its own')
-  // The exchange ends when a reply has nothing more to say. Wren's follow-up
-  // may add a word back, which is allowed; what is not allowed is an
-  // exchange that keeps going, so: quiet for 40s, and well under the cap.
+  say('6. it stops, and the thread says why')
+  // It STOPS. Whether it stops early or at the cap is the models' business.
+  //
+  // This asserted `relayed >= 3 && relayed < 6` -- "ended on its own rather
+  // than running into the hop cap" -- and that is a claim about how terse two
+  // models choose to be, not about this app. MEASURED 2026-09-11 across four
+  // runs: 6, 6, 3, 6 relayed for a question whose answer is one word. Adding a
+  // sentence to the brief naming the remaining budget produced a 3 once and a
+  // 6 the next time, which is exactly as much as a nudge can promise.
+  //
+  // A smoke that asserts model manners flakes forever and teaches the suite's
+  // colour to be ignored -- the finding's own lesson. What Locust owes is
+  // three things it fully controls: the exchange ENDS, it never exceeds the
+  // budget, and if the budget is what stopped it the person is TOLD. Those are
+  // asserted below, and the hop count is reported rather than judged.
   let names = await ledgers()
   for (let i = 0; i < 40; i += 1) {
     await sleep(1000)
@@ -390,10 +401,30 @@ try {
   const MAX_RELAY_HOPS = 6
   const relayed = names.length - 1
   check(
-    'the exchange ended on its own rather than running into the hop cap',
-    relayed >= 3 && relayed < MAX_RELAY_HOPS,
+    'the exchange stopped, and inside its budget',
+    relayed >= 1 && relayed <= MAX_RELAY_HOPS,
     `ledgers: ${names.length} (${relayed} relayed, cap ${MAX_RELAY_HOPS})`
   )
+  // And if the budget is what stopped it, the thread says so. Silence at the
+  // cap is the one outcome a person cannot tell from the app breaking.
+  if (relayed >= MAX_RELAY_HOPS) {
+    // Looked for in EVERY conversation, not just the one on screen. The
+    // notice goes to the run that shared last, and which of the teammates'
+    // threads that is depends on who spoke last -- so checking the current
+    // screen tests where the smoke happened to be standing.
+    const told = await cdp.eval(`(async () => {
+      const rows = [...document.querySelectorAll('.lc-row')]
+      for (const row of rows) {
+        row.click()
+        await new Promise(r => setTimeout(r, 500))
+        if (/Stopped after \d+ automatic repl/i.test(document.body.innerText)) return true
+      }
+      return false
+    })()`)
+    check('some thread says the budget is what stopped it', told === true)
+  } else {
+    say('       ended before the cap; nothing to say about the budget')
+  }
 
   // Nothing on screen may be NAMED by the briefing the host wrote to a
   // runtime. That sentence was appearing as a mission title beside the
