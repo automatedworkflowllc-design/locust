@@ -1651,6 +1651,57 @@ textarea {
 /* The room's name, which is also the control that changes it. A room made
    from an ask starts as `Untitled room`, so this is not decoration -- it is
    the other half of not charging a name up front. */
+/*
+ * The room's chrome bar: a way out, the room, and the one destructive control.
+ *
+ * A divider after the back control, because it is navigation and the rest is
+ * this room -- without it the boxed button read as the first word of the
+ * title. The heading is a two-line stack: the name, and the members under it
+ * at caption size, which is the relationship they actually have.
+ */
+.lc-room__header {
+  gap: var(--lc-space-4);
+}
+
+/*
+ * Hard left, where a way out belongs.
+ *
+ * `.lc-ghostbutton` carries `margin-left: auto` in its BASE rule -- a layout
+ * decision inside a look -- so this button floated into the middle of the bar
+ * and dragged the heading with it: 157px of nothing to its left at 1280, and
+ * a different 133px at 900, which is why it read as a clump rather than as
+ * anything placed (Colin, 2026-09-11: "brutal"). The auto margin is right for
+ * the ghost buttons that sit at the END of a row, which is every other one,
+ * so it is overridden here rather than removed there.
+ */
+.lc-room__header .lc-room__back {
+  flex: none;
+  /* Two classes on purpose: `.lc-ghostbutton` is declared far later in this
+     file, so a single-class override loses the cascade and changes nothing --
+     which is exactly what happened on the first attempt. */
+  margin-left: 0;
+}
+
+.lc-room__heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding-left: var(--lc-space-4);
+  border-left: 1px solid var(--lc-border-hairline);
+}
+
+/* Who is in it, under its name. One line: a room of eight is a tooltip's
+   problem, not a reason for the chrome bar to grow. */
+.lc-room__members {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .lc-room__name {
   border: 0;
   padding: 0;
@@ -1659,6 +1710,11 @@ textarea {
   color: inherit;
   cursor: pointer;
   text-align: left;
+  /* The name can be long and the bar cannot grow. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lc-room__name:hover:not(:disabled) {
@@ -2376,6 +2432,28 @@ textarea {
 .lc-roomsaid__at {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
+}
+
+/*
+ * A turn in progress: the speaker's name, a live marker, and what is coming.
+ *
+ * Lime, the same colour a working teammate carries in the roster, because it
+ * is the same fact. Quiet: nothing here needs a person, so nothing here is
+ * amber.
+ */
+.lc-roomsaid__now {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.02em;
+  color: var(--lc-text-muted);
+}
+
+.lc-roomsaid__pending {
+  margin: 0;
+  color: var(--lc-text-muted);
+  font-style: italic;
 }
 
 /* An absence. Informational: nothing failed, and the whole reason it is drawn

@@ -216,7 +216,10 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     const shot = await send('Page.captureScreenshot', { format: 'png' })
     const file = `${String(step).padStart(2, '0')}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
     if (shot?.result?.data) await writeFile(join(out, `${file}.png`), Buffer.from(shot.result.data, 'base64'))
-    await writeFile(join(out, `${file}.txt`), String(text ?? ''), 'utf8')
+    // The note in full, ahead of the screen's text. SESSION.md's table cuts it
+    // at 220 characters and it existed nowhere else, so a measurement whose
+    // answer was in the tail cost a second run to read (2026-09-11).
+    await writeFile(join(out, `${file}.txt`), `${String(note ?? '')}\n\n---\n\n${String(text ?? '')}`, 'utf8')
     const errors = consoleErrors.splice(0)
     // A COUNT of renderer errors is not actionable. This drive reported "2"
     // on a step and the two sentences existed nowhere on disk, so the only

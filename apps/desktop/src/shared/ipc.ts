@@ -1226,6 +1226,31 @@ export type CodexMissionUpdate =
       readonly message: string
     }
   /**
+   * The host has decided on a reply and is starting it.
+   *
+   * Sent BEFORE the runtime exists, and paired with `relay-start-settled`.
+   * `mission-started` cannot carry this: it needs a run id, which means
+   * waiting for a cold runtime to boot -- and for those seconds the window
+   * was told nothing at all, so every row read idle and a room in the middle
+   * of an argument looked finished (MEASURED 2026-09-11).
+   *
+   * One per teammate at a time, because a teammate runs one mission at a
+   * time; `teammateId` is therefore the whole key.
+   */
+  | {
+      readonly kind: 'relay-starting'
+      readonly teammateId: string
+      readonly name: string
+      /** The mission whose message this will answer, so a room can place the turn. */
+      readonly answering: string
+      readonly hop: number
+    }
+  /** That start finished, however it finished. The placeholder goes. */
+  | {
+      readonly kind: 'relay-start-settled'
+      readonly teammateId: string
+    }
+  /**
    * The host started a run this renderer did not ask for: a teammate
    * replying on their own. Carries everything a start response would, so
    * the renderer adopts it exactly as it adopts its own.
@@ -1247,6 +1272,21 @@ export type CodexMissionUpdate =
         | { readonly kind: 'relay'; readonly hop: number }
         | { readonly kind: 'routine'; readonly routineId: string; readonly step: number }
         | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
+    }
+  /**
+   * A post was written to a room, before anybody has been asked.
+   *
+   * The post has existed before the first run since the queue landed, but
+   * nothing SAID so: the window learned about it either from the first
+   * `mission-started` -- which waits for a cold runtime to boot -- or from
+   * the post's own response, which lands after every member has been tried.
+   * So a person pressed Post and watched "Nothing posted yet" with their own
+   * words still in the box (Colin, 2026-09-11).
+   */
+  | {
+      readonly kind: 'room-posted'
+      readonly roomId: string
+      readonly postId: string
     }
   /**
    * A room's board moved because a teammate's reply moved it. The window

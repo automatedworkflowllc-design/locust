@@ -53,6 +53,24 @@ export type RoomExchangeItem =
       readonly teammateId: string
       readonly name: string
     }
+  /**
+   * A turn that is happening right now.
+   *
+   * Two things look the same to a reader and so are one item: a run that is
+   * going and has not spoken yet, and a hop the host has decided on but not
+   * started. The second is the one that made a room look finished mid-argument
+   * -- `mission-started` goes out only once the runtime is up, and a cold
+   * start is long enough to read as the end of the conversation (MEASURED
+   * 2026-09-11: the probe's own quiet window had to go from 4s to 20s).
+   */
+  | {
+      readonly kind: 'replying'
+      readonly key: string
+      readonly teammateId: string
+      readonly name: string
+      /** Absent while the run is still being started; there is no mission yet. */
+      readonly missionId: string | undefined
+    }
 
 export interface RoomExchangeFoot {
   readonly hops: number
@@ -79,6 +97,13 @@ export interface PostForExchange {
   readonly waiting?: readonly string[]
 }
 
+/** A reply the host has decided on and is starting: no mission of its own yet. */
+export interface StartingReply {
+  readonly teammateId: string
+  /** The mission whose message it answers, which is how a room claims it. */
+  readonly answering: string
+}
+
 export interface SequenceInput {
   readonly post: PostForExchange
   /** Every mission the window knows about, by id. */
@@ -97,21 +122,32 @@ export interface SequenceInput {
   readonly hops: number
   readonly cap: number
   readonly cost: RunCost | undefined
+  /** Replies being started right now, anywhere in the app. */
+  readonly starting?: readonly StartingReply[]
 }
 
 /**
  * Whether this post is a conversation at all.
  *
  * More missions than the post itself started means somebody replied to
- * somebody: the post asked N members and produced more than N runs.
+ * somebody: the post asked N members and produced more than N runs. A reply
+ * the host is starting counts too -- it is the answer to a message that has
+ * already been sent, and waiting for the process to exist before saying so is
+ * exactly the silence this draws through.
  */
-export function postBecameAnExchange(post: PostForExchange, reached: readonly string[]): boolean {
-  return reached.length > Object.keys(post.missions).length
+export function postBecameAnExchange(
+  post: PostForExchange,
+  reached: readonly string[],
+  starting: readonly StartingReply[] = []
+): boolean {
+  return reached.length > Object.keys(post.missions).length || starting.length > 0
 }
 
 export function sequenceOfPost(input: SequenceInput): RoomExchange | undefined {
   const { post, reached } = input
-  if (!postBecameAnExchange(post, reached)) return undefined
+  // Only replies to a mission THIS post reached belong under this post.
+  const starting = (input.starting ?? []).filter((entry) => reached.includes(entry.answering))
+  if (!postBecameAnExchange(post, reached, starting)) return undefined
 
   const ownerOf = new Map<string, string>()
   for (const [teammateId, missionId] of Object.entries(post.missions)) ownerOf.set(missionId, teammateId)
@@ -136,8 +172,19 @@ export function sequenceOfPost(input: SequenceInput): RoomExchange | undefined {
     if (text === undefined || text.trim().length === 0) {
       // Only a FINISHED run that said nothing is a silence. One still going
       // has simply not spoken yet, and drawing it as silent would be a claim
-      // about a run that may be about to answer.
-      if (!input.finishedOf(entry.missionId)) continue
+      // about a run that may be about to answer -- it is drawn as the turn it
+      // is, in progress, which is also what the drawing shows.
+      if (!input.finishedOf(entry.missionId)) {
+        items.push({
+          kind: 'replying',
+          key: `replying_${entry.missionId}`,
+          teammateId,
+          name,
+          missionId: entry.missionId
+        })
+        lastSpeaker = undefined
+        continue
+      }
       items.push({
         kind: 'silent',
         key: `silent_${entry.missionId}`,
@@ -165,6 +212,22 @@ export function sequenceOfPost(input: SequenceInput): RoomExchange | undefined {
     lastSpeaker = teammateId
   }
 
+  // A hop with no run yet. Skipped when that teammate is already drawn as
+  // replying: the update that says a run exists and the one that says it is
+  // being started overlap by a frame, and one person cannot answer twice.
+  const alreadyReplying = new Set(items.flatMap((item) => (item.kind === 'replying' ? [item.teammateId] : [])))
+  for (const entry of starting) {
+    if (alreadyReplying.has(entry.teammateId)) continue
+    alreadyReplying.add(entry.teammateId)
+    items.push({
+      kind: 'replying',
+      key: `replying_${entry.teammateId}_${entry.answering}`,
+      teammateId: entry.teammateId,
+      name: input.nameOf(entry.teammateId),
+      missionId: undefined
+    })
+  }
+
   for (const teammateId of post.waiting ?? []) {
     items.push({
       kind: 'waiting',
@@ -180,7 +243,9 @@ export function sequenceOfPost(input: SequenceInput): RoomExchange | undefined {
       hops: input.hops,
       cap: input.cap,
       cost: input.cost,
-      ending: input.hops >= input.cap ? 'out-of-replies' : undefined
+      // Still going is not an ending, whatever the budget says: a hop in
+      // flight is about to be the reply the reader is waiting for.
+      ending: input.hops >= input.cap && items.every((item) => item.kind !== 'replying') ? 'out-of-replies' : undefined
     }
   }
 }

@@ -1988,6 +1988,10 @@ ${taskSection({
       } catch (error) {
         return roomRejected(error instanceof Error ? error.message : 'The post could not be recorded.')
       }
+      // Said the moment it is on disk. Everything below this line can take as
+      // long as a cold runtime needs; the person's own words are already on
+      // screen where they put them.
+      sendToWindow({ kind: 'room-posted', roomId, postId: post.postId })
 
       for (const teammateId of room.teammateIds) {
         const attempt = await startRoomMember(room, teammateId, text, roster)

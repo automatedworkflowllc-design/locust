@@ -311,6 +311,22 @@ export function createRelay(options: RelayOptions): Relay {
         }. Message ${recipient.self.name} once on the route they should keep.`
       )
     }
+    /*
+     * Say it is coming before it exists.
+     *
+     * A cold runtime takes seconds to boot, and `mission-started` waits for a
+     * run id -- so for those seconds the window knew nothing and the room the
+     * argument was happening in read as finished. The pair is emitted around
+     * the start whatever it returns, including a throw.
+     */
+    options.notify({
+      kind: 'relay-starting',
+      teammateId: recipient.self.teammateId,
+      name: recipient.self.name,
+      answering: from.missionId,
+      hop: input.origin.hop
+    })
+    const settled = (): void => options.notify({ kind: 'relay-start-settled', teammateId: recipient.self.teammateId })
     let response: CodexMissionStartResponse
     try {
       response = await options.start({
@@ -323,9 +339,11 @@ export function createRelay(options: RelayOptions): Relay {
         relay: input.origin
       })
     } catch {
+      settled()
       input.notice(`${recipient.self.name} could not reply on their own: the run could not be started.`)
       return { kind: 'refused' }
     }
+    settled()
     if (!response.ok) {
       // Mid-run is not a refusal. A teammate runs one mission at a time, so
       // answering while they work is impossible and answering when they

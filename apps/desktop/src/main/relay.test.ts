@@ -51,6 +51,8 @@ function harness(options: {
   booty?: MissionPeerContext
   peerContextFor?: RelayOptions['peerContextFor']
   stillWaiting?: (teammateId: string) => Promise<boolean>
+  /** The start path failing outright, not answering with an error. */
+  throwOnStart?: boolean
 } = {}) {
   const starts: Parameters<RelayOptions['start']>[0][] = []
   const owners: [string, string][] = []
@@ -71,6 +73,7 @@ function harness(options: {
       id === BOOTY.teammateId ? (options.booty ?? bootyPeer) : id === WREN.teammateId ? wrenPeer : undefined),
     start: async (input) => {
       starts.push(input)
+      if (options.throwOnStart === true) throw new Error('the runtime is not there')
       const byAttempt = options.startResults?.[starts.length - 1]
       return (
         byAttempt ?? options.startResult ?? {
@@ -432,6 +435,46 @@ describe('relaying a share', () => {
       await relay.onRunEnded(ended('mission_2'))
       expect(said(notices).at(-1)).toContain('Booty finished without writing back')
       expect(notices.at(-1)).toMatchObject({ runId: 'run_wren1', missionId: 'mission_wren1' })
+    })
+  })
+
+  /*
+   * `mission-started` needs a run id, so it cannot go out until the runtime
+   * is up -- and a cold Cursor Agent takes long enough that every row read
+   * idle and a room in the middle of an argument looked finished (MEASURED
+   * 2026-09-11). This pair is what the window has in the meantime.
+   */
+  describe('saying a hop is coming before it exists', () => {
+    it('names the teammate and what they are answering, before the start', async () => {
+      const { relay, notices } = harness()
+      await relay.onShared(sharing(), [message(BOOTY)])
+      const said = notices.find((update) => update.kind === 'relay-starting')
+      expect(said).toMatchObject({
+        kind: 'relay-starting',
+        teammateId: 'tm_booty',
+        name: 'Booty',
+        answering: 'mission_wren1',
+        hop: 1
+      })
+      // Before, so the window is never behind the host.
+      expect(notices.indexOf(said!)).toBeLessThan(
+        notices.findIndex((update) => update.kind === 'mission-started')
+      )
+    })
+
+    it('clears it however the start ended', async () => {
+      for (const result of [undefined, BUSY, { ok: false, error: { code: 'RUNTIME_START_FAILED', message: 'no' } } as const]) {
+        const { relay, notices } = harness(result === undefined ? {} : { startResult: result })
+        await relay.onShared(sharing(), [message(BOOTY)])
+        expect(notices.filter((update) => update.kind === 'relay-starting')).toHaveLength(1)
+        expect(notices.filter((update) => update.kind === 'relay-start-settled')).toHaveLength(1)
+      }
+    })
+
+    it('clears it when the start throws, so a row is never stuck working', async () => {
+      const { relay, notices } = harness({ throwOnStart: true })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      expect(notices.filter((update) => update.kind === 'relay-start-settled')).toHaveLength(1)
     })
   })
 

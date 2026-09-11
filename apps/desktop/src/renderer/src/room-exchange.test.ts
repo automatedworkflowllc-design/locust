@@ -62,6 +62,7 @@ function input(overrides: Partial<SequenceInput> = {}): SequenceInput {
     hops: 4,
     cap: 6,
     cost: undefined,
+    starting: [],
     ...overrides
   }
 }
@@ -120,9 +121,10 @@ describe('the sequence', () => {
     expect(found.items.indexOf(silent!)).toBe(2)
   })
 
-  it('does not call a run that is still going silent', () => {
+  it('draws a run that is still going as the turn it is, never as a silence', () => {
     // It has not spoken YET. Drawing it as silent claims something about a
-    // run that may be about to answer.
+    // run that may be about to answer; drawing nothing at all is what made a
+    // room mid-argument read as finished.
     const found = sequenceOfPost(
       input({
         textOf: (id) => (id === 'm_gem2' ? undefined : ARGUMENT[id as keyof typeof ARGUMENT]?.text),
@@ -130,12 +132,61 @@ describe('the sequence', () => {
       })
     )!
     expect(found.items.some((item) => item.kind === 'silent')).toBe(false)
-    expect(found.items).toHaveLength(3)
+    expect(found.items.at(-1)).toMatchObject({ kind: 'replying', name: 'Gem', missionId: 'm_gem2' })
   })
 
   it('lists a member waiting for a slot, so the room does not look finished', () => {
     const found = sequenceOfPost(input({ post: { ...POST, waiting: ['tm_gem'] } }))!
     expect(found.items.at(-1)).toMatchObject({ kind: 'waiting', name: 'Gem' })
+  })
+})
+
+/*
+ * Between the host deciding on a hop and the runtime existing, the window is
+ * told nothing -- `mission-started` needs a run id, and a cold start is long
+ * enough to read as the end of the argument (MEASURED 2026-09-11: the room
+ * probe's quiet window had to go from 4s to 20s to stop screenshotting a room
+ * mid-hop). `relay-starting` is that seam, and this is what a room does with
+ * it.
+ */
+describe('a reply the host is still starting', () => {
+  const STARTING = [{ teammateId: 'tm_wren', answering: 'm_gem2' }]
+
+  it('is a turn in the sequence, with no mission of its own yet', () => {
+    const found = sequenceOfPost(input({ starting: STARTING }))!
+    expect(found.items.at(-1)).toMatchObject({ kind: 'replying', name: 'Wren', missionId: undefined })
+  })
+
+  it('makes a post a conversation on its own, before the second run exists', () => {
+    // Two members, two answers, nobody has replied yet -- but a reply IS
+    // being started, so the grid is already the wrong claim.
+    const found = sequenceOfPost(input({ reached: ['m_wren1', 'm_gem1'], starting: [{ teammateId: 'tm_wren', answering: 'm_gem1' }] }))
+    expect(found?.items.at(-1)).toMatchObject({ kind: 'replying', name: 'Wren' })
+  })
+
+  it('belongs to the post whose conversation it answers, and no other', () => {
+    expect(sequenceOfPost(input({ starting: [{ teammateId: 'tm_wren', answering: 'm_elsewhere' }] }))!.items
+      .some((item) => item.kind === 'replying')).toBe(false)
+  })
+
+  it('is not drawn twice when the run it becomes has already been announced', () => {
+    // `relay-starting` and `mission-started` overlap by a frame. One person
+    // cannot answer twice.
+    const found = sequenceOfPost(
+      input({
+        textOf: (id) => (id === 'm_wren2' ? undefined : ARGUMENT[id as keyof typeof ARGUMENT]?.text),
+        finishedOf: (id) => id !== 'm_wren2',
+        starting: [{ teammateId: 'tm_wren', answering: 'm_gem1' }]
+      })
+    )!
+    expect(found.items.filter((item) => item.kind === 'replying')).toHaveLength(1)
+  })
+
+  it('is not an ending, even with the budget spent', () => {
+    // The reply the reader is waiting for is in flight. Telling them to post
+    // again would be wrong twice: it is not over, and it is not their turn.
+    expect(sequenceOfPost(input({ hops: 6, cap: 6, starting: STARTING }))!.foot.ending).toBeUndefined()
+    expect(sequenceOfPost(input({ hops: 6, cap: 6 }))!.foot.ending).toBe('out-of-replies')
   })
 })
 

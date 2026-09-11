@@ -97,7 +97,7 @@ import {
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { sequenceOfPost } from './roomExchange.js'
-import type { RoomExchange } from './roomExchange.js'
+import type { RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
@@ -243,8 +243,11 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   }
   // A host-started run is adopted by the listener, never applied to a run.
   if (update.kind === 'mission-started') return live
+  // A hop being started belongs to a teammate, not to any one run.
+  if (update.kind === 'relay-starting' || update.kind === 'relay-start-settled') return live
   // A room's board moving is the room's business, not this run's.
   if (update.kind === 'room-changed') return live
+  if (update.kind === 'room-posted') return live
   // Memory moving is the Memory screen's business, not this run's.
   if (update.kind === 'memory-changed') return live
   // A scheduled routine that would not start has no run to belong to.
@@ -715,6 +718,15 @@ export default function App(): ReactElement {
   }
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
+  /**
+   * Replies the host has decided on and is still starting, by teammate.
+   *
+   * The seconds between deciding on a hop and the runtime existing used to be
+   * silent: `mission-started` needs a run id, so a cold start left every row
+   * idle and a room mid-argument looked finished. One entry per teammate,
+   * because a teammate runs one mission at a time.
+   */
+  const [relayStarting, setRelayStarting] = useState<Readonly<Record<string, StartingReply>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
   const [routines, setRoutines] = useState<readonly PublicRoutine[]>([])
   /** Rooms: a named set of teammates a person writes to at once (vision #2). */
@@ -1262,6 +1274,10 @@ export default function App(): ReactElement {
         setRecentlyReceived((current) => [...current.filter((id) => id !== to), to])
         setTimeout(() => setRecentlyReceived((current) => current.filter((id) => id !== to)), RECEIVED_GLANCE_MS)
       }
+      if (update.kind === 'room-posted') {
+        refreshRooms()
+        return
+      }
       if (update.kind === 'room-changed') {
         // A teammate's reply moved a board. Re-read the rooms so the screen
         // shows the board as the host now holds it, and keep the host's one
@@ -1293,6 +1309,22 @@ export default function App(): ReactElement {
       }
       if (update.kind === 'routine-recovery-changed') {
         void reloadRoutines()
+        return
+      }
+      if (update.kind === 'relay-starting') {
+        setRelayStarting((current) => ({
+          ...current,
+          [update.teammateId]: { teammateId: update.teammateId, answering: update.answering }
+        }))
+        return
+      }
+      if (update.kind === 'relay-start-settled') {
+        setRelayStarting((current) => {
+          if (current[update.teammateId] === undefined) return current
+          const next = { ...current }
+          delete next[update.teammateId]
+          return next
+        })
         return
       }
       if (update.kind === 'mission-started') {
@@ -1785,7 +1817,8 @@ export default function App(): ReactElement {
       laterPostAt,
       hops: whole.hops,
       cap: relayHopCap,
-      cost: whole.cost
+      cost: whole.cost,
+      starting: Object.values(relayStarting)
     })
   }
 
@@ -3111,6 +3144,7 @@ export default function App(): ReactElement {
           }}
           pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
           liveActivity={liveActivityByOwner}
+          starting={Object.keys(relayStarting)}
           recentlyDone={recentlyDone}
           recentlyReceived={recentlyReceived}
           onSelectTeammate={selectTeammate}

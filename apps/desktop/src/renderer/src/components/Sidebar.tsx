@@ -136,6 +136,7 @@ export function Sidebar({
   onTeammateMenu,
   pendingApprovals,
   liveActivity,
+  starting,
   recentlyDone,
   recentlyReceived,
   onSelectTeammate,
@@ -171,6 +172,8 @@ export function Sidebar({
   readonly pendingApprovals: Readonly<Record<string, number>>
   /** What each teammate's live run is doing, by teammate id; absent means no live run. */
   readonly liveActivity: Readonly<Record<string, LiveActivity>>
+  /** Teammates whose automatic reply the host is starting but has not started yet. */
+  readonly starting: readonly string[]
   /** Teammates whose mission just finished, or who just received a message. */
   readonly recentlyDone: readonly string[]
   readonly recentlyReceived: readonly string[]
@@ -393,7 +396,11 @@ export function Sidebar({
               ? undefined
               : runtimes.find((entry) => entry.id === theirRuntime),
             anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-            hasRunningMission: owned.some((mission) => mission.phase === 'running'),
+            // A hop the host is still starting counts as working: the row
+            // used to go idle for as long as a cold runtime takes to boot,
+            // which reads as the teammate having stopped.
+            hasRunningMission:
+              owned.some((mission) => mission.phase === 'running') || starting.includes(teammate.teammateId),
             pendingApprovals: pendingApprovals[teammate.teammateId] ?? 0,
             roleLabel: roleLabelOf(teammate),
             ...(liveActivity[teammate.teammateId] === undefined ? {} : { liveActivity: liveActivity[teammate.teammateId] }),
@@ -589,7 +596,8 @@ export function Sidebar({
           const status = teammateStatusView({
             runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
             anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-            hasRunningMission: theirs.some((mission) => mission.phase === 'running'),
+            hasRunningMission:
+              theirs.some((mission) => mission.phase === 'running') || starting.includes(open.teammateId),
             pendingApprovals: pendingApprovals[open.teammateId] ?? 0,
             roleLabel: roleLabelOf(open),
             ...(liveActivity[open.teammateId] === undefined ? {} : { liveActivity: liveActivity[open.teammateId] }),

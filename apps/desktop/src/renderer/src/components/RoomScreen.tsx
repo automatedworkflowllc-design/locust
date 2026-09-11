@@ -436,15 +436,28 @@ export function RoomScreen({
 
   const post = async (): Promise<void> => {
     if (room === undefined || draftText.trim().length === 0) return
+    const sending = draftText
     setFormError(undefined)
     setBusy(true)
-    const error = await onPost(room.roomId, draftText)
+    /*
+     * The box empties NOW, not when every member has been asked.
+     *
+     * Asking a room is one runtime start per member and each can be a cold
+     * boot, so the response is seconds away -- and until it came, a person's
+     * own sentence sat under their cursor with "Posting..." beneath it,
+     * reading as a message that had not gone (Colin, 2026-09-11). The post is
+     * on disk before the first member is asked, and the host now says so; the
+     * only thing this has to get right is putting the words back if it turns
+     * out they never landed.
+     */
+    setDraftText('')
+    const error = await onPost(room.roomId, sending)
     setBusy(false)
     if (error !== undefined) {
       setFormError(error)
-      return
+      // Theirs to try again with, in the box they typed it in.
+      setDraftText((current) => (current.length === 0 ? sending : current))
     }
-    setDraftText('')
   }
 
   if (room === undefined) {
@@ -551,12 +564,24 @@ export function RoomScreen({
 
   return (
     <div className="lc-screen lc-room">
-      <div className="lc-screen__header">
+      {/*
+        * Back, then the room, then the one destructive thing.
+        *
+        * These three used to be three peers on one row with one gap between
+        * them, so a boxed button, a title and a mono list of names read as a
+        * single clump of text in the top-left corner -- Colin, 2026-09-11:
+        * "the rooms button and text clump at the top is brutal." They are not
+        * peers. The room's name is the heading and its members belong TO it,
+        * a line under it, the way a mission's route sits under its title;
+        * leaving is navigation and sits apart from both.
+        */}
+      <div className="lc-screen__header lc-room__header">
         {/* A way back, pointing back: the only chevron in the icon set points
           * forward, and it read as "go deeper" on the way out. */}
-        <button type="button" className="lc-ghostbutton" onClick={() => onSelectRoom(undefined)} title="All rooms">
+        <button type="button" className="lc-ghostbutton lc-room__back" onClick={() => onSelectRoom(undefined)} title="All rooms">
           ← Rooms
         </button>
+        <span className="lc-room__heading">
         {/*
           * The name, which is also where it is changed.
           *
@@ -597,8 +622,9 @@ export function RoomScreen({
             {room.name}
           </button>
         )}
-        <span className="lc-screen__meta lc-mono">
-          {members.filter((entry) => entry !== undefined).map((entry) => entry!.name).join(' · ')}
+          <span className="lc-room__members lc-mono">
+            {members.filter((entry) => entry !== undefined).map((entry) => entry!.name).join(' · ')}
+          </span>
         </span>
         <button type="button" className="lc-ghostbutton lc-room__remove" onClick={() => onRemoveRoom(room.roomId)} title="Remove this room. The conversations it started stay.">
           Remove room
@@ -826,6 +852,32 @@ export function RoomScreen({
                               </span>
                             )}
                             <RoomAnswerText text={item.text} />
+                          </div>
+                        </div>
+                      )
+                    }
+                    /*
+                      * A turn happening right now.
+                      *
+                      * The drawing's `Wren  writing now / Wren is writing...`
+                      * -- a live turn, in its place in the argument, with the
+                      * face beside it like any other. This is the line that
+                      * keeps a room from reading as finished while the host is
+                      * still booting a runtime.
+                      */
+                    if (item.kind === 'replying') {
+                      return (
+                        <div key={item.key} className="lc-roomsaid__turn" data-replying={item.teammateId}>
+                          <span className="lc-roomsaid__gutter">{face}</span>
+                          <div className="lc-roomsaid__body">
+                            <span className="lc-roomsaid__who">
+                              <span className="lc-roomsaid__name">{item.name}</span>
+                              <span className="lc-roomsaid__now lc-mono">
+                                <span className="lc-dot lc-tone-lime" />
+                                replying now
+                              </span>
+                            </span>
+                            <p className="lc-roomsaid__pending">{item.name} is replying…</p>
                           </div>
                         </div>
                       )
