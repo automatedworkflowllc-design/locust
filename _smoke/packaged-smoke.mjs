@@ -16,10 +16,11 @@ import { spawn } from 'node:child_process'
 import { access, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { portFor } from './ports.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const EXE = join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
-const PORT = 9230
+const PORT = portFor(import.meta.url)
 const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
 const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
 

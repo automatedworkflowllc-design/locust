@@ -15,11 +15,12 @@ import { spawn, execFile } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { portFor } from './ports.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
-const PORT = 9238
+const PORT = portFor(import.meta.url)
 const FREE_MODEL = 'opencode/muse-spark-1.3-contributor-free'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const say = (line) => console.error(line)

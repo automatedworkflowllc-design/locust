@@ -12,10 +12,11 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { portFor } from './ports.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const PORT = 9225
+const PORT = portFor(import.meta.url)
 const DAY = 24 * 60 * 60 * 1000
 
 let failures = 0

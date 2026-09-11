@@ -14,6 +14,7 @@
 // re-running it.
 
 import { spawn } from 'node:child_process'
+import { SMOKE_PORTS, assertPortsAreUnique, waitForPortFree } from './ports.mjs'
 import { readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -42,8 +43,28 @@ say(`running ${String(chosen.length)} of ${String(all.length)} smokes`)
 say('')
 
 const results = []
+/*
+ * Two smokes on one port was most of this suite's flaky tail.
+ *
+ * MEASURED 2026-09-11: eleven port numbers were used twice, and because the
+ * sweep runs alphabetically several collided at close range -- schedule and
+ * steering both on 9299, two apart; raw-conversation and relay both on 9233,
+ * one apart. Each smoke launches an ELECTRON app and this loop waits only for
+ * the node process that spawned it, so an app still shutting down still holds
+ * its port and the next smoke can attach its CDP client to the wrong window.
+ *
+ * Unique ports stop that by design. This stops what design cannot: a smoke
+ * whose app outlived it, an orphan from an earlier failure, a re-run started
+ * too soon.
+ */
+assertPortsAreUnique()
+
 for (const name of chosen) {
   const started = Date.now()
+  const port = SMOKE_PORTS[name]
+  if (port !== undefined && !(await waitForPortFree(port))) {
+    say(`  WAIT  ${name.padEnd(16)} port ${String(port)} is still held; starting anyway`)
+  }
   const output = []
   const code = await new Promise((resolve) => {
     const child = spawn(process.execPath, [join(HERE, `${name}-smoke.mjs`)], {

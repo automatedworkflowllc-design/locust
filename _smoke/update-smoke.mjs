@@ -33,6 +33,7 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { portFor } from './ports.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const INSTALLED = process.argv.includes('--installed')
@@ -40,8 +41,7 @@ const INSTALL = process.argv.includes('--install') && INSTALLED
 const EXE = INSTALLED
   ? join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Locust', 'Locust.exe')
   : join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
-const PORT = 9232
-
+const PORT = portFor(import.meta.url)
 let failures = 0
 function check(label, ok, detail) {
   if (!ok) failures += 1

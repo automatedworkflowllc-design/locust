@@ -17,10 +17,11 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { portFor } from './ports.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const PORT = 9236
+const PORT = portFor(import.meta.url)
 const WORKSPACE = process.argv[2] ?? 'C:\\Users\\<home>\\Documents\\antigravtest'
 const TARGET = 'locust-smoke.txt'
 const CODE = 'PEBBLE-' + String(Math.floor(Math.random() * 9000) + 1000)
