@@ -2032,7 +2032,9 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     const activity = buildThread(events, { running: false }).find((item) => item.type === 'activity')
     const details = activity?.type === 'activity' ? activity.details : []
     const segments = activityTrace(details, events, traceOutcome(events, false))
-    expect(segments.find((seg) => seg.key === 'commands')?.text).toBe('ran 2 commands · all exit 0')
+    // NAMED, not graded. `all exit 0` was the one segment on this line where
+    // the app aggregated into a verdict (design agent, 2026-09-11).
+    expect(segments.find((seg) => seg.key === 'commands')?.text).toBe('ran ls and pwd')
     expect(segments.find((seg) => seg.key === 'calls')).toBeUndefined()
   })
 
@@ -2570,16 +2572,41 @@ describe('what a turn ran, and what came back', () => {
     expect(commandsRun([], true)).toEqual({ ran: 0, nonZero: 0, unsettled: 0 })
   })
 
-  it('reports exit 0 plainly, never as a verdict', () => {
-    // "all exit 0" is what the ledger holds. Not "verified", not "checked".
-    expect(commandsRunText(commandsRun([detail({ exitCode: 0 }), detail({ exitCode: 0 })], true))).toEqual({
-      text: 'ran 2 commands · all exit 0',
+  /*
+   * The success case NAMES the commands; it does not grade them.
+   *
+   * It shipped as `ran 4 commands - all exit 0`, and the design agent found
+   * the defect: that is the one segment where the app aggregates into a
+   * verdict, and "all" plus "0" is as close to PASSED as you get without
+   * typing it. Their test for grading -- "could it be wrong?" -- catches it:
+   * literally no, but what it COMMUNICATES can be, and that gap is the bug.
+   */
+  it('names the commands rather than grading them', () => {
+    expect(commandsRunText(commandsRun([detail(), detail()], true), ['pnpm check', 'tsc --noEmit'])).toEqual({
+      text: 'ran pnpm and tsc',
       amber: false
     })
-    expect(commandsRunText(commandsRun([detail({ exitCode: 0 })], true))).toEqual({
-      text: 'ran 1 command · exit 0',
-      amber: false
-    })
+  })
+
+  it('names two and counts the rest, because four command lines do not fit', () => {
+    const four = [detail(), detail(), detail(), detail()]
+    expect(commandsRunText(commandsRun(four, true), ['pnpm check', 'tsc', 'node x.mjs', 'git status'])?.text)
+      .toBe('ran pnpm, tsc and 2 more')
+  })
+
+  it('falls back to a count when no command name was recorded', () => {
+    // A count is not a verdict either -- it is only less useful.
+    expect(commandsRunText(commandsRun([detail(), detail()], true), [])?.text).toBe('ran 2 commands')
+    expect(commandsRunText(commandsRun([detail()], true), [])?.text).toBe('ran 1 command')
+  })
+
+  it('says nothing about how they came out when they all came out fine', () => {
+    // The whole ruling in one assertion: no "all exit 0", no "passed", no
+    // "checked", nothing the reader could take as the app's judgement.
+    const said = commandsRunText(commandsRun([detail(), detail()], true), ['pnpm check', 'tsc'])?.text ?? ''
+    for (const verdict of ['exit 0', 'pass', 'ok', 'success', 'checked', 'verified']) {
+      expect(said.toLowerCase(), verdict).not.toContain(verdict)
+    }
   })
 
   it('counts a non-zero exit, and says so in amber', () => {

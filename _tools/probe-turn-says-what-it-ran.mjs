@@ -84,6 +84,8 @@ const watch = `(async () => {
   // does not exist and reported 'no trace line' for a card on screen -- and
   // the fix then put a BACKTICK in a comment inside this template literal,
   // ending the string, which is the trap this file's own header warns about.
+  const receipt = document.querySelector('.lc-receipt__summary')
+  if (receipt !== null) { receipt.click(); await new Promise(r => setTimeout(r, 400)) }
   const counts = document.querySelector('.lc-activity__counts')
   const trace = document.querySelector('.lc-activity')
   const line = counts?.innerText.split(String.fromCharCode(10)).join(' ').trim()
@@ -91,8 +93,12 @@ const watch = `(async () => {
     ?? 'no trace line'
   return JSON.stringify({
     line,
-    saysWhatItRan: /ran \\d+ commands|ran echo/i.test(line),
-    saysHowTheyCameOut: /exit 0|exited non-zero|did not report/i.test(line),
+    saysWhatItRan: /ran /i.test(line),
+    // The ruling, 2026-09-11: the success case NAMES the commands and must
+    // not grade them. Anything here reading as a verdict is the defect.
+    gradesThem: /exit 0|passed|checked|verified|all ok/i.test(line),
+    saysHowTheyCameOut: /exited non-zero|did not report/i.test(line),
+    ranOn: document.querySelector('.lc-receipt')?.innerText.split(String.fromCharCode(10)).join(' ').slice(0, 200) ?? 'receipt closed',
     traceSeen: trace !== null
   }, null, 1)
 })()`

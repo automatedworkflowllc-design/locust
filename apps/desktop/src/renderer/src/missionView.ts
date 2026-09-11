@@ -901,7 +901,10 @@ export function activityTrace(
       ...(one?.amber === true ? { tone: 'amber' as const } : {})
     })
   } else {
-    const many = commandsRunText(commandsRun(details, finished))
+    const many = commandsRunText(
+      commandsRun(details, finished),
+      shellCommands.map((detail) => detail.name)
+    )
     if (many !== undefined) {
       segments.push({ key: 'commands', text: many.text, ...(many.amber ? { tone: 'amber' as const } : {}) })
     }
@@ -987,8 +990,32 @@ export function commandsRun(details: readonly ActivityDetail[], finished: boolea
   }
 }
 
-/** That, as the words the trace line uses. `undefined` when nothing ran. */
-export function commandsRunText(run: CommandsRun): { readonly text: string; readonly amber: boolean } | undefined {
+/**
+ * That, as the words the trace line uses. `undefined` when nothing ran.
+ *
+ * THE SUCCESS CASE NAMES THE COMMANDS RATHER THAN GRADING THEM.
+ *
+ * It shipped as `ran 4 commands · all exit 0`, and the design agent's ruling
+ * on 2026-09-11 found the defect in it: that is the ONE segment on the line
+ * where the app aggregates and grades. Every other segment names a thing that
+ * happened; this collapsed four facts into a verdict, and "all" plus "0" is
+ * about as close to the word PASSED as you can get without typing it. Their
+ * test for whether a segment is grading -- "could it be wrong?" -- catches it
+ * exactly: `all exit 0` cannot be wrong literally, but what it COMMUNICATES
+ * can be, and that gap is the whole bug. A person who read it as "checked"
+ * did not misread the line; the line told them.
+ *
+ * `ran pnpm check, tsc and 2 more` is the same derivation with no verdict in
+ * it. The reader supplies the judgement, which is the division of labour this
+ * whole feature committed to.
+ *
+ * The non-zero case is untouched, and deliberately: a command that failed IS
+ * news, it IS derived, and amber is right because a person does need to act.
+ */
+export function commandsRunText(
+  run: CommandsRun,
+  names: readonly string[] = []
+): { readonly text: string; readonly amber: boolean } | undefined {
   if (run.ran === 0) return undefined
   const ran = `ran ${pluralize(run.ran, 'command')}`
   if (run.nonZero > 0) {
@@ -1003,10 +1030,31 @@ export function commandsRunText(run: CommandsRun): { readonly text: string; read
       amber: true
     }
   }
-  // Said plainly, and never as a verdict: `all exit 0` is what the ledger
-  // holds. Whether that amounts to the work being checked is the reader's
-  // call, and the app has no business making it for them.
-  return { text: `${ran} · ${run.ran === 1 ? 'exit 0' : 'all exit 0'}`, amber: false }
+  const named = commandList(names, run.ran)
+  return { text: named ?? ran, amber: false }
+}
+
+/**
+ * `ran pnpm check, tsc and 2 more`, bounded to a line.
+ *
+ * The FIRST WORD of each command, which is the part that identifies it: the
+ * rest is flags and paths, and four full command lines do not fit beside a
+ * duration, a file count and a cost. `undefined` when nothing usable was
+ * recorded, and then the caller falls back to the plain count -- a count is
+ * not a verdict, it is just less useful.
+ */
+export function commandList(names: readonly string[], ran: number): string | undefined {
+  const heads = names
+    .map((name) => shellCommandText(name).split('\n')[0]?.trim() ?? '')
+    .map((line) => line.split(/\s+/)[0] ?? '')
+    .filter((head) => head.length > 0 && head.length <= 24)
+  if (heads.length === 0) return undefined
+  // Two named, then a count. Three names is already longer than the rest of
+  // the line put together.
+  const shown = heads.slice(0, 2)
+  const rest = ran - shown.length
+  if (rest <= 0) return `ran ${shown.join(' and ')}`
+  return `ran ${shown.join(', ')} and ${String(rest)} more`
 }
 
 /**

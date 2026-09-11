@@ -16,6 +16,18 @@ Dates are when the build was cut. Versions are the number Settings shows.
   row are modes — permission, folder, route, effort — and a chip is the right
   shape for something that shows what is currently set. Attaching a file sets
   nothing.
+- **A turn no longer grades its own commands.** `ran 4 commands · all exit 0`
+  shipped yesterday and was the one place on that line where the app
+  aggregated four facts into a verdict — "all" plus "0" is about as close to
+  *passed* as you get without typing it, and a reader who took it that way was
+  not misreading. It names them instead: `ran pnpm check, tsc and 2 more`. A
+  command that failed is unchanged: that one is news, and it stays amber.
+- **The receipt says what a run ran ON.** `Ran on Windows · locust-astra`,
+  beside the runtime it already names. It is the one thing in this space
+  knowable with certainty — a run happens on one machine, in one environment —
+  and it tells a person who changed a path handler everything a "this did not
+  test macOS" warning would have, while telling someone who changed a copy
+  string nothing, which is correct.
 
 ## 0.76.0 - 2026-09-11
 

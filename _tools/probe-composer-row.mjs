@@ -86,10 +86,10 @@ const watch = `(async () => {
   }
   const plus = document.querySelector('[aria-label=\"Attach files\"]')
   const ring = box('.lc-composer__context')
-  // The ROUTE chip specifically. `.lc-control__anchor` matches the mode chip
-  // too, and it is first on the row -- so comparing against it reported the
-  // ring as "not left of the route" while the screenshot showed it exactly
-  // there.
+  // The ROUTE chip specifically. The class lc-control__anchor matches the
+  // MODE chip too, and that one is first on the row -- so comparing against
+  // it reported the ring as not left of the route while the screenshot showed
+  // it exactly there. (No backticks in here: they end the template literal.)
   const route = box('button[aria-haspopup=\"listbox\"]')
   return JSON.stringify({
     plusClasses: plus === null ? 'no plus' : plus.className,

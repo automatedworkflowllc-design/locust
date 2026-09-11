@@ -13,6 +13,7 @@ import type {
 import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine } from '../missionView.js'
 import type { LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
+import { folderName, ranOnLine } from '../ranOn.js'
 import { atBottom } from '../stickToBottom.js'
 import { FOLLOW_TOLERANCE, nextScrollTop } from '../followBottom.js'
 import { ledgerFailureRows, ledgerFailureSentence } from '../ledgerFailure.js'
@@ -57,6 +58,8 @@ function ThreadItems({
   /** What the live run is doing; only the working line draws it. */
   readonly activity: FaceActivity
   readonly workspacePath: string | undefined
+  /** The folder now open, so the receipt names one only for its own missions. */
+  readonly workspaceId?: string | undefined
   /** How to answer a question the run ended on. Absent on earlier turns. */
   readonly decision:
     | { readonly onChoose: (option: DecisionOption) => void; readonly busy: boolean; readonly standing: string }
@@ -194,7 +197,15 @@ function ThreadItems({
  * ledger could not settle, and the ledger's own path. `verified` is a claim
  * about durability, so it is withheld whenever recovery reported an issue.
  */
-function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }): ReactElement {
+function ReceiptCard({
+  mission,
+  workspacePath,
+  workspaceId
+}: {
+  readonly mission: PublicRecoveredMission
+  readonly workspacePath?: string | undefined
+  readonly workspaceId?: string | undefined
+}): ReactElement {
   const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
   const verification = ledgerVerificationLabel(mission.integrityIssueCount)
   const checkpoints = mission.checkpoints ?? []
@@ -251,6 +262,32 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
         <dd className="lc-mono">
           {mission.runtime} {mission.cliVersion ?? ''} · {mission.model}
         </dd>
+        {/*
+          * SCOPE, stated positively -- the design agent's ruling, 2026-09-11,
+          * on whether to say what a run could not have checked. It should
+          * not: choosing which absences matter is a judgement about what the
+          * diff means, and without that judgement the list is true of every
+          * run and becomes furniture. What IS knowable with certainty is that
+          * a run happened on one machine in one environment, and that is
+          * architecture rather than a guess.
+          *
+          * "Ran on Windows" tells a person who changed a path handler
+          * everything a macOS warning would have, and tells a person who
+          * changed a copy string nothing -- correctly.
+          */}
+        <dt>Ran on</dt>
+        <dd className="lc-mono">
+          {ranOnLine({
+            platform: window.desktop?.platform ?? '',
+            // Named only when this mission is one of the open folder's own: a
+            // recovered mission records its workspace as an id, not a path,
+            // so printing today's folder beside an older run would be a claim
+            // nothing supports.
+            ...(workspaceId !== undefined && mission.workspaceId === workspaceId
+              ? { folder: folderName(workspacePath) ?? '' }
+              : {})
+          })}
+        </dd>
         <dt>Mission</dt>
         <dd className="lc-mono">{shortMissionId(mission.missionId)}</dd>
         <dt>Checkpoints</dt>
@@ -285,6 +322,8 @@ function ReceiptCard({ mission }: { readonly mission: PublicRecoveredMission }):
 
 export interface ThreadProps {
   readonly prompt: string
+  /** The folder now open, so the receipt names one only for its own missions. */
+  readonly workspaceId?: string | undefined
   /** Who started the current turn; a host-briefed one is not the person's words. */
   readonly startedBy?: LiveStarter
   /** Open the run a peer message reached; undefined for one nothing received yet. */
@@ -395,6 +434,7 @@ export function Thread({
   onResume,
   sandbox,
   workspacePath,
+  workspaceId,
   events,
   running,
   restoredMission,
@@ -833,7 +873,13 @@ export function Thread({
         {restoredMission !== undefined && onResume !== undefined && (
           <ResumeCard offer={resumeOffer(restoredMission)} onResume={onResume} busy={running} />
         )}
-        {restoredMission !== undefined && <ReceiptCard mission={restoredMission} />}
+        {restoredMission !== undefined && (
+          <ReceiptCard
+            mission={restoredMission}
+            workspacePath={workspacePath}
+            {...(workspaceId === undefined ? {} : { workspaceId })}
+          />
+        )}
       </div>
     </div>
   )

@@ -3753,6 +3753,7 @@ export default function App(): ReactElement {
                 earlierTurns={liveRun.earlierTurns ?? []}
                 coldStart={liveRun.coldStart ?? false}
                 workspacePath={workspacePath}
+                {...(workspaceId === undefined ? {} : { workspaceId })}
                 wasPlan={liveRun.plan === true}
                 onRunWithEdits={
                   // Offered only where it is genuinely the next thing a
