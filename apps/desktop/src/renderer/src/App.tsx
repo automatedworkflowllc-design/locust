@@ -92,8 +92,11 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  typedPrompt, assistantMessages, buildThread } from './missionView.js'
+  typedPrompt, assistantMessages, buildThread, relativePath, shellCommandText } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
+import { folderName, ranOnLine } from './ranOn.js'
+import { reviewBrief } from './reviewBrief.js'
+import type { ReviewMaterial } from './reviewBrief.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { sequenceOfPost } from './roomExchange.js'
 import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
@@ -2899,6 +2902,66 @@ export default function App(): ReactElement {
       liveRun?.data?.missionId !== undefined && routineDraftFor(liveRun.data.missionId) !== undefined
   })
   const [deleteError, setDeleteError] = useState<string>()
+
+  /**
+   * Hand this finished mission to another teammate to be challenged.
+   *
+   * Astra's proposal, part 2, and it waited for part 1a on purpose: until a
+   * turn said what it RAN, a reviewer had nothing to read but the diff, and a
+   * second model re-reading a diff is a second opinion about code rather than
+   * a check on whether the work was done.
+   *
+   * Everything the reviewer is given is already on this screen. The brief
+   * exists because a teammate cannot see another teammate's conversation, so
+   * the facts have to travel -- and because a reviewer told the work passed
+   * and then asked to check it has been handed the answer. See reviewBrief.ts.
+   */
+  const reviewMaterialFor = (run: LiveRunState): ReviewMaterial | undefined => {
+    const events = run.events
+    if (events.length === 0) return undefined
+    const activity = buildThread(events, { running: false }).find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    const changed = [
+      ...new Set(
+        details
+          .filter((detail) => detail.kind === 'edit' && detail.failed !== true)
+          .map((detail) => relativePath(detail.name, workspacePath))
+      )
+    ]
+    const commands = details
+      .filter((detail) => detail.kind === 'shell')
+      .map((detail) => ({
+        name: shellCommandText(detail.name).split('\n')[0]?.trim() ?? detail.name,
+        ...(detail.exitCode === undefined ? {} : { exitCode: detail.exitCode })
+      }))
+    return {
+      // The ROOT request, not this turn's: a continuation's own prompt is the
+      // host's briefing, and a reviewer asked to check that would be checking
+      // the app rather than the work.
+      request: run.earlierTurns?.[0]?.prompt ?? run.prompt,
+      changed,
+      commands: commands.map((command) => ({ name: command.name, exitCode: command.exitCode })),
+      ranOn: ranOnLine({
+        platform: window.desktop?.platform ?? '',
+        ...(folderName(workspacePath) === undefined ? {} : { folder: folderName(workspacePath)! })
+      }),
+      author: teammates.find((entry) => entry.teammateId === ownerOf(run))?.name ?? 'A teammate'
+    }
+  }
+
+  /** Every teammate who could review this one -- anyone but its author. */
+  const reviewersFor = (run: LiveRunState | undefined): readonly PublicTeammate[] =>
+    run === undefined ? [] : teammates.filter((entry) => entry.teammateId !== ownerOf(run))
+
+  const askForReview = (run: LiveRunState, reviewer: PublicTeammate): void => {
+    const material = reviewMaterialFor(run)
+    if (material === undefined) return
+    selectTeammate(reviewer.teammateId)
+    // After the teammate is selected, so the run is started as theirs. The
+    // same path a person's own message takes -- a review is an ordinary
+    // mission of the reviewer's, on their own route, in their own thread.
+    setTimeout(() => void startMission(reviewBrief(material)), 0)
+  }
   /**
    * What a row action just did, when it worked.
    *
@@ -3702,6 +3765,33 @@ export default function App(): ReactElement {
                     * rather than disabled -- there is nothing to explain
                     * about an action with no material.
                     */}
+                  {/*
+                    * Only where there IS someone to ask and something to read.
+                    * Absent rather than disabled, the same rule as Save as
+                    * routine beside it: there is nothing to explain about an
+                    * action with no material.
+                    */}
+                  {liveRun !== undefined && !running && reviewersFor(liveRun).length > 0 && (
+                    <button
+                      type="button"
+                      className="lc-ghostbutton"
+                      title="Hand this to another teammate to challenge against what you asked for"
+                      onClick={(event) => {
+                        const at = event.currentTarget.getBoundingClientRect()
+                        setRowMenu({
+                          x: Math.round(at.left),
+                          y: Math.round(at.bottom + 4),
+                          title: 'Ask for a review',
+                          items: reviewersFor(liveRun).map((reviewer) => ({
+                            label: reviewer.name,
+                            onSelect: () => askForReview(liveRun, reviewer)
+                          }))
+                        })
+                      }}
+                    >
+                      <Icon name="shield" size={12} /> Ask for a review
+                    </button>
+                  )}
                   {saveAsRoutineId !== undefined && (
                     <button
                       type="button"

@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.78.0 - 2026-09-11
+
+- **Ask another teammate to review a finished mission.** A new action on any
+  completed conversation hands it to a teammate of your choosing, with what
+  you asked for, what changed, what ran and its exit codes, and where it ran.
+  A teammate cannot see another's conversation, so the facts have to travel.
+- The brief **makes no claim that the work is done or correct** — telling a
+  reviewer it passed and then asking it to check is handing it the answer. It
+  also says plainly: report, do not fix; and if the work is fine, say so
+  and stop.
+- Tested with the answer hidden: a builder was asked for two files, then told
+  in a follow-up to delete one and not mention it. The reviewer is shown only
+  the original request, and found it — *"notes.test.md was never created, the
+  only recorded action was deleting it."*
+
 ## 0.77.0 - 2026-09-11
 
 - **The context ring is back, beside the route it belongs to.** It had moved
