@@ -86,14 +86,56 @@ mission's phase against the ledger. Running the unit suite, a build or a drive
 alongside a sweep makes those go red for no product reason. A sweep that
 shares the machine reports the machine.
 
-That is worth doing and is NOT enough. Measured 2026-09-11 on a quiet
-machine: four of thirty-two are red on any given run and it is not the same
-four -- three smokes that passed one sweep failed the next. **A single run is
-not evidence about any one smoke.** Re-run anything red before believing it,
-and read a green sweep as weather rather than a gate. See
+That was worth doing and was NOT enough. Measured 2026-09-11 on a quiet
+machine: four of thirty-two red on any given run and not the same four --
+three smokes that passed one sweep failed the next.
+
+**Most of that turned out to be ours, and is fixed.** Eleven port numbers were
+used by two smokes each; the sweep runs alphabetically, so several collided at
+close range (`schedule`/`steering` two apart, `relay`/`raw-conversation` one
+apart). Each smoke launches an Electron app as its own child and the sweep
+waits only for the node process that spawned it, so an app still shutting down
+still held its debugging port -- and the next smoke could attach its CDP client
+to the PREVIOUS app, drive a window on the wrong screen, and report "no row".
+See `ports.mjs` below. A later sweep went **31 of 32**, with the one failure a
+stale assertion rather than a defect.
+
+Re-run anything red before believing it anyway: the habit is cheap and a single
+run still proves less than it looks. See
 `docs/FINDING-smoke-sweep-2026-09-11.md`.
 
 Keep the previous `smoke-results.json` before starting: the runner overwrites
 it, and the old one is the only baseline for "was this already red". Its rows
 are keyed `code`, `failed`, `outOfQuota`, `seconds`, `tail` -- there is no
 `ok` or `pass`, and a parse that assumes one reports every row as failing.
+
+## Adding a smoke: take a port from `ports.mjs`
+
+Every smoke that launches the app gets its debugging port from
+`_smoke/ports.mjs`, and `portFor(import.meta.url)` reads it from the FILENAME
+-- a smoke naming somebody else's port is the bug that file exists to stop. Add
+an entry for a new smoke rather than borrowing one; `run-all.mjs` calls
+`assertPortsAreUnique()` before it runs anything, so a duplicate fails the
+sweep immediately instead of producing a red smoke somewhere else an hour
+later.
+
+The `_tools` drives use 9490-9599 and must stay out of that range.
+
+## Assert what the PRODUCT owes, never what a model chooses
+
+Two smokes were caught asserting things Locust does not control, and both had
+been red for weeks while saying nothing true:
+
+- `relay` asserted an exchange "ended on its own rather than running into the
+  hop cap" -- a claim about how terse two models choose to be. It flaked
+  forever AND hid a real defect, because an exchange stopping AT the budget
+  and one stopping PAST it read as the same red line. Rewritten to the three
+  things the app owes -- it ends, it stays inside the budget, and if the
+  budget stopped it the person is told -- it immediately found both a leak in
+  the cap and a notice that reached nobody.
+- `exchange` pinned the literal `6` as the default budget, so changing a
+  setting reported a broken exchange strip.
+
+If an assertion can be falsified by a model being polite, or by somebody
+changing a default, it is testing the wrong thing. Fix it by making it say
+what it means, not by loosening it.
