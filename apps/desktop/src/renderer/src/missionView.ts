@@ -463,6 +463,17 @@ export type ThreadItem =
   | {
       readonly key: string
       readonly type: 'live-step'
+      /**
+       * WHICH REGISTER this line is, always, in one word.
+       *
+       * Colin, 2026-09-11: thinking, tool calls and connector calls all have
+       * to be distinguishable from text the teammate actually wrote. The
+       * label alone could not carry that -- it is whatever the runtime said,
+       * so "Exploring the repository" and a sentence of the reply were the
+       * same shape of words in the same place. This is derived from the
+       * step's own kind and never from its wording.
+       */
+      readonly register: 'starting' | 'working' | 'thinking' | 'writing' | 'tool' | 'connector'
       readonly label: string
       readonly detail: string | undefined
       /** When the step began, so the card can show elapsed time as it runs. */
@@ -1124,9 +1135,25 @@ export function buildThread(
 ): readonly ThreadItem[] {
   const items: ThreadItem[] = []
   const openTools = new Map<string, ActivityDetail>()
+  /**
+   * When each open tool began, so the live line can be the TOOL rather than
+   * the turn around it.
+   *
+   * Claude Code reports no step for a tool call -- only `tool.started` -- so
+   * a run that spent thirty seconds reading files said "working" the whole
+   * way (MEASURED 2026-09-11, `probe-live-line-says-which`: `sawATool:
+   * false`). The register was honest and useless, which is the worst of both.
+   */
+  const openToolAt = new Map<string, { readonly at: string; readonly connector: string | undefined }>()
   const activity: ActivityDetail[] = []
   let runningStep:
-    | { label: string; detail: string | undefined; startedAt: string; kind: 'turn' | 'reasoning' | 'item' }
+    | {
+        label: string
+        detail: string | undefined
+        startedAt: string
+        kind: 'turn' | 'reasoning' | 'item'
+        register: 'working' | 'thinking' | 'writing' | 'tool'
+      }
     | undefined
   let plan: readonly PlanStep[] = []
   // Notices that arrive before the run has done anything are the runtime
@@ -1159,6 +1186,7 @@ export function buildThread(
           const own = activity.find((detail) => detail.kind === 'edit' && detail.name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) === tail)
           if (own !== undefined) {
             openTools.set(event.payload.itemId, own)
+            openToolAt.set(event.payload.itemId, { at: event.occurredAt, connector: undefined })
             break
           }
         }
@@ -1177,6 +1205,10 @@ export function buildThread(
           settled: false
         }
         openTools.set(event.payload.itemId, detail)
+        // Whether it reaches OFF this machine, decided by the same split the
+        // row uses. `tool !== name` cannot answer it: an ordinary call names
+        // the tool and its target too (`Read` / `README.md`).
+        openToolAt.set(event.payload.itemId, { at: event.occurredAt, connector: mcp?.server })
         activity.push(detail)
         break
       }
@@ -1208,6 +1240,7 @@ export function buildThread(
           }
           openTools.delete(event.payload.itemId)
         }
+        openToolAt.delete(event.payload.itemId)
         break
       }
       case 'step.started': {
@@ -1221,11 +1254,23 @@ export function buildThread(
         // had heard of (seen driving the app, 2026-09-05). The label stays;
         // the item type is only worth showing when it names real work.
         const itemType = event.payload.itemType
+        // A message ITEM is the model writing; anything else a runtime opens
+        // an item for is it using something. Read off the item type, which is
+        // the same fact the detail is suppressed for.
+        const writingNow = itemType !== undefined && /message$/i.test(itemType)
         runningStep = {
           label: message ?? (event.payload.stepKind === 'turn' ? 'Working' : 'Thinking'),
-          detail: itemType !== undefined && /message$/i.test(itemType) ? undefined : itemType,
+          detail: writingNow ? undefined : itemType,
           startedAt: event.occurredAt,
-          kind: event.payload.stepKind
+          kind: event.payload.stepKind,
+          register:
+            event.payload.stepKind === 'reasoning'
+              ? 'thinking'
+              : event.payload.stepKind === 'turn'
+                ? 'working'
+                : writingNow
+                  ? 'writing'
+                  : 'tool'
         }
         break
       }
@@ -1387,7 +1432,30 @@ export function buildThread(
 
   if (options.running) {
     const streaming = items.some((item) => item.type === 'agent-message' && item.streaming)
-    if (runningStep !== undefined) {
+    /*
+     * A TOOL STILL OPEN outranks everything, because it is the most specific
+     * true thing about the run: more specific than the turn around it, and
+     * the one register a person most wants told apart from the reply.
+     *
+     * Newest first -- a tool that opened inside another is what is happening
+     * now. A connector is named as one: the row already splits server from
+     * tool, and "using a connector - get_watchlists - Robinhood" is what a
+     * person would say about it.
+     */
+    const openToolId = [...openTools.keys()].at(-1)
+    const openTool = openToolId === undefined ? undefined : openTools.get(openToolId)
+    const openToolMeta = openToolId === undefined ? undefined : openToolAt.get(openToolId)
+    if (openTool !== undefined && openToolMeta !== undefined) {
+      items.push({
+        key: 'live-step',
+        type: 'live-step',
+        label: openTool.name,
+        detail: openToolMeta.connector,
+        startedAt: openToolMeta.at,
+        kind: 'item',
+        register: openToolMeta.connector === undefined ? 'tool' : 'connector'
+      })
+    } else if (runningStep !== undefined) {
       items.push({
         key: 'live-step',
         type: 'live-step',
@@ -1395,6 +1463,7 @@ export function buildThread(
         detail: runningStep.detail,
         startedAt: runningStep.startedAt,
         kind: runningStep.kind,
+        register: runningStep.register,
         ...(runningStep.kind === 'reasoning' ? { waiting: true } : {})
       })
     } else if (!streaming && options.awaitingDecision !== true) {
@@ -1422,6 +1491,7 @@ export function buildThread(
           key: 'live-step',
           type: 'live-step',
           label: events.length === 0 ? 'Starting' : 'Working',
+          register: events.length === 0 ? ('starting' as const) : ('working' as const),
           detail: undefined,
           startedAt: since,
           kind: 'turn',

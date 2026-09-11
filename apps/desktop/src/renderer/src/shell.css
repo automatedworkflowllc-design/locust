@@ -3988,6 +3988,33 @@ textarea {
   min-width: 0;
 }
 
+/*
+ * Whose, then which register. The same two-part line a room draws over a turn
+ * in progress, for the same reason: what follows is the app narrating, not the
+ * teammate talking, and a person should never have to work that out from the
+ * wording (Colin, 2026-09-11).
+ */
+.lc-livestep__who {
+  color: var(--lc-text-primary);
+  font-weight: 500;
+}
+
+.lc-livestep__register {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.02em;
+  color: var(--lc-text-muted);
+}
+
+/* The separator between the name and the register, drawn only when there is
+   a name -- a run of nobody's is still a register, just an unowned one. */
+.lc-livestep__who + .lc-livestep__register::before {
+  content: '·';
+  margin-right: var(--lc-space-3);
+}
+
 .lc-livestep__meta::before {
   content: '· ';
 }

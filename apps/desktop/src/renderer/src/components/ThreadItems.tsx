@@ -260,6 +260,21 @@ function elapsedLabel(startedAt: string, now: number): string {
   return `${minutes}m ${seconds % 60}s`
 }
 
+/** What a live line IS, in the words a person would use for it. */
+const REGISTER_WORD: Record<LiveRegister, string> = {
+  starting: 'starting',
+  working: 'working',
+  thinking: 'thinking',
+  writing: 'writing',
+  tool: 'using a tool',
+  // Named as its own thing because it IS its own thing: a connector reaches
+  // off this machine, which is the one fact the permission chip exists to
+  // say. "Using a tool" for a call that can send mail would be a quiet lie.
+  connector: 'using a connector'
+}
+
+export type LiveRegister = 'starting' | 'working' | 'thinking' | 'writing' | 'tool' | 'connector'
+
 /**
  * The running step, as one avatar-led line. A tool or turn step is the
  * teammate doing something, so their face works; a reasoning step is thought,
@@ -267,12 +282,23 @@ function elapsedLabel(startedAt: string, now: number): string {
  * bar, no spinner, no synthetic percentage -- elapsed time from the event's
  * own timestamp (so a step already running when the view opened reports its
  * real age) and whatever the runtime actually said.
+ *
+ * IT SAYS WHOSE AND WHICH REGISTER, always.
+ *
+ * Colin, 2026-09-11: thinking, tool calls and connector calls all have to be
+ * distinguishable from text the teammate actually wrote. The line used to be
+ * whatever the runtime said -- "Exploring the repository" -- in the same
+ * place, shape and colour as a sentence of the reply, with only a face and
+ * three dots between them. Now the name and the register are the line, in the
+ * standing register, and the runtime's own words sit beside the clock as the
+ * detail they are. Same treatment as a room's live turn, for the same reason.
  */
 export function LiveStepCard({
   label,
   detail,
   startedAt,
   kind,
+  register,
   waiting = false,
   owner,
   activity
@@ -281,9 +307,13 @@ export function LiveStepCard({
   readonly detail: string | undefined
   readonly startedAt: string
   readonly kind: 'turn' | 'reasoning' | 'item'
+  /** Derived from the step, never from its wording. */
+  readonly register: LiveRegister
   /** Waiting on the model with no step to name; draws the dots. */
   readonly waiting?: boolean
-  readonly owner: { readonly teammateId?: string; readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike } | undefined
+  readonly owner:
+    | { readonly teammateId?: string; readonly name?: string; readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike }
+    | undefined
   /** Decided once from the events, the same way the sidebar and header decide it. */
   readonly activity: FaceActivity
 }): ReactElement {
@@ -301,8 +331,18 @@ export function LiveStepCard({
   // between steps, which is most of the time a person spends waiting.
   const thinking = activity === 'thinking' || waiting
   const face = owner ?? { hue: 'lime' as const, avatar: RUNTIME_FACE }
+  const word = REGISTER_WORD[register]
+  /*
+   * The runtime's own words, when they ARE words and not the register said
+   * twice. `label` is "Thinking" or "Working" whenever the runtime named no
+   * step, and printing that beside "thinking" is the app stuttering.
+   */
+  const said = label.trim().toLowerCase() === word || /^(thinking|working|starting)$/i.test(label.trim())
+    ? undefined
+    : label.trim()
+  const aside = [said, detail].filter((part) => part !== undefined && part.length > 0)
   return (
-    <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind}>
+    <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind} data-register={register}>
       <PixelFace
         hue={face.hue}
         avatar={face.avatar}
@@ -311,19 +351,22 @@ export function LiveStepCard({
         {...(owner?.teammateId === undefined ? {} : { teammateId: owner.teammateId })}
       />
       <span className="lc-livestep__label">
-        {label}
-        {thinking && (
-          <span className="lc-dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
-        )}
+        {owner?.name !== undefined && <span className="lc-livestep__who">{owner.name}</span>}
+        <span className="lc-livestep__register lc-mono">
+          {word}
+          {thinking && (
+            <span className="lc-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          )}
+        </span>
       </span>
-      {/* The clock sits beside the word, not at the far edge: "Working · 57s"
-          reads as one statement about what is happening right now. */}
+      {/* The clock sits beside the words, not at the far edge: "using a tool ·
+          read_file · 57s" reads as one statement about what is happening. */}
       <span className="lc-rail__meta lc-livestep__meta">
-        {detail !== undefined && `${detail} · `}
+        {aside.map((part) => `${String(part)} · `)}
         {elapsed}
       </span>
     </div>

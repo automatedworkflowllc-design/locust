@@ -6,6 +6,31 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.70.0 - 2026-09-11
+
+- **You can tell your teammate talking from the app narrating.** Every live
+  line now says whose it is and which register it is — `Jimothy · thinking`,
+  `Jimothy · using a tool`, `Jimothy · using a connector · Robinhood` — and
+  that word is derived from what the run is actually doing, never from what
+  the runtime called it. A connector is named as one, because it is the one
+  kind of call that reaches off this machine.
+- **A tool call shows while it is happening, not only after.** Claude Code
+  reports no step for a tool call, so a run that spent thirty seconds reading
+  files just said "working"; the open tool is now what the line says, and it
+  names the file or the connector it is working on.
+- **A room stops going quiet mid-argument.** A reply the host is starting is
+  drawn as the turn it is, and so is a turn that is running but has not spoken
+  yet. Before, both were invisible for as long as a cold runtime takes to
+  boot, which reads as the conversation being over — and the budget line no
+  longer says "post again to continue" while a reply is on its way.
+- **Posting to a room is immediate.** The box empties when you press Post and
+  the post appears at once, instead of holding your words under a "Posting…"
+  until every teammate has been asked. If the post genuinely fails, your words
+  come back.
+- **The room's top bar has a shape.** Back on the left, the room's name with
+  its members on a line under it, Remove room alone on the right — instead of
+  three unrelated things clumped together in the middle.
+
 ## 0.69.0 - 2026-09-11
 
 - **Two teammates can now actually argue.** If you post to a room and both

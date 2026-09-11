@@ -140,6 +140,7 @@ function ThreadItems({
               detail={item.detail}
               startedAt={item.startedAt}
               kind={item.kind}
+              register={item.register}
               waiting={item.waiting ?? false}
               owner={owner}
               activity={activity}

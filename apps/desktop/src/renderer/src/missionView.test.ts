@@ -1069,6 +1069,91 @@ describe('the running step', () => {
   })
 })
 
+/*
+ * Colin, 2026-09-11: thinking, tool calls and connector calls all have to be
+ * distinguishable from text the teammate actually wrote. The label could not
+ * carry that -- it is whatever the runtime said, so "Exploring the
+ * repository" and a sentence of the reply were the same shape of words in the
+ * same place. The register is derived from the step's own kind, never from
+ * its wording, which is the whole point: a runtime that names its step
+ * "Writing the answer" while calling a tool cannot mislabel itself.
+ */
+describe('which register a live line is', () => {
+  const step = (payload: Record<string, unknown>) => event('step.started', payload)
+
+  it('is thinking for a reasoning step, whatever the runtime called it', () => {
+    expect(
+      buildThread([step({ stepKind: 'reasoning', message: 'Writing the answer' })], { running: true })
+        .find((item) => item.type === 'live-step')
+    ).toMatchObject({ register: 'thinking' })
+  })
+
+  it('is working for a turn', () => {
+    expect(
+      buildThread([step({ stepKind: 'turn' })], { running: true }).find((item) => item.type === 'live-step')
+    ).toMatchObject({ register: 'working' })
+  })
+
+  it('is writing for a message item -- the model producing prose, not using anything', () => {
+    expect(
+      buildThread([step({ stepKind: 'item', itemType: 'assistantMessage' })], { running: true })
+        .find((item) => item.type === 'live-step')
+    ).toMatchObject({ register: 'writing' })
+  })
+
+  it('is tool for any other item', () => {
+    expect(
+      buildThread([step({ stepKind: 'item', itemType: 'mcpToolCall' })], { running: true })
+        .find((item) => item.type === 'live-step')
+    ).toMatchObject({ register: 'tool', detail: 'mcpToolCall' })
+  })
+
+  it('is the open TOOL, not the turn around it, while one is running', () => {
+    // Claude Code reports no step for a tool call, only `tool.started`, so a
+    // run that spent thirty seconds reading files said "working" the whole
+    // way: honest and useless (MEASURED 2026-09-11, sawATool: false).
+    const line = buildThread(
+      [
+        event('step.started', { stepKind: 'turn' }),
+        event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'Read', command: 'README.md', phase: 'started' })
+      ],
+      { running: true }
+    ).find((item) => item.type === 'live-step')
+    expect(line).toMatchObject({ register: 'tool', label: 'README.md' })
+  })
+
+  it('names a connector as a connector, because it reaches off this machine', () => {
+    const line = buildThread(
+      [event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'mcp__claude_ai_Robinhood__get_accounts', phase: 'started' })],
+      { running: true }
+    ).find((item) => item.type === 'live-step')
+    expect(line).toMatchObject({ register: 'connector', label: 'get_accounts', detail: 'Robinhood' })
+  })
+
+  it('goes back to the turn once the tool closes', () => {
+    const line = buildThread(
+      [
+        event('step.started', { stepKind: 'turn' }),
+        event('tool.started', { itemId: 't1', toolKind: 'tool_use', name: 'Read', command: 'README.md', phase: 'started' }),
+        event('tool.completed', { itemId: 't1' })
+      ],
+      { running: true }
+    ).find((item) => item.type === 'live-step')
+    expect(line).toMatchObject({ register: 'working' })
+  })
+
+  it('is starting before the first event and working after it', () => {
+    expect(
+      buildThread([], { running: true, startedAt: '2026-09-04T21:47:00.000Z' })
+        .find((item) => item.type === 'live-step')
+    ).toMatchObject({ register: 'starting' })
+    expect(
+      buildThread([event('step.started', { stepKind: 'turn' }), event('step.completed', {})], { running: true })
+        .find((item) => item.type === 'live-step')
+    ).toMatchObject({ register: 'working' })
+  })
+})
+
 describe('runtime notices in the thread', () => {
   const at = '2026-09-01T15:00:00.000Z'
   function notice(id: string, sequence: number): NormalizedRuntimeEvent {
