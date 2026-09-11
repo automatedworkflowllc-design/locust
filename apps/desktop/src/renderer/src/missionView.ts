@@ -1260,7 +1260,11 @@ export function buildThread(
         const writingNow = itemType !== undefined && /message$/i.test(itemType)
         runningStep = {
           label: message ?? (event.payload.stepKind === 'turn' ? 'Working' : 'Thinking'),
-          detail: writingNow ? undefined : itemType,
+          // The item type is gone from the line. It was there to name the
+          // kind of work -- `subagent`, `commandExecution` -- and the register
+          // now does that in words a person uses, so printing the runtime's
+          // own word for it beside them is the same fact twice, in jargon.
+          detail: undefined,
           startedAt: event.occurredAt,
           kind: event.payload.stepKind,
           register:

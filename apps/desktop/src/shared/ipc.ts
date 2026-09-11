@@ -892,6 +892,20 @@ export interface WorkspaceSettings {
    * Bounded 1..12 by the host; anything else reads as the default.
    */
   readonly relayHopCap: number
+  /**
+   * Whether a teammate may INTERRUPT another rather than wait their turn.
+   *
+   * A teammate runs one mission at a time, so a message that arrives mid-run
+   * waits for that run to end. Usually right. Sometimes far too late: the
+   * common urgent message is "stop, I am editing that file", and delivering
+   * it after the conflicting work is done delivers it after the damage.
+   *
+   * Off until a person turns it on, because it SPENDS and DISCARDS: the
+   * recipient's turn is stopped where it stands. On, a share that carries
+   * `when="now"` stops the recipient's run so the message is taken next;
+   * anything else still waits. Read when a message is relayed, never cached.
+   */
+  readonly interrupt: boolean
   /** What happens to a memory a teammate writes. Absent or malformed reads as the default. */
   readonly memoryMode: MemoryMode
   /**

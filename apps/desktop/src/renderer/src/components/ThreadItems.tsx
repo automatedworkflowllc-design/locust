@@ -340,7 +340,20 @@ export function LiveStepCard({
   const said = label.trim().toLowerCase() === word || /^(thinking|working|starting)$/i.test(label.trim())
     ? undefined
     : label.trim()
-  const aside = [said, detail].filter((part) => part !== undefined && part.length > 0)
+  /*
+   * Bounded, because a runtime's own words are not always words.
+   *
+   * Claude Code packs a subagent's type, its description and its last tool
+   * into one message, and the description can be the literal search pattern:
+   * `general-purpose · Searching for .{200}e\+09".{100} · last tool Grep`
+   * wrapped the line onto two rows and drowned the register that had just
+   * been added to make the line readable (Colin, 2026-09-11, screenshot).
+   * The register says what kind of thing this is; this says which one, in as
+   * much room as one line has.
+   */
+  const ASIDE_LIMIT = 56
+  const trimmed = said === undefined || said.length <= ASIDE_LIMIT ? said : `${said.slice(0, ASIDE_LIMIT - 1)}…`
+  const aside = [trimmed, detail].filter((part) => part !== undefined && part.length > 0)
   return (
     <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind} data-register={register}>
       <PixelFace

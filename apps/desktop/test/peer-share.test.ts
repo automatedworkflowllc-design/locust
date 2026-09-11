@@ -20,8 +20,8 @@ Docs mention pnpm test only; the full gate is pnpm check.
 describe('share blocks', () => {
   it('finds every complete block, in order, with its recipient and text', () => {
     expect(parseShareBlocks(TRANSCRIPT)).toEqual([
-      { to: 'Wren', text: 'pnpm check runs build, typecheck and tests together.' },
-      { to: 'Nova', text: 'Docs mention pnpm test only; the full gate is pnpm check.' }
+      { to: 'Wren', text: 'pnpm check runs build, typecheck and tests together.', urgent: false },
+      { to: 'Nova', text: 'Docs mention pnpm test only; the full gate is pnpm check.', urgent: false }
     ])
   })
 

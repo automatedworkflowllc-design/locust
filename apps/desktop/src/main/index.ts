@@ -1118,6 +1118,23 @@ if (!ownsSingleInstanceLock) {
       // along on the next run whoever starts it, so a person who messaged
       // them in the meantime already delivered the message.
       stillWaiting: async (teammateId) => (await workroom.unread(teammateId, 1)).messages.length > 0,
+      mayInterrupt: async () => (await teammates.readSettings()).interrupt === true,
+      /*
+       * Stop whatever this teammate is running, whichever transport owns it.
+       *
+       * Only ever stops. The waiting message is started by the relay's own
+       * held-message path when the run ends, which is the path every other
+       * waiting message takes -- so an interruption cannot become a second
+       * way to start a mission, and the hop cap and the relay switch bound it
+       * because it never goes near either.
+       */
+      stopWorkOf: async (teammateId) => {
+        const codexRun = codexMissions.runIdOwnedBy(teammateId)
+        if (codexRun !== undefined) return codexMissions.cancel(codexRun).ok
+        const antigravityRun = antigravityMissions.runIdOwnedBy(teammateId)
+        if (antigravityRun !== undefined) return antigravityMissions.cancel(antigravityRun)
+        return false
+      },
       notify: sendToWindow
     })
 

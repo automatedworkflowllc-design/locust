@@ -53,14 +53,24 @@ function harness(options: {
   stillWaiting?: (teammateId: string) => Promise<boolean>
   /** The start path failing outright, not answering with an error. */
   throwOnStart?: boolean
+  /** Whether a teammate may stop another's run to be heard now. */
+  mayInterrupt?: boolean
+  /** Whether there was anything to stop. */
+  stopWorks?: boolean
 } = {}) {
   const starts: Parameters<RelayOptions['start']>[0][] = []
   const owners: [string, string][] = []
   const notices: CodexMissionUpdate[] = []
   const asked: string[] = []
+  const stopped: string[] = []
   let enabled = options.enabled ?? true
   const relay = createRelay({
     enabled: async () => enabled,
+    mayInterrupt: async () => options.mayInterrupt === true,
+    stopWorkOf: async (teammateId: string) => {
+      stopped.push(teammateId)
+      return options.stopWorks !== false
+    },
     ...(options.stillWaiting === undefined
       ? {}
       : {
@@ -103,6 +113,7 @@ function harness(options: {
     owners,
     notices,
     asked,
+    stopped,
     switchOff: () => {
       enabled = false
     }
@@ -475,6 +486,81 @@ describe('relaying a share', () => {
       const { relay, notices } = harness({ throwOnStart: true })
       await relay.onShared(sharing(), [message(BOOTY)])
       expect(notices.filter((update) => update.kind === 'relay-start-settled')).toHaveLength(1)
+    })
+  })
+
+  /*
+   * A sender asking to be taken NOW -- `when="now"`.
+   *
+   * A teammate does one thing at a time, so a message that lands mid-run
+   * waits. Usually right, and sometimes far too late: the message worth
+   * interrupting for is "stop, I am editing that file", and delivering it
+   * once the conflicting work is done delivers it after the damage.
+   *
+   * Stopping is the WHOLE action. The reply is started by the ordinary
+   * held-message path when the run ends, so an interruption can only shorten
+   * a wait -- never become a second way to start a mission, and never outrun
+   * the hop cap or the relay switch, because it does not go near either.
+   */
+  describe('a message that asks to be taken now', () => {
+    const urgent = (to: { teammateId: string; name: string }) => ({ ...message(to), urgent: true })
+
+    it('stops the recipient when the person has allowed it', async () => {
+      const { relay, stopped, notices } = harness({ startResults: [BUSY], mayInterrupt: true })
+      await relay.onShared(sharing(), [urgent(BOOTY)])
+      expect(stopped).toEqual(['tm_booty'])
+      expect(said(notices).at(-1)).toContain('stopped part-way')
+    })
+
+    it('stops nobody when it is switched off, and says so rather than going quiet', async () => {
+      const { relay, stopped, notices } = harness({ startResults: [BUSY] })
+      await relay.onShared(sharing(), [urgent(BOOTY)])
+      expect(stopped).toEqual([])
+      expect(said(notices).at(-1)).toContain('switched off in Settings')
+    })
+
+    it('stops nobody when the recipient was free anyway', async () => {
+      const { relay, stopped, starts } = harness({ mayInterrupt: true })
+      await relay.onShared(sharing(), [urgent(BOOTY)])
+      expect(starts).toHaveLength(1)
+      expect(stopped).toEqual([])
+    })
+
+    it('leaves an ordinary message waiting, however busy the recipient is', async () => {
+      const { relay, stopped } = harness({ startResults: [BUSY], mayInterrupt: true })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      expect(stopped).toEqual([])
+    })
+
+    it('still only holds the message once: stopping is not a second way to start', async () => {
+      // The reply goes through the same path every waiting message takes.
+      const { relay, starts, stopped } = harness({ startResults: [BUSY], mayInterrupt: true })
+      await relay.onShared(sharing(), [urgent(BOOTY)])
+      expect(starts).toHaveLength(1)
+      expect(stopped).toEqual(['tm_booty'])
+      await relay.onRunEnded(ended('mission_booty'))
+      expect(starts).toHaveLength(2)
+    })
+
+    it('says nothing about stopping when there was nothing to stop', async () => {
+      // The run ended between the refusal and the stop. Claiming otherwise
+      // would put a sentence about discarded work in a thread where none was.
+      const { relay, notices } = harness({ startResults: [BUSY], mayInterrupt: true, stopWorks: false })
+      await relay.onShared(sharing(), [urgent(BOOTY)])
+      expect(said(notices).some((line) => line.includes('stopped part-way'))).toBe(false)
+    })
+
+    it('cannot outrun the budget: a capped exchange never reaches the stop', async () => {
+      const { relay, stopped } = harness({ mayInterrupt: true })
+      const capped = sharing({ relay: { hop: MAX_RELAY_HOPS, lastMissionOf: { tm_wren: 'mission_wren1' } } })
+      await relay.onShared(capped, [urgent(BOOTY)])
+      expect(stopped).toEqual([])
+    })
+
+    it('cannot outrun the relay switch either', async () => {
+      const { relay, stopped } = harness({ enabled: false, mayInterrupt: true })
+      await relay.onShared(sharing(), [urgent(BOOTY)])
+      expect(stopped).toEqual([])
     })
   })
 

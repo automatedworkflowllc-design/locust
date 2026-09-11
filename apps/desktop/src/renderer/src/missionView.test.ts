@@ -1101,11 +1101,13 @@ describe('which register a live line is', () => {
     ).toMatchObject({ register: 'writing' })
   })
 
-  it('is tool for any other item', () => {
-    expect(
-      buildThread([step({ stepKind: 'item', itemType: 'mcpToolCall' })], { running: true })
-        .find((item) => item.type === 'live-step')
-    ).toMatchObject({ register: 'tool', detail: 'mcpToolCall' })
+  it('is tool for any other item, and drops the runtime’s word for the kind', () => {
+    // The register names the kind in words a person uses, so printing
+    // `mcpToolCall` beside "using a tool" is the same fact twice, in jargon.
+    const line = buildThread([step({ stepKind: 'item', itemType: 'mcpToolCall' })], { running: true })
+      .find((item) => item.type === 'live-step')
+    expect(line).toMatchObject({ register: 'tool' })
+    expect(line?.type === 'live-step' ? line.detail : 'set').toBeUndefined()
   })
 
   it('is the open TOOL, not the turn around it, while one is running', () => {

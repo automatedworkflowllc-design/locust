@@ -25,6 +25,11 @@ import { runtimeDisplayName } from '../shared/runtimes.js'
  *     posts no share starts nothing. The hop cap is a backstop for two
  *     agents thanking each other until the account is empty, not the
  *     length of a conversation.
+ *   - A sender may ask to be taken NOW -- `when="now"` on the share block --
+ *     and with the person's switch on, that stops the recipient's run so the
+ *     message is their next one. Off by default and off is the ordinary
+ *     state: it discards work in flight. The case it exists for is the one
+ *     message that is useless late -- "stop, I am editing that file".
  *   - A recipient who is mid-run cannot take a second mission, so their
  *     reply is HELD and started the moment that run ends. Without this an
  *     exchange dies at its first collision: two teammates asked to argue
@@ -107,6 +112,10 @@ export function relayPrompt(input: {
     opening,
     'Do what it asks if that is within your role and this workspace, using what you actually know; if you cannot help, say so briefly.',
     `Write back only if that helps finish the work: end with one <locust-share to="${input.sender.name}"> block holding your reply.`,
+    // The one case where waiting is worse than interrupting, said as a rule
+    // rather than as a feature -- a model told it has an urgent channel will
+    // find reasons to use it.
+    'Add when="now" to a share ONLY if waiting for them to finish would make it useless or cause a conflict, such as telling them to stop touching a file you are changing; an ordinary answer never needs it.',
     // MEASURED 2026-09-05, three runs of relay-smoke: the recipient sometimes
     // declined the request as a possible prompt injection and asked for
     // context -- good judgement -- but asked it with a <locust-ask> block,
@@ -169,6 +178,16 @@ export interface RelayOptions {
    * would brief them on an empty inbox. Absent means start anyway.
    */
   readonly stillWaiting?: (teammateId: string) => Promise<boolean>
+  /** Whether one teammate may stop another's run to be heard now. Read per message. */
+  readonly mayInterrupt?: () => Promise<boolean>
+  /**
+   * Stop whatever this teammate is running, and say whether anything stopped.
+   *
+   * Deliberately nothing more: the reply itself is started by the ordinary
+   * held-message path when the run ends, so an interruption is only ever
+   * "make the wait short", never a second way to start a mission.
+   */
+  readonly stopWorkOf?: (teammateId: string) => Promise<boolean>
   /** Reaches the window, addressed to the SENDER's run, so notices land in the thread that shared. */
   readonly notify: (update: CodexMissionUpdate) => void
 }
@@ -180,8 +199,11 @@ export interface EndedMission {
   readonly relay: RelayOrigin | undefined
 }
 
+/** A message as the relay receives it: the record, plus what its sender asked for. */
+export type RelayedMessage = WorkroomMessage & { readonly urgent?: boolean }
+
 export interface Relay {
-  onShared(mission: SharingMission, posted: readonly WorkroomMessage[]): Promise<void>
+  onShared(mission: SharingMission, posted: readonly RelayedMessage[]): Promise<void>
   /** Any run ending, however it ended. A meeting counts a recipient who left without answering. */
   onRunEnded(mission: EndedMission): Promise<void>
 }
@@ -363,6 +385,37 @@ export function createRelay(options: RelayOptions): Relay {
       startedBy: { kind: 'relay', hop: input.origin.hop }
     })
     return { kind: 'started', missionId: response.data.missionId }
+  }
+
+  /**
+   * Stop a teammate's run so a waiting message is their next one.
+   *
+   * Said in the sender's thread either way: an interruption that was asked
+   * for and refused by a switch is exactly the case where silence reads as
+   * the message never arriving.
+   */
+  const interruptFor = async (recipient: MissionPeerContext, notice: (message: string) => void): Promise<void> => {
+    let allowed = false
+    try {
+      allowed = (await options.mayInterrupt?.()) === true
+    } catch {
+      allowed = false
+    }
+    if (!allowed) {
+      notice(
+        `${recipient.self.name} was asked to take this before finishing. Teammates interrupting each other is switched off in Settings, so it waits for their run to end.`
+      )
+      return
+    }
+    let stopped = false
+    try {
+      stopped = (await options.stopWorkOf?.(recipient.self.teammateId)) === true
+    } catch {
+      stopped = false
+    }
+    if (stopped) {
+      notice(`${recipient.self.name} was stopped part-way so they can take this next. Whatever they had done is in their own conversation.`)
+    }
   }
 
   /** Hold a reply for a teammate who is mid-run. The first one held wins. */
@@ -560,6 +613,17 @@ export function createRelay(options: RelayOptions): Relay {
                 recipientName: recipient.self.name
               }
             })
+            /*
+             * Asked to be taken now, and allowed to be.
+             *
+             * Stopping is the WHOLE action. The reply is started by the held-
+             * message path when the run ends, which is the same path every
+             * other waiting message takes -- so an interruption can only ever
+             * shorten a wait, never become a second way to start a mission,
+             * and it cannot outrun the hop cap or the relay switch because it
+             * does not go near either.
+             */
+            if (message.urgent === true) await interruptFor(recipient, notice)
             continue
           }
           if (result.kind === 'started') started.push({ teammateId: recipientId, name: recipient.self.name, missionId: result.missionId })

@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.71.0 - 2026-09-11
+
+- **A teammate can ask to be taken now.** A message that arrives while its
+  recipient is working normally waits for their run to end — usually right,
+  sometimes far too late, because the message worth interrupting for is "stop,
+  I'm editing that file". A sender can now mark one urgent, and with the new
+  Settings switch on, that stops the recipient part-way so the message is
+  their next one. Off until you turn it on: it throws away whatever they had
+  in flight, and their unfinished work stays in their own conversation. The
+  budget and the replies switch still bound everything — an interruption only
+  ever shortens a wait, it is never a second way to start work.
+- **A long tool step no longer swamps the live line.** Claude Code packs a
+  subagent's type, its description and its last tool into one message, and a
+  search pattern in the description wrapped the line onto two rows. It is one
+  line again, and the runtime's word for the kind of step is gone — the
+  register already says it, in words you'd use.
+
 ## 0.70.0 - 2026-09-11
 
 - **You can tell your teammate talking from the app narrating.** Every live

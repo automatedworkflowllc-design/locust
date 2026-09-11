@@ -53,8 +53,18 @@ export interface PeerExchange {
     readonly missionId: string
     readonly peer: MissionPeerContext
     readonly text: string
-  }, report: (update: CodexMissionUpdate) => void): Promise<readonly WorkroomMessage[]>
+  }, report: (update: CodexMissionUpdate) => void): Promise<readonly PostedShare[]>
 }
+
+/**
+ * A message as it was just posted, with what the SENDER asked for.
+ *
+ * `urgent` is deliberately not in the durable record. It is a fact about this
+ * moment -- "take this before you finish what you are doing" -- and a message
+ * still waiting after a restart is one whose moment has passed; reviving the
+ * interruption then would stop work nobody is waiting on.
+ */
+export type PostedShare = WorkroomMessage & { readonly urgent: boolean }
 
 export function publicPeerMessage(message: WorkroomMessage, direction: 'received' | 'posted'): PublicPeerMessage {
   return {
@@ -188,7 +198,7 @@ export function createPeerExchange(options: {
       const failed = (message: string): void => {
         report({ kind: 'peer-share-failed', runId: input.runId, missionId: input.missionId, message })
       }
-      const posted: WorkroomMessage[] = []
+      const posted: PostedShare[] = []
       const blocks = parseShareBlocks(input.text)
       if (blocks.length > MAX_SHARES_PER_MISSION) {
         failed(
@@ -260,7 +270,7 @@ export function createPeerExchange(options: {
           missionId: input.missionId,
           message: publicPeerMessage(message, 'posted')
         })
-        posted.push(message)
+        posted.push({ ...message, urgent: block.urgent })
       }
       return posted
     }

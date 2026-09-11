@@ -202,6 +202,14 @@ export interface CodexMissionService {
   hasMission(missionId: string): boolean
   /** The missions this transport is running right now. */
   liveMissionIds(): readonly string[]
+  /**
+   * The run this teammate has going here, if any.
+   *
+   * The busy check already asks this question internally; a teammate who may
+   * be interrupted needs it asked from outside, and answering it with a
+   * mission id would make the caller look the run back up.
+   */
+  runIdOwnedBy(teammateId: string): string | undefined
   interrupt(): void
   dispose(): Promise<void>
 }
@@ -1590,6 +1598,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
     hasMission(missionId: string): boolean {
       return [...active.values()].some((mission) => mission.missionId === missionId)
+    },
+
+    runIdOwnedBy(teammateId: string): string | undefined {
+      return [...active.values()].find((mission) => ownerKeyOf(mission.peer) === teammateId)?.runId
     },
 
     liveMissionIds(): readonly string[] {

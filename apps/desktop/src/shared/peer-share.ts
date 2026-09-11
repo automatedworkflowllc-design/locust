@@ -37,7 +37,25 @@ export const MAX_SHARES_PER_MISSION = 4
  * Both are the app failing to read something unambiguous. The role is stripped
  * in `parseShareBlocks` so this stays one expression.
  */
-const BLOCK = /<locust-share\s+to=(?:"([^"<>\n]{1,60})"|'([^'<>\n]{1,60})')\s*>([\s\S]*?)<\/locust-share>/g
+const BLOCK = /<locust-share\s+([^<>]{1,200}?)\s*>([\s\S]*?)<\/locust-share>/g
+
+/**
+ * One attribute of an open tag, either quoting style.
+ *
+ * The open tag is read as attributes rather than as one fixed shape because
+ * there is now more than one of them, and a model that writes them in the
+ * other order is not making a mistake. `to=` is still the only required one;
+ * a block without it is dropped exactly as before.
+ */
+const ATTRIBUTE = /([a-z-]{1,20})=(?:"([^"<>\n]{0,60})"|'([^'<>\n]{0,60})')/gi
+
+function attributesOf(openTag: string): Record<string, string> {
+  const found: Record<string, string> = {}
+  for (const match of openTag.matchAll(ATTRIBUTE)) {
+    found[(match[1] ?? '').toLowerCase()] = match[2] ?? match[3] ?? ''
+  }
+  return found
+}
 
 /** `Gem (Custom)` → `Gem`. The roster prints the role; the parser wants the name. */
 function withoutRole(name: string): string {
@@ -47,16 +65,31 @@ function withoutRole(name: string): string {
 export interface ShareBlock {
   readonly to: string
   readonly text: string
+  /**
+   * `when="now"`: the sender is asking for this to be taken before the
+   * recipient finishes what they are doing.
+   *
+   * A request, never a power. What the host does with it depends on a switch
+   * the person owns, and the ordinary answer -- wait for their run to end --
+   * is what happens when the switch is off. The whole reason it exists is
+   * that the common urgent message is "stop, I am editing that file", and
+   * delivering it after the conflicting work is done delivers it too late.
+   */
+  readonly urgent: boolean
 }
 
 /** Complete, well-formed blocks in transcript order. Empty bodies are dropped. */
 export function parseShareBlocks(text: string): readonly ShareBlock[] {
   const blocks: ShareBlock[] = []
   for (const match of text.matchAll(BLOCK)) {
-    const to = withoutRole(match[1] ?? match[2] ?? '')
-    const body = (match[3] ?? '').trim()
+    const attributes = attributesOf(match[1] ?? '')
+    const to = withoutRole(attributes.to ?? '')
+    const body = (match[2] ?? '').trim()
     if (to.length === 0 || body.length === 0) continue
-    blocks.push({ to, text: body })
+    // Exactly one word means it, so a model reaching for emphasis with
+    // `when="soon"` or `when="urgent"` gets the ordinary treatment rather
+    // than an interruption it did not know it was asking for.
+    blocks.push({ to, text: body, urgent: (attributes.when ?? '').trim().toLowerCase() === 'now' })
   }
   return blocks
 }

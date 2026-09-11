@@ -98,6 +98,8 @@ export interface AntigravityMissionService {
   has(runId: string): boolean
   hasMission(missionId: string): boolean
   liveMissionIds(): readonly string[]
+  /** The run this teammate has going here, if any. */
+  runIdOwnedBy(teammateId: string): string | undefined
   dispose(): Promise<void>
 }
 
@@ -334,6 +336,8 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     has: (runId) => runs.has(runId),
     hasMission: (missionId) => [...runs.values()].some((run) => run.missionId === missionId),
     liveMissionIds: () => [...runs.values()].map((run) => run.missionId),
+    runIdOwnedBy: (teammateId) =>
+      [...runs.values()].find((run) => run.peer?.self.teammateId === teammateId)?.runId,
 
     async start(prompt, peer, route) {
       if (disposed) throw new AntigravityStartError('The mission service is shutting down.')

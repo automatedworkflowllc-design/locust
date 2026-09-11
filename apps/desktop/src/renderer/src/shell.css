@@ -4006,6 +4006,18 @@ textarea {
   font-size: var(--lc-text-mono-label);
   letter-spacing: 0.02em;
   color: var(--lc-text-muted);
+  /* Two words that mean one thing. Wrapped, "using a / tool" reads as two
+     lines of something else (Colin, 2026-09-11, screenshot). */
+  white-space: nowrap;
+}
+
+/* The line is one line. Whatever the runtime called its step gives way
+   before the register or the clock do. */
+.lc-livestep__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The separator between the name and the register, drawn only when there is

@@ -97,7 +97,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, layout: 'auto' }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, layout: 'auto' }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -307,6 +307,12 @@ function parsedFile(text: string): StoredFile {
     relayHopCap: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedHopCap((rawSettings as Record<string, unknown>).relayHopCap)
       : DEFAULT_RELAY_HOP_CAP,
+    // Only a literal true lets one teammate stop another's run. Absent,
+    // malformed, or a file from a version before this existed all read as
+    // off -- the setting DISCARDS work, so off is the answer nobody regrets.
+    interrupt: typeof rawSettings === 'object' && rawSettings !== null
+      ? (rawSettings as Record<string, unknown>).interrupt === true
+      : false,
     memoryMode: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedMemoryMode((rawSettings as Record<string, unknown>).memoryMode)
       : DEFAULT_MEMORY_MODE,
@@ -570,6 +576,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           relayHopCap: typeof settings === 'object' && settings !== null
             ? parsedHopCap((settings as Record<string, unknown>).relayHopCap)
             : DEFAULT_RELAY_HOP_CAP,
+          interrupt: typeof settings === 'object' && settings !== null
+            ? (settings as Record<string, unknown>).interrupt === true
+            : false,
           memoryMode: typeof settings === 'object' && settings !== null
             ? parsedMemoryMode((settings as Record<string, unknown>).memoryMode)
             : DEFAULT_MEMORY_MODE,

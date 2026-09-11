@@ -759,6 +759,8 @@ export function SettingsScreen({
   onInstallUpdate,
   relay,
   onRelayChange,
+  interrupt,
+  onInterruptChange,
   autoMode,
   askConnectors,
   onAskConnectorsChange,
@@ -811,6 +813,9 @@ export function SettingsScreen({
   /** Whether teammates start runs to answer each other. */
   readonly relay: boolean
   readonly onRelayChange: (relay: boolean) => void
+  /** Whether a teammate may stop another's run to be heard now. */
+  readonly interrupt: boolean
+  readonly onInterruptChange: (interrupt: boolean) => void
   /** Whether the Auto permission mode may be chosen at all. */
   readonly autoMode: boolean
   /** Workspace-wide: every mission at its model's maximum effort. */
@@ -1174,6 +1179,13 @@ export function SettingsScreen({
               which is how two models end up on one piece of work. Switch replies off to make messages wait
               for you instead.
             </p>
+            <p>
+              A teammate does one thing at a time, so a message that arrives while they are working waits
+              until that run ends. A sender can mark a message urgent when waiting would make it useless --
+              &ldquo;stop, I am editing that file&rdquo; is the case it exists for. Letting that stop the
+              recipient part-way throws away whatever they had in flight, so it is off until you turn it on;
+              their unfinished work stays in their own conversation either way.
+            </p>
           </More>
           <div className="lc-settingrows">
             <div className="lc-settingrow">
@@ -1187,6 +1199,40 @@ export function SettingsScreen({
                 aria-checked={relay}
                 aria-label={relay ? 'Switch this off' : 'Switch this on'}
                 onClick={() => onRelayChange(!relay)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+            {/*
+              * Waiting their turn, or not.
+              *
+              * A teammate runs one mission at a time, so a message that
+              * arrives mid-run waits for that run to end. Usually right, and
+              * sometimes far too late: the message worth interrupting for is
+              * "stop, I am editing that file", and delivering it once the
+              * conflicting work is finished delivers it after the damage.
+              *
+              * Off by default and described as what it costs, because it
+              * DISCARDS: the recipient's turn stops where it stands. Only a
+              * sender that asked -- `when="now"` on its message -- can spend
+              * it, and the message still goes through the ordinary waiting
+              * path afterwards, so nothing here widens how far teammates may
+              * go on their own.
+              */}
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                {interrupt
+                  ? 'An urgent message stops the recipient part-way. Their unfinished work stays in their own conversation.'
+                  : 'An urgent message still waits for the recipient to finish.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-switch${interrupt ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={interrupt}
+                aria-label={interrupt ? 'Switch this off' : 'Switch this on'}
+                disabled={!relay}
+                onClick={() => onInterruptChange(!interrupt)}
               >
                 <span className="lc-switch__knob" />
               </button>
