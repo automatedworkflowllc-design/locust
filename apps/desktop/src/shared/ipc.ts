@@ -936,9 +936,28 @@ export interface WorkspaceSettings {
   readonly layout: LayoutPreference
 }
 
-export const DEFAULT_RELAY_HOP_CAP = 6
+/*
+ * The budget is a BACKSTOP, not a conversation length.
+ *
+ * It was six, and six was firing as the ordinary way an exchange ended: five
+ * runs of a one-word question went 6, 6, 3, 6, 7 hops (MEASURED 2026-09-11).
+ * A limit that fires in the normal case is not a backstop, it is a timer, and
+ * a teammate cut off mid-thought is the worse failure of the two.
+ *
+ * Colin, the same day: "I honestly think we should just let the teammates talk
+ * until it comes to a natural end. That just seems like the smoothest
+ * integration." Right about the goal. The thing that stopped it being true was
+ * that exchanges were not ENDING -- the brief now names what a reply costs,
+ * and three runs after it went 2, 5, 3.
+ *
+ * So: generous enough that a person never meets it while the work is real,
+ * small enough that two models stuck in a loop at three in the morning do not
+ * empty an account. Twelve is roughly four times the observed median, and the
+ * spend it bounds is now the WHOLE exchange rather than one chain of it.
+ */
+export const DEFAULT_RELAY_HOP_CAP = 12
 export const MIN_RELAY_HOP_CAP = 1
-export const MAX_RELAY_HOP_CAP = 12
+export const MAX_RELAY_HOP_CAP = 24
 
 /** What the runtime is asking permission to do. */
 /**

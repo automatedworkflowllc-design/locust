@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.80.0 - 2026-09-11
+
+- **The reply budget counts what it always claimed to.** It counted the depth
+  of one chain, and an exchange is not one chain — a reply held for a busy
+  teammate starts later on its own branch, so every decision could be inside
+  the budget while the total was outside it. Measured: seven automatic runs
+  against a budget of six. It counts the whole exchange now, and never less
+  than the chain already proves.
+- **And the budget is a backstop again, not a timer.** It was six, and six was
+  firing as the ordinary way an exchange ended — five runs of a one-word
+  question went 6, 6, 3, 6, 7. Now that teammates actually stop when they are
+  done, it is twelve by default and up to twenty-four, which you should never
+  meet while the work is real.
+- A meeting's reply-back also respected a built-in number rather than the one
+  you chose in Settings. It respects yours.
+
 ## 0.79.0 - 2026-09-11
 
 - **Teammates stop thanking each other.** An exchange is meant to end when a

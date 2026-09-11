@@ -149,9 +149,12 @@ describe('deciding whether a teammate replies on their own', () => {
   })
 
   it('the cap is a backstop, not a conversation length', () => {
-    // Three round trips. An exchange normally ends earlier, when a reply
-    // has nothing more to say and posts no share.
-    expect(MAX_RELAY_HOPS).toBe(6)
+    // It had stopped being one. Six was firing as the ordinary way an
+    // exchange ended -- five runs of a one-word question went 6, 6, 3, 6, 7
+    // (MEASURED 2026-09-11) -- and a limit that fires in the normal case is a
+    // timer. Raised only after the brief was taught to name what a reply
+    // costs, which is what made exchanges end on their own: 2, 5, 3.
+    expect(MAX_RELAY_HOPS).toBe(12)
   })
 
   it('takes the person\u2019s own budget over the constant, and says the number it stopped at', () => {
@@ -703,6 +706,67 @@ describe('a meeting: one asks several, and the next turn waits for all of them',
  * The host knows how much budget is left; the teammate did not. Same shape as
  * everything else fixed today: the app holding a fact the reader needed.
  */
+/*
+ * THE LEAK. MEASURED 2026-09-11, `relay-smoke`: seven automatic runs against a
+ * cap of six.
+ *
+ * `hop` counts the depth of ONE chain, and an exchange is not one chain. A
+ * reply held for a busy teammate (0.69.0) carries the hop decided when the
+ * message was POSTED, so by the time it starts the exchange may have gone
+ * deeper elsewhere -- every decision inside the cap, the total outside it.
+ *
+ * The budget is counted per exchange now, against the mission a person began,
+ * and never below what the chain already proves.
+ */
+describe('a budget spent per exchange, not per chain', () => {
+  it('refuses once the exchange has spent its budget, whatever this chain says', () => {
+    // The leak in one assertion: a hop of 1 -- a fresh-looking chain -- in an
+    // exchange that has already started six runs.
+    expect(decideRelay({ enabled: true, hop: 1, recipientName: 'Booty', cap: 6, spent: 6 })).toEqual({
+      start: false,
+      reason: 'Stopped after 6 automatic replies. Booty will see this on their next run.'
+    })
+  })
+
+  it('allows a deep chain that has not spent the budget', () => {
+    // The other direction, and why `hop` alone was never the right number.
+    expect(decideRelay({ enabled: true, hop: 2, recipientName: 'Booty', cap: 6, spent: 2 })).toEqual({
+      start: true,
+      hop: 3
+    })
+  })
+
+  it('falls back to the chain depth when nothing counted', () => {
+    // A record written before the exchange had a root, or a count lost to a
+    // restart: `hop` survives in the mission record and is a floor.
+    expect(decideRelay({ enabled: true, hop: 6, recipientName: 'Booty', cap: 6 }).start).toBe(false)
+    expect(decideRelay({ enabled: true, hop: 0, recipientName: 'Booty', cap: 6 }).start).toBe(true)
+  })
+
+  it('counts every relayed run against one exchange, across separate chains', async () => {
+    // Two teammates, each answering the same post: two chains, one budget.
+    const { relay, starts } = harness()
+    const first = sharing({ runId: 'run_a', missionId: 'mission_root' })
+    await relay.onShared(first, [message(BOOTY)])
+    // A second share from the SAME root, as a held reply or another branch
+    // would be: hop 1 again, but the exchange has already spent one.
+    await relay.onShared(
+      sharing({ runId: 'run_b', missionId: 'mission_b', relay: { hop: 1, rootMissionId: 'mission_root', lastMissionOf: {} } }),
+      [message(BOOTY)]
+    )
+    expect(starts).toHaveLength(2)
+    // Everything started under this exchange carries its root forward, so the
+    // count cannot be reset by a new branch.
+    for (const start of starts) expect(start.relay.rootMissionId).toBe('mission_root')
+  })
+
+  it('gives a person-started mission its own exchange', async () => {
+    const { relay, starts } = harness()
+    await relay.onShared(sharing({ missionId: 'mission_wren1' }), [message(BOOTY)])
+    expect(starts[0]?.relay.rootMissionId).toBe('mission_wren1')
+  })
+})
+
 describe('telling a reply what a reply costs', () => {
   const brief = (hop: number): string =>
     relayPrompt({

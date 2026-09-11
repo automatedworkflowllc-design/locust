@@ -49,14 +49,37 @@ import { runtimeDisplayName } from '../shared/runtimes.js'
 
 /**
  * Automatic runs per exchange before the host stops and waits for a person.
- * A backstop, not a target: an exchange normally ends when a reply has
- * nothing more to say. Three round trips is generous for finishing a job.
+ *
+ * A backstop, not a target, and it had stopped being one: six was firing as
+ * the ordinary way an exchange ended (MEASURED 2026-09-11, five runs of a
+ * one-word question: 6, 6, 3, 6, 7). A limit that fires in the normal case is
+ * a timer, and a teammate cut off mid-thought is the worse failure. The fix
+ * was to make exchanges END -- the brief now names what a reply costs -- and
+ * then to raise this out of the way. See `DEFAULT_RELAY_HOP_CAP`.
+ *
+ * The default only. The person's own number is read from Settings whenever a
+ * share is decided; this is what the relay uses when nobody has said.
  */
-export const MAX_RELAY_HOPS = 6
+export const MAX_RELAY_HOPS = 12
 
 export interface RelayOrigin {
   /** How many automatic runs preceded this one in the exchange. 0 for a person's mission. */
   readonly hop: number
+  /**
+   * The person-started mission this whole exchange grew from.
+   *
+   * The budget is counted against THIS, because `hop` counts the depth of one
+   * chain and an exchange is not one chain. MEASURED 2026-09-11: seven
+   * automatic runs against a cap of six. A reply held for a busy teammate
+   * (0.69.0) carries the hop decided when the message was posted, so by the
+   * time it starts the exchange may have gone deeper elsewhere -- every
+   * decision inside the cap, the total outside it.
+   *
+   * Absent on a record written before this existed; the sharing mission is
+   * then the root, which is right for the exchange it is about to start and
+   * merely generous for one already running.
+   */
+  readonly rootMissionId?: string
   /**
    * Each participant's latest mission in this exchange, so their next hop
    * continues THEIR conversation rather than starting a stranger. The
@@ -79,12 +102,21 @@ export function decideRelay(input: {
   readonly recipientName: string
   /** The person's own budget for one exchange; the constant is only the default. */
   readonly cap?: number
+  /**
+   * Automatic runs this exchange has ALREADY started, across every chain.
+   *
+   * The budget is spent per exchange, not per chain. Absent reads as `hop`,
+   * which is what this did before it could count -- and is exactly the
+   * reading that let seven runs through a cap of six.
+   */
+  readonly spent?: number
 }): RelayDecision {
   const cap = input.cap ?? MAX_RELAY_HOPS
   if (!input.enabled) {
     return { start: false, reason: 'Teammate replies are switched off in Settings; the message waits for their next run.' }
   }
-  if (input.hop >= cap) {
+  const spent = input.spent ?? input.hop
+  if (spent >= cap) {
     return {
       start: false,
       reason: `Stopped after ${String(cap)} automatic ${cap === 1 ? 'reply' : 'replies'}. ${input.recipientName} will see this on their next run.`
@@ -341,6 +373,48 @@ export function createRelay(options: RelayOptions): Relay {
   /** Which meeting a relayed run is answering, by that run's mission id. */
   const answering = new Map<string, Meeting>()
   /**
+   * Automatic runs started per exchange, keyed by the mission a person began.
+   *
+   * `hop` counts the depth of ONE chain, and an exchange is not one chain --
+   * a reply held for a busy teammate starts later, on its own branch, with
+   * the hop it was given when the message was posted. Seven runs got through
+   * a cap of six that way (MEASURED 2026-09-11). This counts what is actually
+   * being spent.
+   *
+   * Bounded, because nothing tells the relay an exchange is over: the oldest
+   * entries are dropped past a few hundred, which cannot under-count a LIVE
+   * exchange -- a live one is, by definition, the most recently touched.
+   */
+  const spentByExchange = new Map<string, number>()
+  const EXCHANGES_REMEMBERED = 400
+  /**
+   * What an exchange has spent, never less than the chain already proves.
+   *
+   * The counter is the real total when it knows -- but it cannot know about
+   * an exchange that began before this code, or one whose count was lost to a
+   * restart or an eviction. `hop` survives all three, because it is written
+   * into the mission record, and the depth of one chain is a FLOOR on the
+   * number of runs the exchange has had. Taking the larger is right in every
+   * case and cannot let the budget through, which is the failure that
+   * mattered.
+   */
+  const spendOf = (root: string | undefined, hop: number): number =>
+    Math.max(hop, root === undefined ? 0 : spentByExchange.get(root) ?? 0)
+  const recordSpend = (root: string): void => {
+    // Read BEFORE deleting. The delete-then-set is only to move the key to
+    // the end of the insertion order so the eviction below drops the least
+    // recently touched exchange; reading after it would reset the count to
+    // one every time and the cap would never fire at all.
+    const next = (spentByExchange.get(root) ?? 0) + 1
+    spentByExchange.delete(root)
+    spentByExchange.set(root, next)
+    while (spentByExchange.size > EXCHANGES_REMEMBERED) {
+      const oldest = spentByExchange.keys().next().value
+      if (oldest === undefined) break
+      spentByExchange.delete(oldest)
+    }
+  }
+  /**
    * Replies whose recipient was mid-run, by that recipient's teammate id.
    *
    * One entry per teammate, not one per message: everything waiting for them
@@ -436,6 +510,10 @@ export function createRelay(options: RelayOptions): Relay {
       input.notice(`${recipient.self.name} could not reply on their own: ${response.error.message} The message waits for their next run.`)
       return { kind: 'refused' }
     }
+    // Counted HERE, not at the decision: a decision that never became a run
+    // spends nothing, and a held reply that starts minutes later spends then.
+    // This is the one place every relayed run passes through.
+    if (input.origin.rootMissionId !== undefined) recordSpend(input.origin.rootMissionId)
     await options.assignOwner(recipient.self.teammateId, response.data.missionId).catch(() => undefined)
     options.notify({
       kind: 'mission-started',
@@ -511,7 +589,16 @@ export function createRelay(options: RelayOptions): Relay {
     } catch {
       cap = MAX_RELAY_HOPS
     }
-    const decision = decideRelay({ enabled, hop: entry.origin.hop - 1, recipientName: entry.recipient.self.name, cap })
+    const decision = decideRelay({
+      enabled,
+      hop: entry.origin.hop - 1,
+      recipientName: entry.recipient.self.name,
+      cap,
+      // Against what the exchange has spent NOW, not when this was held. That
+      // gap is the leak: every decision was inside the cap and the total was
+      // not, because a held reply carried a hop the exchange had moved past.
+      spent: spendOf(entry.origin.rootMissionId, entry.origin.hop - 1)
+    })
     if (!decision.start) {
       entry.notice(decision.reason)
       return
@@ -555,10 +642,24 @@ export function createRelay(options: RelayOptions): Relay {
     const silent = [...meeting.silent, ...meeting.awaiting.values()]
     const origin: RelayOrigin = {
       hop: meeting.origin.hop + 1,
+      ...(meeting.origin.rootMissionId === undefined ? {} : { rootMissionId: meeting.origin.rootMissionId }),
       lastMissionOf: { ...meeting.origin.lastMissionOf, [from.peer.self.teammateId]: from.missionId }
     }
-    if (origin.hop > MAX_RELAY_HOPS) {
-      notify(meeting.askerRunId, meeting.askerMissionId, `Stopped after ${String(MAX_RELAY_HOPS)} automatic replies. The replies wait for your next run.`)
+    // The PERSON'S cap, and the exchange's actual spend -- this checked the
+    // constant, so a workspace that lowered its budget still got six here.
+    let cap = MAX_RELAY_HOPS
+    try {
+      cap = (await options.hopCap?.()) ?? MAX_RELAY_HOPS
+    } catch {
+      cap = MAX_RELAY_HOPS
+    }
+    const spent = spendOf(origin.rootMissionId, origin.hop)
+    if (spent >= cap) {
+      notify(
+        meeting.askerRunId,
+        meeting.askerMissionId,
+        `Stopped after ${String(cap)} automatic ${cap === 1 ? 'reply' : 'replies'}. The replies wait for your next run.`
+      )
       return
     }
     const notice = (message: string): void => notify(meeting.askerRunId, meeting.askerMissionId, message)
@@ -599,6 +700,9 @@ export function createRelay(options: RelayOptions): Relay {
         cap = MAX_RELAY_HOPS
       }
       const hop = mission.relay?.hop ?? 0
+      // The exchange this belongs to. A mission a PERSON started is its own
+      // root; every relayed one carries the root it was started under.
+      const root = mission.relay?.rootMissionId ?? mission.missionId
       const notice = (message: string): void => notify(mission.runId, mission.missionId, message)
 
       // A reply into an open meeting is held, not relayed: the asker's turn
@@ -639,7 +743,7 @@ export function createRelay(options: RelayOptions): Relay {
         if (seen.has(recipientId) || held.has(recipientId)) continue
         seen.add(recipientId)
 
-        const decision = decideRelay({ enabled, hop, recipientName: message.to.name, cap })
+        const decision = decideRelay({ enabled, hop, recipientName: message.to.name, cap, spent: spendOf(root, hop) })
         if (!decision.start) {
           // Every message that goes nowhere is said, off included: replies
           // are on by default now, so off is a choice the person made and
@@ -657,6 +761,7 @@ export function createRelay(options: RelayOptions): Relay {
           }
           const origin: RelayOrigin = {
             hop: decision.hop,
+            rootMissionId: root,
             lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
           }
           const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap })
@@ -706,7 +811,11 @@ export function createRelay(options: RelayOptions): Relay {
           askerName: mission.peer.self.name,
           askerRunId: mission.runId,
           askerMissionId: mission.missionId,
-          origin: { hop, lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId } },
+          origin: {
+            hop,
+            rootMissionId: root,
+            lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
+          },
           awaiting: new Map(started.map((entry) => [entry.teammateId, entry.name])),
           answered: [],
           silent: []

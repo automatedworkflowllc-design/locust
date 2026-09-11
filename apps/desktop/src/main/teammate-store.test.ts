@@ -301,16 +301,19 @@ describe('workspace settings', () => {
     // 0.21.2 QA, rec. 6: the hop cap becomes the person's own number. It is
     // a workspace-wide bound on spend, so a malformed value must not widen it.
     const { root, store: teammates } = await store()
-    expect((await teammates.readSettings()).relayHopCap).toBe(6)
+    expect((await teammates.readSettings()).relayHopCap).toBe(12)
     await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 2 })
     expect((await teammates.readSettings()).relayHopCap).toBe(2)
     expect((await createTeammateStore({ rootDirectory: root }).readSettings()).relayHopCap).toBe(2)
-    for (const value of [0, 13, 2.5, '4', -1, null, undefined, Number.NaN]) {
+    // 25 is past the bound now, and the old bound of 13 is inside it: the
+    // budget counts the WHOLE exchange rather than one chain of it, and six
+    // was firing as the ordinary ending rather than as a backstop.
+    for (const value of [0, 25, 2.5, '4', -1, null, undefined, Number.NaN]) {
       await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: value })
-      expect((await teammates.readSettings()).relayHopCap).toBe(6)
+      expect((await teammates.readSettings()).relayHopCap, String(value)).toBe(12)
     }
-    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12 })
-    expect((await teammates.readSettings()).relayHopCap).toBe(12)
+    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 24 })
+    expect((await teammates.readSettings()).relayHopCap).toBe(24)
   })
 
 
@@ -325,16 +328,16 @@ describe('workspace settings', () => {
       expect((await teammates.readSettings()).relay).toBe(true)
     }
     await teammates.writeSettings({ swarm: false, relay: false })
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
   })
 
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
   })
 
   it('only a literal true turns it on', async () => {
@@ -342,7 +345,7 @@ describe('workspace settings', () => {
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
       await teammates.writeSettings({ swarm: value, relay: false })
-      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
+      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
     }
   })
 
@@ -355,7 +358,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, layout: 'auto' })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 
@@ -441,9 +444,9 @@ describe('memory mode', () => {
     roots.push(root)
     const teammates = createTeammateStore({ rootDirectory: root })
     expect((await teammates.readSettings()).memoryMode).toBe('auto')
-    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'ask' })).memoryMode).toBe('ask')
-    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'off' })).memoryMode).toBe('off')
-    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, memoryMode: 'sometimes' } as never)).memoryMode).toBe('auto')
+    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, memoryMode: 'ask' })).memoryMode).toBe('ask')
+    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, memoryMode: 'off' })).memoryMode).toBe('off')
+    expect((await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, memoryMode: 'sometimes' } as never)).memoryMode).toBe('auto')
     expect((await createTeammateStore({ rootDirectory: root }).readSettings()).memoryMode).toBe('auto')
   })
 })
@@ -537,7 +540,7 @@ describe('asking before every connector call', () => {
     const { store: teammates } = await store()
     expect((await teammates.readSettings()).askConnectors).toBe(false)
     for (const wrong of ['true', 1, 'yes', {}] as const) {
-      const written = await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: wrong as never, layout: 'auto' })
+      const written = await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: wrong as never, layout: 'auto' })
       expect(written.askConnectors, String(wrong)).toBe(false)
     }
   })
@@ -546,8 +549,8 @@ describe('asking before every connector call', () => {
     // Every write carries the whole object; a caller that forgot this field
     // would switch it off as a side effect of changing the layout.
     const { store: teammates } = await store()
-    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'auto' })
-    const after = await teammates.writeSettings({ swarm: true, relay: true, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'rail' })
+    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'auto' })
+    const after = await teammates.writeSettings({ swarm: true, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'rail' })
     expect(after.askConnectors).toBe(true)
     expect((await teammates.readSettings()).askConnectors).toBe(true)
   })
