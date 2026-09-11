@@ -2318,6 +2318,94 @@ textarea {
   grid-template-columns: 1fr;
 }
 
+/*
+ * A post that became a conversation, drawn as one.
+ *
+ * No card, no box, no grid: a card is Standing and a teammate talking is
+ * Said, and the answer cards only ever got away with the wrong register
+ * because a one-utterance sequence and a card look identical (design agent,
+ * 2026-09-11). Once there are four utterances the difference shows, so this
+ * is the thread's shape -- a face gutter and a body -- inside the post.
+ */
+.lc-roomsaid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-5);
+}
+
+.lc-roomsaid__turn {
+  display: flex;
+  gap: var(--lc-space-4);
+  align-items: flex-start;
+}
+
+/* Consecutive turns by one speaker sit closer and keep the gutter empty:
+   they are one person still talking, not a new voice. */
+.lc-roomsaid__turn.is-continued {
+  margin-top: calc(var(--lc-space-4) * -1 + var(--lc-space-2));
+}
+
+/* Fixed, so every body shares one left edge whether or not a face is drawn. */
+.lc-roomsaid__gutter {
+  flex: none;
+  width: 22px;
+  display: flex;
+  justify-content: center;
+}
+
+.lc-roomsaid__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-roomsaid__who {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-3);
+}
+
+.lc-roomsaid__name {
+  font-weight: 500;
+  color: var(--lc-text-primary);
+}
+
+/* Drawn only where it is load-bearing -- a message that arrived after a newer
+   post exists -- so a time on screen always means something. */
+.lc-roomsaid__at {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+/* An absence. Informational: nothing failed, and the whole reason it is drawn
+   is that dropping it makes the reader blame the budget instead. */
+.lc-roomsaid__absent {
+  margin: 0;
+  padding-left: var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-card);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
+/*
+ * The foot: the budget, the cost, and the ending if it has one, in one line.
+ *
+ * Under the thing it describes rather than in the composer, because it is a
+ * fact about THIS post -- put it in the composer and it is wrong the moment
+ * someone scrolls to an older post that stopped for another reason. The
+ * participants are deliberately absent: they are on screen with faces beside
+ * every message, and naming them again is the app repeating itself.
+ */
+.lc-roomsaid__foot {
+  margin: 0;
+  padding-top: var(--lc-space-3);
+  border-top: 1px solid var(--lc-border-hairline);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
 .lc-roomanswer {
   display: flex;
   flex-direction: column;

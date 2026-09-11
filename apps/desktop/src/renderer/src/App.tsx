@@ -96,6 +96,8 @@ import {
   typedPrompt, assistantMessages } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
+import { sequenceOfPost } from './roomExchange.js'
+import type { RoomExchange } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
@@ -1677,8 +1679,14 @@ export default function App(): ReactElement {
    * linked by the workroom messages they posted and received. Nothing is
    * bookkept twice -- the strip says what the records say.
    */
-  const exchange = useMemo(() => {
-    if (shownData === undefined) return undefined
+  /**
+   * Every mission the window knows, live or recorded, in one shape.
+   *
+   * Lifted out of the exchange memo because a ROOM needs the same thing: a
+   * post's conversation is an exchange rooted at the missions that answered
+   * it, and walking it needs every mission's peer messages.
+   */
+  const missionsForExchange = useMemo(() => {
     const byMission = new Map<string, ExchangeMission>()
     for (const mission of history) {
       byMission.set(mission.missionId, {
@@ -1719,8 +1727,72 @@ export default function App(): ReactElement {
         runId: run.data.runId
       })
     }
-    return exchangeOf(shownData.missionId, [...byMission.values()])
-  }, [shownData, history, runs, missionOwners, teammates])
+    return byMission
+  }, [history, runs, missionOwners, teammates])
+
+  const exchange = useMemo(
+    () => (shownData === undefined ? undefined : exchangeOf(shownData.missionId, [...missionsForExchange.values()])),
+    [shownData, missionsForExchange]
+  )
+
+  /**
+   * A post, as the conversation it became -- or nothing, when it stayed a set
+   * of independent answers and the grid of cards is the truth.
+   *
+   * The exchange is rooted at whichever of the post's own missions reaches
+   * furthest: a reply is a NEW mission linked by a peer message, so the post's
+   * own entries are only the first turns. `exchangeOf` walks the rest.
+   */
+  const roomExchangeFor = (room: PublicRoom, postId: string): RoomExchange | undefined => {
+    const post = room.posts.find((entry) => entry.postId === postId)
+    if (post === undefined) return undefined
+    const all = [...missionsForExchange.values()]
+    const started = Object.values(post.missions)
+    let widest: ReturnType<typeof exchangeOf>
+    for (const missionId of started) {
+      const found = exchangeOf(missionId, all)
+      if (found === undefined) continue
+      if (widest === undefined || found.missionIds.length > widest.missionIds.length) widest = found
+    }
+    if (widest === undefined) return undefined
+    // The newest post that is still older than nothing: anything said after
+    // it, under THIS post, is the case that needs a time.
+    const laterPostAt = room.posts
+      .filter((entry) => entry.at > post.at)
+      .map((entry) => entry.at)
+      .sort()[0]
+    const textOf = (missionId: string): string | undefined => {
+      const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
+      const recorded = historyByIdRef.current.get(missionId)
+      const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
+      const finals = assistantMessages(events).filter((message) => message.final)
+      const raw = finals.at(-1)?.text ?? assistantMessages(events).at(-1)?.text
+      return raw === undefined ? undefined : stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw))))
+    }
+    return sequenceOfPost({
+      post: { postId: post.postId, at: post.at, missions: post.missions, ...(post.queued === undefined ? {} : { waiting: post.queued }) },
+      missions: missionsForExchange,
+      reached: widest.missionIds,
+      textOf,
+      startedAtOf: (missionId) =>
+        [...runs.values()].find((run) => run.data?.missionId === missionId)?.startedAtIso
+        ?? historyByIdRef.current.get(missionId)?.createdAt,
+      finishedOf: (missionId) => {
+        const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
+        return live === undefined ? true : !liveRunIsActive(live)
+      },
+      nameOf: (teammateId) => teammates.find((entry) => entry.teammateId === teammateId)?.name ?? teammateId,
+      laterPostAt,
+      hops: widest.hops,
+      cap: relayHopCap,
+      cost: widest.cost
+    })
+  }
+
+  const roomExchangeCostText = (room: PublicRoom, postId: string): string | undefined => {
+    const found = roomExchangeFor(room, postId)
+    return found === undefined ? undefined : costLine(found.foot.cost)
+  }
 
   /**
    * The answers under one room post, read from the missions it started:
@@ -3146,6 +3218,8 @@ export default function App(): ReactElement {
               teammates={teammates}
               currentRoomId={currentRoomId}
               answersFor={roomAnswersFor}
+              exchangeFor={roomExchangeFor}
+              exchangeCostText={roomExchangeCostText}
               runtimeNameOf={runtimeNameOf}
               onSelectRoom={(roomId) => {
                 setRoomNotice(undefined)

@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
 import { PixelFace } from './PixelFace.js'
+import { footLine } from '../roomExchange.js'
+import type { RoomExchange } from '../roomExchange.js'
 
 /**
  * A room: a named set of teammates and the thread of what a person said to
@@ -323,6 +325,8 @@ export function RoomScreen({
   teammates,
   currentRoomId,
   answersFor,
+  exchangeFor,
+  exchangeCostText,
   runtimeNameOf,
   onSelectRoom,
   onCreateRoom,
@@ -338,6 +342,17 @@ export function RoomScreen({
   readonly currentRoomId: string | undefined
   /** The answers under one post, read from the missions it started. */
   readonly answersFor: (room: PublicRoom, postId: string) => readonly RoomAnswer[]
+  /**
+   * The post as a CONVERSATION, when it became one.
+   *
+   * Undefined means nobody replied to anybody, and the grid of cards below is
+   * the truth. Defined means the grid would be a lie -- it claims these
+   * arrived in parallel and none is a reply to another -- so the post is
+   * drawn as a sequence instead (design agent, 2026-09-11).
+   */
+  readonly exchangeFor?: (room: PublicRoom, postId: string) => RoomExchange | undefined
+  /** What the exchange cost, in the runtime's own unit, already worded. */
+  readonly exchangeCostText?: (room: PublicRoom, postId: string) => string | undefined
   readonly runtimeNameOf: (id: string) => string
   readonly onSelectRoom: (roomId: string | undefined) => void
   readonly onCreateRoom: (name: string, teammateIds: readonly string[]) => Promise<string | undefined>
@@ -681,6 +696,7 @@ export function RoomScreen({
         )}
         {room.posts.map((entry) => {
           const answers = answersFor(room, entry.postId)
+          const exchange = exchangeFor?.(room, entry.postId)
           const waiting = waitingLine(
             (entry.queued ?? []).map((id) => teammates.find((candidate) => candidate.teammateId === id)?.name ?? id)
           )
@@ -756,6 +772,74 @@ export function RoomScreen({
                   })}
                 </span>
               </div>
+              {exchange !== undefined ? (
+                /*
+                  * A post that became an argument is a SEQUENCE, first answers
+                  * included -- not a grid with the rest tucked somewhere.
+                  *
+                  * A grid is a claim: these arrived in parallel and none is a
+                  * reply to another. False the instant message three answers
+                  * message two, and the reader then has to merge two shapes in
+                  * their head to recover one conversation. And not a fold: a
+                  * fold means work summarised, this is what they SAID, and
+                  * Said does not collapse (design agent, 2026-09-11).
+                  */
+                <div className="lc-roomsaid">
+                  {exchange.items.map((item) => {
+                    const who = teammates.find((candidate) => candidate.teammateId === item.teammateId)
+                    const face =
+                      who === undefined ? null : (
+                        <PixelFace hue={who.hue} avatar={who.avatar} size={22} activity="idle" presence="none" />
+                      )
+                    if (item.kind === 'said') {
+                      return (
+                        <div
+                          key={item.key}
+                          className={`lc-roomsaid__turn${item.startsSpeaker ? '' : ' is-continued'}`}
+                          data-said={`${entry.postId}:${item.missionId}`}
+                        >
+                          <span className="lc-roomsaid__gutter">{item.startsSpeaker ? face : null}</span>
+                          <div className="lc-roomsaid__body">
+                            {item.startsSpeaker && (
+                              <span className="lc-roomsaid__who">
+                                <span className="lc-roomsaid__name">{item.name}</span>
+                                {/* The one case where a time is load-bearing:
+                                    this arrived after a NEWER post exists, so
+                                    without it the room looks like it inserted
+                                    a message into the past. */}
+                                {item.showTime && item.at !== undefined && (
+                                  <span className="lc-roomsaid__at lc-mono">
+                                    {new Date(item.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                            <RoomAnswerText text={item.text} />
+                          </div>
+                        </div>
+                      )
+                    }
+                    // Absence, drawn where it happened. Drop it and the reader
+                    // watches the argument stop and blames the budget.
+                    return (
+                      <div key={item.key} className="lc-roomsaid__turn">
+                        <span className="lc-roomsaid__gutter">{face}</span>
+                        <p className="lc-roomsaid__absent">
+                          {item.kind === 'silent'
+                            ? `${item.name}\u2019s turn ended without a reply \u2014 the runtime finished and wrote nothing back. Nothing was changed.`
+                            : `${item.name} is finishing another mission. Their reply is queued.`}
+                        </p>
+                      </div>
+                    )
+                  })}
+                  {/* The budget, the cost and the ending, in one line, under
+                      the thing they describe. Never amber: a rule working as
+                      intended is not an alert. */}
+                  <p className="lc-roomsaid__foot lc-mono">
+                    {footLine(exchange.foot, exchangeCostText?.(room, entry.postId))}
+                  </p>
+                </div>
+              ) : (
               <div className={`lc-roompost__answers${answers.length > ANSWERS_BEFORE_A_LIST ? ' is-list' : ''}`}>
                 {room.teammateIds.map((teammateId) => {
                   const teammate = teammates.find((candidate) => candidate.teammateId === teammateId)
@@ -796,6 +880,7 @@ export function RoomScreen({
                   )
                 })}
               </div>
+              )}
               {waiting !== undefined && (
                 <p className="lc-roomwaiting">
                   <span className="lc-roomwaiting__label lc-mono">Waiting for a slot</span>
