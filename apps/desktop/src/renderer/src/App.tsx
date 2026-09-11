@@ -2118,6 +2118,40 @@ export default function App(): ReactElement {
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId })
       })
       if (!response.ok) {
+        /*
+         * "Already running" is NOT A FAILURE, and must not eat the message.
+         *
+         * A teammate takes one mission at a time, so a message sent a moment
+         * too early is refused -- and the turn was marked `failed`, drawn in
+         * the terminal red register under "The run could not continue", and
+         * the composer let go of the text because the turn was on screen. So
+         * the person's sentence was gone and the conversation said it had
+         * broken. Colin, 2026-09-11, with a screenshot of exactly that: "
+         * message broke off then gave me this error", above a sidebar showing
+         * the teammate idle.
+         *
+         * The app already has the right answer for this and was not using it:
+         * the queue. The message waits for the run in front of it and goes
+         * when that one finishes, which is what a person means by sending it.
+         */
+        if (response.error.code === 'RUN_ALREADY_ACTIVE') {
+          const inFront = [...runs.entries()].find(
+            ([, run]) => liveRunIsActive(run) && teammateId !== undefined && ownerOf(run) === teammateId
+          )?.[0]
+          setRuns((current) => {
+            const next = new Map(current)
+            next.delete(key)
+            return next
+          })
+          if (inFront !== undefined) {
+            setQueued({ key: inFront, text: prompt })
+            return true
+          }
+          // Nothing of theirs is on screen to wait behind -- the cap is full,
+          // or the run belongs to a window this one cannot see. The words go
+          // back in the box, which is the only other honest place for them.
+          return false
+        }
         // A ledger that cannot be written is the same failure whether it hits
         // on the FIRST write or the fortieth, and only the second one used to
         // reach the card that explains it. The first -- a ledger folder that

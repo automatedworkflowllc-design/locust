@@ -667,7 +667,20 @@ export function Composer({
   // What the chip states. Swarm overrides it, and otherwise an unchosen
   // level shows the model's default rather than nothing -- the same value
   // App.tsx sets on a route change, so the chip says what the run gets.
-  const shownEffort = swarm ? swarmEffort : effort ?? defaultEffort(supportedEfforts)
+  /*
+   * The effort a VARIANT ID already encodes, when no separate one was chosen.
+   *
+   * Cursor states its effort in the model name -- `cursor-grok-4.6-high` and
+   * `cursor-grok-4.6-low` are two ids for one model -- so a route carrying
+   * only that id already says which level it is. Falling straight through to
+   * `defaultEffort` made a teammate stored on `cursor-grok-4.6-high` read as
+   * `medium` and, worse, run as medium (MEASURED 2026-09-11: seeded `-high`,
+   * the panel said `medium`). The catalog's own variant map is the answer;
+   * nothing is guessed from the string.
+   */
+  const effortOfShownId = Object.entries(shownFamily?.variants ?? {})
+    .find(([, id]) => id === shownModel)?.[0]
+  const shownEffort = swarm ? swarmEffort : effort ?? effortOfShownId ?? defaultEffort(supportedEfforts)
   // The scale this model actually offers, and where the current level sits on
   // it. Four stops and a switch rather than eight rows; see `effortScale.ts`.
   const { bases: effortBases, hasFast: effortHasFast } = effortScale(supportedEfforts)

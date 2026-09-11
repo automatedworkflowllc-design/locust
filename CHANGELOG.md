@@ -6,6 +6,29 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.74.0 - 2026-09-11
+
+- **The effort slider agreed with nothing.** It read `EFFORT high`, put the
+  knob hard left against "Faster", and said "slower, costlier" underneath —
+  three statements about one value. Cursor does not list its models low to
+  high (`cursor-grok-4.6-high-fast` comes before `cursor-grok-4.6-low`), and
+  the scale was built in listing order, so `high` landed at position one. The
+  scale is sorted now, and a level this build has never seen still keeps the
+  runtime's own order.
+- **A Cursor route stated the wrong effort, and ran at it.** A teammate saved
+  on `cursor-grok-4.6-high` read as `medium` — the effort in the model name
+  was dropped and a default put in its place. The name says which level it is;
+  the app now reads it.
+- **"Already has a mission running" no longer eats your message.** Sending a
+  moment too early marked the turn failed, drew a red "The run could not
+  continue", and threw away what you typed. It is not a failure — it is "not
+  yet" — so the message waits behind the run in front of it and goes when that
+  one finishes, which is what sending it meant.
+- **Changing the folder no longer looks like a crash.** It reopens Locust —
+  every service binds its folder at start-up — and that sentence was behind a
+  fold nobody opens, with the window vanishing before the "Reopening in …"
+  notice could be read. Both fixed.
+
 ## 0.73.0 - 2026-09-11
 
 - **A reply comes down the thread instead of lurching.** Measured on a real

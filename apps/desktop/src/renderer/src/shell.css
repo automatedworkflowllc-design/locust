@@ -4707,6 +4707,12 @@ textarea {
   text-align: right;
 }
 
+/* The consequence of the button above it, in front of the person rather than
+   inside a fold they never open. */
+.lc-folder__warns {
+  margin: var(--lc-space-3) 0 0;
+}
+
 .lc-rostergrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

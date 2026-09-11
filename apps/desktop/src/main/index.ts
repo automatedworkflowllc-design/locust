@@ -1464,7 +1464,11 @@ if (!ownsSingleInstanceLock) {
       app.relaunch({
         args: [...process.argv.slice(1).filter((entry) => !entry.startsWith(WORKSPACE_ARGUMENT)), `${WORKSPACE_ARGUMENT}${next}`]
       })
-      setTimeout(() => app.quit(), 150)
+      // Long enough for "Reopening in <folder>" to be READ. At 150ms the
+      // window vanished before the sentence explaining it could be seen, so
+      // the honest restart was indistinguishable from a crash -- reported as
+      // one twice (Colin, 2026-09-11).
+      setTimeout(() => app.quit(), 900)
       return { ok: true, data: { path: next, reopening: true } } as const
     })
 

@@ -919,10 +919,29 @@ export function SettingsScreen({
                 {workspacePath ?? 'Pick a project folder before the first mission.'}
               </div>
             </div>
-            <button type="button" className="lc-button" onClick={onChooseFolder}>
+            <button
+              type="button"
+              className="lc-button"
+              onClick={onChooseFolder}
+              title={workspacePath === undefined ? 'Choose the folder your teammates work in' : 'Choose another folder. Locust reopens in it.'}
+            >
               {workspacePath === undefined ? 'Choose folder' : 'Change'}
             </button>
           </div>
+          {/*
+            * Said in front of the button, not behind a fold.
+            *
+            * Every service binds its folder at start-up, so changing it
+            * reopens the app -- which is the honest switch and looks exactly
+            * like a crash if nobody was told. Colin has reported it twice as
+            * one: "changing worktree folder still crashes/resets the app."
+            * The sentence existed; it was inside `More`, which is closed.
+            */}
+          {workspacePath !== undefined && (
+            <p className="lc-settings__note lc-folder__warns">
+              Locust reopens in the folder you choose. Stop anything running first.
+            </p>
+          )}
           {workspacePath !== undefined && workspaceBrief !== undefined && (
             <div className="lc-policyrow">
               <span className="lc-tag">LOCUST.md</span>
