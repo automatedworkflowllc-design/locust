@@ -337,7 +337,22 @@ try {
   check('Build this plan started a turn', built === 'clicked', String(built))
   await settle(420)
   const finalHeaders = await headers()
-  const building = finalHeaders.find((h) => h.sandbox === 'workspace-write')
+  /*
+   * The NEWEST write-capable turn, not whichever one readdir happened to
+   * yield first.
+   *
+   * Mission files are named by a uuid, so the directory order has nothing to
+   * do with the order the turns ran in. This smoke makes more than one
+   * workspace-write mission, so `find` returned an arbitrary one -- about
+   * half the time an earlier turn that legitimately continues nothing -- and
+   * the assertion went red with no product involvement. Measured 2026-09-11:
+   * PASS, FAIL, FAIL, PASS on an unchanged build, while a trace compiled into
+   * the renderer showed it sending `followUpOf` on every one of those runs.
+   */
+  const building = finalHeaders
+    .filter((h) => h.sandbox === 'workspace-write')
+    .sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')))
+    .at(-1)
   check('the build turn may write, and continues the plan', building !== undefined && building.continuesFrom?.reason === 'follow-up', JSON.stringify({ sandbox: building?.sandbox, follows: building?.continuesFrom?.reason }))
 } catch (error) {
   failures += 1

@@ -22,6 +22,7 @@ import type { FaceActivity } from '../faceState.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { ActivityCard } from './ActivityCard.js'
 import { MemoryCard } from './MemoryCard.js'
+import { memoriesOfTurn } from '../conversationMemories.js'
 import type { MemoryCardLine } from './MemoryCard.js'
 import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
@@ -330,6 +331,8 @@ export interface ThreadProps {
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean
   readonly restoredMission: PublicRecoveredMission | undefined
+  /** The turn being shown, so its own memories are drawn under it. */
+  readonly shownMissionId?: string
   readonly error: string | undefined
   readonly errorIsPersistence: boolean
   /** Where receipts are written; the ledger-failure card offers to open it. */
@@ -393,6 +396,7 @@ export function Thread({
   events,
   running,
   restoredMission,
+  shownMissionId,
   error,
   errorIsPersistence,
   ledgerPath,
@@ -570,6 +574,8 @@ export function Thread({
               {cardsFor(index, 'before-work').map(peerCard)}
               <ThreadItems items={buildThread(turn.events, { running: false, mayEdit, ...(workspacePath === undefined ? {} : { workspacePath }) })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
               {cardsFor(index, 'after-work').map(peerCard)}
+              {/* What that turn taught the team, under that turn. */}
+              <MemoryCard lines={memoriesOfTurn(peers.memories ?? [], turn.missionId)} />
             </Fragment>
           )
         })}
@@ -614,7 +620,14 @@ export function Thread({
         {peers.notices.map((notice, index) => (
           <DiagnosticLine key={`peer_notice_${index}`} level="warning" message={notice} />
         ))}
-        <MemoryCard lines={peers.memories ?? []} />
+        {/*
+          * The CURRENT turn's memories, under the current turn -- and the
+          * card is per turn now, not one at the foot of the conversation.
+          * A memory learned on turn one used to be drawn under turn five,
+          * which read as something the last reply had just done (Colin,
+          * 2026-09-11).
+          */}
+        <MemoryCard lines={memoriesOfTurn(peers.memories ?? [], shownMissionId)} />
 
         {/*
           Approvals sit at the END of the thread, after everything that has

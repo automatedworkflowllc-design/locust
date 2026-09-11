@@ -3532,6 +3532,7 @@ export default function App(): ReactElement {
                 events={liveRun.events}
                 running={running}
                 restoredMission={liveRun.restored === true ? liveRun.restoredMission : undefined}
+                {...(liveRun.data?.missionId === undefined ? {} : { shownMissionId: liveRun.data.missionId })}
                 error={liveRun.error}
                 errorIsPersistence={liveRun.errorIsPersistence === true}
                 {...(ledgerPath === undefined ? {} : { ledgerPath })}

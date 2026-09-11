@@ -306,8 +306,23 @@ try {
   const after = await evaluate(`(async () => {
     const team = [...document.querySelectorAll('button')].find(b => b.getAttribute('title') === 'Team (Ctrl 2)')
     team.click()
-    await new Promise(r => setTimeout(r, 800))
-    return [...document.querySelectorAll('.lc-routinerow')].map(r => r.innerText.replace(/\\s+/g, ' ')).join(' | ')
+    /*
+     * Poll for the COUNT rather than reading the row once after a fixed
+     * pause. A routine's run counter moves when reconciliation confirms
+     * the last step's mission against the ledger, which is a separate
+     * beat from the step finishing -- so a single read 800ms after the
+     * screen opens catches the card mid-reconcile and reports '0
+     * completed runs, waiting for review' as though the routine had
+     * stalled. Measured 2026-09-11 on an unchanged build: five runs went
+     * FAIL, FAIL, PASS, PASS, PASS, then three more FAIL.
+     */
+    let rows = ''
+    for (let i = 0; i < 80; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      rows = [...document.querySelectorAll('.lc-routinerow')].map(r => r.innerText.replace(/\\s+/g, ' ')).join(' | ')
+      if (/run 1 time/.test(rows)) break
+    }
+    return rows
   })()`)
   check('the routine says it has run once', /run 1 time/.test(String(after)), String(after).slice(0, 200))
 } catch (error) {

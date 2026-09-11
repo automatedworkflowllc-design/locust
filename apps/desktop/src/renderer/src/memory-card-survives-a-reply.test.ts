@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
+import { memoriesOfConversation, memoriesOfTurn, turnsOfConversation } from './conversationMemories.js'
 import type { ConversationMemory } from './conversationMemories.js'
 
 /**
@@ -64,5 +64,38 @@ describe('the memories of a conversation', () => {
     // The list's own order is the order they were learned; this does not
     // re-sort, it filters.
     expect(found.map((line) => line.text)).toEqual(['third', 'first'])
+  })
+})
+
+/**
+ * And each one is drawn where it HAPPENED.
+ *
+ * Colin, 2026-09-11: "the remembered tab should stay at where the memory
+ * happened, not permanently at the bottom." The conversation's memories were
+ * gathered correctly and then drawn as one card at the foot of the thread, so
+ * a memory learned on turn one appeared under turn five -- reading as
+ * something the last reply had just done.
+ */
+describe('a memory belongs to the turn it was learned on', () => {
+  const lines = memoriesOfConversation(
+    [memory('turn1', 'learned first'), memory('turn3', 'learned later')],
+    turnsOfConversation('turn2', ROWS)
+  )
+
+  it('keeps the turn on the line, so the thread can place it', () => {
+    expect(lines.map((line) => line.missionId)).toEqual(['turn1', 'turn3'])
+  })
+
+  it('gives each turn only its own', () => {
+    expect(memoriesOfTurn(lines, 'turn1').map((line) => line.text)).toEqual(['learned first'])
+    expect(memoriesOfTurn(lines, 'turn3').map((line) => line.text)).toEqual(['learned later'])
+  })
+
+  it('gives a turn that taught nothing an empty card rather than a neighbour list', () => {
+    expect(memoriesOfTurn(lines, 'turn2')).toEqual([])
+  })
+
+  it('draws nothing at all when there is no turn to draw under', () => {
+    expect(memoriesOfTurn(lines, undefined)).toEqual([])
   })
 })

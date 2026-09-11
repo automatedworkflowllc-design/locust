@@ -251,9 +251,16 @@ try {
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 200))
     document.querySelector('.lc-roomcompose').requestSubmit()
-    for (let i = 0; i < 40; i += 1) {
+    /*
+     * Wait for the CARDS, which is what the next assertion is about, not for
+     * the post that carries them. The post appears as soon as it is written;
+     * a card appears per teammate as each run is admitted, and those are not
+     * the same moment. Waiting on the post and then asserting on cards read
+     * a half-drawn room about half the time.
+     */
+    for (let i = 0; i < 80; i += 1) {
       await new Promise(r => setTimeout(r, 250))
-      if (document.querySelectorAll('.lc-roompost').length === 2) break
+      if (document.querySelectorAll('.lc-roomanswer').length >= 4) break
     }
     return ${ROOM_STATE}
   })()`))

@@ -19,6 +19,8 @@ export interface MemoryCardLine {
   readonly by: string
   readonly text: string
   readonly status: 'kept' | 'proposed'
+  /** The turn it was learned on: the card is drawn under that turn. */
+  readonly missionId: string
 }
 
 export function memoryCardSummary(lines: readonly MemoryCardLine[]): string {

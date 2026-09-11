@@ -28,6 +28,16 @@ export interface MemoryLine {
   readonly by: string
   readonly text: string
   readonly status: 'kept' | 'proposed'
+  /**
+   * The turn it was learned on, kept so the card can sit THERE.
+   *
+   * Colin, 2026-09-11: "the remembered tab should stay at where the memory
+   * happened, not permanently at the bottom." It was dropped here and the
+   * thread drew one card at the foot of the conversation, so a memory from
+   * turn one appeared under turn five -- reading as something the last reply
+   * had just done.
+   */
+  readonly missionId: string
 }
 
 /**
@@ -53,6 +63,14 @@ export function turnsOfConversation(
  * happened, so a card opened on a long conversation reads as a history rather
  * than as a set.
  */
+export function memoriesOfTurn(
+  lines: readonly MemoryLine[],
+  missionId: string | undefined
+): readonly MemoryLine[] {
+  return missionId === undefined ? [] : lines.filter((line) => line.missionId === missionId)
+}
+
+
 export function memoriesOfConversation(
   memories: readonly ConversationMemory[],
   turns: ReadonlySet<string>
@@ -60,5 +78,5 @@ export function memoriesOfConversation(
   if (turns.size === 0) return []
   return memories
     .filter((memory) => memory.missionId !== undefined && turns.has(memory.missionId))
-    .map((memory) => ({ by: memory.by.name, text: memory.text, status: memory.status }))
+    .map((memory) => ({ by: memory.by.name, text: memory.text, status: memory.status, missionId: memory.missionId! }))
 }
