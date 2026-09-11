@@ -135,6 +135,30 @@ describe('the sequence', () => {
     expect(found.items.at(-1)).toMatchObject({ kind: 'replying', name: 'Gem', missionId: 'm_gem2' })
   })
 
+  it('carries what a live turn is doing, so a room can draw the thread’s line', () => {
+    // Colin, 2026-09-11: "lets make this behave more like our actual chat,
+    // where the animated ...'s appear and all the calls." The room used to
+    // draw a flat "Gem is replying..." beside a static dot.
+    const found = sequenceOfPost(
+      input({
+        textOf: (id) => (id === 'm_gem2' ? undefined : ARGUMENT[id as keyof typeof ARGUMENT]?.text),
+        finishedOf: (id) => id !== 'm_gem2',
+        liveOf: (id) =>
+          id !== 'm_gem2'
+            ? undefined
+            : { register: 'tool', label: 'README.md', detail: undefined, startedAt: '2026-09-11T10:00:05.000Z', thinking: false }
+      })
+    )!
+    expect(found.items.at(-1)).toMatchObject({ kind: 'replying', live: { register: 'tool', label: 'README.md' } })
+  })
+
+  it('has nothing to say a hop is doing before its run exists', () => {
+    // The host has decided on this reply and the process does not exist, so
+    // there is nothing it could honestly be said to be doing.
+    const found = sequenceOfPost(input({ starting: [{ teammateId: 'tm_wren', answering: 'm_gem2' }] }))!
+    expect(found.items.at(-1)).toMatchObject({ kind: 'replying', live: undefined })
+  })
+
   it('lists a member waiting for a slot, so the room does not look finished', () => {
     const found = sequenceOfPost(input({ post: { ...POST, waiting: ['tm_gem'] } }))!
     expect(found.items.at(-1)).toMatchObject({ kind: 'waiting', name: 'Gem' })

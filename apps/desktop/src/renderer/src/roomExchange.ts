@@ -2,6 +2,23 @@ import type { ExchangeMission } from './exchange.js'
 import type { RunCost } from './cost.js'
 
 /**
+ * What a mission is doing right now, in the room's words.
+ *
+ * The same four facts the thread's live line draws, so a room can draw the
+ * SAME line rather than a flat sentence beside it -- Colin, 2026-09-11: "lets
+ * make this behave more like our actual chat, where the animated ...'s appear
+ * and all the calls."
+ */
+export interface LiveTurn {
+  readonly register: 'starting' | 'working' | 'thinking' | 'writing' | 'tool' | 'connector'
+  readonly label: string | undefined
+  readonly detail: string | undefined
+  readonly startedAt: string
+  /** Waiting on the model with nothing to show: the dots. */
+  readonly thinking: boolean
+}
+
+/**
  * A post that became a conversation, in the order it was said.
  *
  * The design agent's ruling, 2026-09-11, answering where an exchange goes in
@@ -70,6 +87,14 @@ export type RoomExchangeItem =
       readonly name: string
       /** Absent while the run is still being started; there is no mission yet. */
       readonly missionId: string | undefined
+      /**
+       * What that run is doing, when there is a run to ask.
+       *
+       * Absent for a hop the host has decided on and not started: there is no
+       * process yet, so there is nothing it could honestly be said to be
+       * doing. The room draws `starting` for those, which is what they are.
+       */
+      readonly live: LiveTurn | undefined
     }
 
 export interface RoomExchangeFoot {
@@ -124,6 +149,8 @@ export interface SequenceInput {
   readonly cost: RunCost | undefined
   /** Replies being started right now, anywhere in the app. */
   readonly starting?: readonly StartingReply[]
+  /** What a mission is doing, for the turns that are still happening. */
+  readonly liveOf?: (missionId: string) => LiveTurn | undefined
 }
 
 /**
@@ -180,7 +207,8 @@ export function sequenceOfPost(input: SequenceInput): RoomExchange | undefined {
           key: `replying_${entry.missionId}`,
           teammateId,
           name,
-          missionId: entry.missionId
+          missionId: entry.missionId,
+          live: input.liveOf?.(entry.missionId)
         })
         lastSpeaker = undefined
         continue
@@ -224,7 +252,8 @@ export function sequenceOfPost(input: SequenceInput): RoomExchange | undefined {
       key: `replying_${entry.teammateId}_${entry.answering}`,
       teammateId: entry.teammateId,
       name: input.nameOf(entry.teammateId),
-      missionId: undefined
+      missionId: undefined,
+      live: undefined
     })
   }
 

@@ -97,7 +97,7 @@ import {
 import type { LiveStarter } from './missionView.js'
 import { conversationCost, costLine, latestContext } from './cost.js'
 import { sequenceOfPost } from './roomExchange.js'
-import type { RoomExchange, StartingReply } from './roomExchange.js'
+import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
@@ -1821,7 +1821,8 @@ export default function App(): ReactElement {
       hops: whole.hops,
       cap: relayHopCap,
       cost: whole.cost,
-      starting: Object.values(relayStarting)
+      starting: Object.values(relayStarting),
+      liveOf: liveTurnOf
     })
   }
 
@@ -3060,18 +3061,34 @@ export default function App(): ReactElement {
    * request". Twelve rows reading RUNNING tell you which to open only by
    * opening them.
    */
-  const missionDoing = (missionId: string): string | undefined => {
-    const waiting = approvals.find((request) => request.missionId === missionId)
-    // What it wants beats what it is doing: a run that stopped to ask is not
-    // doing anything, and that is the row a person is looking for.
-    if (waiting !== undefined) return `Pending: ${waiting.summary}`
+  const liveTurnOf = (missionId: string): LiveTurn | undefined => {
     const run = [...runs.values()].find((entry) => entry.data?.missionId === missionId)
     if (run === undefined || !liveRunIsActive(run)) return undefined
     const live = buildThread(run.events, { running: true, ...(run.startedAtIso === undefined ? {} : { startedAt: run.startedAtIso }) })
       .find((item) => item.type === 'live-step')
     if (live === undefined || live.type !== 'live-step') return undefined
+    return {
+      register: live.register,
+      label: live.label,
+      detail: live.detail,
+      startedAt: live.startedAt,
+      // The same rule the thread uses: the dots mean waiting on the model
+      // with nothing to show, which is a reasoning step or a gap between
+      // steps -- not a tool that is visibly running.
+      thinking: live.waiting === true || live.register === 'thinking'
+    }
+  }
+
+  const missionDoing = (missionId: string): string | undefined => {
+    const waiting = approvals.find((request) => request.missionId === missionId)
+    // What it wants beats what it is doing: a run that stopped to ask is not
+    // doing anything, and that is the row a person is looking for.
+    if (waiting !== undefined) return `Pending: ${waiting.summary}`
+    const live = liveTurnOf(missionId)
+    if (live === undefined) return undefined
     const word = REGISTER_WORD[live.register]
-    const said = /^(thinking|working|starting)$/i.test(live.label.trim()) ? undefined : live.label.trim()
+    const said =
+      live.label === undefined || /^(thinking|working|starting)$/i.test(live.label.trim()) ? undefined : live.label.trim()
     return [word, said, live.detail].filter((part) => part !== undefined && part.length > 0).join(' · ')
   }
 

@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
-import { AgentText } from './ThreadItems.js'
+import { AgentText, LiveRegisterLine } from './ThreadItems.js'
 import { Icon } from './Icon.js'
 import { PixelFace } from './PixelFace.js'
 import { footLine } from '../roomExchange.js'
@@ -866,18 +866,41 @@ export function RoomScreen({
                       * still booting a runtime.
                       */
                     if (item.kind === 'replying') {
+                      /*
+                        * The thread's live line, in the room.
+                        *
+                        * It used to be a flat `Gem is replying…` beside a
+                        * static dot, while the thread two clicks away animated
+                        * and named the tool it was on. Colin, 2026-09-11:
+                        * "lets make this behave more like our actual chat,
+                        * where the animated ...'s appear and all the calls."
+                        * Same component, so they cannot drift again.
+                        *
+                        * No run yet means `starting` -- the host has decided
+                        * on this reply and the process does not exist, which
+                        * is a true thing to say and the only one available.
+                        */
                       return (
-                        <div key={item.key} className="lc-roomsaid__turn" data-replying={item.teammateId}>
+                        <div
+                          key={item.key}
+                          className="lc-roomsaid__turn is-live"
+                          data-replying={item.teammateId}
+                          data-register={item.live?.register ?? 'starting'}
+                        >
                           <span className="lc-roomsaid__gutter">{face}</span>
                           <div className="lc-roomsaid__body">
                             <span className="lc-roomsaid__who">
                               <span className="lc-roomsaid__name">{item.name}</span>
-                              <span className="lc-roomsaid__now lc-mono">
-                                <span className="lc-dot lc-tone-lime" />
-                                replying now
-                              </span>
                             </span>
-                            <p className="lc-roomsaid__pending">{item.name} is replying…</p>
+                            <span className="lc-roomsaid__live">
+                              <LiveRegisterLine
+                                register={item.live?.register ?? 'starting'}
+                                {...(item.live?.label === undefined ? {} : { label: item.live.label })}
+                                {...(item.live?.detail === undefined ? {} : { detail: item.live.detail })}
+                                startedAt={item.live?.startedAt ?? entry.at}
+                                thinking={item.live?.thinking ?? true}
+                              />
+                            </span>
                           </div>
                         </div>
                       )

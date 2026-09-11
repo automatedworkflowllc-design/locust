@@ -2450,10 +2450,13 @@ textarea {
   color: var(--lc-text-muted);
 }
 
-.lc-roomsaid__pending {
-  margin: 0;
-  color: var(--lc-text-muted);
-  font-style: italic;
+/* The thread's live line, inside a room turn. Laid out the way the thread
+   lays it out, so the two cannot drift apart by stylesheet. */
+.lc-roomsaid__live {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  min-width: 0;
 }
 
 /* An absence. Informational: nothing failed, and the whole reason it is drawn

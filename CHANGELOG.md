@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.73.0 - 2026-09-11
+
+- **A reply comes down the thread instead of lurching.** Measured on a real
+  400-word answer: the thread used to move on 26 of 1361 frames, with 47% of
+  the whole journey in five of them and one single jump of 221px — a third of
+  a screen at once. It now walks: 123 moving frames, a biggest jump of 17px,
+  and 9% in the worst five. The text is on screen the moment it arrives; the
+  page just takes a few frames to walk to it. Opening a conversation still
+  jumps, and "reduce motion" still snaps.
+- **A room shows what a teammate is doing, not just that they are.** A live
+  turn in a room drew a flat "Gem is replying…" while the thread two clicks
+  away animated and named the tool. It is the same line now, in both places —
+  the register, the animated dots, the tool or connector, and the clock.
+
 ## 0.72.1 - 2026-09-11
 
 - **A connector call is named as one even without the `mcp__` prefix.** A

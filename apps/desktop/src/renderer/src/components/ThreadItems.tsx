@@ -260,6 +260,98 @@ function elapsedLabel(startedAt: string, now: number): string {
   return `${minutes}m ${seconds % 60}s`
 }
 
+/**
+ * A clock that runs while the line is on screen.
+ *
+ * From the event's OWN timestamp, so a step already running when the view
+ * opened reports its real age rather than starting at zero.
+ */
+function useElapsed(startedAt: string): string {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  return elapsedLabel(startedAt, now)
+}
+
+/**
+ * WHOSE, WHICH REGISTER, and what it is on -- the one live line this app has.
+ *
+ * Drawn without a face on purpose: a thread puts the teammate's face in its
+ * own gutter and a room puts it in the room's, and the two gutters are
+ * different widths. Everything to the right of the face is this, in both
+ * places, because Colin asked for the room to behave like the thread --
+ * 2026-09-11, on a room drawing a flat "Gem is replying…" while the thread
+ * beside it animated and named the tool: "lets make this behave more like our
+ * actual chat, where the animated ...'s appear and all the calls".
+ */
+export function LiveRegisterLine({
+  name,
+  register,
+  label,
+  detail,
+  startedAt,
+  thinking
+}: {
+  /** Absent in a one-to-one thread, where the header already says whose it is. */
+  readonly name?: string
+  readonly register: LiveRegister
+  /** Whatever the runtime called this step, if it called it anything. */
+  readonly label?: string
+  readonly detail?: string
+  readonly startedAt: string
+  /** Draws the dots: waiting on the model with nothing to show yet. */
+  readonly thinking: boolean
+}): ReactElement {
+  const elapsed = useElapsed(startedAt)
+  const word = REGISTER_WORD[register]
+  /*
+   * The runtime's own words, when they ARE words and not the register said
+   * twice. `label` is "Thinking" or "Working" whenever the runtime named no
+   * step, and printing that beside "thinking" is the app stuttering.
+   */
+  const said =
+    label === undefined || label.trim().toLowerCase() === word || /^(thinking|working|starting)$/i.test(label.trim())
+      ? undefined
+      : label.trim()
+  /*
+   * Bounded, because a runtime's own words are not always words.
+   *
+   * Claude Code packs a subagent's type, its description and its last tool
+   * into one message, and the description can be the literal search pattern:
+   * `general-purpose · Searching for .{200}e\+09".{100} · last tool Grep`
+   * wrapped the line onto two rows and drowned the register that had just
+   * been added to make the line readable (Colin, 2026-09-11, screenshot).
+   */
+  const ASIDE_LIMIT = 56
+  const trimmed = said === undefined || said.length <= ASIDE_LIMIT ? said : `${said.slice(0, ASIDE_LIMIT - 1)}…`
+  const aside = [trimmed, detail].filter((part) => part !== undefined && part.length > 0)
+  return (
+    <>
+      <span className="lc-livestep__label">
+        {name !== undefined && <span className="lc-livestep__who">{name}</span>}
+        <span className="lc-livestep__register lc-mono">
+          {word}
+          {thinking && (
+            <span className="lc-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          )}
+        </span>
+      </span>
+      {/* The clock sits beside the words, not at the far edge: "using a tool ·
+          read_file · 57s" reads as one statement about what is happening. */}
+      <span className="lc-rail__meta lc-livestep__meta">
+        {aside.map((part) => `${String(part)} · `)}
+        {elapsed}
+      </span>
+    </>
+  )
+}
+
 /** What a live line IS, in the words a person would use for it. */
 export const REGISTER_WORD: Record<LiveRegister, string> = {
   starting: 'starting',
@@ -317,12 +409,6 @@ export function LiveStepCard({
   /** Decided once from the events, the same way the sidebar and header decide it. */
   readonly activity: FaceActivity
 }): ReactElement {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-  const elapsed = elapsedLabel(startedAt, now)
   // The dots meant "a reasoning step is open", which most runtimes never
   // report -- so the nicest signal in the app almost never appeared (Colin,
   // 2026-09-04: "I feel like i never see the '...'"). They now mean the
@@ -331,29 +417,6 @@ export function LiveStepCard({
   // between steps, which is most of the time a person spends waiting.
   const thinking = activity === 'thinking' || waiting
   const face = owner ?? { hue: 'lime' as const, avatar: RUNTIME_FACE }
-  const word = REGISTER_WORD[register]
-  /*
-   * The runtime's own words, when they ARE words and not the register said
-   * twice. `label` is "Thinking" or "Working" whenever the runtime named no
-   * step, and printing that beside "thinking" is the app stuttering.
-   */
-  const said = label.trim().toLowerCase() === word || /^(thinking|working|starting)$/i.test(label.trim())
-    ? undefined
-    : label.trim()
-  /*
-   * Bounded, because a runtime's own words are not always words.
-   *
-   * Claude Code packs a subagent's type, its description and its last tool
-   * into one message, and the description can be the literal search pattern:
-   * `general-purpose · Searching for .{200}e\+09".{100} · last tool Grep`
-   * wrapped the line onto two rows and drowned the register that had just
-   * been added to make the line readable (Colin, 2026-09-11, screenshot).
-   * The register says what kind of thing this is; this says which one, in as
-   * much room as one line has.
-   */
-  const ASIDE_LIMIT = 56
-  const trimmed = said === undefined || said.length <= ASIDE_LIMIT ? said : `${said.slice(0, ASIDE_LIMIT - 1)}…`
-  const aside = [trimmed, detail].filter((part) => part !== undefined && part.length > 0)
   return (
     <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind} data-register={register}>
       <PixelFace
@@ -363,25 +426,14 @@ export function LiveStepCard({
         activity={activity}
         {...(owner?.teammateId === undefined ? {} : { teammateId: owner.teammateId })}
       />
-      <span className="lc-livestep__label">
-        {owner?.name !== undefined && <span className="lc-livestep__who">{owner.name}</span>}
-        <span className="lc-livestep__register lc-mono">
-          {word}
-          {thinking && (
-            <span className="lc-dots" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </span>
-          )}
-        </span>
-      </span>
-      {/* The clock sits beside the words, not at the far edge: "using a tool ·
-          read_file · 57s" reads as one statement about what is happening. */}
-      <span className="lc-rail__meta lc-livestep__meta">
-        {aside.map((part) => `${String(part)} · `)}
-        {elapsed}
-      </span>
+      <LiveRegisterLine
+        {...(owner?.name === undefined ? {} : { name: owner.name })}
+        register={register}
+        label={label}
+        {...(detail === undefined ? {} : { detail })}
+        startedAt={startedAt}
+        thinking={thinking}
+      />
     </div>
   )
 }
