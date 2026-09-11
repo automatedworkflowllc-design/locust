@@ -50,6 +50,16 @@ export interface RoutineRunnerOptions {
   /** How a finished mission ended, from the durable record. Undefined when the ledger cannot say. */
   readonly phaseOf: (missionId: string) => Promise<RecoveredMissionPhase | undefined>
   /**
+   * Whether that mission is still RUNNING somewhere in this process.
+   *
+   * The ledger cannot answer it. `phaseFor` reads the events and returns
+   * `interrupted` when it finds no terminal one -- which is exactly what a
+   * mission that has not finished yet looks like. So "still going" and
+   * "abandoned mid-flight" are the same record, and only the live set can
+   * tell them apart.
+   */
+  readonly isLive?: (missionId: string) => boolean
+  /**
    * Whether that turn ended by ASKING the person something.
    *
    * A turn that ends on a decision block completes perfectly normally -- exit
@@ -153,6 +163,19 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         await hold(routine, execution, 'Open the original workspace to reconcile this attempt. Nothing will be replayed.')
         continue
       }
+      /*
+       * A mission that is STILL RUNNING is not a mission to review.
+       *
+       * `phaseFor` returns `interrupted` for any mission with no terminal
+       * event, and a run that is a second from finishing has none -- so
+       * reconciling during that window held the routine with "Review
+       * required: that run was interrupted", and nothing re-checked it. The
+       * routine then sat at "waiting for review, 0 completed runs" forever,
+       * with both its steps done. Measured 2026-09-11: the same routine
+       * passed and failed on an unchanged build depending on whether the
+       * terminal event landed first.
+       */
+      if (execution.missionId !== undefined && options.isLive?.(execution.missionId) === true) continue
       const phase = execution.missionId === undefined ? undefined : await options.phaseOf(execution.missionId).catch(() => undefined)
       const question = execution.missionId === undefined || options.askedAQuestion === undefined
         ? true : await options.askedAQuestion(execution.missionId).catch(() => true)
@@ -399,6 +422,10 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       // reconciliation too, rather than leaving this session stuck in RAM.
       for (const progress of [...active.values()]) {
         const phase = await options.phaseOf(progress.missionId).catch(() => undefined)
+        // Same rule as reconcile: `interrupted` is also what a run that has
+        // not written its terminal event yet looks like, so a live mission is
+        // not one that ended.
+        if (options.isLive?.(progress.missionId) === true) continue
         if (phase === 'completed' || phase === 'failed' || phase === 'cancelled' || phase === 'interrupted') await runner.onRunEnded({ missionId: progress.missionId })
       }
       await reconcile()

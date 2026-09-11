@@ -1146,6 +1146,9 @@ if (!ownsSingleInstanceLock) {
         ),
       assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
       phaseOf: async (missionId) => (await missionLedger.getMission(missionId))?.phase,
+      // Whichever transport owns it. The ledger cannot say "still going" --
+      // a mission with no terminal event reads as `interrupted` either way.
+      isLive: (missionId) => codexMissions.hasMission(missionId) || antigravityMissions.hasMission(missionId),
       /*
        * Whether that turn ended by asking the person something.
        *
