@@ -38,18 +38,42 @@ function sharing(overrides: Partial<SharingMission> = {}): SharingMission {
   }
 }
 
-function harness(options: { enabled?: boolean; startResult?: CodexMissionStartResponse; booty?: MissionPeerContext; peerContextFor?: RelayOptions['peerContextFor'] } = {}) {
+const BUSY: CodexMissionStartResponse = {
+  ok: false,
+  error: { code: 'RUN_ALREADY_ACTIVE', message: 'Booty already has a mission running.' }
+}
+
+function harness(options: {
+  enabled?: boolean
+  startResult?: CodexMissionStartResponse
+  /** Answers by attempt, so a recipient can be busy on the first and free on the next. */
+  startResults?: readonly (CodexMissionStartResponse | undefined)[]
+  booty?: MissionPeerContext
+  peerContextFor?: RelayOptions['peerContextFor']
+  stillWaiting?: (teammateId: string) => Promise<boolean>
+} = {}) {
   const starts: Parameters<RelayOptions['start']>[0][] = []
   const owners: [string, string][] = []
   const notices: CodexMissionUpdate[] = []
+  const asked: string[] = []
+  let enabled = options.enabled ?? true
   const relay = createRelay({
-    enabled: async () => options.enabled ?? true,
+    enabled: async () => enabled,
+    ...(options.stillWaiting === undefined
+      ? {}
+      : {
+          stillWaiting: async (teammateId: string) => {
+            asked.push(teammateId)
+            return options.stillWaiting!(teammateId)
+          }
+        }),
     peerContextFor: options.peerContextFor ?? (async (id) =>
       id === BOOTY.teammateId ? (options.booty ?? bootyPeer) : id === WREN.teammateId ? wrenPeer : undefined),
     start: async (input) => {
       starts.push(input)
+      const byAttempt = options.startResults?.[starts.length - 1]
       return (
-        options.startResult ?? {
+        byAttempt ?? options.startResult ?? {
           ok: true,
           data: {
             runId: `run_${String(starts.length)}`,
@@ -70,7 +94,26 @@ function harness(options: { enabled?: boolean; startResult?: CodexMissionStartRe
     },
     notify: (update) => notices.push(update)
   })
-  return { relay, starts, owners, notices }
+  return {
+    relay,
+    starts,
+    owners,
+    notices,
+    asked,
+    switchOff: () => {
+      enabled = false
+    }
+  }
+}
+
+/** A run ending, as the service reports it. */
+function ended(missionId: string, peer: MissionPeerContext | undefined = bootyPeer) {
+  return { missionId, peer, relay: undefined }
+}
+
+/** What the thread that shared was told, in order. */
+function said(notices: readonly CodexMissionUpdate[]): string[] {
+  return notices.flatMap((update) => (update.kind === 'relay-notice' ? [update.message] : []))
 }
 
 describe('deciding whether a teammate replies on their own', () => {
@@ -304,12 +347,92 @@ describe('relaying a share', () => {
 
   it("says why when the recipient's run could not start, and lets the message wait", async () => {
     const { relay, notices, owners } = harness({
-      startResult: { ok: false, error: { code: 'RUN_ALREADY_ACTIVE', message: 'Booty already has a mission running.' } }
+      startResult: { ok: false, error: { code: 'RUNTIME_START_FAILED', message: 'Claude is not installed.' } }
     })
     await relay.onShared(sharing(), [message(BOOTY)])
     expect(owners).toHaveLength(0)
-    expect(notices[0]?.kind === 'relay-notice' ? notices[0].message : '').toContain('Booty already has a mission running')
-    expect(notices[0]?.kind === 'relay-notice' ? notices[0].message : '').toContain('waits for their next run')
+    expect(said(notices)[0]).toContain('Claude is not installed')
+    expect(said(notices)[0]).toContain('waits for their next run')
+  })
+
+  /*
+   * Colin, 2026-09-11, watching two teammates asked to argue: the room drew
+   * one opening card each and nothing after. MEASURED with a trace compiled
+   * into the renderer -- two missions started, two peer messages sent, zero
+   * hops. Both answered at once, so each wrote to the other while the other
+   * was still running, and a teammate takes one mission at a time. The relay
+   * called that a failed start and gave up, and nothing ever started the
+   * "next run" its own notice promised. The argument died at hop zero.
+   */
+  describe('a reply whose recipient is mid-run', () => {
+    it('is held rather than dropped, and the thread that shared is told', async () => {
+      const { relay, owners, notices } = harness({ startResults: [BUSY] })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      expect(owners).toHaveLength(0)
+      expect(said(notices)[0]).toContain('part-way through another mission')
+      expect(said(notices)[0]).toContain('starts when it ends')
+    })
+
+    it('starts the moment that run ends', async () => {
+      const { relay, starts, owners } = harness({ startResults: [BUSY] })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      await relay.onRunEnded(ended('mission_booty'))
+      expect(starts).toHaveLength(2)
+      // The same brief, on Booty's own route, as the first attempt.
+      expect(starts[1]).toMatchObject({ runtime: 'claude', model: 'sonnet', mode: 'ask', relay: { hop: 1 } })
+      expect(owners).toEqual([['tm_booty', 'mission_2']])
+    })
+
+    it('is held once however many messages pile up for one teammate', async () => {
+      // Everything unread is folded into one brief, so a second held reply
+      // would start a second run that had already been told everything.
+      const { relay, starts, notices } = harness({ startResults: [BUSY, BUSY] })
+      await relay.onShared(sharing(), [message(BOOTY, 'first')])
+      await relay.onShared(sharing({ runId: 'run_wren2', missionId: 'mission_wren2' }), [message(BOOTY, 'second')])
+      expect(said(notices).filter((line) => line.includes('part-way'))).toHaveLength(1)
+      await relay.onRunEnded(ended('mission_booty'))
+      expect(starts).toHaveLength(3)
+    })
+
+    it('waits again when the teammate was taken by something else in between', async () => {
+      const { relay, starts } = harness({ startResults: [BUSY, BUSY] })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      await relay.onRunEnded(ended('mission_booty'))
+      expect(starts).toHaveLength(2)
+      // Still held: the next ending is another chance, not a lost message.
+      await relay.onRunEnded(ended('mission_booty2'))
+      expect(starts).toHaveLength(3)
+    })
+
+    it('does not start when a later run already carried the message', async () => {
+      // A person messaged Booty while the reply was held. Whatever a teammate
+      // has not read rides along on the next run whoever started it, so the
+      // message has arrived and a second run would brief an empty inbox.
+      const { relay, starts, asked } = harness({ startResults: [BUSY], stillWaiting: async () => false })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      await relay.onRunEnded(ended('mission_booty'))
+      expect(asked).toEqual(['tm_booty'])
+      expect(starts).toHaveLength(1)
+    })
+
+    it('does not start once replies have been switched off', async () => {
+      const { relay, starts, notices, switchOff } = harness({ startResults: [BUSY] })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      switchOff()
+      await relay.onRunEnded(ended('mission_booty'))
+      expect(starts).toHaveLength(1)
+      expect(said(notices).at(-1)).toContain('switched off in Settings')
+    })
+
+    it('still tells the asker when the held reply finishes without writing back', async () => {
+      const { relay, notices } = harness({ startResults: [BUSY] })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      await relay.onRunEnded(ended('mission_booty'))
+      // mission_2 is the run the held reply started.
+      await relay.onRunEnded(ended('mission_2'))
+      expect(said(notices).at(-1)).toContain('Booty finished without writing back')
+      expect(notices.at(-1)).toMatchObject({ runId: 'run_wren1', missionId: 'mission_wren1' })
+    })
   })
 
   it('starts one run per recipient however many messages went to them', async () => {

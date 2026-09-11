@@ -35,6 +35,10 @@ const drive = await startDrive({
   port: 9493,
   workspace,
   spends: true,
+  // The profile survives the run so the workroom and the ledger can be read
+  // afterwards. A screenshot says the room drew a grid; only the message log
+  // says whether anything was ever posted for it to draw.
+  keep: true,
   seed: {
     schemaVersion: 1,
     teammates: [
@@ -92,12 +96,18 @@ const shape = `(async () => {
   const busy = () => [...document.querySelectorAll('.lc-row__metastate')]
     .some(n => /working|thinking|replying|waiting on you/i.test(n.innerText))
   let quiet = 0
-  for (let i = 0; i < 420; i += 1) {
+  for (let i = 0; i < 900; i += 1) {
     await new Promise(r => setTimeout(r, 500))
     quiet = busy() ? 0 : quiet + 1
-    // Eight quiet half-seconds: a relay hop takes a moment to be admitted, so
-    // one idle sample is not the argument being over.
-    if (quiet >= 8) break
+    // Forty quiet half-seconds, not eight.
+    //
+    // MEASURED 2026-09-11: between the host deciding to start a hop and the
+    // run existing, the window is told NOTHING -- the mission-started notice
+    // goes out only once the runtime is up -- so every row reads idle for as
+    // long as a cold Cursor Agent takes to boot. At eight the probe called
+    // that the argument being over and screenshotted a room mid-hop, twice,
+    // and blamed the relay. Twenty seconds covers a cold start.
+    if (quiet >= 40) break
   }
   await new Promise(r => setTimeout(r, 1500))
   const said = [...document.querySelectorAll('.lc-roomsaid__turn')]
@@ -122,7 +132,8 @@ try {
 } catch (error) {
   say(`probe failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({
+  const { profile } = await drive.finish({
     intro: 'Build: whatever `pnpm build` last wrote to out/. Two teammates on free routes in a room, relay on with a hop cap of 3, asked to argue. A post that produced replies must render as a sequence (.lc-roomsaid) rather than as answer cards, with a foot naming the budget.'
   })
+  say(`profile: ${profile}`)
 }

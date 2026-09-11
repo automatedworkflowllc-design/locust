@@ -2,7 +2,7 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it } from 'vitest'
 
 import type { PublicPeerMessage } from '../../shared/ipc.js'
-import { exchangeOf } from './exchange.js'
+import { exchangeAcross, exchangeOf } from './exchange.js'
 import type { ExchangeMission } from './exchange.js'
 
 const AT = '2026-09-05T04:00:00.000Z'
@@ -133,5 +133,63 @@ describe('the exchange a conversation is part of', () => {
     const booty = mission({ missionId: 'm_b', teammateId: 'tm_booty', teammateName: 'Booty', peerMessages: [message('wm_1', 'received', ['', 'Nobody'], BOOTY)] })
     const overview = exchangeOf('m_b', [nobody, booty])
     expect(overview!.participants.map((p) => p.name).sort()).toEqual(['Booty', 'Nobody'])
+  })
+})
+
+/*
+ * A room post starts one mission per member, and a reply is a NEW mission
+ * linked only to the turn it answers. Two teammates who answer at the same
+ * moment and then write to each other therefore leave TWO components: Wren's
+ * opening and Gem's reply in one, Gem's opening and Wren's reply in the
+ * other. MEASURED 2026-09-11 on a real argument -- the room drew three turns
+ * and silently dropped Wren's opening, because the walk started at whichever
+ * half was bigger.
+ */
+describe('one exchange walked from several openings at once', () => {
+  const opening = (missionId: string, who: [string, string], other: [string, string], messageId: string) =>
+    mission({
+      missionId,
+      teammateId: who[0],
+      teammateName: who[1],
+      peerMessages: [message(messageId, 'posted', who, other)]
+    })
+  const reply = (missionId: string, who: [string, string], from: [string, string], messageId: string) =>
+    mission({
+      missionId,
+      teammateId: who[0],
+      teammateName: who[1],
+      startedBy: { kind: 'relay', hop: 1 },
+      peerMessages: [message(messageId, 'received', from, who)]
+    })
+  const HALVES = [
+    opening('m_wren1', WREN, BOOTY, 'wm_a'),
+    reply('m_booty2', BOOTY, WREN, 'wm_a'),
+    opening('m_booty1', BOOTY, WREN, 'wm_b'),
+    reply('m_wren2', WREN, BOOTY, 'wm_b')
+  ]
+
+  it('walking from one opening sees only that half', () => {
+    expect(exchangeOf('m_wren1', HALVES)?.missionIds.slice().sort()).toEqual(['m_booty2', 'm_wren1'])
+  })
+
+  it('walking from both openings is the whole argument', () => {
+    const whole = exchangeAcross(['m_wren1', 'm_booty1'], HALVES)
+    expect(whole?.missionIds.slice().sort()).toEqual(['m_booty1', 'm_booty2', 'm_wren1', 'm_wren2'])
+    // Two people, four turns -- not four people.
+    expect(whole?.participants.map((entry) => entry.name).sort()).toEqual(['Booty', 'Wren'])
+  })
+
+  it('takes the deepest hop of any half, so the budget is the argument’s', () => {
+    const deeper = [...HALVES, reply('m_booty3', BOOTY, WREN, 'wm_c')]
+    expect(exchangeAcross(['m_wren1', 'm_booty1'], deeper)?.hops).toBe(1)
+  })
+
+  it('is nothing when none of the openings exists', () => {
+    expect(exchangeAcross(['m_nope'], HALVES)).toBeUndefined()
+    expect(exchangeAcross([], HALVES)).toBeUndefined()
+  })
+
+  it('is nothing when the openings talked to nobody', () => {
+    expect(exchangeAcross(['m1', 'm2'], [mission({ missionId: 'm1' }), mission({ missionId: 'm2' })])).toBeUndefined()
   })
 })

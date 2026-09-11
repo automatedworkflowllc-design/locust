@@ -1113,6 +1113,11 @@ if (!ownsSingleInstanceLock) {
         )
       },
       assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
+      // The one question a held reply has to ask before it starts: is there
+      // still anything to show them? Whatever a teammate has not read rides
+      // along on the next run whoever starts it, so a person who messaged
+      // them in the meantime already delivered the message.
+      stillWaiting: async (teammateId) => (await workroom.unread(teammateId, 1)).messages.length > 0,
       notify: sendToWindow
     })
 

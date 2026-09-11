@@ -2621,30 +2621,43 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/*
+ * The reply's own blocks space themselves here.
+ *
+ * `AgentText` emits paragraphs, lists and code, and the browser's default
+ * paragraph margin put an inch between a speaker's name and their first
+ * sentence -- visible on every turn of the first argument drawn this way
+ * (2026-09-11). The first block sits against the name; the rest get a
+ * paragraph gap.
+ */
+.lc-roomanswer__text > * {
+  margin: var(--lc-space-3) 0 0;
+}
+
+.lc-roomanswer__text > :first-child {
+  margin-top: 0;
+}
+
+/*
+ * A room's composer IS the thread's composer.
+ *
+ * Everything about the field, the send control and their spacing comes from
+ * `.lc-composer`, which this carries alongside; what is left here is only what
+ * a room adds -- the rule separating it from the posts above, and the line
+ * underneath saying where a post goes. `.lc-roomcompose__box` is kept as a
+ * name so the drives can still find the field, and deliberately styles
+ * nothing: `.lc-composer textarea` already does.
+ */
 .lc-roomcompose {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-2);
-  padding: var(--lc-space-4) var(--lc-space-6) var(--lc-space-5);
   border-top: 1px solid var(--lc-border-hairline);
-}
-
-.lc-roomcompose__box {
-  width: 100%;
-  resize: none;
-  padding: var(--lc-space-3) var(--lc-space-4);
-  border: 1px solid var(--lc-border-control);
-  border-radius: var(--lc-radius-card);
-  background: var(--lc-bg-field);
-  color: var(--lc-text-primary);
-  font: inherit;
 }
 
 .lc-roomcompose__row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--lc-space-3);
 }
 

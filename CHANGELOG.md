@@ -6,22 +6,27 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
-## 0.61.0 - 2026-09-10
+## 0.69.0 - 2026-09-11
 
-- **Your teammates can now use your connectors, in every mode.** Whatever your
-  Claude Code can reach, they can reach — no list to set up. Driven and
-  verified in Accept edits: the row reads `get_watchlists · Robinhood · done`
-  and the teammate answers with the number.
-- **Worth knowing, and the permission chip now says it:** a connector is not
-  on this machine. "Ask · every write is refused" is a promise about *files*.
-  A teammate in Ask can still send mail or place an order through a connector,
-  because no sandbox here reaches the far end of one.
-- **A refused tool is named the way you would say it.** It read
-  `mcp__claude_ai_Robinhood__get_accounts`; it now reads `get_accounts on
-  Robinhood`, and the reason it gives is one you can act on rather than a
-  sentence about running commands.
-- A connector you sign into after Locust is open reaches the next mission
-  without restarting anything.
+- **Two teammates can now actually argue.** If you post to a room and both
+  answer at once, each one's message used to arrive while the other was still
+  working — and a teammate takes one mission at a time, so the relay gave up
+  and the argument died before it started. A message that lands mid-run is now
+  held and delivered the moment that run ends. The room says so while it
+  waits: *is part-way through another mission. Their reply starts when it
+  ends.*
+- **The room shows the whole argument, not half of it.** A post starts one
+  mission per member, and a reply is a new conversation of its own, so an
+  argument that began on both sides at once was two halves — and the room drew
+  whichever half was bigger, silently dropping somebody's opening. It now
+  draws every turn, in the order they were said.
+- **A teammate reads the same in a room as in a thread.** A room drew literal
+  `**asterisks**` and hyphens where the mission thread drew bold text and a
+  list; it now uses the thread's own reader. And a turn no longer opens with a
+  gap where a stripped share block used to be.
+- **Posting to a room uses the same box as everywhere else.** The wide filled
+  *Post* button under the field is gone; the field and the round send control
+  are the ones you already know from a mission.
 
 ## 0.68.0 - 2026-09-11
 
@@ -193,6 +198,23 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - **Cursor file rows lose their long paths again.** A Windows path was being
   flattened with one separator left in, so Locust stopped recognising its own
   mirror folder.
+
+## 0.61.0 - 2026-09-10
+
+- **Your teammates can now use your connectors, in every mode.** Whatever your
+  Claude Code can reach, they can reach — no list to set up. Driven and
+  verified in Accept edits: the row reads `get_watchlists · Robinhood · done`
+  and the teammate answers with the number.
+- **Worth knowing, and the permission chip now says it:** a connector is not
+  on this machine. "Ask · every write is refused" is a promise about *files*.
+  A teammate in Ask can still send mail or place an order through a connector,
+  because no sandbox here reaches the far end of one.
+- **A refused tool is named the way you would say it.** It read
+  `mcp__claude_ai_Robinhood__get_accounts`; it now reads `get_accounts on
+  Robinhood`, and the reason it gives is one you can act on rather than a
+  sentence about running commands.
+- A connector you sign into after Locust is open reaches the next mission
+  without restarting anything.
 
 ## 0.60.1 - 2026-09-09
 

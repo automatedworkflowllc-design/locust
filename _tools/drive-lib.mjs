@@ -217,7 +217,12 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     const file = `${String(step).padStart(2, '0')}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
     if (shot?.result?.data) await writeFile(join(out, `${file}.png`), Buffer.from(shot.result.data, 'base64'))
     await writeFile(join(out, `${file}.txt`), String(text ?? ''), 'utf8')
-    record.push({ step, title, note: note ?? '', errors: consoleErrors.splice(0) })
+    const errors = consoleErrors.splice(0)
+    // A COUNT of renderer errors is not actionable. This drive reported "2"
+    // on a step and the two sentences existed nowhere on disk, so the only
+    // way to read them was to spend another run (2026-09-11).
+    if (errors.length > 0) await writeFile(join(out, `${file}.errors.txt`), errors.map(String).join('\n'), 'utf8')
+    record.push({ step, title, note: note ?? '', errors })
     say(`${String(step).padStart(2, '0')}. ${title}${note ? ` -- ${String(note).slice(0, 160)}` : ''}`)
     return note
   }
@@ -294,7 +299,7 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
 
   /** Write SESSION.md with the step table and close the app. */
   const finish = async ({ intro, extra = '', last = true }) => {
-    const rows = record.map((r) => `| ${String(r.step)} | ${r.title} | ${String(r.note).replace(/\|/g, '/').replace(/\s+/g, ' ').slice(0, 220)} | ${String(r.errors.length)} |`)
+    const rows = record.map((r) => `| ${String(r.step)} | ${r.title} | ${String(r.note).replace(/\|/g, '/').replace(/\s+/g, ' ').slice(0, 220)} | ${r.errors.length === 0 ? '0' : `${String(r.errors.length)} — ${String(r.errors[0]).replace(/\|/g, '/').replace(/\s+/g, ' ').slice(0, 120)}`} |`)
     const session = join(out, 'SESSION.md')
     const { readFile } = await import('node:fs/promises')
     const existing = await readFile(session, 'utf8').catch(() => undefined)
@@ -304,6 +309,15 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
       ? [`# User session ${stamp} — ${name}`, '', intro, '', ...table, ...tail]
       : [existing.replace(/\n## Judgement[\s\S]*$/, '\n'), `## Continued: ${intro}`, '', ...table, ...tail]
     await writeFile(session, body.join('\n'), 'utf8')
+    /*
+     * What the MAIN process said, kept beside the screenshots.
+     *
+     * A drive could read the renderer and the disk but never the host's own
+     * words, so a relay that refused to start a run was invisible: the screen
+     * showed a room with two answers and no argument, and the only place the
+     * reason existed was a stream nobody wrote down (2026-09-11).
+     */
+    await writeFile(join(out, 'main.log'), appOutput.join(''), 'utf8').catch(() => undefined)
     try { socket.close() } catch { /* gone */ }
     try { child.kill() } catch { /* gone */ }
     await sleep(1500)

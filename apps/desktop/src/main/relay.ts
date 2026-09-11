@@ -25,6 +25,12 @@ import { runtimeDisplayName } from '../shared/runtimes.js'
  *     posts no share starts nothing. The hop cap is a backstop for two
  *     agents thanking each other until the account is empty, not the
  *     length of a conversation.
+ *   - A recipient who is mid-run cannot take a second mission, so their
+ *     reply is HELD and started the moment that run ends. Without this an
+ *     exchange dies at its first collision: two teammates asked to argue
+ *     answer at the same time, each writes to the other while the other is
+ *     still working, and both messages sit undelivered forever. MEASURED
+ *     2026-09-11 -- two participants, hop zero, nothing said back.
  *   - The recipient's run uses the RECIPIENT's own runtime, model and mode,
  *     the route a person last started them on. Grok answers as Grok, Fable
  *     as Fable; a teammate who has never run yet borrows the sender's route,
@@ -153,6 +159,16 @@ export interface RelayOptions {
     readonly relay: RelayOrigin
   }) => Promise<CodexMissionStartResponse>
   readonly assignOwner: (teammateId: string, missionId: string) => Promise<void>
+  /**
+   * Whether anything is still waiting to be shown to this teammate.
+   *
+   * A held reply is not the only way a message gets delivered: anything a
+   * teammate has not read is folded into the brief of whatever run starts
+   * next, whoever started it. So if a person messaged them while the reply
+   * was held, the message has already arrived and starting a second run
+   * would brief them on an empty inbox. Absent means start anyway.
+   */
+  readonly stillWaiting?: (teammateId: string) => Promise<boolean>
   /** Reaches the window, addressed to the SENDER's run, so notices land in the thread that shared. */
   readonly notify: (update: CodexMissionUpdate) => void
 }
@@ -176,6 +192,26 @@ export interface Relay {
  * with all the replies quoted -- the minutes -- instead of once per reply,
  * which a teammate who runs one mission at a time could not take anyway.
  */
+/** An ordinary one-to-one exchange, from the asker's side. */
+interface OpenExchange {
+  readonly askerRunId: string
+  readonly askerMissionId: string
+  readonly askerId: string
+  readonly recipientName: string
+}
+
+/** A reply that could not start because its recipient was already running. */
+interface DeferredReply {
+  readonly recipient: MissionPeerContext
+  readonly prompt: string
+  readonly from: SharingMission
+  readonly origin: RelayOrigin
+  /** Addressed to the thread that shared, so the wait is visible where it was caused. */
+  readonly notice: (message: string) => void
+  /** Registered once the held run actually starts, so the asker still hears silence. */
+  readonly exchange: OpenExchange | undefined
+}
+
 interface Meeting {
   readonly askerId: string
   readonly askerName: string
@@ -217,16 +253,33 @@ export function createRelay(options: RelayOptions): Relay {
    * nothing at all -- Colin, 2026-09-05: "wren answered it but only in his
    * own chat, we never got the reply in booty's chat".
    */
-  const exchanges = new Map<
-    string,
-    { readonly askerRunId: string; readonly askerMissionId: string; readonly askerId: string; readonly recipientName: string }
-  >()
+  const exchanges = new Map<string, OpenExchange>()
   /** Which meeting a relayed run is answering, by that run's mission id. */
   const answering = new Map<string, Meeting>()
+  /**
+   * Replies whose recipient was mid-run, by that recipient's teammate id.
+   *
+   * One entry per teammate, not one per message: everything waiting for them
+   * is folded into one brief, so a second held reply would start a second
+   * run that had already been told everything.
+   */
+  const deferred = new Map<string, DeferredReply>()
 
   const notify = (runId: string, missionId: string, message: string): void => {
     options.notify({ kind: 'relay-notice', runId, missionId, message })
   }
+
+  /**
+   * What came of asking for a run.
+   *
+   * `busy` is split out from every other refusal because it is the only one
+   * that resolves itself: the recipient is working, and will not be shortly.
+   * Collapsing it into "could not start" is what ended exchanges at hop zero.
+   */
+  type StartOutcome =
+    | { readonly kind: 'started'; readonly missionId: string }
+    | { readonly kind: 'busy' }
+    | { readonly kind: 'refused' }
 
   const startFor = async (input: {
     readonly recipient: MissionPeerContext
@@ -234,7 +287,7 @@ export function createRelay(options: RelayOptions): Relay {
     readonly from: SharingMission
     readonly origin: RelayOrigin
     readonly notice: (message: string) => void
-  }): Promise<{ readonly missionId: string } | undefined> => {
+  }): Promise<StartOutcome> => {
     const { recipient, from } = input
     const followUpOf = input.origin.lastMissionOf[recipient.self.teammateId]
     // Their own route, so each teammate stays the model a person made
@@ -271,11 +324,15 @@ export function createRelay(options: RelayOptions): Relay {
       })
     } catch {
       input.notice(`${recipient.self.name} could not reply on their own: the run could not be started.`)
-      return undefined
+      return { kind: 'refused' }
     }
     if (!response.ok) {
+      // Mid-run is not a refusal. A teammate runs one mission at a time, so
+      // answering while they work is impossible and answering when they
+      // finish is ordinary; the caller holds the reply until then.
+      if (response.error.code === 'RUN_ALREADY_ACTIVE') return { kind: 'busy' }
       input.notice(`${recipient.self.name} could not reply on their own: ${response.error.message} The message waits for their next run.`)
-      return undefined
+      return { kind: 'refused' }
     }
     await options.assignOwner(recipient.self.teammateId, response.data.missionId).catch(() => undefined)
     options.notify({
@@ -287,7 +344,70 @@ export function createRelay(options: RelayOptions): Relay {
       data: response.data,
       startedBy: { kind: 'relay', hop: input.origin.hop }
     })
-    return { missionId: response.data.missionId }
+    return { kind: 'started', missionId: response.data.missionId }
+  }
+
+  /** Hold a reply for a teammate who is mid-run. The first one held wins. */
+  const defer = (entry: DeferredReply): void => {
+    const teammateId = entry.recipient.self.teammateId
+    if (deferred.has(teammateId)) return
+    deferred.set(teammateId, entry)
+    entry.notice(`${entry.recipient.self.name} is part-way through another mission. Their reply starts when it ends.`)
+  }
+
+  /**
+   * Start a held reply, now that its recipient's run has ended.
+   *
+   * The switch and the cap are read again rather than remembered: a person
+   * who turned replies off while a teammate was working meant it, and a hop
+   * budget they lowered should bind the hop it was lowered before.
+   */
+  const deliverDeferred = async (teammateId: string): Promise<void> => {
+    const entry = deferred.get(teammateId)
+    if (entry === undefined) return
+    deferred.delete(teammateId)
+    let enabled = false
+    try {
+      enabled = await options.enabled()
+    } catch {
+      enabled = false
+    }
+    let cap = MAX_RELAY_HOPS
+    try {
+      cap = (await options.hopCap?.()) ?? MAX_RELAY_HOPS
+    } catch {
+      cap = MAX_RELAY_HOPS
+    }
+    const decision = decideRelay({ enabled, hop: entry.origin.hop - 1, recipientName: entry.recipient.self.name, cap })
+    if (!decision.start) {
+      entry.notice(decision.reason)
+      return
+    }
+    if (options.stillWaiting !== undefined) {
+      let waiting = true
+      try {
+        waiting = await options.stillWaiting(teammateId)
+      } catch {
+        // Unknown means send: a reply shown twice is recoverable, one never
+        // shown is the bug this whole path exists to fix.
+        waiting = true
+      }
+      if (!waiting) return
+    }
+    const outcome = await startFor({
+      recipient: entry.recipient,
+      prompt: entry.prompt,
+      from: entry.from,
+      origin: entry.origin,
+      notice: entry.notice
+    })
+    // Free for a moment and taken again -- by a person, or by another
+    // teammate's reply that landed first. Wait for the next ending.
+    if (outcome.kind === 'busy') {
+      deferred.set(teammateId, entry)
+      return
+    }
+    if (outcome.kind === 'started' && entry.exchange !== undefined) exchanges.set(outcome.missionId, entry.exchange)
   }
 
   /** The asker's next turn, once, briefed with everyone's reply. */
@@ -308,13 +428,26 @@ export function createRelay(options: RelayOptions): Relay {
       notify(meeting.askerRunId, meeting.askerMissionId, `Stopped after ${String(MAX_RELAY_HOPS)} automatic replies. The replies wait for your next run.`)
       return
     }
-    await startFor({
+    const notice = (message: string): void => notify(meeting.askerRunId, meeting.askerMissionId, message)
+    const outcome = await startFor({
       recipient: asker,
       prompt: meetingPrompt({ repliers: meeting.answered, silent }),
       from,
       origin,
-      notice: (message) => notify(meeting.askerRunId, meeting.askerMissionId, message)
+      notice
     })
+    // The asker picked up another mission while the meeting ran. The minutes
+    // keep until they are free rather than being dropped on the floor.
+    if (outcome.kind === 'busy') {
+      defer({
+        recipient: asker,
+        prompt: meetingPrompt({ repliers: meeting.answered, silent }),
+        from,
+        origin,
+        notice,
+        exchange: undefined
+      })
+    }
   }
 
   return {
@@ -393,14 +526,25 @@ export function createRelay(options: RelayOptions): Relay {
             hop: decision.hop,
             lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
           }
-          const result = await startFor({
-            recipient,
-            prompt: relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop }),
-            from: mission,
-            origin,
-            notice
-          })
-          if (result !== undefined) started.push({ teammateId: recipientId, name: recipient.self.name, missionId: result.missionId })
+          const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop })
+          const result = await startFor({ recipient, prompt, from: mission, origin, notice })
+          if (result.kind === 'busy') {
+            defer({
+              recipient,
+              prompt,
+              from: mission,
+              origin,
+              notice,
+              exchange: {
+                askerRunId: mission.runId,
+                askerMissionId: mission.missionId,
+                askerId: mission.peer.self.teammateId,
+                recipientName: recipient.self.name
+              }
+            })
+            continue
+          }
+          if (result.kind === 'started') started.push({ teammateId: recipientId, name: recipient.self.name, missionId: result.missionId })
         } catch (error) {
           // Whatever failed between the decision and the start, the thread
           // says so. The service that called us swallows anything thrown
@@ -454,29 +598,33 @@ export function createRelay(options: RelayOptions): Relay {
       }
       const meeting = answering.get(mission.missionId)
       answering.delete(mission.missionId)
-      if (meeting === undefined || mission.peer === undefined) return
-      const teammateId = mission.peer.self.teammateId
-      if (!meeting.awaiting.has(teammateId)) return
-      // Ended without a word to the asker: counted, not waited for forever.
-      meeting.awaiting.delete(teammateId)
-      meeting.silent.push(mission.peer.self.name)
-      if (meeting.awaiting.size > 0) {
-        notify(
-          meeting.askerRunId,
-          meeting.askerMissionId,
-          `${mission.peer.self.name} finished without replying. Still waiting on ${[...meeting.awaiting.values()].join(', ')}.`
-        )
-        return
+      const teammateId = mission.peer?.self.teammateId
+      if (meeting !== undefined && mission.peer !== undefined && teammateId !== undefined && meeting.awaiting.has(teammateId)) {
+        // Ended without a word to the asker: counted, not waited for forever.
+        meeting.awaiting.delete(teammateId)
+        meeting.silent.push(mission.peer.self.name)
+        if (meeting.awaiting.size > 0) {
+          notify(
+            meeting.askerRunId,
+            meeting.askerMissionId,
+            `${mission.peer.self.name} finished without replying. Still waiting on ${[...meeting.awaiting.values()].join(', ')}.`
+          )
+        } else {
+          await closeMeeting(meeting, {
+            runId: '',
+            missionId: mission.missionId,
+            runtime: 'codex',
+            sandbox: 'read-only',
+            model: undefined,
+            peer: mission.peer,
+            relay: mission.relay
+          })
+        }
       }
-      await closeMeeting(meeting, {
-          runId: '',
-          missionId: mission.missionId,
-          runtime: 'codex',
-          sandbox: 'read-only',
-          model: undefined,
-          peer: mission.peer,
-          relay: mission.relay
-        })
+      // Whatever this run was and however it ended, its teammate is free now.
+      // This is the line that makes an argument alternate: the reply that
+      // arrived mid-run starts here instead of waiting for a person.
+      if (teammateId !== undefined) await deliverDeferred(teammateId)
     }
   }
 }

@@ -61,7 +61,7 @@ import { ExchangeStrip } from './components/ExchangeStrip.js'
 import { RoomScreen } from './components/RoomScreen.js'
 import type { RoomAnswer } from './components/RoomScreen.js'
 import { refusalNotice } from './components/RoomScreen.js'
-import { exchangeOf } from './exchange.js'
+import { exchangeAcross, exchangeOf } from './exchange.js'
 import type { ExchangeMission } from './exchange.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
 import { CommandPalette } from './components/CommandPalette.js'
@@ -1739,22 +1739,17 @@ export default function App(): ReactElement {
    * A post, as the conversation it became -- or nothing, when it stayed a set
    * of independent answers and the grid of cards is the truth.
    *
-   * The exchange is rooted at whichever of the post's own missions reaches
-   * furthest: a reply is a NEW mission linked by a peer message, so the post's
-   * own entries are only the first turns. `exchangeOf` walks the rest.
+   * Rooted at EVERY mission the post started, not the one that reaches
+   * furthest: a reply is a new mission linked only to the turn it answers, so
+   * two members who answer at once and then write to each other leave two
+   * halves of one argument. Walking from one of them drew the argument with
+   * its opening turn missing (MEASURED 2026-09-11).
    */
   const roomExchangeFor = (room: PublicRoom, postId: string): RoomExchange | undefined => {
     const post = room.posts.find((entry) => entry.postId === postId)
     if (post === undefined) return undefined
-    const all = [...missionsForExchange.values()]
-    const started = Object.values(post.missions)
-    let widest: ReturnType<typeof exchangeOf>
-    for (const missionId of started) {
-      const found = exchangeOf(missionId, all)
-      if (found === undefined) continue
-      if (widest === undefined || found.missionIds.length > widest.missionIds.length) widest = found
-    }
-    if (widest === undefined) return undefined
+    const whole = exchangeAcross(Object.values(post.missions), [...missionsForExchange.values()])
+    if (whole === undefined) return undefined
     // The newest post that is still older than nothing: anything said after
     // it, under THIS post, is the case that needs a time.
     const laterPostAt = room.posts
@@ -1767,12 +1762,17 @@ export default function App(): ReactElement {
       const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
       const finals = assistantMessages(events).filter((message) => message.final)
       const raw = finals.at(-1)?.text ?? assistantMessages(events).at(-1)?.text
-      return raw === undefined ? undefined : stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw))))
+      // Trimmed: a stripped share block leaves the blank lines that held it,
+      // and the room drew a turn whose name and first sentence were an inch
+      // apart for no reason a reader could see (MEASURED 2026-09-11).
+      return raw === undefined
+        ? undefined
+        : stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw)))).trim()
     }
     return sequenceOfPost({
       post: { postId: post.postId, at: post.at, missions: post.missions, ...(post.queued === undefined ? {} : { waiting: post.queued }) },
       missions: missionsForExchange,
-      reached: widest.missionIds,
+      reached: whole.missionIds,
       textOf,
       startedAtOf: (missionId) =>
         [...runs.values()].find((run) => run.data?.missionId === missionId)?.startedAtIso
@@ -1783,9 +1783,9 @@ export default function App(): ReactElement {
       },
       nameOf: (teammateId) => teammates.find((entry) => entry.teammateId === teammateId)?.name ?? teammateId,
       laterPostAt,
-      hops: widest.hops,
+      hops: whole.hops,
       cap: relayHopCap,
-      cost: widest.cost
+      cost: whole.cost
     })
   }
 

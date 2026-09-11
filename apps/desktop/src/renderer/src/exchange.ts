@@ -56,9 +56,27 @@ export interface ExchangeOverview {
  * message id on both records, which is the only link the record keeps.
  */
 export function exchangeOf(missionId: string, missions: readonly ExchangeMission[]): ExchangeOverview | undefined {
+  return exchangeAcross([missionId], missions)
+}
+
+/**
+ * The same walk from SEVERAL missions at once, as one exchange.
+ *
+ * A room post starts one mission per member, and each reply is a new mission
+ * linked only to the one it answers -- so two teammates who answer at the
+ * same moment and then write to each other leave TWO components in the graph,
+ * not one. Walking from the widest root drew the argument with its opening
+ * turn missing: Wren's first answer was in the other half (MEASURED
+ * 2026-09-11, a real argument between Wren and Gem). Every mission the post
+ * started is a root of the same conversation, so all of them seed the walk.
+ */
+export function exchangeAcross(
+  roots: readonly string[],
+  missions: readonly ExchangeMission[]
+): ExchangeOverview | undefined {
   const byId = new Map(missions.map((mission) => [mission.missionId, mission]))
-  const root = byId.get(missionId)
-  if (root === undefined) return undefined
+  const seeds = roots.map((missionId) => byId.get(missionId)).filter((mission) => mission !== undefined)
+  if (seeds.length === 0) return undefined
 
   // Which missions carry which message ids.
   const byMessage = new Map<string, ExchangeMission[]>()
@@ -71,7 +89,7 @@ export function exchangeOf(missionId: string, missions: readonly ExchangeMission
   }
 
   const reached = new Map<string, ExchangeMission>()
-  const queue = [root]
+  const queue = [...seeds]
   while (queue.length > 0) {
     const current = queue.pop()!
     if (reached.has(current.missionId)) continue

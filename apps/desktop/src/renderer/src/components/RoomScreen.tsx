@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
+import { AgentText } from './ThreadItems.js'
+import { Icon } from './Icon.js'
 import { PixelFace } from './PixelFace.js'
 import { footLine } from '../roomExchange.js'
 import type { RoomExchange } from '../roomExchange.js'
@@ -181,7 +183,7 @@ export const ANSWERS_BEFORE_A_LIST = 6
 function RoomAnswerText({ text }: { readonly text: string }): ReactElement {
   const [open, setOpen] = useState(false)
   const [overflows, setOverflows] = useState(false)
-  const body = useRef<HTMLParagraphElement>(null)
+  const body = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     // Only while folded: once open the clamp is gone and scrollHeight equals
@@ -195,9 +197,18 @@ function RoomAnswerText({ text }: { readonly text: string }): ReactElement {
 
   return (
     <>
-      <p ref={body} className={`lc-roomanswer__text lc-para${open ? '' : ' is-folded'}`}>
-        {text}
-      </p>
+      {/*
+        * The thread's own reader, not a second one.
+        *
+        * A teammate answers in Markdown whether or not anyone asked, and this
+        * used to be one plain paragraph -- so an argument drew literal
+        * asterisks and hyphens where the same reply in the thread drew bold
+        * and a list (MEASURED 2026-09-11: "**column alignment**" on screen).
+        * What a teammate says reads the same wherever it is read.
+        */}
+      <div ref={body} className={`lc-roomanswer__text${open ? '' : ' is-folded'}`}>
+        <AgentText text={text} streaming={false} />
+      </div>
       {overflows && !open && (
         <button type="button" className="lc-shellout__more" onClick={() => setOpen(true)}>
           Show the rest
@@ -893,36 +904,56 @@ export function RoomScreen({
           )
         })}
       </div>
+      {/*
+        * The thread's composer, not a second design.
+        *
+        * It used to be a bordered textarea with a wide filled "Post" button on
+        * a row of its own underneath -- Colin, 2026-09-11: "the post button is
+        * a little wonky, lets just make it the same as our regular chat box."
+        * It is literally the same box now: `lc-composer` carries the field and
+        * the round send control, and the room only adds what is true of a room
+        * -- the line saying where a post goes.
+        */}
       <form
-        className="lc-roomcompose"
+        className="lc-composer lc-roomcompose"
         onSubmit={(event) => {
           event.preventDefault()
           void post()
         }}
       >
-        <textarea
-          className="lc-roomcompose__box"
-          value={draftText}
-          onChange={(event) => setDraftText(event.target.value)}
-          placeholder={`Post to ${room.name}…`}
-          aria-label={`Post to ${room.name}`}
-          rows={2}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault()
-              void post()
-            }
-          }}
-        />
+        <div className="lc-composer__box">
+          <textarea
+            className="lc-roomcompose__box"
+            value={draftText}
+            onChange={(event) => setDraftText(event.target.value)}
+            placeholder={`Post to ${room.name}…`}
+            aria-label={`Post to ${room.name}`}
+            rows={1}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                void post()
+              }
+            }}
+          />
+          <button
+            type="submit"
+            className="send-button lc-send"
+            disabled={busy || draftText.trim().length === 0}
+            aria-label={`Post to ${room.name}`}
+            title={`Post to ${room.name} — Shift+Enter for a new line`}
+          >
+            <Icon name="arrow-up" size={15} />
+          </button>
+        </div>
         <div className="lc-roomcompose__row">
           <span className="lc-settings__note">
-            {notice ??
-              formError ??
-              `Goes to ${String(room.teammateIds.length)} teammate${room.teammateIds.length === 1 ? '' : 's'}, each on their own route.`}
+            {busy
+              ? 'Posting…'
+              : notice ??
+                formError ??
+                `Goes to ${String(room.teammateIds.length)} teammate${room.teammateIds.length === 1 ? '' : 's'}, each on their own route.`}
           </span>
-          <button type="submit" className="lc-button is-active" disabled={busy || draftText.trim().length === 0}>
-            {busy ? 'Posting…' : 'Post'}
-          </button>
         </div>
       </form>
     </div>
