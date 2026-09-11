@@ -48,7 +48,7 @@ import {
   threadMarkers,
   threadPeerCards,
   typedPrompt
-} from './missionView.js'
+, commandsRun, commandsRunText} from './missionView.js'
 
 const NOW = '2026-08-31T16:00:00.000Z'
 let sequence = 0
@@ -2007,14 +2007,20 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     const activity = buildThread(events, { running: false }).find((item) => item.type === 'activity')
     const details = activity?.type === 'activity' ? activity.details : []
     const segments = activityTrace(details, events, traceOutcome(events, false))
-    const calls = segments.find((seg) => seg.key === 'calls')
-    expect(calls?.text).toBe('ran seq 1 300')
-    expect(calls?.text).not.toContain('powershell')
+    // Under `commands` now, not `calls`: a command is named, never counted
+    // among the anonymous calls. The words a person reads are unchanged.
+    const ran = segments.find((seg) => seg.key === 'commands')
+    expect(ran?.text).toBe('ran seq 1 300')
+    expect(ran?.text).not.toContain('powershell')
+    expect(segments.find((seg) => seg.key === 'calls')).toBeUndefined()
   })
 
-  it('goes back to counting when there is more than one command', () => {
-    // The control: naming one of several would be arbitrary, so the count has
-    // to survive for that case rather than the summary picking a favourite.
+  it('counts several commands and says how they came out', () => {
+    // Naming one of several would be arbitrary, so several get a count -- and
+    // it carries what came back, which is the whole of Astra's first ask: a
+    // turn said what it CHANGED and never what it RAN, so a run that edited
+    // three files and a run that edited three files and proved them read
+    // identically (2026-09-11).
     const events = [
       ev(1, 'run.started', { runtimeThreadId: 't', process: {} }, 0),
       ev(2, 'tool.started', { itemId: 'a', toolKind: 'command_execution', name: 'shell', command: 'ls', phase: 'started' }, 1),
@@ -2026,7 +2032,8 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     const activity = buildThread(events, { running: false }).find((item) => item.type === 'activity')
     const details = activity?.type === 'activity' ? activity.details : []
     const segments = activityTrace(details, events, traceOutcome(events, false))
-    expect(segments.find((seg) => seg.key === 'calls')?.text).toBe('2 tool calls')
+    expect(segments.find((seg) => seg.key === 'commands')?.text).toBe('ran 2 commands · all exit 0')
+    expect(segments.find((seg) => seg.key === 'calls')).toBeUndefined()
   })
 
   it('carries the notices it used to only count, as sentences on the fold', () => {
@@ -2537,5 +2544,70 @@ describe('a shell row and its output', () => {
     expect(empty?.kind === 'shell' ? empty.output : 'missing').toBe('')
     const absent = activityEntries([shellDetail()], undefined)[0]
     expect(absent?.kind === 'shell' ? absent.output : 'missing').toBeUndefined()
+  })
+})
+
+/*
+ * Astra, 2026-09-11: a turn's line says what it CHANGED and never what it
+ * RAN. The ledger has had the commands and their exit codes the whole time.
+ *
+ * The rule these all share: NO INFERENCE ABOUT WHAT A COMMAND MEANS. Nothing
+ * here decides that `pnpm test` is a test and `ls` is not. It says what ran
+ * and what came back; whether that is evidence is the reader's call, and an
+ * app guessing at proof is worse than one staying quiet.
+ */
+describe('what a turn ran, and what came back', () => {
+  const detail = (over: Partial<ActivityDetail> = {}): ActivityDetail => ({
+    kind: 'shell',
+    name: 'pnpm test',
+    tool: 'shell',
+    settled: true,
+    ...over
+  }) as ActivityDetail
+
+  it('says nothing at all when nothing was run', () => {
+    expect(commandsRunText(commandsRun([], true))).toBeUndefined()
+    expect(commandsRun([], true)).toEqual({ ran: 0, nonZero: 0, unsettled: 0 })
+  })
+
+  it('reports exit 0 plainly, never as a verdict', () => {
+    // "all exit 0" is what the ledger holds. Not "verified", not "checked".
+    expect(commandsRunText(commandsRun([detail({ exitCode: 0 }), detail({ exitCode: 0 })], true))).toEqual({
+      text: 'ran 2 commands · all exit 0',
+      amber: false
+    })
+    expect(commandsRunText(commandsRun([detail({ exitCode: 0 })], true))).toEqual({
+      text: 'ran 1 command · exit 0',
+      amber: false
+    })
+  })
+
+  it('counts a non-zero exit, and says so in amber', () => {
+    const run = commandsRun([detail({ exitCode: 0 }), detail({ exitCode: 1 })], true)
+    expect(run).toMatchObject({ ran: 2, nonZero: 1 })
+    expect(commandsRunText(run)).toEqual({ text: 'ran 2 commands · 1 exited non-zero', amber: true })
+  })
+
+  it('counts a command that failed outright as non-zero, however it failed', () => {
+    expect(commandsRun([detail({ failed: true })], true).nonZero).toBe(1)
+  })
+
+  it('does not call a command that never reported a pass', () => {
+    // A turn that is over and a command that never reported is not a pass,
+    // and not a failure either.
+    const run = commandsRun([detail({ exitCode: 0 }), detail({ settled: false })], true)
+    expect(run).toMatchObject({ ran: 2, nonZero: 0, unsettled: 1 })
+    expect(commandsRunText(run)).toEqual({ text: 'ran 2 commands · 1 did not report', amber: true })
+  })
+
+  it('does not count an unfinished turn\u2019s open command as unreported', () => {
+    // It has not finished YET. Only a turn that is over can say a command
+    // never came back.
+    expect(commandsRun([detail({ settled: false })], false).unsettled).toBe(0)
+  })
+
+  it('a non-zero exit outranks an unreported one: the failure is the news', () => {
+    const run = commandsRun([detail({ exitCode: 2 }), detail({ settled: false })], true)
+    expect(commandsRunText(run)?.text).toBe('ran 2 commands · 1 exited non-zero')
   })
 })

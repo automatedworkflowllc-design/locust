@@ -788,7 +788,16 @@ export function activityTrace(
   const helpers = entries.filter((entry) => entry.kind === 'helper')
   const helpersFailed = helpers.filter((entry) => entry.failed).length
   const helpersSilent = finished ? helpers.filter((entry) => !entry.settled && !entry.failed).length : 0
-  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit').length
+  /*
+   * Shell commands are counted SEPARATELY, not among the anonymous calls.
+   *
+   * The line already named the command when there was exactly one -- "ran seq
+   * 1 300" instead of "1 tool call" -- on the reasoning that a count of a
+   * thing you cannot see is not worth the room. The same is true of four of
+   * them, and counting them twice ("6 tool calls · ran 4 commands") would say
+   * one fact in two places, which this line does not do.
+   */
+  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit' && detail.kind !== 'shell').length
     + details.filter((detail) => detail.kind === 'edit' && detail.failed === true).length
   const diagnostics = events.filter(
     (event): event is Extract<NormalizedRuntimeEvent, { type: 'adapter.diagnostic' }> => event.type === 'adapter.diagnostic' && !/\.usage_window$/.test(event.payload.code)
@@ -872,12 +881,30 @@ export function activityTrace(
     shellCommands.length === 1
       ? shellCommandText(shellCommands[0]?.name ?? '').split('\n')[0]?.trim()
       : undefined
-  if (calls > 0) {
-    segments.push(
-      onlyCommand !== undefined && onlyCommand.length > 0 && calls === 1
-        ? { key: 'calls', text: `ran ${onlyCommand.length > 60 ? `${onlyCommand.slice(0, 59)}…` : onlyCommand}` }
-        : { key: 'calls', text: pluralize(calls, 'tool call') }
-    )
+  if (calls > 0) segments.push({ key: 'calls', text: pluralize(calls, 'tool call') })
+  /*
+   * What it RAN, and what came back.
+   *
+   * One command still gets its name -- that is the most useful thing the line
+   * can say, and it was already true. Several get a count and their outcome,
+   * because four command lines will not fit and "all exit 0" is the part a
+   * reader is actually asking about.
+   */
+  if (shellCommands.length === 1 && onlyCommand !== undefined && onlyCommand.length > 0) {
+    const one = commandsRunText(commandsRun(details, finished))
+    const named = `ran ${onlyCommand.length > 60 ? `${onlyCommand.slice(0, 59)}…` : onlyCommand}`
+    segments.push({
+      key: 'commands',
+      // The command's own exit code is on its ROW, so the line repeats it only
+      // when it is the thing worth knowing: something other than success.
+      text: one !== undefined && one.amber ? `${named} · ${one.text.split(' · ')[1] ?? ''}` : named,
+      ...(one?.amber === true ? { tone: 'amber' as const } : {})
+    })
+  } else {
+    const many = commandsRunText(commandsRun(details, finished))
+    if (many !== undefined) {
+      segments.push({ key: 'commands', text: many.text, ...(many.amber ? { tone: 'amber' as const } : {}) })
+    }
   }
   if (files > 0 && !(outcome === 'cancelled' && files === 0)) segments.push({ key: 'files', text: pluralize(files, 'file') })
   else if (files === 0 && outcome === 'completed' && mayEdit === true && !cannotAttribute) {
@@ -922,6 +949,64 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
   if (helpers > 0) parts.push(`asked ${pluralize(helpers, 'subagent')}`)
   if (other > 0) parts.push(`${pluralize(other, 'tool call')}`)
   return parts.length === 0 ? 'No tool activity' : parts.join(' · ')
+}
+
+/**
+ * The commands a turn RAN, and what they returned.
+ *
+ * Astra's proposal, 2026-09-11, and the one part of it that needs no new
+ * judgement from anybody: a turn's line says what it CHANGED -- `3 files` --
+ * and never what it ran, so a run that edited three files and a run that
+ * edited three files and proved them read identically. The ledger has had the
+ * commands and their exit codes the whole time.
+ *
+ * Deliberately no inference about what a command MEANS. This does not decide
+ * that `pnpm test` is a test and `ls` is not; it says what was run and what
+ * came back, and the reader decides whether that is evidence. Anything else
+ * would be the app guessing at proof, which is worse than staying quiet.
+ *
+ * An unsettled command is its own answer: a turn that is over and a command
+ * that never reported is not a pass, and not a failure either.
+ */
+export interface CommandsRun {
+  readonly ran: number
+  /** Reported a non-zero exit, or failed outright. */
+  readonly nonZero: number
+  /** Started, and the turn ended without an outcome. Only meaningful once finished. */
+  readonly unsettled: number
+}
+
+export function commandsRun(details: readonly ActivityDetail[], finished: boolean): CommandsRun {
+  const shell = details.filter((detail) => detail.kind === 'shell')
+  return {
+    ran: shell.length,
+    nonZero: shell.filter((detail) => detail.failed === true || (detail.exitCode !== undefined && detail.exitCode !== 0)).length,
+    unsettled: finished
+      ? shell.filter((detail) => detail.settled !== true && detail.failed !== true).length
+      : 0
+  }
+}
+
+/** That, as the words the trace line uses. `undefined` when nothing ran. */
+export function commandsRunText(run: CommandsRun): { readonly text: string; readonly amber: boolean } | undefined {
+  if (run.ran === 0) return undefined
+  const ran = `ran ${pluralize(run.ran, 'command')}`
+  if (run.nonZero > 0) {
+    return {
+      text: `${ran} · ${run.ran === 1 ? 'it exited non-zero' : `${String(run.nonZero)} exited non-zero`}`,
+      amber: true
+    }
+  }
+  if (run.unsettled > 0) {
+    return {
+      text: `${ran} · ${run.ran === 1 ? 'it did not report' : `${String(run.unsettled)} did not report`}`,
+      amber: true
+    }
+  }
+  // Said plainly, and never as a verdict: `all exit 0` is what the ledger
+  // holds. Whether that amounts to the work being checked is the reader's
+  // call, and the app has no business making it for them.
+  return { text: `${ran} · ${run.ran === 1 ? 'exit 0' : 'all exit 0'}`, amber: false }
 }
 
 /**

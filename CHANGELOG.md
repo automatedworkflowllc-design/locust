@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.75.0 - 2026-09-11
+
+- **A finished turn says what it ran, not only what it changed.** The line
+  read `3 files` or `no files changed` and never mentioned the commands — so a
+  run that edited three files and a run that edited three files and proved
+  them looked identical. It now reads `ran 3 commands · all exit 0`, or names
+  the one command when there was only one. A command that exited non-zero, or
+  that never reported at all, is said in amber.
+- Deliberately **no guess about what a command means**. Nothing here decides
+  that `pnpm test` is a test and `ls` is not; it says what ran and what came
+  back, and you decide whether that is evidence. An app guessing at proof
+  would be worse than one staying quiet.
+
 ## 0.74.0 - 2026-09-11
 
 - **The effort slider agreed with nothing.** It read `EFFORT high`, put the
