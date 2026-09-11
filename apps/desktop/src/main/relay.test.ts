@@ -63,9 +63,13 @@ function harness(options: {
   const notices: CodexMissionUpdate[] = []
   const asked: string[] = []
   const stopped: string[] = []
+  const kept: { missionId: string; message: string }[] = []
   let enabled = options.enabled ?? true
   const relay = createRelay({
     enabled: async () => enabled,
+    note: async (input: { missionId: string; message: string }) => {
+      kept.push(input)
+    },
     mayInterrupt: async () => options.mayInterrupt === true,
     stopWorkOf: async (teammateId: string) => {
       stopped.push(teammateId)
@@ -114,6 +118,7 @@ function harness(options: {
     notices,
     asked,
     stopped,
+    kept,
     switchOff: () => {
       enabled = false
     }
@@ -718,6 +723,54 @@ describe('a meeting: one asks several, and the next turn waits for all of them',
  * The budget is counted per exchange now, against the mission a person began,
  * and never below what the chain already proves.
  */
+/*
+ * A relay notice was a LIVE UPDATE ONLY. "Stopped after 12 automatic replies"
+ * reached the window and nowhere else, so a person watching a different
+ * conversation when an exchange ended never learned it had -- and reopening
+ * the thread later showed nothing at all, so it simply appeared to stop for
+ * no reason (MEASURED 2026-09-11, `relay-smoke`: no thread carried it).
+ *
+ * Endings are written into the mission's own record now. Only endings: "still
+ * waiting on Booty" is true for a moment and false after it, and a record of
+ * it would be a record of something no longer so.
+ */
+describe('an ending is written down, not only announced', () => {
+  it('keeps the reason an exchange stopped at its budget', async () => {
+    const { relay, kept } = harness()
+    const capped = sharing({ relay: { hop: MAX_RELAY_HOPS, lastMissionOf: { tm_wren: 'mission_wren1' } } })
+    await relay.onShared(capped, [message(BOOTY)])
+    expect(kept).toHaveLength(1)
+    expect(kept[0]?.message).toContain('Stopped after')
+    // Against the mission a person would reopen: the one that shared.
+    expect(kept[0]?.missionId).toBe('mission_wren1')
+  })
+
+  it('keeps that a teammate finished without writing back', async () => {
+    const { relay, kept } = harness()
+    await relay.onShared(sharing(), [message(BOOTY)])
+    await relay.onRunEnded(ended('mission_1'))
+    expect(kept.some((note) => note.message.includes('finished without writing back'))).toBe(true)
+  })
+
+  it('keeps nothing for a reply that is merely being waited on', async () => {
+    // "Booty is part-way through another mission; their reply starts when it
+    // ends" is true for a moment and false after it. A record of it would be
+    // a record of something no longer so.
+    const { relay, kept, notices } = harness({ startResults: [BUSY] })
+    await relay.onShared(sharing(), [message(BOOTY)])
+    expect(said(notices).some((line) => line.includes('part-way through'))).toBe(true)
+    expect(kept).toHaveLength(0)
+  })
+
+  it('says it as well as keeping it: the live update is unchanged', async () => {
+    const { relay, kept, notices } = harness()
+    const capped = sharing({ relay: { hop: MAX_RELAY_HOPS, lastMissionOf: { tm_wren: 'mission_wren1' } } })
+    await relay.onShared(capped, [message(BOOTY)])
+    expect(said(notices).some((line) => line.includes('Stopped after'))).toBe(true)
+    expect(kept).toHaveLength(1)
+  })
+})
+
 describe('a budget spent per exchange, not per chain', () => {
   it('refuses once the exchange has spent its budget, whatever this chain says', () => {
     // The leak in one assertion: a hop of 1 -- a fresh-looking chain -- in an

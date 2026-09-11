@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.81.0 - 2026-09-11
+
+- **You find out an exchange stopped, even if you were looking elsewhere.**
+  "Stopped after 12 automatic replies" reached the window and nowhere else, so
+  anyone watching a different conversation when it fired never learned — and
+  reopening the thread later showed nothing, so the exchange simply appeared
+  to stop for no reason. Endings are written into the mission's own record
+  now, and are there when you come back.
+- Only **endings**. "Still waiting on Booty" is true for a moment and false
+  after it, and a record of it would be a record of something that is no
+  longer so.
+
 ## 0.80.0 - 2026-09-11
 
 - **The reply budget counts what it always claimed to.** It counted the depth

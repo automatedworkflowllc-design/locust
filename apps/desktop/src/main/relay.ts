@@ -284,6 +284,25 @@ export interface RelayOptions {
   readonly stopWorkOf?: (teammateId: string) => Promise<boolean>
   /** Reaches the window, addressed to the SENDER's run, so notices land in the thread that shared. */
   readonly notify: (update: CodexMissionUpdate) => void
+  /**
+   * Write a notice into a mission's own record, so it survives being looked
+   * away from.
+   *
+   * A relay notice was a LIVE UPDATE ONLY. "Stopped after 12 automatic
+   * replies" reached the window and nowhere else, so a person watching a
+   * different conversation when an exchange ended never learned it had, and
+   * reopening the thread later showed nothing at all -- the exchange simply
+   * appeared to stop for no reason (MEASURED 2026-09-11, `relay-smoke`:
+   * no thread carried the sentence).
+   *
+   * Only ENDINGS are written. "Still waiting on Booty" is true for a moment
+   * and false after it; a record of it would be a record of something that
+   * is no longer so.
+   */
+  readonly note?: (input: {
+    readonly missionId: string
+    readonly message: string
+  }) => Promise<void>
 }
 
 /** A run the relay may care about ending: who it belonged to and what exchange it was in. */
@@ -425,6 +444,19 @@ export function createRelay(options: RelayOptions): Relay {
 
   const notify = (runId: string, missionId: string, message: string): void => {
     options.notify({ kind: 'relay-notice', runId, missionId, message })
+  }
+
+  /**
+   * Say it, and keep it.
+   *
+   * For the notices a person needs AFTER the moment: why an exchange stopped,
+   * and that a teammate finished without writing back. Both are facts about
+   * how the work ended, and both used to exist only for as long as the window
+   * was pointed at the right thread.
+   */
+  const notifyAndKeep = (runId: string, missionId: string, message: string): void => {
+    notify(runId, missionId, message)
+    void options.note?.({ missionId, message }).catch(() => undefined)
   }
 
   /**
@@ -655,7 +687,7 @@ export function createRelay(options: RelayOptions): Relay {
     }
     const spent = spendOf(origin.rootMissionId, origin.hop)
     if (spent >= cap) {
-      notify(
+      notifyAndKeep(
         meeting.askerRunId,
         meeting.askerMissionId,
         `Stopped after ${String(cap)} automatic ${cap === 1 ? 'reply' : 'replies'}. The replies wait for your next run.`
@@ -745,6 +777,9 @@ export function createRelay(options: RelayOptions): Relay {
 
         const decision = decideRelay({ enabled, hop, recipientName: message.to.name, cap, spent: spendOf(root, hop) })
         if (!decision.start) {
+          // Kept: this is the sentence that explains why a conversation the
+          // person comes back to simply stopped.
+          void options.note?.({ missionId: mission.missionId, message: decision.reason }).catch(() => undefined)
           // Every message that goes nowhere is said, off included: replies
           // are on by default now, so off is a choice the person made and
           // may have forgotten -- and a share with no answer and no word
@@ -843,7 +878,7 @@ export function createRelay(options: RelayOptions): Relay {
       const exchange = exchanges.get(mission.missionId)
       exchanges.delete(mission.missionId)
       if (exchange !== undefined) {
-        notify(
+        notifyAndKeep(
           exchange.askerRunId,
           exchange.askerMissionId,
           `${exchange.recipientName} finished without writing back. Anything they said is in their own conversation.`

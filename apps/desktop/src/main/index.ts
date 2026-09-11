@@ -128,7 +128,7 @@ import {
   TEAMMATE_REMOVE_CHANNEL,
   TEAMMATE_UPDATE_CHANNEL
 } from '../shared/ipc.js'
-import type { MissionRuntimeId } from '@teammate/runtime-adapters'
+import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { routeAtStart } from '../shared/route-at-start.js'
 import { roleLabelOf } from '../shared/ipc.js'
@@ -1128,6 +1128,48 @@ if (!ownsSingleInstanceLock) {
        * way to start a mission, and the hop cap and the relay switch bound it
        * because it never goes near either.
        */
+      /*
+       * Write an ending into the mission's own record.
+       *
+       * A relay notice was a live update only, so a person watching another
+       * conversation when an exchange stopped never learned it had, and
+       * reopening the thread later showed nothing -- it simply appeared to
+       * stop for no reason. The host already raises `host.*` diagnostics into
+       * a mission this way (`host.shared_workspace`, disk-observation.ts);
+       * this is the same shape.
+       *
+       * Appending AFTER a run's terminal event is safe: `phaseFor` scans
+       * backwards for any terminal event, so a completed mission stays
+       * completed. Checked before this was written rather than after.
+       */
+      note: async ({ missionId, message }) => {
+        const mission = await missionLedger.getMission(missionId).catch(() => undefined)
+        if (mission === undefined) return
+        const last = mission.events.at(-1)
+        // The ledger requires contiguous sequences, and this is the only
+        // writer once a run is over -- so the recorded tail is the truth.
+        const sequence = (last?.sequence ?? 0) + 1
+        await missionLedger
+          .appendEvents(missionId, [
+            {
+              id: `${mission.metadata.runId}:relay:${String(sequence)}`,
+              runId: mission.metadata.runId,
+              missionId,
+              sequence,
+              type: 'adapter.diagnostic',
+              occurredAt: new Date().toISOString(),
+              sourceAdapter: last?.sourceAdapter ?? mission.metadata.runtime,
+              payload: {
+                level: 'info',
+                code: 'host.relay_ended',
+                message,
+                terminal: false,
+                evidence: { redacted: true }
+              }
+            } as NormalizedRuntimeEvent
+          ])
+          .catch(() => undefined)
+      },
       stopWorkOf: async (teammateId) => {
         const codexRun = codexMissions.runIdOwnedBy(teammateId)
         if (codexRun !== undefined) return codexMissions.cancel(codexRun).ok
