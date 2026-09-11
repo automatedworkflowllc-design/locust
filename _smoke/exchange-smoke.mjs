@@ -212,7 +212,16 @@ try {
     String(opened).slice(0, 200)
   )
   check('and it still names both participants', /Wren/.test(String(opened)) && /Booty/.test(String(opened)), String(opened).slice(0, 200))
-  check('it counts the automatic replies against the budget', /1 of 6 automatic replies/.test(booty.strip ?? ''), booty.strip)
+  // Against WHATEVER the budget is. This pinned the literal 6 and went red
+  // the day the default moved to 12 -- reporting a settings change as a
+  // broken exchange strip, which is the kind of red that teaches the suite's
+  // colour to be ignored. What it means is that the strip counts replies
+  // against the budget, and that is what it says now.
+  check(
+    'it counts the automatic replies against the budget',
+    /1 of \d+ automatic replies/.test(booty.strip ?? ''),
+    booty.strip
+  )
   check('it adds up the cost of both runs', /\$0\.45/.test(booty.strip ?? ''), booty.strip)
   check('no stop control: nothing is running', !/Stop/.test(booty.strip ?? ''), booty.strip)
 
@@ -237,7 +246,12 @@ try {
   })()`))
   say(`       ${JSON.stringify(settings).slice(0, 300)}`)
   check('Settings offers the budget as fixed steps', settings.group === true && settings.choices?.length === 6, JSON.stringify(settings.choices))
-  check('six is the default', settings.choices?.find((c) => c[0] === '6')?.[1] === 'true')
+  // One step is chosen, and the sentence above agrees with it. Pinning the
+  // NUMBER made this a test of the current default rather than of the
+  // control: it said "six is the default" and could only ever be true until
+  // somebody changed the default, which is not a defect.
+  const checkedStep = settings.choices?.find((c) => c[1] === 'true')?.[0]
+  check('exactly one budget is chosen to begin with', checkedStep !== undefined, JSON.stringify(settings.choices))
   check('two is now chosen', settings.after?.find((c) => c[0] === '2')?.[1] === 'true', JSON.stringify(settings.after))
   check('the copy says the number, not "six"', /after 2 automatic replies/.test(settings.lede ?? ''), settings.lede)
 
