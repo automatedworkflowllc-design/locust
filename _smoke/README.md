@@ -139,3 +139,21 @@ been red for weeks while saying nothing true:
 If an assertion can be falsified by a model being polite, or by somebody
 changing a default, it is testing the wrong thing. Fix it by making it say
 what it means, not by loosening it.
+
+**The whole suite was audited for this on 2026-09-12** -- delegated to Grok
+on Cursor's free quota, read-only, reported rather than applied, because
+rewriting an assertion needs judgement about what the app promises. Nine more
+were found and fixed; the report is `docs/GROK-RESULT-2026-09-12-SMOKE-ASSERTIONS.md`.
+Every finding was re-checked against the source before it was applied, and one
+of its suggestions was NOT taken: it proposed asserting that the composed
+brief in the ledger carries the seeded memory, and the ledger's
+`mission.created` turns out to hold the person's words only, so there is
+nothing there to assert. Read the file before trusting a fix written for it.
+
+The nine, as a list of the shapes to watch for:
+
+- a hop cap the smoke asserted but never seeded (`relay`)
+- a model quoting a code word back (`memory`, `folder-brief`, `follow-up`)
+- a model repeating an instructed phrase (`room`, `side-by-side`, `workroom`)
+- a model producing reasoning at all (`cursor`)
+- a default interval the smoke never chose (`schedule`, in four places)

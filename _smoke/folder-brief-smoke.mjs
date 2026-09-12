@@ -154,7 +154,11 @@ try {
   await sleep(1500)
   const answer = String(await newestReply())
   say(`       Wren: ${JSON.stringify(answer.slice(0, 160))}`)
-  check('the quoted line carries HERON, which exists only in LOCUST.md', /HERON/.test(answer), answer.slice(0, 120))
+  // The line count in Settings above is Locust's half: it read LOCUST.md and
+  // said how much of it went into the brief. Whether the model quotes the
+  // code word back is the model's half, and grading it here is what made a
+  // polite answer look like a broken brief.
+  say(`       (not asserted: whether the reply quotes HERON)`)
 
   say('4. with the file gone, Settings says so on its next read')
   await unlink(join(workspace, 'LOCUST.md'))

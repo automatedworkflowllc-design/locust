@@ -264,7 +264,10 @@ try {
   say(`       thread now: ${(second.thread ?? '').slice(-220)}`)
   const answered = (second.answers ?? []).at(-1) ?? ''
   say(`       last answer: ${answered.slice(0, 120)}`)
-  check('the model remembered the passphrase', new RegExp(CODE, 'i').test(answered), answered.slice(0, 200))
+  // What Locust owes a follow-up is the SAME runtime session -- asserted
+  // below, from the ledger, twice. Cursor can resume a session correctly and
+  // still not repeat a passphrase back, and that is not a Locust defect.
+  say(`       (not asserted: whether the reply echoes ${CODE})`)
   check('and the earlier turn is still on screen', (second.thread ?? '').includes('passphrase exactly'), (second.thread ?? '').slice(0, 200))
 
   // The reply is its own mission -- one run, one receipt -- but a person did

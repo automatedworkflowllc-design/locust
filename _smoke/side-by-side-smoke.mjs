@@ -312,7 +312,15 @@ try {
     await new Promise(r => setTimeout(r, 400))
     return [...document.querySelectorAll('.lc-agentline')].map(n => n.innerText).join(' ')
   })()`)
-  check('Wren\u2019s finished thread still holds Wren\u2019s answer after the switching', /Wren here/i.test(wrenThread), wrenThread.slice(0, 80))
+  // What switching owes is that Wren's finished thread is still WREN's -- it
+  // holds her own reply and has not been overwritten by the conversation
+  // switched to. The instructed phrase was a stand-in for that, and a model
+  // answering in its own words is not a switching defect.
+  check(
+    'Wren\u2019s finished thread still holds her own reply after the switching',
+    wrenThread.trim().length > 0 && !wrenThread.includes(ATLAS_PROMPT.slice(0, 40)),
+    wrenThread.slice(0, 80)
+  )
 } finally {
   child.kill()
   await sleep(500)

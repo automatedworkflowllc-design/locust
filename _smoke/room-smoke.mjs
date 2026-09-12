@@ -279,7 +279,11 @@ try {
   })()`))
   say(`       ${JSON.stringify(settled.cards.slice(2))}`)
   check('both runs finished', settled.cards.slice(2).every((c) => c.phase === 'completed'), JSON.stringify(settled.cards.slice(2)))
-  check('and each answered in its own card', settled.cards.slice(2).every((c) => /ready/i.test(c.text)), JSON.stringify(settled.cards.slice(2)))
+  // The room owes a card per teammate carrying that teammate's answer. The
+  // post asks them to say "ready"; whether a free model obeys an instruction
+  // to the letter is the same class as the task block below, which this file
+  // already logs rather than asserts.
+  check('and each answered in its own card', settled.cards.slice(2).every((c) => String(c.text ?? '').trim().length > 0), JSON.stringify(settled.cards.slice(2)))
   // Whether a free model follows the block is the model's business, not the
   // product's; what the product owes is that a block that arrives moves the
   // board and a block that does not leaves it. Logged, not asserted.

@@ -197,7 +197,13 @@ try {
   await sleep(1500)
   const answer = await newestReply()
   say(`       Wren: ${JSON.stringify(String(answer).slice(0, 160))}`)
-  check('the quoted line carries PELICAN, which was only in memory', /PELICAN/i.test(String(answer)), String(answer).slice(0, 120))
+  // NOT asserted, and checked before deleting: the composed brief is not in
+  // the ledger -- `mission.created` carries the person's words only -- so
+  // there is no record of Locust's half to assert against here. What Locust
+  // owes is that the memory was kept and briefed, and Settings' own count
+  // above is the witness for that. Whether a free model quotes it back is
+  // the model's business.
+  say(`       (not asserted: whether the reply quotes PELICAN)`)
 
   say('B. Booty is asked to remember something')
   check('the run finished', (await ask('Booty', 'Remember, for this project only, that the build command is pnpm build. Use the memory block you were shown. Then reply with the single word OK.')) === 'finished')

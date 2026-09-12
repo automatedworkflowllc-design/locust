@@ -247,29 +247,46 @@ try {
   })()`)
   let dialog = {}
   try { dialog = JSON.parse(String(saved)) } catch { /* reported below */ }
-  check('the hours control appeared, defaulting to 4, and the dialog said the limits out loud', dialog.hours === '4' && /Only while Locust is open/.test(String(dialog.note)) && dialog.closed === true, String(saved).slice(0, 220))
+  /*
+   * The number the CONTROL showed, not a number this file guessed.
+   *
+   * This smoke clicks "Every few hours" and Save; it never picks an
+   * interval. Four assertions then required 4, so changing the default --
+   * a settings change, not a defect -- would have reported a broken
+   * schedule card, a broken routines file and a broken next-run line. Same
+   * trap as `1 of 6 automatic replies` in exchange-smoke.
+   *
+   * What the product owes is that the control, the card and the file all
+   * say the SAME interval, whatever it is.
+   */
+  const hours = String(dialog.hours ?? '')
+  check(
+    'the hours control appeared with an interval, and the dialog said the limits out loud',
+    /^\d+$/.test(hours) && /Only while Locust is open/.test(String(dialog.note)) && dialog.closed === true,
+    String(saved).slice(0, 220)
+  )
 
   say('5. the Team screen shows the schedule and the next run')
   const listed = await teamRows(app.evaluate)
   // Show the SCHEDULE part, not the first 200 characters of the card -- the
   // routine name ate the whole budget and the failure never showed what the
   // line actually said.
-  const scheduleText = (String(listed).match(/every 4 hours[^|]{0,40}/) ?? ['no schedule line in the card'])[0]
+  const scheduleText = (String(listed).match(new RegExp(`every ${hours} hours[^|]{0,40}`)) ?? ['no schedule line in the card'])[0]
   // routineScheduleSummary has FOUR shapes, all correct, and which one you
   // get depends on the clock: "next 06:12" today, "next tomorrow 02:08",
   // "next Sat 09:00" further out, and "due now" once it is due. Pinning only
   // the same-day one made this fail every evening -- it ran at 22:08, four
   // hours later is tomorrow, and the card rightly said so.
   check(
-    'the card reads "every 4 hours · next <when>"',
-    /every 4 hours · (due now|next (tomorrow |(Sun|Mon|Tue|Wed|Thu|Fri|Sat) )?\d\d:\d\d)/.test(String(listed)),
+    `the card names the interval the control showed (every ${hours} hours)`,
+    new RegExp(`every ${hours} hours · (due now|next (tomorrow |(Sun|Mon|Tue|Wed|Thu|Fri|Sat) )?\\d\\d:\\d\\d)`).test(String(listed)),
     scheduleText
   )
 
   const routinesPath = join(profile, 'routines.json')
   const file = JSON.parse(await readFile(routinesPath, 'utf8'))
   const routine = file.routines?.[0]
-  check('the schedule is on disk', routine?.schedule?.kind === 'every' && routine?.schedule?.hours === 4, JSON.stringify(routine?.schedule))
+  check('the schedule on disk is the one the control showed', routine?.schedule?.kind === 'every' && String(routine?.schedule?.hours) === hours, JSON.stringify(routine?.schedule))
 
   say('6. quit, back-date the routine five hours, relaunch, press nothing')
   await app.stop()
@@ -308,7 +325,7 @@ try {
   const after = JSON.parse(await readFile(routinesPath, 'utf8')).routines?.[0]
   check('the run was recorded: runs 1, lastRunAt set', after?.runs === 1 && typeof after?.lastRunAt === 'string', JSON.stringify({ runs: after?.runs, lastRunAt: after?.lastRunAt }))
   const rows = await teamRows(app.evaluate)
-  check('the card says run 1 time and names the next run', /run 1 time/.test(String(rows)) && /every 4 hours · next /.test(String(rows)), String(rows).slice(0, 200))
+  check('the card says run 1 time and names the next run', /run 1 time/.test(String(rows)) && new RegExp(`every ${hours} hours · next `).test(String(rows)), String(rows).slice(0, 200))
 } catch (error) {
   failures += 1
   say(`  [FAIL] ${error instanceof Error ? error.message : String(error)}`)

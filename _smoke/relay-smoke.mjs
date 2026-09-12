@@ -109,7 +109,12 @@ await writeFile(
       { teammateId: 'tm_booty', name: 'Booty', hue: 'violet', role: 'Custom', createdAt }
     ],
     missionOwners: {},
-    settings: { swarm: false, relay: true }
+    // The cap this smoke CHOSE, written here so the assertion below has a
+    // number of its own. It used to assert 6 while the file seeded no cap
+    // at all -- so the product default moving to 12 would have failed a
+    // 7-hop exchange that was well inside its budget, which is the very
+    // defect this smoke was rewritten to stop reporting.
+    settings: { swarm: false, relay: true, relayHopCap: 6 }
   })
 )
 const LEDGER_DIR = join(profile, 'mission-ledger')
@@ -398,6 +403,7 @@ try {
   // in one more round trip. A model that asks before complying is behaving
   // well, and a smoke test that calls that a failure teaches the wrong thing.
   // One seeded run precedes the exchange, so the relayed runs are the rest.
+  // Not a guess at the product default: the number seeded above.
   const MAX_RELAY_HOPS = 6
   const relayed = names.length - 1
   check(
