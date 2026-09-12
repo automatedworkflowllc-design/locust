@@ -135,7 +135,31 @@ export function taskSection(input: {
     input.tasks.length === 0
       ? 'The board is empty.'
       : input.tasks
-          .map((task) => `- [${task.state}] ${task.text}${task.ownerName === undefined ? '' : ` (${task.ownerName})`}`)
+          .map((task) => {
+            /*
+             * WHOSE, said from the reader's side.
+             *
+             * The board named an owner -- `(Yurt)` -- and left every reader to
+             * work out whether that was them. Both teammates in a two-person
+             * room then started the same task: Colin, 2026-09-11, on a task
+             * assigned to Yurt alone, "i can imagine if both teammates receive
+             * the task only assigned to one things can get messy". They both
+             * received the board, which is right; nothing told either of them
+             * that a name on a row was a claim already made.
+             *
+             * So a row says `(yours)` or `(Yurt's)` -- the same fact addressed
+             * to the person reading it, which is the same correction the
+             * opening line needed when it described a teammate's colleagues
+             * instead of naming the teammate.
+             */
+            const owner =
+              task.ownerName === undefined
+                ? ' (unassigned)'
+                : task.ownerName === input.selfName
+                  ? ' (yours)'
+                  : ` (${task.ownerName}'s)`
+            return `- [${task.state}] ${task.text}${owner}`
+          })
           .join('\n')
   const handoffExample = others[0] ?? 'Name'
   return [
@@ -165,6 +189,13 @@ export function taskSection(input: {
     `handoff ${handoffExample} :: the task text`,
     'new :: a task that should exist and does not',
     `</${TASK_TAG}>`,
+    /*
+     * The rule the board always implied and never stated. Without it, "claim
+     * only what you are actually doing" reads as being about honesty -- and a
+     * teammate that genuinely intends to do someone else's task is not
+     * breaking it.
+     */
+    "A row marked with another teammate's name is already theirs: leave it alone, and do not claim, redo or report on it. Work an unassigned row, or one marked yours.",
     'Claim only what you are actually doing, mark done only what is finished, and if you touched no task, end with no block.'
   ].join('\n')
 }

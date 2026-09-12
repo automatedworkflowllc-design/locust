@@ -86,10 +86,34 @@ describe('what a room mission is told about the board', () => {
       ]
     })
     expect(text).toContain('room "Release" with Booty')
-    expect(text).toContain('- [in-hand] Write the release notes (Wren)')
-    expect(text).toContain('- [open] Check the version string')
+    // Whose, from the READER's side: Wren is told her row is hers.
+    expect(text).toContain('- [in-hand] Write the release notes (yours)')
+    expect(text).toContain('- [open] Check the version string (unassigned)')
     expect(text).toContain('handoff Booty :: the task text')
     expect(text).toContain('end with no block')
+  })
+
+  it("names another teammate's row as theirs, and says to leave it alone", () => {
+    /*
+     * Both teammates in a two-person room started the same task, because the
+     * board named an owner and left each reader to work out whether that name
+     * was their own (Colin, 2026-09-11: "i can imagine if both teammates
+     * receive the task only assigned to one things can get messy").
+     *
+     * Both DO receive the board -- that is right, a room is shared -- so the
+     * fix is that a row says whose it is in the second person, and that
+     * somebody else's row is stated to be off limits rather than merely
+     * attributed.
+     */
+    const text = taskSection({
+      roomName: 'Release',
+      selfName: 'Booty',
+      memberNames: ['Wren', 'Booty'],
+      tasks: [{ text: 'Write the release notes', state: 'in-hand', ownerName: 'Wren' }]
+    })
+    expect(text).toContain("- [in-hand] Write the release notes (Wren's)")
+    expect(text).toContain('already theirs')
+    expect(text).toContain('leave it alone')
   })
 
   it('says the board is empty and names nobody when alone', () => {

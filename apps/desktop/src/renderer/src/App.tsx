@@ -3980,6 +3980,9 @@ export default function App(): ReactElement {
           {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer
+            // So the mode menu can say where connectors live when this route
+            // is not the one they are signed in on. See `connectorsNote`.
+            hasConnectors={connectorList !== undefined && connectorList.length > 0}
             // Said before the send: a reply on another runtime continues
             // from the stopped run's checkpoint, not from its memory.
             continuationNote={continuationNote}

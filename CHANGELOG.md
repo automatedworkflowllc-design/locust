@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.86.0 - 2026-09-12
+
+- **The app tells you where your connectors live.** Locust reads your
+  connectors from Claude Code, and only a teammate on a Claude Code route gets
+  them — which it had never said anywhere. On any other route the mode menu
+  now names that plainly. It does not claim the other route has none: Cursor
+  has its own, signed in separately. That silence cost a whole evening of
+  chasing a Robinhood connector that was signed in on Claude Code and could
+  never have worked on Cursor.
+- **A room's task board says whose each task is, from your teammate's side.**
+  A row read `(Yurt)`, which left every teammate to work out whether that name
+  was their own — so both members of a two-person room started the same task.
+  Rows now read `(yours)`, `(Yurt's)` or `(unassigned)`, and a teammate is
+  told plainly that somebody else's row is not theirs to take.
+
 ## 0.85.0 - 2026-09-11
 
 - **A Cursor reply no longer says itself twice.** Cursor streams a reply word

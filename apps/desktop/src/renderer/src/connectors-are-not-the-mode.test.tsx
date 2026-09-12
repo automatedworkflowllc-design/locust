@@ -90,3 +90,44 @@ describe('what a mode does to a connector', () => {
     }
   })
 })
+
+describe('a route that is not where your connectors live', () => {
+  /*
+   * MEASURED 2026-09-11, and it cost Colin an evening. Robinhood is signed in
+   * and `Connected` on his Claude Code; `cursor-agent mcp list` reports
+   * `requires_authentication` for the SAME url, and its `mcp login` completes
+   * in the browser and persists nothing. So a teammate on Cursor failed every
+   * call, and -- with nothing on screen to go on -- explained it by inventing
+   * reasons about desktop OAuth, which Colin then chased.
+   *
+   * The app knew. It reads connectors off Claude Code and builds allow rules
+   * only for Claude Code runs. It just never said so anywhere.
+   */
+  it('says where they are signed in, once there are any', () => {
+    const said = connectorsNote('cursor', 'auto', true)
+    expect(said).toContain('Claude Code')
+    expect(said).toContain('Cursor')
+  })
+
+  it('does not claim the other route has none, because that is not true', () => {
+    // Cursor's own plugins were ready in the very session Robinhood failed
+    // in. A different SET, signed in separately -- not an absence.
+    const said = connectorsNote('cursor', 'auto', true) ?? ''
+    for (const wrong of ['no connectors', 'cannot use', 'without connectors']) {
+      expect(said.toLowerCase()).not.toContain(wrong)
+    }
+    expect(said).toContain('different set')
+  })
+
+  it('stays quiet when this machine has none, because then there is nothing to place', () => {
+    expect(connectorsNote('cursor', 'auto', false)).toBeUndefined()
+    expect(connectorsNote('codex', 'read-only', false)).toBeUndefined()
+  })
+
+  it('leaves the Claude sentence exactly as it was', () => {
+    // The mode sentence is measured and hard-won; this change must not touch
+    // it. It also must not depend on the new flag.
+    expect(connectorsNote('claude', 'auto', true)).toBe(connectorsNote('claude', 'auto', false))
+    expect(connectorsNote('claude', 'auto', true)).toContain('work here')
+  })
+})

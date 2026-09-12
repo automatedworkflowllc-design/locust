@@ -22,6 +22,7 @@ import {
 } from '../status.js'
 import { defaultEffort } from '../status.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
+import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
 import { ContextRing } from './ContextRing.js'
@@ -96,18 +97,51 @@ const MODES: readonly { readonly mode: MissionMode; readonly name: string; reado
  * DISK. A teammate in Ask can still send mail or place an order through a
  * connector, because no sandbox on this machine reaches the far end of one.
  *
- * Claude Code only: it is the only runtime whose command builder mentions MCP
- * at all, so the same words elsewhere would be a claim nothing behind them
- * makes.
+ * Claude Code only, for the MODE sentence: it is the only runtime whose
+ * command builder mentions MCP at all, so the same words elsewhere would be a
+ * claim nothing behind them makes.
+ *
+ * ELSEWHERE, THE SILENCE WAS THE PROBLEM. Locust reads connectors from the
+ * person's Claude Code (`connector-reader.ts` -- `claude mcp list` is the
+ * only source that has the claude.ai ones) and builds allow rules only for
+ * Claude Code runs. On any other route this said nothing at all, so a person
+ * with connectors set up had no way to learn that the route they had chosen
+ * was not where they live.
+ *
+ * MEASURED 2026-09-11, and it cost Colin an evening: Robinhood is signed in
+ * and `Connected` on his Claude Code, while `cursor-agent mcp list` reports
+ * `requires_authentication` for the same URL and its `mcp login` persists
+ * nothing at all -- so a teammate on Cursor failed every call, and, having
+ * nothing else to go on, explained the failure by inventing reasons about
+ * desktop OAuth. One sentence here would have ended it in a minute.
+ *
+ * The sentence must not overclaim in the other direction either. A teammate
+ * on Cursor is NOT without connectors -- Cursor's own plugins were ready in
+ * that same session -- it is a DIFFERENT SET, signed in separately. That is
+ * the fact, and it is the one a person cannot see from here.
  */
-export function connectorsNote(runtime: string, mode: MissionMode): string | undefined {
-  if (runtime !== 'claude') return undefined
+export function connectorsNote(
+  runtime: string,
+  mode: MissionMode,
+  /** Whether this machine's Claude Code has any, from `listConnectors`. */
+  hasConnectors = false
+): string | undefined {
+  if (runtime !== 'claude') {
+    if (!hasConnectors) return undefined
+    return `Your connectors are signed in on Claude Code. A teammate on ${shortRuntimeName(runtime as MissionRuntimeId)} uses that program's own instead — a different set, signed in separately.`
+  }
   return mode === 'auto'
     ? 'Your connectors work here, and so does everything else on this machine.'
     : 'Your connectors work in this mode too. What this mode limits is this machine — a connector acts on the service it reaches, so it is outside the sandbox either way.'
 }
 
 export interface ComposerProps {
+  /**
+   * Whether this machine's Claude Code has any connectors, so the mode menu
+   * can say where they live when the route is not Claude. See
+   * `connectorsNote`.
+   */
+  readonly hasConnectors?: boolean
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
@@ -204,6 +238,7 @@ export interface ComposerProps {
  * discovery, never from a constant.
  */
 export function Composer({
+  hasConnectors = false,
   continuationNote,
   workspaceName,
   workspacePath,
@@ -1025,8 +1060,8 @@ export function Composer({
                       * servers would have hidden this in exactly the case that
                       * raised it.
                       */}
-                    {connectorsNote(route.runtime, mode) !== undefined && (
-                      <p className="lc-menu__foot">{connectorsNote(route.runtime, mode)}</p>
+                    {connectorsNote(route.runtime, mode, hasConnectors) !== undefined && (
+                      <p className="lc-menu__foot">{connectorsNote(route.runtime, mode, hasConnectors)}</p>
                     )}
                   </div>
                 )}
@@ -1039,7 +1074,7 @@ export function Composer({
                   aria-haspopup="menu"
                   aria-expanded={modeOpen}
                   aria-label="Permission mode"
-                  title={connectorsNote(route.runtime, effectiveMode) ?? 'Permission mode'}
+                  title={connectorsNote(route.runtime, effectiveMode, hasConnectors) ?? 'Permission mode'}
                   disabled={running}
                   onClick={() => setModeOpen(!modeOpen)}
                 >
