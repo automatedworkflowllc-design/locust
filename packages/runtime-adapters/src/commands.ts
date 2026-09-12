@@ -781,6 +781,31 @@ export function createCursorPrintCommand(
     // stops on a "Workspace Trust Required" prompt nobody can answer. The
     // host chose this workspace, so trusting it for this run is the truth.
     "--trust",
+    /*
+     * The same shape as `--trust` above it, and missed for the same reason.
+     *
+     * A connector in `~/.cursor/mcp.json` is approved by ANSWERING A PROMPT,
+     * and a headless run has nobody to answer it -- so the prompt resolves
+     * to "no" and every connector call fails. MEASURED 2026-09-11, one
+     * headless run against Colin's own configured server:
+     *
+     *   Failed: user rejected MCP `robinhood-trading-get_accounts`.
+     *
+     * Not an auth failure, though it arrives beside one: the run was
+     * REJECTED before the credential mattered. That is why the connector
+     * worked in Cursor's own app and not here, which is how Colin found it
+     * ("works on cursor agent but not on locust") -- the app has someone to
+     * ask and this does not.
+     *
+     * So the effective policy without this flag is not "safer", it is
+     * "always no", for servers the person themselves configured and that
+     * Cursor's own app uses freely. Colin's standing rule is the other way
+     * round: "just let them have access to the mcp tools if the client have
+     * access to it." Locust adds no server of its own and reads no
+     * credential -- what a teammate can reach here is exactly what its CLI
+     * was already set up to reach.
+     */
+    "--approve-mcps",
     "--workspace",
     options.workspacePath,
   ];

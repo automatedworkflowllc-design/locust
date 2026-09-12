@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.84.0 - 2026-09-11
+
+- **Your Cursor connectors work in Locust.** A connector configured in
+  `~/.cursor/mcp.json` is approved in Cursor by answering a prompt — and a
+  Locust run has nobody to answer it, so the prompt was resolving to "no" and
+  every connector call failed. Measured against a real configured server:
+  `Failed: user rejected MCP`. That is a rejection, not a sign-in problem,
+  which is why the same connector worked in Cursor's own app and not here.
+- Locust adds no connector of its own and reads no credential. What a
+  teammate can reach is exactly what their CLI was already set up to reach.
+
 ## 0.83.0 - 2026-09-11
 
 - **Text is no longer eaten from the beginning while a teammate is writing.**

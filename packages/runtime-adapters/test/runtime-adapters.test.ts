@@ -513,8 +513,27 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     // read-only mission asks for both, because plan mode alone was measured
     // letting a run edit files.
     expect(spec.args).toEqual([
-      "--print", "--output-format", "stream-json", "--stream-partial-output", "--trust", "--workspace", workspacePath, "--mode", "plan", "--sandbox", "enabled",
+      "--print", "--output-format", "stream-json", "--stream-partial-output", "--trust", "--approve-mcps", "--workspace", workspacePath, "--mode", "plan", "--sandbox", "enabled",
     ]);
+  });
+
+  it("approves the connectors the person already configured, because nobody is here to be asked", () => {
+    /*
+     * A headless run cannot answer Cursor's MCP approval prompt, so without
+     * this the prompt resolves to "no" and every connector call fails.
+     * MEASURED against a real configured server, 2026-09-11: "Failed: user
+     * rejected MCP `robinhood-trading-get_accounts`" -- a rejection, not an
+     * auth failure, which is why the same connector worked in Cursor's own
+     * app and not here.
+     *
+     * It rides with `--trust` on EVERY mode, read-only included: approving
+     * a connector is not permission to change anything, and a plan-mode run
+     * that cannot read the thing it is planning about is no safer, only
+     * less useful.
+     */
+    for (const sandbox of ["read-only", "workspace-write", "full-access"] as const) {
+      expect(createCursorPrintCommand(nativeExecutable, { workspacePath, sandbox }).args).toContain("--approve-mcps");
+    }
   });
 
   it("lets a workspace-write Cursor mission edit, still without --force", () => {
