@@ -106,7 +106,18 @@ describe('a room the store would refuse', () => {
      */
     expect(MAX_ROOM_TEAMMATES).toBeLessThanOrEqual(MAX_LIVE_MISSIONS)
     const full = open(MAX_ROOM_TEAMMATES)
-    expect(full).toContain(`Goes to ${String(MAX_ROOM_TEAMMATES)} teammates, each on their own route`)
+    /*
+     * The absence is the whole claim, and it used to be checked alongside the
+     * PRESENCE of a standing sentence -- "Goes to 8 teammates, each on their
+     * own route" -- which was never what this file is about. That sentence
+     * was removed as filler on 2026-09-11 and took this test red with it,
+     * which is the tell: an assertion that goes red when something unrelated
+     * is reworded was pinning a wording, not a fact.
+     *
+     * The room is drawn and it does not warn. That is the regression.
+     */
+    expect(full).toContain('Post to Standup')
     expect(full).not.toContain('will not start')
+    expect(full).not.toContain('will not all start')
   })
 })

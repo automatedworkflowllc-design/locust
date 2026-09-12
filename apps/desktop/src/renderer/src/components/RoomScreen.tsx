@@ -1003,15 +1003,29 @@ export function RoomScreen({
             <Icon name="arrow-up" size={15} />
           </button>
         </div>
-        <div className="lc-roomcompose__row">
-          <span className="lc-settings__note">
-            {busy
-              ? 'Posting…'
-              : notice ??
-                formError ??
-                `Goes to ${String(room.teammateIds.length)} teammate${room.teammateIds.length === 1 ? '' : 's'}, each on their own route.`}
-          </span>
-        </div>
+        {/*
+          * Only when there is something to say.
+          *
+          * This line was never empty. It narrated the board back at you --
+          * "Jimothy took on X. Jimothy finished X. Jimothy handed X to Yurt."
+          * -- directly under a board already showing X as IN HAND beside
+          * Jimothy's face, and when it had no news it fell back to a standing
+          * sentence about where a post goes. Colin, 2026-09-11: "that texxt
+          * under the chat box needs to go away."
+          *
+          * Both halves were the same mistake in different directions: the
+          * narration says what another register already says, and the
+          * fallback is true forever, which is what makes it furniture rather
+          * than information. The room header already names who is in the room.
+          *
+          * What survives is what a person cannot find anywhere else: that a
+          * post is in flight, and that one was REFUSED.
+          */}
+        {(busy || notice !== undefined || formError !== undefined) && (
+          <div className="lc-roomcompose__row">
+            <span className="lc-settings__note">{busy ? 'Posting…' : notice ?? formError}</span>
+          </div>
+        )}
       </form>
     </div>
   )

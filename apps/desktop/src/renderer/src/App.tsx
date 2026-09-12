@@ -1297,11 +1297,21 @@ export default function App(): ReactElement {
         return
       }
       if (update.kind === 'room-changed') {
-        // A teammate's reply moved a board. Re-read the rooms so the screen
-        // shows the board as the host now holds it, and keep the host's one
-        // line for the room to show.
+        /*
+         * A teammate's reply moved a board. Re-read the rooms so the screen
+         * shows the board as the host now holds it -- and say NOTHING extra.
+         *
+         * This used to narrate the move under the composer: "Jimothy took on
+         * X. Jimothy finished X. Jimothy handed X to Yurt." -- directly below
+         * a board already showing X as IN HAND beside Jimothy's face. One
+         * fact in two registers, which is the thing this app refuses
+         * everywhere else. Colin, 2026-09-11: "that texxt under the chat box
+         * needs to go away."
+         *
+         * The notice itself is kept for what a person cannot read off the
+         * board: a REFUSAL. Those are set where they happen.
+         */
         refreshRooms()
-        setRoomNotice(update.message)
         return
       }
       if (update.kind === 'memory-changed') {

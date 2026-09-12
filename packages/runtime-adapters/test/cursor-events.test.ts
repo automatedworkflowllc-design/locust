@@ -307,14 +307,25 @@ describe("a turn that opens", () => {
   });
 });
 
-describe("a message longer than the ledger's bound", () => {
-  const init = JSON.stringify({ type: "system", subtype: "init", session_id: "s1", model: "Auto" });
-  const long = "x".repeat(20_000);
 
-  it("never takes back text the fragments already delivered", () => {
-    // Each fragment is bounded on its own, so fragments are never truncated;
-    // the complete message can be. Replacing with the truncated copy left the
-    // ledger holding LESS than it held a moment earlier.
+describe("a Cursor version that marks nothing", () => {
+  /*
+   * TAKEN FROM COLIN'S OWN LEDGER, 2026-09-11 (mission fd0adba1), where two
+   * runs the same evening disagreed about the keys on a complete message:
+   *
+   *   f8dedec3  type,message,session_id,model_call_id,timestamp_ms
+   *   fd0adba1  type,message,session_id,timestamp_ms
+   *
+   * In the second nothing distinguishes the complete message from a
+   * fragment, so it was appended and the reply said itself twice -- and,
+   * worse, was never marked final, so the host reported "Jimothy's turn
+   * ended without a reply" about a teammate who had plainly written one.
+   */
+  const init = JSON.stringify({ type: "system", subtype: "init", session_id: "s1", model: "Auto" });
+  const WORDS = ["Looking", " up", " NVIDIA", " forward", " earnings", " now", "."];
+  const WHOLE = WORDS.join("");
+
+  const feed = (words: readonly string[], andThen: readonly string[] = []) => {
     const cursor = normalizer();
     const events: NormalizedRuntimeEvent[] = [];
     let sequence = 0;
@@ -322,56 +333,57 @@ describe("a message longer than the ledger's bound", () => {
       sequence += 1;
       events.push(...cursor.accept({ sequence, raw: JSON.stringify(value) }));
     };
+    const say = (text: string) =>
+      accept({ type: "assistant", timestamp_ms: sequence, message: { role: "assistant", content: [{ type: "text", text }] } });
     accept(JSON.parse(init));
-    for (const piece of [long.slice(0, 10_000), long.slice(10_000)]) {
-      accept({
-        type: "assistant",
-        timestamp_ms: sequence,
-        message: { role: "assistant", content: [{ type: "text", text: piece }] }
-      });
-    }
-    accept({
-      type: "assistant",
-      model_call_id: "m1",
-      message: { role: "assistant", content: [{ type: "text", text: long }] }
-    });
+    for (const word of words) say(word);
+    // The complete message, carrying no `model_call_id` -- indistinguishable
+    // from a fragment by its keys, identifiable only by what it says.
+    say(words.join(""));
+    for (const word of andThen) say(word);
+    return events;
+  };
 
-    const built = [...messages(events).values()];
-    expect(built[0]?.length).toBe(20_000);
+  it("does not let the reply say itself twice", () => {
+    const built = [...messages(feed(WORDS)).values()];
+    expect(built[0]).toBe(WHOLE);
+    expect(built[0]).not.toBe(`${WHOLE}${WHOLE}`);
   });
 
-  it("still replaces when the complete message is no shorter", () => {
+  it("closes the message, which is what the rest of the host reads", () => {
+    /*
+     * The half that cost a reply. The share, the memory block, the room task
+     * and the workroom post all read the last FINAL message; a turn that
+     * never marks one said nothing, as far as they can tell.
+     */
+    const deltas = feed(WORDS).filter((event) => event.type === "message.delta");
+    expect(deltas.at(-1)?.payload).toMatchObject({ final: true });
+  });
+
+  it("starts a new message after the complete one, rather than running two together", () => {
+    // Thirty seconds later in the real run, after tool work: the ANSWER --
+    // which had been concatenated onto the end of the preamble.
+    const built = [...messages(feed(WORDS, ["Partly", ".", " The", " stock"])).values()];
+    expect(built).toHaveLength(2);
+    expect(built[0]).toBe(WHOLE);
+    expect(built[1]).toBe("Partly. The stock");
+  });
+
+  it("still trusts the marker where a version sends one", () => {
+    // The old rule is not replaced, only backed up: a marked complete message
+    // is complete even where its text differs from the fragments.
     const cursor = normalizer();
     const events: NormalizedRuntimeEvent[] = [];
     events.push(...cursor.accept({ sequence: 1, raw: init }));
     events.push(...cursor.accept({
       sequence: 2,
-      raw: JSON.stringify({
-        type: "assistant",
-        timestamp_ms: 2,
-        message: { role: "assistant", content: [{ type: "text", text: "Peb" }] }
-      })
+      raw: JSON.stringify({ type: "assistant", timestamp_ms: 1, message: { role: "assistant", content: [{ type: "text", text: "part" }] } })
     }));
     events.push(...cursor.accept({
       sequence: 3,
-      raw: JSON.stringify({
-        type: "assistant",
-        model_call_id: "m1",
-        message: { role: "assistant", content: [{ type: "text", text: "Pebble is a timer." }] }
-      })
+      raw: JSON.stringify({ type: "assistant", model_call_id: "m1", message: { role: "assistant", content: [{ type: "text", text: "part and the rest" }] } })
     }));
-    expect([...messages(events).values()]).toEqual(["Pebble is a timer."]);
-  });
-});
-
-describe("a turn that opens", () => {
-  it("also closes, so nothing is left looking unfinished", () => {
-    const cursor = normalizer();
-    const events = cursor.accept({
-      sequence: 1,
-      raw: JSON.stringify({ type: "system", subtype: "compact" })
-    });
-    expect(events.map((event) => event.type)).toEqual(["step.started", "step.completed"]);
+    expect([...messages(events).values()][0]).toBe("part and the rest");
   });
 });
 

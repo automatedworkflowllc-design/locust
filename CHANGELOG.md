@@ -6,6 +6,29 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.85.0 - 2026-09-11
+
+- **A Cursor reply no longer says itself twice.** Cursor streams a reply word
+  by word and then sends the whole message again to mark it complete. Locust
+  recognised that closing message by a field Cursor has stopped always
+  sending — so it was appended as if it were new text, and the reply read
+  "…hand the numbers to Yurt for his take.Looking up NVIDIA forward
+  earnings…". It is now recognised by what it says, which is not something a
+  version can stop sending.
+- **And a teammate who wrote a reply is no longer reported as having written
+  nothing.** That was the same bug, and the worse half of it: the message was
+  never marked finished, and everything the app reads out of a reply — a
+  message to another teammate, something remembered, a task claimed, a post
+  to the room — reads the finished one. So a reply that was plainly on screen
+  could be announced as "the runtime finished and wrote nothing back".
+- Separate replies in one turn are also kept apart again, instead of being
+  run together into a single block of text.
+- **The line under a room's message box is quiet now.** It narrated the task
+  board back at you — "Jimothy took on X. Jimothy finished X." — directly
+  under a board already showing exactly that, and when it had no news it fell
+  back to a standing sentence. It now speaks only when a post is in flight or
+  something was refused.
+
 ## 0.84.0 - 2026-09-11
 
 - **Your Cursor connectors work in Locust.** A connector configured in

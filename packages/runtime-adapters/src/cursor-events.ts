@@ -187,6 +187,14 @@ export function createCursorEventNormalizer(
   let thinking = false;
   /** How much of each message the fragments have already put in the ledger. */
   const deliveredLength = new Map<string, number>();
+  /*
+   * What each open message has actually said so far, so the COMPLETE message
+   * can be recognised by what it contains when Cursor does not mark it.
+   * See `restatesTheWholeMessage` below.
+   */
+  const deliveredText = new Map<string, string>();
+  /** How many fragments each open message is built from; see the rule below. */
+  const deliveredPieces = new Map<string, number>();
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -268,8 +276,60 @@ export function createCursorEventNormalizer(
       const text = assistantText(parsed);
       if (text.length === 0) return [];
       const itemId = `msg_${String(messageIndex)}`;
-      if (isCursorMessageFragment(parsed)) {
+      /*
+       * THE SECOND TELL, and now the load-bearing one.
+       *
+       * `isCursorMessageFragment` reads a field: fragments carry
+       * `timestamp_ms` and no `model_call_id`, the complete message carries
+       * `model_call_id`. That was measured, and it rotted. TWO RUNS FROM ONE
+       * EVENING, 2026-09-11, same CLI:
+       *
+       *   f8dedec3  complete message keys: type,message,session_id,model_call_id,timestamp_ms
+       *   fd0adba1  complete message keys: type,message,session_id,timestamp_ms
+       *
+       * In the second, nothing distinguishes the complete message from a
+       * fragment -- so it was appended, and the reply said itself twice:
+       * "...to Yurt for his take.Looking up NVIDIA forward earnings now,
+       * then I'll hand the numbers to Yurt for his take." (Colin's
+       * screenshot, and 2872 characters of it in the ledger.)
+       *
+       * The doubling was the visible half. The worse half is that the item
+       * was never CLOSED: nothing was ever marked final, and everything the
+       * host reads out of a reply reads the last FINAL message -- the share,
+       * the memory block, the room task, the workroom post. So a teammate
+       * who had plainly written something was reported as "Jimothy's turn
+       * ended without a reply", which is what Colin saw next.
+       *
+       * So the content decides when the field does not. A complete message
+       * RESTATES exactly what its fragments already delivered; a fragment
+       * adds to it. That is a fact about what the stream contains rather
+       * than about which keys this version chose to send.
+       *
+       * TWO GUARDS, and the second was earned by this repo's own test.
+       *
+       * A message of 20,000 identical characters arrives as two fragments of
+       * 10,000 identical characters -- so the SECOND fragment equals
+       * everything delivered so far, and a naive content rule closed the
+       * message at half its length. That test was written for a different
+       * defect and caught this one, which is the whole reason to run the
+       * suite before believing a rule.
+       *
+       * So a restatement must cover SEVERAL fragments, not one. Cursor
+       * streams token by token, so the complete message always restates many
+       * of them; a single fragment that happens to equal everything before it
+       * is one fragment repeating one fragment, which is text.
+       *
+       * `text.length > 1` keeps the other honestly ambiguous case: a single
+       * character repeated ("a" then "a") is a real two-character message.
+       */
+      const restatesTheWholeMessage =
+        text.length > 1
+        && (deliveredPieces.get(itemId) ?? 0) > 1
+        && text === (deliveredText.get(itemId) ?? "");
+      if (isCursorMessageFragment(parsed) && !restatesTheWholeMessage) {
         deliveredLength.set(itemId, (deliveredLength.get(itemId) ?? 0) + text.length);
+        deliveredText.set(itemId, `${deliveredText.get(itemId) ?? ""}${text}`);
+        deliveredPieces.set(itemId, (deliveredPieces.get(itemId) ?? 0) + 1);
         return [
           emit("message.delta", {
             itemId,
