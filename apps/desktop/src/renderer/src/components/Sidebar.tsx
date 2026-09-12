@@ -4,6 +4,7 @@ import type { ReactElement, ReactNode } from 'react'
 import type { PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
+import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 import mark from '../assets/locust-mark.svg'
@@ -505,8 +506,18 @@ export function Sidebar({
                     // says who is who without opening a thread. This line
                     // earns its place; the two below it were one line's worth
                     // of fact spread over two.
-                    <span className="lc-row__route lc-mono" title="The route this teammate last ran on; replies on their own run here">
-                      {runtimeDisplayName(teammate.route.runtime)} / {teammate.route.model}
+                    <span
+                      className="lc-row__route lc-mono"
+                      title={`${runtimeDisplayName(teammate.route.runtime)} / ${teammate.route.model}`}
+                    >
+                      {/*
+                        * Spelled as a name, the same way the composer's chip
+                        * spells it -- `Cursor / Grok 4.6`, not `Cursor Agent
+                        * / cursor-grok-4.6-medium`, which says cursor twice
+                        * and then spells a product in lowercase. The exact id
+                        * is the tooltip.
+                        */}
+                      {shortRuntimeName(teammate.route.runtime)} / {modelDisplayName(teammate.route.runtime, teammate.route.model)}
                     </span>
                   )}
                   {/*
@@ -609,7 +620,7 @@ export function Sidebar({
               teammate={open}
               statusLabel={status.label}
               statusTone={status.tone === 'muted' ? 'muted' : status.tone}
-              route={open.route === undefined ? undefined : `${runtimeDisplayName(open.route.runtime)} / ${open.route.model}`}
+              route={open.route === undefined ? undefined : `${shortRuntimeName(open.route.runtime)} / ${modelDisplayName(open.route.runtime, open.route.model)}`}
               missions={theirs}
               selectedMissionId={selectedMissionId}
               top={railAnchor.top}

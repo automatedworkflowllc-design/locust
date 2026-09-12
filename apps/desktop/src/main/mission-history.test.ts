@@ -1,7 +1,8 @@
 import type { MissionLedger, RecoveredMission, WorkroomMessage } from '@teammate/mission-store'
+import { joinMessageFragments } from '../shared/messageFragments.js'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it, vi } from 'vitest'
-import { deleteMissionRecord, joinMessageFragments, limitedRuntimesFrom, publicRecoveredMission, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
+import { deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 
@@ -92,7 +93,7 @@ describe('a long reply survives the history window', () => {
    */
   const wordsOf = (events: readonly NormalizedRuntimeEvent[]): string =>
     events
-      .filter((event) => event.type === 'message.delta')
+      .filter((event): event is NormalizedRuntimeEvent & { type: 'message.delta' } => event.type === 'message.delta')
       .map((event) => (event.payload as { text: string }).text)
       .join('')
 

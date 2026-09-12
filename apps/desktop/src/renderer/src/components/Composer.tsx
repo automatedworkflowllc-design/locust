@@ -20,7 +20,8 @@ import {
   modelFamily,
   runtimeIsUsable
 } from '../status.js'
-import { defaultEffort, modelLabelFor } from '../status.js'
+import { defaultEffort } from '../status.js'
+import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
 import { ContextRing } from './ContextRing.js'
@@ -702,13 +703,33 @@ export function Composer({
   const { base: effortBase, fast: effortIsFast } = splitEffort(shownEffort ?? effortBases[0] ?? '')
   const effortIndex = Math.max(0, effortBases.indexOf(effortBase))
   const shownRuntimeStatus = runtimes.find((runtime) => runtime.id === shownRuntime)
-  const runtimeLabel = shownRuntimeStatus?.displayName ?? runtimeDisplayName(shownRuntime)
+  // The chip is a label on a control, not the Settings row that tells you
+  // which program this is -- so `Cursor`, not `Cursor Agent`. See `routeName`.
+  const runtimeLabel = shortRuntimeName(shownRuntime)
+  // The whole thing, for the tooltip: a chip drops repetition, and the exact
+  // string you would type somewhere else must still be reachable.
+  const exactRoute = `${shownRuntimeStatus?.displayName ?? runtimeDisplayName(shownRuntime)} / ${shownModel}`
   // A family known only through its effort variants is listed under its
   // family name; showing the stand-in variant's id ("cursor-grok-4.6-high-fast")
   // beside "effort · low" read as two different answers (2026-09-06).
   const shownEntry = models.find((model) => model.runtime === shownRuntime && model.id === shownModel)
+  const namedModel = modelDisplayName(
+    shownRuntime,
+    shownEntry?.variants !== undefined ? shownEntry.displayName : shownModel
+  )
+  /*
+   * Not twice on one row. Cursor carries the effort INSIDE the id
+   * (`cursor-grok-4.6-medium`), and the control immediately to the right of
+   * this chip is the effort. Normally the catalog resolves the family and the
+   * question never arises; when it has not loaded yet, the id is all there is
+   * and the row read `Grok 4.6 Medium` beside a slider saying `medium`.
+   */
+  const effortWord = (shownEffort ?? '').split('-')[0] ?? ''
+  const trailing = effortWord.length === 0 ? '' : ` ${effortWord.charAt(0).toUpperCase()}${effortWord.slice(1)}`
   const modelLabel =
-    shownEntry?.variants !== undefined ? shownEntry.displayName : modelLabelFor(shownRuntime, shownModel)
+    trailing.length > 0 && namedModel.endsWith(trailing) && namedModel.length > trailing.length
+      ? namedModel.slice(0, -trailing.length)
+      : namedModel
   // What the RUNNING mission is actually on, which is not always what the
   // composer's next-run route says. A handoff has to be measured against the
   // live run, or picking "the same" route would still stop it.
@@ -1165,7 +1186,7 @@ export function Composer({
                 <button
                   type="button"
                   className={`lc-control lc-control--boxed${usagePressing ? ' is-pressing' : ''}`}
-                  title={[`${runtimeLabel} / ${modelLabel}`, handoffTitle(handoff), usageSentence]
+                  title={[exactRoute, handoffTitle(handoff), usageSentence]
                     .filter((part) => part !== undefined && part.length > 0)
                     .join('\n')}
                   onClick={() => {

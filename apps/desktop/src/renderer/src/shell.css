@@ -2532,20 +2532,6 @@ textarea {
   word-break: break-word;
 }
 
-/*
- * A folded answer, bounded by RENDERED LINES rather than newlines.
- *
- * Counting newlines folded exactly the wrong answers: prose has few of them
- * and wraps to many lines, so a three-paragraph reply counted as three and
- * rendered whole. `line-clamp` counts what the reader actually sees, which
- * is the only number that was ever meant.
- */
-.lc-roomanswer__text.is-folded {
-  display: -webkit-box;
-  -webkit-line-clamp: 12;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
 
 /*
  * One sticky line per post: the glance, and the way to one answer.

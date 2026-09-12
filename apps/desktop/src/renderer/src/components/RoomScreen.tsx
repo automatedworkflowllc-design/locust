@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
@@ -163,58 +163,40 @@ export const ANSWERS_BEFORE_A_LIST = 6
  * position is left to be position.
  */
 /**
- * An answer, folded when it is long.
+ * An answer, whole.
  *
- * MEASURED, not counted. The first version split on newlines -- and the
- * design agent caught what my own fixture hid: a three-paragraph prose
- * answer has TWO newlines, so `3 <= 12` and it rendered whole, seventeen or
- * more rendered lines of it. The counting workload I tested with is one
- * number per line with 499 newlines, which folds perfectly. That is why it
- * looked right, and every real answer is the case that did not fold.
+ * It used to fold past twelve rendered lines behind `Show the rest`. Colin
+ * took it out, 2026-09-11: "just let them post uninhibited in chat."
  *
- * So the clamp is on rendered line boxes and the control is drawn only when
- * the text actually overflows its clamp. The label loses its count with it:
- * "28 more lines" was a number I would otherwise defend, but it was only
- * ever knowable in the case that needed folding least.
+ * He is right about what a room IS. A folded answer is a summary the reader
+ * did not ask for, and a room is the place two teammates argue in front of
+ * you -- the argument is the content, so hiding two thirds of it and
+ * offering a button is the wrong default for this surface. The thread has
+ * its own fold for a turn's WORK, which is a different thing: that hides
+ * tool calls, not prose.
  *
- * The elision stays a CONTROL rather than a sentence -- the shell output's
- * pattern, down to the class, because this app already ships that one.
+ * What the fold was really covering for is fixed rather than hidden now.
+ * Long answers looked broken here because the live event window was eating
+ * their beginnings (`messageFragments.ts`), so what a fold opened onto was
+ * a reply starting mid-sentence.
+ *
+ * Kept as a component rather than inlined: the Markdown rendering is the
+ * part that matters and it has its own reason, below.
  */
 function RoomAnswerText({ text }: { readonly text: string }): ReactElement {
-  const [open, setOpen] = useState(false)
-  const [overflows, setOverflows] = useState(false)
-  const body = useRef<HTMLDivElement>(null)
-
-  useLayoutEffect(() => {
-    // Only while folded: once open the clamp is gone and scrollHeight equals
-    // clientHeight, which would answer "no overflow" and retract the control
-    // the reader just used.
-    if (open) return
-    const element = body.current
-    if (element === null) return
-    setOverflows(element.scrollHeight > element.clientHeight + 1)
-  }, [text, open])
-
   return (
-    <>
-      {/*
-        * The thread's own reader, not a second one.
-        *
-        * A teammate answers in Markdown whether or not anyone asked, and this
-        * used to be one plain paragraph -- so an argument drew literal
-        * asterisks and hyphens where the same reply in the thread drew bold
-        * and a list (MEASURED 2026-09-11: "**column alignment**" on screen).
-        * What a teammate says reads the same wherever it is read.
-        */}
-      <div ref={body} className={`lc-roomanswer__text${open ? '' : ' is-folded'}`}>
-        <AgentText text={text} streaming={false} />
-      </div>
-      {overflows && !open && (
-        <button type="button" className="lc-shellout__more" onClick={() => setOpen(true)}>
-          Show the rest
-        </button>
-      )}
-    </>
+    /*
+     * The thread's own reader, not a second one.
+     *
+     * A teammate answers in Markdown whether or not anyone asked, and this
+     * used to be one plain paragraph -- so an argument drew literal
+     * asterisks and hyphens where the same reply in the thread drew bold
+     * and a list (MEASURED 2026-09-11: "**column alignment**" on screen).
+     * What a teammate says reads the same wherever it is read.
+     */
+    <div className="lc-roomanswer__text">
+      <AgentText text={text} streaming={false} />
+    </div>
   )
 }
 

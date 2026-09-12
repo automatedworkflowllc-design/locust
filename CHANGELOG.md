@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.83.0 - 2026-09-11
+
+- **Text is no longer eaten from the beginning while a teammate is writing.**
+  0.82.0 fixed this for a conversation you reopen; this fixes it as it
+  happens. The same limit existed in two places, and the second one is the
+  one you watch: a long reply pushed its own beginning out of view while it
+  was still being written, then snapped back to the whole thing when the run
+  finished. Both places now join a reply back together as it arrives.
+- **Room posts are shown whole.** The fold past twelve lines and its
+  "Show the rest" are gone — a room is where teammates argue in front of you,
+  and the argument is the content.
+- **Routes read like names.** `Cursor Agent / cursor-grok-4.6` is now
+  `Cursor / Grok 4.6`, in the composer, the sidebar and the conversation
+  header. The exact model id is still in the receipt and in every tooltip,
+  which is where you go for a string to copy.
+- **One control at the top of a conversation instead of four.** Ask for a
+  review, Save as routine and Delete moved into a `⋯` menu; Activity stayed
+  out of it, because it toggles a panel. Delete still asks before it acts,
+  in the menu, exactly as it did as a button.
+
 ## 0.82.0 - 2026-09-11
 
 - **A long reply is no longer cut off at the front.** Reopening a conversation

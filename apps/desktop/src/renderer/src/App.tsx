@@ -77,7 +77,7 @@ import { PixelFace } from './components/PixelFace.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { ContextMenu } from './components/ContextMenu.js'
-import type { ContextMenuState } from './components/ContextMenu.js'
+import type { ContextMenuItem, ContextMenuState } from './components/ContextMenu.js'
 import { Thread } from './components/Thread.js'
 import { AgentAvatar, REGISTER_WORD } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
@@ -106,6 +106,8 @@ import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
 import { splitAttachments } from '../../shared/attachments.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { modelDisplayName } from './routeName.js'
+import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 
@@ -256,7 +258,19 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'routine-blocked') return live
   if (update.kind === 'routine-recovery-changed') return live
 
-  const events = [...live.events, update.event].slice(-500)
+  /*
+   * The cap is on THINGS THAT HAPPENED, and a reply is one of them.
+   *
+   * This was `[...live.events, update.event].slice(-500)`, and a reply
+   * arrives as hundreds of fragments -- so a long answer pushed its own
+   * beginning out of the window while it was still being written. Colin
+   * watched it, 2026-09-11: "im currently watching it eat text from the
+   * beginning", and then the other half of the symptom, which is the proof:
+   * "the text seems to go back to normal after they are done". It did,
+   * because a finished run is re-read from the record, where the fragments
+   * are joined. Now they are joined here too, as they arrive.
+   */
+  const events = withMessageDelta(live.events, update.event).slice(-500)
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
   if (update.event.type === 'run.cancelled') return { ...live, events, phase: 'cancelled' }
   if (update.event.type === 'run.failed') {
@@ -2886,7 +2900,6 @@ export default function App(): ReactElement {
    * mission leaves every list it was in and the thread empties, because
    * showing a thread whose record is gone would be showing a ghost.
    */
-  const [deleteArmed, setDeleteArmed] = useState(false)
   /**
    * The conversation on screen, when it can be saved as a routine.
    *
@@ -2986,7 +2999,6 @@ export default function App(): ReactElement {
     void bridge
       .deleteMission(missionId)
       .then((response) => {
-        setDeleteArmed(false)
         if (!response.ok) {
           setDeleteError(response.error.message)
           return
@@ -3011,7 +3023,6 @@ export default function App(): ReactElement {
         void refreshStorage()
       })
       .catch(() => {
-        setDeleteArmed(false)
         setDeleteError('The mission could not be deleted.')
       })
   }
@@ -3143,6 +3154,47 @@ export default function App(): ReactElement {
   for (const run of runs.values()) {
     const owner = ownerOf(run)
     if (owner !== undefined && liveRunIsActive(run)) liveActivityByOwner[owner] = liveActivityOf(run.events, true)
+  }
+
+  /**
+   * What the conversation header's `⋯` offers, built where the things it
+   * needs already are.
+   *
+   * Each entry is present only where it is TRUE, which is the rule the four
+   * buttons kept and the menu inherits: there is nothing to explain about an
+   * action with no material, so a review with nobody to ask and a routine
+   * with nothing to save are absent rather than greyed. An empty list draws
+   * no button at all.
+   */
+  const headerActions: ContextMenuItem[] = []
+  if (liveRun !== undefined && !running) {
+    for (const reviewer of reviewersFor(liveRun)) {
+      headerActions.push({
+        label: `Ask ${reviewer.name} for a review`,
+        onSelect: () => askForReview(liveRun, reviewer)
+      })
+    }
+  }
+  if (saveAsRoutineId !== undefined) {
+    headerActions.push({ label: 'Save as routine', onSelect: () => openSaveRoutine(saveAsRoutineId) })
+  }
+  if (!running && liveRun?.data?.missionId !== undefined) {
+    const shownId = liveRun.data.missionId
+    headerActions.push({
+      label: 'Delete conversation',
+      confirmLabel: 'Delete for good?',
+      danger: true,
+      onSelect: () => {
+        setDeleteError(undefined)
+        // Every turn of the conversation on screen, not just the one whose
+        // id the header carries. Deleting the last turn and leaving the row
+        // reads as the control doing nothing (Colin, 2026-09-05).
+        const row = sidebarMissionsRef.current.find((entry) =>
+          (entry.memberIds ?? [entry.missionId]).includes(shownId)
+        )
+        for (const turn of row?.memberIds ?? [shownId]) deleteMissionById(turn)
+      }
+    })
   }
 
   const noRuntimeReady =
@@ -3663,7 +3715,15 @@ export default function App(): ReactElement {
                         // and is NOT here: the receipt card below already
                         // states it, and two places stating one fact is how
                         // they come to disagree.
-                        : `Mission · ${shortMissionId(liveRun.data.missionId)} · ${liveRun.data.model ?? 'account-default'} · ${
+                        // Spelled as a name rather than an identifier, the
+                        // same way the composer's chip spells it. The exact
+                        // id is in the receipt below, which is where a person
+                        // goes for a string to copy.
+                        : `Mission · ${shortMissionId(liveRun.data.missionId)} · ${
+                            liveRun.data.model === undefined
+                              ? 'account-default'
+                              : modelDisplayName(liveRun.data.runtime, liveRun.data.model)
+                          } · ${
                             running
                               ? 'running'
                               : liveRun.restored === true
@@ -3698,108 +3758,51 @@ export default function App(): ReactElement {
                 </div>
                 <div className="lc-workroom__actions">
                   {/*
-                    Two clicks, and the second says what it does. Deletion is
-                    the one thing here that cannot be undone, so it is never
-                    one click away and never hidden in a menu either.
-
-                    The 2026-09-04 design pass asked for it inside a `⋯` menu,
-                    on the grounds that it is destructive and sits a
-                    pixel-perfect click from Activity. Kept as it is: a menu
-                    makes it three clicks and hides the one action a person
-                    most needs to find deliberately, and the arming step
-                    already removes the misclick -- it turns red, says what it
-                    does, and disarms on blur. Adjacency is the real half of
-                    that note, and the danger state answers it.
-                  */}
-                  {!running && (
+                    * One control for the occasional actions, because four
+                    * buttons across the top of every conversation is what the
+                    * header looked like (Colin, 2026-09-11: "lets clean up
+                    * this area with maybe a triple dot dropdown or something").
+                    *
+                    * Activity stays out of it. It TOGGLES the panel beside the
+                    * thread -- it is a view control with a pressed state, and
+                    * a thing you turn on and off does not belong behind a menu
+                    * that closes when you pick from it. The other three are
+                    * each done once and then not again.
+                    *
+                    * Delete is in here now, and the 2026-09-04 note that kept
+                    * it out is answered rather than overruled: its worry was a
+                    * menu making the one destructive action harder to find and
+                    * three clicks deep. It is NAMED here, which is how a
+                    * person finds out an action exists, and the menu asks in
+                    * place -- `Delete for good?`, the same second press the
+                    * header button had. Nothing about the asking changed.
+                    *
+                    * Reviewers are listed flat rather than behind a second
+                    * menu: `Ask Yurt for a review` is one click instead of
+                    * two and says who it goes to before you commit.
+                    */}
+                  {headerActions.length > 0 && (
                     <button
                       type="button"
-                      className={`lc-button${deleteArmed ? ' lc-button--danger' : ''}`}
-                      title={deleteArmed ? 'This removes the record for good' : 'Delete this mission'}
-                      onClick={() => {
-                        if (deleteArmed) {
-                          const shownId = liveRun?.data?.missionId
-                          // Every turn of the conversation on screen, not
-                          // just the one whose id the header carries. The
-                          // sidebar's Delete had the same bug -- it removed
-                          // the last turn and left the row, which reads as
-                          // the control doing nothing (Colin, 2026-09-05).
-                          // Here it would leave a thread you are looking at.
-                          if (shownId !== undefined) {
-                            const row = sidebarMissionsRef.current.find((entry) =>
-                              (entry.memberIds ?? [entry.missionId]).includes(shownId)
-                            )
-                            for (const turn of row?.memberIds ?? [shownId]) deleteMissionById(turn)
-                          }
-                        }
-                        else {
-                          setDeleteError(undefined)
-                          setDeleteArmed(true)
-                        }
-                      }}
-                      onBlur={() => setDeleteArmed(false)}
-                    >
-                      {deleteArmed ? 'Delete for good?' : 'Delete'}
-                    </button>
-                  )}
-                  {/*
-                    * Where the material IS -- the other half of the routines
-                    * answer (design agent, 2026-09-10).
-                    *
-                    * This is the entrance the app already chose, made
-                    * visible. `Save as routine` lived only in a right-click,
-                    * and a menu is where you look once you know an action
-                    * exists; the header is how you find out it does. The
-                    * menus keep it.
-                    *
-                    * Chrome, not a card: it does not arrive, animate or take
-                    * a line in the thread, so it is not the nag that was
-                    * ruled out -- a card asking to be saved would be a
-                    * pending-register card for something nobody is waiting
-                    * on.
-                    *
-                    * Only where it is true. Absent while running, absent on
-                    * a run that failed or was cancelled, absent when nothing
-                    * in the conversation was typed by the person: a routine
-                    * is turns worth repeating and those are not. ABSENT
-                    * rather than disabled -- there is nothing to explain
-                    * about an action with no material.
-                    */}
-                  {/*
-                    * Only where there IS someone to ask and something to read.
-                    * Absent rather than disabled, the same rule as Save as
-                    * routine beside it: there is nothing to explain about an
-                    * action with no material.
-                    */}
-                  {liveRun !== undefined && !running && reviewersFor(liveRun).length > 0 && (
-                    <button
-                      type="button"
-                      className="lc-ghostbutton"
-                      title="Hand this to another teammate to challenge against what you asked for"
+                      className="lc-button"
+                      aria-label="More actions"
+                      aria-haspopup="menu"
+                      title="More actions"
                       onClick={(event) => {
                         const at = event.currentTarget.getBoundingClientRect()
                         setRowMenu({
-                          x: Math.round(at.left),
+                          // Right-aligned under the button: the menu is wider
+                          // than the control and the header sits at the window
+                          // edge, so hanging it from the left corner pushed it
+                          // off screen.
+                          x: Math.round(Math.max(8, at.right - 220)),
                           y: Math.round(at.bottom + 4),
-                          title: 'Ask for a review',
-                          items: reviewersFor(liveRun).map((reviewer) => ({
-                            label: reviewer.name,
-                            onSelect: () => askForReview(liveRun, reviewer)
-                          }))
+                          title: 'This conversation',
+                          items: headerActions
                         })
                       }}
                     >
-                      <Icon name="shield" size={12} /> Ask for a review
-                    </button>
-                  )}
-                  {saveAsRoutineId !== undefined && (
-                    <button
-                      type="button"
-                      className="lc-ghostbutton lc-saveroutine"
-                      title="Save this conversation as a routine this teammate can replay"
-                      onClick={() => openSaveRoutine(saveAsRoutineId)}
-                    >
-                      <Icon name="clock" size={12} /> Save as routine
+                      <Icon name="dots" size={13} />
                     </button>
                   )}
                   <button

@@ -209,12 +209,12 @@ describe('the members a post did not reach', () => {
    * it goes down this far". The elision is a control, not a sentence, and it
    * is the shape the shell output already ships.
    */
-  it('renders the whole answer in the markup, folded or not', () => {
+  it('renders the whole answer, with nothing to open', () => {
     /*
-     * The clamp hides overflow; it does not truncate the text. A person who
-     * opens the fold, or copies the card, gets everything -- and a server
-     * render has no layout at all, so the control cannot appear there and
-     * the words must not depend on it.
+     * The fold is gone (Colin, 2026-09-11: "just let them post uninhibited
+     * in chat"). A room is where two teammates argue in front of you and the
+     * argument is the content, so the whole of it is on screen -- no clamp,
+     * no control, nothing to press.
      */
     const long = ['First paragraph.', 'Second paragraph.', 'Third paragraph.'].join('\n')
     const room: PublicRoom = {
@@ -241,11 +241,10 @@ describe('the members a post did not reach', () => {
         notice={undefined}
       />
     )
+    expect(markup).toContain('First paragraph.')
     expect(markup).toContain('Third paragraph.')
-    expect(markup).toContain('is-folded')
-    // No count in the label any more: it was only ever knowable in the case
-    // that needed folding least.
-    expect(markup).not.toContain('more lines')
+    expect(markup).not.toContain('is-folded')
+    expect(markup).not.toContain('Show the rest')
   })
 
   it('leaves a short answer alone', () => {

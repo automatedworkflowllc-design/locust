@@ -1,5 +1,5 @@
 import { workspaceIdFor } from './workspace.js'
-import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import { joinMessageFragments } from '../shared/messageFragments.js'
 import type { MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type {
   MissionDeleteResponse,
@@ -106,74 +106,6 @@ export function usageWindowsFrom(missions: readonly RecoveredMission[]): Record<
   const windows: Record<string, string> = {}
   for (const [runtime, entry] of latest) windows[runtime] = entry.said
   return windows
-}
-
-/**
- * Collapse each streamed message into the one event it always was.
- *
- * A reply does not arrive as an event; it arrives as HUNDREDS of them, each
- * carrying a few characters that the renderer concatenates by `itemId`
- * (`assistantMessages`). The window below bounds the event COUNT, and it was
- * counting those fragments as if they were separate happenings -- so an
- * oversized mission kept the newest 499 events and threw away the beginning
- * of the reply, leaving text that starts mid-sentence and LOOKS complete.
- *
- * MEASURED 2026-09-11 on mission 645f02a4 (Cursor, 1279 events, 1251 of them
- * deltas): the ledger held 4853 characters, the renderer was handed 1954.
- * 2899 characters -- sixty percent of an answer about a stock -- were gone,
- * and the only sign was an unopened `**` where the bold had begun. Colin:
- * "looks like this message got cut off".
- *
- * So: join the fragments first, and window what remains. One message is one
- * event, which is both the truthful count and, for a reply of any length, a
- * hundredfold reduction in what the window has to fit -- the mission above
- * goes from 1279 events to 29 and is not truncated at all.
- *
- * The joined event keeps the FIRST fragment's identity -- id, sequence,
- * occurredAt -- so the array stays ordered by time and React keys stay
- * stable across a reload. It takes `final` from the LAST fragment, because
- * whether the message ended is the last fragment's news.
- */
-export function joinMessageFragments(
-  events: readonly NormalizedRuntimeEvent[]
-): readonly NormalizedRuntimeEvent[] {
-  const joined = new Map<string, { text: string; final: boolean; pieces: number }>()
-  for (const event of events) {
-    if (event.type !== 'message.delta') continue
-    const { itemId, operation, text, final } = event.payload
-    const held = joined.get(itemId)
-    joined.set(itemId, {
-      text: operation === 'replace' ? text : `${held?.text ?? ''}${text}`,
-      final,
-      pieces: (held?.pieces ?? 0) + 1
-    })
-  }
-  // Nothing was split, so nothing is rewritten and nothing is copied: a
-  // message that arrived whole keeps the record the ledger holds, down to
-  // its `append`. Most missions reaching this function take this path.
-  if (![...joined.values()].some((message) => message.pieces > 1)) return events
-
-  const emitted = new Set<string>()
-  const dense: NormalizedRuntimeEvent[] = []
-  for (const event of events) {
-    if (event.type !== 'message.delta') {
-      dense.push(event)
-      continue
-    }
-    const { itemId } = event.payload
-    if (emitted.has(itemId)) continue
-    emitted.add(itemId)
-    const whole = joined.get(itemId)!
-    if (whole.pieces === 1) {
-      dense.push(event)
-      continue
-    }
-    dense.push({
-      ...event,
-      payload: { ...event.payload, operation: 'replace', text: whole.text, final: whole.final }
-    })
-  }
-  return dense
 }
 
 export function publicRecoveredMission(
