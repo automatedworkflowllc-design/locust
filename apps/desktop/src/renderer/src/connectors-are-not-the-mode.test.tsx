@@ -121,7 +121,7 @@ describe('a route that is not where your connectors live', () => {
 
   it('stays quiet when this machine has none, because then there is nothing to place', () => {
     expect(connectorsNote('cursor', 'auto', false)).toBeUndefined()
-    expect(connectorsNote('codex', 'read-only', false)).toBeUndefined()
+    expect(connectorsNote('codex', 'ask', false)).toBeUndefined()
   })
 
   it('leaves the Claude sentence exactly as it was', () => {
