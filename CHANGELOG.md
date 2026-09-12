@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.87.0 - 2026-09-12
+
+- **A Cursor teammate now says when it has been told not to read the folder.**
+  Cursor obeys `.cursorignore`, and its tools refuse an ignored file with
+  "permission denied" and no reason — so the teammate invents a reason, and
+  the invention is what you read. It happened three times on one machine, the
+  last of them to a screenshot Locust itself had just written into the
+  workspace it then handed over. Locust reads the rule first and names it:
+  which file, which line, and what to change it to.
+- Nothing is changed on your behalf — the rule is yours, and the folders these
+  rules cover are usually excluded for a good reason.
+
 ## 0.86.0 - 2026-09-12
 
 - **The app tells you where your connectors live.** Locust reads your

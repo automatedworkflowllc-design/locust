@@ -44,6 +44,7 @@ import { fileChangesOf, itemOf } from './approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
 import { composeHandoffPrompt } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
+import { cursorCannotSee, cursorIgnoreNotice } from './cursor-visibility.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
 import type { ToolPatch } from '@teammate/runtime-adapters'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
@@ -245,6 +246,8 @@ interface CodexMissionServiceOptions {
   readonly onRunEnded?: (mission: EndedMission) => Promise<void>
   /** Test seam: how the working tree is looked at before and after a write-capable run. Defaults to `git status`. */
   readonly observeDisk?: (workspacePath: string) => Promise<WorkspaceSnapshot | undefined>
+  /** Test seam: what `.cursorignore` says, if anything. See cursor-visibility.ts. */
+  readonly readCursorIgnore?: (path: string) => Promise<string | undefined>
   /** Test seam: the change behind each changed path, read off the disk. */
   readonly observePatches?: (workspacePath: string, after: WorkspaceSnapshot, paths: readonly string[], options?: unknown, before?: WorkspaceSnapshot) => Promise<ReadonlyMap<string, ToolPatch>>
   readonly createId?: () => string
@@ -1316,6 +1319,44 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           persisted: []
         }
         active.set(runId, mission)
+        /*
+         * Before anything runs: has Cursor been told not to look at this
+         * folder?
+         *
+         * Its file tools refuse an ignored path with "permission denied" and
+         * no reason, so the model explains the failure by inventing a cause,
+         * and the invention is what the person reads and then chases. Three
+         * incidents on one machine (`shared/cursorIgnore.ts`), the last of
+         * them a screenshot LOCUST had written into the workspace it then
+         * handed over.
+         *
+         * Best effort, and never fatal: a run that can still use its shell
+         * may do perfectly good work. What it cannot do is explain itself.
+         */
+        if (runtime === 'cursor') {
+          try {
+            const sentence = await cursorCannotSee(runCwd, options.readCursorIgnore)
+            if (sentence !== undefined) {
+              await persistAndEmit(
+                mission,
+                options.ledger,
+                [
+                  cursorIgnoreNotice({
+                    runId,
+                    missionId,
+                    sourceAdapter: runtime,
+                    nextSequence: mission.lastSequence + 1,
+                    at: now().toISOString(),
+                    sentence
+                  })
+                ] as ReturnType<CodexEventNormalizer['accept']>
+              )
+            }
+          } catch {
+            // A rule file that cannot be read tells us nothing, which is the
+            // same as there being no rule: say nothing rather than guess.
+          }
+        }
         // Whoever else is writing in this same folder right now: neither of
         // us can be credited with what the tree looks like afterwards.
         if (mission.diskBefore !== undefined) {
