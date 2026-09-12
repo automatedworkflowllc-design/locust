@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.82.0 - 2026-09-11
+
+- **A long reply is no longer cut off at the front.** Reopening a conversation
+  could show an answer that began mid-sentence and looked complete — no
+  ellipsis, nothing to say anything was missing. Measured on one real
+  conversation: the record held 4,853 characters and 1,954 reached the screen.
+  Every character is there now.
+- Why it happened, because it is worth knowing: a reply arrives in hundreds of
+  small pieces, and the limit on how much of a conversation gets loaded was
+  counting those pieces as if each were a separate thing that happened. It kept
+  the most recent few hundred, which is the END of the reply. The pieces are
+  joined back into the message before that limit is applied.
+- Long conversations also open faster, because one reply is now one thing to
+  load instead of a thousand.
+
 ## 0.81.0 - 2026-09-11
 
 - **You find out an exchange stopped, even if you were looking elsewhere.**

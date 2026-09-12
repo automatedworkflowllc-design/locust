@@ -103,9 +103,9 @@ const watch = `(async () => {
   // Booty's -- and the stopped run is Wren's.
   let notices = ''
   let stoppedSomewhere = false
-  // Conversation rows only. Clicking every `.lc-row` walked onto the Routines
-  // screen and screenshotted that instead of the thread -- the assertions were
-  // right, the picture was of somewhere else.
+  // Conversation rows only. Clicking every row in the sidebar walked onto
+  // the Routines screen and screenshotted that instead of the thread -- the
+  // assertions were right, the picture was of somewhere else.
   const rows = [...document.querySelectorAll('.lc-row')].filter(
     (row) => row.closest('.lc-sidebar') !== null && !/^Save one from/.test(row.innerText)
   )

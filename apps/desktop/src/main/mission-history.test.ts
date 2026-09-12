@@ -1,7 +1,7 @@
 import type { MissionLedger, RecoveredMission, WorkroomMessage } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it, vi } from 'vitest'
-import { deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
+import { deleteMissionRecord, joinMessageFragments, limitedRuntimesFrom, publicRecoveredMission, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 
@@ -18,6 +18,20 @@ function event(sequence: number): NormalizedRuntimeEvent {
       stepKind: 'turn',
       evidence: { redacted: true }
     }
+  } as unknown as NormalizedRuntimeEvent
+}
+
+
+function fragment(sequence: number, text: string, final = false, itemId = 'msg_0'): NormalizedRuntimeEvent {
+  return {
+    id: `event_${sequence}`,
+    runId: 'run_1',
+    missionId: 'mission_1',
+    sequence,
+    type: 'message.delta',
+    occurredAt: NOW,
+    sourceAdapter: 'cursor',
+    payload: { itemId, operation: 'append', text, final, evidence: { redacted: true } }
   } as unknown as NormalizedRuntimeEvent
 }
 
@@ -62,6 +76,77 @@ describe('which folder a mission belongs to', () => {
     // client, or an unreleased project.
     expect(workspaceIdFor('C:/clients/acme-secret')).not.toContain('acme')
     expect(workspaceIdFor('C:/clients/acme-secret')).toMatch(/^ws_[0-9a-f]{32}$/)
+  })
+})
+
+describe('a long reply survives the history window', () => {
+  /*
+   * The shape that lost sixty percent of an answer, measured on mission
+   * 645f02a4 -- 1279 events, 1251 of them fragments of ONE reply. Windowing
+   * by event count kept the newest 499 fragments and dropped the rest, so
+   * the message reopened starting mid-sentence and looked complete.
+   *
+   * The assertion is the whole text, because "the front is still there" is
+   * the only thing that was ever wrong; a count would have passed the whole
+   * time this was broken.
+   */
+  const wordsOf = (events: readonly NormalizedRuntimeEvent[]): string =>
+    events
+      .filter((event) => event.type === 'message.delta')
+      .map((event) => (event.payload as { text: string }).text)
+      .join('')
+
+  it('keeps every character of a reply streamed across more fragments than the window holds', () => {
+    const fragments = Array.from({ length: 1200 }, (_, index) =>
+      fragment(index + 1, `w${index} `, index === 1199)
+    )
+    const mission = recovered({ events: fragments })
+    const mapped = publicRecoveredMission(mission)
+    expect(wordsOf(mapped.events)).toBe(fragments.map((_, index) => `w${index} `).join(''))
+    expect(wordsOf(mapped.events)).toMatch(/^w0 w1 /)
+  })
+
+  it('reports the true event count, and does not call joining truncation', () => {
+    const mission = recovered({ events: Array.from({ length: 1200 }, (_, index) => fragment(index + 1, 'x')) })
+    const mapped = publicRecoveredMission(mission)
+    // What the ledger holds, unchanged -- the footnote must not start lying
+    // in the other direction.
+    expect(mapped.eventCount).toBe(1200)
+    // One message is one event, so nothing was dropped and nothing is said.
+    expect(mapped.events).toHaveLength(1)
+    expect(mapped.eventsTruncated).toBe(false)
+  })
+
+  it('marks the message final from the LAST fragment, not the first', () => {
+    const joined = joinMessageFragments([fragment(1, 'a'), fragment(2, 'b'), fragment(3, 'c', true)])
+    expect(joined).toHaveLength(1)
+    expect(joined[0]?.payload).toMatchObject({ text: 'abc', final: true, operation: 'replace' })
+    // The first fragment's identity, so the array stays in time order and a
+    // reopened thread keeps its keys.
+    expect(joined[0]?.id).toBe('event_1')
+  })
+
+  it('honours a replace, which is how a runtime rewrites what it already said', () => {
+    const joined = joinMessageFragments([
+      fragment(1, 'draft'),
+      { ...fragment(2, 'final answer', true), payload: { itemId: 'msg_0', operation: 'replace', text: 'final answer', final: true, evidence: { redacted: true } } } as unknown as NormalizedRuntimeEvent
+    ])
+    expect((joined[0]?.payload as { text: string }).text).toBe('final answer')
+  })
+
+  it('keeps two messages apart, and in the order they were said', () => {
+    const joined = joinMessageFragments([
+      fragment(1, 'first '),
+      fragment(2, 'one', true),
+      fragment(3, 'second ', false, 'msg_1'),
+      fragment(4, 'two', true, 'msg_1')
+    ])
+    expect(joined.map((event) => (event.payload as { text: string }).text)).toEqual(['first one', 'second two'])
+  })
+
+  it('leaves a mission that never streamed exactly as it was', () => {
+    const events = [event(1), event(2)]
+    expect(joinMessageFragments(events)).toBe(events)
   })
 })
 
