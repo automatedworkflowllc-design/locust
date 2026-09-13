@@ -2,6 +2,8 @@ import type { ReactElement } from 'react'
 import { useEffect, useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
+import type { ThreadItem } from '../missionView.js'
+import { ThreadItems } from './Thread.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
 import { AgentText, LiveRegisterLine } from './ThreadItems.js'
 import { Icon } from './Icon.js'
@@ -30,6 +32,20 @@ export interface RoomAnswer {
   readonly startedAt: string | undefined
   /** The teammate's final words in that mission, when there are any yet. */
   readonly text: string | undefined
+  /**
+   * The whole turn, as the thread would draw it: every message, the work
+   * fold with its tool calls, the plan and its progress, the live line.
+   *
+   * `text` above is the LAST final message and was all a room ever showed, so
+   * a teammate that said three things showed one, and a teammate still
+   * thinking showed "working...". Colin, 2026-09-12: "there are parts of the
+   * chat that are missing... we already have this exact same system we just
+   * need to be able to have it work with multiple in one chat."
+   *
+   * `text` stays for the one thing it is still better at: the collapsed
+   * answers list a large room falls back to.
+   */
+  readonly items: readonly ThreadItem[]
   readonly runtime: string
   readonly model: string
 }
@@ -909,11 +925,26 @@ export function RoomScreen({
                 </div>
               ) : (
               <div className={`lc-roompost__answers${answers.length > ANSWERS_BEFORE_A_LIST ? ' is-list' : ''}`}>
-                {room.teammateIds.map((teammateId) => {
+                {/*
+                  * WHOEVER REPLIED FIRST, first.
+                  *
+                  * The roster order is the order they were added to the room,
+                  * which is not a fact about this post. Colin, 2026-09-12: "we
+                  * can just have whoever replies first, appear in the chat".
+                  * A teammate with no first event yet sorts last, because
+                  * they have not spoken.
+                  */}
+                {[...room.teammateIds]
+                  .sort((left, right) => {
+                    const at = (id: string): string =>
+                      answers.find((candidate) => candidate.teammateId === id)?.startedAt ?? '~'
+                    return at(left) < at(right) ? -1 : at(left) > at(right) ? 1 : 0
+                  })
+                  .map((teammateId) => {
                   const teammate = teammates.find((candidate) => candidate.teammateId === teammateId)
                   const answer = answers.find((candidate) => candidate.teammateId === teammateId)
                   const name = teammate?.name ?? teammateId
-                  // No mission, no card. They are named together underneath.
+                  // No mission, nothing said. They are named together underneath.
                   if (answer === undefined) return null
                   return (
                     <div key={teammateId} className="lc-roomanswer" data-answer={`${entry.postId}:${teammateId}`}>
@@ -940,10 +971,28 @@ export function RoomScreen({
                           Open
                         </button>
                       </div>
-                      {answer.text !== undefined && <RoomAnswerText text={answer.text} />}
-                      {answer.text === undefined && (answer.phase === 'running' || answer.phase === 'starting') && (
-                        <p className="lc-roomanswer__text lc-settings__note">working…</p>
-                      )}
+                      {/*
+                        * The thread's own renderer, not a summary of it.
+                        *
+                        * This was one paragraph carrying the teammate's LAST
+                        * final message. Everything else a turn does -- the
+                        * other messages, the thinking, the tool calls, the
+                        * plan and how far through it is -- existed and was
+                        * simply not drawn here, which is what Colin saw
+                        * "missing" and what the loading flash showed for a
+                        * moment before the card settled on one message.
+                        *
+                        * `ThreadItems` is the same component the conversation
+                        * uses, and it was already extracted to be rendered
+                        * more than once. A room renders one per teammate.
+                        */}
+                      <ThreadItems
+                        items={answer.items}
+                        owner={teammate}
+                        activity={answer.phase === 'running' || answer.phase === 'starting' ? 'thinking' : 'idle'}
+                        workspacePath={undefined}
+                        decision={undefined}
+                      />
                     </div>
                   )
                 })}

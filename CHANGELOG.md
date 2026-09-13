@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.89.0 - 2026-09-13
+
+- **A room shows the whole of what a teammate did, in the chat.** Each
+  teammate's answer was a little card in a grid showing their LAST message and
+  nothing else — so a teammate who said three things showed one, and their
+  thinking, tool calls and plan were not drawn at all. That is the "missing"
+  part you could glimpse while it loaded. A room now renders the same thing
+  the conversation does, one per teammate: every message, the work fold with
+  its commands and files, the plan and how far through it is, and the live
+  line while it is still going.
+- **No boxes.** A teammate talking is not a card anywhere else in the app, and
+  it is not one here. They stack down the page in the order they replied —
+  whoever answered first is first — under a quiet rule that groups each
+  teammate's turn.
+- Side by side was also what forced the summary: a 280px column cannot hold a
+  work fold and four messages. Stacked, each teammate gets the width the
+  conversation has.
+
 ## 0.88.1 - 2026-09-12
 
 - **The receipt says what it verified.** It ended with a green `verified`

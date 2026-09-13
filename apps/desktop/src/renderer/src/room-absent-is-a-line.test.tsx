@@ -39,8 +39,21 @@ const teammate = (id: string, name: string): PublicTeammate =>
 const NAMES = ['Wren', 'Booty', 'Gem', 'Fen', 'Otto', 'Pike', 'Dell', 'Ember']
 const ROSTER = NAMES.map((name, i) => teammate(`tm_${String(i)}`, name))
 
+/*
+ * `items` is what the room draws now -- the thread's own renderer, one per
+ * teammate -- so a fixture without it draws nothing at all. `text` stays
+ * because the collapsed list past six answers still uses it.
+ */
 const answer = (teammateId: string): RoomAnswer =>
-  ({ teammateId, missionId: `m_${teammateId}`, phase: 'completed', text: 'ALMANAC', runtime: 'opencode', model: 'free' }) as RoomAnswer
+  ({
+    teammateId,
+    missionId: `m_${teammateId}`,
+    phase: 'completed',
+    text: 'ALMANAC',
+    items: [{ key: `msg_${teammateId}`, type: 'agent-message', text: 'ALMANAC' }],
+    runtime: 'opencode',
+    model: 'free'
+  }) as RoomAnswer
 
 /** A room of six where only the first `started` members ran. */
 function screen(started: number): string {
@@ -230,7 +243,7 @@ describe('the members a post did not reach', () => {
         rooms={[room]}
         teammates={ROSTER}
         currentRoomId="room_standup"
-        answersFor={() => [{ ...answer(ROSTER[0]!.teammateId), text: long }]}
+        answersFor={() => [{ ...answer(ROSTER[0]!.teammateId), text: long, items: [{ key: 'msg_long', type: 'agent-message', text: long }] }]}
         runtimeNameOf={(id) => id}
         onSelectRoom={() => undefined}
         onCreateRoom={async () => undefined}

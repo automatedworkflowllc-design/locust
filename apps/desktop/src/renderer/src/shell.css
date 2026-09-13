@@ -2353,10 +2353,24 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/*
+ * One column, because a room is a chat.
+ *
+ * This was a grid: two or three answers side by side, each in its own box.
+ * Colin, 2026-09-12: "the boxes seem to be a big sticking point... we can
+ * just have whoever replies first, appear in the chat, and have it show their
+ * thinking, tool calls etc."
+ *
+ * Side by side was also what forced each answer into a summary -- a column
+ * 280px wide cannot hold a work fold, a plan and four messages, so the card
+ * showed one message and dropped the rest. Stacked, each teammate gets the
+ * width the thread has, and the thread's own renderer can draw the whole
+ * turn.
+ */
 .lc-roompost__answers {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--lc-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
 }
 
 /*
@@ -2487,14 +2501,22 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/*
+ * No box. A teammate talking is SAID, and Said has never been a card
+ * anywhere else in this app -- the thread draws a face and prose, and that
+ * is what this is now. The border and the fill were the last thing making a
+ * room feel like a dashboard of little reports rather than a conversation.
+ *
+ * The rule down the left is the only mark left: it groups a teammate's whole
+ * turn -- their thinking, their tools, their plan, their messages -- without
+ * putting a container around it.
+ */
 .lc-roomanswer {
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-2);
-  padding: var(--lc-space-3) var(--lc-space-4);
-  border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-card);
-  background: var(--lc-bg-bubble-peer);
+  padding: 0 0 0 var(--lc-space-3);
+  border-left: 1px solid var(--lc-border-hairline);
 }
 
 /*

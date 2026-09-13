@@ -45,8 +45,16 @@ import type { DecisionOption } from '../../../shared/decision.js'
  * One transcript's worth of items. Extracted so a handed-off mission can render
  * TWO of them -- what the first runtime did, the divider, then what the second
  * one did -- without either half being re-derived differently from the other.
+ *
+ * EXPORTED for the same reason, one step further: a room renders N of them,
+ * one per teammate answering a post. Colin, 2026-09-12: "we already have this
+ * exact same system we just need to be able to have it work with multiple in
+ * one chat." The room used to draw its own little card showing a teammate's
+ * LAST message and nothing else -- no thinking, no tool calls, no plan, and
+ * none of the earlier messages of the same turn, which is what he saw going
+ * missing. Rendering the real thing is both less code and more of the truth.
  */
-function ThreadItems({
+export function ThreadItems({
   items,
   owner,
   activity,

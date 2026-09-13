@@ -1894,6 +1894,20 @@ export default function App(): ReactElement {
         startedAt: events[0]?.occurredAt ?? post.at,
         phase,
         text: last === undefined || last.trim().length === 0 ? undefined : last,
+        /*
+         * The whole turn, drawn by the thread's own renderer.
+         *
+         * Built here rather than in the room because this is where the events
+         * are -- live if the run is still going, from the record otherwise --
+         * and because `buildThread` is the one place that decides what a turn
+         * looks like. A second opinion about that in the room is how the two
+         * surfaces came to disagree in the first place.
+         */
+        items: buildThread(events, {
+          running: phase === 'running' || phase === 'starting',
+          mayEdit: (live?.data?.sandbox ?? recorded?.sandbox) !== 'read-only',
+          ...(workspacePath === undefined ? {} : { workspacePath })
+        }),
         runtime,
         model
       })

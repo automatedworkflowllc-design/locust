@@ -45,6 +45,14 @@ const open = `(async () => {
   return 'opened ' + String(document.querySelectorAll('.lc-roomanswer__text').length) + ' answer cards'
 })()`
 
+const toBottom = `(async () => {
+  const scroll = document.querySelector('.lc-screen__scroll, .lc-room__thread')
+  if (scroll === null) return 'no scroller'
+  scroll.scrollTop = scroll.scrollHeight
+  await new Promise(r => setTimeout(r, 1200))
+  return 'at the bottom'
+})()`
+
 const read = `(async () => {
   const cards = [...document.querySelectorAll('.lc-roomanswer__text')].map(n => n.innerText.trim()).filter(t => t.length > 40)
   // A card says itself twice when its first half equals its second half, and
@@ -70,6 +78,7 @@ try {
     await drive.ready()
     return drive.evaluate(open)
   })
+  await drive.capture('the newest posts, where a teammate actually spoke', () => drive.evaluate(toBottom))
   const seen = await drive.capture('no answer says itself twice', () => drive.evaluate(read))
   const measured = JSON.parse(seen)
   if (measured.cards === 0) say('NOT THE TEST: no answer cards were on screen to read')
