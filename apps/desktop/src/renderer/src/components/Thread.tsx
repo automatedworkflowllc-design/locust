@@ -154,6 +154,7 @@ export function ThreadItems({
               kind={item.kind}
               register={item.register}
               waiting={item.waiting ?? false}
+              {...(item.spoken === undefined ? {} : { spoken: item.spoken })}
               owner={owner}
               activity={activity}
             />

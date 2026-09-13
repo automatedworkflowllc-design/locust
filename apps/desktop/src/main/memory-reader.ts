@@ -100,17 +100,29 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       }
       if (kept.length === 0 && proposed.length === 0 && forgotten.length === 0) return
 
-      const parts: string[] = []
-      if (kept.length > 0) parts.push(`remembered ${quoted(kept)}`)
-      if (proposed.length > 0) parts.push(`wants to remember ${quoted(proposed)} -- keep or forget it on the Memory screen`)
-      if (forgotten.length > 0) parts.push(`forgot ${quoted(forgotten)}`)
-      options.notify({
-        kind: 'relay-notice',
-        runId: recovered.metadata.runId,
-        missionId: mission.missionId,
-        message: `${by.name} ${parts.join('; ')}.`
-      })
+      /*
+       * Only what the memory card cannot say.
+       *
+       * Colin, 2026-09-13, with a screenshot of one memory announced twice:
+       * an amber line quoting it in full, and directly under it the card --
+       * "Yurt remembered 1 thing" -- holding the same sentence. Two notices,
+       * one fact, from these two adjacent `notify` calls.
+       *
+       * The card is the better surface and the one that was designed for
+       * this: it folds, it counts, and it names the action for a proposal.
+       * So KEPT and PROPOSED are the card's alone now. FORGOTTEN stays here,
+       * because the card is read from the memories that exist and a memory
+       * that was forgotten is exactly the one it cannot draw.
+       */
       options.notify({ kind: 'memory-changed', by: by.name, kept, proposed, forgotten })
+      if (forgotten.length > 0) {
+        options.notify({
+          kind: 'relay-notice',
+          runId: recovered.metadata.runId,
+          missionId: mission.missionId,
+          message: `${by.name} forgot ${quoted(forgotten)}.`
+        })
+      }
     }
   }
 }

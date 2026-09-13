@@ -31,7 +31,12 @@ export function memoryCardSummary(lines: readonly MemoryCardLine[]): string {
   const parts: string[] = []
   if (kept.length > 0) parts.push(`remembered ${things(kept.length)}`)
   if (proposed.length > 0) parts.push(`wants to remember ${things(proposed.length)}`)
-  return `${by} ${parts.join(' and ')}`
+  // A proposal needs a person, and until 2026-09-13 the sentence that said so
+  // lived on a second notice above this card -- which is the redundancy that
+  // notice was removed for. The card is the only surface for memory now, so
+  // the ACTION has to be on its collapsed face rather than a click inside it.
+  const summary = `${by} ${parts.join(' and ')}`
+  return proposed.length > 0 ? `${summary} — keep or forget it on the Memory screen` : summary
 }
 
 export function MemoryCard({ lines }: { readonly lines: readonly MemoryCardLine[] }): ReactElement | null {

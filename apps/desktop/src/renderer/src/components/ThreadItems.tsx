@@ -8,6 +8,7 @@ import type { PlanStep } from '../missionView.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
+import { hasBeenQuiet } from '../quiet.js'
 
 /** One fixed face for the runtime itself, when a mission belongs to nobody. */
 const RUNTIME_FACE = seedAvatar('locust-runtime')
@@ -318,13 +319,13 @@ function elapsedLabel(startedAt: string, now: number): string {
  * From the event's OWN timestamp, so a step already running when the view
  * opened reports its real age rather than starting at zero.
  */
-function useElapsed(startedAt: string): string {
+function useElapsed(startedAt: string): { readonly label: string; readonly now: number } {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [])
-  return elapsedLabel(startedAt, now)
+  return { label: elapsedLabel(startedAt, now), now }
 }
 
 /**
@@ -344,7 +345,8 @@ export function LiveRegisterLine({
   label,
   detail,
   startedAt,
-  thinking
+  thinking,
+  spoken
 }: {
   /** Absent in a one-to-one thread, where the header already says whose it is. */
   readonly name?: string
@@ -355,6 +357,15 @@ export function LiveRegisterLine({
   readonly startedAt: string
   /** Draws the dots: waiting on the model with nothing to show yet. */
   readonly thinking: boolean
+  /**
+   * Whether the runtime has said ANYTHING yet -- one event, of any kind.
+   *
+   * Not the same question as `thinking`, which is about what the last event
+   * was. This is about whether there has been a first one, and past twenty
+   * seconds it is the only fact worth adding: see `quiet.ts` for the run that
+   * went 128 seconds without a word while this line read "working ···".
+   */
+  readonly spoken?: boolean
 }): ReactElement {
   const elapsed = useElapsed(startedAt)
   const word = REGISTER_WORD[register]
@@ -398,7 +409,19 @@ export function LiveRegisterLine({
           read_file · 57s" reads as one statement about what is happening. */}
       <span className="lc-rail__meta lc-livestep__meta">
         {aside.map((part) => `${String(part)} · `)}
-        {elapsed}
+        {elapsed.label}
+        {/*
+          * The room has said this since 2026-09-11 and the conversation did
+          * not, so the same run told two stories depending which screen you
+          * were on. Amber, because it is the one state here where a person
+          * may want to do something -- and a SENTENCE rather than a phase
+          * change, because nothing has changed: the run is not failing, it
+          * is quiet, and those are different claims. See `quiet.ts` for the
+          * measured run that prompted it.
+          */}
+        {spoken === false && hasBeenQuiet(startedAt, elapsed.now) && (
+          <span className="lc-livestep__quiet"> · no word back yet</span>
+        )}
       </span>
     </>
   )
@@ -444,6 +467,7 @@ export function LiveStepCard({
   kind,
   register,
   waiting = false,
+  spoken,
   owner,
   activity
 }: {
@@ -455,6 +479,8 @@ export function LiveStepCard({
   readonly register: LiveRegister
   /** Waiting on the model with no step to name; draws the dots. */
   readonly waiting?: boolean
+  /** Whether the runtime has recorded a single event yet. See quiet.ts. */
+  readonly spoken?: boolean
   readonly owner:
     | { readonly teammateId?: string; readonly name?: string; readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike }
     | undefined
@@ -485,6 +511,7 @@ export function LiveStepCard({
         {...(detail === undefined ? {} : { detail })}
         startedAt={startedAt}
         thinking={thinking}
+        {...(spoken === undefined ? {} : { spoken })}
       />
     </div>
   )

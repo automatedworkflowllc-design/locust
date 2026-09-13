@@ -10,6 +10,7 @@ import { Icon } from './Icon.js'
 import { PixelFace } from './PixelFace.js'
 import { footLine } from '../roomExchange.js'
 import { useFollowBottom } from '../useFollowBottom.js'
+import { QUIET_SECONDS_BEFORE_SAYING_SO } from '../quiet.js'
 import { JumpToBottom } from './JumpToBottom.js'
 import type { RoomExchange } from '../roomExchange.js'
 
@@ -221,13 +222,11 @@ function RoomAnswerText({ text }: { readonly text: string }): ReactElement {
 /**
  * How long a member has been quiet, past which it is worth saying so.
  *
- * From Astra's numbers rather than a guess: the solo write baseline is a 70s
- * process whose first record lands well inside twenty seconds, and the
- * eight-way case put 45s between a process starting and its notification. So
- * twenty is past normal and short of the observed bad case. Tune it once
- * launches have been visible for a while.
+ * The number itself moved to `quiet.ts` on 2026-09-13, when the conversation
+ * needed the same rule: one silence must not be described two ways. Still
+ * exported from here because this is where it has been imported from.
  */
-export const QUIET_SECONDS_BEFORE_SAYING_SO = 20
+export { QUIET_SECONDS_BEFORE_SAYING_SO }
 
 /**
  * What a member is doing, and for how long.

@@ -66,7 +66,11 @@ describe('reading a reply for memory', () => {
     expect(h.forgotten).toEqual(['The API is on port 3000', 'nothing like this'])
     const notice = h.updates.find((u) => u.kind === 'relay-notice')
     expect(notice).toMatchObject({ kind: 'relay-notice', runId: 'run_1', missionId: 'mission_1' })
-    expect((notice as { message: string }).message).toBe('Wren remembered "Tests run with pnpm test."; "Colin wants diffs."; forgot "The API is on port 3000".')
+    // Colin, 2026-09-13: one memory announced twice, an amber line quoting it
+    // in full directly above the card holding the same sentence. The notice
+    // now carries only what the card cannot draw -- a memory that is gone.
+    expect((notice as { message: string }).message).toBe('Wren forgot "The API is on port 3000".')
+    expect((notice as { message: string }).message).not.toContain('remembered')
     expect(h.updates.find((u) => u.kind === 'memory-changed')).toEqual({
       kind: 'memory-changed',
       by: 'Wren',
@@ -80,9 +84,13 @@ describe('reading a reply for memory', () => {
     const h = harness({ reply: BLOCK, owner: 'tm_wren', mode: 'ask' })
     await h.reader.onRunEnded({ missionId: 'mission_1' })
     expect(h.added.every((m) => m.status === 'proposed')).toBe(true)
+    // The proposal is the card's to announce, and its collapsed face carries
+    // the action -- see `memoryCardSummary`. The notice says only the forget.
     const notice = h.updates.find((u) => u.kind === 'relay-notice') as { message: string }
-    expect(notice.message).toContain('wants to remember')
-    expect(notice.message).toContain('Memory screen')
+    expect(notice.message).not.toContain('wants to remember')
+    expect(h.updates.find((u) => u.kind === 'memory-changed')).toMatchObject({
+      proposed: ['Tests run with pnpm test.', 'Colin wants diffs.']
+    })
   })
 
   it('off means nothing is read; a run that did not complete, or a reply with no block, writes nothing', async () => {

@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.97.0 - 2026-09-13
+
+- **A run that has not said anything now says so.** A Cursor turn showed
+  "working ···" and nothing else for over two minutes. That was the truth —
+  measured in its own ledger, the runtime sent nothing for 128 seconds and then
+  thirty events inside three — but "working" reads the same whether a run is
+  thinking or hung. Past twenty seconds of silence the line adds **no word back
+  yet**, which is the sentence rooms have carried since 0.89 and the
+  conversation never did.
+- **A memory is announced once.** Keeping one drew an amber line quoting it in
+  full *and*, directly underneath, the card holding the same sentence. The card
+  is the only surface for it now, and it carries the "keep or forget it on the
+  Memory screen" action on its face. A memory that was **forgotten** still gets
+  a line, because a card read from the memories that exist cannot draw one that
+  is gone.
+
 ## 0.96.0 - 2026-09-13
 
 - **A reviewer is shown what the teammate SAID.** Asking for a review of a

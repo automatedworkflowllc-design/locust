@@ -8576,3 +8576,15 @@ textarea {
   border-color: var(--lc-border-hover);
   color: var(--lc-text-primary);
 }
+
+/*
+ * "no word back yet", on the conversation's live line.
+ *
+ * Amber, and the same sentence the room has carried since 2026-09-11 -- a
+ * person may want to do something about a run that has not spoken, and that
+ * is what amber means here. It is added to the line rather than replacing the
+ * register, because nothing has changed: the run is not failing, it is quiet.
+ */
+.lc-livestep__quiet {
+  color: var(--lc-amber-text);
+}

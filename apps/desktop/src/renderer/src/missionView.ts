@@ -491,6 +491,12 @@ export type ThreadItem =
        * for a wait: there is no step to name and no progress to claim.
        */
       readonly waiting?: boolean
+      /**
+       * Whether the runtime has reported ANYTHING yet, beyond the app's own
+       * record of launching it. Absent on a line that names a real step,
+       * because a named step is itself the answer. See `quiet.ts`.
+       */
+      readonly spoken?: boolean
     }
   | {
       readonly key: string
@@ -1675,7 +1681,13 @@ export function buildThread(
           detail: undefined,
           startedAt: since,
           kind: 'turn',
-          waiting: true
+          waiting: true,
+          // Whether the RUNTIME has said anything, which is not the same as
+          // whether the mission has events: 'run.started' is the app's own
+          // record of launching the process. Past twenty seconds with none,
+          // the line says so -- see quiet.ts for the measured Cursor run
+          // that showed 'working' for 128 seconds in silence.
+          spoken: events.some((event) => event.type !== 'run.started')
         })
       }
     }
