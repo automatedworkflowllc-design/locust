@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.90.0 - 2026-09-13
+
+- **Your team's memory no longer takes over every brief.** Every memory the
+  app had was sent to every teammate on every turn. Measured on a real store:
+  56 memories came to about 3,700 tokens, against 900 characters for
+  everything else — so most of what a teammate read before your actual
+  question was old notes, and you paid for it on every turn of every mission.
+  It grows, too: the app keeps up to 400.
+- A brief now carries the most useful two dozen — this folder's before
+  everywhere's, newest first — and **says how many it left out**, so a
+  teammate that needs an older one can ask rather than quietly working from a
+  shortened list. The same conversation went from ~3,700 tokens of preamble to
+  ~1,500.
+- Nothing is forgotten. Every memory is still kept, still on the Memory
+  screen, still editable.
+
 ## 0.89.0 - 2026-09-13
 
 - **A room shows the whole of what a teammate did, in the chat.** Each

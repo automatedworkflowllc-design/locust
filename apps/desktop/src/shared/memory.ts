@@ -87,6 +87,19 @@ export function sanitizeMemoryTags(text: string): string {
   return text.replace(/<(\/?)locust-memory/gi, '‹$1locust-memory')
 }
 
+/**
+ * How much of a brief the team's memory may take.
+ *
+ * Not a guess at a context window: a bound on how much of what a teammate
+ * reads is OLD before it reaches what was actually asked. Sized from the
+ * measurement that prompted it -- roughly a quarter of what 56 memories
+ * cost, and still more lines than anyone reads back in a sitting.
+ */
+export const MEMORY_BRIEF_LINES = 24
+export const MEMORY_BRIEF_BUDGET = 4000
+/** Written once: a newline inside a template is a real newline. */
+const NEWLINE = String.fromCharCode(10)
+
 export interface MemoryLine {
   readonly text: string
   readonly scope: MemoryScope
@@ -117,17 +130,54 @@ export function memorySection(input: {
   /** Whether a new memory is kept at once or shown to the person first. */
   readonly askFirst: boolean
 }): string {
+  /*
+   * BOUNDED, and it was not.
+   *
+   * Every memory the store held went into every brief, on every turn, for
+   * every teammate. MEASURED on Colin's own store, 2026-09-13: 56 memories
+   * came to 14,123 characters -- about 3,700 tokens -- beside a 907-character
+   * task section. Ninety-four percent of what a teammate read before the
+   * person's actual words was memory, it was paid for on every turn of every
+   * mission, and it grows: the store's own cap is 400, which is the same
+   * brief at roughly 100,000 characters.
+   *
+   * Which ones stay, in order: THIS FOLDER before everywhere, because a
+   * memory about this project is likelier to bear on this turn; and within
+   * each, the newest, which is the end of the list the store returns.
+   *
+   * What is dropped is SAID. A teammate that reads "41 older memories are
+   * kept but not in this brief" can ask for one; a teammate handed a silently
+   * shortened list cannot tell that it was shortened, and neither can the
+   * person reading the answer.
+   */
+  const here = input.memories.filter((memory) => memory.scope !== 'global')
+  const everywhere = input.memories.filter((memory) => memory.scope === 'global')
+  const candidates = [...here.slice(-MEMORY_BRIEF_LINES), ...everywhere.slice(-MEMORY_BRIEF_LINES)]
+  const briefed: MemoryLine[] = []
+  let spent = 0
+  // From the FRONT: `candidates` is already folder-first, newest-within-group,
+  // so taking the tail would drop exactly the folder memories the order
+  // exists to prefer. Its own test caught that.
+  for (const memory of candidates.slice(0, MEMORY_BRIEF_LINES)) {
+    spent += memory.text.length + 40
+    if (spent > MEMORY_BRIEF_BUDGET && briefed.length > 0) break
+    briefed.push(memory)
+  }
+  const dropped = input.memories.length - briefed.length
   const listed =
     input.memories.length === 0
       ? 'Nothing is remembered yet.'
-      : input.memories
+      : briefed
           .map((memory) => {
             // "you" is how the screen names the person; in a brief it would read as the model itself.
             memory = memory.by === 'you' ? { ...memory, by: 'the person' } : memory
             const origin = memory.scope === 'global' ? `everywhere, by ${memory.by}${memory.where === undefined ? '' : ` in ${memory.where}`}` : `this folder, by ${memory.by}`
             return `- ${memory.text} (${origin})`
           })
-          .join('\n')
+          .join(NEWLINE)
+        + (dropped > 0
+          ? `${NEWLINE}(${String(dropped)} older ${dropped === 1 ? 'memory is' : 'memories are'} kept but not in this brief. Ask the person if you need one.)`
+          : '')
   return [
     input.workspaceName === undefined
       ? 'Your team keeps a shared memory. What is remembered for this project and everywhere:'

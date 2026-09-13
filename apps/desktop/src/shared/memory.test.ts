@@ -10,6 +10,7 @@ import {
   sanitizeMemoryTags,
   stripMemoryBlocks
 } from './memory.js'
+import type { MemoryLine } from './memory.js'
 
 describe('the memory block', () => {
   it('reads remember, remember everywhere and forget, one per line, in order', () => {
@@ -105,5 +106,61 @@ describe('a memory is a colleague’s note, not a report on them', () => {
 
   it('still tells it to answer from a memory that does fit', () => {
     expect(brief()).toContain('answer from it and say it came from memory')
+  })
+})
+
+describe('how much of a brief the memory may take', () => {
+  /*
+   * MEASURED on Colin's own store, 2026-09-13, which is how this was found at
+   * all: 56 memories came to 14,123 characters -- about 3,700 tokens -- next
+   * to a 907-character task section. Ninety-four percent of what a teammate
+   * read before the person's words was memory, paid for on every turn of
+   * every mission by every teammate. Nothing bounded it, and the store's own
+   * cap is 400, which is the same brief at roughly 100,000 characters.
+   */
+  const many = (count: number, scope: 'workspace' | 'global' = 'workspace'): MemoryLine[] =>
+    Array.from({ length: count }, (_, index) => ({
+      text: `remembered thing number ${String(index)}, long enough to be a real note about the project`,
+      scope,
+      by: 'Wren',
+      where: undefined
+    }))
+
+  const section = (memories: MemoryLine[]): string =>
+    memorySection({ selfName: 'Wren', workspaceName: 'app', memories, askFirst: false })
+
+  it('stays bounded however many are kept', () => {
+    const big = section(many(400))
+    expect(big.length).toBeLessThan(8000)
+    // And the bound is the LIST, not the instructions: a brief with no
+    // memories at all is the floor it is measured against.
+    expect(big.length).toBeGreaterThan(section([]).length)
+  })
+
+  it('says how many it left out, rather than quietly shortening', () => {
+    const said = section(many(60))
+    expect(said).toMatch(/older memories are kept but not in this brief/)
+    // A teammate that knows something is missing can ask for it.
+    expect(said).toContain('Ask the person if you need one')
+  })
+
+  it('says nothing about dropping when nothing was dropped', () => {
+    expect(section(many(3))).not.toMatch(/not in this brief/)
+    expect(section([])).not.toMatch(/not in this brief/)
+    expect(section([])).toContain('Nothing is remembered yet.')
+  })
+
+  it('keeps this folder ahead of everywhere', () => {
+    // A memory about THIS project is likelier to bear on this turn than one
+    // written in another folder.
+    const said = section([...many(30, 'global'), ...many(2)])
+    expect(said).toContain('remembered thing number 0, long enough')
+    expect(said).toMatch(/this folder/)
+  })
+
+  it('keeps the newest of a long list, not the oldest', () => {
+    const said = section(many(40))
+    expect(said).toContain('number 39')
+    expect(said).not.toContain('number 0,')
   })
 })
