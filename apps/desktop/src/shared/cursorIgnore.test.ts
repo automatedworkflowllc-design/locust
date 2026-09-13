@@ -92,6 +92,27 @@ describe('which rule hides a path from Cursor', () => {
     expect(cursorIgnoreHit(mixed, AS_IT_WAS)).toMatchObject({ directory: 'AppData' })
   })
 
+  it('does not tell you to change a rule into itself', () => {
+    /*
+     * 0.87.0 shipped advice that read "Change that rule to \".claude/*\"" when
+     * the rule ALREADY was `.claude/*`. A message that tells a person to make
+     * a change they have made is how they stop believing the rest of it.
+     *
+     * The two cases need different advice: a bare `dir/` cannot be negated at
+     * all, so the rule itself must change; a `dir/*` already can be, so what
+     * is missing is the line that lets this folder back in.
+     */
+    const narrowed = cursorIgnoreHit('C:/Users/<home>/.claude/projects/x', AS_FIXED)
+    expect(narrowed).toMatchObject({ alreadyNarrowed: true })
+    const advice = cursorIgnoreSentence(narrowed!, 'C:/Users/<home>/.cursorignore')
+    expect(advice).not.toContain('Change that rule')
+    expect(advice).toContain('Add "!.claude/')
+
+    const bare = cursorIgnoreHit('C:/Users/<home>/.claude/projects/x', AS_IT_WAS)
+    expect(bare).toMatchObject({ alreadyNarrowed: false })
+    expect(cursorIgnoreSentence(bare!, 'C:/x/.cursorignore')).toContain('Change that rule to ".claude/*"')
+  })
+
   it('says what to do, naming the rule and the file', () => {
     const hit = cursorIgnoreHit('C:/Users/<home>/.claude/.locust/attachments/a.png', AS_IT_WAS)
     const said = cursorIgnoreSentence(hit!, 'C:/Users/<home>/.cursorignore')

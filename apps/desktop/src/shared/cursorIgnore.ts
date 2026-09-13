@@ -38,6 +38,14 @@ export interface CursorIgnoreHit {
   readonly rule: string
   /** The directory it names, for the sentence. */
   readonly directory: string
+  /**
+   * Whether the rule is already the `dir/*` shape.
+   *
+   * It decides the advice, and getting it wrong produced a sentence that told
+   * Colin to change `.claude/*` to `.claude/*` -- which is the kind of thing
+   * that makes a person stop believing the rest of the message.
+   */
+  readonly alreadyNarrowed: boolean
 }
 
 interface Rule {
@@ -45,6 +53,8 @@ interface Rule {
   readonly name: string
   /** The path under it that a `!` line brought back, if any. */
   readonly negated: boolean
+  /** `name/*` rather than `name/`, which changes what there is left to advise. */
+  readonly narrowed: boolean
 }
 
 /*
@@ -74,7 +84,7 @@ function ruleOf(line: string): Rule | undefined {
   const match = /^(.+?)\/(\*)?$/.exec(body)
   if (match === null) return undefined
   const name = match[1] ?? ''
-  return name.length === 0 ? undefined : { line: trimmed, name, negated }
+  return name.length === 0 ? undefined : { line: trimmed, name, negated, narrowed: match[2] === '*' }
 }
 
 export function cursorIgnoreHit(path: string, ignoreText: string): CursorIgnoreHit | undefined {
@@ -90,7 +100,7 @@ export function cursorIgnoreHit(path: string, ignoreText: string): CursorIgnoreH
     if (!containsInOrder(segments, wanted)) continue
     // Later rules win, which is gitignore's own rule and is how a fix is
     // written: the exclusion first, the re-inclusion after it.
-    hit = rule.negated ? undefined : { rule: rule.line, directory: rule.name }
+    hit = rule.negated ? undefined : { rule: rule.line, directory: rule.name, alreadyNarrowed: rule.narrowed }
   }
   return hit
 }
@@ -118,5 +128,13 @@ function containsInOrder(segments: readonly string[], wanted: readonly string[])
  * its own is the same dead end the runtime already produces.
  */
 export function cursorIgnoreSentence(hit: CursorIgnoreHit, ignorePath: string): string {
-  return `Cursor cannot read files here: ${ignorePath} hides this folder with the rule "${hit.rule}". Its tools will answer "permission denied" and give no reason. Change that rule to "${hit.directory}/*" and add "!${hit.directory}/<what you need>" beneath it, or remove it.`
+  const said = `Cursor cannot read files here: ${ignorePath} hides this folder with the rule "${hit.rule}". Its tools will answer "permission denied" and give no reason.`
+  // Two different situations, and one piece of advice cannot serve both. A
+  // bare `dir/` cannot be negated at all, so the rule itself has to change; a
+  // `dir/*` already can be, so what is missing is the line that lets this
+  // folder back in. 0.87.0 gave the first advice in both cases and told
+  // Colin to change ".claude/*" to ".claude/*".
+  return hit.alreadyNarrowed
+    ? `${said} Add "!${hit.directory}/<the folder you need>" beneath that rule, or remove it.`
+    : `${said} Change that rule to "${hit.directory}/*" and add "!${hit.directory}/<the folder you need>" beneath it, or remove it.`
 }

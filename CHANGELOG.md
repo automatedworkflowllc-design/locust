@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.87.1 - 2026-09-12
+
+- **Fixes a serious bug in 0.87.0: a Cursor run in a folder `.cursorignore`
+  hides recorded nothing at all.** The warning 0.87.0 added was written into
+  the mission's record, and the record requires its events to be numbered
+  without gaps — so the warning took a number the run was going to use, and
+  everything the run did afterwards was refused. Two teammates would do real
+  work and be reported as having written nothing back, and the conversation
+  ended with "the mission ledger could not be written". The warning is now
+  shown without being recorded, which is also the truer place for it: it is a
+  fact about this machine right now, not about what the mission did.
+- **And the warning's advice made sense.** It could tell you to change a rule
+  into itself. When the rule is already narrowed it now says to add the one
+  line that lets the folder back in.
+
 ## 0.87.0 - 2026-09-12
 
 - **A Cursor teammate now says when it has been told not to read the folder.**

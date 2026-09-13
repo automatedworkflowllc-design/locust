@@ -1337,20 +1337,45 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           try {
             const sentence = await cursorCannotSee(runCwd, options.readCursorIgnore)
             if (sentence !== undefined) {
-              await persistAndEmit(
-                mission,
-                options.ledger,
-                [
-                  cursorIgnoreNotice({
-                    runId,
-                    missionId,
-                    sourceAdapter: runtime,
-                    nextSequence: mission.lastSequence + 1,
-                    at: now().toISOString(),
-                    sentence
-                  })
-                ] as ReturnType<CodexEventNormalizer['accept']>
-              )
+              /*
+               * SHOWN, NOT RECORDED, and the difference cost a release.
+               *
+               * 0.87.0 appended this to the ledger. The ledger requires
+               * strictly contiguous event sequences -- `appendEvents` throws
+               * `Mission event sequence is invalid` otherwise -- and the
+               * adapter numbers its own events from zero, independently. So
+               * the notice took a sequence the runtime was going to use, and
+               * EVERY event the run produced afterwards was refused. Colin's
+               * missions recorded one event, this one, and nothing else:
+               * two teammates did real work and the app reported "the runtime
+               * finished and wrote nothing back" about both.
+               *
+               * The host's own observations that ARE persisted
+               * (`sharedTreeNotice`, `observedEditEvents`) are appended after
+               * the terminal events, when the adapter has stopped numbering.
+               * There is no such slot BEFORE a run, and this notice is only
+               * useful before one.
+               *
+               * So it goes to the window and not to the record. That is also
+               * the truer register for it: it is a fact about this machine's
+               * configuration right now, not about what this mission did, and
+               * a fresh run raises it again for as long as it stays true.
+               */
+              safelyEmit(mission, {
+                kind: 'event',
+                runId,
+                missionId,
+                event: cursorIgnoreNotice({
+                  runId,
+                  missionId,
+                  sourceAdapter: runtime,
+                  // Never collides: the renderer keys by event id and this one
+                  // is never handed to the ledger.
+                  nextSequence: -1,
+                  at: now().toISOString(),
+                  sentence
+                })
+              })
             }
           } catch {
             // A rule file that cannot be read tells us nothing, which is the
