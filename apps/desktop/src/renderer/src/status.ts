@@ -419,8 +419,25 @@ export function missionPhaseView(
  * claim about durability, so it requires zero integrity issues -- not merely
  * that a mission was recovered.
  */
-export function ledgerVerificationLabel(integrityIssueCount: number): 'verified' | 'incomplete' {
-  return integrityIssueCount === 0 ? 'verified' : 'incomplete'
+/**
+ * What was verified, said on the face of it.
+ *
+ * This returned a bare `verified`, in green, beside `COMPLETED`. Astra's audit
+ * of 0.87.1: "it does not name what was verified on its collapsed face... a
+ * completed but incorrect artifact can have an intact record without appearing
+ * endorsed as correct work."
+ *
+ * That is the one claim this app must never make by accident. The receipt is
+ * about DURABILITY -- that the record of this mission is whole and recovers --
+ * and it says nothing at all about whether the work was any good. A green
+ * `verified` under a finished turn invites exactly the other reading.
+ *
+ * The Missions header has always said `ledger verified` for the same fact
+ * (`Screens.tsx`), so this is also two surfaces agreeing on their own words
+ * rather than a new phrase.
+ */
+export function ledgerVerificationLabel(integrityIssueCount: number): 'ledger verified' | 'ledger incomplete' {
+  return integrityIssueCount === 0 ? 'ledger verified' : 'ledger incomplete'
 }
 
 /** Short mission id for mono provenance: real UUID prefix, never a fake counter. */

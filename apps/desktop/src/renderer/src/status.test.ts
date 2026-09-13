@@ -305,8 +305,13 @@ describe('mission phase and receipt truth', () => {
     const view = missionPhaseView('completed', true)
     expect(view.tone).toBe('amber')
     expect(view.label).toMatch(/incomplete/)
-    expect(ledgerVerificationLabel(1)).toBe('incomplete')
-    expect(ledgerVerificationLabel(0)).toBe('verified')
+    // It names WHAT was verified. A bare green "verified" beside COMPLETED
+    // reads as an endorsement of the work, which this app knows nothing
+    // about; the Missions header has always said "ledger verified" for the
+    // same fact (Astra's 0.87.1 audit).
+    expect(ledgerVerificationLabel(1)).toBe('ledger incomplete')
+    expect(ledgerVerificationLabel(0)).toBe('ledger verified')
+    expect(ledgerVerificationLabel(0)).not.toBe('verified')
   })
 })
 

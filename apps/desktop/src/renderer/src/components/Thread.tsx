@@ -244,7 +244,7 @@ function ReceiptCard({
           <span className="lc-separator">·</span>
           {checkpoints.length === 0 ? 'no checkpoints' : `${String(checkpoints.length)} checkpoints`}
           <span className="lc-separator">·</span>
-          <span className={verification === 'verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</span>
+          <span className={verification === 'ledger verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</span>
           {unsettled.length > 0 && (
             <>
               <span className="lc-separator">·</span>
@@ -313,7 +313,7 @@ function ReceiptCard({
         <dt>Cost</dt>
         <dd className="lc-mono">{costLine(runCostOf(mission.events)) ?? 'not reported by the runtime'}</dd>
         <dt>Ledger</dt>
-        <dd className={verification === 'verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
+        <dd className={verification === 'ledger verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
       </dl>
       )}
     </div>

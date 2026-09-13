@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.88.1 - 2026-09-12
+
+- **The receipt says what it verified.** It ended with a green `verified`
+  beside `COMPLETED`, which reads as an endorsement of the work. It has never
+  meant that — it means the record of the mission is whole and recovers — so
+  it now says `ledger verified`, the same words the Missions screen has always
+  used for the same fact. A finished turn that did the wrong thing can have a
+  perfectly intact record, and nothing on this screen should suggest otherwise.
+
 ## 0.88.0 - 2026-09-12
 
 - **Conversations recorded before the doubling was fixed now read correctly
