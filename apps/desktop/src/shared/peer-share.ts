@@ -1,3 +1,5 @@
+import { defangProtocolBlocks } from './protocolTags.js'
+
 /**
  * The share block: how a teammate's runtime says "another teammate needs this".
  *
@@ -104,13 +106,18 @@ export function stripShareBlocks(text: string): string {
 }
 
 /**
- * A received message is quoted into another agent's prompt. Defang the tag
- * so a message cannot carry a share block that the recipient's runtime could
- * echo back verbatim and have posted under ITS name. The text stays readable:
+ * A received message is quoted into another agent's prompt. Defang the tags
+ * so a message cannot carry a block that the recipient's runtime could echo
+ * back verbatim and have acted on under ITS name. The text stays readable:
  * the angle bracket becomes a visibly different one.
+ *
+ * This defended `locust-share` alone until 2026-09-13, which left the other
+ * three -- a quoted message carrying `<locust-memory>` could be echoed by the
+ * recipient and written to the team's memory. `defangProtocolBlocks` covers
+ * every tag the host parses, so adding a fifth tag cannot leave this behind.
  */
 export function sanitizeInbound(text: string): string {
-  return text.replace(/<(\/?)locust-share/gi, '‹$1locust-share')
+  return defangProtocolBlocks(text)
 }
 
 /**

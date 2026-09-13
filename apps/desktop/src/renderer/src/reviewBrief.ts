@@ -1,3 +1,5 @@
+import { defangProtocolBlocks } from '../../shared/protocolTags.js'
+
 /**
  * Handing a finished mission to another teammate to be challenged.
  *
@@ -100,7 +102,19 @@ export function reviewBrief(material: ReviewMaterial): string {
   if (material.said.trim().length === 0) {
     lines.push('This turn recorded no reply text.')
   } else {
-    const said = bounded(material.said, MAX_SAID)
+    /*
+     * Defanged, because this is one model's words becoming another model's
+     * instructions.
+     *
+     * Carrying the reply (0.96.0) opened a path peer messages have been
+     * defended against since they existed: a reviewed turn very often
+     * contains a `<locust-memory>` block, because that is how a teammate
+     * remembers something. Quoted raw into the reviewer's prompt, a reviewer
+     * that echoes it -- and models echo what they are asked to assess -- has
+     * that block parsed out of ITS reply and written to the team's memory,
+     * under its name, with nobody having asked.
+     */
+    const said = bounded(defangProtocolBlocks(material.said), MAX_SAID)
     lines.push(said)
     if (said !== material.said.replace(/\r\n?/g, '\n').trim()) {
       lines.push('(The reply was longer than this; the rest is in their thread.)')

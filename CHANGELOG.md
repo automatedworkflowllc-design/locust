@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.100.0 - 2026-09-13
+
+- **A teammate's words can no longer act as another teammate's instructions.**
+  Locust reads four blocks out of a reply and each makes the app *do*
+  something — send a message, write to the team's memory, raise a decision,
+  move a room's board. Text one teammate said gets quoted into another's
+  prompt in several places, and a model asked to review or reply to quoted
+  text often reproduces it verbatim — at which point the block is parsed out
+  of the *second* teammate's reply and acted on under their name. Peer
+  messages have been defended against this since they existed, but only for
+  the share block; the reviewer brief added in 0.96.0 defended against none.
+  All four tags are now defanged by one rule, everywhere model text is
+  re-quoted, and the words still read normally.
+
 ## 0.99.1 - 2026-09-13
 
 - **A finished task is muted, not crossed out.** Checked against the design
