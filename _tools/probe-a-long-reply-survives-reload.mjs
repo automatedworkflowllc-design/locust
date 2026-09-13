@@ -26,7 +26,12 @@ import { join } from 'node:path'
 import { say, startDrive } from './drive-lib.mjs'
 
 const HIS = join(process.env.APPDATA ?? '', '@teammate', 'desktop')
-const LEDGER = 'mission_645f02a4-40b4-4b9e-9c71-bd29c451da7c.jsonl'
+// Either of Colin's real conversations: the one whose FRONT was lost to the
+// history window (the default), or one the old Cursor adapter recorded
+// doubled, which the reader repairs on load. `LOCUST_LEDGER` and
+// `LOCUST_ROW` pick the other one.
+const LEDGER = process.env.LOCUST_LEDGER ?? 'mission_645f02a4-40b4-4b9e-9c71-bd29c451da7c.jsonl'
+const WANTED = process.env.LOCUST_ROW ?? 'google as a stock'
 
 const profile = await mkdtemp(join(tmpdir(), 'locust-long-reply-'))
 await mkdir(join(profile, 'mission-ledger'), { recursive: true })
@@ -57,7 +62,7 @@ const open = `(async () => {
   if (missions === undefined) return 'no Missions button'
   missions.click()
   await new Promise(r => setTimeout(r, 1200))
-  const row = [...document.querySelectorAll('.lc-missionrow, .lc-row')].find(n => /google as a stock/i.test(n.innerText))
+  const row = [...document.querySelectorAll('.lc-missionrow, .lc-row')].find(n => new RegExp(${JSON.stringify(WANTED)}, 'i').test(n.innerText))
   if (row === undefined) return 'no row for that mission'
   row.click()
   await new Promise(r => setTimeout(r, 2000))

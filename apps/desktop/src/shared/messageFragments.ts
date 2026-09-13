@@ -77,37 +77,106 @@ export function withMessageDelta(
 export function joinMessageFragments(
   events: readonly NormalizedRuntimeEvent[]
 ): readonly NormalizedRuntimeEvent[] {
-  const joined = new Map<string, { text: string; final: boolean; pieces: number }>()
-  for (const event of events) {
-    if (event.type !== 'message.delta') continue
-    const { itemId, operation, text, final } = event.payload
-    const held = joined.get(itemId)
-    joined.set(itemId, {
-      text: operation === 'replace' ? text : `${held?.text ?? ''}${text}`,
-      final,
-      pieces: (held?.pieces ?? 0) + 1
-    })
+  interface Built {
+    readonly key: string
+    readonly at: number
+    text: string
+    final: boolean
+    pieces: number
   }
-  if (![...joined.values()].some((message) => message.pieces > 1)) return events
+  const open = new Map<string, Built>()
+  const built: Built[] = []
+  let changed = false
 
-  const emitted = new Set<string>()
+  events.forEach((event, index) => {
+    if (event.type !== 'message.delta') return
+    const { itemId, operation, text, final } = event.payload
+    const held = open.get(itemId)
+    if (held === undefined) {
+      const fresh: Built = { key: itemId, at: index, text, final, pieces: 1 }
+      open.set(itemId, fresh)
+      built.push(fresh)
+      return
+    }
+    if (operation === 'replace') {
+      held.text = text
+      held.final = final
+      held.pieces += 1
+      changed = true
+      return
+    }
+    /*
+     * THE REPAIR, for records already on disk.
+     *
+     * A Cursor version that marked nothing had its closing message -- the one
+     * carrying the WHOLE text -- appended like any other fragment, so the
+     * reply said itself twice and the next reply was welded onto its end. The
+     * adapter recognises that message by content now (`cursor-events.ts`),
+     * but every conversation recorded before that fix still holds the doubled
+     * form, and a ledger is append-only: what is written is written.
+     *
+     * The reader can apply the same understanding. A fragment that restates
+     * exactly what its message has said so far is that message ENDING, not
+     * twice as much of it -- so it closes here, and what follows starts a new
+     * one. MEASURED on Colin's mission `fd0adba1`, which rendered as one
+     * 2872-character block beginning "...for his take.Looking up NVIDIA
+     * forward earnings now, then I'll hand the numbers to Yurt for his take.":
+     * it recovers as the 88-character preamble and the 2696-character answer
+     * that had been welded to it.
+     *
+     * Same two guards as the adapter, and the second was earned by a test: a
+     * long message can arrive as two IDENTICAL halves, so a restatement must
+     * cover SEVERAL fragments, not one.
+     */
+    if (text.length > 1 && held.pieces > 1 && text === held.text) {
+      held.final = true
+      open.delete(itemId)
+      changed = true
+      return
+    }
+    held.text = `${held.text}${text}`
+    held.final = final
+    held.pieces += 1
+    changed = true
+  })
+
+  // Nothing was split and nothing was joined, so nothing is rewritten and
+  // nothing is copied: a mission whose messages each arrived whole keeps the
+  // record the ledger holds, down to its `append`.
+  if (!changed) return events
+
+  // A message that was closed by a restatement leaves the next one sharing its
+  // itemId. Numbered rather than renamed, so the first keeps the id every
+  // other surface already knows and the keys stay stable across a reload.
+  const seen = new Map<string, number>()
+  const keyed = built.map((message) => {
+    const n = (seen.get(message.key) ?? 0) + 1
+    seen.set(message.key, n)
+    return { message, id: n === 1 ? message.key : `${message.key}#${String(n)}` }
+  })
+
+  const byIndex = new Map(keyed.map((entry) => [entry.message.at, entry]))
   const dense: NormalizedRuntimeEvent[] = []
-  for (const event of events) {
+  for (const [index, event] of events.entries()) {
     if (event.type !== 'message.delta') {
       dense.push(event)
       continue
     }
-    const { itemId } = event.payload
-    if (emitted.has(itemId)) continue
-    emitted.add(itemId)
-    const whole = joined.get(itemId)
-    if (whole === undefined || whole.pieces === 1) {
+    const entry = byIndex.get(index)
+    if (entry === undefined) continue
+    if (entry.message.pieces === 1 && entry.id === entry.message.key) {
       dense.push(event)
       continue
     }
     dense.push({
       ...event,
-      payload: { ...event.payload, operation: 'replace', text: whole.text, final: whole.final }
+      payload: {
+        ...event.payload,
+        itemId: entry.id,
+        operation: 'replace',
+        text: entry.message.text,
+        final: entry.message.final
+      }
     })
   }
   return dense

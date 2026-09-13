@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.88.0 - 2026-09-12
+
+- **Conversations recorded before the doubling was fixed now read correctly
+  too.** 0.85.0 stopped a Cursor reply saying itself twice, but every
+  conversation already on disk still held the doubled text — and a record is
+  only ever added to, never rewritten. So the reader repairs it instead: a
+  passage that restates exactly what the message has already said is that
+  message ending, not twice as much of it, and whatever follows is the next
+  reply rather than more of the same one.
+- Measured on a real conversation: one 2,872-character block that began by
+  saying its first sentence twice becomes the 88-character note it started
+  with and the 2,696-character answer that had been stuck to the end of it.
+  Nothing on disk changed.
+
 ## 0.87.1 - 2026-09-12
 
 - **Fixes a serious bug in 0.87.0: a Cursor run in a folder `.cursorignore`
