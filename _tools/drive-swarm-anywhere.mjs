@@ -27,7 +27,7 @@ const drive = await startDrive({
 })
 
 const ON_SETTINGS = `(async () => {
-  const flat = (el) => el.innerText.split(/\s+/).join(' ').trim()
+  const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
   // The rail button carries a stable title; its text sits inside a span next
   // to an icon and is not a reliable handle.
   let tab
@@ -48,7 +48,7 @@ const ON_SETTINGS = `(async () => {
 })()`
 
 const TOGGLE = `(async () => {
-  const flat = (el) => el.innerText.split(/\s+/).join(' ').trim()
+  const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
   const heading = [...document.querySelectorAll('.lc-settings__heading')].find((h) => /^Swarm$/i.test(flat(h)))
   if (!heading) return 'no Swarm section'
   const scope = heading.parentElement

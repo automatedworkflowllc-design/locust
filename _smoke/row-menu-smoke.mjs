@@ -267,7 +267,7 @@ try {
 
   say('7. the second press removes them')
   const gone = await cdp.eval(`(async () => {
-    const remove = [...document.querySelectorAll('.lc-context__item')].find(b => /^Remove.*\?$/.test(b.innerText.trim()))
+    const remove = [...document.querySelectorAll('.lc-context__item')].find(b => /^Remove.*\\?$/.test(b.innerText.trim()))
     remove.click()
     await new Promise(r => setTimeout(r, 1200))
     return document.querySelector('.lc-sidebar').innerText

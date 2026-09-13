@@ -359,7 +359,7 @@ try {
           found: true,
           outgoingShown: fromWren !== undefined,
           // Double-escaped on purpose: this whole function is inside a JS
-          // template literal before it reaches the page, and a lone \s there
+          // template literal before it reaches the page, and a lone \\s there
           // collapses to a bare s -- which quietly turned this into /s+/g and
           // deleted every letter s from the reported text.
           outgoing: fromWren ? fromWren.innerText.replace(/\\s+/g, ' ').slice(0, 200) : null,
@@ -423,7 +423,7 @@ try {
       for (const row of rows) {
         row.click()
         await new Promise(r => setTimeout(r, 500))
-        if (/Stopped after \d+ automatic repl/i.test(document.body.innerText)) return true
+        if (/Stopped after \\d+ automatic repl/i.test(document.body.innerText)) return true
       }
       return false
     })()`)

@@ -88,7 +88,10 @@ installer with a version people can read in Settings.
 `docs/REMAINING-PLAN.md` holds the ordered record of what landed and what is
 still open, each entry saying plainly which parts were verified live.
 
-Verification, as of this date: 449 tests across the workspace; 133 mutations
+Verification, **as it stood on 2026-09-02 and not since** -- the workspace has
+passed 3000 tests and 32 live smokes since, and Antigravity and swarm both
+shipped. Treat every number below as history and read `pnpm test` for the
+present: 449 tests across the workspace; 133 mutations
 caught across three mutation controls (27 + 34 + 72); and fourteen live
 smokes in `_smoke/` driving the built app over CDP -- see `_smoke/README.md`
 for what each proves, what it cannot see, and which three spend no provider

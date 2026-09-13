@@ -92,9 +92,9 @@ try {
       // note about Antigravity's unpublished interface matched that and made
       // the first run of this read as inconclusive.
       const line = text.split(String.fromCharCode(10)).map((t) => t.trim()).find((t) =>
-        /^Up to date\.$/.test(t)
+        /^Up to date\\.$/.test(t)
         || /^Checking/.test(t)
-        || /^Not checked yet\.$/.test(t)
+        || /^Not checked yet\\.$/.test(t)
         || /^Version .* is available/.test(t)
         || /^Downloading /.test(t)
         || /is downloaded and ready to install/.test(t)

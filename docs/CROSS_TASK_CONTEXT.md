@@ -73,9 +73,9 @@ Run the complete validation suite with:
 pnpm check
 ```
 
-Last verified on 2026-09-01: production build and every workspace TypeScript check pass, with 350 tests and 97 mutations caught across three mutation controls. Nine live smokes in `_smoke/` drive the built app against the real CLIs over CDP; they need a signed-in provider and a desktop session, so they are run by hand rather than by `pnpm check`.
+Live smokes in `_smoke/` drive the built app against the real CLIs over CDP; they need a signed-in provider and a desktop session, so they are run by hand rather than by `pnpm check`. **Counts are deliberately not repeated here** -- this paragraph said "350 tests" and "nine live smokes" for eleven days while the real numbers passed 3000 and 32. Run `pnpm test` and `ls _smoke/*-smoke.mjs` for the truth; a number written down twice is a number that will disagree with itself.
 
-Read `docs/REMAINING-PLAN.md` first — it is the ordered record of what landed and what is still open, and each entry says which parts were verified live and which were not. In short, as of this date: both runtimes own real missions, missions run side by side one per teammate, teammates exchange findings through the durable workroom, a running mission can be handed between runtimes from a reconciled checkpoint, and per-action approvals run on the app-server transport. Still open: connections, mission deletion and retention, the curated OmniRoute gateway with Ask/Automatic fallback, and packaging. Contract fixtures must remain authentication-free.
+Read the newest `docs/PLAN-*-NEXT.md` first — it is where things stand. `docs/REMAINING-PLAN.md` is a 2026-09-01 snapshot and is HISTORY: it still lists as unbuilt several things that shipped (mission deletion and retention, connectors, packaging). In short, as of this date: both runtimes own real missions, missions run side by side one per teammate, teammates exchange findings through the durable workroom, a running mission can be handed between runtimes from a reconciled checkpoint, and per-action approvals run on the app-server transport. Still open: connections, mission deletion and retention, the curated OmniRoute gateway with Ask/Automatic fallback, and packaging. Contract fixtures must remain authentication-free.
 
 ## Important implementation invariants
 

@@ -76,7 +76,7 @@ const arms = `(async () => {
   return JSON.stringify({
     // One press must ASK, not act.
     stillOpen: after !== null,
-    asks: after !== null && /Delete for good\?/.test(after.innerText),
+    asks: after !== null && /Delete for good\\?/.test(after.innerText),
     conversationStillHere: /google as a stock/i.test(thread)
   }, null, 1)
 })()`

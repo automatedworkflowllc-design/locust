@@ -285,7 +285,7 @@ try {
       return c ? c.disabled : null
     })(),
     stopPresent: document.querySelector('button[aria-label^="Stop the running"]') !== null,
-    header: (document.querySelector('.lc-workroom__header') || { innerText: '' }).innerText.split(/\s+/).join(' ').trim().slice(0, 120)
+    header: (document.querySelector('.lc-workroom__header') || { innerText: '' }).innerText.split(/\\s+/).join(' ').trim().slice(0, 120)
   })`)
   say(`       mid-flight: ${midFlight}`)
 
@@ -298,7 +298,7 @@ try {
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 500))
       const head = document.querySelector('.lc-workroom__header')
-      const state = head ? head.innerText.split(/\s+/).join(' ').trim().slice(0, 90) : 'no header'
+      const state = head ? head.innerText.split(/\\s+/).join(' ').trim().slice(0, 90) : 'no header'
       if (trail[trail.length - 1] !== state) trail.push(state)
       const divider = document.querySelector('.lc-handoff')
       if (divider) {

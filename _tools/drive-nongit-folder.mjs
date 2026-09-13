@@ -45,13 +45,13 @@ const RUN = `(async () => {
   for (let i = 0; i < 240; i += 1) {
     await new Promise((r) => setTimeout(r, 1000))
     const header = document.querySelector('.lc-workroom__header')
-    const text = header ? header.innerText.split(/\s+/).join(' ') : ''
+    const text = header ? header.innerText.split(/\\s+/).join(' ') : ''
     if (/completed|failed|cancelled/i.test(text)) {
       const rows = [...document.querySelectorAll('.lc-filerow__path')].map((n) => n.innerText.trim())
       const trace = document.querySelector('.lc-activity')
       return 'settled in ' + (i + 1) + 's :: ' + (text.match(/completed|failed|cancelled/i) ?? ['?'])[0]
         + ' || file rows: ' + (rows.length ? rows.join(', ') : 'none')
-        + ' || trace: ' + (trace ? trace.innerText.split(/\s+/).join(' ').slice(0, 120) : 'no fold')
+        + ' || trace: ' + (trace ? trace.innerText.split(/\\s+/).join(' ').slice(0, 120) : 'no fold')
     }
   }
   return 'never settled'

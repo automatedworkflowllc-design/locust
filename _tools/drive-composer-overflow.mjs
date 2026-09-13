@@ -66,7 +66,7 @@ const measure = `(() => {
     children: [...row.children].map(group => ({
       group: Math.round(group.getBoundingClientRect().width),
       items: [...group.children].map(node => ({
-        what: (node.getAttribute('aria-label') ?? node.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 22),
+        what: (node.getAttribute('aria-label') ?? node.textContent ?? '').replace(/\\s+/g, ' ').trim().slice(0, 22),
         w: Math.round(node.getBoundingClientRect().width)
       }))
     }))

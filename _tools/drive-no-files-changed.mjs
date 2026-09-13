@@ -34,10 +34,10 @@ const RUN = `(async () => {
   for (let i = 0; i < 240; i += 1) {
     await new Promise((r) => setTimeout(r, 1000))
     const header = document.querySelector('.lc-workroom__header')
-    const text = header ? header.innerText.split(/\s+/).join(' ') : ''
+    const text = header ? header.innerText.split(/\\s+/).join(' ') : ''
     if (/completed|failed|cancelled/i.test(text)) {
       const trace = document.querySelector('.lc-activity__trace, .lc-activity')
-      const line = trace ? trace.innerText.split(/\s+/).join(' ').slice(0, 200) : 'no activity fold'
+      const line = trace ? trace.innerText.split(/\\s+/).join(' ').slice(0, 200) : 'no activity fold'
       return 'settled in ' + (i + 1) + 's :: ' + (text.match(/completed|failed|cancelled/i) ?? ['?'])[0]
         + ' || mode: ' + (/may edit/i.test(text) ? 'may edit' : /read-only/i.test(text) ? 'read-only' : '?')
         + ' || trace: ' + line

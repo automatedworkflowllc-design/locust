@@ -54,7 +54,7 @@ const read = `(async () => {
   const chip = [...document.querySelectorAll('button[aria-label=\"Reasoning effort\"]')][0]
   if (chip === undefined) {
     return JSON.stringify({
-      controls: [...document.querySelectorAll('.lc-control')].map(n => n.innerText.split(/\s+/).join(' ').trim()),
+      controls: [...document.querySelectorAll('.lc-control')].map(n => n.innerText.split(/\\s+/).join(' ').trim()),
       labelled: [...document.querySelectorAll('[aria-label]')].map(n => n.tagName + ':' + n.getAttribute('aria-label')).slice(0, 30)
     }, null, 1)
   }

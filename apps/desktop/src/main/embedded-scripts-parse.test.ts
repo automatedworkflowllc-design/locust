@@ -64,10 +64,56 @@ function harnesses(): readonly string[] {
  * end the literal early -- then built through the engine so the escapes are
  * resolved exactly as they would be at run time.
  */
+/**
+ * How a harness hands a script to the page.
+ *
+ * `evaluate(` was the only form this looked for, and it is not the only form
+ * used: `cdp.eval(` sends exactly the same way, and several files build the
+ * script into a `const` first and pass the NAME. Both were invisible here,
+ * which is how `relay-smoke`'s `/Stopped after \d+ automatic repl/i` -- a
+ * check that could never once have matched -- survived inside a `cdp.eval`
+ * template (Grok's audit, 2026-09-12).
+ */
+const SENDERS = /(?:evaluate|cdp\.eval|eval)\(\s*`/g
+
+/**
+ * A script built into a `const` and sent by name.
+ *
+ * `const watch = ` ... `` then `drive.evaluate(watch)`. The template is just
+ * as page-bound as an inline one and its escapes are eaten just the same.
+ * Only names this file actually sends are taken, so an ordinary string
+ * constant is not scanned as if it were code.
+ */
+function sentByName(source: string): readonly number[] {
+  const names = new Set<string>()
+  for (const match of source.matchAll(/(?:evaluate|cdp\.eval|eval)\(\s*([A-Za-z_$][\w$]*)\s*\)/g)) {
+    if (match[1] !== undefined) names.add(match[1])
+  }
+  const starts: number[] = []
+  for (const name of names) {
+    /*
+     * `String.raw`, and the reason is this line's own history: it was
+     * written as an ordinary template and the `\s` in it was eaten by
+     * that template -- leaving `consts+NAMEs*=s*` , which matches
+     * nothing. The check for swallowed escapes, swallowing its own.
+     * The backtick is appended rather than escaped, since a raw
+     * template cannot hold one.
+     */
+    const declared = new RegExp(String.raw`const\s+${name}\s*=\s*` + '`', 'g')
+    for (const match of source.matchAll(declared)) starts.push((match.index ?? 0) + match[0].length)
+  }
+  return starts
+}
+
+/** Where every page-bound template in this file begins, both forms. */
+function templateStarts(source: string): readonly number[] {
+  const starts = [...source.matchAll(SENDERS)].map((match) => (match.index ?? 0) + match[0].length)
+  return [...starts, ...sentByName(source)].sort((a, b) => a - b)
+}
+
 export function embeddedScripts(source: string): readonly string[] {
   const scripts: string[] = []
-  for (const match of source.matchAll(/evaluate\(\s*`/g)) {
-    const from = (match.index ?? 0) + match[0].length
+  for (const from of templateStarts(source)) {
     let index = from
     let depth = 0
     let end = -1
@@ -111,8 +157,7 @@ export function embeddedScripts(source: string): readonly string[] {
  */
 export function embeddedSources(source: string): readonly string[] {
   const raw: string[] = []
-  for (const match of source.matchAll(/evaluate\(\s*`/g)) {
-    const from = (match.index ?? 0) + match[0].length
+  for (const from of templateStarts(source)) {
     let index = from
     let depth = 0
     let end = -1
@@ -170,7 +215,24 @@ export function swallowedEscapes(raw: string): readonly number[] {
       i += 1
       continue
     }
-    if (/[sdwSDWb]/.test(raw[i + 1] ?? '')) found.push(line)
+    /*
+     * Every escape whose LOSS changes what a regex means.
+     *
+     * This was `[sdwSDWb]` -- the character classes -- and three of the four
+     * escapes that have actually bitten were outside it:
+     *
+     *   `\d`  relay-smoke, a notice check that could never match
+     *   `\?`  row-menu and probe-the-header-menu, a literal ? made optional
+     *   `\.`  drive-update-from-older, a period made "any character"
+     *   `\/`  probe-cursor-says-it-cannot-see, which ENDS the regex literal
+     *          and throws in the page -- the one shape nothing here looked
+     *          for, and the one that fails loudest and latest
+     *
+     * `n`, `r` and `t` are deliberately absent: a real newline or tab inside
+     * a page-bound template is almost always what the author wanted, and
+     * flagging them would bury the four above in noise.
+     */
+    if (/[sdwSDWbB.?+*|()[\]{}^/]/.test(raw[i + 1] ?? '')) found.push(line)
   }
   return found
 }

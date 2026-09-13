@@ -68,7 +68,7 @@ await writeFile(
 const drive = await startDrive({ name: 'routine-affordance', port: 9350, workspace, profilePath: profile })
 
 const FIND = `(async () => {
-  // No regex: a \s in a template literal that then crosses the CDP bridge
+  // No regex: a whitespace escape in a template literal that then crosses the CDP bridge
   // has been eaten twice tonight, turning every 's' in the report into a
   // space ('Copy mi ion id').
   const flat = (el) => el.innerText.split('\\n').map((t) => t.trim()).filter(Boolean).join(' ')
@@ -90,7 +90,7 @@ const FIND = `(async () => {
 })()`
 
 const SAVE = `(async () => {
-  // No regex: a \s in a template literal that then crosses the CDP bridge
+  // No regex: a whitespace escape in a template literal that then crosses the CDP bridge
   // has been eaten twice tonight, turning every 's' in the report into a
   // space ('Copy mi ion id').
   const flat = (el) => el.innerText.split('\\n').map((t) => t.trim()).filter(Boolean).join(' ')

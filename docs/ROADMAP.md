@@ -65,7 +65,7 @@ Remainder of [issue #1](https://github.com/automatedworkflowllc-design/ai-teamma
 
 ## M6 — Name, packaging, community
 
-- Public name settled: **Locust** (2026-08-31, see docs/BRAND.md). Package namespace still open; installer/distribution for Windows first; contributor documentation and issue templates beyond the current baseline.
+- Public name settled: **Locust** (2026-08-31). Package namespace still open; installer/distribution for Windows first; contributor documentation and issue templates beyond the current baseline.
 
 ## How I would build this — the planning model's opinionated approach (2026-08-31)
 

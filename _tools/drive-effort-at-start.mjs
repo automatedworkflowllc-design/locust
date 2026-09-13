@@ -29,7 +29,7 @@ const drive = await startDrive({
 })
 
 const WATCH = `(async () => {
-  const flat = (el) => el.innerText.split(/\s+/).join(' ').trim()
+  const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
   const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
   if (open) open.click()
   await new Promise((r) => setTimeout(r, 400))
