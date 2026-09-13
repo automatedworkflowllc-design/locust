@@ -1168,7 +1168,14 @@ function prettyServer(raw: string): string {
  * next runtime will pick one of them.
  */
 export function isShellTool(name: string, toolKind: string | undefined): boolean {
-  return /^(bash|shell)$/i.test(name) || toolKind === 'command_execution'
+  // `run_command` is Antigravity's word, and leaving it out cost every one of
+  // its runs their commands: MEASURED 2026-09-13 across the recorded ledgers,
+  // 76 `run_command` calls, none of them counted as a command. So "Ran N
+  // commands" said nothing, the trace line had nothing to trace, and the
+  // reviewer's WHAT RAN was empty for a run that had run seventy-six things.
+  return /^(bash|shell|run_command|run_terminal_cmd|execute_command)$/i.test(name)
+    || toolKind === 'command_execution'
+    || toolKind === 'run_command'
 }
 
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {
@@ -1210,17 +1217,34 @@ const EDIT_TOOL_WORDS = new Set([
 ])
 const NOT_EDIT_TOOLS = /^(todowrite|todoread|todo_write|todo_read|write_agent|writeagent)$/i
 
+/**
+ * Words that mean the tool LOOKED at something.
+ *
+ * They beat the nouns below, and they have to, because the noun is the half
+ * the two kinds of tool share: `view_file` and `write_to_file` both contain
+ * `file`, and matching nouns alone made READING a file count as changing one.
+ *
+ * MEASURED 2026-09-13 in the recorded ledgers: 38 Antigravity `view_file`
+ * calls, every one of them counted as an edit. So an Antigravity run that
+ * changed nothing reported changed files -- and since 0.96.0 those files are
+ * handed to a reviewer under WHAT CHANGED, which makes it a false claim about
+ * the work rather than a miscount.
+ */
+const READ_TOOL_WORDS = new Set(['view', 'read', 'open', 'show', 'list', 'cat', 'search', 'find', 'grep'])
+
 export function editToolName(name: string): boolean {
   const trimmed = name.trim()
   if (trimmed.length === 0) return false
   if (NOT_EDIT_TOOLS.test(trimmed)) return false
+  const words = trimmed
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z]+/)
+    .map((word) => word.toLowerCase())
+  if (words.some((word) => READ_TOOL_WORDS.has(word))) return false
   // Split on separators AND on camelCase, so `deleteFile`, `delete_file` and
   // `DeleteFile` all read as the two words they are -- and `todowrite`, which
   // is one word, reads as one and matches nothing.
-  return trimmed
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .split(/[^A-Za-z]+/)
-    .some((word) => EDIT_TOOL_WORDS.has(word.toLowerCase()))
+  return words.some((word) => EDIT_TOOL_WORDS.has(word))
 }
 
 /**

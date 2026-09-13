@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.98.0 - 2026-09-13
+
+- **Cursor's plan is drawn.** Cursor keeps a to-do list and Locust threw every
+  update away — on the runtime that accounts for 90 of the 147 missions
+  recorded here. It now shows as the same live step list every other runtime
+  gets. Cursor sends only the items that *changed* after the first update, so
+  the plan is merged by item rather than replaced; without that, a three-step
+  plan would shrink to one as it finished.
+- **Antigravity's commands are counted as commands.** It calls them
+  `run_command`, which nothing recognised, so an Antigravity run that ran
+  seventy-six commands reported that it ran none — in the activity fold, in the
+  trace line, and in what a reviewer is handed.
+- **Reading a file no longer counts as changing one.** Antigravity's
+  `view_file` was read as an edit because it contains the word "file", so runs
+  reported changed files they had only looked at. A verb like *view* or *read*
+  now beats the noun.
+- Every tool name five runtimes have actually produced is now pinned in a test
+  built from the recorded ledgers, so the next runtime's spelling has to be
+  measured before it is trusted.
+
 ## 0.97.0 - 2026-09-13
 
 - **A run that has not said anything now says so.** A Cursor turn showed

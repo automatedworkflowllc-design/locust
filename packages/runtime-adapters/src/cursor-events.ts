@@ -6,6 +6,7 @@ import {
   malformedEvidence,
   processEvidence,
   requireContextText,
+  sanitizeJson,
   stringValue,
   toolPatchFrom,
 } from "./codex-events.js";
@@ -123,6 +124,22 @@ function sanitizedUsage(value: JsonObject): RedactedJsonValue {
   return counts as RedactedJsonValue;
 }
 
+/**
+ * Put one todo into the run's plan, keyed by its own id.
+ *
+ * Cursor's ids are strings ("1", "2", "3"). An entry with no id cannot be
+ * merged against anything, so it is kept under its own text instead -- which
+ * is stable enough to replace itself and is never confused with another step.
+ * A todo carrying neither an id nor content is not a step and is dropped.
+ */
+function rememberTodo(into: Map<string, JsonObject>, todo: unknown): void {
+  if (!isObject(todo)) return;
+  const content = stringValue(todo.content) ?? stringValue(todo.text);
+  const id = identityValue(todo.id) ?? content;
+  if (id === undefined || content === undefined) return;
+  into.set(id, todo);
+}
+
 function globTarget(args: JsonObject): string | undefined {
   const pattern = stringValue(args.globPattern);
   if (pattern === undefined) return undefined;
@@ -176,6 +193,15 @@ export function createCursorEventNormalizer(
   const now = context.now ?? (() => new Date());
 
   const openTools = new Map<string, { kind: string }>();
+  /*
+   * The run's todo list, held by id because Cursor sends partial updates.
+   *
+   * A Map rather than an array so `merge: true` means what it says: an item
+   * that arrives again replaces itself in place and keeps its position, and
+   * an item that is not mentioned this time is left exactly as it was. An
+   * array would either lose the unmentioned ones or reorder the plan.
+   */
+  const cursorTodos = new Map<string, JsonObject>();
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
   let finalized = false;
@@ -416,6 +442,60 @@ export function createCursorEventNormalizer(
         ?? stringValue(args.prompt)
         ?? globTarget(args);
       const subtype = stringValue(parsed.subtype);
+
+      /*
+       * Cursor keeps a plan, and Locust threw it away for ninety missions.
+       *
+       * MEASURED 2026-09-13, a real `cursor-agent` run on grok-4.6 asked for
+       * three files: `updateTodosToolCall` arrived four times, each carrying
+       * `{id, content, status: TODO_STATUS_*}`. Every one of them was drawn
+       * as an ordinary tool row, so the plan advanced four times in silence
+       * -- the same defect Astra found in OpenCode, on the runtime Colin
+       * actually uses for 90 of his 147 recorded missions.
+       *
+       * THE TRAP, and the reason this cannot be a copy of the OpenCode
+       * mapping: after the first call every update sets `merge: true` and
+       * sends ONLY THE ITEMS THAT CHANGED. Update two carried ids 1 and 2,
+       * update four carried id 3 alone. Taking `args.todos` as the plan would
+       * shrink a three-step plan to one step as it neared the end -- a
+       * progress display that goes backwards.
+       *
+       * So the completed record's `result.success.todos` is preferred: Cursor
+       * sends the whole list back there, which is the authoritative snapshot.
+       * The merge below is the fallback for the `started` half, which has no
+       * result yet.
+       */
+      if (key === "updateTodosToolCall") {
+        // Only the completed half speaks: both halves carry the same list, so
+        // reading each would count every update twice, and the completed one
+        // is the half that carries the authoritative whole list. Measured,
+        // they arrive milliseconds apart -- nothing is waiting for this.
+        if (subtype !== "completed") return [];
+        const fromResult = isObject(outcome.success) ? (outcome.success as JsonObject).todos : undefined;
+        if (Array.isArray(fromResult)) {
+          cursorTodos.clear();
+          for (const todo of fromResult) rememberTodo(cursorTodos, todo);
+        } else {
+          // No result to read: fall back to what was sent, honouring `merge`.
+          if (args.merge !== true) cursorTodos.clear();
+          for (const todo of Array.isArray(args.todos) ? args.todos : []) rememberTodo(cursorTodos, todo);
+        }
+        const plan = [...cursorTodos.values()];
+        // A todo call carrying nothing is not a plan, and must not become an
+        // empty one.
+        if (plan.length === 0) return [];
+        const planState = { redacted: false };
+        return [
+          emit("plan.updated", {
+            itemId,
+            plan: sanitizeJson(plan, planState),
+            // Cursor never says which update is the last one.
+            final: false,
+            evidence,
+          }),
+        ];
+      }
+
       if (subtype === "started") {
         openTools.set(itemId, { kind });
         return [

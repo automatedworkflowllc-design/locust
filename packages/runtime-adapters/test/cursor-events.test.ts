@@ -540,3 +540,64 @@ describe("a long answer whose fragments outrun the complete message", () => {
     }
   });
 });
+
+/*
+ * Cursor keeps a plan, and Locust dropped it for ninety missions.
+ *
+ * Captured 2026-09-13 off a real cursor-agent run on grok-4.6, asked for
+ * three files and told to keep a todo list: `updateTodosToolCall` arrived
+ * four times and every one of them was drawn as an ordinary tool row.
+ *
+ * The trap this exists to hold down: after the first call Cursor sets
+ * `merge: true` and sends ONLY the items that changed -- the last update in
+ * this very fixture carries one todo. A mapping that took `args.todos` as the
+ * plan would shrink three steps to one as the run finished.
+ */
+describe("Cursor's plan", () => {
+  it("becomes a plan that never shrinks, not four tool rows", () => {
+    const { events } = run(fixture("todo-plan.jsonl"));
+    const plans = events.filter((event) => event.type === "plan.updated");
+    expect(plans.length).toBeGreaterThanOrEqual(3);
+
+    const sizes = plans.map((event) => (event.payload as { readonly plan: readonly unknown[] }).plan.length);
+    // THE REGRESSION THIS CATCHES: the last update carries one todo.
+    expect(sizes.every((size) => size === 3)).toBe(true);
+
+    // and the todo call is never also a tool row
+    expect(
+      events.filter((event) => /todo/i.test(String((event.payload as { name?: string }).name ?? "")))
+    ).toHaveLength(0);
+  });
+
+  it("advances the steps and finishes with all of them done", () => {
+    const { events } = run(fixture("todo-plan.jsonl"));
+    const plans = events.filter((event) => event.type === "plan.updated");
+    const statuses = plans.map((event) =>
+      ((event.payload as { readonly plan: readonly Record<string, unknown>[] }).plan).map((step) => String(step.status))
+    );
+    const last = statuses[statuses.length - 1] ?? [];
+    expect(last.every((status) => /COMPLETED/i.test(status))).toBe(true);
+    expect(statuses.some((row) => row.some((status) => /IN_PROGRESS/i.test(status)))).toBe(true);
+    // The step order is the plan's own and must not be reshuffled by a merge.
+    const words = ((plans[plans.length - 1]?.payload as { readonly plan: readonly Record<string, unknown>[] }).plan)
+      .map((step) => String(step.content));
+    expect(words).toEqual([
+      "Create a.txt containing alpha",
+      "Create b.txt containing beta",
+      "Create c.txt listing the two file names"
+    ]);
+  });
+
+  it("invents no plan from a todo call that carries nothing", () => {
+    const { events } = run([
+      JSON.stringify({ type: "system", subtype: "init", session_id: "s1" }),
+      JSON.stringify({
+        type: "tool_call",
+        subtype: "completed",
+        call_id: "c1",
+        tool_call: { updateTodosToolCall: { args: { todos: [] }, result: { success: {} }, toolCallId: "c1" } }
+      })
+    ]);
+    expect(events.filter((event) => event.type === "plan.updated")).toHaveLength(0);
+  });
+});
