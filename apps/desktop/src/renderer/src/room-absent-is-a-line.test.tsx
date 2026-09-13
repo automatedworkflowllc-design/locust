@@ -50,7 +50,8 @@ const answer = (teammateId: string): RoomAnswer =>
     missionId: `m_${teammateId}`,
     phase: 'completed',
     text: 'ALMANAC',
-    items: [{ key: `msg_${teammateId}`, type: 'agent-message', text: 'ALMANAC' }],
+    startedAt: '2026-09-05T05:00:00.000Z',
+    items: [{ key: `msg_${teammateId}`, type: 'agent-message', text: 'ALMANAC', streaming: false }],
     runtime: 'opencode',
     model: 'free'
   }) as RoomAnswer
@@ -243,7 +244,7 @@ describe('the members a post did not reach', () => {
         rooms={[room]}
         teammates={ROSTER}
         currentRoomId="room_standup"
-        answersFor={() => [{ ...answer(ROSTER[0]!.teammateId), text: long, items: [{ key: 'msg_long', type: 'agent-message', text: long }] }]}
+        answersFor={() => [{ ...answer(ROSTER[0]!.teammateId), text: long, items: [{ key: 'msg_long', type: 'agent-message', text: long, streaming: false }] }]}
         runtimeNameOf={(id) => id}
         onSelectRoom={() => undefined}
         onCreateRoom={async () => undefined}
