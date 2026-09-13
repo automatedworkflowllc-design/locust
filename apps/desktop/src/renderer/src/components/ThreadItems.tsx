@@ -142,6 +142,53 @@ export function AgentText({
             </ul>
           )
         }
+        if (block.kind === 'table') {
+          /*
+           * Columns, which is what a teammate meant when it wrote pipes.
+           *
+           * Each cell goes through the same inline reader as prose, because
+           * half the value of these tables is a bold figure in one cell. The
+           * whole thing sits in its own scroller: a wide table must scroll
+           * itself rather than make the conversation scroll sideways.
+           */
+          return (
+            <div className="lc-tablewrap" key={`b${String(index)}`}>
+              <table className="lc-table">
+                <thead>
+                  <tr>
+                    {block.header.map((cell, cellIndex) => (
+                      <th key={`h${String(cellIndex)}`} className={alignClass(block.align[cellIndex])}>
+                        {inline(cell)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, rowIndex) => (
+                    <tr key={`r${String(rowIndex)}`}>
+                      {row.map((cell, cellIndex) => (
+                        <td key={`c${String(cellIndex)}`} className={alignClass(block.align[cellIndex])}>
+                          {inline(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+        if (block.kind === 'rule') {
+          return <hr className="lc-hr" key={`b${String(index)}`} />
+        }
+        if (block.kind === 'quote') {
+          // Models use these for cautions. A chevron is not a caution.
+          return (
+            <blockquote className="lc-quote" key={`b${String(index)}`}>
+              {inline(block.text)}
+            </blockquote>
+          )
+        }
         // Line breaks inside a paragraph are kept (`lc-para` is pre-line):
         // asked for "every file, one per line", Composer answered
         // "README.md\nstatus.ts" and the thread drew "README.md status.ts",
@@ -204,6 +251,11 @@ export function AgentText({
  * eye. The ordinals are `user-select: none`, so copying the plan yields the
  * steps and not the numbering.
  */
+/** A column's alignment as a class, or none where the table did not say. */
+function alignClass(align: 'left' | 'right' | 'center' | undefined): string | undefined {
+  return align === undefined ? undefined : `is-${align}`
+}
+
 export function PlanSteps({
   steps,
   doneCount,

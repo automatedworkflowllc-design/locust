@@ -41,6 +41,47 @@
  * time: this app's whole claim is that nothing leaves the machine, and a font
  * request would be the one network call on a screen that promises none.
  */
+/*
+ * The Anthropic type family: the teammate's voice, and Anthropic's own rule
+ * about how to use it.
+ *
+ * Colin, 2026-09-13: "the actual base text should be whatever claude code
+ * font youre using", then the family's own guidelines, which are explicit --
+ * "Use Anthropic Serif at 20px for all body copy and Anthropic Sans at
+ * 12-16px for UI chrome", and under DON'T, "body must be serif at 20px; sans
+ * is UI chrome only". So the SERIF carries a reply and the sans does not.
+ *
+ * Both are single variable files covering 300-800; every weight in the
+ * package is the same bytes, which is why one file replaces six. There is no
+ * italic in it, so `<em>` synthesises -- the one thing this gives up against
+ * Plex, and `<em>` is rare in a reply where `<strong>` is not.
+ *
+ * MIT, vendored from the `anthropic-fonts` npm package (1.1.0) rather than
+ * lifted out of an installed app, with its LICENSE beside the files. Worth
+ * knowing: that package is published by a third party (`devchauhann/fonts`),
+ * not by Anthropic, so the MIT grant is the repackager's. Colin's call, made
+ * knowingly, on a project that is his own and not yet released.
+ *
+ * Bundled, never fetched: the same rule as Geist and Plex. This app's claim
+ * is that nothing leaves the machine, and a font request would be the one
+ * network call on a screen that promises none.
+ */
+@font-face {
+  font-family: 'Anthropic Serif';
+  src: url('./assets/fonts/AnthropicSerif-Variable.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Anthropic Sans';
+  src: url('./assets/fonts/AnthropicSans-Variable.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: block;
+}
+
 @font-face {
   font-family: 'IBM Plex Sans';
   src: url('./assets/fonts/IBMPlexSans-Regular.woff2') format('woff2');
@@ -230,7 +271,29 @@
   --lc-font-ui: 'Geist', Helvetica, ui-sans-serif, system-ui, sans-serif;
   --lc-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* The teammate's voice. Only the reply prose wears it; everything the app says stays in Geist. */
-  --lc-font-prose: 'IBM Plex Sans', 'Geist', Helvetica, sans-serif;
+  /*
+   * THE BASE TEXT IS GEIST NOW, and the swap is one token wide.
+   *
+   * Colin, 2026-09-13: "whatever font claude code uses... lets just switch to
+   * that for the main chat text", then "we can keep all the geist mono and
+   * weird sidebar text, but the actual base text should be whatever claude
+   * code font youre using".
+   *
+   * That face is Anthropic Sans, and it is NOT shipped here: it is a
+   * proprietary licensed typeface sitting inside another company's installed
+   * app, and lifting the file into an installer Colin ships -- and intends to
+   * open source -- is the one kind of copying that lands on him. Geist is the
+   * nearest thing already in this repo under a licence that allows it (SIL
+   * OFL 1.1), it is what the rest of the app is set in, and it is the look he
+   * has been reading all week.
+   *
+   * It is a SUBSTITUTE, not a match, and it overrides a deliberate decision:
+   * the design agent chose Plex for the teammate's voice on 2026-09-10 --
+   * humanist, narrower, a rhythm to follow over nine lines, a real 500 and a
+   * real italic. That reasoning still stands and the files are still bundled,
+   * so putting `'IBM Plex Sans'` back in front is the whole revert.
+   */
+  --lc-font-prose: 'Anthropic Serif', 'IBM Plex Sans', Georgia, serif;
 
   /*
    * Two display moments only. Everything was <= 15px before, which read as

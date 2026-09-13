@@ -613,6 +613,22 @@ textarea {
  * at about 73 -- the top of the comfortable range, which is where a reply
  * that has to share a screen with a sidebar belongs.
  */
+/*
+ * THE WHOLE of a teammate's voice, not only its paragraphs.
+ *
+ * `--lc-font-prose` reached `.lc-agentline p` and nothing else, so a reply's
+ * prose was IBM Plex while its lists, headings, tables and quotes fell back
+ * to the app's own Geist. One voice, two faces, inside a single answer --
+ * which is what Colin was pointing at, 2026-09-13: "whatever font claude code
+ * uses... lets just switch to that for the main chat text."
+ *
+ * It was already the right font; it just was not reaching most of the reply.
+ * Code keeps mono: a command is not the teammate talking.
+ */
+.lc-agentline__body {
+  font-family: var(--lc-font-prose);
+}
+
 .lc-agentline p {
   margin: 0;
   /* The teammate's voice, not the app's. See the Plex note in tokens.css. */
@@ -8450,4 +8466,75 @@ textarea {
 
 .lc-tone-muted.lc-tone-muted {
   color: var(--lc-text-muted);
+}
+
+/*
+ * A table a teammate wrote, drawn as columns.
+ *
+ * They write these constantly -- a quarter against a quarter, one model
+ * against another -- and until 0.95.0 the thread printed the pipes.
+ *
+ * The wrapper scrolls, never the thread: a table wider than the column is the
+ * one piece of a reply allowed its own sideways scroll, because the
+ * alternative is a conversation that slides under the composer.
+ */
+.lc-tablewrap {
+  overflow-x: auto;
+  margin: var(--lc-space-2) 0;
+}
+
+.lc-table {
+  border-collapse: collapse;
+  font-size: var(--lc-text-description);
+  /* Figures under figures. A comparison table is the whole reason for this. */
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-table th,
+.lc-table td {
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-bottom: 1px solid var(--lc-border-hairline);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.lc-table th {
+  color: var(--lc-text-secondary);
+  font-weight: 500;
+}
+
+.lc-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.lc-table .is-right {
+  text-align: right;
+}
+
+.lc-table .is-center {
+  text-align: center;
+}
+
+.lc-table .is-left {
+  text-align: left;
+}
+
+/* `---` in a reply: a divider, not three hyphens. */
+.lc-hr {
+  border: 0;
+  border-top: 1px solid var(--lc-border-hairline);
+  margin: var(--lc-space-3) 0;
+}
+
+/*
+ * `> ` in a reply. Models reach for it when they are cautioning about
+ * something, which is exactly the kind of sentence that should not arrive as
+ * punctuation.
+ */
+.lc-quote {
+  margin: var(--lc-space-2) 0;
+  padding-left: var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-hairline);
+  color: var(--lc-text-secondary);
 }

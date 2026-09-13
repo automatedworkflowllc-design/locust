@@ -22,6 +22,29 @@
 
 export type AgentBlock =
   | { readonly kind: 'text'; readonly text: string }
+  /**
+   * A markdown table, drawn as columns.
+   *
+   * Teammates write these constantly -- a quarter against a quarter, one
+   * model against another -- and the thread printed the pipes. Colin,
+   * 2026-09-13, on a reply whose whole point was a financial comparison:
+   * "i feel like our harness is TRYING to with bolded text and good
+   * structure... is there anyway we can make it work like claude code."
+   *
+   * It was trying: headings, lists, code and the inline marks all render.
+   * A table fell through to prose and came out as punctuation.
+   */
+  | {
+      readonly kind: 'table'
+      readonly header: readonly string[]
+      /** Per column, from the `:---:` row; undefined where none was given. */
+      readonly align: readonly ('left' | 'right' | 'center' | undefined)[]
+      readonly rows: readonly (readonly string[])[]
+    }
+  /** `---`, `***`, `___` alone on a line: a divider, not three hyphens. */
+  | { readonly kind: 'rule' }
+  /** `> ` lines. Models use them for cautions, which should not read as punctuation. */
+  | { readonly kind: 'quote'; readonly text: string }
   | {
       readonly kind: 'code'
       readonly code: string
@@ -57,6 +80,9 @@ const BULLET = /^[ \t]*[-*+][ \t]+(.+)$/
 const NUMBERED = /^[ \t]*\d+[.)][ \t]+(.+)$/
 
 /** ```lang, or ``` on its own. Leading spaces are allowed; models indent them. */
+/** One newline, written once. */
+const NEWLINE = String.fromCharCode(10)
+
 const FENCE = /^[ \t]*(`{3,})[ \t]*(.*)$/
 
 /**
@@ -66,6 +92,43 @@ const FENCE = /^[ \t]*(`{3,})[ \t]*(.*)$/
  * keeping the punctuation.
  */
 const HEADING = /^[ \t]{0,3}(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/
+
+/**
+ * A table row: a line carrying a pipe with content either side. Leading and
+ * trailing pipes are optional because that is what models actually emit.
+ */
+const TABLE_ROW = /^[ \t]{0,3}\|?[^\n]*\|[^\n]*$/
+
+/**
+ * `|---|:--:|---:|` -- the line that turns the row above it into a header.
+ *
+ * A table needs BOTH. A sentence with a pipe in it is prose, and a row of
+ * hyphens with nothing above it is prose too; requiring the pair is what
+ * keeps ordinary writing out of a table.
+ */
+const TABLE_RULE = /^[ \t]{0,3}\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
+
+/** `---`, `***` or `___` alone on a line. */
+const RULE = /^[ \t]{0,3}(-{3,}|\*{3,}|_{3,})[ \t]*$/
+
+/** `> quoted`, with the marker taken off. */
+const QUOTE = /^[ \t]{0,3}>[ \t]?(.*)$/
+
+/** Split a row on its pipes, dropping the empty edges a fully-piped row has. */
+function tableCells(line: string): string[] {
+  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim())
+}
+
+function columnAlignment(rule: string): ('left' | 'right' | 'center' | undefined)[] {
+  return tableCells(rule).map((cell) => {
+    const left = cell.startsWith(':')
+    const right = cell.endsWith(':')
+    if (left && right) return 'center'
+    if (right) return 'right'
+    if (left) return 'left'
+    return undefined
+  })
+}
 
 /**
  * Split a reply into prose and fenced code blocks, in the order written.
@@ -103,7 +166,53 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
       blocks.push({ kind: 'list', ordered, items })
       items = []
     }
-    for (const line of prose) {
+    /*
+     * A table is a header row, a rule under it, and the rows that follow.
+     *
+     * BOTH halves are required. A sentence with a pipe in it is prose, and a
+     * row of hyphens with nothing above it is prose -- demanding the pair is
+     * what keeps ordinary writing out of a table.
+     */
+    for (let index = 0; index < prose.length; index += 1) {
+      const line = prose[index] ?? ''
+      const next = prose[index + 1]
+      if (TABLE_ROW.test(line) && next !== undefined && TABLE_RULE.test(next)) {
+        const header = tableCells(line)
+        const align = columnAlignment(next)
+        const rows: string[][] = []
+        let at = index + 2
+        while (at < prose.length && TABLE_ROW.test(prose[at] ?? '') && !TABLE_RULE.test(prose[at] ?? '')) {
+          rows.push(tableCells(prose[at] ?? ''))
+          at += 1
+        }
+        flushList()
+        flushParagraph()
+        blocks.push({ kind: 'table', header, align, rows })
+        index = at - 1
+        continue
+      }
+      if (RULE.test(line)) {
+        flushList()
+        flushParagraph()
+        blocks.push({ kind: 'rule' })
+        continue
+      }
+      const quoted = QUOTE.exec(line)
+      if (quoted !== null) {
+        flushList()
+        flushParagraph()
+        const said: string[] = [quoted[1] ?? '']
+        let at = index + 1
+        while (at < prose.length) {
+          const more = QUOTE.exec(prose[at] ?? '')
+          if (more === null) break
+          said.push(more[1] ?? '')
+          at += 1
+        }
+        blocks.push({ kind: 'quote', text: said.join(NEWLINE).trim() })
+        index = at - 1
+        continue
+      }
       const heading = HEADING.exec(line)
       if (heading !== null) {
         flushList()
@@ -218,11 +327,15 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
 export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]): boolean {
   const kept = blocks
     .map((block) =>
-      block.kind === 'text' || block.kind === 'heading'
+      block.kind === 'text' || block.kind === 'heading' || block.kind === 'quote'
         ? block.text
         : block.kind === 'code'
           ? block.code
-          : block.items.join('\n')
+          : block.kind === 'rule'
+            ? ''
+            : block.kind === 'table'
+              ? [block.header, ...block.rows].map((row) => row.join(' ')).join('\n')
+              : block.items.join('\n')
     )
     .join('\n')
     .replace(/\s+/g, ' ')
@@ -234,7 +347,22 @@ export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]):
     // A list marker is punctuation the renderer redraws, not words: the
     // bullet becomes a real bullet. Everything AFTER the marker still has to
     // survive, which is what this is checking.
-    .map((line) => line.replace(HEADING, '$2').replace(BULLET, '$1').replace(NUMBERED, '$1').trim())
+    /*
+     * Punctuation the renderer REDRAWS is not content it dropped. A bullet
+     * becomes a real bullet, a `>` becomes an indent, `---` becomes a line,
+     * and a table's pipes become its columns -- what has to survive is the
+     * words either side of each of them.
+     */
+    .filter((line) => !RULE.test(line) && !TABLE_RULE.test(line))
+    .map((line) =>
+      line
+        .replace(HEADING, '$2')
+        .replace(BULLET, '$1')
+        .replace(NUMBERED, '$1')
+        .replace(QUOTE, '$1')
+        .trim()
+    )
+    .map((line) => (TABLE_ROW.test(line) ? tableCells(line).join(' ') : line))
     .join('\n')
     .replace(/\s+/g, ' ')
     .trim()

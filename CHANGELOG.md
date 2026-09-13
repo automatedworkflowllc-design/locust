@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.95.0 - 2026-09-13
+
+- **Tables are drawn as columns.** Teammates write them constantly — a quarter
+  against a quarter, one name against another — and the thread printed the
+  pipes. They now come out as a real table, with the figures lined up under
+  each other and its own sideways scroll when it is wider than the
+  conversation.
+- **`---` is a divider and `>` is a quote**, rather than three hyphens and a
+  chevron.
+- **A reply is set in Anthropic Serif.** Anthropic publish the family and its
+  own guidance is that the serif carries body copy while the sans is for
+  chrome — so the teammate's voice is the serif, and the app keeps Geist and
+  Geist Mono for everything that is the app talking. The whole of a reply
+  wears it now, not only its paragraphs: lists, headings, tables and quotes
+  had been falling back to the app's own face mid-answer.
+
 ## 0.94.0 - 2026-09-13
 
 - **The ".cursorignore hides this folder" warning only appears when a read is

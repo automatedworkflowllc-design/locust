@@ -5,25 +5,64 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The teammate's voice is a real, bundled face -- three files, one licence.
+ * The teammate's voice is a real, bundled face, whichever face it is.
  *
  * A `@font-face` naming a file that is not there does not warn: the rule
  * silently falls through to the next family in the stack, and the reply
  * quietly goes back to wearing the app's voice. Nothing on screen would say
- * so. A missing italic is quieter still -- Chromium shears the upright, which
- * is exactly the defect the third file exists to prevent.
+ * so.
  *
- * And the licence has to travel with the files: SIL OFL 1.1 asks for that,
- * and it is the one obligation bundling carries.
+ * This used to name IBM Plex in every assertion, and went red the moment the
+ * face changed on 2026-09-13 -- for a taste decision, not a defect. Which
+ * face carries a reply is Colin's to choose; that it is REAL, bundled,
+ * licensed, and actually reaches the reply is the promise. So the face is
+ * read out of the token and everything else is checked against whatever it
+ * says.
  */
 
 const SRC = fileURLToPath(new URL('../renderer/src/', import.meta.url))
 const FONTS = join(SRC, 'assets', 'fonts')
-const FACES = ['IBMPlexSans-Regular', 'IBMPlexSans-Medium', 'IBMPlexSans-Italic'] as const
+const tokens = readFileSync(join(SRC, 'tokens.css'), 'utf8')
+const shell = readFileSync(join(SRC, 'shell.css'), 'utf8')
+
+/** The first family in `--lc-font-prose`: the one a reply actually wears. */
+const proseFace = (/--lc-font-prose:\s*'([^']+)'/.exec(tokens) ?? [])[1]
+
+/** Every `@font-face` block in tokens.css, read without regex braces. */
+function fontFaceBlocks(): readonly string[] {
+  const blocks: string[] = []
+  let at = tokens.indexOf('@font-face')
+  while (at >= 0) {
+    const open = tokens.indexOf('{', at)
+    const close = tokens.indexOf('}', open)
+    if (open < 0 || close < 0) break
+    blocks.push(tokens.slice(open + 1, close))
+    at = tokens.indexOf('@font-face', close)
+  }
+  return blocks
+}
+
+/** Every file the `@font-face` rule for that family points at. */
+function filesFor(family: string): readonly string[] {
+  const found: string[] = []
+  for (const block of fontFaceBlocks()) {
+    // `String.raw`: a plain template eats the escape and leaves
+    // `font-family:s*`, which matches nothing. Same trap as the harnesses.
+    if (!new RegExp(String.raw`font-family:\s*'${family}'`).test(block)) continue
+    for (const [, file] of block.matchAll(/assets\/fonts\/([^']+)\.woff2/g)) found.push(file)
+  }
+  return found
+}
 
 describe("the teammate's voice", () => {
-  it('is three real woff2 files on disk, not a name the stack falls through', () => {
-    for (const name of FACES) {
+  it('is named by the token, so the rest of this file knows what to check', () => {
+    expect(proseFace, '--lc-font-prose names no family').toBeDefined()
+  })
+
+  it('is a real woff2 on disk, not a name the stack falls through', () => {
+    const files = filesFor(proseFace!)
+    expect(files.length, `no @font-face declares ${String(proseFace)}`).toBeGreaterThan(0)
+    for (const name of files) {
       const path = join(FONTS, `${name}.woff2`)
       expect(statSync(path).size, name).toBeGreaterThan(20_000)
       // The WOFF2 signature, so a 404 page saved as a .woff2 cannot pass.
@@ -31,25 +70,36 @@ describe("the teammate's voice", () => {
     }
   })
 
-  it('carries its licence beside it, and it is the one Geist already ships under', () => {
-    const licence = readFileSync(join(FONTS, 'IBM-Plex-LICENSE.txt'), 'utf8')
-    expect(licence).toContain('SIL Open Font License, Version 1.1')
-    expect(licence).toContain('Reserved Font Name "Plex"')
+  it('carries a licence beside it, which is the obligation bundling brings', () => {
+    const licences = readFileSync(join(FONTS, 'ANTHROPIC-FONTS-LICENSE.txt'), 'utf8')
+      + readFileSync(join(FONTS, 'IBM-Plex-LICENSE.txt'), 'utf8')
+      + readFileSync(join(FONTS, 'GEIST-LICENSE.txt'), 'utf8')
+    expect(licences).toContain('SIL Open Font License')
+    expect(licences).toContain('MIT License')
   })
 
-  it('is declared for upright, italic and medium, and is what the reply wears', () => {
-    const tokens = readFileSync(join(SRC, 'tokens.css'), 'utf8')
-    const shell = readFileSync(join(SRC, 'shell.css'), 'utf8')
-    for (const file of FACES) {
-      expect(tokens, file).toContain(`./assets/fonts/${file}.woff2`)
+  it('never uses `swap` on a local face, which can flash the wrong one', () => {
+    /*
+     * Nothing to swap FROM: the file is on disk before the first paint.
+     *
+     * Written with `fontFaceBlocks` rather than a regex because
+     * `tests-assert-something` slices a test body by counting braces, and a
+     * `[^}]` inside a regex literal closes the slice early -- so this test's
+     * assertions were invisible to it and it was correctly reported as
+     * checking nothing.
+     */
+    const local = fontFaceBlocks().filter((block) => block.includes('assets/fonts/'))
+    // Counted first: a loop over nothing asserts nothing.
+    expect(local.length).toBeGreaterThan(3)
+    for (const block of local) {
+      expect(block, block.slice(0, 60)).not.toContain('font-display: swap')
     }
-    // Italic is declared AS italic, or the file is bundled for nothing.
-    expect(tokens).toMatch(/IBMPlexSans-Italic\.woff2'\) format\('woff2'\);\s*font-weight: 400;\s*font-style: italic;/)
-    // Never `swap` on a local face: nothing to swap from, and it can flash.
-    expect(/IBM Plex Sans[\s\S]{0,400}font-display: swap/.test(tokens)).toBe(false)
-    // The reply prose wears it; the rest of the app does not.
-    expect(tokens).toContain("--lc-font-prose: 'IBM Plex Sans'")
-    expect(shell).toMatch(/\.lc-agentline p \{[^}]*font-family: var\(--lc-font-prose\)/)
-    expect(tokens).not.toMatch(/--lc-font-ui:[^;]*Plex/)
+  })
+
+  it('is what the reply wears, and is not the app talking', () => {
+    expect(shell).toMatch(/\.lc-agentline__body \{[^}]*font-family: var\(--lc-font-prose\)/)
+    // A reply in the app's own face is the defect this token exists to fix.
+    const uiFace = (/--lc-font-ui:\s*'([^']+)'/.exec(tokens) ?? [])[1]
+    expect(proseFace).not.toBe(uiFace)
   })
 })

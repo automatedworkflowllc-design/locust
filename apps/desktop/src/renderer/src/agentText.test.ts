@@ -221,3 +221,78 @@ describe('headings and emphasis', () => {
     ])
   })
 })
+
+describe('the shapes a teammate writes that were drawn as punctuation', () => {
+  /*
+   * Colin, 2026-09-13, on a reply whose whole point was a financial
+   * comparison: "i feel like our harness is TRYING to with bolded text and
+   * good structure... is there anyway we can make it work like claude code."
+   *
+   * It was trying: headings, lists, code and the inline marks all rendered.
+   * A table came out as `| Revenue | $30.4M | $60.9M |`, a rule as three
+   * hyphens, a quote as a chevron. MEASURED against the parser before any of
+   * this was written.
+   */
+  const NEWLINE = String.fromCharCode(10)
+  const lines = (...parts: string[]): string => parts.join(NEWLINE)
+
+  it('reads a table as columns', () => {
+    const blocks = parseAgentText(lines('| Metric | Q2 2026 | Q2 2025 |', '|---|---|---|', '| Revenue | $30.4M | $60.9M |'))
+    expect(blocks).toHaveLength(1)
+    const table = blocks[0]!
+    expect(table.kind).toBe('table')
+    if (table.kind !== 'table') return
+    expect(table.header).toEqual(['Metric', 'Q2 2026', 'Q2 2025'])
+    expect(table.rows).toEqual([['Revenue', '$30.4M', '$60.9M']])
+  })
+
+  it('takes the alignment from the colons', () => {
+    const blocks = parseAgentText(lines('| a | b | c |', '|:--|:-:|--:|', '| 1 | 2 | 3 |'))
+    const table = blocks[0]!
+    if (table.kind !== 'table') throw new Error('not a table')
+    expect(table.align).toEqual(['left', 'center', 'right'])
+  })
+
+  it('leaves a sentence with a pipe in it as prose', () => {
+    /*
+     * THE negative case, and the reason a table needs BOTH a row and a rule.
+     * "Run `a | b`" is a sentence. A parser that took any pipe would turn
+     * ordinary writing into a one-column table.
+     */
+    const blocks = parseAgentText('Run the command `grep foo | head` and report back.')
+    expect(blocks[0]?.kind).toBe('text')
+  })
+
+  it('leaves a row of hyphens with nothing above it as a rule, not a table', () => {
+    const blocks = parseAgentText(lines('Before.', '', '---', '', 'After.'))
+    expect(blocks.map((block) => block.kind)).toEqual(['text', 'rule', 'text'])
+  })
+
+  it('reads a quote as a quote', () => {
+    const blocks = parseAgentText(lines('Before.', '', '> A caution worth reading.', '> Still the same caution.', '', 'After.'))
+    expect(blocks.map((block) => block.kind)).toEqual(['text', 'quote', 'text'])
+    const quote = blocks[1]!
+    if (quote.kind !== 'quote') throw new Error('not a quote')
+    expect(quote.text).toContain('A caution worth reading.')
+    expect(quote.text).not.toContain('>')
+  })
+
+  it('keeps every word, which is what the coverage guard is for', () => {
+    // The renderer redraws the punctuation -- pipes become columns, `>`
+    // becomes an indent -- but not one word may go missing on the way.
+    const text = lines(
+      'Here is the split.',
+      '',
+      '| Metric | Q2 2026 |',
+      '|---|---|',
+      '| Revenue | $30.4M |',
+      '',
+      '> Treat that as a range.',
+      '',
+      '---',
+      '',
+      'Done.'
+    )
+    expect(segmentsCoverInput(text, parseAgentText(text))).toBe(true)
+  })
+})
