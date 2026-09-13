@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.91.2 - 2026-09-13
+
+- **The ".cursorignore hides this folder" warning is said once per folder, not
+  on every run.** It is a standing fact about your machine — as true on the
+  tenth mission as the first, and it cannot change while the app is open
+  without you editing the file it names. Repeated, it became one amber line
+  per teammate per post and the loudest thing in a room, about something you
+  had already read. It still says the rule, the file and the fix, the first
+  time a folder needs it.
+
 ## 0.91.1 - 2026-09-13
 
 - **A room no longer fills with "Unhandled Cursor record" lines.** Cursor

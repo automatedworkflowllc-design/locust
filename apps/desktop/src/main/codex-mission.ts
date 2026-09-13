@@ -447,6 +447,22 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   })
   /** Live missions by runId. */
   const active = new Map<string, ActiveCodexMission>()
+  /**
+   * Folders already told that Cursor cannot read them, so it is said once.
+   *
+   * The rule is a STANDING fact about this machine's configuration: it is as
+   * true on the tenth mission as the first, and it cannot change while the
+   * app is running without the person editing the file that states it. Said
+   * every time, it became the loudest thing in a room -- one amber line per
+   * teammate per post, forever, about something the person had already read
+   * and decided about (Colin, 2026-09-13, on his own room: "necessary?").
+   *
+   * Which is the same mistake this app spent the night removing from other
+   * surfaces -- a room narrating its own board, an adapter reporting one
+   * unknown record type per record. A fact does not get truer by repetition,
+   * and a warning that is always there is furniture.
+   */
+  const foldersToldAboutCursor = new Set<string>()
   /** Owners with a start in flight, between the guard and activation. */
   const starting = new Set<string>()
   /** Each live mission's consume loop, so a handoff can wait for ITS run alone. */
@@ -1335,8 +1351,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
          */
         if (runtime === 'cursor') {
           try {
-            const sentence = await cursorCannotSee(runCwd, options.readCursorIgnore)
+            const sentence = foldersToldAboutCursor.has(runCwd)
+              ? undefined
+              : await cursorCannotSee(runCwd, options.readCursorIgnore)
             if (sentence !== undefined) {
+              foldersToldAboutCursor.add(runCwd)
               /*
                * SHOWN, NOT RECORDED, and the difference cost a release.
                *

@@ -191,6 +191,28 @@ describe('a Cursor run in a folder .cursorignore hides', () => {
     const written = appendEvents.mock.calls.flatMap(([, events]) => events)
     expect(written.some((event) => JSON.stringify(event).includes('cursorignore'))).toBe(false)
   })
+
+  it('says it once for a folder, not once per mission', async () => {
+    /*
+     * The rule is a standing fact about the machine: as true on the tenth
+     * mission as the first, and it cannot change while the app runs without
+     * the person editing the file it names. Said every time it became the
+     * loudest thing in a room -- one amber line per teammate per post, about
+     * something already read and decided about.
+     */
+    const { service } = scheduledService(
+      { start: () => ({ records: records([]), completion: Promise.resolve(completion()) }) } as unknown as RuntimeProcessRunner,
+      fakeLedger(),
+      { discover: async () => [cursorRuntime()], readCursorIgnore: async () => 'safe-workspace/' }
+    )
+    const said: number[] = []
+    for (const turn of [1, 2, 3]) {
+      const updates: CodexMissionUpdate[] = []
+      await service.start(`Turn ${String(turn)}.`, 'cursor', 'accept-edits', {}, (update) => updates.push(update))
+      said.push(updates.filter((update) => update.kind === 'event' && update.event.type === 'adapter.diagnostic').length)
+    }
+    expect(said).toEqual([1, 0, 0])
+  })
 })
 
 function scheduledService(
