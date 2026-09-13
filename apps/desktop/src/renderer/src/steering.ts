@@ -72,3 +72,91 @@ export function requeuedTo<T extends { readonly key: string }>(
   if (queued === undefined || queued.key !== fromKey) return queued
   return { ...queued, key: toKey }
 }
+
+/**
+ * One queued row: what a person typed while a teammate was working.
+ *
+ * `origin` is the half grok-build gets right and this did not have at all.
+ * A person's own follow-ups may be merged into one turn; anything the HOST
+ * queued -- a routine's next step, a decision reply, a relay hand-off --
+ * must go on its own, because merging it would put two different intents in
+ * one instruction and attribute both to whoever typed last.
+ */
+export interface QueuedRow {
+  readonly id: string
+  /** The run it was typed at. Follows a re-key, as `requeuedTo` always has. */
+  readonly key: string
+  readonly text: string
+  /** Whose intent this is. Only `person` rows merge. */
+  readonly origin: 'person' | 'host'
+  /** Attachments ride with the row. Only the FIRST of a merge may carry them. */
+  readonly attachments?: readonly string[]
+}
+
+/** What separates two merged follow-ups in the text the runtime receives. */
+export const QUEUE_SEPARATOR = '\n\n'
+
+/**
+ * Whether a row may open a merge run.
+ *
+ * grok-build's `can_merge_front`, with their gates and one of ours: a row
+ * the host queued never merges. The front MAY carry attachments; a follower
+ * may not, because there is no way to say which half of a merged instruction
+ * an image belongs to.
+ */
+export function canMergeFront(row: QueuedRow): boolean {
+  return row.origin === 'person' && row.text.trim().length > 0
+}
+
+/** `can_merge_follower`: the front's rules, plus no attachments. */
+export function canMergeFollower(row: QueuedRow): boolean {
+  return canMergeFront(row) && (row.attachments ?? []).length === 0
+}
+
+/**
+ * Fold the leading run of mergeable rows into one.
+ *
+ * Three thoughts typed during one run are one instruction, not three turns --
+ * which is the difference a person actually feels, because three turns means
+ * the teammate answers the first, then the second, then the third, each
+ * without knowing the others were coming.
+ *
+ * Only the LEADING run folds. A host row in the middle stops it and keeps its
+ * place, so a routine step queued behind two follow-ups still runs after them
+ * rather than being absorbed into them.
+ */
+export function combineQueued(rows: readonly QueuedRow[]): readonly QueuedRow[] {
+  const front = rows[0]
+  if (front === undefined || !canMergeFront(front)) return rows
+  let taken = 1
+  while (taken < rows.length) {
+    const next = rows[taken]
+    if (next === undefined || !canMergeFollower(next)) break
+    taken += 1
+  }
+  if (taken === 1) return rows
+  const merged: QueuedRow = {
+    ...front,
+    text: rows
+      .slice(0, taken)
+      .map((row) => row.text.trim())
+      .join(QUEUE_SEPARATOR)
+  }
+  return [merged, ...rows.slice(taken)]
+}
+
+/**
+ * The same re-key rule, for the whole queue.
+ *
+ * Kept beside `requeuedTo` rather than written at the call site, because the
+ * rule it encodes -- a message follows its conversation when the host renames
+ * the run under it -- is the one an outside tester hit in 0.38.7 by simply
+ * typing the next line quickly.
+ */
+export function requeuedRows(
+  rows: readonly QueuedRow[],
+  fromKey: string,
+  toKey: string
+): readonly QueuedRow[] {
+  return rows.map((row) => requeuedTo(row, fromKey, toKey) ?? row)
+}

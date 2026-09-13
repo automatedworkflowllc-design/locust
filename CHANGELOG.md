@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.101.0 - 2026-09-13
+
+- **Everything you type while a teammate works is kept, and arrives as one
+  instruction.** There was one queue slot, so a second thought *replaced* the
+  first and you watched your own words disappear. The queue is a list now, and
+  the run of plain follow-ups at the front is folded into a single turn when it
+  goes — so a teammate answers all of them knowing they exist, instead of
+  answering the first without knowing the other two were coming. The strip says
+  how many are waiting and shows the instruction that will actually be sent.
+- Anything the app queued for you — a routine's next step, a decision reply, a
+  hand-off — never merges into your words, and keeps its own turn.
+
 ## 0.100.0 - 2026-09-13
 
 - **A teammate's words can no longer act as another teammate's instructions.**

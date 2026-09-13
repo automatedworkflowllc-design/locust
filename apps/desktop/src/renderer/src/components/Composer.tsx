@@ -216,8 +216,16 @@ export interface ComposerProps {
    * runtime starts from the old one's checkpoint rather than its memory.
    */
   readonly continuationNote: string | undefined
-  /** What is waiting to be sent when the running mission finishes, if anything. */
+  /**
+   * What is waiting to be sent when the running mission finishes, if anything.
+   *
+   * Already FOLDED: the strip shows the one instruction that will actually go,
+   * not the pieces it was typed in, because that is what the teammate will
+   * receive and therefore what a person is deciding about.
+   */
   readonly queued: string | undefined
+  /** How many separate things are waiting, so the strip can say so. */
+  readonly queuedCount?: number
   /** Why a queued message has not gone yet, when it is not simply still running. */
   readonly queuedNote: string | undefined
   readonly onQueue: (text: string) => void
@@ -275,6 +283,7 @@ export function Composer({
   teammateName,
   busyWith,
   queued,
+  queuedCount,
   queuedNote,
   onQueue,
   onUnqueue,
@@ -797,7 +806,12 @@ export function Composer({
         )}
         {queued !== undefined && (
           <div className="lc-queued" role="status" aria-live="polite">
-            <span className="lc-queued__label lc-mono">NEXT</span>
+            {/* The count only appears once there is more than one thing
+                waiting -- "NEXT · 3" is a fact worth having, "NEXT · 1" is
+                the label said twice. */}
+            <span className="lc-queued__label lc-mono">
+              NEXT{queuedCount !== undefined && queuedCount > 1 ? ` · ${String(queuedCount)}` : ''}
+            </span>
             <span className="lc-queued__text">{queued}</span>
             <span className="lc-queued__actions">
               {!workingNow && (

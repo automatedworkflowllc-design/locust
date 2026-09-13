@@ -41,7 +41,8 @@ import type {
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft } from './routines.js'
-import { queuedVerdict, requeuedTo } from './steering.js'
+import { combineQueued, queuedVerdict, requeuedRows } from './steering.js'
+import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
@@ -795,7 +796,18 @@ export default function App(): ReactElement {
    * can never be sent into some other conversation: if that run is no longer
    * the one on screen, it waits and says so rather than guessing.
    */
-  const [queued, setQueued] = useState<{ readonly key: string; readonly text: string }>()
+  /*
+   * Everything typed while a teammate is working, in order.
+   *
+   * One slot until 2026-09-13, so a second thought REPLACED the first -- the
+   * person watched their own words disappear. It is a list now, and the
+   * leading run of plain follow-ups is folded into one turn when it goes, so
+   * three thoughts reach the teammate as one instruction it can answer
+   * knowing all three, rather than as three turns it answers blind. Gates and
+   * reasoning in `steering.ts`; grok-build does the same thing and Colin
+   * asked for it by name.
+   */
+  const [queued, setQueued] = useState<readonly QueuedRow[]>([])
   /** The save/edit dialog, open on a draft taken from a conversation or on a routine already saved. */
   const [routineDialog, setRoutineDialog] = useState<{
     readonly teammateId: string
@@ -2211,7 +2223,7 @@ export default function App(): ReactElement {
             return next
           })
           if (inFront !== undefined) {
-            setQueued({ key: inFront, text: prompt })
+            setQueued((rows) => [...rows, { id: `q_${String(rows.length)}_${inFront}`, key: inFront, text: prompt, origin: 'person' as const }])
             return true
           }
           // Nothing of theirs is on screen to wait behind -- the cap is full,
@@ -2305,7 +2317,7 @@ export default function App(): ReactElement {
       // deleted above, so a message typed while the host was still answering
       // pointed at nothing and was held as "that conversation is no longer
       // open" -- about the conversation on screen.
-      setQueued((current) => requeuedTo(current, key, runId))
+      setQueued((current) => requeuedRows(current, key, runId))
       return true
     } catch {
       setRuns((current) =>
@@ -2463,7 +2475,7 @@ export default function App(): ReactElement {
       // A handoff continues the same conversation under another runtime, so
       // the next thing the person said belongs to it and not to the run that
       // was handed off.
-      setQueued((current) => requeuedTo(current, runId, newRunId))
+      setQueued((current) => requeuedRows(current, runId, newRunId))
     } catch {
       setRuns((all) =>
         withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: 'The handoff request could not be delivered.' }))
@@ -2844,24 +2856,33 @@ export default function App(): ReactElement {
   // waiting with the reason on screen: sending the next instruction into a
   // conversation whose last turn did not happen would build on work that
   // never ran, which is the same rule a routine's steps follow.
-  const queuedRun = queued === undefined ? undefined : runs.get(queued.key)
+  // The queue is judged by its FRONT, because that is the row that goes next
+  // and every row behind it is waiting on the same run.
+  const front = queued[0]
+  const queuedRun = front === undefined ? undefined : runs.get(front.key)
   const verdict =
-    queued === undefined
+    front === undefined
       ? undefined
       : queuedVerdict({
           running: queuedRun !== undefined && liveRunIsActive(queuedRun),
           phase: queuedRun?.phase,
-          onScreen: shownKey === queued.key
+          onScreen: shownKey === front.key
         })
   const queuedNote = verdict?.kind === 'held' ? verdict.note : undefined
   useEffect(() => {
-    if (queued === undefined || verdict?.kind !== 'send') return
-    const text = queued.text
+    if (front === undefined || verdict?.kind !== 'send') return
+    // Folded at the moment of sending rather than as it is typed, so a person
+    // can still edit or drop any row right up until it goes.
+    const folded = combineQueued(queued)
+    const going = folded[0]
+    if (going === undefined) return
     // Cleared BEFORE sending: this effect runs again on the state the send
     // produces, and a queue still holding the message would send it twice.
-    setQueued(undefined)
-    void startMission(text)
-  }, [queued, verdict?.kind])
+    // Only what actually went is dropped -- anything the fold refused to
+    // merge stays queued and takes its own turn.
+    setQueued(folded.slice(1))
+    void startMission(going.text)
+  }, [queued, front, verdict?.kind])
 
   /** The addressed teammate's live run, if they have one: they cannot be given a second. */
   const busyRun = [...runs.values()].find(
@@ -4112,9 +4133,13 @@ export default function App(): ReactElement {
             handingOff={handingOff}
             teammateName={pickedTeammate?.name}
             busyWith={busyRun === undefined ? undefined : (pickedTeammate?.name ?? 'This teammate')}
-            queued={queued?.text}
+            // What is waiting, as the person will see it go: folded, so the
+            // strip shows the one instruction that will actually be sent
+            // rather than the pieces it was typed in.
+            queued={combineQueued(queued)[0]?.text}
+            queuedCount={queued.length}
             queuedNote={queuedNote}
-            queuedElsewhere={queued !== undefined && shownKey !== queued.key}
+            queuedElsewhere={front !== undefined && shownKey !== front.key}
             onQueue={(text) => {
               // Against the LIVE run on screen -- that is the conversation
               // being replied into. Keyed on the addressed teammate's busy
@@ -4124,13 +4149,19 @@ export default function App(): ReactElement {
               // thread on screen is someone else's.
               const onScreen = shownKey !== undefined && liveRunIsActive(runs.get(shownKey)) ? shownKey : undefined
               const key = onScreen ?? [...runs.entries()].find(([, run]) => run === busyRun)?.[0]
-              if (key !== undefined) setQueued({ key, text })
+              if (key !== undefined) {
+                setQueued((rows) => [
+                  ...rows,
+                  { id: `q_${String(rows.length)}_${key}`, key, text, origin: 'person' as const }
+                ])
+              }
             }}
-            onUnqueue={() => setQueued(undefined)}
+            onUnqueue={() => setQueued([])}
             onSendQueued={() => {
-              const text = queued?.text
-              setQueued(undefined)
-              if (text !== undefined) void startMission(text)
+              const folded = combineQueued(queued)
+              const going = folded[0]
+              setQueued(folded.slice(1))
+              if (going !== undefined) void startMission(going.text)
             }}
           />
           )}
