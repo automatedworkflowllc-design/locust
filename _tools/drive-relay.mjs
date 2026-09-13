@@ -7,6 +7,11 @@
 // Booty's run starting by itself in the sidebar, then the answer landing
 // back in Wren's thread with the exchange strip on top.
 
+// `.lc-peer__open` is a class nothing renders any more; the message that
+// opens a run is `.lc-peer__bubble.is-link` (PeerThread.tsx), which the
+// click path in this drive already uses. Counting the dead one made
+// "underlined links: 0" true by construction.
+
 import { FREE_ROUTE, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const CODE = 'TANGERINE'
@@ -109,7 +114,7 @@ try {
     return document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-260) ?? ''
   })()`))
   await drive.capture("click Booty's message: it should open Booty's conversation, and no underlined link remains", () => drive.evaluate(`(async () => {
-    const links = document.querySelectorAll('.lc-peer__open').length
+    const links = document.querySelectorAll('.lc-peer__bubble.is-link').length
     const bubble = document.querySelector('.lc-peer__bubble.is-link')
     if (!bubble) return 'no clickable message; underlined links: ' + links
     const title = bubble.getAttribute('title')

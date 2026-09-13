@@ -20,6 +20,13 @@
 //
 // Spends nothing.
 
+// The picker no longer holds effort or swarm -- both moved to the composer
+// (`lc-effortpanel*`, `lc-swarm`). This asked for `.lc-picker__effort*`, a
+// class nothing renders any more, so "none in the picker" was true because
+// the class was dead rather than because the control had moved: an
+// unfalsifiable pass. Asking for the LIVE class keeps the same question and
+// makes a wrong answer possible again.
+
 import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-cold-open-ws-')
@@ -73,7 +80,7 @@ const COLD = `(async () => {
       actives.push(group + ' >> ' + flat(row).slice(0, 30))
     }
   }
-  const chips = picker.querySelectorAll('.lc-picker__effort')
+  const chips = picker.querySelectorAll('.lc-effortpanel__notch')
   const more = [...picker.querySelectorAll('.lc-picker__more')].map(flat)
   return [
     'chip: ' + chip.slice(0, 44),

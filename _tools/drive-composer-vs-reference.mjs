@@ -16,6 +16,13 @@
 //
 // Spends nothing -- it opens the composer and the picker.
 
+// The picker no longer holds effort or swarm -- both moved to the composer
+// (`lc-effortpanel*`, `lc-swarm`). This asked for `.lc-picker__effort*`, a
+// class nothing renders any more, so "none in the picker" was true because
+// the class was dead rather than because the control had moved: an
+// unfalsifiable pass. Asking for the LIVE class keeps the same question and
+// makes a wrong answer possible again.
+
 import { say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-composer-ws-')
@@ -63,9 +70,9 @@ const OPEN_PICKER = `(async () => {
   if (!picker) return 'picker did not open'
   const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
   const head = picker.querySelector('.lc-picker__head')
-  const swarm = picker.querySelector('.lc-picker__swarm')
-  const efforts = picker.querySelectorAll('.lc-picker__effort')
-  const held = picker.querySelector('.lc-picker__effortheld')
+  const swarm = picker.querySelector('.lc-swarm')
+  const efforts = picker.querySelectorAll('.lc-effortpanel__notch')
+  const held = picker.querySelector('.lc-effortpanel__now')
   return [
     'head: ' + (head ? flat(head).slice(0, 70) : 'none'),
     'swarm pill in head: ' + (swarm ? 'YES -- ' + flat(swarm) : 'NO'),
@@ -84,13 +91,13 @@ try {
 
   await drive.capture('swarm on: the effort chips should grey and say who holds them', () =>
     drive.evaluate(`(async () => {
-      const pill = document.querySelector('.lc-picker__swarm')
+      const pill = document.querySelector('.lc-swarm')
       if (!pill) return 'no swarm pill to press'
       pill.click()
       await new Promise((r) => setTimeout(r, 900))
       const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
-      const held = document.querySelector('.lc-picker__effortheld')
-      const on = document.querySelector('.lc-picker__swarm.is-on')
+      const held = document.querySelector('.lc-effortpanel__now')
+      const on = document.querySelector('.lc-swarm.is-on')
       return 'swarm pressed: ' + (on ? 'on' : 'NOT on') + '  ||  held line: ' + (held ? flat(held) : 'none')
     })()`)
   )

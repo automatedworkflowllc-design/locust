@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.93.0 - 2026-09-13
+
+- **The permissions panel told you the opposite of the truth on an Auto run.**
+  It called a full-access run "workspace-write" and listed "deny: anything
+  outside the workspace" — which is exactly what Auto allows — while the
+  conversation header two inches away said "may edit anything on this
+  machine". It now has three states instead of two, takes its wording from the
+  same function the header uses, and says plainly that an Auto run may write
+  anywhere and run any command your account can.
+- **Six internal checks were measuring nothing.** They looked for parts of the
+  screen that had been removed, and passed because the old styling was still
+  in the stylesheet. The check that was meant to prevent that counted a
+  leftover style rule as proof the app could still draw it; it now only counts
+  what a component actually renders.
+
 ## 0.92.0 - 2026-09-13
 
 - **A teammate's whole turn stays in the room.** Their progress appeared as

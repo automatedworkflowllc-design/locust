@@ -16,6 +16,13 @@
 //
 // Spends nothing: no mission is sent.
 
+// The picker no longer holds effort or swarm -- both moved to the composer
+// (`lc-effortpanel*`, `lc-swarm`). This asked for `.lc-picker__effort*`, a
+// class nothing renders any more, so "none in the picker" was true because
+// the class was dead rather than because the control had moved: an
+// unfalsifiable pass. Asking for the LIVE class keeps the same question and
+// makes a wrong answer possible again.
+
 import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-effort-reg-ws-')
@@ -63,9 +70,9 @@ const PICKER_HAS_EFFORT = `(async () => {
   await new Promise((r) => setTimeout(r, 1300))
   const picker = document.querySelector('.lc-picker')
   if (!picker) return 'picker did not open'
-  const chips = picker.querySelectorAll('.lc-picker__effort')
-  const held = picker.querySelector('.lc-picker__effortheld')
-  const pill = picker.querySelector('.lc-picker__swarm')
+  const chips = picker.querySelectorAll('.lc-effortpanel__notch')
+  const held = picker.querySelector('.lc-effortpanel__now')
+  const pill = picker.querySelector('.lc-swarm')
   control.click()
   await new Promise((r) => setTimeout(r, 500))
   return 'effort chips in picker: ' + chips.length + ' || held line: ' + (held ? 'present' : 'none') + ' || swarm pill: ' + (pill ? 'present' : 'none')

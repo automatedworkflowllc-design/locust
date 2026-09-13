@@ -15,6 +15,13 @@
 //
 // Spends nothing -- it opens the picker.
 
+// The picker no longer holds effort or swarm -- both moved to the composer
+// (`lc-effortpanel*`, `lc-swarm`). This asked for `.lc-picker__effort*`, a
+// class nothing renders any more, so "none in the picker" was true because
+// the class was dead rather than because the control had moved: an
+// unfalsifiable pass. Asking for the LIVE class keeps the same question and
+// makes a wrong answer possible again.
+
 import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-effort-ws-')
@@ -62,8 +69,8 @@ const REPORT = `(async () => {
       activeRows.push(flat(row).slice(0, 40) + (detail ? ' [detail: ' + flat(detail).slice(0, 46) + ']' : ' [no detail]'))
     }
   }
-  const chips = picker.querySelectorAll('.lc-picker__effort')
-  const swarmPill = picker.querySelector('.lc-picker__swarm')
+  const chips = picker.querySelectorAll('.lc-effortpanel__notch')
+  const swarmPill = picker.querySelector('.lc-swarm')
   return [
     'chip: ' + chip.slice(0, 46),
     'ACTIVE rows: ' + activeRows.length + (activeRows.length ? ' >> ' + activeRows.join(' ;; ') : ''),
@@ -111,7 +118,7 @@ try {
   await drive.capture('choose high, and read the composer chip', () =>
     drive.evaluate(`(async () => {
       const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
-      const chips = [...document.querySelectorAll('.lc-picker__effort')]
+      const chips = [...document.querySelectorAll('.lc-effortpanel__notch')]
       const high = chips.find((c) => flat(c) === 'high')
       if (!high) return 'no high chip among ' + chips.map(flat).join(' ')
       high.click()

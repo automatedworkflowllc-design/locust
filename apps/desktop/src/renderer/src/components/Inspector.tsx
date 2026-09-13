@@ -6,7 +6,7 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import type { MissionRouteSummary, PublicRecoveredMission } from '../../../shared/ipc.js'
 import { costLine, runCostOf } from '../cost.js'
 import { buildSignalRail, buildThread, producedFiles } from '../missionView.js'
-import { checkpointLabel, ledgerVerificationLabel, shortMissionId } from '../status.js'
+import { checkpointLabel, ledgerVerificationLabel, sandboxPhrase, shortMissionId } from '../status.js'
 import { Icon } from './Icon.js'
 
 const TABS = ['Activity', 'Details', 'Artifacts', 'Receipt'] as const
@@ -45,7 +45,23 @@ export function Inspector({
   const [tab, setTab] = useState<Tab>('Activity')
   // What this run was ACTUALLY allowed to do, read from the start receipt --
   // not from whatever mode the composer happens to show now.
-  const writes = route?.sandbox === 'workspace-write' || route?.sandbox === 'full-access'
+  /*
+   * THREE states, not two, and the third was being described as its opposite.
+   *
+   * `writes` collapsed workspace-write and full-access together, so an Auto
+   * run -- the one that may touch the whole machine -- was labelled
+   * `workspace-write` and then told the reader "deny: anything outside the
+   * workspace", which is exactly what Auto is for. The conversation header
+   * said "may edit anything on this machine" two inches away. Of the two
+   * surfaces the person is likelier to trust the specific-looking one, and it
+   * was the wrong one (Grok's audit, 2026-09-13).
+   *
+   * The label now comes from `sandboxPhrase`, the same function the header
+   * uses, so the two cannot drift again.
+   */
+  const sandbox = route?.sandbox
+  const writes = sandbox === 'workspace-write' || sandbox === 'full-access'
+  const anywhere = sandbox === 'full-access'
   const rows = buildSignalRail(events, { running })
   const [artifactNotice, setArtifactNotice] = useState<string | undefined>(undefined)
   // Every file this run touched, gathered from the same activity the fold
@@ -106,7 +122,7 @@ export function Inspector({
             <div className="lc-permissions">
               <div className="lc-permissions__head">
                 <span className="lc-fieldlabel lc-mono">Tools &amp; permissions</span>
-                <span className="lc-rail__meta">{writes ? 'workspace-write' : 'read-only'}</span>
+                <span className="lc-rail__meta">{sandboxPhrase(sandbox)}</span>
               </div>
               <div className="lc-permissions__rows">
                 <div className="lc-permissions__row">
@@ -116,7 +132,11 @@ export function Inspector({
                 {writes ? (
                   <div className="lc-permissions__row">
                     <span className="lc-tone-green">allow</span>
-                    <span>write files inside that same workspace folder</span>
+                    <span>
+                      {anywhere
+                        ? 'write files anywhere this account can reach, inside the workspace and outside it'
+                        : 'write files inside that same workspace folder'}
+                    </span>
                   </div>
                 ) : (
                   <div className="lc-permissions__row">
@@ -124,10 +144,17 @@ export function Inspector({
                     <span>every write to disk</span>
                   </div>
                 )}
-                <div className="lc-permissions__row">
-                  <span className="lc-tone-red">deny</span>
-                  <span>anything outside the workspace, and any network the runtime does not make itself</span>
-                </div>
+                {anywhere ? (
+                  <div className="lc-permissions__row">
+                    <span className="lc-tone-amber">allow</span>
+                    <span>run any command this account can run, and reach any network the runtime reaches</span>
+                  </div>
+                ) : (
+                  <div className="lc-permissions__row">
+                    <span className="lc-tone-red">deny</span>
+                    <span>anything outside the workspace, and any network the runtime does not make itself</span>
+                  </div>
+                )}
               </div>
               <p className="lc-permissions__note">
                 The host fixes the workspace, executable, argv and sandbox. `codex exec` has no

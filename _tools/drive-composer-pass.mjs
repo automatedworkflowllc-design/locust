@@ -10,6 +10,13 @@
 //
 // This reads what is actually on screen, then opens the picker and reads that.
 
+// The picker no longer holds effort or swarm -- both moved to the composer
+// (`lc-effortpanel*`, `lc-swarm`). This asked for `.lc-picker__effort*`, a
+// class nothing renders any more, so "none in the picker" was true because
+// the class was dead rather than because the control had moved: an
+// unfalsifiable pass. Asking for the LIVE class keeps the same question and
+// makes a wrong answer possible again.
+
 import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-composer-ws-')
@@ -49,15 +56,15 @@ try {
     return drive.evaluate(`(() => {
       const picker = document.querySelector('.lc-picker')
       if (picker === null) return 'picker did not open'
-      const swarm = picker.querySelector('.lc-picker__swarm')
-      const efforts = [...picker.querySelectorAll('.lc-picker__effort')].map(b => b.innerText.trim())
+      const swarm = picker.querySelector('.lc-swarm')
+      const efforts = [...picker.querySelectorAll('.lc-effortpanel__notch')].map(b => b.innerText.trim())
       const actives = [...picker.querySelectorAll('.lc-picker__row.is-active')].map(r => ({
         name: r.innerText.replace(/[ ]+/g, ' ').split(String.fromCharCode(10))[0],
         recent: r.closest('.lc-picker__tray') !== null,
         detail: (r.querySelector('.lc-picker__detail') || {}).innerText || 'no detail'
       }))
       const active = picker.querySelector('.lc-picker__row.is-active')
-      const groups = picker.querySelectorAll('.lc-picker__efforts').length
+      const groups = picker.querySelectorAll('.lc-effortpanel__notches').length
       return 'actives: ' + JSON.stringify(actives) + ' || active row: ' + (active === null ? 'NONE MARKED ACTIVE' : active.innerText.replace(/[ ]+/g, ' ').split(String.fromCharCode(10))[0])
         + ' || effort groups in the DOM: ' + groups
         + ' || swarm row: ' + (swarm === null ? 'ABSENT' : swarm.innerText.replace(/[ ]+/g, ' ').split(String.fromCharCode(10)).join(' '))

@@ -75,7 +75,26 @@ function readAll(directory: string, endings: readonly string[]): string[] {
 }
 
 const appSource = readAll(SRC, ['.tsx', '.ts', '.css'])
-const appClasses = new Set(appSource.flatMap((text) => text.match(/lc-[a-zA-Z0-9_-]+/g) ?? []))
+/*
+ * What the app can DRAW is what a component renders -- never what the
+ * stylesheet still has a rule for.
+ *
+ * This read `.css` too, so a control that was removed while its rule stayed
+ * behind went on counting as drawable forever. Six drives were querying
+ * classes no component renders and passing this test on the strength of dead
+ * CSS: `.lc-attachchip`, `.lc-composer__newline`, the whole
+ * `.lc-picker__effort*` family, `.lc-peer__open`, `.lc-workroom__context`.
+ * Their assertions are unfalsifiable -- "chip drawn before choosing
+ * anything" reads the absence of a class nothing can produce, so it is
+ * always false and always green (Grok's audit, 2026-09-13, confirming its
+ * own earlier finding was right and this test was wrong).
+ *
+ * `.ts` stays: a helper that assembles a class name is still the app
+ * drawing it.
+ */
+const appClasses = new Set(
+  readAll(SRC, ['.tsx', '.ts']).flatMap((text) => text.match(/lc-[a-zA-Z0-9_-]+/g) ?? [])
+)
 
 /** Every literal an `aria-label` can hold, plus the fixed prefix of a template one. */
 const appLabels = new Set<string>()
