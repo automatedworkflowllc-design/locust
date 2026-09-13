@@ -294,9 +294,15 @@ function AnswerState({ phase, startedAt }: { readonly phase: string; readonly st
  * for the queue and it decides this too.
  */
 export function postHeadline(
-  members: readonly { readonly name: string; readonly state: 'answered' | 'replied' | 'running' | 'failed' | 'waiting' }[]
+  members: readonly {
+    readonly name: string
+    readonly state: 'answered' | 'replied' | 'running' | 'failed' | 'waiting' | 'absent'
+  }[]
 ): string {
-  const asked = members.filter((member) => member.state !== 'waiting').length
+  // `absent` is someone the post never reached, and `waiting` someone it has
+  // not reached YET. Neither was asked, so neither is counted as asked, and
+  // both are said elsewhere -- the absent line names them with the reason.
+  const asked = members.filter((member) => member.state !== 'waiting' && member.state !== 'absent').length
   const parts: string[] = [`${String(asked)} asked`]
   const of = (state: string): readonly string[] =>
     members.filter((member) => member.state === state).map((member) => member.name)
@@ -670,20 +676,25 @@ export function RoomScreen({
           * the end of a reply; this is where a person moves it by hand.
           */}
         <section className="lc-board" aria-label="Task board">
-          <div className="lc-board__head">
-            <span className="lc-sectionlabel">Tasks</span>
-            {/*
-              * The plan's own counter, word for word. A board and a plan are
-              * the same thing to a reader -- a short list of work with some of
-              * it finished -- and this said `2 open · 0 done` beside a plan
-              * two inches below saying `2 of 4 done`.
-              */}
-            <span className="lc-board__count lc-mono">
-              {room.tasks.length === 0
-                ? 'none yet'
-                : `${String(room.tasks.filter((task) => task.state === 'done').length)} of ${String(room.tasks.length)} done`}
-            </span>
-          </div>
+          {/*
+            * The PLAN's header, not a section of its own.
+            *
+            * Colin, 2026-09-13: "I just really enjoyed that UI over the task
+            * bar we setup. Would there be a way to have at least replace
+            * that?" The rows already borrowed the plan's shape; what still
+            * read as a bar was everything around them -- a bordered raised
+            * card with a titled head, pinned above every room, drawn even
+            * when the board was empty.
+            *
+            * A plan draws nothing when it has no steps, so neither does this:
+            * an empty board is one quiet line to add the first task, and the
+            * head arrives with the first one.
+            */}
+          {room.tasks.length > 0 && (
+            <div className="lc-rail__meta lc-mono lc-board__head">
+              TASKS · {room.tasks.filter((task) => task.state === 'done').length} of {room.tasks.length} done
+            </div>
+          )}
           {room.tasks.map((task) => {
             const owner = teammates.find((entry) => entry.teammateId === task.ownerId)
             return (
@@ -719,12 +730,16 @@ export function RoomScreen({
                     </>
                   )}
                 </span>
-                {task.missionId !== undefined && (
-                  <button type="button" className="lc-ghostbutton" title="The conversation whose reply last moved this task" onClick={() => onOpenMission(task.missionId!)}>
-                    Open
-                  </button>
-                )}
                 <span className="lc-task__actions">
+                  {/* Open sits with the other controls rather than beside the
+                      owner: at rest a row is a marker, the words, and who has
+                      it -- which is a plan step with a note, and is the whole
+                      of what this rebuild is for. */}
+                  {task.missionId !== undefined && assigning !== task.taskId && (
+                    <button type="button" className="lc-ghostbutton" title="The conversation whose reply last moved this task" onClick={() => onOpenMission(task.missionId!)}>
+                      Open
+                    </button>
+                  )}
                   {assigning === task.taskId ? (
                     <span className="lc-task__assign" role="group" aria-label="Assign to">
                       {members.filter((entry) => entry !== undefined).map((entry) => (
@@ -823,7 +838,14 @@ export function RoomScreen({
                       const name = teammates.find((candidate) => candidate.teammateId === id)?.name ?? id
                       if ((entry.queued ?? []).includes(id)) return { name, state: 'waiting' as const }
                       const found = answers.find((candidate) => candidate.teammateId === id)
-                      if (found === undefined) return { name, state: 'failed' as const }
+                      // No mission at all is NOT a failure -- nothing ran to
+                      // fail. Seen in a screenshot 2026-09-13: the headline
+                      // said "Booty failed" directly above the line saying
+                      // "Booty was not asked.", which is one fact answered two
+                      // ways. `absentLine` owns this case and says why; the
+                      // headline counts only the people who were actually
+                      // asked.
+                      if (found === undefined) return { name, state: 'absent' as const }
                       if (found.phase === 'failed' || found.phase === 'cancelled') return { name, state: 'failed' as const }
                       // Having SPOKEN is not having FINISHED. Astra measured
                       // "2 asked · all answered" over two cards that both

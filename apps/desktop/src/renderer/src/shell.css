@@ -2768,25 +2768,35 @@ textarea {
 
 /* The board on a room: one line per task -- state, text, owner, the
    mission that last moved it, and what a person can do to it. */
+/*
+ * A plan, not a bar.
+ *
+ * Colin, 2026-09-13: "I just really enjoyed that UI over the task bar we
+ * setup." The ROWS had already been rebuilt on the plan step; everything
+ * around them had not. This was a bordered raised card with a titled head,
+ * pinned above every room and drawn at full size even with nothing on it --
+ * so a fresh room opened on a panel announcing that it was empty.
+ *
+ * The card chrome goes. What is left is the plan's own shape: a quiet mono
+ * header that only exists once there is something to count, steps with room
+ * to breathe, and no rules between them. Same register as the memory note,
+ * and for the same reason -- this is a fact about the work, and it asks
+ * nothing of anybody.
+ */
 .lc-board {
   display: flex;
   flex-direction: column;
-  gap: var(--lc-space-2);
-  padding: var(--lc-space-3) var(--lc-space-4);
-  border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-card);
-  background: var(--lc-bg-raised);
+  gap: var(--lc-space-3);
+  padding: 0;
+  border: 0;
+  background: none;
 }
 
 .lc-board__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.lc-board__count {
-  font-size: var(--lc-text-mono-caption);
-  color: var(--lc-text-muted);
+  /* Sizing and colour come from `lc-rail__meta lc-mono`, which is what the
+     plan's own "PLAN · 2 of 4 done" line uses. Nothing is redefined here, so
+     the two headers cannot drift apart. */
+  letter-spacing: 0.04em;
 }
 
 /*
@@ -2811,9 +2821,11 @@ textarea {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--lc-space-3);
-  padding: var(--lc-space-2) 0;
-  border-top: 1px solid var(--lc-border-hairline);
+  /* The plan's gap and no rules: a hairline between every step made a table
+     of a list, and a plan has neither. */
+  gap: var(--lc-space-4);
+  padding: 0;
+  border-top: 0;
 }
 
 /*
@@ -2880,8 +2892,34 @@ textarea {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--lc-space-2);
-  padding-top: var(--lc-space-2);
-  border-top: 1px solid var(--lc-border-hairline);
+  padding-top: 0;
+  border-top: 0;
+}
+
+/*
+ * The add line stays out of the way until it is wanted.
+ *
+ * Seen in the probe's own screenshot once the card chrome was gone: with the
+ * rows drawn as quiet plan steps, a full-strength bordered input became the
+ * LOUDEST thing on the board -- the bar, rebuilt one element down. It is the
+ * least important thing here and now looks it, at full strength the moment it
+ * is hovered or focused. On an empty board it is the only thing, which is the
+ * one faint line a fresh room should open on.
+ */
+.lc-board__add {
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+}
+
+.lc-board__add:hover,
+.lc-board__add:focus-within {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-board__add {
+    transition: none;
+  }
 }
 
 .lc-board__add .lc-roomform__name {

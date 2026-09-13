@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.99.0 - 2026-09-13
+
+- **The room's task board is a plan.** Its rows already borrowed the plan's
+  shape; everything around them did not — a bordered panel with a titled head,
+  above every room, drawn at full size even with nothing on it. The card is
+  gone. What is left is the plan's own quiet counter, `TASKS · 1 of 3 done`,
+  steps with room to breathe, and no rules between them. A board with no tasks
+  now draws **nothing at all** except one faint line to add the first one, so a
+  new room opens on the room rather than on an empty panel.
+- **Adding a task stopped shouting.** With the rows quiet, a full-strength
+  input box became the loudest thing on the board — the bar rebuilt one element
+  down. It sits back until you hover or focus it.
+- **A teammate a post never reached is no longer called a failure.** The line
+  above a post read "2 asked · 1 answered · Booty failed" directly above "Booty
+  was not asked." Nothing ran, so nothing failed; they are counted as not
+  asked, which the line underneath already explains.
+
 ## 0.98.0 - 2026-09-13
 
 - **Cursor's plan is drawn.** Cursor keeps a to-do list and Locust threw every

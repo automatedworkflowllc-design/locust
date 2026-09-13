@@ -23,7 +23,7 @@ import { postHeadline } from './components/RoomScreen.js'
  * inventing one is the mistake Astra's finding refuses twice over.
  */
 
-const member = (name: string, state: 'answered' | 'replied' | 'running' | 'failed' | 'waiting') => ({
+const member = (name: string, state: 'answered' | 'replied' | 'running' | 'failed' | 'waiting' | 'absent') => ({
   name,
   state
 })
@@ -94,5 +94,22 @@ describe('the line above a post', () => {
   it("keeps a finished one separate from one that only spoke", () => {
     const mixed = [member("A", "answered"), member("B", "replied")]
     expect(postHeadline(mixed)).toBe("2 asked · 1 answered · B replied, still working")
+  })
+
+  /*
+   * Seen in a screenshot, 2026-09-13: "2 asked · 1 answered · Booty failed"
+   * printed directly above "Booty was not asked." Booty had no mission at
+   * all -- nothing ran, so nothing failed, and the absent line already says
+   * so with the reason.
+   */
+  it('never calls someone the post did not reach a failure', () => {
+    const one = [member('A', 'answered'), member('B', 'absent')]
+    expect(postHeadline(one)).toBe('1 asked · all answered')
+    expect(postHeadline(one)).not.toContain('failed')
+  })
+
+  it('still counts a real failure', () => {
+    const real = [member('A', 'answered'), member('B', 'failed')]
+    expect(postHeadline(real)).toBe('2 asked · 1 answered · B failed')
   })
 })
