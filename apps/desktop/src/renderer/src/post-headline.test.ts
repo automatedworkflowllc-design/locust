@@ -23,7 +23,10 @@ import { postHeadline } from './components/RoomScreen.js'
  * inventing one is the mistake Astra's finding refuses twice over.
  */
 
-const member = (name: string, state: 'answered' | 'running' | 'failed' | 'waiting') => ({ name, state })
+const member = (name: string, state: 'answered' | 'replied' | 'running' | 'failed' | 'waiting') => ({
+  name,
+  state
+})
 
 describe('the line above a post', () => {
   it('says so when everyone answered', () => {
@@ -70,5 +73,26 @@ describe('the line above a post', () => {
   it('says something even for a post nothing came back from', () => {
     const silent = [member('A', 'running'), member('B', 'running')]
     expect(postHeadline(silent)).toBe('2 asked · A and B running')
+  })
+
+  /*
+   * Astra, 2026-09-13: two cards both saying running, headline saying
+   * all answered. Having spoken is not having finished, and the whole
+   * value of this line is knowing whether anything is left to wait for.
+   */
+  it('never says all answered while someone is still working', () => {
+    const both = [member("A", "replied"), member("B", "replied")]
+    expect(postHeadline(both)).toBe("2 asked · A and B replied, still working")
+    expect(postHeadline(both)).not.toContain("all answered")
+  })
+
+  it("counts the repliers past two, like every other state", () => {
+    const three = [member("A", "replied"), member("B", "replied"), member("C", "replied")]
+    expect(postHeadline(three)).toBe("3 asked · 3 replied, still working")
+  })
+
+  it("keeps a finished one separate from one that only spoke", () => {
+    const mixed = [member("A", "answered"), member("B", "replied")]
+    expect(postHeadline(mixed)).toBe("2 asked · 1 answered · B replied, still working")
   })
 })

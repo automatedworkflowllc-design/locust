@@ -2991,6 +2991,10 @@ export default function App(): ReactElement {
       // host's briefing, and a reviewer asked to check that would be checking
       // the app rather than the work.
       request: run.earlierTurns?.[0]?.prompt ?? run.prompt,
+      // The reply, which for research or a question IS the work. Its absence
+      // is what made a reviewer say "the work is missing entirely" about a
+      // page of analysis on 2026-09-13.
+      said: turnText(events),
       changed,
       commands: commands.map((command) => ({ name: command.name, exitCode: command.exitCode })),
       ranOn: ranOnLine({
@@ -3566,6 +3570,7 @@ export default function App(): ReactElement {
               onPost={postToRoom}
               onTask={updateRoomTask}
               onOpenMission={openMission}
+              workspacePath={workspacePath}
               notice={roomNotice}
             />
           ) : screen === 'settings' ? (

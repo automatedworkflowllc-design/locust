@@ -11,9 +11,20 @@
  * What a reviewer is given is exactly what the record holds and nothing else:
  *
  *   - the request the person actually made, as they typed it
+ *   - what the teammate said back
  *   - what changed, by path
  *   - what ran, and what came back
  *   - the conditions it ran under
+ *
+ * The reply was missing until 2026-09-13, and its absence made this feature
+ * lie. Colin asked for a review of a stock research turn and was told "That
+ * did not happen... The work is missing entirely" -- because research changes
+ * no paths and runs no commands, so the brief said only "Nothing in the
+ * workspace" and "No commands were run", and the reviewer believed it. That
+ * is this app's own ruling broken by this app: state scope, not absence
+ * (`docs/RULING-2026-09-11-SCOPE-NOT-ABSENCE.md`). A turn whose deliverable
+ * is an ANSWER is in scope; the brief presented it as an emptiness and
+ * invited the reviewer to name what was missing.
  *
  * Every one of those is already on screen. The point of the brief is not to
  * compute anything new; it is that a reviewer cannot see another teammate's
@@ -29,6 +40,14 @@
 export interface ReviewMaterial {
   /** What the person asked for, in their words. */
   readonly request: string
+  /**
+   * What the teammate said back -- the assistant text of the turn, joined.
+   *
+   * For research, a question, a recommendation -- most of what is actually
+   * asked for -- this is the whole deliverable and the only evidence there
+   * is. Empty only when a turn genuinely said nothing.
+   */
+  readonly said: string
   /** Paths this run changed, as the receipt counts them. */
   readonly changed: readonly string[]
   /** Commands it ran, first word and exit code, in order. */
@@ -41,6 +60,13 @@ export interface ReviewMaterial {
 
 /** Long enough to carry a real request, short enough not to be the whole turn. */
 const MAX_REQUEST = 1_200
+/**
+ * The reply gets the largest budget of anything here, because for most turns
+ * it IS the work. It is still bounded: a brief that carries a whole long
+ * session would cost more to read than the review is worth, and the truncation
+ * is said out loud rather than left as a silent cut.
+ */
+const MAX_SAID = 8_000
 const MAX_PATHS = 20
 const MAX_COMMANDS = 12
 
@@ -66,6 +92,34 @@ export function reviewBrief(material: ReviewMaterial): string {
   lines.push('WHAT WAS ASKED FOR')
   lines.push(bounded(material.request, MAX_REQUEST))
   lines.push('')
+
+  // Above what changed, deliberately: for a question, a recommendation or a
+  // piece of research this is the entire deliverable, and a reviewer that
+  // reads the paths first reads an emptiness first.
+  lines.push('WHAT THEY SAID')
+  if (material.said.trim().length === 0) {
+    lines.push('This turn recorded no reply text.')
+  } else {
+    const said = bounded(material.said, MAX_SAID)
+    lines.push(said)
+    if (said !== material.said.replace(/\r\n?/g, '\n').trim()) {
+      lines.push('(The reply was longer than this; the rest is in their thread.)')
+    }
+  }
+  lines.push('')
+
+  // The two negatives, when they are BOTH negatives, are said once as a fact
+  // about the kind of work rather than twice as an absence.
+  if (material.changed.length === 0 && material.commands.length === 0) {
+    lines.push('WHAT IT DID IN THE WORKSPACE')
+    lines.push('This turn answered in the conversation; it changed no files and ran no commands.')
+    lines.push('')
+    lines.push('WHERE IT RAN')
+    lines.push(material.ranOn)
+    lines.push('')
+    lines.push(...jobLines())
+    return lines.join('\n')
+  }
 
   lines.push('WHAT CHANGED')
   if (material.changed.length === 0) {
@@ -93,20 +147,29 @@ export function reviewBrief(material: ReviewMaterial): string {
   lines.push(material.ranOn)
   lines.push('')
 
-  lines.push('YOUR JOB')
-  lines.push(
-    'Say whether the change does what was asked for, and name anything it misses or breaks. Read the files it changed; you may run commands to check.'
-  )
-  // The two failure modes of a reviewer, said as rules. Both were watched for
-  // in the proposal: a reviewer that redoes the work is a second builder, and
-  // a reviewer that approves everything is worse than none.
-  lines.push('Do not redo the work or make the change yourself. Report; do not fix.')
-  lines.push(
-    'If it does what was asked, say so plainly and stop — a short answer is the right answer for work that is fine. If something is wrong, name the file and what is wrong with it.'
-  )
-  // The exact claim this whole feature exists to stop being made by accident.
-  lines.push(
-    'The commands above are what was run, not proof that the work is correct: a command exiting 0 says only that it exited 0. Decide for yourself what it does and does not show.'
-  )
+  lines.push(...jobLines())
   return lines.join('\n')
+}
+
+/**
+ * The job, said the same way whatever kind of work it was.
+ *
+ * "The change" was the old wording throughout, and it is what told a reviewer
+ * of a research turn that the thing it was looking for was a diff.
+ */
+function jobLines(): readonly string[] {
+  return [
+    'YOUR JOB',
+    'Say whether the work does what was asked for, and name anything it misses or gets wrong. Read what they said, and the files they changed if there are any; you may run commands to check.',
+    // Not every turn leaves a trace in the workspace, and the reviewer must
+    // not read that as the work being absent -- it said so once already.
+    'A turn that only answered is a complete piece of work. Judge the answer.',
+    // The two failure modes of a reviewer, said as rules. Both were watched for
+    // in the proposal: a reviewer that redoes the work is a second builder, and
+    // a reviewer that approves everything is worse than none.
+    'Do not redo the work or make the change yourself. Report; do not fix.',
+    'If it does what was asked, say so plainly and stop — a short answer is the right answer for work that is fine. If something is wrong, name the file and what is wrong with it.',
+    // The exact claim this whole feature exists to stop being made by accident.
+    'The commands above are what was run, not proof that the work is correct: a command exiting 0 says only that it exited 0. Decide for yourself what it does and does not show.'
+  ]
 }

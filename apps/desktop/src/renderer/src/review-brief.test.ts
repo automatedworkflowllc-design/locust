@@ -17,6 +17,7 @@ import type { ReviewMaterial } from './reviewBrief.js'
 
 const MATERIAL: ReviewMaterial = {
   request: 'Make the path handler work on Windows.',
+  said: 'I normalised the separators in resolve() and added two cases for drive letters.',
   changed: ['src/paths.ts', 'src/paths.test.ts'],
   commands: [
     { name: 'pnpm test', exitCode: 0 },
@@ -88,6 +89,58 @@ describe('the brief a reviewer is handed', () => {
     const many = Array.from({ length: 25 }, (_, index) => `src/file${String(index)}.ts`)
     const brief = reviewBrief({ ...MATERIAL, changed: many })
     expect(brief).toContain('and 5 more')
+  })
+
+  /*
+   * 2026-09-13. A reviewer was handed a stock research turn and answered
+   * "That did not happen... The work is missing entirely." The analysis was
+   * on screen. The brief carried paths and commands and never the reply, so
+   * for work whose deliverable is an ANSWER it described an emptiness.
+   */
+  describe('a turn whose work was an answer', () => {
+    const ANSWERED: ReviewMaterial = {
+      ...MATERIAL,
+      request: 'Research the company Keel.',
+      said: 'Keel is a private logistics company founded in 2019. Revenue is not disclosed…',
+      changed: [],
+      commands: []
+    }
+
+    it('carries what the teammate said', () => {
+      expect(reviewBrief(ANSWERED)).toContain('WHAT THEY SAID')
+      expect(reviewBrief(ANSWERED)).toContain('Keel is a private logistics company')
+    })
+
+    it('never presents it as the two bare absences', () => {
+      // Which is what the reviewer read, and believed.
+      const brief = reviewBrief(ANSWERED)
+      expect(brief).not.toContain('Nothing in the workspace.')
+      expect(brief).not.toContain('No commands were run.')
+      expect(brief).toContain('answered in the conversation')
+    })
+
+    it('tells the reviewer that answering IS the work', () => {
+      expect(reviewBrief(ANSWERED)).toContain('A turn that only answered is a complete piece of work.')
+    })
+
+    it('asks about the work rather than about the change', () => {
+      const brief = reviewBrief(ANSWERED)
+      expect(brief).toContain('Say whether the work does what was asked for')
+      expect(brief).not.toContain('Say whether the change does')
+    })
+  })
+
+  it('still leads a real code change with what changed', () => {
+    // The negative case: carrying the reply must not bury the diff.
+    const brief = reviewBrief(MATERIAL)
+    expect(brief).toContain('WHAT CHANGED')
+    expect(brief).toContain('src/paths.ts')
+    expect(brief.indexOf('WHAT THEY SAID')).toBeLessThan(brief.indexOf('WHAT CHANGED'))
+  })
+
+  it('says out loud when the reply was cut, rather than ending mid-sentence', () => {
+    const brief = reviewBrief({ ...MATERIAL, said: 'y'.repeat(20_000) })
+    expect(brief).toContain('the rest is in their thread')
   })
 
   it('bounds a very long request, with a mark', () => {

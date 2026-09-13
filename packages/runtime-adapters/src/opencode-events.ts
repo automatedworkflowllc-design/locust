@@ -6,6 +6,7 @@ import {
   malformedEvidence,
   processEvidence,
   requireContextText,
+  sanitizeJson,
   stringValue,
   toolPatchFrom,
 } from "./codex-events.js";
@@ -150,6 +151,12 @@ export function openCodeToolTitle(tool: string, input: JsonObject): string | und
   return stringValue(input.description);
 }
 
+/**
+ * The tool OpenCode keeps its plan in. `todowrite` is the measured name;
+ * `todo_write` is spelled that way elsewhere in the family, so both are read.
+ */
+const OPENCODE_PLAN_TOOL = /^todo_?write$/i;
+
 /** What a tool acted on, in the order OpenCode reports it. */
 export function openCodeToolTarget(input: JsonObject, metadata: JsonObject): string | undefined {
   return stringValue(input.filePath)
@@ -275,6 +282,35 @@ export function createOpenCodeEventNormalizer(
       const metadata = isObject(state.metadata) ? state.metadata : {};
       const kind = identityValue(part.tool) ?? "tool";
       const itemId = identityValue(part.callID) ?? `tool_${String(record.sequence)}`;
+      // OpenCode keeps a plan, and until 2026-09-13 no surface showed it.
+      //
+      // Astra measured a single run: `todowrite` arrived FOUR times carrying
+      // real three-step state (`payload.evidence.raw.part.state.input.todos`),
+      // each update advancing one step, and both the room and the thread drew
+      // one row -- `todowrite done` -- four times over. The plan moved and
+      // nothing said so. Codex's `todo_list` has always become `plan.updated`;
+      // this is the same fact under another runtime's name, so it becomes the
+      // same event and NOT a tool row, exactly as Codex's does.
+      //
+      // No todos, no plan: a run without todo data must not have one invented
+      // for it, so anything unrecognisable falls through to the ordinary rows.
+      if (OPENCODE_PLAN_TOOL.test(kind)) {
+        const todos = Array.isArray(input.todos) ? input.todos : undefined;
+        if (todos !== undefined && todos.length > 0) {
+          const planState = { redacted: false };
+          return [
+            emit("plan.updated", {
+              itemId,
+              plan: sanitizeJson(todos, planState),
+              // OpenCode never says which update is the last one, and guessing
+              // from "everything is complete" would close a plan the model may
+              // still add to.
+              final: false,
+              evidence,
+            }),
+          ];
+        }
+      }
       const target = openCodeToolTarget(input, metadata);
       const verdict = openCodeToolOutcome(state);
       const filePath = stringValue(input.filePath) ?? stringValue(metadata.filepath);

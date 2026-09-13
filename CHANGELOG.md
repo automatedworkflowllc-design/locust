@@ -6,6 +6,34 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.96.0 - 2026-09-13
+
+- **A reviewer is shown what the teammate SAID.** Asking for a review of a
+  piece of research got back "That did not happen… the work is missing
+  entirely" — about a full page of analysis that was on screen the whole time.
+  The brief carried the files a turn changed and the commands it ran and never
+  its reply, so work whose deliverable is an answer looked like nothing at all.
+  The reply now leads the brief, a turn that changed nothing says so as a fact
+  about the kind of work rather than as two absences, and the reviewer is asked
+  about the work rather than about "the change".
+- **OpenCode's plan shows its progress.** It keeps a three-step plan and
+  updates it as it goes; every update was drawn as one more `todowrite done`
+  row, so the plan advanced four times and no surface moved. It is now the same
+  live step list every other runtime gets. A run with no plan still gets none.
+- **Every chat follows the newest line, and offers a way back down.** The
+  conversation already followed; rooms did not, so a post to several teammates
+  grew under you. And nothing anywhere offered the way back once you had
+  scrolled up to read — there is now a small control for it, for exactly as
+  long as you are away from the bottom.
+- **A room says who is still working.** It could read "2 asked · all answered"
+  while both teammates were still running, because they had spoken. Speaking is
+  not finishing, and the line now says so.
+- **A file in a room reads the same as it does in the conversation** —
+  `README.md`, not its whole absolute path.
+- **The permissions panel stops explaining Codex to other runtimes.** The
+  footer describing `codex exec` approvals appeared under every runtime's
+  allow-list, including runs it had nothing to do with.
+
 ## 0.95.0 - 2026-09-13
 
 - **Tables are drawn as columns.** Teammates write them constantly — a quarter

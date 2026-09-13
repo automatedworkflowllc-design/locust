@@ -379,7 +379,7 @@ export function redactText(value: string): string {
     );
 }
 
-function sanitizeJson(
+export function sanitizeJson(
   value: unknown,
   state: { redacted: boolean },
   depth = 0,

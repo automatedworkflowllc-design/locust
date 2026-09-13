@@ -157,9 +157,18 @@ export function Inspector({
                 )}
               </div>
               <p className="lc-permissions__note">
-                The host fixes the workspace, executable, argv and sandbox. `codex exec` has no
-                interactive approval channel, so consent is given when the mission starts rather
-                than per action; mid-run approvals need the app-server protocol.
+                The host fixes the workspace, executable, argv and sandbox.{' '}
+                {/*
+                  * The second sentence is about `codex exec` specifically, and
+                  * until 2026-09-13 it was printed under every runtime's rows.
+                  * Astra measured it under an OpenCode run: a correct allow-list
+                  * with a footer explaining app-server approvals that had nothing
+                  * to do with the run being described. A true sentence about
+                  * another runtime is a false sentence here.
+                  */}
+                {route?.runtime === 'codex'
+                  ? '`codex exec` has no interactive approval channel, so consent is given when the mission starts rather than per action; mid-run approvals need the app-server protocol.'
+                  : 'They are set when the mission starts.'}
               </p>
             </div>
           </>

@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -14,8 +14,8 @@ import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, 
 import type { LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
-import { atBottom } from '../stickToBottom.js'
-import { FOLLOW_TOLERANCE, nextScrollTop } from '../followBottom.js'
+import { useFollowBottom } from '../useFollowBottom.js'
+import { JumpToBottom } from './JumpToBottom.js'
 import { ledgerFailureRows, ledgerFailureSentence } from '../ledgerFailure.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
@@ -561,99 +561,26 @@ export function Thread({
   // moment they scroll up to read something. See `stickToBottom.ts` for why
   // the "am I at the bottom" question has to be asked BEFORE the content
   // grows rather than after.
-  const scroller = useRef<HTMLDivElement | null>(null)
-  const following = useRef(true)
-  const lastHeight = useRef(0)
-  /** The frame loop walking the thread to the bottom; 0 when it is not running. */
-  const walking = useRef(0)
-  /** True for exactly the scroll event our own assignment is about to cause. */
-  const ourOwnScroll = useRef(false)
+  // The whole of it -- following, the eased walk, and the way back down --
+  // now lives in `useFollowBottom`, because the room and the peer thread need
+  // the same behaviour and had none of it (Colin, 2026-09-13: "lets have all
+  // chats auto scroll the same way").
+  const follow = useFollowBottom()
 
-  /*
-   * Walk to the bottom rather than teleport there.
-   *
-   * MEASURED (`probe-reply-arrives-smoothly`, a real 400-word reply): the
-   * thread moved on 26 of 1361 frames, with 47% of the whole journey in five
-   * of them and one single frame of 221px. The text arrives in batches
-   * because the runtime emits it in batches, and nothing here can change
-   * that; what this changes is that a batch no longer teleports the page by
-   * its own height. See followBottom.ts.
-   */
-  const stepToBottom = useCallback((): void => {
-    const box = scroller.current
-    if (box === null) {
-      walking.current = 0
-      return
-    }
-    const reduced = typeof window !== 'undefined'
-      && typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const target = Math.max(0, box.scrollHeight - box.clientHeight)
-    const next = nextScrollTop(box.scrollTop, target, reduced)
-    ourOwnScroll.current = true
-    box.scrollTop = next
-    walking.current = next < target ? requestAnimationFrame(stepToBottom) : 0
-  }, [])
-
-  useLayoutEffect(() => {
-    const box = scroller.current
-    if (box === null) return
-    const grew = box.scrollHeight > lastHeight.current
-    lastHeight.current = box.scrollHeight
-    if (following.current && grew && walking.current === 0) {
-      walking.current = requestAnimationFrame(stepToBottom)
-    }
-  })
-
-  useEffect(
-    () => () => {
-      if (walking.current !== 0) cancelAnimationFrame(walking.current)
-    },
-    []
-  )
   // A mission the person just opened starts at its newest line, wherever the
-  // previous one had been left.
+  // previous one had been left. Opening a conversation JUMPS -- walking would
+  // make a person watch the whole of somebody else's finished answer scroll
+  // past.
   useEffect(() => {
-    const box = scroller.current
-    if (box === null) return
-    following.current = true
-    // Opening a conversation JUMPS. Walking would make a person watch the
-    // whole of somebody else's finished answer scroll past.
-    if (walking.current !== 0) {
-      cancelAnimationFrame(walking.current)
-      walking.current = 0
-    }
-    ourOwnScroll.current = true
-    box.scrollTop = box.scrollHeight
+    follow.jumpNow()
     // Identity of the conversation on screen: the recovered mission when there
     // is one, else this run's start time. Either changes exactly when the
     // person opens a different conversation, which is the moment to jump.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restoredMission?.missionId, startedAtIso])
 
   return (
-    <div
-      className="lc-thread"
-      ref={scroller}
-      onScroll={(event) => {
-        /*
-         * Our own step is not the person scrolling away.
-         *
-         * While the walk is in flight the thread is BY DEFINITION not at the
-         * bottom, so reading these events as a person's would stop following
-         * on the first frame of every batch -- the animation would cancel
-         * itself and the fix would do nothing at all.
-         */
-        if (ourOwnScroll.current) {
-          ourOwnScroll.current = false
-          return
-        }
-        following.current = atBottom(event.currentTarget, FOLLOW_TOLERANCE)
-        if (!following.current && walking.current !== 0) {
-          cancelAnimationFrame(walking.current)
-          walking.current = 0
-        }
-      }}
-    >
+    <div className="lc-thread" ref={follow.ref} onScroll={follow.onScroll}>
       <div className="lc-thread__column">
         {/*
           * The mission id is PROVENANCE, and provenance lives on the workroom
@@ -889,6 +816,7 @@ export function Thread({
           />
         )}
       </div>
+      <JumpToBottom shown={follow.away} onClick={follow.toBottom} />
     </div>
   )
 }

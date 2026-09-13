@@ -536,7 +536,9 @@ export function readPlan(value: unknown): readonly PlanStep[] {
     }
     if (typeof entry !== 'object' || entry === null) continue
     const record = entry as Record<string, unknown>
-    const text = record.step ?? record.text ?? record.title ?? record.name
+    // `content` is OpenCode's word for the step (2026-09-13); the others are
+    // Codex's and the app-server's. One plan, four spellings.
+    const text = record.step ?? record.text ?? record.title ?? record.name ?? record.content
     if (typeof text !== 'string' || text.length === 0) continue
     const status = typeof record.status === 'string' ? record.status.toLowerCase() : ''
     const state: PlanStep['state'] =

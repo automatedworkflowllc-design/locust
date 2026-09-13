@@ -331,3 +331,83 @@ describe("a run the host stopped for output volume", () => {
     expect(failure({ exitCode: 2 })).toContain("without a step that reported it had stopped");
   });
 });
+
+/*
+ * Astra, 2026-09-13, measuring a live OpenCode run: `todowrite` arrived four
+ * times carrying real three-step state at
+ * `payload.evidence.raw.part.state.input.todos`, and every surface drew one
+ * row -- `todowrite done`. The plan advanced four times and nothing showed it.
+ * Codex's `todo_list` has always been `plan.updated`; this is the same fact.
+ */
+describe("OpenCode's plan", () => {
+  function todoLine(todos: readonly unknown[], callID: string): string {
+    return JSON.stringify({
+      type: "tool_use",
+      sessionID: "ses_1",
+      part: { tool: "todowrite", callID, state: { status: "completed", input: { todos } } },
+    });
+  }
+
+  const STEPS = ["read README", "write notes", "verify"];
+  /** Astra's exact sequence: one step advancing per update. */
+  const SEQUENCE = [
+    ["in_progress", "pending", "pending"],
+    ["completed", "in_progress", "pending"],
+    ["completed", "completed", "in_progress"],
+    ["completed", "completed", "completed"],
+  ];
+
+  function plans(statuses: readonly (readonly string[])[]) {
+    const { events } = run(
+      statuses.map((row, index) =>
+        todoLine(STEPS.map((content, step) => ({ id: String(step), content, status: row[step] })), `call_${String(index)}`)
+      )
+    );
+    return events.filter((event) => event.type === "plan.updated");
+  }
+
+  it("becomes a plan, four times, not four tool rows", () => {
+    const events = run(SEQUENCE.map((row, index) =>
+      todoLine(STEPS.map((content, step) => ({ id: String(step), content, status: row[step] })), `call_${String(index)}`)
+    )).events;
+    expect(events.filter((event) => event.type === "plan.updated")).toHaveLength(4);
+    expect(events.filter((event) => event.type === "tool.completed")).toHaveLength(0);
+    expect(events.filter((event) => event.type === "tool.started")).toHaveLength(0);
+  });
+
+  it("carries the steps and their advancing state", () => {
+    const updates = plans(SEQUENCE);
+    const last = updates[updates.length - 1];
+    const first = updates[0];
+    const plan = (event: NormalizedRuntimeEvent | undefined): readonly Record<string, unknown>[] =>
+      event === undefined ? [] : ((event.payload as { readonly plan: unknown }).plan as Record<string, unknown>[]);
+    expect(plan(first).map((step) => step.content)).toEqual(STEPS);
+    expect(plan(first).map((step) => step.status)).toEqual(["in_progress", "pending", "pending"]);
+    expect(plan(last).map((step) => step.status)).toEqual(["completed", "completed", "completed"]);
+  });
+
+  it("invents no plan when a todo call carries no todos", () => {
+    // Acceptance is Astra's: a run without todo data must not grow a plan.
+    const { events } = run([
+      JSON.stringify({
+        type: "tool_use",
+        sessionID: "ses_1",
+        part: { tool: "todowrite", callID: "call_0", state: { status: "completed", input: { todos: [] } } },
+      }),
+    ]);
+    expect(events.filter((event) => event.type === "plan.updated")).toHaveLength(0);
+    expect(events.filter((event) => event.type === "tool.completed")).toHaveLength(1);
+  });
+
+  it("leaves every other tool alone", () => {
+    const { events } = run([
+      JSON.stringify({
+        type: "tool_use",
+        sessionID: "ses_1",
+        part: { tool: "bash", callID: "call_0", state: { status: "completed", input: { command: "ls" } } },
+      }),
+    ]);
+    expect(events.filter((event) => event.type === "plan.updated")).toHaveLength(0);
+    expect(events.filter((event) => event.type === "tool.completed")).toHaveLength(1);
+  });
+});

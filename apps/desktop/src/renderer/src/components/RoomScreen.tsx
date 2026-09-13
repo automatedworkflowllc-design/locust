@@ -9,6 +9,8 @@ import { AgentText, LiveRegisterLine } from './ThreadItems.js'
 import { Icon } from './Icon.js'
 import { PixelFace } from './PixelFace.js'
 import { footLine } from '../roomExchange.js'
+import { useFollowBottom } from '../useFollowBottom.js'
+import { JumpToBottom } from './JumpToBottom.js'
 import type { RoomExchange } from '../roomExchange.js'
 
 /**
@@ -293,7 +295,7 @@ function AnswerState({ phase, startedAt }: { readonly phase: string; readonly st
  * for the queue and it decides this too.
  */
 export function postHeadline(
-  members: readonly { readonly name: string; readonly state: 'answered' | 'running' | 'failed' | 'waiting' }[]
+  members: readonly { readonly name: string; readonly state: 'answered' | 'replied' | 'running' | 'failed' | 'waiting' }[]
 ): string {
   const asked = members.filter((member) => member.state !== 'waiting').length
   const parts: string[] = [`${String(asked)} asked`]
@@ -303,6 +305,18 @@ export function postHeadline(
   const answered = of('answered')
   if (answered.length > 0 && answered.length === asked && asked > 0) parts.push('all answered')
   else if (answered.length > 0) parts.push(`${String(answered.length)} answered`)
+
+  // Spoke, still going. Said as one segment rather than counted twice, and
+  // never folded into "answered": the whole value of this line is knowing
+  // whether there is anything left to wait for.
+  const replied = of('replied')
+  if (replied.length > 0) {
+    parts.push(
+      replied.length <= 2
+        ? `${replied.join(' and ')} replied, still working`
+        : `${String(replied.length)} replied, still working`
+    )
+  }
 
   // Named at one or two, counted past that. `running` and `failed` are the
   // exceptions a person is looking for; `waiting` is always a count because
@@ -343,6 +357,7 @@ export function RoomScreen({
   onRenameRoom,
   onPost,
   onOpenMission,
+  workspacePath,
   onTask,
   notice
 }: {
@@ -370,6 +385,15 @@ export function RoomScreen({
   readonly onRenameRoom?: (roomId: string, name: string) => void
   readonly onPost: (roomId: string, text: string) => Promise<string | undefined>
   readonly onOpenMission: (missionId: string) => void
+  /**
+   * The folder, so a file reads the same here as it does in the thread.
+   *
+   * It was undefined until 2026-09-13, which meant `relativePath` had nothing
+   * to fold against and Astra measured one file appearing as a long absolute
+   * path in the room and as `README.md` in the conversation. Two surfaces, one
+   * fact, computed differently.
+   */
+  readonly workspacePath?: string
   /** A person moving the board. Resolves with the host's refusal, if any. */
   readonly onTask: (request: RoomTaskRequest) => Promise<string | undefined>
   /** The host's last word about a post or a room, when it had one. */
@@ -386,6 +410,18 @@ export function RoomScreen({
   const [boardError, setBoardError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState<string>()
+
+  // A room is a chat, so it scrolls like one: following the newest answer
+  // while the person is at the bottom, and offering the way back as soon as
+  // they are not. It did neither until 2026-09-13 -- a post to eight
+  // teammates grew under the reader and never moved.
+  const follow = useFollowBottom()
+  // Opening a different room starts at its newest post, not wherever the last
+  // one was left.
+  useEffect(() => {
+    follow.jumpNow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRoomId])
 
   const members = room === undefined ? [] : room.teammateIds.map((id) => teammates.find((entry) => entry.teammateId === id))
 
@@ -628,7 +664,7 @@ export function RoomScreen({
           Remove room
         </button>
       </div>
-      <div className="lc-screen__scroll lc-room__thread">
+      <div className="lc-screen__scroll lc-room__thread" ref={follow.ref} onScroll={follow.onScroll}>
         {/*
           * The board. A task is a line of text, an owner, a state, and the
           * mission that last touched it. Teammates move it with a block at
@@ -790,7 +826,13 @@ export function RoomScreen({
                       const found = answers.find((candidate) => candidate.teammateId === id)
                       if (found === undefined) return { name, state: 'failed' as const }
                       if (found.phase === 'failed' || found.phase === 'cancelled') return { name, state: 'failed' as const }
-                      if (found.text !== undefined) return { name, state: 'answered' as const }
+                      // Having SPOKEN is not having FINISHED. Astra measured
+                      // "2 asked · all answered" over two cards that both
+                      // still said running: the text had arrived and the
+                      // missions had not ended. A person reads "all answered"
+                      // as "nothing left to wait for", which was false.
+                      if (found.phase === 'completed') return { name, state: 'answered' as const }
+                      if (found.text !== undefined) return { name, state: 'replied' as const }
                       return { name, state: 'running' as const }
                     })
                   )}
@@ -809,7 +851,10 @@ export function RoomScreen({
                       ? 'waiting'
                       : found === undefined || found.phase === 'failed' || found.phase === 'cancelled'
                         ? 'failed'
-                        : found.text !== undefined
+                        : // Terminal, same as the headline above -- a pip that
+                          // said "answered" while the line said "still
+                          // working" would be the same fact told two ways.
+                          found.phase === 'completed'
                           ? 'answered'
                           : 'running'
                     return (
@@ -1013,7 +1058,7 @@ export function RoomScreen({
                         items={answer.items}
                         owner={teammate}
                         activity={answer.phase === 'running' || answer.phase === 'starting' ? 'thinking' : 'idle'}
-                        workspacePath={undefined}
+                        workspacePath={workspacePath}
                         decision={undefined}
                       />
                     </div>
@@ -1032,6 +1077,7 @@ export function RoomScreen({
             </section>
           )
         })}
+        <JumpToBottom shown={follow.away} onClick={follow.toBottom} />
       </div>
       {/*
         * The thread's composer, not a second design.
