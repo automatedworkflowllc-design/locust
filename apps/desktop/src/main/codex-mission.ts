@@ -72,6 +72,8 @@ export { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 const NOBODY = ''
 
 interface ActiveCodexMission {
+  /** Whether this mission has already explained a refused read. Once is enough. */
+  saidWhyAReadFailed: boolean
   readonly runId: string
   readonly missionId: string
   readonly controller: AbortController
@@ -447,22 +449,6 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   })
   /** Live missions by runId. */
   const active = new Map<string, ActiveCodexMission>()
-  /**
-   * Folders already told that Cursor cannot read them, so it is said once.
-   *
-   * The rule is a STANDING fact about this machine's configuration: it is as
-   * true on the tenth mission as the first, and it cannot change while the
-   * app is running without the person editing the file that states it. Said
-   * every time, it became the loudest thing in a room -- one amber line per
-   * teammate per post, forever, about something the person had already read
-   * and decided about (Colin, 2026-09-13, on his own room: "necessary?").
-   *
-   * Which is the same mistake this app spent the night removing from other
-   * surfaces -- a room narrating its own board, an adapter reporting one
-   * unknown record type per record. A fact does not get truer by repetition,
-   * and a warning that is always there is furniture.
-   */
-  const foldersToldAboutCursor = new Set<string>()
   /** Owners with a start in flight, between the guard and activation. */
   const starting = new Set<string>()
   /** Each live mission's consume loop, so a handoff can wait for ITS run alone. */
@@ -493,6 +479,63 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     }
   }
 
+  /**
+   * Say why a read was refused, AT THE MOMENT IT IS REFUSED.
+   *
+   * Cursor obeys `.cursorignore` and its tools answer "permission denied"
+   * with no reason, so the model invents one and the person chases the
+   * invention. That cost an evening on 2026-09-12.
+   *
+   * 0.87.0 fixed it by warning at the START of every Cursor run in a hidden
+   * folder. Which is TRUE and was still wrong: Colin's teammates in that
+   * folder do web research and never open a file, so the warning was correct,
+   * inapplicable and unavoidable -- an amber line above every exchange,
+   * forever. 0.91.2 reduced it to once per folder per session; he restarted
+   * the app all night and asked again, which is the right question: "is it
+   * necessary to have the error".
+   *
+   * Not preemptively. A rule that hides a folder only matters when something
+   * is actually refused, and Cursor says so precisely -- the raw record of a
+   * failed tool carries `errorMessage: "Permission denied"`, unredacted. So
+   * the explanation waits for that, arrives beside the failure it explains,
+   * and a run that never opens a file never hears about it.
+   *
+   * Once per mission. The second denial has the same cause as the first.
+   */
+  const explainADeniedRead = async (
+    mission: ActiveCodexMission,
+    events: readonly NormalizedRuntimeEvent[]
+  ): Promise<void> => {
+    if (mission.runtime !== 'cursor' || mission.saidWhyAReadFailed) return
+    const denied = events.some(
+      (event) =>
+        event.type === 'tool.failed'
+        && /permission denied/i.test(JSON.stringify(event.payload.evidence?.raw ?? ''))
+    )
+    if (!denied) return
+    mission.saidWhyAReadFailed = true
+    try {
+      const sentence = await cursorCannotSee(mission.cwd, options.readCursorIgnore)
+      if (sentence === undefined) return
+      // Shown, never recorded: see the note where this used to be raised.
+      safelyEmit(mission, {
+        kind: 'event',
+        runId: mission.runId,
+        missionId: mission.missionId,
+        event: cursorIgnoreNotice({
+          runId: mission.runId,
+          missionId: mission.missionId,
+          sourceAdapter: mission.runtime,
+          nextSequence: -1,
+          at: now().toISOString(),
+          sentence
+        })
+      })
+    } catch {
+      // A rule file that cannot be read explains nothing.
+    }
+  }
+
   const consume = async (mission: ActiveCodexMission): Promise<void> => {
     let persistenceFailed = false
     try {
@@ -515,6 +558,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const batch = [record, ...buffered]
           const events = batch.flatMap((entry) => [...mission.normalizer.accept(entry)])
           await persistAndEmit(mission, options.ledger, events)
+          await explainADeniedRead(mission, events)
         } catch {
           persistenceFailed = true
           mission.controller.abort()
@@ -1331,6 +1375,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           cwd: runCwd,
           sharedTree: false,
           settled: false,
+          saidWhyAReadFailed: false,
           lastSequence: 0,
           persisted: []
         }
@@ -1349,58 +1394,6 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
          * Best effort, and never fatal: a run that can still use its shell
          * may do perfectly good work. What it cannot do is explain itself.
          */
-        if (runtime === 'cursor') {
-          try {
-            const sentence = foldersToldAboutCursor.has(runCwd)
-              ? undefined
-              : await cursorCannotSee(runCwd, options.readCursorIgnore)
-            if (sentence !== undefined) {
-              foldersToldAboutCursor.add(runCwd)
-              /*
-               * SHOWN, NOT RECORDED, and the difference cost a release.
-               *
-               * 0.87.0 appended this to the ledger. The ledger requires
-               * strictly contiguous event sequences -- `appendEvents` throws
-               * `Mission event sequence is invalid` otherwise -- and the
-               * adapter numbers its own events from zero, independently. So
-               * the notice took a sequence the runtime was going to use, and
-               * EVERY event the run produced afterwards was refused. Colin's
-               * missions recorded one event, this one, and nothing else:
-               * two teammates did real work and the app reported "the runtime
-               * finished and wrote nothing back" about both.
-               *
-               * The host's own observations that ARE persisted
-               * (`sharedTreeNotice`, `observedEditEvents`) are appended after
-               * the terminal events, when the adapter has stopped numbering.
-               * There is no such slot BEFORE a run, and this notice is only
-               * useful before one.
-               *
-               * So it goes to the window and not to the record. That is also
-               * the truer register for it: it is a fact about this machine's
-               * configuration right now, not about what this mission did, and
-               * a fresh run raises it again for as long as it stays true.
-               */
-              safelyEmit(mission, {
-                kind: 'event',
-                runId,
-                missionId,
-                event: cursorIgnoreNotice({
-                  runId,
-                  missionId,
-                  sourceAdapter: runtime,
-                  // Never collides: the renderer keys by event id and this one
-                  // is never handed to the ledger.
-                  nextSequence: -1,
-                  at: now().toISOString(),
-                  sentence
-                })
-              })
-            }
-          } catch {
-            // A rule file that cannot be read tells us nothing, which is the
-            // same as there being no rule: say nothing rather than guess.
-          }
-        }
         // Whoever else is writing in this same folder right now: neither of
         // us can be credited with what the tree looks like afterwards.
         if (mission.diskBefore !== undefined) {

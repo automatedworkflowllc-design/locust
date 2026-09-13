@@ -127,24 +127,22 @@ function fakeLedger(overrides: Partial<MissionLedger> = {}): MissionLedger {
   }
 }
 
-describe('a Cursor run in a folder .cursorignore hides', () => {
+describe('a Cursor run whose folder .cursorignore hides', () => {
   /*
-   * THE REGRESSION FROM 0.87.0, and it broke every Cursor run in a hidden
-   * folder.
+   * THE REGRESSION FROM 0.87.0, which broke every Cursor run in a hidden
+   * folder: the notice was APPENDED to the ledger, `appendEvents` requires
+   * strictly contiguous event sequences, and the adapter numbers its own from
+   * zero -- so the notice took a number the runtime was going to use and
+   * every later event was refused. Two teammates did real work and were
+   * reported as having written nothing back.
    *
-   * The notice was APPENDED to the ledger. `appendEvents` requires strictly
-   * contiguous event sequences -- it throws "Mission event sequence is
-   * invalid" otherwise -- and the adapter numbers its own events from zero,
-   * independently. So the notice took a number the runtime was going to use
-   * and every event the run produced afterwards was refused. Colin's missions
-   * held exactly one event, this one; two teammates did real work and the app
-   * reported "the runtime finished and wrote nothing back" about both, then
-   * "Stopped -- the mission ledger could not be written".
-   *
-   * The host observations that ARE persisted are appended after the terminal
-   * events, when the adapter has stopped numbering. There is no such slot
-   * before a run, and this notice is only useful before one -- so it goes to
-   * the window and never to the record.
+   * AND THE NOISE, which is why it is no longer raised up front. Warning at
+   * the start of every run in a hidden folder is true and unavoidable, and
+   * Colin's teammates there never open a file: an amber line above every
+   * exchange, forever, about something inapplicable. It waits for an actual
+   * refusal now -- Cursor's failed tool carries `Permission denied`
+   * unredacted -- so it arrives beside the failure it explains and a run that
+   * reads nothing never hears it.
    */
   function cursorRuntime(): RuntimeDiscovery {
     return {
@@ -161,57 +159,56 @@ describe('a Cursor run in a folder .cursorignore hides', () => {
     }
   }
 
-  it('shows the notice and never writes it to the ledger', async () => {
+  const denied = {
+    type: 'tool_call',
+    subtype: 'completed',
+    call_id: 'call-1',
+    tool_call: { readToolCall: { result: { error: { errorMessage: 'Permission denied' } } }, toolCallId: 'call-1' }
+  }
+
+  const drive = async (stream: readonly Record<string, unknown>[]) => {
     const appendEvents = vi.fn<MissionLedger['appendEvents']>(async () => undefined)
-    const { service } = scheduledService(
-      { start: () => ({ records: records([]), completion: Promise.resolve(completion()) }) } as unknown as RuntimeProcessRunner,
+    const { service, scheduled } = scheduledService(
+      { start: () => ({ records: records(stream), completion: Promise.resolve(completion()) }) } as unknown as RuntimeProcessRunner,
       fakeLedger({ appendEvents }),
-      {
-        discover: async () => [cursorRuntime()],
-        // A rule that really covers the test workspace, so the notice has a
-        // reason to fire. `safe-workspace` is the last segment of WORKSPACE.
-        readCursorIgnore: async () => 'safe-workspace/'
-      }
-    )
-    const updates: CodexMissionUpdate[] = []
-    const response = await service.start('Read notes.txt.', 'cursor', 'accept-edits', {}, (update) => {
-      updates.push(update)
-    })
-    if (!response.ok) throw new Error('start refused: ' + JSON.stringify(response.error))
-
-    // Said, where a person reads it.
-    const notice = updates.find(
-      (update) => update.kind === 'event' && update.event.type === 'adapter.diagnostic'
-    )
-    expect(notice).toBeDefined()
-    expect(JSON.stringify(notice)).toContain('Cursor cannot read files here')
-
-    // And NOT written, which is the whole of the regression: nothing the host
-    // says before a run may consume a sequence the runtime is going to use.
-    const written = appendEvents.mock.calls.flatMap(([, events]) => events)
-    expect(written.some((event) => JSON.stringify(event).includes('cursorignore'))).toBe(false)
-  })
-
-  it('says it once for a folder, not once per mission', async () => {
-    /*
-     * The rule is a standing fact about the machine: as true on the tenth
-     * mission as the first, and it cannot change while the app runs without
-     * the person editing the file it names. Said every time it became the
-     * loudest thing in a room -- one amber line per teammate per post, about
-     * something already read and decided about.
-     */
-    const { service } = scheduledService(
-      { start: () => ({ records: records([]), completion: Promise.resolve(completion()) }) } as unknown as RuntimeProcessRunner,
-      fakeLedger(),
       { discover: async () => [cursorRuntime()], readCursorIgnore: async () => 'safe-workspace/' }
     )
-    const said: number[] = []
-    for (const turn of [1, 2, 3]) {
-      const updates: CodexMissionUpdate[] = []
-      await service.start(`Turn ${String(turn)}.`, 'cursor', 'accept-edits', {}, (update) => updates.push(update))
-      said.push(updates.filter((update) => update.kind === 'event' && update.event.type === 'adapter.diagnostic').length)
-    }
-    expect(said).toEqual([1, 0, 0])
+    const updates: CodexMissionUpdate[] = []
+    const response = await service.start('Read notes.txt.', 'cursor', 'accept-edits', {}, (update) => updates.push(update))
+    if (!response.ok) throw new Error('start refused')
+    scheduled[0]?.()
+    await vi.waitFor(() => {
+      expect(updates.some((update) => update.kind === 'event')).toBe(true)
+    })
+    const notices = updates.filter(
+      (update) => update.kind === 'event' && update.event.type === 'adapter.diagnostic'
+        && JSON.stringify(update.event).includes('Cursor cannot read files here')
+    )
+    const written = appendEvents.mock.calls.flatMap(([, events]) => events)
+    return { notices, written }
+  }
+
+  it('says nothing when nothing was refused', async () => {
+    // The whole point. A run that never opens a file has no reason to hear
+    // about a rule that hides files.
+    const { notices } = await drive([{ type: 'tool_call', subtype: 'started', call_id: 'c', tool_call: { readToolCall: {}, toolCallId: 'c' } }])
+    expect(notices).toHaveLength(0)
+  })
+
+  it('explains a refusal when one actually happens', async () => {
+    const { notices } = await drive([denied])
+    expect(notices).toHaveLength(1)
+    expect(JSON.stringify(notices[0])).toContain('.cursorignore')
+  })
+
+  it('explains it once, however many reads are refused', async () => {
+    const { notices } = await drive([denied, denied, denied])
+    expect(notices).toHaveLength(1)
+  })
+
+  it('never writes it to the ledger, which once broke every run in such a folder', async () => {
+    const { written } = await drive([denied])
+    expect(written.some((event) => JSON.stringify(event).includes('cursorignore'))).toBe(false)
   })
 })
 

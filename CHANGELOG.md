@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.94.0 - 2026-09-13
+
+- **The ".cursorignore hides this folder" warning only appears when a read is
+  actually refused.** It used to greet every Cursor run in such a folder,
+  whether or not that run ever opened a file — true, inapplicable, and
+  unavoidable, an amber line above every exchange. It now waits for the
+  refusal it explains and arrives beside it, once per conversation. A teammate
+  that only searches the web never sees it at all.
+
 ## 0.93.0 - 2026-09-13
 
 - **The permissions panel told you the opposite of the truth on an Auto run.**
