@@ -2859,9 +2859,18 @@ textarea {
   }
 }
 
+/*
+ * A finished step is QUIETER, not crossed out.
+ *
+ * Checked against the design artifact itself (`Locust Desktop.dc.html`, the
+ * Plan block) on 2026-09-13, after Colin asked whether what shipped was
+ * actually the drawn asset. Its two done steps are muted and nothing else --
+ * no rule through them -- and the app's own `lc-plan__step.is-done` agrees.
+ * The board was the only one of the three striking the text out, which is
+ * exactly the drift the rebuild was supposed to end.
+ */
 .lc-task.is-done .lc-task__text {
-  color: var(--lc-text-muted);
-  text-decoration: line-through;
+  color: var(--lc-text-secondary);
 }
 
 .lc-task__text {

@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.99.1 - 2026-09-13
+
+- **A finished task is muted, not crossed out.** Checked against the design
+  artifact itself: its done steps are quieter and nothing more, and the app's
+  own plan agrees. The board was the only one of the three drawing a line
+  through them.
+
 ## 0.99.0 - 2026-09-13
 
 - **The room's task board is a plan.** Its rows already borrowed the plan's
