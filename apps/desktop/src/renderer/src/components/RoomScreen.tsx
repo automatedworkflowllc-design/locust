@@ -637,23 +637,46 @@ export function RoomScreen({
         <section className="lc-board" aria-label="Task board">
           <div className="lc-board__head">
             <span className="lc-sectionlabel">Tasks</span>
+            {/*
+              * The plan's own counter, word for word. A board and a plan are
+              * the same thing to a reader -- a short list of work with some of
+              * it finished -- and this said `2 open · 0 done` beside a plan
+              * two inches below saying `2 of 4 done`.
+              */}
             <span className="lc-board__count lc-mono">
               {room.tasks.length === 0
                 ? 'none yet'
-                : `${String(room.tasks.filter((task) => task.state !== 'done').length)} open · ${String(room.tasks.filter((task) => task.state === 'done').length)} done`}
+                : `${String(room.tasks.filter((task) => task.state === 'done').length)} of ${String(room.tasks.length)} done`}
             </span>
           </div>
           {room.tasks.map((task) => {
             const owner = teammates.find((entry) => entry.teammateId === task.ownerId)
             return (
-              <div key={task.taskId} className={`lc-task is-${task.state}`}>
-                <span className={`lc-tag lc-task__state${task.state === 'done' ? ' is-green' : task.state === 'in-hand' ? ' is-amber' : ''}`}>
-                  {task.state === 'in-hand' ? 'IN HAND' : task.state.toUpperCase()}
+              /*
+               * THE PLAN'S SHAPE, because it is the same kind of thing.
+               *
+               * Every row carried a state TAG, the text, an owner with a face
+               * and a name, an Open button and three ghost buttons -- six
+               * competing elements per line, all at full strength, for a list
+               * of two. Colin, 2026-09-13: "that task bar at the top is a
+               * disaster lets just scrap that for this plan ui asset."
+               *
+               * A plan step is a marker, the words, and one quiet note on the
+               * right. The state is the MARKER now -- a tick when it is done,
+               * a filled dot while someone has it, an empty one otherwise --
+               * so the tag goes, the text carries the done state itself, and
+               * the owner becomes the quiet note.
+               */
+              <div key={task.taskId} className={`lc-task lc-plan__step is-${task.state}`}>
+                <span className="lc-plan__marker" aria-hidden="true">
+                  {task.state === 'done' ? <Icon name="check" size={11} /> : <span className="lc-dot" />}
                 </span>
+                {/* Said for a reader who cannot see the marker. */}
+                <span className="lc-sr">{task.state === 'in-hand' ? 'in hand' : task.state}</span>
                 <span className="lc-task__text">{task.text}</span>
                 <span className="lc-task__owner">
                   {owner === undefined ? (
-                    <span className="lc-settings__note">nobody</span>
+                    <span className="lc-settings__note">unassigned</span>
                   ) : (
                     <>
                       <PixelFace hue={owner.hue} avatar={owner.avatar} size={16} activity="idle" presence="none" />

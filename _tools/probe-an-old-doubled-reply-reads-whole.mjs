@@ -38,7 +38,8 @@ const drive = await startDrive({
 
 // No backticks inside these template literals.
 const open = `(async () => {
-  const room = [...document.querySelectorAll('.lc-row, button, a')].find(n => /testing/.test(n.innerText) && /post/i.test(n.innerText))
+  // Whatever the first room is called: the name is the person's, not ours.
+  const room = [...document.querySelectorAll('.lc-row')].find(n => n.innerText.indexOf(' posts') >= 0 || n.innerText.indexOf(' post') >= 0)
   if (room === undefined) return 'no room row'
   room.click()
   await new Promise(r => setTimeout(r, 2500))

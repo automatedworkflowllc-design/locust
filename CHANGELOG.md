@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.92.0 - 2026-09-13
+
+- **A teammate's whole turn stays in the room.** Their progress appeared as
+  they wrote it and then vanished the moment they finished — the room kept
+  only the last message, so three quarters of what was said disappeared at the
+  end. Opening the same conversation showed all of it. Everything they said is
+  now in the room, in order.
+- **The task board is a plan, not a dashboard.** Every row carried a state
+  tag, the text, an owner, and four buttons — six things competing on one line
+  for a list of two. It reads like the plan card now: a tick or a dot for the
+  state, the text struck through when it is done, the owner as one quiet note,
+  and the same "1 of 2 done" the plan uses. Assign, Done and Remove are still
+  there and appear when you reach for a row.
+
 ## 0.91.2 - 2026-09-13
 
 - **The ".cursorignore hides this folder" warning is said once per folder, not

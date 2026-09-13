@@ -266,3 +266,71 @@ describe('the members a post did not reach', () => {
   })
 })
 
+describe('the task board, rebuilt on the plan card', () => {
+  /*
+   * Every row carried a state TAG, the text, an owner face and name, an Open
+   * button and three ghost buttons -- six competing elements per line, all at
+   * full strength, for a list of two. Colin, 2026-09-13: "that task bar at
+   * the top is a disaster lets just scrap that for this plan ui asset that we
+   * already have in the zip."
+   *
+   * A plan step is a marker, the words, and one quiet note. The app already
+   * drew exactly that for a plan (`PlanSteps`), so the board is the same
+   * shape now: the state IS the marker, the done row strikes itself through,
+   * and the controls wait until you reach for them.
+   */
+  const withTasks = (tasks: PublicRoom['tasks']): string => {
+    const room: PublicRoom = {
+      roomId: 'room_standup',
+      name: 'Standup',
+      teammateIds: [ROSTER[0]!.teammateId],
+      createdAt: '2026-09-05T05:00:00.000Z',
+      posts: [],
+      tasks
+    }
+    return renderToStaticMarkup(
+      <RoomScreen
+        rooms={[room]}
+        teammates={ROSTER}
+        currentRoomId="room_standup"
+        answersFor={() => []}
+        runtimeNameOf={(id) => id}
+        onSelectRoom={() => undefined}
+        onCreateRoom={async () => undefined}
+        onRemoveRoom={() => undefined}
+        onRenameRoom={async () => undefined}
+        onPost={async () => undefined}
+        onOpenMission={() => undefined}
+        onTask={async () => undefined}
+        notice={undefined}
+      />
+    )
+  }
+
+  const task = (over: Partial<PublicRoom['tasks'][number]>): PublicRoom['tasks'][number] =>
+    ({ taskId: 't1', text: 'Map v2 to v3 payloads', state: 'open', ...over }) as PublicRoom['tasks'][number]
+
+  it('draws a step, not a tagged row', () => {
+    const markup = withTasks([task({ state: 'done' })])
+    expect(markup).toContain('lc-plan__step')
+    expect(markup).toContain('lc-plan__marker')
+    // The tag is what made it a dashboard row. The state is the marker now.
+    expect(markup).not.toContain('lc-task__state')
+    expect(markup).not.toContain('IN HAND')
+  })
+
+  it('counts the way the plan counts, so two lists do not use two phrasings', () => {
+    const markup = withTasks([task({ state: 'done' }), task({ taskId: 't2', state: 'open' })])
+    expect(markup).toContain('1 of 2 done')
+    expect(markup).not.toContain('open ·')
+  })
+
+  it('still says the state for a reader who cannot see the marker', () => {
+    expect(withTasks([task({ state: 'in-hand' })])).toContain('in hand')
+  })
+
+  it('still offers every control, because hiding them was never the point', () => {
+    const markup = withTasks([task({})])
+    for (const control of ['Assign', 'Done', 'Remove']) expect(markup).toContain(control)
+  })
+})
