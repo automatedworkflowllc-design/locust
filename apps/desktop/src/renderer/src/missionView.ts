@@ -1237,6 +1237,29 @@ export function assistantMessages(
   return order.map((itemId) => ({ itemId, ...buffers.get(itemId)! }))
 }
 
+/**
+ * Everything a teammate SAID in one turn, as one piece of prose.
+ *
+ * For the surfaces that draw a turn as a single utterance -- a room's
+ * exchange, the collapsed answers list -- where the thread itself draws each
+ * message separately.
+ *
+ * It exists because those surfaces each took `the last message marked final`
+ * and fell back to `the latest message` while none was. So a teammate's
+ * progress appeared as it was written and vanished the moment the turn
+ * finished, the final message replacing everything before it (Colin,
+ * 2026-09-13). A turn is what was said, all of it, in order.
+ */
+export function turnText(events: readonly NormalizedRuntimeEvent[]): string {
+  return assistantMessages(events)
+    .map((message) => message.text)
+    .filter((text) => text.trim().length > 0)
+    .join(PARAGRAPH_GAP)
+}
+
+/** A blank line between two things that were said separately. */
+const PARAGRAPH_GAP = String.fromCharCode(10, 10)
+
 export interface MissionThreadOptions {
   /** While a run is live the last message shows a streaming caret. */
   readonly running: boolean

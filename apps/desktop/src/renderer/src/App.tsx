@@ -92,7 +92,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  typedPrompt, assistantMessages, buildThread, relativePath, shellCommandText } from './missionView.js'
+  typedPrompt, buildThread, relativePath, shellCommandText, turnText } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -1821,14 +1821,29 @@ export default function App(): ReactElement {
       const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
       const recorded = historyByIdRef.current.get(missionId)
       const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
-      const finals = assistantMessages(events).filter((message) => message.final)
-      const raw = finals.at(-1)?.text ?? assistantMessages(events).at(-1)?.text
+      /*
+       * EVERY message of the turn, not the last one.
+       *
+       * This took `finals.at(-1)` -- the last message marked final -- and fell
+       * back to the latest message while none was. So a teammate's progress
+       * appeared as it was written and then VANISHED the moment the turn
+       * finished: the fallback had been showing message three, and the final
+       * replaced the lot with message four. Colin, 2026-09-13: "the agents
+       * initial messages are properly appearing in rooms chat but then when
+       * final message is sent out it disappears."
+       *
+       * The same defect the answer cards had before 0.89.0, surviving in the
+       * path that kept the old shape: one string standing in for a whole
+       * turn. The thread has always drawn all of them, which is why the
+       * mission opened beside the room showed four messages where the room
+       * showed one.
+       */
+      const raw = turnText(events)
       // Trimmed: a stripped share block leaves the blank lines that held it,
       // and the room drew a turn whose name and first sentence were an inch
       // apart for no reason a reader could see (MEASURED 2026-09-11).
-      return raw === undefined
-        ? undefined
-        : stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw)))).trim()
+      const said = stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw)))).trim()
+      return said.length === 0 ? undefined : said
     }
     return sequenceOfPost({
       post: { postId: post.postId, at: post.at, missions: post.missions, ...(post.queued === undefined ? {} : { waiting: post.queued }) },
@@ -1871,8 +1886,8 @@ export default function App(): ReactElement {
       const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
       const recorded = historyByIdRef.current.get(missionId)
       const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
-      const finals = assistantMessages(events).filter((message) => message.final)
-      const raw = finals.at(-1)?.text ?? assistantMessages(events).at(-1)?.text
+      // Same rule as the exchange above: a turn is everything it said.
+      const raw = turnText(events)
       // The words, not the blocks: what a reply shared, asked or moved on the
       // board is shown by those surfaces. The room smoke's first live run
       // drew a raw task block inside the card (2026-09-05).

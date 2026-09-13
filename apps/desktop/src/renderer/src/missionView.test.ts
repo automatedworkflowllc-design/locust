@@ -10,6 +10,7 @@ import {
   activityEntries,
   activitySummary,
   assistantMessages,
+  turnText,
   buildSignalRail,
   buildThread,
   editToolName,
@@ -2636,5 +2637,61 @@ describe('what a turn ran, and what came back', () => {
   it('a non-zero exit outranks an unreported one: the failure is the news', () => {
     const run = commandsRun([detail({ exitCode: 2 }), detail({ settled: false })], true)
     expect(commandsRunText(run)?.text).toBe('ran 2 commands · 1 exited non-zero')
+  })
+})
+
+describe('everything a teammate said in one turn', () => {
+  /*
+   * The room drew a turn from `the last message marked final`, falling back
+   * to `the latest message` while none was -- so progress appeared as it was
+   * written and VANISHED the moment the turn finished, the final message
+   * replacing everything before it. Colin, 2026-09-13: "the agents initial
+   * messages are properly appearing in rooms chat but then when final message
+   * is sent out it disappears."
+   *
+   * Measured against his own thread, which had always drawn all four: the
+   * room showed one.
+   */
+  const said = (texts: readonly { text: string; final: boolean }[]): NormalizedRuntimeEvent[] =>
+    texts.map((entry, index) => ({
+      id: `e${String(index)}`,
+      runId: 'run_1',
+      missionId: 'mission_1',
+      sequence: index,
+      type: 'message.delta',
+      occurredAt: '2026-09-13T00:00:00.000Z',
+      sourceAdapter: 'cursor',
+      payload: { itemId: `msg_${String(index)}`, operation: 'replace', text: entry.text, final: entry.final, evidence: { redacted: true } }
+    }) as unknown as NormalizedRuntimeEvent)
+
+  it('keeps what was said before the last message, not just the last', () => {
+    const text = turnText(said([
+      { text: 'I will check the workspace notes first.', final: true },
+      { text: 'I have Street prints; next I will pin live spots.', final: true },
+      { text: 'NVDA stays in the 215-250 band.', final: true }
+    ]))
+    expect(text).toContain('workspace notes')
+    expect(text).toContain('Street prints')
+    expect(text).toContain('215-250')
+  })
+
+  it('keeps them in the order they were said', () => {
+    const text = turnText(said([{ text: 'first', final: true }, { text: 'second', final: true }]))
+    expect(text.indexOf('first')).toBeLessThan(text.indexOf('second'))
+  })
+
+  it('does not change while a turn is still going, then finishing', () => {
+    // The exact shape of the disappearance: mid-turn there is no final
+    // message, and the earlier text must survive one arriving.
+    const during = turnText(said([{ text: 'working on it', final: false }]))
+    const after = turnText(said([{ text: 'working on it', final: false }, { text: 'here is the answer', final: true }]))
+    expect(during).toContain('working on it')
+    expect(after).toContain('working on it')
+    expect(after).toContain('here is the answer')
+  })
+
+  it('is empty when nothing was said, rather than a blank paragraph', () => {
+    expect(turnText([])).toBe('')
+    expect(turnText(said([{ text: '   ', final: true }]))).toBe('')
   })
 })
