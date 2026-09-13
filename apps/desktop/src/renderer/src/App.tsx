@@ -3001,6 +3001,10 @@ export default function App(): ReactElement {
           .map((detail) => relativePath(detail.name, workspacePath))
       )
     ]
+    // A run the host started carries an assembled briefing as its prompt, so
+    // only a person-typed turn can speak for itself.
+    const thisTurnAsk = run.startedBy === undefined ? run.prompt : undefined
+    const rootAsk = run.earlierTurns?.[0]?.prompt
     const commands = details
       .filter((detail) => detail.kind === 'shell')
       .map((detail) => ({
@@ -3008,10 +3012,26 @@ export default function App(): ReactElement {
         ...(detail.exitCode === undefined ? {} : { exitCode: detail.exitCode })
       }))
     return {
-      // The ROOT request, not this turn's: a continuation's own prompt is the
-      // host's briefing, and a reviewer asked to check that would be checking
-      // the app rather than the work.
-      request: run.earlierTurns?.[0]?.prompt ?? run.prompt,
+      /*
+       * THIS turn's request, and the conversation's opening ask beside it.
+       *
+       * It was the ROOT request alone, on the reasoning that a continuation's
+       * own prompt is the host's briefing -- true for a run the HOST started
+       * (a relay hand-off, a routine step, another review), and false for a
+       * follow-up a person typed, whose prompt is their words.
+       *
+       * Astra caught what that cost, 2026-09-14, in a real four-turn
+       * conversation: turn one asked "explain git ... don't change any
+       * files", turn four asked for two files to be created, and the review
+       * of turn four was handed turn ONE as WHAT WAS ASKED FOR. The reviewer
+       * was being asked to judge file-creating work against an instruction
+       * not to create files -- a mismatch that would make correct work read
+       * as a violation.
+       */
+      request: thisTurnAsk ?? rootAsk ?? run.prompt,
+      ...(rootAsk !== undefined && thisTurnAsk !== undefined && rootAsk.trim() !== thisTurnAsk.trim()
+        ? { openedWith: rootAsk }
+        : {}),
       // The reply, which for research or a question IS the work. Its absence
       // is what made a reviewer say "the work is missing entirely" about a
       // page of analysis on 2026-09-13.

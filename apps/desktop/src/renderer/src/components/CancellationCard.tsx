@@ -59,7 +59,22 @@ export function CancellationCard({
           <dt>Cut off</dt>
           <dd className={summary.interrupted.length > 0 ? 'lc-tone-amber' : undefined}>
             {summary.interrupted.length === 0 ? (
-              'Nothing was mid-flight.'
+              /*
+               * What this actually knows, said as what it knows.
+               *
+               * It said "Nothing was mid-flight." -- a claim about the
+               * MACHINE, from a list that only holds tool calls the runtime
+               * had reported as open. Astra measured the gap on 2026-09-14:
+               * a stopped run showed this sentence while the command it had
+               * launched was still running, and ninety seconds later that
+               * command wrote its second file into the workspace. The card
+               * said nothing was in flight; something was.
+               *
+               * The list is right and the sentence was wrong, so only the
+               * sentence changes. What a stop cannot promise is said below,
+               * beside the note about nothing being rolled back.
+               */
+              'No tool call was open when you stopped it.'
             ) : (
               <>
                 <ul className="lc-cancel__list">
@@ -95,6 +110,18 @@ export function CancellationCard({
       <p className="lc-approval__note">
         Everything up to this point is in the durable record. Nothing is rolled back — this build
         does not snapshot the workspace, so undoing a change is yours to do.
+      </p>
+      {/*
+        * The one thing a stop cannot promise, said once rather than implied
+        * by silence. MEASURED 2026-09-14: a stopped run's own command kept
+        * running and wrote a file into the workspace ninety seconds later.
+        * Until that is fixed at the process level, a person reading this card
+        * has to be told it can happen — a stop that is quietly partial is the
+        * worst version of this feature.
+        */}
+      <p className="lc-approval__note lc-tone-amber">
+        A command that had already started may still finish on its own. If one was running, check the
+        workspace rather than assuming it stopped when you did.
       </p>
     </div>
   )

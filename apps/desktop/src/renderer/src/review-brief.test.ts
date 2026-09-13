@@ -148,4 +148,40 @@ describe('the brief a reviewer is handed', () => {
     expect(brief).toContain('…')
     expect(brief.length).toBeLessThan(3_000)
   })
+
+  /*
+   * Astra, 2026-09-14, in a real four-turn conversation: turn one asked
+   * "explain git ... don't change any files"; turn four asked for two files
+   * to be created; the review of turn four was handed turn ONE as WHAT WAS
+   * ASKED FOR. The reviewer was judging file-creating work against an
+   * instruction not to create files.
+   */
+  describe('a conversation that moved on', () => {
+    const LATER: ReviewMaterial = {
+      ...MATERIAL,
+      request: 'Create alpha.txt and beta.txt, then print them joined.',
+      openedWith: "I'm new to git. Explain the working tree. Please only answer; don't change any files."
+    }
+
+    it('asks about THIS turn, not the one the conversation opened with', () => {
+      const brief = reviewBrief(LATER)
+      const asked = brief.indexOf('WHAT WAS ASKED FOR')
+      const context = brief.indexOf('EARLIER IN THE SAME CONVERSATION')
+      expect(asked).toBeGreaterThanOrEqual(0)
+      expect(context).toBeGreaterThan(asked)
+      // The request under the heading is this turn's.
+      expect(brief.slice(asked, context)).toContain('Create alpha.txt')
+      expect(brief.slice(asked, context)).not.toContain('only answer')
+    })
+
+    it('keeps the opening ask, labelled as context rather than as the request', () => {
+      const brief = reviewBrief(LATER)
+      expect(brief).toContain('EARLIER IN THE SAME CONVERSATION (context, not the request)')
+      expect(brief).toContain("don't change any files")
+    })
+
+    it('says nothing extra when the conversation has not moved on', () => {
+      expect(reviewBrief(MATERIAL)).not.toContain('EARLIER IN THE SAME CONVERSATION')
+    })
+  })
 })

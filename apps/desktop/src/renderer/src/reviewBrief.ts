@@ -40,8 +40,20 @@ import { defangProtocolBlocks } from '../../shared/protocolTags.js'
  */
 
 export interface ReviewMaterial {
-  /** What the person asked for, in their words. */
+  /** What the person asked for ON THIS TURN, in their words. */
   readonly request: string
+  /**
+   * What the conversation ORIGINALLY opened with, when this turn asked for
+   * something else.
+   *
+   * A four-turn conversation is four different asks. Handing a reviewer the
+   * first one as the request for the fourth one's work is how correct work
+   * reads as a violation -- Astra measured exactly that on 2026-09-14, a
+   * review of file-creating work shown an opening request that said not to
+   * change any files. The opening ask is still worth having as context, so it
+   * is kept and labelled as what it is rather than dropped.
+   */
+  readonly openedWith?: string
   /**
    * What the teammate said back -- the assistant text of the turn, joined.
    *
@@ -94,6 +106,14 @@ export function reviewBrief(material: ReviewMaterial): string {
   lines.push('WHAT WAS ASKED FOR')
   lines.push(bounded(material.request, MAX_REQUEST))
   lines.push('')
+
+  if (material.openedWith !== undefined && material.openedWith.trim().length > 0) {
+    // Context, explicitly not the thing being judged. Without the label a
+    // reviewer reads two requests and picks one.
+    lines.push('EARLIER IN THE SAME CONVERSATION (context, not the request)')
+    lines.push(bounded(material.openedWith, MAX_REQUEST))
+    lines.push('')
+  }
 
   // Above what changed, deliberately: for a question, a recommendation or a
   // piece of research this is the entire deliverable, and a reviewer that

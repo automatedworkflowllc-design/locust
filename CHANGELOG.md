@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.102.0 - 2026-09-14
+
+- **A stopped run no longer claims nothing was in flight.** It said "Nothing
+  was mid-flight" from a list that only holds tool calls the runtime had
+  reported as open — while, measured on a real run, the command it had launched
+  kept going and wrote a file into the workspace ninety seconds after the stop.
+  It now says what it actually knows, and says out loud that a command which
+  had already started may still finish on its own. The stop itself not reaching
+  that command is a separate fault and is not fixed yet.
+- **A review is asked about the turn you are reviewing.** In a conversation
+  that had moved on, the reviewer was handed the request the conversation
+  *opened* with — so a turn asked to create two files was judged against an
+  earlier instruction not to change any files, and correct work read as a
+  violation. The request is now this turn's own, with the opening ask kept
+  beside it and labelled as context.
+
 ## 0.101.0 - 2026-09-13
 
 - **Everything you type while a teammate works is kept, and arrives as one
