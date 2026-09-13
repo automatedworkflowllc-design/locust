@@ -195,6 +195,8 @@ export function createCursorEventNormalizer(
   const deliveredText = new Map<string, string>();
   /** How many fragments each open message is built from; see the rule below. */
   const deliveredPieces = new Map<string, number>();
+  /** Record types already reported as unhandled, so each is said once a run. */
+  const unknownTypesSaid = new Set<string>();
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -467,6 +469,36 @@ export function createCursorEventNormalizer(
       return [];
     }
 
+    /*
+     * `interaction_query` is the SAME tool call, announced twice.
+     *
+     * Cursor sends a web search and a web fetch on two channels: a
+     * `tool_call` record carrying `webSearchToolCall` / `webFetchToolCall`,
+     * which this adapter already turns into a proper tool row, and an
+     * `interaction_query` request/response pair carrying the same work. They
+     * are the same call -- MEASURED on Colin's ledgers, 2026-09-13: the
+     * `toolCallId` inside the query is byte-for-byte the `call_id` on the
+     * tool_call beside it (234 of them across his missions, 184 searches and
+     * 50 fetches, in matched request/response pairs).
+     *
+     * So it is dropped rather than drawn: rendering it would put every web
+     * search on screen twice, once as a tool row and once as something with
+     * no name.
+     */
+    if (type === "interaction_query") return [];
+
+    /*
+     * A record type nobody handled is worth saying ONCE.
+     *
+     * This said it per record, and Cursor sends a lot of them: Colin's room
+     * filled with two dozen identical amber lines reading "Unhandled Cursor
+     * record: interaction_query", which buried the actual conversation and
+     * read as the app being broken. The fact is about the STREAM -- this
+     * version sends a kind we do not read -- and a fact about the stream does
+     * not get truer by being repeated.
+     */
+    if (unknownTypesSaid.has(type)) return [];
+    unknownTypesSaid.add(type);
     return [diagnostic("info", "cursor.unknown_event", `Unhandled Cursor record: ${type}`, evidence)];
   }
 

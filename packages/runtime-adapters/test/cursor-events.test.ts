@@ -308,6 +308,74 @@ describe("a turn that opens", () => {
 });
 
 
+describe("records Cursor sends that this adapter does not draw", () => {
+  /*
+   * TAKEN FROM COLIN'S LEDGERS, 2026-09-13. A room filled with two dozen
+   * identical amber lines reading "Unhandled Cursor record: interaction_query",
+   * burying the conversation under them.
+   *
+   * Two things were wrong. `interaction_query` is the same tool call the
+   * adapter already draws -- Cursor announces a web search on two channels and
+   * the `toolCallId` in the query is byte-for-byte the `call_id` on the
+   * `tool_call` beside it -- so drawing it would have shown every search
+   * twice. And an unhandled TYPE is a fact about the stream, which does not
+   * get truer by being repeated once per record.
+   */
+  const init = JSON.stringify({ type: "system", subtype: "init", session_id: "s1", model: "Auto" });
+
+  const run = (records: readonly unknown[]) => {
+    const cursor = normalizer();
+    const events: NormalizedRuntimeEvent[] = [];
+    let sequence = 0;
+    events.push(...cursor.accept({ sequence: (sequence += 1), raw: init }));
+    for (const record of records) events.push(...cursor.accept({ sequence: (sequence += 1), raw: JSON.stringify(record) }));
+    return events;
+  };
+
+  const query = (term: string) => ({
+    type: "interaction_query",
+    subtype: "request",
+    query_type: "webSearchRequestQuery",
+    query: { id: 0, webSearchRequestQuery: { args: { searchTerm: term, toolCallId: "call-1" } } },
+    session_id: "s1",
+    timestamp_ms: 1
+  });
+
+  it("says nothing at all about interaction_query, because the tool row already says it", () => {
+    const events = run([query("TSMC capex"), query("NVDA targets"), { ...query("GOOGL"), subtype: "response" }]);
+    const said = events.filter((event) => event.type === "adapter.diagnostic");
+    expect(said).toHaveLength(0);
+  });
+
+  it("still draws the tool call itself, which is where a web search belongs", () => {
+    const events = run([
+      { type: "tool_call", subtype: "started", call_id: "call-1", tool_call: { webSearchToolCall: { args: { searchTerm: "TSMC capex" } }, toolCallId: "call-1" } },
+      query("TSMC capex")
+    ]);
+    expect(events.some((event) => event.type === "tool.started")).toBe(true);
+    // And exactly once: the query must not add a second row for the same call.
+    expect(events.filter((event) => event.type === "tool.started")).toHaveLength(1);
+  });
+
+  it("says an unhandled type once a run, however many arrive", () => {
+    const odd = { type: "something_new", session_id: "s1", timestamp_ms: 1 };
+    const said = run([odd, odd, odd, odd]).filter(
+      (event) => event.type === "adapter.diagnostic" && /Unhandled/.test((event.payload as { message: string }).message)
+    );
+    expect(said).toHaveLength(1);
+    expect((said[0]?.payload as { message: string }).message).toContain("something_new");
+  });
+
+  it("still says each different type it meets", () => {
+    const said = run([
+      { type: "alpha", session_id: "s1", timestamp_ms: 1 },
+      { type: "beta", session_id: "s1", timestamp_ms: 1 },
+      { type: "alpha", session_id: "s1", timestamp_ms: 1 }
+    ]).filter((event) => event.type === "adapter.diagnostic");
+    expect(said).toHaveLength(2);
+  });
+});
+
 describe("a Cursor version that marks nothing", () => {
   /*
    * TAKEN FROM COLIN'S OWN LEDGER, 2026-09-11 (mission fd0adba1), where two

@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.91.1 - 2026-09-13
+
+- **A room no longer fills with "Unhandled Cursor record" lines.** Cursor
+  announces a web search or a web fetch on two channels, and Locust already
+  draws one of them as a proper tool row — the other was being reported, once
+  per record, as something it did not understand. Two dozen identical amber
+  lines could bury a conversation and made a working teammate look broken.
+  The duplicate is ignored; the search still shows up where it belongs, in the
+  turn's work.
+- And when Locust really does meet a record it does not know, it says so
+  **once** for that run rather than once per record. That a version sends a
+  kind we do not read is a fact about the stream, and repeating it does not
+  make it truer.
+
 ## 0.91.0 - 2026-09-13
 
 - **A teammate now reads your question last, not first.** The brief was built
