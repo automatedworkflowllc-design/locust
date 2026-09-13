@@ -410,4 +410,34 @@ describe("OpenCode's plan", () => {
     expect(events.filter((event) => event.type === "plan.updated")).toHaveLength(0);
     expect(events.filter((event) => event.type === "tool.completed")).toHaveLength(1);
   });
+
+  /*
+   * The same thing again, but from a REAL run rather than a hand-built line.
+   *
+   * Captured 2026-09-13 off opencode-ai against muse-spark-1.3-contributor-free,
+   * asked for three files and told to keep a todo list. Five `todowrite` calls
+   * came back carrying the plan at every stage. The hand-built cases above
+   * prove the mapping; this proves the SHAPE is still the one the runtime
+   * actually sends, which is the half that rots.
+   */
+  it("reads the plan out of a captured live run, advancing step by step", () => {
+    const { events } = run(fixture("todo-plan.jsonl"));
+    const plans = events.filter((event) => event.type === "plan.updated");
+    expect(plans).toHaveLength(5);
+    expect(events.filter((event) => /todo/i.test(String((event.payload as { name?: string }).name ?? "")))).toHaveLength(0);
+
+    const statuses = plans.map((event) =>
+      ((event.payload as { readonly plan: readonly Record<string, unknown>[] }).plan).map((step) => String(step.status))
+    );
+    // Every step starts pending and every step ends completed: the plan moved.
+    expect(statuses[0]).toEqual(["pending", "pending", "pending"]);
+    expect(statuses[statuses.length - 1]).toEqual(["completed", "completed", "completed"]);
+    // And it advanced rather than jumping: some update has work in flight.
+    expect(statuses.some((row) => row.includes("in_progress"))).toBe(true);
+
+    const first = (plans[0]?.payload as { readonly plan: readonly Record<string, unknown>[] }).plan;
+    expect(first).toHaveLength(3);
+    // OpenCode spells the step `content`; the thread reads that spelling.
+    expect(first.every((step) => typeof step.content === "string" && String(step.content).length > 0)).toBe(true);
+  });
 });

@@ -7,6 +7,7 @@ import { withAttachments } from '../../shared/attachments.js'
 
 import {
   activityCounts,
+  readPlan,
   activityEntries,
   activitySummary,
   assistantMessages,
@@ -340,6 +341,43 @@ describe('the words a person typed, across a route switch (0.35.0 QA)', () => {
       continuesFrom: { missionId: 'first', checkpointEpoch: 1, reason: 'route-switch' }
     })
     expect(typedPrompt(next, new Map([['first', first], ['next', next]]))).toBe('Create a module and test it')
+  })
+})
+
+describe("OpenCode's plan, in the shape it really arrives in", () => {
+  /*
+   * The exact payload a live opencode run sent on 2026-09-13 -- three steps,
+   * spelled `content`, with `in_progress` between pending and completed. The
+   * adapter test proves the events; this proves the THREAD reads them.
+   *
+   * Until this build `readPlan` knew `step`/`text`/`title`/`name` and not
+   * `content`, so these steps would have arrived and drawn nothing: a plan
+   * with three rows of blank.
+   */
+  const OPENCODE_PLAN = [
+    { id: '1', content: 'create a.txt containing alpha', status: 'completed' },
+    { id: '2', content: 'create b.txt containing beta', status: 'in_progress' },
+    { id: '3', content: 'create c.txt listing the two file names', status: 'pending' }
+  ]
+
+  it('reads the steps, their words and their states', () => {
+    const steps = readPlan(OPENCODE_PLAN)
+    expect(steps.map((step) => step.text)).toEqual([
+      'create a.txt containing alpha',
+      'create b.txt containing beta',
+      'create c.txt listing the two file names'
+    ])
+    expect(steps.map((step) => step.state)).toEqual(['done', 'running', 'pending'])
+  })
+
+  it('and the fold counts how far through it is', () => {
+    const thread = buildThread(
+      [event('tool.started', { itemId: 't1', name: 'write' }), event('plan.updated', { plan: OPENCODE_PLAN })],
+      { running: true }
+    )
+    const fold = thread.find((item) => item.type === 'activity')
+    expect(fold?.type === 'activity' ? fold.plan?.steps.length : undefined).toBe(3)
+    expect(fold?.type === 'activity' ? fold.plan?.doneCount : undefined).toBe(1)
   })
 })
 
