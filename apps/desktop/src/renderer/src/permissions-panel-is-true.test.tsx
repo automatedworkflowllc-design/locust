@@ -23,6 +23,8 @@ const render = (sandbox: 'read-only' | 'workspace-write' | 'full-access'): strin
     <Inspector
       events={[]}
       running={false}
+      workspacePath={undefined}
+      restoredMission={undefined}
       route={{ runtime: 'cursor', model: 'composer-2.5', sandbox } as never}
       onClose={() => undefined}
     />
