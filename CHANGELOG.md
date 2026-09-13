@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.91.0 - 2026-09-13
+
+- **A teammate now reads your question last, not first.** The brief was built
+  the wrong way round: your words at the top, then the roster, the memory and
+  the block formats — so the last thing a teammate read before answering was
+  boilerplate rather than what you asked. It now leads with the standing
+  things and ends with the question.
+- **That should also make missions cheaper.** Providers reuse a cached copy of
+  a prompt's opening when it does not change; ours changed at the front on
+  every turn, so none of it could be reused. The opening is now identical from
+  turn to turn — about 1,700 characters of it, more when memory is fuller.
+- Plan mode is the one exception and stays as it was: its "change nothing this
+  turn" instruction is still the last thing read, because a promise the app has
+  to keep outranks a general rule about ordering.
+
 ## 0.90.0 - 2026-09-13
 
 - **Your team's memory no longer takes over every brief.** Every memory the

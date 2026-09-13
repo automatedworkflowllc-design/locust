@@ -47,7 +47,12 @@ describe('what a teammate is told about reaching another', () => {
     const text = brief('Review the tests.', [])
     expect(text).not.toContain('locust-share')
     expect(text).not.toContain('besides you')
-    expect(text.startsWith('Review the tests.')).toBe(true)
+    // LAST, not first. The brief leads with the standing things -- roster,
+    // memory, block formats -- and ends with what was actually asked, so the
+    // question is the nearest thing to the answer and the stable prefix can
+    // be cached. `endsWith` is the same claim the old `startsWith` made:
+    // the person's words go in whole and are not rewritten.
+    expect(text.endsWith('Review the tests.')).toBe(true)
   })
 
   it('tells every mission how to ask, teammates or not', () => {
@@ -68,7 +73,12 @@ describe('what a teammate is told about reaching another', () => {
     expect(text).toContain('do not ask permission to continue')
   })
 
-  it('keeps the person’s words first and unaltered', () => {
-    expect(brief('Review the tests.').startsWith('Review the tests.')).toBe(true)
+  it('keeps the person’s words last and unaltered', () => {
+    // LAST, not first. The brief leads with the standing things -- roster,
+    // memory, block formats -- and ends with what was actually asked, so the
+    // question is the nearest thing to the answer and the stable prefix can
+    // be cached. `endsWith` is the same claim the old `startsWith` made:
+    // the person's words go in whole and are not rewritten.
+    expect(brief('Review the tests.').endsWith('Review the tests.')).toBe(true)
   })
 })

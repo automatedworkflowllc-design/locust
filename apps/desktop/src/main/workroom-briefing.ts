@@ -189,19 +189,47 @@ export function planSection(): string {
  * out from the newest end and are NOT reported as delivered, so they wait for
  * the next mission rather than vanishing; the notice line then counts them.
  */
+/** Two newlines, written once rather than escaped into every caller. */
+const SECTION_GAP = String.fromCharCode(10, 10)
+
 export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
   const trailer = input.peer.others.length > 0 ? rosterSection(input.peer) : undefined
   const roster = [input.peer.self, ...input.peer.others]
   let delivered = [...input.inbound]
   let remaining = input.remaining
 
+  /*
+   * STANDING THINGS FIRST, THE ASK LAST.
+   *
+   * This built `[the person's words, inbound, memory, trailer, ask format]`
+   * -- the part that changes every turn at the front, the part that never
+   * changes at the back. Backwards twice over:
+   *
+   *   READING. The last thing a teammate read before answering was
+   *   block-format boilerplate, not the question. Everything else in this app
+   *   puts the thing being asked about closest to the asking.
+   *
+   *   COST. The providers behind these runtimes cache on a stable PREFIX. A
+   *   brief whose first bytes differ every turn matches no cached prefix, so
+   *   the roster, the memory and the formats were re-read and re-paid on
+   *   every turn of every mission -- about 6,000 characters of it, and 15,000
+   *   before the memory bound in 0.90.0.
+   *
+   * So: roster, then memory, then the block formats, then what arrived this
+   * turn, then what the person actually said. Roughly stable to roughly
+   * volatile, which is the order that caches and the order that reads.
+   *
+   * The truncation below re-runs this function, so shedding messages still
+   * works unchanged.
+   */
   const assemble = (): string => {
-    const sections = [input.prompt]
-    if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))
-    if (input.memory !== undefined) sections.push(input.memory)
+    const sections: string[] = []
     if (trailer !== undefined) sections.push(trailer)
+    if (input.memory !== undefined) sections.push(input.memory)
     sections.push(askSection())
-    return sections.join('\n\n')
+    if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))
+    sections.push(input.prompt)
+    return sections.join(SECTION_GAP)
   }
 
   let prompt = assemble()

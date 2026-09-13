@@ -9,6 +9,8 @@ import type {
 } from '@teammate/runtime-adapters'
 import type { MissionLedger, MissionPeerLink, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import { describe, expect, it, vi } from 'vitest'
+
+import { planSection } from './workroom-briefing.js'
 import type { CodexMissionUpdate, MissionApprovalRequest } from '../shared/ipc.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { createCodexMissionService } from './codex-mission.js'
@@ -1466,7 +1468,12 @@ describe('the workroom around a mission', () => {
     expect(response.ok).toBe(true)
     if (!response.ok) return
     const sentPrompt = start.mock.calls[0]?.[1] as string
-    expect(sentPrompt.startsWith('Which command runs the checks?')).toBe(true)
+    // LAST, not first. The brief leads with the standing things -- roster,
+    // memory, block formats -- and ends with what was actually asked, so the
+    // question is the nearest thing to the answer and the stable prefix can
+    // be cached. `endsWith` is the same claim the old `startsWith` made:
+    // the person's words go in whole and are not rewritten.
+    expect(sentPrompt.endsWith('Which command runs the checks?')).toBe(true)
     expect(sentPrompt).toContain('CLAIMS from other agents')
     expect(sentPrompt).toContain('pnpm check runs everything.')
     expect(sentPrompt).toContain('<locust-share to="Atlas">')
@@ -1508,7 +1515,20 @@ describe('the workroom around a mission', () => {
     // with, so it is asserted here rather than trusted from the mode name.
     expect(planned.ok && planned.data.sandbox).toBe('read-only')
     const withPlan = planning.start.mock.calls[0]?.[1] as string
-    expect(withPlan.startsWith('Add retries to the fetch helper.')).toBe(true)
+    /*
+     * The brief now leads with the standing things and ends with what was
+     * asked -- except here, where PLAN FIRST is deliberately appended after
+     * everything ("so it is the instruction closest to the model's answer",
+     * codex-mission.ts). That is the same reasoning and it outranks: a
+     * read-only promise the app has to keep beats a general ordering rule.
+     *
+     * So the person's words are LAST OF THE BRIEF, with only the plan
+     * instruction after them -- and still whole and unaltered, which is the
+     * claim the old `startsWith` was really making.
+     */
+    expect(withPlan).toContain('Add retries to the fetch helper.')
+    expect(withPlan.endsWith(planSection())).toBe(true)
+    expect(withPlan.indexOf('Add retries to the fetch helper.')).toBeGreaterThan(withPlan.indexOf('<locust-ask>'))
     expect(withPlan).toContain('PLAN FIRST')
     expect(withPlan).toContain('numbered steps')
 
