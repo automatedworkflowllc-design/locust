@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.132.0 - 2026-09-14
+
+- **The loading screen is just the monitor now.** It had a black slab behind
+  it and around its corners; the window is transparent, so the only thing on
+  screen is the bezel and its own edge.
+- **The app comes forward when it opens.** Held behind the loading screen, it
+  could arrive minimised behind whatever you were last looking at. It is
+  restored, shown and focused — and the loading screen raises itself too,
+  since one that opens behind another window is one nobody sees.
+
 ## 0.131.0 - 2026-09-14
 
 - **Locust opens on a loading screen.** The monitor is its own window now: it

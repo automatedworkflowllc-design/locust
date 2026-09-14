@@ -527,7 +527,18 @@ let appWindowWaiting: BrowserWindow | undefined
 const showAppWindow = (): void => {
   const waiting = appWindowWaiting
   appWindowWaiting = undefined
-  if (waiting !== undefined && !waiting.isDestroyed() && !waiting.isVisible()) waiting.show()
+  if (waiting === undefined || waiting.isDestroyed()) return
+  /*
+   * Restored, shown and focused, in that order.
+   *
+   * `show()` alone left the app "opened minimized" (Colin, 2026-09-14): a
+   * window held unshown while another window had focus does not
+   * necessarily come forward when it is finally shown, and on Windows it
+   * can land minimised behind whatever the person was last looking at.
+   */
+  if (waiting.isMinimized()) waiting.restore()
+  if (!waiting.isVisible()) waiting.show()
+  waiting.focus()
 }
 
 /** How long the loading window may hold the app before it is opened anyway. */
@@ -548,7 +559,17 @@ const createSplashWindow = (): BrowserWindow => {
     minimizable: false,
     maximizable: false,
     skipTaskbar: false,
-    backgroundColor: '#090a0c',
+    /*
+     * TRANSPARENT, so the monitor is the only thing on screen.
+     *
+     * A window with its own ground drew a black slab behind the bezel and
+     * around its rounded corners -- Colin, 2026-09-14: "remove the weird
+     * black border behind it, just keep our natural border". The bezel
+     * already has an edge and a radius of its own; the window should add
+     * nothing to it.
+     */
+    transparent: true,
+    backgroundColor: '#00000000',
     icon: app.isPackaged
       ? join(process.resourcesPath, 'icon.ico')
       : join(__dirname, '../../resources/icon-512.png'),
@@ -559,7 +580,12 @@ const createSplashWindow = (): BrowserWindow => {
       nodeIntegration: false
     }
   })
-  splash.once('ready-to-show', () => splash.show())
+  splash.once('ready-to-show', () => {
+    // Shown AND raised. A loading screen that opens behind the window that
+    // had focus is a loading screen nobody sees.
+    splash.show()
+    splash.focus()
+  })
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void splash.loadURL(`${process.env.ELECTRON_RENDERER_URL}#splash`)
   } else {

@@ -9550,14 +9550,18 @@ textarea {
   }
 }
 
-/* The loading window: the monitor, centred, on nothing else. */
+/* The loading window: the monitor, and NOTHING else.
+ *
+ * No ground of its own -- the window is transparent, so a background here
+ * would put the black slab back that the transparency exists to remove. The
+ * bezel brings its own edge, radius and shadow. */
 .lc-splash {
   width: 100vw;
   height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--lc-bg-app);
+  background: transparent;
   -webkit-app-region: drag;
 }
 
