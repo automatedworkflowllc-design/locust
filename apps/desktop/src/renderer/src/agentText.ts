@@ -57,8 +57,8 @@ export type AgentBlock =
   | {
       readonly kind: 'list'
       readonly ordered: boolean
-      /** Item text, marker already removed. */
-      readonly items: readonly string[]
+      /** Item text, marker already removed, with how deeply it was nested. */
+      readonly items: readonly ListItem[]
     }
   | {
       /** `# Title` through `### Title`. Deeper levels are drawn as the third. */
@@ -75,9 +75,32 @@ export type InlineSpan =
   | { readonly kind: 'em'; readonly text: string }
 
 /** `- item`, `* item`, `+ item`. */
-const BULLET = /^[ \t]*[-*+][ \t]+(.+)$/
+/**
+ * One item of a list, and how deeply it was nested.
+ *
+ * `depth` is derived from the INDENT STACK rather than from a fixed number of
+ * spaces per level, because models indent with two spaces, four spaces and
+ * tabs interchangeably -- often inside one answer. What matters is that an
+ * item indented further than the one above it is a child of it, whatever the
+ * width; anything else turns a two-space list into depth 1 and a four-space
+ * list into depth 2 and draws the same structure two ways.
+ */
+export interface ListItem {
+  readonly text: string
+  /** 0 is top level. */
+  readonly depth: number
+}
+
+/** A tab counts as four columns, which is what every runtime here emits. */
+function indentWidth(prefix: string): number {
+  let width = 0
+  for (const char of prefix) width += char === '	' ? 4 : 1
+  return width
+}
+
+const BULLET = /^([ \t]*)[-*+][ \t]+(.+)$/
 /** `1. item`, `2) item`. */
-const NUMBERED = /^[ \t]*\d+[.)][ \t]+(.+)$/
+const NUMBERED = /^([ \t]*)\d+[.)][ \t]+(.+)$/
 
 /** ```lang, or ``` on its own. Leading spaces are allowed; models indent them. */
 /** One newline, written once. */
@@ -152,8 +175,10 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
   const flushProse = (): void => {
     if (prose.length === 0) return
     let paragraph: string[] = []
-    let items: string[] = []
+    let items: ListItem[] = []
     let ordered = false
+    /** Indent widths of the open list levels, outermost first. */
+    const indents: number[] = []
     const flushParagraph = (): void => {
       const joined = paragraph.join('\n')
       // Whitespace between blocks is layout, not content: the gap between a
@@ -225,13 +250,28 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
       const numbered = NUMBERED.exec(line)
       if (bullet !== null || numbered !== null) {
         const isOrdered = numbered !== null
-        // A change of list kind ends the one before it.
-        if (items.length > 0 && isOrdered !== ordered) flushList()
+        // A change of list kind ends the one before it -- but only at the SAME
+        // depth. A numbered list nested under a bullet is a child of it, not a
+        // new list, and treating it as new was half of the flattening.
+        const width = indentWidth((numbered?.[1] ?? bullet![1]!))
+        // Deeper than the list's OUTERMOST level, not than the innermost.
+        // Compared against the innermost, the SECOND numbered child looked
+        // like a sibling of the first and ended the list under it.
+        const nested = indents.length > 0 && width > indents[0]!
+        if (items.length > 0 && isOrdered !== ordered && !nested) flushList()
         if (items.length === 0) {
           flushParagraph()
           ordered = isOrdered
+          indents.length = 0
         }
-        items.push((numbered?.[1] ?? bullet![1]!).trim())
+        // The indent stack: deeper pushes, shallower pops back to its level,
+        // equal stays. Depth is then just how deep the stack is.
+        if (indents.length === 0 || width > indents[indents.length - 1]!) {
+          indents.push(width)
+        } else {
+          while (indents.length > 1 && width < indents[indents.length - 1]!) indents.pop()
+        }
+        items.push({ text: (numbered?.[2] ?? bullet![2]!).trim(), depth: indents.length - 1 })
         continue
       }
       // A blank line inside a list ends it; prose after it is prose.
@@ -335,7 +375,7 @@ export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]):
             ? ''
             : block.kind === 'table'
               ? [block.header, ...block.rows].map((row) => row.join(' ')).join('\n')
-              : block.items.join('\n')
+              : block.items.map((item) => item.text).join('\n')
     )
     .join('\n')
     .replace(/\s+/g, ' ')
@@ -357,8 +397,11 @@ export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]):
     .map((line) =>
       line
         .replace(HEADING, '$2')
-        .replace(BULLET, '$1')
-        .replace(NUMBERED, '$1')
+        // `$2`, not `$1`: both matchers capture the INDENT first now, so a
+        // list item's words are the second group. Caught by this very check
+        // the moment nesting landed, which is what it is for.
+        .replace(BULLET, '$2')
+        .replace(NUMBERED, '$2')
         .replace(QUOTE, '$1')
         .trim()
     )

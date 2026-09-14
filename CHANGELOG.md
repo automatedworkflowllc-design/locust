@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.104.0 - 2026-09-14
+
+- **Nested lists are nested.** Every item became a top-level row whatever its
+  indent, so a three-level answer came out as one column of equal-weight lines
+  — and in a list, the structure *is* the content. Depth now comes from the
+  indent itself, so two spaces, four spaces and tabs all draw the same shape,
+  and a numbered list written under a bullet is a child of it rather than a new
+  list.
+- A leading `/` is a command only where a person typed it — pinned as a guard,
+  so a teammate's message or a routine step beginning with `/model` can never
+  become one.
+
 ## 0.103.0 - 2026-09-14
 
 - **A run of plain tool calls is one row.** A turn that read eleven files drew

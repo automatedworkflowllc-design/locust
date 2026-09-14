@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 
 import { seedAvatar } from '../../../shared/avatar.js'
 import { parseAgentText, splitInlineCode } from '../agentText.js'
+import type { ListItem } from '../agentText.js'
 import { splitSettled } from '../settledText.js'
 import type { PlanStep } from '../missionView.js'
 import { PixelFace } from './PixelFace.js'
@@ -85,6 +86,50 @@ function inline(text: string): ReactElement {
   )
 }
 
+/**
+ * A list, drawn at the depths the model wrote it at.
+ *
+ * It was flat: every item became a top-level `<li>` whatever its indent, so a
+ * three-level answer came out as one column of equal-weight lines and the
+ * structure -- which is the content, in a list -- was thrown away. B5 of the
+ * interaction plan, and the one Claude Code parity item Colin could see.
+ *
+ * Built by walking the flat items and recursing on any run that is deeper
+ * than the current level. Depth can only ever step UP by one at a time (the
+ * parser's indent stack guarantees it), so there is no case where a child
+ * arrives with no parent.
+ */
+function NestedList({
+  items,
+  ordered,
+  level = 0
+}: {
+  readonly items: readonly ListItem[]
+  readonly ordered: boolean
+  readonly level?: number
+}): ReactElement | null {
+  if (items.length === 0) return null
+  const rows: ReactElement[] = []
+  let index = 0
+  while (index < items.length) {
+    const item = items[index]
+    if (item === undefined) break
+    // Everything after it that is deeper belongs to it.
+    let end = index + 1
+    while (end < items.length && (items[end]?.depth ?? 0) > level) end += 1
+    const children = items.slice(index + 1, end)
+    rows.push(
+      <li key={`i${String(index)}`}>
+        {inline(item.text)}
+        {children.length > 0 && <NestedList items={children} ordered={ordered} level={level + 1} />}
+      </li>
+    )
+    index = end
+  }
+  const className = level === 0 ? 'lc-list' : 'lc-list lc-list--nested'
+  return ordered ? <ol className={className}>{rows}</ol> : <ul className={className}>{rows}</ul>
+}
+
 export function AgentText({
   text,
   streaming
@@ -130,18 +175,9 @@ export function AgentText({
           )
         }
         if (block.kind === 'list') {
-          const items = block.items.map((item, itemIndex) => (
-            <li key={`i${String(itemIndex)}`}>{inline(item)}</li>
-          ))
-          return block.ordered ? (
-            <ol className="lc-list" key={`b${String(index)}`}>
-              {items}
-            </ol>
-          ) : (
-            <ul className="lc-list" key={`b${String(index)}`}>
-              {items}
-            </ul>
-          )
+          // Nested, from each item's own depth. A flat list is the same markup
+          // it always was; a nested one is the shape the model actually wrote.
+          return <NestedList items={block.items} ordered={block.ordered} key={`b${String(index)}`} />
         }
         if (block.kind === 'table') {
           /*

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import { parseAgentText, segmentsCoverInput, splitInlineCode } from './agentText.js'
 
+/** A top-level list item, which is what every case below writes unless it nests. */
+const flat = (text: string) => ({ text, depth: 0 })
+
 const NL = String.fromCharCode(10)
 const lines = (...parts: string[]): string => parts.join(NL)
 
@@ -80,21 +83,21 @@ describe('lists', () => {
     )
     expect(blocks).toEqual([
       { kind: 'text', text: 'Implemented the streak fix.' },
-      { kind: 'list', ordered: false, items: ['currentStreak counts yesterday', 'It resets once missed'] },
+      { kind: 'list', ordered: false, items: [flat('currentStreak counts yesterday'), flat('It resets once missed')] },
       { kind: 'text', text: 'Verification: 3 tests passed.' }
     ])
   })
 
   it('reads a numbered list as ordered', () => {
     expect(parseAgentText(lines('1. first', '2) second'))).toEqual([
-      { kind: 'list', ordered: true, items: ['first', 'second'] }
+      { kind: 'list', ordered: true, items: [flat('first'), flat('second')] }
     ])
   })
 
   it('starts a new list when the kind changes', () => {
     expect(parseAgentText(lines('- a', '1. b'))).toEqual([
-      { kind: 'list', ordered: false, items: ['a'] },
-      { kind: 'list', ordered: true, items: ['b'] }
+      { kind: 'list', ordered: false, items: [flat('a')] },
+      { kind: 'list', ordered: true, items: [flat('b')] }
     ])
   })
 
@@ -176,7 +179,7 @@ describe('headings and emphasis', () => {
 
   it('a heading ends the list before it', () => {
     expect(parseAgentText(lines('- one', '- two', '## Next', 'prose'))).toEqual([
-      { kind: 'list', ordered: false, items: ['one', 'two'] },
+      { kind: 'list', ordered: false, items: [flat('one'), flat('two')] },
       { kind: 'heading', level: 2, text: 'Next' },
       { kind: 'text', text: 'prose' }
     ])

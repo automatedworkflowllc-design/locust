@@ -8646,3 +8646,12 @@ textarea {
 .lc-filerow--folded .lc-filerow__path {
   color: var(--lc-text-secondary);
 }
+
+/*
+ * A nested list. Indented from its parent item and given a little air above
+ * it, so the structure reads as structure rather than as a longer list.
+ */
+.lc-list--nested {
+  margin-top: var(--lc-space-2);
+  padding-left: var(--lc-space-5);
+}
