@@ -9550,6 +9550,17 @@ textarea {
   }
 }
 
+/* Nothing between the monitor and the desktop.
+ *
+ * The window is transparent; these three are what was still being painted
+ * on it. `html` and `body` come from the shared stylesheet, and `#root` is
+ * the mount point, so all three have to be told. */
+.is-splash,
+.is-splash body,
+.is-splash #root {
+  background: transparent;
+}
+
 /* The loading window: the monitor, and NOTHING else.
  *
  * No ground of its own -- the window is transparent, so a background here

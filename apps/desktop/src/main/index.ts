@@ -569,7 +569,6 @@ const createSplashWindow = (): BrowserWindow => {
      * nothing to it.
      */
     transparent: true,
-    backgroundColor: '#00000000',
     icon: app.isPackaged
       ? join(process.resourcesPath, 'icon.ico')
       : join(__dirname, '../../resources/icon-512.png'),

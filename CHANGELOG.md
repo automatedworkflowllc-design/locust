@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.133.0 - 2026-09-14
+
+- **The black square behind the loading screen is gone.** Making the window
+  transparent was not enough: the page drawn on it painted its own
+  background, so the window was see-through and its contents were not. The
+  loading screen is now the monitor and its own edge, on your desktop.
+
 ## 0.132.0 - 2026-09-14
 
 - **The loading screen is just the monitor now.** It had a black slab behind

@@ -16,6 +16,19 @@ import './shell.css'
  */
 const isSplash = window.location.hash === '#splash'
 
+/*
+ * THE PAGE ITSELF HAS TO BE TRANSPARENT, not just the window.
+ *
+ * Making the BrowserWindow transparent was not enough and the black square
+ * stayed exactly where it was (Colin, twice). `shell.css` paints `body`
+ * with `--lc-bg-app`, and the loading window loads the same stylesheet --
+ * so the window was see-through and the page drawn on it was not.
+ *
+ * Marked on the root element rather than by a wrapper, because `html` and
+ * `body` are above anything a component can reach.
+ */
+if (isSplash) document.documentElement.classList.add('is-splash')
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>{isSplash ? <SplashApp /> : <App />}</StrictMode>
 )
