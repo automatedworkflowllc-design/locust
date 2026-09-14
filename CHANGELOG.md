@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.108.0 - 2026-09-14
+
+- **The room's plan sits with the conversation, not above it.** It was pinned
+  at the top, which meant that in any room with a conversation in it the board
+  was scrolled off screen exactly when you would act on it. It now sits under
+  the newest messages, where you already are.
+- **Adding a task is a line, not a bar.** A bordered full-width input used to
+  be the loudest thing in an empty room, for the least important thing in it.
+  A plan has steps and a quiet way to add one.
+- **Locust says when a Cursor connector has no credential.** If you have a
+  connector set up but a Cursor teammate never calls it, this is almost always
+  why: `cursor-agent mcp list` reports `requires_authentication`, and signing
+  in inside the Cursor app does not sign the CLI in. The app now says so, with
+  the exact command that fixes it, once per run.
+
 ## 0.107.0 - 2026-09-14
 
 - **"no word back yet" is gone from the conversation.** Added yesterday for a

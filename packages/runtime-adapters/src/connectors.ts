@@ -110,3 +110,75 @@ export function parseClaudeConnectors(text: string): readonly ClaudeConnector[] 
   }
   return found;
 }
+
+/**
+ * What `cursor-agent mcp list` says about each server this machine has.
+ *
+ * Colin, 2026-09-14, after days of this: "is there really no way to fix the
+ * mcp tools working for our app for cursor, i literally have robinhood
+ * working on the cli but cursor still cant call it."
+ *
+ * The CLI answers it in one line:
+ *
+ *     robinhood-trading: requires_authentication
+ *
+ * That is not an approval problem and never was. Locust passes
+ * `--approve-mcps`, the flag still exists, and approval was never what
+ * refused the call -- the CLI has no token for that server, so its tools do
+ * not reach ANY run, headless or not. The Cursor IDE app keeps its own
+ * credentials, which is why the same connector can work there and nowhere
+ * else, and is exactly the confusion this parses to end.
+ *
+ * A person cannot be expected to run `cursor-agent mcp list` to find that
+ * out. The app can.
+ */
+export interface CursorConnector {
+  readonly name: string
+  /** The CLI's own word, kept verbatim. */
+  readonly status: string
+  /** Whether the CLI says it has no credential for this server yet. */
+  readonly needsAuthentication: boolean
+}
+
+/** `name: status` per line. Anything that is not that shape is not a server. */
+export function parseCursorMcpList(text: string): readonly CursorConnector[] {
+  const out: CursorConnector[] = [];
+  for (const line of text.replace(/\r\n?/g, "\n").split("\n")) {
+    const match = /^\s*([A-Za-z0-9][\w .-]*?)\s*:\s*(\S.*?)\s*$/.exec(line);
+    if (match === null) continue;
+    const name = match[1] ?? "";
+    const status = match[2] ?? "";
+    if (name.length === 0 || status.length === 0) continue;
+    out.push({
+      name,
+      status,
+      // The CLI's own token for "no credential yet". Matched loosely on the
+      // word rather than the exact string, because the surrounding wording is
+      // the CLI's to change and the meaning is not.
+      needsAuthentication: /requires?[_\s-]*auth/i.test(status),
+    });
+  }
+  return out;
+}
+
+/**
+ * The one sentence a person needs, with the command that fixes it.
+ *
+ * Names the servers rather than counting them, because the command takes a
+ * name. Undefined when there is nothing to say -- the app does not remark on
+ * connectors that are working.
+ */
+export function cursorConnectorSentence(
+  connectors: readonly CursorConnector[],
+): string | undefined {
+  const waiting = connectors.filter((connector) => connector.needsAuthentication);
+  if (waiting.length === 0) return undefined;
+  const names = waiting.map((connector) => connector.name);
+  const list = names.length === 1
+    ? names[0]
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
+  const commands = names.map((name) => `cursor-agent mcp login ${name}`).join(" && ");
+  return `Cursor has no credential for ${String(list)}, so a Cursor teammate cannot call ${
+    names.length === 1 ? "it" : "them"
+  }. Signing in inside the Cursor app does not cover the CLI. Run this in a terminal: ${commands}`;
+}

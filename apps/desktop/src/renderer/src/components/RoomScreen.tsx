@@ -411,6 +411,8 @@ export function RoomScreen({
   const [draftMembers, setDraftMembers] = useState<readonly string[]>([])
   const [draftText, setDraftText] = useState('')
   const [draftTask, setDraftTask] = useState('')
+  /** The add field only exists once somebody asks for it. */
+  const [adding, setAdding] = useState(false)
   const [assigning, setAssigning] = useState<string>()
   const [boardError, setBoardError] = useState<string>()
   const [busy, setBusy] = useState(false)
@@ -675,130 +677,6 @@ export function RoomScreen({
           * mission that last touched it. Teammates move it with a block at
           * the end of a reply; this is where a person moves it by hand.
           */}
-        <section className="lc-board" aria-label="Task board">
-          {/*
-            * The PLAN's header, not a section of its own.
-            *
-            * Colin, 2026-09-13: "I just really enjoyed that UI over the task
-            * bar we setup. Would there be a way to have at least replace
-            * that?" The rows already borrowed the plan's shape; what still
-            * read as a bar was everything around them -- a bordered raised
-            * card with a titled head, pinned above every room, drawn even
-            * when the board was empty.
-            *
-            * A plan draws nothing when it has no steps, so neither does this:
-            * an empty board is one quiet line to add the first task, and the
-            * head arrives with the first one.
-            */}
-          {room.tasks.length > 0 && (
-            <div className="lc-rail__meta lc-mono lc-board__head">
-              TASKS · {room.tasks.filter((task) => task.state === 'done').length} of {room.tasks.length} done
-            </div>
-          )}
-          {room.tasks.map((task) => {
-            const owner = teammates.find((entry) => entry.teammateId === task.ownerId)
-            return (
-              /*
-               * THE PLAN'S SHAPE, because it is the same kind of thing.
-               *
-               * Every row carried a state TAG, the text, an owner with a face
-               * and a name, an Open button and three ghost buttons -- six
-               * competing elements per line, all at full strength, for a list
-               * of two. Colin, 2026-09-13: "that task bar at the top is a
-               * disaster lets just scrap that for this plan ui asset."
-               *
-               * A plan step is a marker, the words, and one quiet note on the
-               * right. The state is the MARKER now -- a tick when it is done,
-               * a filled dot while someone has it, an empty one otherwise --
-               * so the tag goes, the text carries the done state itself, and
-               * the owner becomes the quiet note.
-               */
-              <div key={task.taskId} className={`lc-task lc-plan__step is-${task.state}`}>
-                <span className="lc-plan__marker" aria-hidden="true">
-                  {task.state === 'done' ? <Icon name="check" size={11} /> : <span className="lc-dot" />}
-                </span>
-                {/* Said for a reader who cannot see the marker. */}
-                <span className="lc-sr">{task.state === 'in-hand' ? 'in hand' : task.state}</span>
-                <span className="lc-task__text">{task.text}</span>
-                <span className="lc-task__owner">
-                  {owner === undefined ? (
-                    <span className="lc-settings__note">unassigned</span>
-                  ) : (
-                    <>
-                      <PixelFace hue={owner.hue} avatar={owner.avatar} size={16} activity="idle" presence="none" />
-                      {owner.name}
-                    </>
-                  )}
-                </span>
-                <span className="lc-task__actions">
-                  {/* Open sits with the other controls rather than beside the
-                      owner: at rest a row is a marker, the words, and who has
-                      it -- which is a plan step with a note, and is the whole
-                      of what this rebuild is for. */}
-                  {task.missionId !== undefined && assigning !== task.taskId && (
-                    <button type="button" className="lc-ghostbutton" title="The conversation whose reply last moved this task" onClick={() => onOpenMission(task.missionId!)}>
-                      Open
-                    </button>
-                  )}
-                  {assigning === task.taskId ? (
-                    <span className="lc-task__assign" role="group" aria-label="Assign to">
-                      {members.filter((entry) => entry !== undefined).map((entry) => (
-                        <button key={entry!.teammateId} type="button" className="lc-button" onClick={() => void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId, ownerId: entry!.teammateId })}>
-                          {entry!.name}
-                        </button>
-                      ))}
-                      <button type="button" className="lc-button" onClick={() => void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId })}>
-                        Nobody
-                      </button>
-                      <button type="button" className="lc-ghostbutton" onClick={() => setAssigning(undefined)}>
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
-                    <>
-                      <button type="button" className="lc-ghostbutton" onClick={() => setAssigning(task.taskId)}>
-                        Assign
-                      </button>
-                      {task.state === 'done' ? (
-                        <button type="button" className="lc-ghostbutton" onClick={() => void move({ roomId: room.roomId, op: 'reopen', taskId: task.taskId })}>
-                          Reopen
-                        </button>
-                      ) : (
-                        <button type="button" className="lc-ghostbutton" onClick={() => void move({ roomId: room.roomId, op: 'done', taskId: task.taskId })}>
-                          Done
-                        </button>
-                      )}
-                      <button type="button" className="lc-ghostbutton" title="Take it off the board" onClick={() => void move({ roomId: room.roomId, op: 'remove', taskId: task.taskId })}>
-                        Remove
-                      </button>
-                    </>
-                  )}
-                </span>
-              </div>
-            )
-          })}
-          <form
-            className="lc-board__add"
-            onSubmit={(event) => {
-              event.preventDefault()
-              if (draftTask.trim().length === 0) return
-              void move({ roomId: room.roomId, op: 'add', text: draftTask }).then(() => setDraftTask(''))
-            }}
-          >
-            <input
-              className="lc-roomform__name"
-              value={draftTask}
-              onChange={(event) => setDraftTask(event.target.value)}
-              placeholder="Add a task"
-              aria-label="Add a task"
-              maxLength={200}
-            />
-            <button type="submit" className="lc-button" disabled={draftTask.trim().length === 0}>
-              Add
-            </button>
-            {boardError !== undefined && <span className="lc-settings__note lc-tone-red">{boardError}</span>}
-          </form>
-        </section>
         {room.posts.length === 0 && (
           <p className="lc-settings__note">Nothing posted yet. Whatever you write below goes to everyone in the room.</p>
         )}
@@ -1104,6 +982,176 @@ export function RoomScreen({
             </section>
           )
         })}
+        {/*
+          * The board sits with the newest messages, not above everything.
+          *
+          * Colin, 2026-09-14: "it should actually match how the design agent
+          * set it up and appear where the user can actually see it?" It was
+          * pinned at the top of the room, which means that in any room with a
+          * conversation in it the board is scrolled off screen exactly when
+          * somebody would act on it -- and the design's plan is drawn INLINE,
+          * where the reading is, never as a strip above the page.
+          *
+          * At the end it is what you are looking at when you are caught up,
+          * which is the moment a task list is worth anything. The room
+          * follows its newest line (0.96.0), so this is on screen on open.
+          */}
+        <section className="lc-board" aria-label="Task board">
+          {/*
+            * The PLAN's header, not a section of its own.
+            *
+            * Colin, 2026-09-13: "I just really enjoyed that UI over the task
+            * bar we setup. Would there be a way to have at least replace
+            * that?" The rows already borrowed the plan's shape; what still
+            * read as a bar was everything around them -- a bordered raised
+            * card with a titled head, pinned above every room, drawn even
+            * when the board was empty.
+            *
+            * A plan draws nothing when it has no steps, so neither does this:
+            * an empty board is one quiet line to add the first task, and the
+            * head arrives with the first one.
+            */}
+          {room.tasks.length > 0 && (
+            <div className="lc-rail__meta lc-mono lc-board__head">
+              TASKS · {room.tasks.filter((task) => task.state === 'done').length} of {room.tasks.length} done
+            </div>
+          )}
+          {room.tasks.map((task) => {
+            const owner = teammates.find((entry) => entry.teammateId === task.ownerId)
+            return (
+              /*
+               * THE PLAN'S SHAPE, because it is the same kind of thing.
+               *
+               * Every row carried a state TAG, the text, an owner with a face
+               * and a name, an Open button and three ghost buttons -- six
+               * competing elements per line, all at full strength, for a list
+               * of two. Colin, 2026-09-13: "that task bar at the top is a
+               * disaster lets just scrap that for this plan ui asset."
+               *
+               * A plan step is a marker, the words, and one quiet note on the
+               * right. The state is the MARKER now -- a tick when it is done,
+               * a filled dot while someone has it, an empty one otherwise --
+               * so the tag goes, the text carries the done state itself, and
+               * the owner becomes the quiet note.
+               */
+              <div key={task.taskId} className={`lc-task lc-plan__step is-${task.state}`}>
+                <span className="lc-plan__marker" aria-hidden="true">
+                  {task.state === 'done' ? <Icon name="check" size={11} /> : <span className="lc-dot" />}
+                </span>
+                {/* Said for a reader who cannot see the marker. */}
+                <span className="lc-sr">{task.state === 'in-hand' ? 'in hand' : task.state}</span>
+                <span className="lc-task__text">{task.text}</span>
+                <span className="lc-task__owner">
+                  {owner === undefined ? (
+                    <span className="lc-settings__note">unassigned</span>
+                  ) : (
+                    <>
+                      <PixelFace hue={owner.hue} avatar={owner.avatar} size={16} activity="idle" presence="none" />
+                      {owner.name}
+                    </>
+                  )}
+                </span>
+                <span className="lc-task__actions">
+                  {/* Open sits with the other controls rather than beside the
+                      owner: at rest a row is a marker, the words, and who has
+                      it -- which is a plan step with a note, and is the whole
+                      of what this rebuild is for. */}
+                  {task.missionId !== undefined && assigning !== task.taskId && (
+                    <button type="button" className="lc-ghostbutton" title="The conversation whose reply last moved this task" onClick={() => onOpenMission(task.missionId!)}>
+                      Open
+                    </button>
+                  )}
+                  {assigning === task.taskId ? (
+                    <span className="lc-task__assign" role="group" aria-label="Assign to">
+                      {members.filter((entry) => entry !== undefined).map((entry) => (
+                        <button key={entry!.teammateId} type="button" className="lc-button" onClick={() => void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId, ownerId: entry!.teammateId })}>
+                          {entry!.name}
+                        </button>
+                      ))}
+                      <button type="button" className="lc-button" onClick={() => void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId })}>
+                        Nobody
+                      </button>
+                      <button type="button" className="lc-ghostbutton" onClick={() => setAssigning(undefined)}>
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <>
+                      <button type="button" className="lc-ghostbutton" onClick={() => setAssigning(task.taskId)}>
+                        Assign
+                      </button>
+                      {task.state === 'done' ? (
+                        <button type="button" className="lc-ghostbutton" onClick={() => void move({ roomId: room.roomId, op: 'reopen', taskId: task.taskId })}>
+                          Reopen
+                        </button>
+                      ) : (
+                        <button type="button" className="lc-ghostbutton" onClick={() => void move({ roomId: room.roomId, op: 'done', taskId: task.taskId })}>
+                          Done
+                        </button>
+                      )}
+                      <button type="button" className="lc-ghostbutton" title="Take it off the board" onClick={() => void move({ roomId: room.roomId, op: 'remove', taskId: task.taskId })}>
+                        Remove
+                      </button>
+                    </>
+                  )}
+                </span>
+              </div>
+            )
+          })}
+          {/*
+            * Adding a task is a LINE, not a bar.
+            *
+            * Colin, 2026-09-14, on an empty room: "i thought we completely
+            * removed the add a task function and replaced it with the plan
+            * ui no? this is definitely not what we cooked up lmfao." He was
+            * looking at a bordered full-width input sitting at the top of a
+            * room with nothing in it -- the loudest thing on the screen, for
+            * the least important thing there.
+            *
+            * The plan came first in 0.99.0 and this did not follow it. A
+            * plan has no input in it; it has steps. So the field is gone
+            * until it is asked for, and what is left is one quiet line at the
+            * END of the list, where a new step belongs.
+            */}
+          {adding ? (
+            <form
+              className="lc-board__add"
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (draftTask.trim().length === 0) return
+                void move({ roomId: room.roomId, op: 'add', text: draftTask }).then(() => {
+                  setDraftTask('')
+                  setAdding(false)
+                })
+              }}
+            >
+              <input
+                className="lc-roomform__name"
+                value={draftTask}
+                onChange={(event) => setDraftTask(event.target.value)}
+                onKeyDown={(event) => {
+                  // Escape puts it away without leaving a half-typed step.
+                  if (event.key === 'Escape') {
+                    setDraftTask('')
+                    setAdding(false)
+                  }
+                }}
+                placeholder="What needs doing?"
+                aria-label="Add a task"
+                maxLength={200}
+                autoFocus
+              />
+              <button type="submit" className="lc-button" disabled={draftTask.trim().length === 0}>
+                Add
+              </button>
+              {boardError !== undefined && <span className="lc-settings__note lc-tone-red">{boardError}</span>}
+            </form>
+          ) : (
+            <button type="button" className="lc-board__addlink" onClick={() => setAdding(true)}>
+              + Add a task
+            </button>
+          )}
+        </section>
         <JumpToBottom shown={follow.away} onClick={follow.toBottom} />
       </div>
       {/*

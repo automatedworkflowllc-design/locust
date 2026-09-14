@@ -8664,3 +8664,25 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }
+
+/*
+ * `+ Add a task`: the way a person adds a step, as a line rather than a bar.
+ *
+ * It was a bordered full-width input at the top of every room, which in an
+ * empty room was the loudest thing on the screen for the least important
+ * thing there (Colin, 2026-09-14). A plan has no input in it; it has steps
+ * and a way to add one.
+ */
+.lc-board__addlink {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-board__addlink:hover {
+  color: var(--lc-text-primary);
+}

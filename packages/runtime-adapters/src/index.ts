@@ -10,8 +10,14 @@ export {
   OMNIROUTE_REQUIRED_FEATURES,
 } from "./commands.js";
 export { discoverInstalledRuntimes } from "./discovery.js";
-export { allowRuleFor, parseClaudeConnectors, toolPrefixFor } from "./connectors.js";
-export type { ClaudeConnector } from "./connectors.js";
+export {
+  allowRuleFor,
+  cursorConnectorSentence,
+  parseClaudeConnectors,
+  parseCursorMcpList,
+  toolPrefixFor,
+} from "./connectors.js";
+export type { ClaudeConnector, CursorConnector } from "./connectors.js";
 export { createAppServerClient } from "./app-server.js";
 export {
   createAppServerEventNormalizer,
