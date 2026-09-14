@@ -4096,7 +4096,14 @@ textarea {
      column of fragments -- "No / mis... / yet. / Des... / one". Measured on
      screen at 1014px wide, 2026-09-05. Every other piece of prose in this
      rail is already hidden here; this one was missed. */
-.lc-shell.is-compact .lc-sidebar__brand img,
+/* The WORDMARK goes, the mark stays.
+ *
+ * Both were hidden, so the rail opened with a `+` where the app's own name
+ * should be -- it lost its identity at exactly the width where the window
+ * is smallest and most anonymous, and there was nothing to click to get
+ * home (Colin, 2026-09-14; the design pass said the same). The mark is
+ * 1.744:1 and fits the rail at 26px. */
+.lc-shell.is-compact .lc-brand__wordmark,
 .lc-shell.is-compact .lc-sidebar .lc-row__text,
 .lc-shell.is-compact .lc-sidebar .lc-sectionlabel,
 .lc-shell.is-compact .lc-search,
@@ -4105,6 +4112,25 @@ textarea {
 .lc-shell.is-compact .lc-sidebar__empty {
     display: none;
   }
+
+/* The rail's brand is the mark alone, and it is the way home. */
+.lc-shell.is-compact .lc-brand__mark {
+    width: 26px;
+    height: auto;
+  }
+
+/* The second bare `+`. Its words are hidden at this width, so it is an
+   unlabelled icon that cannot be told from the one above it; the header's
+   menu carries New room instead. */
+.lc-shell.is-compact .lc-roomrow--new {
+    display: none;
+  }
+
+.lc-sidebar__addmenu {
+  top: calc(100% + var(--lc-space-2));
+  right: 0;
+  min-width: 168px;
+}
 
 .lc-shell.is-compact .lc-row {
     justify-content: center;

@@ -26,8 +26,19 @@ import { discoverInstalledRuntimes } from "./discovery.js";
  * order) and drops what it cost (the sum).
  */
 
-/** A locator that finds nothing: the probe path still runs, just faster. */
+/**
+ * A locator that finds nothing -- the shape of a machine with no runtimes
+ * installed, which is the case the stagger must not tax.
+ *
+ * Worth knowing when reading these: `discoverOne` returns HERE, before the
+ * runner is ever called. A "slow runner" with this locator is not slow at
+ * all, and a test written that way measures nothing -- which is exactly
+ * what happened on the first attempt at the timing tests below.
+ */
 const locator = { find: async () => undefined };
+
+/** A locator that DOES find something, so the runner is actually reached. */
+const foundLocator = { find: async () => ({ executablePath: "C:/fake/bin.exe", prefixArgs: [] }) };
 
 const slowRunner = (ms: number) =>
   ({
@@ -69,7 +80,7 @@ describe("discovery as it happens", () => {
     const starts: number[] = [];
     await discoverInstalledRuntimes({
       runner: slowRunner(60),
-      locator: locator as never,
+      locator: foundLocator as never,
       staggerMs: 5,
       watch: { started: () => starts.push(Date.now()), finished: () => undefined },
     });
@@ -87,7 +98,7 @@ describe("discovery as it happens", () => {
     const began = Date.now();
     await discoverInstalledRuntimes({
       runner: slowRunner(50),
-      locator: locator as never,
+      locator: foundLocator as never,
       staggerMs: 2,
       watch: { started: () => undefined, finished: () => undefined },
     });
@@ -124,5 +135,49 @@ describe("discovery as it happens", () => {
     // The watcher is an observer, never a condition of the sweep.
     const found = await discoverInstalledRuntimes({ runner: instantRunner, locator: locator as never });
     expect(found.length).toBeGreaterThan(0);
+  });
+});
+
+describe("a machine with nothing installed waits for nothing", () => {
+  /*
+   * Colin, 2026-09-14: "lets make sure if ian or anyone else gets the app
+   * that doesnt have all the runtimes that the loading screen isnt a
+   * nuisance."
+   *
+   * A fixed stagger put a floor under the sweep -- seven definitions at
+   * 240ms is about 1.7s before the last one starts -- and that floor was
+   * paid by exactly the people who should pay nothing. A probe for a binary
+   * that is not on PATH answers in about 10ms because nothing is spawned,
+   * so on a bare machine the stagger WAS the whole wait.
+   *
+   * Each probe now waits for the one before it OR for the stagger,
+   * whichever comes first.
+   */
+  it("chains straight through when every probe is instant", async () => {
+    const began = Date.now();
+    await discoverInstalledRuntimes({
+      runner: instantRunner,
+      locator: locator as never,
+      staggerMs: 240,
+      watch: { started: () => undefined, finished: () => undefined },
+    });
+    // Seven definitions at a fixed 240ms would be about 1,680ms.
+    expect(Date.now() - began).toBeLessThan(400);
+  });
+
+  it("still spaces them out when the probes are slow", async () => {
+    // The beat only exists where there is a wait to fill.
+    const starts: number[] = [];
+    await discoverInstalledRuntimes({
+      runner: slowRunner(200),
+      locator: foundLocator as never,
+      staggerMs: 40,
+      watch: { started: () => starts.push(Date.now()), finished: () => undefined },
+    });
+    const gaps = starts.slice(1).map((at, index) => at - (starts[index] ?? 0));
+    // Every gap is the stagger, not the probe: the next one does not wait
+    // for a slow answer.
+    for (const gap of gaps) expect(gap).toBeLessThan(200);
+    expect(Math.max(...gaps)).toBeGreaterThan(10);
   });
 });

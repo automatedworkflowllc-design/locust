@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.134.0 - 2026-09-14
+
+- **The loading screen is quick on a machine without the runtimes.** Checking
+  spaced each runtime a beat apart so the log could be read, and that beat
+  was being paid by the people with nothing to check — a runtime that is not
+  installed answers in about ten milliseconds, so the spacing *was* the whole
+  wait. Each check now waits for the one before it or for the beat, whichever
+  comes first: slow runtimes still arrive one at a time, and an empty machine
+  goes straight through.
+- **The narrow sidebar keeps the Locust mark**, and it is still the way home.
+  Both it and the wordmark were hidden, so the app lost its own name at
+  exactly the width where the window is smallest.
+- **One `+` in the narrow sidebar, and it says what it adds.** There were two
+  stacked, unlabelled and indistinguishable; it is now a single control
+  offering New teammate or New room.
+
 ## 0.133.0 - 2026-09-14
 
 - **The black square behind the loading screen is gone.** Making the window

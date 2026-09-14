@@ -483,21 +483,72 @@ export async function discoverInstalledRuntimes(
     ? DEFINITIONS.filter((definition) => definition.id !== "omniroute")
     : DEFINITIONS;
   const stagger = options.staggerMs ?? 0;
-  return Promise.all(
-    definitions.map(async (definition, index) => {
-      if (stagger > 0 && index > 0) {
-        await new Promise((resolve) => setTimeout(resolve, stagger * index));
-      }
-      // Before the spawn. A watcher told afterwards learns nothing it could
-      // not have read from the result.
-      options.watch?.started({
-        id: definition.id,
-        displayName: definition.displayName,
-        bin: definition.commandName,
-      });
-      const discovery = await discoverOne(definition, options.runner, options.locator);
-      options.watch?.finished({ id: definition.id }, discovery);
-      return discovery;
-    }),
-  );
+  /*
+   * NEVER WAIT LONGER THAN THE RUNTIME DOES.
+   *
+   * A fixed stagger put a floor under the whole sweep: seven definitions at
+   * 240ms is about 1.7 seconds before the last one even starts, and that
+   * floor is paid by exactly the people who should pay nothing -- somebody
+   * with one runtime installed, or none. A probe for a binary that is not
+   * on PATH answers in about 10ms because nothing is ever spawned, so on
+   * that machine the stagger WAS the entire wait.
+   *
+   * Colin, 2026-09-14: "lets make sure if ian or anyone else gets the app
+   * that doesnt have all the runtimes that the loading screen isnt a
+   * nuisance."
+   *
+   * So each probe waits for the one before it to finish, OR for the
+   * stagger, whichever comes first. Slow runtimes still arrive a readable
+   * beat apart, because the beat is shorter than they are. Instant ones
+   * chain straight through, because there is no wait to fill.
+   */
+  /*
+   * A GATE PER PROBE, opened by the one before it.
+   *
+   * The first attempt raced a shared `previous` inside `Promise.all`, and
+   * every callback runs synchronously up to its first await -- so all seven
+   * raced the same already-resolved promise and started together. The
+   * measurement caught it: the gaps between starts were zero.
+   *
+   * Each probe holds a gate the next one waits on, and opens it when it
+   * finishes OR after the stagger, whichever comes first -- timed from when
+   * that probe actually began.
+   */
+  const found: Promise<RuntimeDiscovery>[] = [];
+  let gate: Promise<void> = Promise.resolve();
+  for (const definition of definitions) {
+    const mine = gate;
+    let openNext: () => void = () => undefined;
+    gate = new Promise<void>((resolve) => {
+      openNext = resolve;
+    });
+    found.push(
+      (async () => {
+        await mine;
+        // Before the spawn. A watcher told afterwards learns nothing it
+        // could not have read from the result.
+        options.watch?.started({
+          id: definition.id,
+          displayName: definition.displayName,
+          bin: definition.commandName,
+        });
+        const running = discoverOne(definition, options.runner, options.locator);
+        if (stagger > 0) {
+          void Promise.race([
+            running.then(
+              () => undefined,
+              () => undefined,
+            ),
+            new Promise((resolve) => setTimeout(resolve, stagger)),
+          ]).then(() => openNext());
+        } else {
+          openNext();
+        }
+        const discovery = await running;
+        options.watch?.finished({ id: definition.id }, discovery);
+        return discovery;
+      })(),
+    );
+  }
+  return Promise.all(found);
 }

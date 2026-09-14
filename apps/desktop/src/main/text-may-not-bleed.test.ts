@@ -129,3 +129,46 @@ describe('the conversation row reserves room for its menu', () => {
     expect(CSS).not.toContain('.lc-teammate__missionrow:hover .lc-teammate__turns')
   })
 })
+
+describe('the rail keeps its identity and one way to add', () => {
+  /*
+   * Colin, 2026-09-14: "for rail mode maybe consolidate room and teammate
+   * add into one +, looks clunky, also there is no locust logo to click in
+   * rail mode to go to home". The design pass had flagged the same two.
+   *
+   * Both came from one rule hiding more than it meant to: every image in
+   * the brand block went, taking the mark with the wordmark, and the Rooms
+   * row's label went, leaving a bare `+` indistinguishable from the one
+   * above it.
+   */
+  const SIDEBAR = readFileSync(
+    fileURLToPath(new URL('../renderer/src/components/Sidebar.tsx', import.meta.url)),
+    'utf8'
+  )
+
+  it('keeps the mark in the rail, and only drops the wordmark', () => {
+    expect(CSS).toContain('.lc-shell.is-compact .lc-brand__wordmark')
+    // The old rule took both, which is what left a `+` where the app's own
+    // name should be.
+    expect(CSS).not.toContain('.lc-shell.is-compact .lc-sidebar__brand img')
+    expect(CSS).toContain('.lc-shell.is-compact .lc-brand__mark')
+  })
+
+  it('leaves the mark clickable, because it is the way home', () => {
+    expect(SIDEBAR).toContain('aria-label="Home"')
+    expect(SIDEBAR).toContain('lc-brand__mark')
+  })
+
+  it('shows one add control in the rail, not two bare pluses', () => {
+    expect(CSS).toContain('.lc-shell.is-compact .lc-roomrow--new')
+    expect(SIDEBAR).toContain('lc-sidebar__addmenu')
+  })
+
+  it('makes that one control say what it would add', () => {
+    // An unlabelled `+` is what was wrong with two of them; one unlabelled
+    // `+` would only be half a fix.
+    expect(SIDEBAR).toContain('New teammate')
+    expect(SIDEBAR).toContain('New room')
+    expect(SIDEBAR).toContain("aria-haspopup=\"menu\"")
+  })
+})
