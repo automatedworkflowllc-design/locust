@@ -80,24 +80,3 @@ export function ContextRing({
     </span>
   )
 }
-
-/**
- * The conversation's spend, where there is no ring to hang it on.
- *
- * The ruling sent this number to the context ring. Measured afterwards:
- * **only Claude Code reports a context window**, so the ring renders for one
- * of seven runtimes and the fact would have vanished on the two Colin
- * actually drives. Same slot, same scope, stated rather than hidden --
- * which is the ruling's own principle applied where its surface is empty.
- */
-export function ConversationSpend({ cost }: { readonly cost: string }): ReactElement {
-  return (
-    <span
-      className="lc-composer__spend"
-      title={`This conversation: ${cost}`}
-      aria-label={`This conversation: ${cost}`}
-    >
-      {cost}
-    </span>
-  )
-}

@@ -27,7 +27,7 @@ import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
-import { ConversationSpend, ContextRing } from './ContextRing.js'
+import { ContextRing } from './ContextRing.js'
 import type { ContextReading } from '../cost.js'
 import { Icon } from './Icon.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
@@ -1186,12 +1186,7 @@ export function Composer({
                 <span className="lc-composer__context">
                   <ContextRing reading={context} {...(conversationCost === undefined ? {} : { conversationCost })} />
                 </span>
-              ) : conversationCost === undefined ? null : (
-                // No ring: only Claude Code reports a context window, so on
-                // every other runtime this slot is where the conversation's
-                // spend is stated outright rather than lost.
-                <ConversationSpend cost={conversationCost} />
-              )}
+              ) : null}
               <span className="lc-control__anchor" ref={pickerAnchor}>
                 {pickerOpen && (
                   <RoutePicker

@@ -347,7 +347,14 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     return { width, height }
   }
 
-  return { evaluate, send, capture, ready, finish, profile, out, record, resize }
+  /*
+   * The OS process id, for the one thing CDP cannot do: move and photograph
+   * the real window. `resize` above changes the PAGE and leaves the window
+   * where it is, which is fine for anything measured inside the page and is
+   * NOT a native-window sizing pass. A design review counting pixels needs
+   * the window a person actually has.
+   */
+  return { evaluate, send, capture, ready, finish, profile, out, record, resize, pid: child.pid }
 }
 
 /**

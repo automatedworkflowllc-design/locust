@@ -3643,20 +3643,6 @@ textarea {
   margin-right: var(--lc-space-2);
 }
 
-/* The conversation's spend, in the ring's slot, for the runtimes that report
- * no context window -- which is every runtime but Claude Code. Muted mono so
- * it reads as a quantity beside the route chip rather than a control. */
-.lc-composer__spend {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  margin-right: var(--lc-space-2);
-  font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-label);
-  color: var(--lc-text-muted);
-  white-space: nowrap;
-}
-
 .lc-send {
   width: 30px;
   height: 30px;
@@ -3848,8 +3834,26 @@ textarea {
 }
 
 /* The effort level, riding on the route chip as `· high`. */
+/*
+ * TEXT MAY NOT BLEED OUT OF ITS OWN BOX.
+ *
+ * Colin, 2026-09-14, on a live window: "text bleeding off model picker".
+ * Measured in the DOM at two widths -- the `effort - fixed` label and the
+ * swarm mark overlapped by 44px at 1477 and 83px at 1120.
+ *
+ * The mechanism is the `min-width: 0` a few rules down, which exists so the
+ * folder and model names CAN truncate. It applies to every child, so a box
+ * with no truncation of its own shrinks below its text and the text paints
+ * over whatever is next. Only the two names are meant to give; everything
+ * else in the row holds its size.
+ */
 .lc-control__effort {
   color: var(--lc-text-muted);
+  flex: none;
+}
+
+.lc-control.is-static {
+  flex: none;
 }
 
 /* Same ceiling, same reason it has to be able to give: see the folder above. */

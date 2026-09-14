@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.126.0 - 2026-09-14
+
+- **Text no longer bleeds across the composer's controls.** The `effort ·
+  fixed` label and the swarm mark were drawn on top of each other — measured
+  at 44px of overlap in a default window and 83px in a small one. That row is
+  capped and deliberately does not wrap, and the rule that lets the folder
+  and model names truncate was letting everything else shrink below its own
+  text too. Only those two names give now.
+- **The conversation's running total is out of that row.** 0.125.0 put it
+  there for runtimes that draw no context ring, and that row was already at
+  capacity. It stays in the ring's hover where a ring exists; where to put it
+  otherwise is back with the design review rather than answered in the
+  tightest row in the app.
+
 ## 0.125.0 - 2026-09-14
 
 From a static sweep of the whole renderer.
