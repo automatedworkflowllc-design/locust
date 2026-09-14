@@ -20,7 +20,9 @@ import type {
   PublicWorktree
 } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
+import type { TeammateStatusView } from '../status.js'
 import {
+  facePresenceFor,
   formatBytes,
   integrationOf,
   missionPhaseView,
@@ -30,13 +32,12 @@ import {
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
 import { PixelFace } from './PixelFace.js'
-import type { FaceActivity } from '../faceState.js'
 import { COST_NOT_REPORTED_SHORT, costLine, costLineOrWhyNot, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
 import type { RecoverRoutine } from './RoutineRecovery.js'
-import { FREE_START_RUNTIME, installCommand } from '../../../shared/runtime-install.js'
+import { FREE_START_RUNTIME, installCommand, signInCommand } from '../../../shared/runtime-install.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
@@ -327,7 +328,7 @@ export function TeammatesScreen({
   teammates,
   missions,
   missionOwners,
-  activityByTeammate,
+  viewByTeammate,
   titleOf,
   onOpenMission,
   onNewTeammate,
@@ -348,7 +349,7 @@ export function TeammatesScreen({
   readonly titleOf: (mission: PublicRecoveredMission) => string
   readonly onOpenMission: (missionId: string) => void
   /** Each teammate's face state, decided once in the shell so the roster agrees with the sidebar. */
-  readonly activityByTeammate: Readonly<Record<string, FaceActivity>>
+  readonly viewByTeammate: Readonly<Record<string, TeammateStatusView>>
   readonly onNewTeammate: () => void
   readonly onEdit: (teammate: PublicTeammate) => void
   readonly onRemove: (teammateId: string) => void
@@ -381,7 +382,10 @@ export function TeammatesScreen({
                     hue={teammate.hue}
                     avatar={teammate.avatar}
                     size={36}
-                    activity={activityByTeammate[teammate.teammateId] ?? 'idle'}
+                    activity={viewByTeammate[teammate.teammateId]?.activity ?? 'idle'}
+                    // The roster had no dot because it had no status. It has
+                    // both now, from the same call the sidebar reads.
+                    presence={facePresenceFor(viewByTeammate[teammate.teammateId]?.status ?? 'idle')}
                     teammateId={teammate.teammateId}
                   />
                   <div className="lc-rostercard__id">
@@ -1089,6 +1093,16 @@ export function SettingsScreen({
                   >
                     {status.tag}
                   </span>
+                  {/*
+                    * A red tag that does not say what to do is half a message.
+                    * The first-run panel has printed this command since it was
+                    * built; Settings -- the screen a person opens when a
+                    * runtime is wrong -- drew the same red tag and stopped
+                    * there (Grok's audit, 2026-09-13).
+                    */}
+                  {status.tag === 'SIGN IN' && signInCommand(runtime.id) !== undefined && (
+                    <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
+                  )}
                 </div>
               )
             })}

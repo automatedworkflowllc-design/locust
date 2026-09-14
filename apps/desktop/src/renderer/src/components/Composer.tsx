@@ -11,7 +11,9 @@ import type {
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
 import { hostCanRunMission, isMissionRuntime, runtimeDisplayName } from '../../../shared/runtimes.js'
+import type { ModeFacts } from '../status.js'
 import {
+  MODE_FACTS,
   handoffAvailability,
   handoffTitle,
   modeRunsOn,
@@ -44,29 +46,12 @@ const MAX_PROMPT_LENGTH = 8_000
  * interactive approval channel, so "plan first" and "automatic" would be
  * labels over behaviour that does not differ.
  */
-const MODES: readonly { readonly mode: MissionMode; readonly name: string; readonly consequence: string }[] = [
-  { mode: 'ask', name: 'Ask', consequence: 'Reads and explains. Every write is refused by the sandbox.' },
-  {
-    mode: 'accept-edits',
-    name: 'Accept edits',
-    consequence: 'May edit files inside this workspace folder, and nowhere else.'
-  },
-  {
-    mode: 'plan',
-    name: 'Plan',
-    consequence: 'Answers with the steps it would take, and changes nothing.'
-  },
-  {
-    mode: 'approve-each',
-    name: 'Approve each action',
-    consequence: 'Stops and asks before every command or file change.'
-  },
-  {
-    mode: 'auto',
-    name: 'Auto',
-    consequence: 'Runs without asking and may change files anywhere on this machine, not only this folder.'
-  }
-]
+/*
+ * The picker's rows, from the one table. They used to be written out here,
+ * which is how the same mode came to be `Ask` in this list and `ask` in a
+ * receipt -- see `MODE_FACTS` for the rest of that history.
+ */
+const MODES: readonly ModeFacts[] = MODE_FACTS
 
 /**
  * What this mode does to a connector, in one sentence, measured.
@@ -583,7 +568,7 @@ export function Composer({
         }
       }
     })()
-      .catch(() => setNote('That could not be attached.'))
+      .catch(() => setNote('That could not be attached. Your message is untouched.'))
       .finally(() => setAttaching(false))
   }
 
@@ -1184,7 +1169,7 @@ export function Composer({
                         setNote(answer.message)
                       }
                     })
-                    .catch(() => setNote('Those files could not be attached.'))
+                    .catch(() => setNote('Those files could not be attached. Your message is untouched.'))
                     .finally(() => setAttaching(false))
                 }}
               >

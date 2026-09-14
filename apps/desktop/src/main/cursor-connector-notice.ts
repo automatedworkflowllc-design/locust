@@ -1,6 +1,10 @@
 import { execFile } from 'node:child_process'
 
-import { cursorConnectorSentence, parseCursorMcpList } from '@teammate/runtime-adapters'
+import {
+  createPathExecutableLocator,
+  cursorConnectorSentence,
+  parseCursorMcpList
+} from '@teammate/runtime-adapters'
 
 /**
  * Say when a Cursor connector has no credential, because nothing else will.
@@ -32,15 +36,34 @@ let held: { readonly at: number; readonly sentence: string | undefined } | undef
 
 export type McpLister = () => Promise<string>
 
-const runCursorMcpList: McpLister = () =>
-  new Promise((resolve) => {
+const runCursorMcpList: McpLister = async () => {
+  /*
+   * Resolve the launcher; do not assume the name works as a program.
+   *
+   * MEASURED 2026-09-13 on Colin's machine, and it is why the notice this
+   * module exists for had never once appeared: Cursor installs `cursor-agent`
+   * as a `.cmd` shim, and `execFile` without a shell cannot start a `.cmd` at
+   * all -- `spawn cursor-agent ENOENT`, every time, on the one platform this
+   * app ships to. The reading failed, the catch below swallowed it as "no
+   * answer", and the app said nothing about a connector it could see was
+   * waiting. A whole feature, silent, for the oldest Windows reason there is.
+   *
+   * The locator is the same one discovery uses, so a machine where Cursor
+   * runs at all can also be asked about its connectors. Its `npmBinDirectory`
+   * is not threaded through here on purpose: Cursor's installer writes to
+   * %LOCALAPPDATA%, never npm's prefix, and PATH is still searched first.
+   */
+  const launch = await createPathExecutableLocator({}).find('cursor-agent')
+  if (launch === undefined) return ''
+  return await new Promise((resolve) => {
     execFile(
-      'cursor-agent',
-      ['mcp', 'list'],
+      launch.executablePath,
+      [...launch.prefixArgs, 'mcp', 'list'],
       { timeout: TIMEOUT_MS, windowsHide: true },
       (_error, stdout) => resolve(typeof stdout === 'string' ? stdout : '')
     )
   })
+}
 
 /**
  * The sentence to show, or undefined when there is nothing to say.

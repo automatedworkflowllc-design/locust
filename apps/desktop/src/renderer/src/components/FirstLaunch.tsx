@@ -5,7 +5,7 @@ import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
 import { connectedRuntimeCount, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
-import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts } from '../../../shared/runtime-install.js'
+import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
 
 /**
  * First run, and the empty state generally.
@@ -37,12 +37,6 @@ import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFact
  */
 function openLink(url: string): void {
   void window.desktop?.openLink(url)
-}
-
-/** The line a person runs once to sign in, when the runtime needs an account. */
-function signInCommand(runtime: string): string | undefined {
-  const facts = runtimeInstallFacts(runtime)
-  return facts?.signIn === undefined ? undefined : `run ${facts.signIn}`
 }
 
 /** Where a runtime that is not a package comes from. */

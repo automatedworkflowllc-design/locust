@@ -6,9 +6,31 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { branchNameFor, createWorktreeManager, gitVersionSupportsWorktrees, parseGitVersion, parseWorktreeList } from './worktrees.js'
 
+/*
+ * These tests drive REAL git against REAL directories, and that is the point
+ * of them -- the bugs they exist to catch are git's behaviour, not ours. What
+ * it costs is that they are the only tests here whose runtime depends on the
+ * machine, and twice on 2026-09-13 and once more on 2026-09-14 the
+ * two-teammate case timed out under parallel load and then passed alone.
+ *
+ * Neither symptom was our code. The first is arithmetic: that case runs twelve
+ * git invocations end to end, and twelve process starts on Windows -- with a
+ * scanner in front of each -- does not reliably fit in vitest's 5s default
+ * while the rest of the suite is using the cores. It gets a budget that
+ * matches what it actually does.
+ *
+ * The second is Windows: `git worktree` leaves handles on the directory for a
+ * moment after the process exits, so an immediate recursive delete raises
+ * EBUSY. `rm` will wait if asked, and asking is the whole fix.
+ */
+const CLEANUP = { recursive: true, force: true, maxRetries: 5, retryDelay: 100 } as const
+
+/** Twelve git process starts, measured, not guessed. */
+const REAL_GIT_TIMEOUT_MS = 30_000
+
 const roots: string[] = []
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map((directory) => rm(directory, CLEANUP)))
 })
 
 const git = (args: readonly string[], cwd: string): Promise<string> =>
@@ -74,7 +96,7 @@ describe('a worktree per teammate, on a real repository', () => {
     await expect(manager.ensure({ teammateId: 'tm_wren', name: 'Wren' })).rejects.toThrow(/not a git repository/)
   })
 
-  it('makes the tree under .locust/worktrees on its own branch, excludes .locust, and is idempotent', async () => {
+  it('makes the tree under .locust/worktrees on its own branch, excludes .locust, and is idempotent', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
     const root = await repository()
     const manager = createWorktreeManager({ workspacePath: root })
     expect((await manager.probe()).repository).toBe(true)
@@ -89,7 +111,7 @@ describe('a worktree per teammate, on a real repository', () => {
     expect((await manager.list()).map((entry) => [entry.teammateId, entry.branch])).toEqual([['tm_wren', 'locust/wren']])
   })
 
-  it('two teammates get two trees that do not see each other, and the main checkout stays untouched', async () => {
+  it('two teammates get two trees that do not see each other, and the main checkout stays untouched', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
     const root = await repository()
     const manager = createWorktreeManager({ workspacePath: root })
     const wren = await manager.ensure({ teammateId: 'tm_wren', name: 'Wren' })
@@ -109,7 +131,7 @@ describe('a worktree per teammate, on a real repository', () => {
     expect((await git(['rev-parse', '--abbrev-ref', 'HEAD'], again)).trim()).toBe('locust/booty')
   })
 
-  it('refuses an id that could name a path outside the folder', async () => {
+  it('refuses an id that could name a path outside the folder', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
     const root = await repository()
     const manager = createWorktreeManager({ workspacePath: root })
     await expect(manager.ensure({ teammateId: '../escape', name: 'x' })).rejects.toThrow(/cannot name a worktree/)

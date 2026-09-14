@@ -222,7 +222,7 @@ export function ActivityCard({
       .then((response) => {
         if (!response.ok) setRevealNotice(response.message)
       })
-      .catch(() => setRevealNotice('That file could not be shown.'))
+      .catch(() => setRevealNotice('That file could not be shown. It is still where it was written.'))
   }
   const entries = activityEntries(details, workspacePath)
   const counts = activityCounts(details, workspacePath)

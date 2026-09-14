@@ -229,7 +229,7 @@ export function Inspector({
                         .then((response) => {
                           if (!response.ok) setArtifactNotice(response.message)
                         })
-                        .catch(() => setArtifactNotice('That file could not be shown.'))
+                        .catch(() => setArtifactNotice('That file could not be shown. It is still where it was written.'))
                     }}
                   >
                     <Icon name="folder" size={13} />

@@ -120,3 +120,17 @@ export function installSentence(runtime: string, displayName: string): string {
     : `Install it below, then run ${facts.signIn} once to sign in with ${facts.account ?? 'your account'}.`
   return `${displayName} was not found on this machine. ${after}`
 }
+
+/**
+ * The line a person runs once to sign in, when the runtime needs an account.
+ *
+ * Lives beside the facts rather than in the first-run panel, because the
+ * first-run panel is not the only place a person meets a signed-out runtime.
+ * Settings drew the same red SIGN IN tag and said nothing else at all, so the
+ * screen a person opens when something is wrong knew LESS than the screen
+ * they see once (Grok's audit, 2026-09-13).
+ */
+export function signInCommand(runtime: string): string | undefined {
+  const facts = runtimeInstallFacts(runtime)
+  return facts?.signIn === undefined ? undefined : `run ${facts.signIn}`
+}

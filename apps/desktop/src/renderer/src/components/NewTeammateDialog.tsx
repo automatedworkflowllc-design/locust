@@ -4,6 +4,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector} from '../../../shared/ipc.js'
+import { modeSummary } from '../status.js'
 import { PixelFace } from './PixelFace.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 
@@ -41,20 +42,7 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
  * which is the THIRD time this dialog has claimed a permission the run did
  * not have, and the first time in the direction that understates it.
  */
-function modeSummary(mode: MissionMode): string {
-  switch (mode) {
-    case 'accept-edits':
-      return 'Accept edits · may change files in this workspace'
-    case 'approve-each':
-      return 'Approve each action · asks before every command or change'
-    case 'plan':
-      return 'Plan · answers with the steps it would take, changes nothing'
-    case 'auto':
-      return 'Auto · may edit anything on this machine'
-    case 'ask':
-      return 'Ask · reads and explains, every write refused'
-  }
-}
+/* `modeSummary` now lives in `status.ts` with every other mode phrasing. */
 
 export function NewTeammateDialog({
   onCancel,

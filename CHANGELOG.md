@@ -6,6 +6,34 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.109.0 - 2026-09-14
+
+- **The Cursor connector notice actually appears now.** It shipped yesterday
+  and had never once run on Windows: Cursor installs `cursor-agent` as a `.cmd`
+  shim, and the way Locust was starting it cannot start a `.cmd` at all. The
+  reading failed instantly every time and the app treated that as "nothing to
+  report". It now finds the launcher the same way it finds every other runtime.
+- **A Cursor mission no longer waits on that reading.** The same call sat in
+  the middle of the event stream, so with it fixed every event behind it would
+  have queued up behind a question asked of another program. It answers in its
+  own time now.
+- **Settings tells you how to sign a runtime in.** A red SIGN IN tag there said
+  nothing else at all, while the first-run panel had been printing the exact
+  command since it was built. The screen you open when something is wrong knew
+  less than the one you see once.
+- **The teammate dot means the same thing everywhere.** The workroom header
+  drew its own and had no "blocked" state at all, so a teammate stuck on a
+  sign-in looked identical to one with nothing to do — inches from a sidebar
+  row drawing it correctly. The Team roster had no dot at all.
+- **A mode says one thing.** The five modes were described by four separate
+  tables in four files, already disagreeing on capitalisation and on whether
+  Ask is read-only, which is the most important fact about it. One table now.
+- **Every failure says what is still true.** "That room could not be renamed."
+  tells you about the request and nothing about the room, and the reading
+  people assume is the one that would hurt. Twenty-three of these now name what
+  did not change: the room kept its name, the mission is still running, your
+  message is untouched.
+
 ## 0.108.0 - 2026-09-14
 
 - **The room's plan sits with the conversation, not above it.** It was pinned

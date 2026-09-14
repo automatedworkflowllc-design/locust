@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 
 import type { MissionMode, PublicTeammate, TeammateRole } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
+import { modeSentence } from '../status.js'
 import { PixelFace } from './PixelFace.js'
 
 /**
@@ -11,20 +12,11 @@ import { PixelFace } from './PixelFace.js'
  * fresh Research teammate promised read-only while the footer said it may
  * edit the workspace (user session 1, 2026-09-05).
  */
-export function modeSentence(mode: MissionMode): string {
-  switch (mode) {
-    case 'ask':
-      return 'In Ask mode nothing is changed: every write is refused.'
-    case 'approve-each':
-      return 'Every change waits for your approval before it lands.'
-    case 'accept-edits':
-      return 'Accept edits is on, so it may change files here; switch to Ask below to keep it read-only.'
-    case 'plan':
-      return 'In Plan mode it answers with the steps it would take and changes nothing.'
-    case 'auto':
-      return 'Auto is on: it runs without asking and may change files anywhere on this machine, not only in this folder.'
-  }
-}
+/*
+ * Moved to `status.ts` beside every other phrasing of a mode. Re-exported
+ * because this is where callers already look for it.
+ */
+export { modeSentence }
 
 /**
  * The idle teammate: a capability-led empty state.

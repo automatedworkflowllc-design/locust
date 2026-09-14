@@ -659,15 +659,116 @@ export function modeRunsOn(
  * runtime could edit, that line was simply false. MEASURED 2026-09-03 while
  * reading the Teammates screen.
  */
+/**
+ * Every mode, and every phrasing of it, in ONE table.
+ *
+ * There were four, in four files: the composer's `MODES` rows, `modeLabel`
+ * here, `modeSentence` in `IdleTeammate.tsx`, `modeSummary` in
+ * `NewTeammateDialog.tsx`. Nothing made them agree and they already did not --
+ * the same mode was `Ask` in one place and `ask` in another, and only two of
+ * the four said Ask is read-only, which is the single most load-bearing fact
+ * about it (Grok's audit, 2026-09-13). Four tables is four chances to be wrong
+ * about what a run may touch, and this app has been wrong about that before:
+ * the histories on `modeSummary` and on the composer's connector sentence are
+ * both records of shipping a permission claim that the run did not have.
+ *
+ * The registers stay different on purpose -- a picker row, a receipt line, a
+ * summary card and a second-person sentence are not the same writing. What is
+ * shared is the FACTS, and they are these.
+ */
+export interface ModeFacts {
+  readonly mode: MissionMode
+  /** Title case, the way a control names it. */
+  readonly name: string
+  /** The clause a receipt appends to say what it may touch, where one adds anything. */
+  readonly scope?: string
+  /** A short lowercase clause, for a summary card that leads with the name. */
+  readonly short: string
+  /** One full third-person sentence, for a picker row that has the room. */
+  readonly consequence: string
+  /** Said to the person, second person, where they are about to choose. */
+  readonly sentence: string
+}
+
+/** In the order the composer offers them. */
+export const MODE_FACTS: readonly ModeFacts[] = [
+  {
+    mode: 'ask',
+    name: 'Ask',
+    scope: 'read-only',
+    short: 'reads and explains, every write refused',
+    consequence: 'Reads and explains. Every write is refused by the sandbox.',
+    sentence: 'In Ask mode nothing is changed: every write is refused.'
+  },
+  {
+    mode: 'accept-edits',
+    name: 'Accept edits',
+    short: 'may change files in this workspace',
+    consequence: 'May edit files inside this workspace folder, and nowhere else.',
+    sentence:
+      'Accept edits is on, so it may change files here; switch to Ask below to keep it read-only.'
+  },
+  {
+    mode: 'plan',
+    name: 'Plan',
+    scope: 'read-only',
+    short: 'answers with the steps it would take, changes nothing',
+    consequence: 'Answers with the steps it would take, and changes nothing.',
+    sentence: 'In Plan mode it answers with the steps it would take and changes nothing.'
+  },
+  {
+    mode: 'approve-each',
+    name: 'Approve each action',
+    short: 'asks before every command or change',
+    consequence: 'Stops and asks before every command or file change.',
+    sentence: 'Every change waits for your approval before it lands.'
+  },
+  {
+    mode: 'auto',
+    name: 'Auto',
+    scope: 'whole machine',
+    short: 'may edit anything on this machine',
+    consequence:
+      'Runs without asking and may change files anywhere on this machine, not only this folder.',
+    sentence:
+      'Auto is on: it runs without asking and may change files anywhere on this machine, not only in this folder.'
+  }
+]
+
+export function modeFacts(mode: MissionMode): ModeFacts {
+  // The union is closed and the table covers it, which `mode-says-one-thing`
+  // asserts. The fallback exists so a mode added to the union without a row
+  // renders SOMETHING rather than crashing the surface that drew it.
+  return MODE_FACTS.find((facts) => facts.mode === mode) ?? MODE_FACTS[0]!
+}
+
+/**
+ * A mission mode in the words a receipt uses for it.
+ *
+ * The roster card printed the literal string `read-only` for every teammate,
+ * whatever mode they had actually run in -- a fact the card never had. Once a
+ * runtime could edit, that line was simply false. MEASURED 2026-09-03 while
+ * reading the Teammates screen.
+ *
+ * Lowercase, because it sits mid-sentence in a receipt; the scope clause is
+ * appended only where it adds something the name does not already carry.
+ */
 export function modeLabel(mode: MissionMode | undefined): string {
-  // Named for what it allowed, not for what it was called: a record that says
-  // only "auto" does not tell a reader what that run was permitted to touch.
-  if (mode === 'auto') return 'auto · whole machine'
-  if (mode === 'accept-edits') return 'accept edits'
-  if (mode === 'approve-each') return 'approve each action'
-  if (mode === 'ask') return 'ask · read-only'
-  if (mode === 'plan') return 'plan · read-only'
-  return 'not set yet'
+  if (mode === undefined) return 'not set yet'
+  const facts = modeFacts(mode)
+  const name = facts.name.toLowerCase()
+  return facts.scope === undefined ? name : `${name} · ${facts.scope}`
+}
+
+/** The summary card's line: the name, then what it does. */
+export function modeSummary(mode: MissionMode): string {
+  const facts = modeFacts(mode)
+  return `${facts.name} · ${facts.short}`
+}
+
+/** Said to the person on the surface where they are about to choose. */
+export function modeSentence(mode: MissionMode): string {
+  return modeFacts(mode).sentence
 }
 
 /**

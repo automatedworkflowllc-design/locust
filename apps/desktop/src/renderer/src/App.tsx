@@ -106,11 +106,12 @@ import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
 import { splitAttachments } from '../../shared/attachments.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
-import type { FaceActivity, LiveActivity } from './faceState.js'
+import type { LiveActivity } from './faceState.js'
+import type { TeammateStatusView } from './status.js'
 
 /**
  * The Locust shell.
@@ -544,7 +545,7 @@ export default function App(): ReactElement {
           return next
         })
       })
-      .catch(() => setDeleteError('That mission could not be assigned.'))
+      .catch(() => setDeleteError('That mission could not be assigned. It still belongs to whoever had it.'))
   }
 
   const openMissionMenu = (missionId: string, at: { readonly x: number; readonly y: number }): void => {
@@ -952,7 +953,7 @@ export default function App(): ReactElement {
       .catch(() => {
         setInstalling(undefined)
         setInstallFailure({
-          what: 'The install could not be started.',
+          what: 'The install could not be started. Nothing was installed or changed.',
           next: 'Run the command shown in Settings from a terminal.'
         })
       })
@@ -1170,7 +1171,7 @@ export default function App(): ReactElement {
       setWorktrees({ list: response.data.worktrees, reason: response.data.reason })
       return undefined
     } catch {
-      return 'That worktree could not be removed.'
+      return 'That worktree could not be removed. It is still on disk with its files intact.'
     }
   }
 
@@ -1973,7 +1974,7 @@ export default function App(): ReactElement {
     try {
       return adoptMemories(await call)
     } catch {
-      return 'Memory could not be changed.'
+      return 'Memory could not be changed. What was saved is still saved.'
     }
   }
   const addMemory = (text: string, scope: MemoryScope): Promise<string | undefined> => memoryCall(window.desktop?.addMemory({ text, scope }))
@@ -2003,11 +2004,11 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     if (bridge === undefined) return { message: 'The secure desktop bridge is unavailable.' }
     const response = await bridge.createRoom({ name, teammateIds }).catch(() => undefined)
-    if (response === undefined) return { message: 'The room could not be created.' }
+    if (response === undefined) return { message: 'The room could not be created. No room was added.' }
     if (!response.ok) return { message: response.error.message }
     refreshRooms()
     const made = response.data.room
-    if (made === undefined) return { message: 'The room could not be created.' }
+    if (made === undefined) return { message: 'The room could not be created. No room was added.' }
     setCurrentRoomId(made.roomId)
     return { roomId: made.roomId }
   }
@@ -2028,7 +2029,7 @@ export default function App(): ReactElement {
         setRoomNotice(undefined)
         refreshRooms()
       })
-      .catch(() => setRoomNotice('That room could not be renamed.'))
+      .catch(() => setRoomNotice('That room could not be renamed. It kept the name it had.'))
   }
 
   const removeRoom = (roomId: string): void => {
@@ -2042,14 +2043,14 @@ export default function App(): ReactElement {
         setCurrentRoomId((current) => (current === roomId ? undefined : current))
         refreshRooms()
       })
-      .catch(() => setRoomNotice('That room could not be removed.'))
+      .catch(() => setRoomNotice('That room could not be removed. It and its posts are still there.'))
   }
 
   const postToRoom = async (roomId: string, text: string): Promise<string | undefined> => {
     const bridge = window.desktop
     if (bridge === undefined) return 'The secure desktop bridge is unavailable.'
     const response = await bridge.postToRoom({ roomId, text }).catch(() => undefined)
-    if (response === undefined) return 'The post could not be made.'
+    if (response === undefined) return 'The post could not be made. Nothing was added to the room.'
     if (!response.ok) return response.error.message
     refreshRooms()
     // Who could not be started, in the host's words, said once per reason.
@@ -2062,7 +2063,7 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     if (bridge === undefined) return 'The secure desktop bridge is unavailable.'
     const response = await bridge.updateRoomTask(request).catch(() => undefined)
-    if (response === undefined) return 'The board could not be changed.'
+    if (response === undefined) return 'The board could not be changed. It still shows what it showed.'
     if (!response.ok) return response.error.message
     setRooms((current) => current.map((room) => (room.roomId === response.data.room.roomId ? response.data.room : room)))
     return undefined
@@ -2307,7 +2308,7 @@ export default function App(): ReactElement {
             setRuns((all) =>
               withRun(all, runId, (run) =>
                 liveRunIsActive(run)
-                  ? { ...run, phase: 'running', error: 'The cancellation request could not be delivered.' }
+                  ? { ...run, phase: 'running', error: 'The cancellation request could not be delivered. The mission is still running.' }
                   : run
               )
             )
@@ -2321,7 +2322,7 @@ export default function App(): ReactElement {
       return true
     } catch {
       setRuns((current) =>
-        withRun(current, key, (run) => ({ ...run, phase: 'failed', error: 'The mission could not be started.' }))
+        withRun(current, key, (run) => ({ ...run, phase: 'failed', error: 'The mission could not be started. Nothing was run and nothing was changed.' }))
       )
       return false
     }
@@ -2478,7 +2479,7 @@ export default function App(): ReactElement {
       setQueued((current) => requeuedRows(current, runId, newRunId))
     } catch {
       setRuns((all) =>
-        withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: 'The handoff request could not be delivered.' }))
+        withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: 'The handoff request could not be delivered. The mission stayed on the runtime it was on.' }))
       )
     } finally {
       setHandingOff(false)
@@ -2515,7 +2516,7 @@ export default function App(): ReactElement {
         setRuns((all) =>
           withRun(all, runId, (run) =>
             liveRunIsActive(run)
-              ? { ...run, phase: 'running', error: 'The cancellation request could not be delivered.' }
+              ? { ...run, phase: 'running', error: 'The cancellation request could not be delivered. The mission is still running.' }
               : run
           )
         )
@@ -2540,7 +2541,7 @@ export default function App(): ReactElement {
           setMissionOwners(listed.data.missionOwners)
         })
       })
-      .catch(() => setTeammateError('That teammate could not be created.'))
+      .catch(() => setTeammateError('That teammate could not be created. Nobody was added.'))
   }
 
   const updateTeammate = (
@@ -2564,7 +2565,7 @@ export default function App(): ReactElement {
           setMissionOwners(listed.data.missionOwners)
         })
       })
-      .catch(() => setTeammateError('That teammate could not be updated.'))
+      .catch(() => setTeammateError('That teammate could not be updated. Their details are unchanged.'))
   }
 
   /**
@@ -2609,7 +2610,7 @@ export default function App(): ReactElement {
           setMissionOwners(listed.data.missionOwners)
         })
       })
-      .catch(() => setFolderNotice('That could not be changed.'))
+      .catch(() => setFolderNotice('That could not be changed. The setting is as it was.'))
   }
 
   const chooseTeammateFolder = (teammateId: string, clear: boolean): void => {
@@ -2631,7 +2632,7 @@ export default function App(): ReactElement {
           setMissionOwners(listed.data.missionOwners)
         })
       })
-      .catch(() => setFolderNotice('That folder could not be chosen.'))
+      .catch(() => setFolderNotice('That folder could not be chosen. The workspace is unchanged.'))
   }
 
   const reloadRoutines = async (): Promise<void> => {
@@ -2717,7 +2718,7 @@ export default function App(): ReactElement {
         setRoutineDialog(undefined)
         await reloadRoutines()
       })
-      .catch(() => setRoutineDialog({ ...dialog, busy: false, error: 'That routine could not be saved.' }))
+      .catch(() => setRoutineDialog({ ...dialog, busy: false, error: 'That routine could not be saved. The version on disk is unchanged.' }))
   }
 
   /**
@@ -2755,7 +2756,7 @@ export default function App(): ReactElement {
         openMission(response.data.missionId)
         await reloadRoutines()
       })
-      .catch(() => setTeammateError('That routine could not be started.'))
+      .catch(() => setTeammateError('That routine could not be started. None of its steps ran.'))
   }
 
   const recoverRoutine: import('./components/RoutineRecovery.js').RecoverRoutine = async (request) => {
@@ -2824,7 +2825,7 @@ export default function App(): ReactElement {
         if (response.ok) setWorkspaceNotice(`Reopening in ${response.data.path}...`)
         else if (response.error.code !== 'CANCELLED') setWorkspaceNotice(response.error.message)
       })
-      .catch(() => setWorkspaceNotice('The folder could not be chosen.'))
+      .catch(() => setWorkspaceNotice('The folder could not be chosen. The workspace is unchanged.'))
   }
   const historyById = useMemo(
     () => new Map(history.map((mission) => [mission.missionId, mission] as const)),
@@ -3107,7 +3108,7 @@ export default function App(): ReactElement {
         void refreshStorage()
       })
       .catch(() => {
-        setDeleteError('The mission could not be deleted.')
+        setDeleteError('The mission could not be deleted. Its record and events are still here.')
       })
   }
 
@@ -3417,15 +3418,24 @@ export default function App(): ReactElement {
       of: routine.steps.length
     }
   }
-  // And each teammate's face, decided once here with the same inputs the
-  // sidebar uses, for the surfaces that do not compute their own status.
-  const activityByTeammate: Record<string, FaceActivity> = {}
+  /*
+   * And each teammate's state, decided once here with the same inputs the
+   * sidebar uses, for the surfaces that do not compute their own.
+   *
+   * The WHOLE view, not just `.activity`. Keeping only the activity is what
+   * left the Team roster with no presence dot at all -- not a roster that
+   * chose not to draw one, a roster that was never handed the fact (Grok's
+   * audit, 2026-09-13). A teammate blocked on a sign-in looked, on the one
+   * screen that is entirely about teammates, exactly like a teammate with
+   * nothing to do.
+   */
+  const viewByTeammate: Record<string, TeammateStatusView> = {}
   for (const teammate of teammates) {
     const owned = sidebarMissions.filter(
       (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
     )
     const theirRuntime = owned.find((mission) => mission.phase === 'running')?.runtime ?? owned.at(0)?.runtime
-    activityByTeammate[teammate.teammateId] = teammateStatusView({
+    viewByTeammate[teammate.teammateId] = teammateStatusView({
       runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
       anyRuntimeUsable: runtimes.some(runtimeIsUsable),
       hasRunningMission: owned.some((mission) => mission.phase === 'running'),
@@ -3434,8 +3444,31 @@ export default function App(): ReactElement {
       ...(liveActivityByOwner[teammate.teammateId] === undefined ? {} : { liveActivity: liveActivityByOwner[teammate.teammateId] }),
       recentlyDone: recentlyDone.includes(teammate.teammateId),
       recentlyReceived: recentlyReceived.includes(teammate.teammateId)
-    }).activity
+    })
   }
+
+  /*
+   * The workroom header's teammate, resolved ONCE.
+   *
+   * Both the face and the dot beside it are this teammate's state, so both
+   * read it from here. They used to be assembled separately in the JSX and
+   * had already drifted -- see the `presence` prop below.
+   */
+  const workroomOwnerView =
+    missionOwner === undefined
+      ? undefined
+      : teammateStatusView({
+          runtime: runtimes.find((entry) => entry.id === liveRun?.data?.runtime),
+          anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+          hasRunningMission: running,
+          pendingApprovals: shownApprovals.length,
+          roleLabel: roleLabelOf(missionOwner),
+          ...(liveActivityByOwner[missionOwner.teammateId] === undefined
+            ? {}
+            : { liveActivity: liveActivityByOwner[missionOwner.teammateId] }),
+          recentlyDone: recentlyDone.includes(missionOwner.teammateId),
+          recentlyReceived: recentlyReceived.includes(missionOwner.teammateId)
+        })
 
   return (
     <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}`}>
@@ -3541,7 +3574,7 @@ export default function App(): ReactElement {
               teammates={teammates}
               missions={history}
               missionOwners={missionOwners}
-              activityByTeammate={activityByTeammate}
+              viewByTeammate={viewByTeammate}
               titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
               onOpenMission={openMission}
               routines={routines}
@@ -3749,27 +3782,21 @@ export default function App(): ReactElement {
                       avatar={missionOwner.avatar}
                       size={32}
                       teammateId={missionOwner.teammateId}
-                      activity={
-                        teammateStatusView({
-                          runtime: runtimes.find((entry) => entry.id === liveRun?.data?.runtime),
-                          anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-                          hasRunningMission: running,
-                          pendingApprovals: shownApprovals.length,
-                          roleLabel: roleLabelOf(missionOwner),
-                          ...(liveActivityByOwner[missionOwner.teammateId] === undefined
-                            ? {}
-                            : { liveActivity: liveActivityByOwner[missionOwner.teammateId] }),
-                          recentlyDone: recentlyDone.includes(missionOwner.teammateId),
-                          recentlyReceived: recentlyReceived.includes(missionOwner.teammateId)
-                        }).activity
-                      }
-                      presence={
-                        running
-                          ? 'working'
-                          : shownApprovals.length > 0
-                            ? 'approval'
-                            : 'none'
-                      }
+                      activity={workroomOwnerView?.activity ?? 'idle'}
+                      /*
+                       * The dot comes from the same status as the face.
+                       *
+                       * It used to be a ternary written out here -- running,
+                       * else approvals, else none -- which is three ways of
+                       * saying what `facePresenceFor` already says, and it
+                       * disagreed in a way nobody would see until it mattered:
+                       * it had no `blocked` branch AT ALL. A teammate whose
+                       * runtime needed a sign-in drew the same nothing as a
+                       * teammate with no work, two inches from a sidebar row
+                       * drawing the red one correctly (Grok's audit,
+                       * 2026-09-13). One call now decides both.
+                       */
+                      presence={workroomOwnerView === undefined ? 'none' : facePresenceFor(workroomOwnerView.status)}
                     />
                   )}
                   <div style={{ minWidth: 0 }}>

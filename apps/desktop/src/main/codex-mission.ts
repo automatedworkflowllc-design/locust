@@ -600,7 +600,18 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const events = batch.flatMap((entry) => [...mission.normalizer.accept(entry)])
           await persistAndEmit(mission, options.ledger, events)
           await explainADeniedRead(mission, events)
-          await sayIfAConnectorNeedsLogin(mission)
+          /*
+           * NOT awaited: this asks another program a question.
+           *
+           * It sat in the pump behind an `await` and nobody saw it, because
+           * the call it makes was failing instantly for an unrelated reason
+           * (see `cursor-connector-notice.ts`). With that fixed it is a real
+           * child process in the middle of the event stream, and every event
+           * behind it -- the whole mission's output -- would wait on it. It
+           * says something about the MACHINE, so it has no business holding
+           * up a run; it emits when it answers, or never.
+           */
+          void sayIfAConnectorNeedsLogin(mission)
         } catch {
           persistenceFailed = true
           mission.controller.abort()
