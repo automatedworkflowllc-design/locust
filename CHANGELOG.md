@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.121.0 - 2026-09-14
+
+- **"Started without the earlier messages" now sits where the turn starts.**
+  It was drawn at the very bottom of the thread, after the approvals and hard
+  against the composer — which is where live and pending things live, so a
+  permanent note about the past read as an alert that would not go away. It
+  is neither an alert nor dismissable: it says this turn began without the
+  model carrying the conversation, because the turn before it left no session
+  to resume. Beside the time marker that opens the turn, it reads as what it
+  is.
+
 ## 0.120.0 - 2026-09-14
 
 - **A runtime that cannot save its own settings file now says so in English.**

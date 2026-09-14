@@ -635,6 +635,28 @@ export function Thread({
           )
         })}
 
+        {coldStart && (
+          /*
+           * WHERE THIS TURN BEGAN, said where the turn begins.
+           *
+           * Said plainly because the alternative is a person assuming the
+           * model read the turn above it. The conversation is one thread; the
+           * runtime's memory of it is not.
+           *
+           * It used to render at the very END of the thread -- after the
+           * approvals, hard against the composer, which is where LIVE and
+           * PENDING things live. Colin, 2026-09-14, looking at one: "is that
+           * alert at the bottom about memory bc of the update, also its not
+           * disappearing". Both readings were the placement's fault. It is
+           * not an alert and there is nothing to dismiss: it is a durable
+           * fact about where this turn started, and it belongs beside the
+           * time marker that opens the turn, above the work it describes.
+           */
+          <div className="lc-thread__marker lc-mono">
+            Started without the earlier messages — the turn before this one left no session to resume
+          </div>
+        )}
+
         {currentMarker !== undefined && (
           <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
         )}
@@ -698,15 +720,6 @@ export function Thread({
             onAnswer={(answers) => onAnswerQuestion(request.approvalId, answers)}
           />
         ))}
-
-        {coldStart && (
-          // Said plainly because the alternative is a person assuming the
-          // model read the turn above it. The conversation is one thread; the
-          // runtime's memory of it is not.
-          <div className="lc-thread__marker lc-mono">
-            Started without the earlier messages — the turn before this one left no session to resume
-          </div>
-        )}
 
         {onRunWithEdits !== undefined && (wasPlan === true || answeredWithCode) && (
           // Deliberately not an error: the run did exactly what its mode
