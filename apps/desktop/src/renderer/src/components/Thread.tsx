@@ -346,6 +346,8 @@ export interface ThreadProps {
   readonly workspacePath?: string
   /** Present only when re-running with edits allowed is possible; see App. */
   readonly onRunWithEdits?: () => void
+  /** Offered only where the runtime never started, so nothing can repeat. */
+  readonly onRunAgain?: () => void
   /** Whether that run was asked to PLAN rather than do; the offer then reads as the build step. */
   readonly wasPlan?: boolean
   /**
@@ -437,6 +439,7 @@ export function Thread({
   earlierTurns,
   coldStart = false,
   onRunWithEdits,
+  onRunAgain,
   wasPlan,
   onAnswer,
   onResume,
@@ -735,6 +738,29 @@ export function Thread({
             </span>
             <button type="button" className="lc-button" onClick={onRunWithEdits}>
               <Icon name="diff" size={13} /> {wasPlan === true ? 'Build this plan' : 'Run again with edits allowed'}
+            </button>
+          </div>
+        )}
+
+        {onRunAgain !== undefined && (
+          /*
+           * One press, where retyping was the only way forward.
+           *
+           * Offered ONLY where the runtime never started -- no session, no
+           * tool, nothing touched -- so pressing this cannot repeat work.
+           * A run that got as far as doing something is deliberately not
+           * offered it: whether the half it did matters is the person's
+           * call, and the app does not get to make it for them.
+           *
+           * The case that produced this is a Cursor start failing on its own
+           * config file while a second copy of it held that file open
+           * (Colin, 2026-09-14). It is transient, it is not his fault, and
+           * the message he had typed was still right.
+           */
+          <div className="lc-rerun">
+            <span>Nothing had started, so running this again cannot repeat anything.</span>
+            <button type="button" className="lc-button" onClick={onRunAgain}>
+              <Icon name="play" size={13} /> Run it again
             </button>
           </div>
         )}

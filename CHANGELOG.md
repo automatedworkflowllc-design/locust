@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.122.0 - 2026-09-14
+
+- **A run that never started offers to run again.** When a runtime dies
+  before it opens a session — nothing started, no tool called, nothing
+  touched — the card now offers one press instead of leaving you to retype
+  the message you already wrote. It is offered *only* in that case: a run
+  that got as far as doing something is deliberately not offered it, because
+  whether the half it did matters is your call and not the app's.
+
 ## 0.121.0 - 2026-09-14
 
 - **"Started without the earlier messages" now sits where the turn starts.**

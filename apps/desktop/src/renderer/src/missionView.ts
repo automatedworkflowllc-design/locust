@@ -2845,3 +2845,24 @@ export function lastActivityAt(mission: {
   const last = mission.events.at(-1)?.occurredAt
   return last !== undefined && last > mission.createdAt ? last : mission.createdAt
 }
+
+/**
+ * Whether this run died before its runtime did anything at all.
+ *
+ * The precondition for offering to run it again. A run that never emitted
+ * `run.started` never opened a session, never called a tool and never
+ * touched the workspace -- so starting it again cannot repeat anything,
+ * because there is nothing to repeat. Any run that DID start is excluded,
+ * however early it failed: at that point the honest answer is the person's,
+ * not the app's, because only they know whether the half it did matters.
+ *
+ * Measured 2026-09-14: `cursor-agent` rewrites its own config on startup and
+ * on Windows that rename fails with EPERM while a second copy of it holds
+ * the file. The mission ledger for one of these holds exactly two records --
+ * `mission.created` and `run.failed` -- and nothing else. That is the shape
+ * this recognises. Colin hit it, and the only way forward was to retype the
+ * message, which is a chore the app can spare him without guessing.
+ */
+export function runtimeNeverStarted(events: readonly NormalizedRuntimeEvent[]): boolean {
+  return !events.some((event) => event.type === 'run.started')
+}
