@@ -73,6 +73,12 @@ export interface RuntimePromptInput {
   readonly remaining: number
   /** What the team remembers, already worded for the runtime; absent when memory is off. */
   readonly memory?: string
+  /**
+   * Ask the runtime to keep a todo list as it works. Off unless the person
+   * turned it on, and only ever true for a runtime that has such a tool --
+   * see `RUNTIMES_THAT_KEEP_A_TODO_LIST`.
+   */
+  readonly keepATodoList?: boolean
 }
 
 export interface RuntimePrompt {
@@ -185,6 +191,46 @@ export function planSection(): string {
 }
 
 /**
+ * The runtimes that can actually honour a request to keep a todo list.
+ *
+ * Every one of these has a real tool for it and uses it when asked: Codex's
+ * `todo_list`, Cursor's `updateTodos`, OpenCode's `todowrite`. All three were
+ * measured complying on 2026-09-13, and all three already become
+ * `plan.updated` events, which is what the board draws.
+ *
+ * Claude Code is deliberately absent and must stay absent. It has no such tool
+ * at all -- asked directly, its CLI says so -- so the sentence would be an
+ * instruction it cannot follow, and a plan panel that stays empty forever with
+ * no explanation is worse than a panel that was never offered. Asking a
+ * runtime for something it does not have is how a product teaches people not
+ * to trust its controls.
+ */
+export const RUNTIMES_THAT_KEEP_A_TODO_LIST: readonly string[] = ['codex', 'cursor', 'opencode']
+
+export function runtimeKeepsATodoList(runtime: string): boolean {
+  return RUNTIMES_THAT_KEEP_A_TODO_LIST.includes(runtime)
+}
+
+/**
+ * One sentence, opt in, asking for the list the board already knows how to
+ * draw.
+ *
+ * Deliberately short and deliberately not a format. These runtimes have a
+ * TOOL for this; describing a shape here would compete with it, and what
+ * arrives is then prose that looks like a plan rather than the structured
+ * update the board reads. The only thing worth saying is when to keep it
+ * current, because a list written once at the start and never touched is the
+ * failure mode that makes the panel lie.
+ */
+export function todoSection(): string {
+  return [
+    'KEEP A TODO LIST for this work, using your own todo tool, and keep it current.',
+    'Add the steps when you know them, mark one in progress while you are on it, and mark it done when it is actually done -- not when you start writing the next one.',
+    'The person is watching this list rather than reading every line of output, so a stale list is worse than no list.'
+  ].join(String.fromCharCode(10))
+}
+
+/**
  * Compose what the runtime is sent. Inbound messages that do not fit are left
  * out from the newest end and are NOT reported as delivered, so they wait for
  * the next mission rather than vanishing; the notice line then counts them.
@@ -226,6 +272,9 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
     const sections: string[] = []
     if (trailer !== undefined) sections.push(trailer)
     if (input.memory !== undefined) sections.push(input.memory)
+    // Standing, like the ask format beside it: the same sentence every turn,
+    // so it sits in the cached prefix rather than ahead of the person's words.
+    if (input.keepATodoList === true) sections.push(todoSection())
     sections.push(askSection())
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))
     sections.push(input.prompt)

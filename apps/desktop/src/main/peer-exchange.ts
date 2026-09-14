@@ -3,7 +3,7 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { CodexMissionUpdate, PublicPeerMessage } from '../shared/ipc.js'
 import { boundedShareText, MAX_SHARES_PER_MISSION, parseShareBlocks } from '../shared/peer-share.js'
-import { composeRuntimePrompt, MAX_INBOUND_MESSAGES } from './workroom-briefing.js'
+import { composeRuntimePrompt, MAX_INBOUND_MESSAGES, runtimeKeepsATodoList } from './workroom-briefing.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
 /**
@@ -42,7 +42,12 @@ export interface TranscriptTracker {
 }
 
 export interface PeerExchange {
-  prepare(prompt: string, peer: MissionPeerContext): Promise<PreparedPeerPrompt>
+  /**
+   * `runtime` decides whether the todo-list request is included: the setting
+   * is the person's answer, but the runtime is what makes it answerable. See
+   * `RUNTIMES_THAT_KEEP_A_TODO_LIST`.
+   */
+  prepare(prompt: string, peer: MissionPeerContext, runtime?: string): Promise<PreparedPeerPrompt>
   /** Throws when the ledger refuses: a mission must not run on messages it cannot record. */
   recordReceived(missionId: string, delivered: readonly WorkroomMessage[], occurredAt: string): Promise<void>
   /** Never throws: a delivery that cannot be marked is shown again next time, which is the safe direction. */
@@ -148,11 +153,23 @@ export function createPeerExchange(options: {
   readonly workroom: Workroom
   readonly ledger: MissionLedger
   readonly memory?: MemoryBriefing
+  /** The person's opt-in, read when a mission starts rather than cached. */
+  readonly keepATodoList?: () => Promise<boolean>
 }): PeerExchange {
   return {
-    async prepare(prompt, peer) {
+    async prepare(prompt, peer, runtime) {
       // Memory that cannot be read is left out, never a refusal to run.
       const memory = options.memory === undefined ? undefined : await options.memory.section(peer).catch(() => undefined)
+      /*
+       * Both halves must be true, and the runtime half is not negotiable.
+       * A setting that is on does not make Claude Code able to keep a list;
+       * it has no such tool, and asking would produce an empty board with no
+       * explanation. A setting that cannot be read reads as off.
+       */
+      const todos =
+        runtime !== undefined &&
+        runtimeKeepsATodoList(runtime) &&
+        (await options.keepATodoList?.().catch(() => false)) === true
       try {
         const unread = await options.workroom.unread(peer.self.teammateId, MAX_INBOUND_MESSAGES)
         const composed = composeRuntimePrompt({
@@ -160,13 +177,21 @@ export function createPeerExchange(options: {
           peer,
           inbound: unread.messages,
           remaining: unread.remaining,
-          ...(memory === undefined ? {} : { memory })
+          ...(memory === undefined ? {} : { memory }),
+          keepATodoList: todos
         })
         return { runtimePrompt: composed.prompt, delivered: composed.delivered, failed: false }
       } catch {
         // The roster trailer still goes: the run can share even when it could
         // not be shown what was waiting.
-        const composed = composeRuntimePrompt({ prompt, peer, inbound: [], remaining: 0, ...(memory === undefined ? {} : { memory }) })
+        const composed = composeRuntimePrompt({
+          prompt,
+          peer,
+          inbound: [],
+          remaining: 0,
+          ...(memory === undefined ? {} : { memory }),
+          keepATodoList: todos
+        })
         return { runtimePrompt: composed.prompt, delivered: [], failed: true }
       }
     },

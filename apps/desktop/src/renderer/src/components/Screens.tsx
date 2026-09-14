@@ -818,6 +818,8 @@ export function SettingsScreen({
   onInterruptChange,
   autoMode,
   askConnectors,
+  keepATodoList,
+  onKeepATodoListChange,
   onAskConnectorsChange,
   swarm,
   onSwarmChange,
@@ -879,6 +881,8 @@ export function SettingsScreen({
   readonly onAutoModeChange: (autoMode: boolean) => void
   readonly askConnectors: boolean
   readonly onAskConnectorsChange: (askConnectors: boolean) => void
+  readonly keepATodoList: boolean
+  readonly onKeepATodoListChange: (keepATodoList: boolean) => void
   /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
   readonly relayHopCap: number
   readonly onRelayHopCapChange: (cap: number) => void
@@ -1239,6 +1243,51 @@ export function SettingsScreen({
                 aria-checked={askConnectors}
                 aria-label={askConnectors ? 'Stop asking before connector calls' : 'Ask before every connector call'}
                 onClick={() => onAskConnectorsChange(!askConnectors)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Plans</h2>
+          <p className="lc-settings__lede">
+            {keepATodoList
+              ? 'Asking for a plan. Teammates that can keep a todo list are asked to, and the board fills in as they work.'
+              : 'Not asking. A teammate keeps a list only if it decides to on its own.'}
+          </p>
+          <More>
+            <p>
+              Codex, Cursor and OpenCode each have a tool for keeping a todo list, and the board in a room
+              draws whatever they put in it. This asks them to use it: add the steps once they are known,
+              mark one in progress, mark it done when it is done.
+            </p>
+            <p>
+              It is off by default because it is not free -- the bookkeeping costs tokens and changes how a
+              teammate narrates itself. It is worth switching on when you are watching the board rather
+              than reading every line.
+            </p>
+            <p>
+              Claude Code is never asked. It has no such tool, so the request would be an instruction it
+              cannot follow and the board would stay empty with no explanation. This switch does nothing
+              for a Claude Code teammate, in either position.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                {keepATodoList
+                  ? 'On. Codex, Cursor and OpenCode teammates are asked to keep the board current.'
+                  : 'Off. Nothing is asked for; a teammate may still keep one.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-switch${keepATodoList ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={keepATodoList}
+                aria-label={keepATodoList ? 'Stop asking teammates to keep a todo list' : 'Ask teammates to keep a todo list'}
+                onClick={() => onKeepATodoListChange(!keepATodoList)}
               >
                 <span className="lc-switch__knob" />
               </button>

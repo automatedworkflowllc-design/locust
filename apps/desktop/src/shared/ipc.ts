@@ -928,6 +928,18 @@ export interface WorkspaceSettings {
    */
   readonly askConnectors: boolean
   /**
+   * Ask the teammate to keep a todo list as it works, so the board fills in
+   * while the mission runs.
+   *
+   * Off by default and opt in, because it spends tokens on bookkeeping and
+   * changes how a runtime narrates itself -- worth it when you are watching,
+   * noise when you are not. Only ever sent to a runtime that HAS such a tool
+   * (`RUNTIMES_THAT_KEEP_A_TODO_LIST`); Claude Code has none, so the sentence
+   * is never added to its briefing whatever this says. Absent or malformed
+   * reads as off.
+   */
+  readonly keepATodoList: boolean
+  /**
    * Which shell layout to draw: the full sidebar, the compact avatar rail, or
    * whichever the window width calls for. Colin asked for the layout to be a
    * choice as well as a consequence of window size (2026-09-07). Absent or

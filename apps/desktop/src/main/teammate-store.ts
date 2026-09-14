@@ -97,7 +97,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, layout: 'auto' }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto' }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -325,6 +325,9 @@ function parsedFile(text: string): StoredFile {
     // the ordinary state, which is not asking.
     askConnectors: typeof rawSettings === 'object' && rawSettings !== null
       ? (rawSettings as Record<string, unknown>).askConnectors === true
+      : false,
+    keepATodoList: typeof rawSettings === 'object' && rawSettings !== null
+      ? (rawSettings as Record<string, unknown>).keepATodoList === true
       : false,
     layout: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedLayout((rawSettings as Record<string, unknown>).layout)
@@ -589,6 +592,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             : false,
           askConnectors: typeof settings === 'object' && settings !== null
             ? (settings as Record<string, unknown>).askConnectors === true
+            : false,
+          keepATodoList: typeof settings === 'object' && settings !== null
+            ? (settings as Record<string, unknown>).keepATodoList === true
             : false,
           layout: typeof settings === 'object' && settings !== null
             ? parsedLayout((settings as Record<string, unknown>).layout)

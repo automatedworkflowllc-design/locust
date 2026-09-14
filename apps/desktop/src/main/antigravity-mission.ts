@@ -126,7 +126,11 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
   const pollMs = options.pollMs ?? 1_000
   const idleTimeoutMs = options.idleTimeoutMs ?? ANTIGRAVITY_IDLE_TIMEOUT_MS
   const peerExchange: PeerExchange | undefined =
-    options.workroom === undefined ? undefined : createPeerExchange({ workroom: options.workroom, ledger: options.ledger, ...(options.memory === undefined ? {} : { memory: options.memory }) })
+    options.workroom === undefined ? undefined : createPeerExchange({
+          workroom: options.workroom,
+          ledger: options.ledger,
+          ...(options.memory === undefined ? {} : { memory: options.memory })
+        })
   const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.self.teammateId ?? NOBODY
 
   interface LiveRun {
@@ -386,7 +390,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false
         if (peer !== undefined && peerExchange !== undefined) {
-          const prepared = await peerExchange.prepare(prompt, peer)
+          const prepared = await peerExchange.prepare(prompt, peer, 'antigravity')
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered
           peerDeliveryFailed = prepared.failed

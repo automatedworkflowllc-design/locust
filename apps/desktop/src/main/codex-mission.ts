@@ -275,6 +275,8 @@ interface CodexMissionServiceOptions {
    * LOCUST_ASK_CONNECTORS=1 does the same for the drives.
    */
   readonly askConnectors?: () => Promise<boolean>
+  /** The person's opt-in for a runtime-kept todo list. Absent reads as off. */
+  readonly keepATodoList?: () => Promise<boolean>
   /**
    * How many missions are live on the OTHER transports right now.
    *
@@ -467,7 +469,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined
       ? undefined
-      : createPeerExchange({ workroom: options.workroom, ledger: options.ledger, ...(options.memory === undefined ? {} : { memory: options.memory }) })
+      : createPeerExchange({
+          workroom: options.workroom,
+          ledger: options.ledger,
+          ...(options.memory === undefined ? {} : { memory: options.memory }),
+          ...(options.keepATodoList === undefined ? {} : { keepATodoList: options.keepATodoList })
+        })
 
   const clearActive = (candidate: ActiveCodexMission): void => {
     if (active.get(candidate.runId) === candidate) active.delete(candidate.runId)
@@ -1217,7 +1224,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false
         if (peer !== undefined && peerExchange !== undefined) {
-          const prepared = await peerExchange.prepare(prompt, peer)
+          const prepared = await peerExchange.prepare(prompt, peer, runtime)
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered
           peerDeliveryFailed = prepared.failed

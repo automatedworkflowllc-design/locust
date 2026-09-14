@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.110.0 - 2026-09-14
+
+- **Ask your teammates to keep a plan.** New in Settings, under Plans, off by
+  default. Switch it on and a Codex, Cursor or OpenCode teammate is asked to
+  keep a todo list as it works, so the board in a room fills in while the
+  mission runs instead of after it. It costs tokens and changes how a teammate
+  narrates itself, which is why it is a choice rather than the default.
+- **Claude Code is never asked.** It has no todo tool at all, so the request
+  would be an instruction it cannot follow and the board would sit empty with
+  nothing to explain it. The switch does nothing for a Claude Code teammate in
+  either position, and says so.
+
 ## 0.109.0 - 2026-09-14
 
 - **The Cursor connector notice actually appears now.** It shipped yesterday

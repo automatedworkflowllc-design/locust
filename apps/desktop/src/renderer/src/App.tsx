@@ -776,7 +776,7 @@ export default function App(): ReactElement {
     const before = layout
     setLayout(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, layout: next })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout: next })
       .then((settings) => setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto'))
       .catch(() => setLayout(before))
   }
@@ -1070,6 +1070,8 @@ export default function App(): ReactElement {
   const [autoMode, setAutoMode] = useState(false)
   /** Ask before every connector call. See WorkspaceSettings.askConnectors. */
   const [askConnectors, setAskConnectors] = useState(false)
+  /** Ask teammates that can to keep a todo list. See WorkspaceSettings.keepATodoList. */
+  const [keepATodoList, setKeepATodoList] = useState(false)
 
   // Switching Auto off takes it away from a window that was sitting on it,
   // rather than leaving a choice the host would refuse at the next send.
@@ -1514,6 +1516,7 @@ export default function App(): ReactElement {
           setRelay(settings.relay === true)
           setAutoMode(settings.autoMode === true)
           setAskConnectors(settings.askConnectors === true)
+          setKeepATodoList(settings.keepATodoList === true)
           setRelayHopCap(settings.relayHopCap)
           setInterrupt(settings.interrupt)
           setMemoryMode(settings.memoryMode)
@@ -1985,7 +1988,7 @@ export default function App(): ReactElement {
     const before = memoryMode
     setMemoryMode(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode: next, autoMode, askConnectors, layout })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode: next, autoMode, askConnectors, keepATodoList, layout })
       .then((settings) => setMemoryMode(settings.memoryMode))
       .catch(() => setMemoryMode(before))
   }
@@ -3678,7 +3681,7 @@ export default function App(): ReactElement {
                 // reconciled with what the store actually saved.
                 setSwarm(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, layout })
+                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
                   .then((settings) => setSwarm(settings.swarm === true))
                   .catch(() => setSwarm(!next))
               }}
@@ -3686,7 +3689,7 @@ export default function App(): ReactElement {
               onAutoModeChange={(next) => {
                 setAutoMode(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: next, askConnectors, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: next, askConnectors, keepATodoList, layout })
                   .then((settings) => setAutoMode(settings.autoMode === true))
                   .catch(() => setAutoMode(!next))
               }}
@@ -3694,9 +3697,17 @@ export default function App(): ReactElement {
               onAskConnectorsChange={(next) => {
                 setAskConnectors(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors: next, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors: next, keepATodoList, layout })
                   .then((settings) => setAskConnectors(settings.askConnectors === true))
                   .catch(() => setAskConnectors(!next))
+              }}
+              keepATodoList={keepATodoList}
+              onKeepATodoListChange={(next) => {
+                setKeepATodoList(next)
+                void window.desktop
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList: next, layout })
+                  .then((settings) => setKeepATodoList(settings.keepATodoList === true))
+                  .catch(() => setKeepATodoList(!next))
               }}
               relayHopCap={relayHopCap}
               memoryMode={memoryMode}
@@ -3710,14 +3721,14 @@ export default function App(): ReactElement {
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, interrupt, memoryMode, autoMode, askConnectors, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
                   .then((settings) => setRelayHopCap(settings.relayHopCap))
                   .catch(() => undefined)
               }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, layout })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -3725,7 +3736,7 @@ export default function App(): ReactElement {
             onInterruptChange={(next) => {
               setInterrupt(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt: next, memoryMode, autoMode, askConnectors, layout })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt: next, memoryMode, autoMode, askConnectors, keepATodoList, layout })
                 .then((settings) => setInterrupt(settings.interrupt === true))
                 .catch(() => setInterrupt(!next))
             }}
@@ -4123,7 +4134,7 @@ export default function App(): ReactElement {
               // same answer the composer just showed.
               setAutoMode(true)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: true, askConnectors, layout: 'auto' })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: true, askConnectors, keepATodoList, layout: 'auto' })
                 .then((settings) => setAutoMode(settings.autoMode === true))
                 .catch(() => setAutoMode(false))
             }}
@@ -4165,7 +4176,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, layout })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}
@@ -4253,7 +4264,7 @@ export default function App(): ReactElement {
                   const next = !swarm
                   setSwarm(next)
                   void window.desktop
-                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, layout })
+                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
                     .then((settings) => setSwarm(settings.swarm === true))
                     .catch(() => setSwarm(!next))
                 }
