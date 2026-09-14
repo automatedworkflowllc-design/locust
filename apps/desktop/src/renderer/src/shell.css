@@ -1713,6 +1713,35 @@ textarea {
 }
 
 /*
+ * One control per task row, and it stays out of the way until wanted.
+ *
+ * Four boxed buttons rode every row -- Open, Assign, Done/Reopen, Remove --
+ * so a five-task board drew twenty of them and the tasks were the quietest
+ * thing in their own list. Colin, 2026-09-14: "make all these a dropdown, its
+ * clutter and i want it to be mostly automatic anyway." The second half is
+ * why: teammates move this board themselves and are told to claim a row the
+ * moment they start it, so these are the manual override, and an override
+ * should be reachable rather than resident.
+ */
+.lc-task__more {
+  flex: none;
+  opacity: 0.55;
+  transition: opacity var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-task:hover .lc-task__more,
+.lc-task__more:hover,
+.lc-task__more:focus-visible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-task__more {
+    transition: none;
+  }
+}
+
+/*
  * Hard left, where a way out belongs.
  *
  * `.lc-ghostbutton` carries `margin-left: auto` in its BASE rule -- a layout

@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.116.0 - 2026-09-14
+
+- **A teammate claims the task it starts.** Ask one to do something a row on
+  the board describes and it now claims that row in the same reply. Every
+  instruction it had was a limit — *claim only what you are actually doing* —
+  and a model reading only limits errs toward doing nothing, so the board said
+  "unassigned" while someone was actively working it. That is not untidiness:
+  the rule beside it sends other teammates at unassigned rows.
+- **One control per task, not four.** Open, Assign, Done and Remove were four
+  boxed buttons on every row, so a five-task board drew twenty of them and the
+  tasks were the quietest thing in their own list. They are all one press away
+  now, in the same menu the room header uses.
+
 ## 0.115.0 - 2026-09-14
 
 - **A room's header is a conversation's header.** It was a boxed Rooms button,

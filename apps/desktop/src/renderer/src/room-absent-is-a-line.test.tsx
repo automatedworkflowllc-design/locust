@@ -326,8 +326,24 @@ describe('the task board, rebuilt on the plan card', () => {
     expect(withTasks([task({ state: 'in-hand' })])).toContain('in hand')
   })
 
-  it('still offers every control, because hiding them was never the point', () => {
+  it('offers its actions through one control, not four', () => {
+    /*
+     * This asserted that `Assign`, `Done` and `Remove` each appear in the
+     * markup, on the reasoning that hiding them was never the point. Still
+     * true -- and they are not hidden, they are one press away. Colin,
+     * 2026-09-14, looking at a one-task board wearing four boxed buttons:
+     * "make all these a dropdown, its clutter and i want it to be mostly
+     * automatic anyway."
+     *
+     * The second half is why a menu is right rather than smaller buttons.
+     * Teammates move this board themselves and are told to claim a row the
+     * moment they start it; these are the manual override, and an override
+     * should be reachable rather than resident.
+     */
     const markup = withTasks([task({})])
-    for (const control of ['Assign', 'Done', 'Remove']) expect(markup).toContain(control)
+    expect(markup).toContain('aria-haspopup="menu"')
+    expect(markup).toContain('Actions for')
+    // The row itself is the task, its owner and its state -- nothing else.
+    for (const gone of ['>Assign<', '>Remove<', '>Reopen<']) expect(markup).not.toContain(gone)
   })
 })

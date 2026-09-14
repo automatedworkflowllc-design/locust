@@ -417,7 +417,6 @@ export function RoomScreen({
   const [draftTask, setDraftTask] = useState('')
   /** The add field only exists once somebody asks for it. */
   const [adding, setAdding] = useState(false)
-  const [assigning, setAssigning] = useState<string>()
   const [boardError, setBoardError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState<string>()
@@ -474,7 +473,6 @@ export function RoomScreen({
 
   const move = async (request: RoomTaskRequest): Promise<void> => {
     setBoardError(undefined)
-    setAssigning(undefined)
     const error = await onTask(request)
     if (error !== undefined) setBoardError(error)
   }
@@ -1099,48 +1097,97 @@ export function RoomScreen({
                   )}
                 </span>
                 <span className="lc-task__actions">
-                  {/* Open sits with the other controls rather than beside the
-                      owner: at rest a row is a marker, the words, and who has
-                      it -- which is a plan step with a note, and is the whole
-                      of what this rebuild is for. */}
-                  {task.missionId !== undefined && assigning !== task.taskId && (
-                    <button type="button" className="lc-ghostbutton" title="The conversation whose reply last moved this task" onClick={() => onOpenMission(task.missionId!)}>
-                      Open
-                    </button>
-                  )}
-                  {assigning === task.taskId ? (
-                    <span className="lc-task__assign" role="group" aria-label="Assign to">
-                      {members.filter((entry) => entry !== undefined).map((entry) => (
-                        <button key={entry!.teammateId} type="button" className="lc-button" onClick={() => void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId, ownerId: entry!.teammateId })}>
-                          {entry!.name}
-                        </button>
-                      ))}
-                      <button type="button" className="lc-button" onClick={() => void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId })}>
-                        Nobody
-                      </button>
-                      <button type="button" className="lc-ghostbutton" onClick={() => setAssigning(undefined)}>
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
-                    <>
-                      <button type="button" className="lc-ghostbutton" onClick={() => setAssigning(task.taskId)}>
-                        Assign
-                      </button>
-                      {task.state === 'done' ? (
-                        <button type="button" className="lc-ghostbutton" onClick={() => void move({ roomId: room.roomId, op: 'reopen', taskId: task.taskId })}>
-                          Reopen
-                        </button>
-                      ) : (
-                        <button type="button" className="lc-ghostbutton" onClick={() => void move({ roomId: room.roomId, op: 'done', taskId: task.taskId })}>
-                          Done
-                        </button>
-                      )}
-                      <button type="button" className="lc-ghostbutton" title="Take it off the board" onClick={() => void move({ roomId: room.roomId, op: 'remove', taskId: task.taskId })}>
-                        Remove
-                      </button>
-                    </>
-                  )}
+                  {/*
+                    * ONE control, not four.
+                    *
+                    * Open, Assign, Done/Reopen and Remove were four boxed
+                    * buttons on every row, so a five-task board drew twenty
+                    * of them and the tasks themselves were the quietest thing
+                    * in the list. Colin, 2026-09-14: "make all these a
+                    * dropdown, its clutter and i want it to be mostly
+                    * automatic anyway."
+                    *
+                    * The second half of that is the real point and it is why
+                    * this is the right shape rather than a smaller version of
+                    * the same thing: teammates move this board themselves,
+                    * with `locust-task` blocks, and 0.116.0 tells them to
+                    * claim a row the moment they start it. These controls are
+                    * the manual override for when that goes wrong -- and an
+                    * override should be reachable, not resident.
+                    *
+                    * Same menu the room header uses, so there is one way to
+                    * ask this app for the occasional actions.
+                    */}
+                  <button
+                    type="button"
+                    className="lc-ghostbutton lc-task__more"
+                    aria-label={`Actions for ${task.text}`}
+                    aria-haspopup="menu"
+                    title="Actions"
+                    onClick={(event) => {
+                      const at = event.currentTarget.getBoundingClientRect()
+                      onMenu?.({
+                        x: Math.round(Math.max(8, at.right - 220)),
+                        y: Math.round(at.bottom + 4),
+                        title: task.text,
+                        items: [
+                          ...(task.missionId === undefined
+                            ? []
+                            : [
+                                {
+                                  label: 'Open the conversation',
+                                  onSelect: () => onOpenMission(task.missionId!)
+                                }
+                              ]),
+                          ...(task.state === 'done'
+                            ? [
+                                {
+                                  label: 'Reopen',
+                                  onSelect: () => void move({ roomId: room.roomId, op: 'reopen', taskId: task.taskId })
+                                }
+                              ]
+                            : [
+                                {
+                                  label: 'Mark done',
+                                  onSelect: () => void move({ roomId: room.roomId, op: 'done', taskId: task.taskId })
+                                }
+                              ]),
+                          // Assigning names people, so each one is its own
+                          // row rather than a second menu to open.
+                          ...members
+                            .filter((entry) => entry !== undefined)
+                            .filter((entry) => entry!.teammateId !== task.ownerId)
+                            .map((entry) => ({
+                              label: `Assign to ${entry!.name}`,
+                              onSelect: () =>
+                                void move({
+                                  roomId: room.roomId,
+                                  op: 'assign',
+                                  taskId: task.taskId,
+                                  ownerId: entry!.teammateId
+                                })
+                            })),
+                          ...(task.ownerId === undefined
+                            ? []
+                            : [
+                                {
+                                  label: 'Leave it unassigned',
+                                  onSelect: () =>
+                                    void move({ roomId: room.roomId, op: 'assign', taskId: task.taskId })
+                                }
+                              ]),
+                          {
+                            label: 'Take it off the board',
+                            confirmLabel: 'Remove for good?',
+                            danger: true,
+                            onSelect: () => void move({ roomId: room.roomId, op: 'remove', taskId: task.taskId })
+                          }
+                        ]
+                      })
+                    }}
+                  >
+                    <Icon name="dots" size={13} />
+                  </button>
                 </span>
               </div>
             )

@@ -312,27 +312,40 @@ try {
     document.querySelector('.lc-board__add').requestSubmit()
     await new Promise(r => setTimeout(r, 600))
     steps.push(['added', state()])
-    // assign to Booty
+    // assign to Booty -- one menu since 0.116.0, and it opens into the app's
+    // own ContextMenu rather than inside the row.
     let row = find('Sign the installer')
-    ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Assign').click()
-    await new Promise(r => setTimeout(r, 200))
-    row = find('Sign the installer')
-    ;[...row.querySelectorAll('.lc-task__assign button')].find(b => b.innerText.trim() === 'Booty').click()
+    row.querySelector('button[aria-haspopup="menu"]').click()
+    await new Promise(r => setTimeout(r, 250))
+    ;[...document.querySelectorAll('.lc-menu button, [role=menu] button')]
+      .find(b => /Assign to Booty/i.test(b.innerText)).click()
     await new Promise(r => setTimeout(r, 600))
     steps.push(['assigned', state()])
     // done
     row = find('Sign the installer')
-    ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Done').click()
+    row.querySelector('button[aria-haspopup="menu"]').click()
+    await new Promise(r => setTimeout(r, 250))
+    ;[...document.querySelectorAll('.lc-menu button, [role=menu] button')]
+      .find(b => b.innerText.toLowerCase().includes('mark done')).click()
     await new Promise(r => setTimeout(r, 600))
     steps.push(['done', state()])
     // reopen
     row = find('Sign the installer')
-    ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Reopen').click()
+    row.querySelector('button[aria-haspopup="menu"]').click()
+    await new Promise(r => setTimeout(r, 250))
+    ;[...document.querySelectorAll('.lc-menu button, [role=menu] button')]
+      .find(b => b.innerText.toLowerCase().includes('reopen')).click()
     await new Promise(r => setTimeout(r, 600))
     steps.push(['reopened', state()])
     // remove
     row = find('Sign the installer')
-    ;[...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Remove').click()
+    row.querySelector('button[aria-haspopup="menu"]').click()
+    await new Promise(r => setTimeout(r, 250))
+    ;[...document.querySelectorAll('.lc-menu button, [role=menu] button')]
+      .find(b => b.innerText.toLowerCase().includes('off the board')).click()
+    await new Promise(r => setTimeout(r, 200))
+    ;[...document.querySelectorAll('.lc-menu button, [role=menu] button')]
+      .find(b => b.innerText.toLowerCase().includes('for good')).click()
     await new Promise(r => setTimeout(r, 600))
     steps.push(['removed', state()])
     return JSON.stringify(steps)

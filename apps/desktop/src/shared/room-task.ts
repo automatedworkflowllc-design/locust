@@ -196,6 +196,25 @@ export function taskSection(input: {
      * breaking it.
      */
     "A row marked with another teammate's name is already theirs: leave it alone, and do not claim, redo or report on it. Work an unassigned row, or one marked yours.",
+    /*
+     * The obligation, not just the restriction.
+     *
+     * Everything here was phrased as a limit -- claim only what you are
+     * actually doing -- and a model reading only limits errs toward doing
+     * nothing, which is the safe-looking failure. Colin watched exactly that
+     * on 2026-09-14: he asked a teammate to review a codebase, it started,
+     * and the row stayed `unassigned` while it worked. He asked "shouldnt a
+     * teammate automatically claim a task if asked to though?", and the
+     * answer is yes -- nothing had ever told it so.
+     *
+     * The cost is not tidiness. An unassigned row and a row being worked look
+     * identical to every other teammate in the room, and the rule directly
+     * above sends them at unassigned rows. So a board that under-reports
+     * invites two teammates onto the same task, which is the collision the
+     * board exists to prevent (Colin, 2026-09-10: "i can imagine if both
+     * teammates receive the task only assigned to one things can get messy").
+     */
+    'If you begin work that a row on that board describes -- because the person asked you to, or because you picked it up -- claim it in the same reply. An unassigned row and a row you are working look the same to everyone else, and the rule above sends them at unassigned rows.',
     'Claim only what you are actually doing, mark done only what is finished, and if you touched no task, end with no block.'
   ].join('\n')
 }

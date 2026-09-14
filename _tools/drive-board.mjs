@@ -62,12 +62,14 @@ try {
   await drive.capture('assign the first to Wren from the board', () => drive.evaluate(`(async () => {
     const task = [...document.querySelectorAll('.lc-task')].find(t => /release notes/.test(t.innerText))
     if (!task) return 'no task'
-    const assign = [...task.querySelectorAll('button')].find(b => /Assign/i.test(b.innerText))
-    if (!assign) return 'no Assign button: ' + [...task.querySelectorAll('button')].map(b => b.innerText.trim()).join('/')
-    assign.click()
+    // One menu since 0.116.0, not four buttons on every row. The menu opens
+    // into the app's own ContextMenu, so the choices are not inside the task.
+    const more = task.querySelector('button[aria-haspopup="menu"]')
+    if (!more) return 'no actions menu: ' + [...task.querySelectorAll('button')].map(b => b.innerText.trim()).join('/')
+    more.click()
     await new Promise(r => setTimeout(r, 400))
-    const wren = [...task.querySelectorAll('[role=group][aria-label="Assign to"] button')].find(b => b.innerText.trim() === 'Wren')
-    if (!wren) return 'no Wren choice: ' + [...task.querySelectorAll('button')].map(b => b.innerText.trim()).join('/')
+    const wren = [...document.querySelectorAll('.lc-menu button, [role=menu] button')].find(b => /Assign to Wren/i.test(b.innerText))
+    if (!wren) return 'no Wren choice: ' + [...document.querySelectorAll('.lc-menu button, [role=menu] button')].map(b => b.innerText.trim()).join('/')
     wren.click()
     await new Promise(r => setTimeout(r, 700))
     return ${board}
