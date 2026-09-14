@@ -236,7 +236,9 @@ textarea {
 }
 
 .lc-search:focus-within {
-  border-color: var(--lc-focus-ring);
+  /* The same soft treatment as the message box: a field is a field. */
+  border-color: var(--lc-focus-edge);
+  box-shadow: 0 0 0 3px var(--lc-focus-glow);
 }
 
 .lc-search input {
@@ -3573,13 +3575,25 @@ textarea {
 }
 
 .lc-composer__box:focus-within {
-  /* The box a person types in, showing that it is where the keys go. Sweep
-   * A1, 2026-09-14: tabbing in changed nothing on screen at all.
+  /*
+   * A GLOW, not an outline.
+   *
+   * The box a person types in has to show that it is where the keys go --
+   * tabbing in used to change nothing on screen at all, which was the only
+   * accessibility defect the static sweep found. But a 2px lime edge on the
+   * largest control in the app reads as an alert: Colin, 2026-09-14, "the
+   * yellow outline for clicking the chat box is pointless and clunky, just
+   * do what claude does, a very subtle highlight/glow of the same color".
+   *
+   * Same hue at a fraction of the weight, so the indicator survives and the
+   * shouting does not.
    *
    * AFTER :hover deliberately. Both are one class and one pseudo-class, so
-   * they tie on specificity and source order decides -- and a focused box
-   * under the pointer must show focus, not hover. */
-  border-color: var(--lc-focus-ring);
+   * they tie on specificity and source order decides -- a focused box under
+   * the pointer must show focus, not hover.
+   */
+  border-color: var(--lc-focus-edge);
+  box-shadow: 0 0 0 3px var(--lc-focus-glow);
 }
 
 /* The newline hint, beside the send control and only while there is something

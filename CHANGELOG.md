@@ -18,6 +18,15 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - **The narrow sidebar keeps the Locust mark**, and it is still the way home.
   Both it and the wordmark were hidden, so the app lost its own name at
   exactly the width where the window is smallest.
+- **The plan is visible without opening anything.** It used to ride inside
+  the tool-call fold whenever a turn had one — so on exactly the turns worth
+  watching, the plan was the thing you had to go looking for. The fold hides
+  *how* a turn was carried out; a plan is *what* it is doing and how far
+  along, which is the question you actually have while it runs.
+- **Clicking the message box glows instead of outlining.** The hard edge was
+  too loud for the biggest control in the app. Same colour, a fraction of the
+  weight — it still says where the keyboard is, which is the part that
+  matters.
 - **One `+` in the narrow sidebar, and it says what it adds.** There were two
   stacked, unlabelled and indistinguishable; it is now a single control
   offering New teammate or New room.

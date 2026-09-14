@@ -370,26 +370,39 @@ describe("OpenCode's plan, in the shape it really arrives in", () => {
     expect(steps.map((step) => step.state)).toEqual(['done', 'running', 'pending'])
   })
 
-  it('and the fold counts how far through it is', () => {
+  it('and the thread counts how far through it is, in the open', () => {
     const thread = buildThread(
       [event('tool.started', { itemId: 't1', name: 'write' }), event('plan.updated', { plan: OPENCODE_PLAN })],
       { running: true }
     )
-    const fold = thread.find((item) => item.type === 'activity')
-    expect(fold?.type === 'activity' ? fold.plan?.steps.length : undefined).toBe(3)
-    expect(fold?.type === 'activity' ? fold.plan?.doneCount : undefined).toBe(1)
+    const shown = thread.find((item) => item.type === 'plan')
+    expect(shown?.type === 'plan' ? shown.steps.length : undefined).toBe(3)
+    expect(shown?.type === 'plan' ? shown.doneCount : undefined).toBe(1)
   })
 })
 
-describe('a plan is what the run did, not a thing above what it did', () => {
-  // The thread had nineteen visual species against Claude Code's three, and
-  // no rule saying what earns a card -- so each new fact arrived as a new
-  // widget. A plan is the clearest possible statement of what a run DID, so
-  // it belongs in the fold rather than in a card above it, which is a card
-  // off almost every Codex run (design review, 2026-09-06).
+describe('a plan is WHAT, and the fold is HOW', () => {
+  /*
+   * This used to read "a plan is what the run did, not a thing above what
+   * it did", and the plan rode inside the activity fold whenever there was
+   * one. The reasoning then was about card proliferation: nineteen visual
+   * species against Claude Code's three, and no rule for what earns a card
+   * (design review, 2026-09-06). Fair, and it put the plan in the wrong
+   * place.
+   *
+   * Colin, 2026-09-14, watching a five-step run: "the plan should be
+   * visible to the user probably". He is right, and the line is the one the
+   * trace comment already draws -- the fold hides HOW a turn was carried
+   * out, and a plan is WHAT it is doing and how far along. That is the only
+   * question a person waiting actually has, and it was the one thing they
+   * had to go looking for.
+   *
+   * Not a new species either: the `plan` item already existed for turns
+   * that touched nothing. It simply stopped being conditional.
+   */
   const steps = { plan: [{ step: 'Read the file', status: 'completed' }, { step: 'Edit it', status: 'in_progress' }] }
 
-  it('rides on the fold when the run also did something', () => {
+  it('stands on its own even when the run also did something', () => {
     const thread = buildThread(
       [
         event('plan.updated', steps),
@@ -399,12 +412,16 @@ describe('a plan is what the run did, not a thing above what it did', () => {
       ],
       { running: false, latestTurn: true, spokeToPeers: false }
     )
-    // One object, not two: the fold carries the plan.
-    expect(thread.some((item) => item.type === 'plan')).toBe(false)
+    const shown = thread.find((item) => item.type === 'plan')
+    expect(shown, 'the plan is its own item, not a passenger on the fold').toBeDefined()
+    expect(shown?.type === 'plan' ? shown.steps.length : undefined).toBe(2)
+    // The fold is still there, and still carries the work.
     const fold = thread.find((item) => item.type === 'activity')
     expect(fold).toBeDefined()
-    expect(fold?.type === 'activity' ? fold.plan?.steps.length : undefined).toBe(2)
-    expect(fold?.type === 'activity' ? fold.plan?.doneCount : undefined).toBe(1)
+    // Read first: the shape of the work, then how it was carried out.
+    expect(thread.indexOf(shown!)).toBeLessThan(thread.indexOf(fold!))
+    // The count travels with the plan, which is now the only place it is.
+    expect(shown?.type === 'plan' ? shown.doneCount : undefined).toBe(1)
   })
 
   it('keeps its own item when the run did nothing else', () => {

@@ -40,6 +40,26 @@ describe('a keyboard user can see where they are', () => {
     })
   }
 
+  it('shows focus as a glow on the two fields, not a hard outline', () => {
+    /*
+     * The indicator has to exist -- an invisible one was the only
+     * accessibility defect the static sweep found. It does not have to
+     * shout: Colin, 2026-09-14, "the yellow outline for clicking the chat
+     * box is pointless and clunky, just do what claude does, a very subtle
+     * highlight/glow of the same color".
+     *
+     * So: same hue, a fraction of the weight. What this guards is that
+     * softening it never becomes removing it.
+     */
+    for (const field of ['.lc-composer__box:focus-within {', '.lc-search:focus-within {']) {
+      const rule = shell.slice(shell.indexOf(field), shell.indexOf('}', shell.indexOf(field)))
+      expect(rule, `${field} must still say where focus is`).toContain('box-shadow')
+      expect(rule).toContain('--lc-focus-glow')
+      // The hard 2px lime edge is what was too loud.
+      expect(rule).not.toContain('border-color: var(--lc-focus-ring)')
+    }
+  })
+
   it('lets focus win over hover, which needs source order at equal specificity', () => {
     // One class and one pseudo-class each, so nothing but position decides.
     // A focused box under the pointer must read as focused.

@@ -436,6 +436,19 @@
   --lc-hover-surface-strong: rgba(255, 255, 255, 0.07);
   --lc-hover-border: rgba(255, 255, 255, 0.2);
   --lc-focus-ring: var(--lc-lime);
+  /*
+   * The SOFT version, for a box you type in.
+   *
+   * A 2px lime edge is right on a small control and wrong on the message
+   * box: Colin, 2026-09-14, "the yellow outline for clicking the chat box
+   * is pointless and clunky, just do what claude does, a very subtle
+   * highlight/glow of the same color". Same hue, a fraction of the weight
+   * -- the indicator stays, which is the part that matters, because an
+   * invisible focus ring was the only accessibility defect the static sweep
+   * found.
+   */
+  --lc-focus-glow: rgba(201, 240, 74, 0.18);
+  --lc-focus-edge: rgba(201, 240, 74, 0.38);
 }
 
 /*

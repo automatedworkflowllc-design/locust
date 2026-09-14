@@ -1657,13 +1657,36 @@ export function buildThread(
   // saying the same kind of thing the fold below it says (design review,
   // 2026-09-06).
   //
-  // It only rides along when there IS a fold. A plan with no activity behind
-  // it -- a read-only run that answered with steps and touched nothing -- is
-  // still the only account of that turn, and it keeps its own item rather
-  // than vanishing.
   const planSteps = plan.length > 0
     ? { steps: plan, doneCount: plan.filter((step) => step.state === 'done').length }
     : undefined
+
+  /*
+   * THE PLAN IS NOT PROCESS, so it does not live behind the fold.
+   *
+   * It used to ride inside the activity card whenever there was one, and
+   * only stand on its own when a turn had touched nothing -- so on exactly
+   * the turns worth watching, the plan was the one thing you had to go
+   * looking for. Colin, 2026-09-14: "the plan should be visible to the user
+   * probably".
+   *
+   * The fold exists to hide HOW: tool calls, shell lines, the thousand
+   * small steps. A plan is WHAT, and how far along -- which is the question
+   * a person waiting actually has, and the only part of a running turn that
+   * answers it. The comment on the trace already says this in so many
+   * words: "the plan is the shape of the work, and the rest is how it was
+   * carried out". It just was not where the code put it.
+   *
+   * Before the fold, so a turn reads plan first and then its workings.
+   */
+  if (planSteps !== undefined) {
+    items.push({
+      key: 'plan',
+      type: 'plan',
+      steps: planSteps.steps,
+      doneCount: planSteps.doneCount
+    })
+  }
 
   if (activity.length > 0) {
     items.push({
@@ -1702,16 +1725,8 @@ export function buildThread(
        */
       ...(options.running ? {} : { openByDefault: true }),
       details: activity,
-      ...(planSteps === undefined ? {} : { plan: planSteps }),
       ...(foldNotices.length === 0 ? {} : { notices: foldNotices }),
       reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
-    })
-  } else if (planSteps !== undefined) {
-    items.push({
-      key: 'plan',
-      type: 'plan',
-      steps: planSteps.steps,
-      doneCount: planSteps.doneCount
     })
   }
 
