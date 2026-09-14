@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.105.0 - 2026-09-14
+
+- **Stopping a run now stops what the run started.** Measured on the installed
+  app: a teammate was asked for one command that writes a file, waits ninety
+  seconds, then writes another — and stopped after eighteen. Both files were
+  there afterwards. The command had kept running and written into the workspace
+  a minute and a half after the person stopped it. The stop reached the CLI and
+  never the command underneath it. It does now, and the case is a test that
+  costs nothing to run.
+
 ## 0.104.0 - 2026-09-14
 
 - **Nested lists are nested.** Every item became a top-level row whatever its

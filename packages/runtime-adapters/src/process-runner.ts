@@ -537,6 +537,33 @@ export function createNodeRuntimeProcessRunner(
         if (userCancellation) cancelled = true;
         if (settled || terminationRequested) return;
         terminationRequested = true;
+        /*
+         * Take the TREE down FIRST, and not only if the grace period elapses.
+         *
+         * MEASURED 2026-09-14 (Astra, on the installed app; reproduced with
+         * real processes in `stop-reaches-the-tree.test.ts`): a run was asked
+         * for a Node command that writes a file, waits ninety seconds, then
+         * writes another, and was stopped at eighteen. Both files were there
+         * afterwards. The command ran to completion and wrote into the
+         * person's workspace a minute and a half after they stopped it.
+         *
+         * The reason is the ORDER. A well-behaved CLI obeys SIGINT and exits
+         * immediately; the run settles, the forced timer below is cancelled,
+         * and the grandchild it spawned is never anybody's problem again --
+         * on Windows it is not even reachable afterwards, because the tree it
+         * belonged to is gone the moment its parent is.
+         *
+         * ORDER IS THE WHOLE FIX, and the first attempt at it failed:
+         * sweeping AFTER `child.kill` changed nothing, because on Windows
+         * `kill` is not a signal -- it terminates the process outright. The
+         * parent was already gone, so `taskkill /T` had no tree left to walk.
+         * Measured both ways; this is the order that works.
+         *
+         * Nothing is lost by going first. `killProcessTree` is a no-op off
+         * Windows, so POSIX still gets its SIGINT and its grace period, and
+         * on Windows there was never a graceful stop to give up.
+         */
+        killProcessTree(child.pid);
         try {
           child.kill("SIGINT");
         } catch {
