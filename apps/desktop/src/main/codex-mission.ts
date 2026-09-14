@@ -44,7 +44,6 @@ import { fileChangesOf, itemOf } from './approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
 import { composeHandoffPrompt } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
-import { cursorConnectorsNeedingLogin } from './cursor-connector-notice.js'
 import { cursorCannotSee, cursorIgnoreNotice } from './cursor-visibility.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
 import type { ToolPatch } from '@teammate/runtime-adapters'
@@ -253,7 +252,6 @@ interface CodexMissionServiceOptions {
   readonly observeDisk?: (workspacePath: string) => Promise<WorkspaceSnapshot | undefined>
   /** Test seam: what `.cursorignore` says, if anything. See cursor-visibility.ts. */
   /** Test seam: what the Cursor CLI says about its connectors. */
-  readonly readCursorConnectors?: () => Promise<string | undefined>
   readonly readCursorIgnore?: (path: string) => Promise<string | undefined>
   /** Test seam: the change behind each changed path, read off the disk. */
   readonly observePatches?: (workspacePath: string, after: WorkspaceSnapshot, paths: readonly string[], options?: unknown, before?: WorkspaceSnapshot) => Promise<ReadonlyMap<string, ToolPatch>>
@@ -548,41 +546,6 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     }
   }
 
-  /*
-   * Say once, per Cursor run, when a connector has no credential.
-   *
-   * Proactive rather than reactive, unlike `explainADeniedRead`: with no
-   * token the server's tools are never offered to the model, so there is no
-   * failure to notice. The run just behaves as though the connector does not
-   * exist. See `cursor-connector-notice.ts` for what the CLI says and why the
-   * Cursor app being signed in does not help.
-   */
-  const sayIfAConnectorNeedsLogin = async (mission: ActiveCodexMission): Promise<void> => {
-    if (mission.runtime !== 'cursor' || mission.saidConnectorsNeedLogin === true) return
-    mission.saidConnectorsNeedLogin = true
-    try {
-      const sentence = await (options.readCursorConnectors ?? cursorConnectorsNeedingLogin)()
-      if (sentence === undefined) return
-      // Shown, never recorded -- the same rule the `.cursorignore` notice
-      // follows, and for the same reason: a persisted event here would
-      // consume a ledger sequence the adapter is about to use.
-      safelyEmit(mission, {
-        kind: 'event',
-        runId: mission.runId,
-        missionId: mission.missionId,
-        event: cursorIgnoreNotice({
-          runId: mission.runId,
-          missionId: mission.missionId,
-          sourceAdapter: mission.runtime,
-          nextSequence: -1,
-          at: now().toISOString(),
-          sentence
-        })
-      })
-    } catch {
-      // A CLI that will not answer says nothing about connectors.
-    }
-  }
 
   const consume = async (mission: ActiveCodexMission): Promise<void> => {
     let persistenceFailed = false
@@ -607,18 +570,6 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const events = batch.flatMap((entry) => [...mission.normalizer.accept(entry)])
           await persistAndEmit(mission, options.ledger, events)
           await explainADeniedRead(mission, events)
-          /*
-           * NOT awaited: this asks another program a question.
-           *
-           * It sat in the pump behind an `await` and nobody saw it, because
-           * the call it makes was failing instantly for an unrelated reason
-           * (see `cursor-connector-notice.ts`). With that fixed it is a real
-           * child process in the middle of the event stream, and every event
-           * behind it -- the whole mission's output -- would wait on it. It
-           * says something about the MACHINE, so it has no business holding
-           * up a run; it emits when it answers, or never.
-           */
-          void sayIfAConnectorNeedsLogin(mission)
         } catch {
           persistenceFailed = true
           mission.controller.abort()

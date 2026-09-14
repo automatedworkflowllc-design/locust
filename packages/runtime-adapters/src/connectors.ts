@@ -162,11 +162,27 @@ export function parseCursorMcpList(text: string): readonly CursorConnector[] {
 }
 
 /**
- * The one sentence a person needs, with the command that fixes it.
+ * What is true about a connector the CLI has no credential for.
  *
- * Names the servers rather than counting them, because the command takes a
- * name. Undefined when there is nothing to say -- the app does not remark on
- * connectors that are working.
+ * This used to end "Run this in a terminal: cursor-agent mcp login <name>",
+ * shown once per Cursor run in the conversation. Colin, 2026-09-14, after
+ * trying it: "that doesnt work we have tried that in the terminal" -- and
+ * "this doesnt need to be in the chat".
+ *
+ * Both complaints are right and the first is the serious one. MEASURED on his
+ * machine the same evening: `cursor-agent mcp login` persists NOTHING. There
+ * is no MCP credential in `~/.cursor/cli-config.json` (its `authInfo` is the
+ * Cursor account), no credential file anywhere under `~/.cursor` or the
+ * cursor-agent install, and nothing in Windows Credential Manager. Meanwhile
+ * the Cursor IDE connects to the SAME url from the SAME `mcp.json` and logs
+ * "Successfully connected to streamableHttp server" -- because it holds a
+ * token in its own store. The sign-ins were landing in the app, every time,
+ * and the CLI has nowhere to receive one.
+ *
+ * So the sentence no longer prescribes a fix. An app that tells a person to
+ * run a command that cannot work spends their evening for them, which is
+ * worse than saying nothing -- and it did, repeatedly. It states what is
+ * true and stops there.
  */
 export function cursorConnectorSentence(
   connectors: readonly CursorConnector[],
@@ -177,8 +193,7 @@ export function cursorConnectorSentence(
   const list = names.length === 1
     ? names[0]
     : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
-  const commands = names.map((name) => `cursor-agent mcp login ${name}`).join(" && ");
-  return `Cursor has no credential for ${String(list)}, so a Cursor teammate cannot call ${
+  return `The Cursor CLI has no credential for ${String(list)}, so a Cursor teammate cannot call ${
     names.length === 1 ? "it" : "them"
-  }. Signing in inside the Cursor app does not cover the CLI. Run this in a terminal: ${commands}`;
+  }. Signing in inside the Cursor app does not cover the CLI; they keep separate credentials.`;
 }

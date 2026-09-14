@@ -132,7 +132,7 @@ import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { routeAtStart } from '../shared/route-at-start.js'
 import { roleLabelOf } from '../shared/ipc.js'
-import { isOutboundLink } from '../shared/outbound-links.js'
+import { isOutboundLink, isWebLink } from '../shared/outbound-links.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { createUpdateService } from './updates.js'
 import type {
@@ -1535,7 +1535,21 @@ if (!ownsSingleInstanceLock) {
      */
     ipcMain.handle(OPEN_LINK_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
-      if (!isOutboundLink(requested)) return { ok: false, message: 'Locust does not open that address.' } as const
+      /*
+       * The app's own three addresses, OR a plain web address from a reply.
+       *
+       * The widening is real and is named here rather than buried: before
+       * this, a renderer turned against the person could reach exactly three
+       * hosts, and now it can reach any http(s) one. What has not changed is
+       * that `shell.openExternal` opens the PERSON's browser, visibly, and
+       * only ever because they clicked something. What is refused has not
+       * changed either: every non-web scheme, which is what the original
+       * policy was actually defending -- a reply must not become a way to
+       * reach this machine. See `isWebLink`.
+       */
+      if (!isOutboundLink(requested) && !isWebLink(requested)) {
+        return { ok: false, message: 'Locust does not open that address.' } as const
+      }
       try {
         await shell.openExternal(requested)
         return { ok: true } as const

@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.114.0 - 2026-09-14
+
+- **Links in a reply are clickable, and they say where they go.** They were
+  shown but never linked. A web address now opens in your own browser, with
+  the site's host printed quietly after the label — because the label is the
+  model's words and the destination is the fact, and you should see the second
+  one before you click. A local file path is still not clickable: a reply must
+  not become a way to reach this machine.
+- **An italicised link renders as a link.** `*[Title](https://…)*` — which
+  models write constantly for an article title — used to render with the
+  brackets and the whole URL sitting in the middle of the sentence.
+- **The Cursor connector notice is gone from the conversation.** It said to run
+  `cursor-agent mcp login`, and that command does not work: it persists no
+  credential anywhere. An app that prescribes a command which cannot work
+  spends your evening for you.
+
 ## 0.113.0 - 2026-09-14
 
 - **A teammate whose runtime is signed out no longer says "idle".** If you made

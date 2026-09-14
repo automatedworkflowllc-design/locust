@@ -6826,6 +6826,41 @@ textarea {
   cursor: default;
 }
 
+/* --- 3b. Links that actually go somewhere --------------------------------
+ * The note above says a hairline underline is the one signal every reader has
+ * learned means "click", and removes it because .lc-linklabel does NOT click.
+ * This one does, so it takes the underline back -- and it takes it for the
+ * same reason the other refused it.
+ *
+ * The host rides after the label, quieter than it, because the label is the
+ * MODEL's words and the destination is the fact. A reader deciding whether to
+ * click needs the second one, and it must not shout over the sentence to
+ * give it.
+ */
+.lc-link {
+  /* A button, so it has to be talked out of looking like one. */
+  appearance: none;
+  background: none;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--lc-blue-text);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--lc-blue-text) 45%, transparent);
+  cursor: pointer;
+}
+
+.lc-link:hover,
+.lc-link:focus-visible {
+  border-bottom-color: var(--lc-blue-text);
+}
+
+.lc-link__host {
+  font-family: var(--lc-font-mono);
+  font-size: 0.86em;
+  color: var(--lc-text-muted);
+}
+
 /* --- 4. The rerun offer -------------------------------------------------
  * Replaces .lc-rerun, .lc-rerun span. Not a card. Same register as
  * .lc-diagnostic (a note about the run, left-ruled), in green because the

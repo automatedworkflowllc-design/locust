@@ -37,12 +37,19 @@ describe("what the Cursor CLI says about its connectors", () => {
     expect(cursorConnectorSentence([])).toBeUndefined();
   });
 
-  it("names the server and gives the command that fixes it", () => {
+  it("names the server and stops short of prescribing a fix", () => {
     const said = cursorConnectorSentence(parseCursorMcpList("robinhood-trading: requires_authentication"));
     expect(said).toContain("robinhood-trading");
-    expect(said).toContain("cursor-agent mcp login robinhood-trading");
     // The distinction that cost the most time.
     expect(said).toContain("Cursor app does not cover the CLI");
+    /*
+     * It used to end with `cursor-agent mcp login <name>`. Colin ran it, more
+     * than once, and it does nothing -- MEASURED 2026-09-14: that command
+     * persists no credential anywhere on this machine. An app that prescribes
+     * a command which cannot work spends a person's evening for them.
+     */
+    expect(said).not.toContain("mcp login");
+    expect(said).not.toMatch(/run this|in a terminal/i);
   });
 
   it("names every waiting server when there are several", () => {
@@ -50,6 +57,6 @@ describe("what the Cursor CLI says about its connectors", () => {
       parseCursorMcpList(lines("a: requires_authentication", "b: connected", "c: requires_authentication")),
     );
     expect(said).toContain("a and c");
-    expect(said).not.toContain("login b");
+    expect(said).not.toContain("b,");
   });
 });

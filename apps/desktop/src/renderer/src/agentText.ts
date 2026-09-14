@@ -338,8 +338,25 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
   // "name", and `2 * 3 * 4` is arithmetic. The QA pass on 0.21.2 read a
   // literal `**Yes, whitespace-only input is already covered.**` in a Claude
   // reply, which is the model's own emphasis drawn as four asterisks.
+  /*
+   * An EMPHASISED link is its own alternative, and it has to come before the
+   * emphasis ones.
+   *
+   * Colin, 2026-09-14, with a screenshot of a Cursor reply: a whole
+   * `*[We Must Pace the Frontier](https://darioamodei.com/post/...)*` rendered
+   * in italics with the brackets and the URL sitting in the middle of the
+   * sentence. Models write this constantly -- an italicised article title
+   * that is also the link.
+   *
+   * The scan finds the earliest match, and `*` comes before `[`, so the
+   * emphasis alternative won and captured the entire link as its text. An
+   * emphasis span's text is not parsed again, so the link syntax inside it
+   * rendered literally. Handling the pair explicitly is enough; going
+   * recursive would mean giving `strong` and `em` children instead of text,
+   * which is a much larger change than one bad line deserves.
+   */
   const pattern =
-    /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)|(?:\*\*|__)(?=\S)([^\n]+?\S)(?:\*\*|__)|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]+?\S)(?:\*|_)(?![A-Za-z0-9*_])/g
+    /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)|(?:\*\*|__|\*|_)\[([^\]\n]+)\]\(([^)\s]+)\)(?:\*\*|__|\*|_)|(?:\*\*|__)(?=\S)([^\n]+?\S)(?:\*\*|__)|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]+?\S)(?:\*|_)(?![A-Za-z0-9*_])/g
   let cursor = 0
   for (const match of text.matchAll(pattern)) {
     const at = match.index
@@ -349,9 +366,13 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
     } else if (match[2] !== undefined) {
       spans.push({ kind: 'link', text: match[2], href: match[3]! })
     } else if (match[4] !== undefined) {
-      spans.push({ kind: 'strong', text: match[4] })
+      // `*[label](url)*` -- a link that happened to be italicised. It reads
+      // as a link; the italics were decoration on the label.
+      spans.push({ kind: 'link', text: match[4], href: match[5]! })
+    } else if (match[6] !== undefined) {
+      spans.push({ kind: 'strong', text: match[6] })
     } else {
-      spans.push({ kind: 'em', text: match[5]! })
+      spans.push({ kind: 'em', text: match[7]! })
     }
     cursor = at + match[0].length
   }

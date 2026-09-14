@@ -5,6 +5,7 @@ import { seedAvatar } from '../../../shared/avatar.js'
 import { parseAgentText, splitInlineCode } from '../agentText.js'
 import type { ListItem } from '../agentText.js'
 import { splitSettled } from '../settledText.js'
+import { linkHost } from '../../../shared/outbound-links.js'
 import type { PlanStep } from '../missionView.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
@@ -61,16 +62,63 @@ function inline(text: string): ReactElement {
           )
         }
         if (span.kind === 'link') {
-          // Shown, not linked: a thread must not become a way to navigate the
-          // app -- or the machine -- somewhere a model chose. The target
-          // rides on the title so it is available without sitting in the
-          // middle of the sentence. Deliberate, and kept after the 0.21.2 QA
-          // pass asked for "actionable links": what it asked for is what a
-          // prompt injection would ask for.
+          /*
+           * A web address is clickable now; anything else still is not.
+           *
+           * It used to be neither -- "shown, not linked" -- and the note
+           * beside it said an actionable link is what a prompt injection
+           * would ask for. Right instinct, wrong risk. A reply is rendered as
+           * TEXT and never as markup, so nothing here executes; what a model
+           * can do is write a label that disagrees with its target. That is
+           * phishing, and the answer to phishing is to show the destination,
+           * not to break every honest citation -- Colin, 2026-09-14: "source
+           * links are hoverable but not clickable".
+           *
+           * A local path keeps exactly the old behaviour, because the old
+           * worry was about those: a thread must not become a way to reach
+           * this machine, and `isWebLink` refuses every non-web scheme.
+           */
+          const host = linkHost(span.href)
+          if (host === undefined) {
+            return (
+              <span className="lc-linklabel" key={`s${String(index)}`} title={span.href}>
+                {span.text}
+              </span>
+            )
+          }
+          /*
+           * A button, NOT an anchor with a prevented href.
+           *
+           * `no-dead-links.test.ts` refuses every `<a href>` in the renderer,
+           * because the host cancels navigation away from its own URL and an
+           * href that goes nowhere does it SILENTLY -- three of them shipped
+           * dead once and an outside tester found them. Writing an href and
+           * then calling preventDefault on every click would slip past the
+           * spirit of that guard by satisfying nothing: the markup would
+           * claim a destination the element never uses. A button says what
+           * this is -- something you press, which asks the host to open your
+           * browser.
+           */
           return (
-            <span className="lc-linklabel" key={`s${String(index)}`} title={span.href}>
+            <button
+              type="button"
+              className="lc-link"
+              key={`s${String(index)}`}
+              title={span.href}
+              onClick={() => {
+                void window.desktop?.openLink(span.href)
+              }}
+            >
               {span.text}
-            </span>
+              {/*
+                * The host, beside the label, because the label is the MODEL's
+                * words and the target is not. A citation reading "his essay"
+                * that goes somewhere unrelated is the only real hazard in
+                * making these clickable, and saying where it goes before the
+                * person decides is the whole fix.
+                */}
+              <span className="lc-link__host"> ({host})</span>
+            </button>
           )
         }
         if (span.kind === 'strong') {

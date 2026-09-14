@@ -39,3 +39,58 @@ export const OUTBOUND_LINKS: readonly string[] = [...new Set([...RUNTIME_LINKS, 
 export function isOutboundLink(url: unknown): url is string {
   return typeof url === 'string' && OUTBOUND_LINKS.includes(url)
 }
+
+/**
+ * A plain web address, which is a DIFFERENT and weaker guarantee than the
+ * list above, and the difference is the point.
+ *
+ * The list is what the APP links to: three addresses, fixed, chosen here. This
+ * is what a MODEL wrote in a reply, and there is no allowlist that can cover
+ * that -- the whole value of a link in a reply is that it goes somewhere
+ * nobody anticipated.
+ *
+ * Colin asked for it twice, 2026-09-14: "do we have clickable links yet" and
+ * "source links are hoverable but not clickable". The old answer was a
+ * deliberate no, and the note explaining it said "what it asked for is what a
+ * prompt injection would ask for". That was the right instinct about the wrong
+ * risk. A reply is rendered as TEXT, never as markup, so a model cannot
+ * execute anything here; what it can do is write a label that disagrees with
+ * its target and hope for a click. The answer to that is not to break every
+ * honest citation -- it is to show where the link actually goes, which is
+ * what `linkHost` is for.
+ *
+ * Narrow on purpose:
+ *   - http and https ONLY. No `file:`, no `vscode:`, no custom scheme -- the
+ *     original worry was a reply becoming a way to reach the machine, and
+ *     that worry survives intact.
+ *   - It must parse as a URL with a real host.
+ *   - The person still has to click it, and the browser it opens in is
+ *     theirs, outside this app entirely.
+ */
+export function isWebLink(url: unknown): url is string {
+  if (typeof url !== "string" || url.length > 2048) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  return (parsed.protocol === "https:" || parsed.protocol === "http:") && parsed.hostname.length > 0;
+}
+
+/**
+ * The host, for showing beside a link whose label is the model's own words.
+ *
+ * A citation reading "his essay" that goes to somewhere unrelated is the only
+ * real hazard in making these clickable, and it is entirely solved by saying
+ * where it goes before the person decides. Undefined when it is not a web
+ * link, in which case nothing should be clickable anyway.
+ */
+export function linkHost(url: string): string | undefined {
+  if (!isWebLink(url)) return undefined;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return undefined;
+  }
+}
