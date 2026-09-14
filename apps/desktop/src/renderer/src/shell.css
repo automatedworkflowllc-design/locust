@@ -220,8 +220,23 @@ textarea {
   transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
 }
 
+/* A KEYBOARD USER MUST BE ABLE TO SEE WHERE THEY ARE.
+ *
+ * Static sweep, 2026-09-14 (A1), the only accessibility defect it found.
+ * `tokens.css` gives every input a 2px focus ring; four of them then set
+ * `outline: none` and put nothing back, and their wrappers change border on
+ * :hover only. So tabbing into the composer produced NO visual change at
+ * all. The command palette was the worst of the four -- a surface that is
+ * keyboard-only by nature, whose input is the first thing focused.
+ *
+ * The bare input keeps `outline: none`, because the ring belongs on the box
+ * a person actually sees; the wrapper takes it with :focus-within. */
 .lc-search:hover {
   border-color: var(--lc-border-hover);
+}
+
+.lc-search:focus-within {
+  border-color: var(--lc-focus-ring);
 }
 
 .lc-search input {
@@ -3557,6 +3572,16 @@ textarea {
   border-color: var(--lc-border-hover);
 }
 
+.lc-composer__box:focus-within {
+  /* The box a person types in, showing that it is where the keys go. Sweep
+   * A1, 2026-09-14: tabbing in changed nothing on screen at all.
+   *
+   * AFTER :hover deliberately. Both are one class and one pseudo-class, so
+   * they tie on specificity and source order decides -- and a focused box
+   * under the pointer must show focus, not hover. */
+  border-color: var(--lc-focus-ring);
+}
+
 /* The newline hint, beside the send control and only while there is something
    to send. Quiet enough to ignore once learned: it is a fact you need exactly
    once, and a permanent label for it would be the "dead control" the design
@@ -4432,7 +4457,9 @@ textarea {
   outline: none;
 }
 
-.lc-input:focus {
+.lc-input:focus-visible {
+  /* :focus-visible, not :focus -- every other ring in this file uses it, and
+   * :focus gave mouse users a ring they did not ask for (sweep A1). */
   border-color: var(--lc-hover-border);
 }
 
@@ -5275,6 +5302,10 @@ textarea {
   overflow: hidden;
 }
 
+.lc-palette__head:focus-within {
+  border-bottom-color: var(--lc-focus-ring);
+}
+
 .lc-palette__head {
   display: flex;
   align-items: center;
@@ -5789,6 +5820,10 @@ textarea {
   z-index: 5;
 }
 
+.lc-picker__head:focus-within {
+  border-bottom-color: var(--lc-focus-ring);
+}
+
 .lc-picker__head {
   display: flex;
   align-items: center;
@@ -6271,7 +6306,7 @@ textarea {
 
 .lc-peer__toggle:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: var(--lc-text-secondary, #a8adab);
+  color: var(--lc-text-secondary);
 }
 
 .lc-peer.is-open .lc-peer__toggle {
@@ -6315,17 +6350,18 @@ textarea {
   color: var(--lc-blue-text);
 }
 
-/* Violet and clay have no text token; these are their hues lifted to the
-   same contrast band as the lime and blue text tokens (>= 4.5:1 on the raised
-   surface), checked with a ratio, not by eye. */
+/* Violet and clay now HAVE text tokens, and these are they: their hues
+   lifted to the same contrast band as lime and blue (>= 4.5:1 on the raised
+   surface), checked with a ratio and not by eye. The ratios are the ones
+   measured when these were literals here; only their home changed. */
 .lc-peer__name.is-violet,
 .lc-peer__author.is-violet {
-  color: #c9b8f3;
+  color: var(--lc-violet-text);
 }
 
 .lc-peer__name.is-clay,
 .lc-peer__author.is-clay {
-  color: #f0aea6;
+  color: var(--lc-clay-text);
 }
 
 .lc-peer__message {
@@ -6478,7 +6514,7 @@ textarea {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  border: 2px solid var(--lc-bg-sidebar, var(--lc-bg-raised));
+  border: 2px solid var(--lc-bg-sidebar);
   box-sizing: content-box;
 }
 
@@ -6487,11 +6523,11 @@ textarea {
 }
 
 .lc-presence--amber {
-  background: var(--lc-amber, #e9b949);
+  background: var(--lc-amber);
 }
 
 .lc-presence--red {
-  background: var(--lc-red, #e4685d);
+  background: var(--lc-red);
 }
 
 .lc-shuffle {
@@ -6555,11 +6591,11 @@ textarea {
 .lc-rostercard__edit {
   border: 1px solid var(--lc-border-card);
   background: transparent;
-  color: var(--lc-text-secondary, #a8adab);
+  color: var(--lc-text-secondary);
   font: inherit;
   font-size: var(--lc-text-description);
   padding: 4px 10px;
-  border-radius: var(--lc-radius-button, 7px);
+  border-radius: var(--lc-radius-button);
   cursor: pointer;
 }
 
@@ -6689,9 +6725,9 @@ textarea {
 }
 
 .lc-button--danger {
-  border-color: var(--lc-red-border, rgba(228, 104, 93, 0.45));
-  color: var(--lc-red-text, #f5d9d4);
-  background: var(--lc-red-tint, rgba(228, 104, 93, 0.1));
+  border-color: var(--lc-red-border);
+  color: var(--lc-red-text);
+  background: var(--lc-red-tint);
 }
 
 /* The Custom role's own words, under the role grid. */
@@ -7779,7 +7815,11 @@ textarea {
 .lc-sectionlabel__count {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
-  color: var(--lc-text-faint);
+  color: var(--lc-text-muted);
+  /* NOT faint. Faint is reserved for things that paint no readable text --
+   * separators, an SVG stroke -- and this is the only thing on the row that
+   * varies, so it is information. #7a807f on #17191a measured about 3.2:1
+   * (static sweep, 2026-09-14, A6). */
 }
 
 /* The Inspector's Artifacts tab: one row per file the mission touched, each

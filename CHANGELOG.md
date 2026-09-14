@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.125.0 - 2026-09-14
+
+From a static sweep of the whole renderer.
+
+- **Tabbing into a text box now shows you where you are.** The search field,
+  the composer, the command palette and the route picker each hid their own
+  focus ring and put nothing back, so moving between them by keyboard
+  changed nothing on screen. The palette is keyboard-only by nature, which
+  made it the worst of the four.
+- **A one-step plan no longer reads "0 of 1 steps".**
+- **The count beside TEAMMATES and ROOMS is readable.** It was using the tone
+  reserved for things that carry no information, at about 3.2:1.
+- Violet and clay teammate names now come from the colour system like every
+  other hue, and no colour in the stylesheet can quietly fall back to a value
+  that was never checked.
+
 ## 0.124.0 - 2026-09-14
 
 Two findings from the first acceptance pass to reach routines.

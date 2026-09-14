@@ -940,7 +940,11 @@ export function activityTrace(
   if (plan !== undefined && plan.steps.length > 0) {
     segments.push({
       key: 'steps',
-      text: `${String(plan.doneCount)} of ${String(plan.steps.length)} steps`
+      // `pluralize`, like every other count in this file. A one-step plan
+      // read "0 of 1 steps" (static sweep, 2026-09-14, A3) -- and a one-step
+      // plan is reachable, because this line only renders where there are
+      // outcomes to count.
+      text: `${String(plan.doneCount)} of ${pluralize(plan.steps.length, 'step')}`
     })
   }
 

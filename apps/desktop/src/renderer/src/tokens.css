@@ -263,6 +263,20 @@
   --lc-hue-clay: #e4857a;
   --lc-hue-clay-face: #1e100f;
 
+  /* THE TWO HUES THAT HAD NO TEXT SIBLING.
+   *
+   * Lime, blue, green, amber and red each carry a `-text` variant for type
+   * on a dark surface; violet and clay did not, so two literal hexes lived
+   * in `shell.css` instead -- contrast-checked honestly, and still the one
+   * thing the token gate exists to forbid (static sweep, 2026-09-14, A5).
+   * The ratios measured there are kept exactly; only their home changes.
+   *
+   * Worth finishing now rather than later: the room is a group chat since
+   * the exchange work, so peer names appear far more often and in more
+   * places than when this was two rules. */
+  --lc-violet-text: #c9b8f3;
+  --lc-clay-text: #f0aea6;
+
   /* --- Typography ------------------------------------------------------
    * Weights 400/500 only -- no bold headings inside the app.
    * Floor is 10px and only for uppercase mono labels; everything readable
