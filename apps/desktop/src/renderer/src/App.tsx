@@ -3606,7 +3606,6 @@ export default function App(): ReactElement {
               answersFor={roomAnswersFor}
               exchangeFor={roomExchangeFor}
               exchangeCostText={roomExchangeCostText}
-              runtimeNameOf={runtimeNameOf}
               onSelectRoom={(roomId) => {
                 setRoomNotice(undefined)
                 setCurrentRoomId(roomId)

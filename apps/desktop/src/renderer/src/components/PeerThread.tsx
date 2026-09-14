@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
+import { agoLabel } from '../teammateWork.js'
 import { seedAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { PublicPeerMessage, PublicTeammate, TeammateHue } from '../../../shared/ipc.js'
@@ -75,6 +76,25 @@ export function PeerThread({
   // What the exchange was about, for the times it stays collapsed. A count
   // alone says one happened and nothing about what it said.
   const snippet = open ? undefined : peerSnippet(messages[0]?.text ?? null)
+  /*
+   * WHEN it was sent, once it is old enough for that to be the question.
+   *
+   * A message waits for its recipient's next turn, and that turn can be a
+   * conversation about something else entirely. Colin, 2026-09-14, opening a
+   * new conversation to ask for one thing and finding a paragraph about a
+   * database schema above it: "??? wtf is yurt doing".
+   *
+   * Nothing was wrong -- Yurt sent that hours earlier, in another
+   * conversation, and it was delivered at the first chance. What was missing
+   * is the only fact that makes it make sense: when. Under the threshold this
+   * stays silent, because "sent 2 seconds ago" is the card saying it exists
+   * twice.
+   */
+  const sentAgo = agoLabel(messages[0]?.at ?? '')
+  const waited =
+    messages.length === 1 && sentAgo !== undefined && !/just now|second/.test(sentAgo)
+      ? sentAgo
+      : undefined
 
   const hueFor = (teammateId: string): TeammateHue =>
     teammateId === self?.teammateId
@@ -94,6 +114,7 @@ export function PeerThread({
         <span>{label}</span>
         <PixelFace hue={peerHue} avatar={faceOf(peer.teammateId, peerProfile)} size={16} />
         <span className={`lc-peer__name is-${peerHue}`}>{peer.name}</span>
+        {waited !== undefined && <span className="lc-peer__when lc-mono">sent {waited}</span>}
         {!open && snippet !== undefined && <span className="lc-peer__snippet">{snippet}</span>}
       </button>
       {open && (

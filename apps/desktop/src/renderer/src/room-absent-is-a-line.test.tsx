@@ -73,7 +73,6 @@ function screen(started: number): string {
       teammates={ROSTER}
       currentRoomId="room_standup"
       answersFor={() => answers}
-      runtimeNameOf={(id) => id}
       onSelectRoom={() => undefined}
       onCreateRoom={async () => undefined}
       onRemoveRoom={() => undefined}
@@ -245,7 +244,6 @@ describe('the members a post did not reach', () => {
         teammates={ROSTER}
         currentRoomId="room_standup"
         answersFor={() => [{ ...answer(ROSTER[0]!.teammateId), text: long, items: [{ key: 'msg_long', type: 'agent-message', text: long, streaming: false }] }]}
-        runtimeNameOf={(id) => id}
         onSelectRoom={() => undefined}
         onCreateRoom={async () => undefined}
         onRemoveRoom={() => undefined}
@@ -294,7 +292,6 @@ describe('the task board, rebuilt on the plan card', () => {
         teammates={ROSTER}
         currentRoomId="room_standup"
         answersFor={() => []}
-        runtimeNameOf={(id) => id}
         onSelectRoom={() => undefined}
         onCreateRoom={async () => undefined}
         onRemoveRoom={() => undefined}

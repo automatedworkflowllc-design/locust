@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { durationText, usagePercent, usageWindowSentence } from '../missionView.js'
+import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type {
@@ -30,12 +31,11 @@ import {
 import { CliArtifacts } from './CliArtifacts.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
-import { costLine, runCostOf, sumCosts } from '../cost.js'
+import { COST_NOT_REPORTED_SHORT, costLine, costLineOrWhyNot, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
 import type { RecoverRoutine } from './RoutineRecovery.js'
-import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { FREE_START_RUNTIME, installCommand } from '../../../shared/runtime-install.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
@@ -298,13 +298,19 @@ export function MissionsScreen({
                   </span>
                   <span className="lc-missionrow__owner">{owner?.name ?? '—'}</span>
                   <span className="lc-missionrow__route lc-mono">
-                    {mission.runtime} / {mission.model}
+                    {/* The route, spelled the way the composer and sidebar
+                        spell it. This printed raw ids -- `opencode /
+                        muse-spark-1.3-contributor-free` -- so one route read
+                        three different ways depending on the screen (Grok's
+                        finding 1). Receipts keep raw ids on purpose; a row is
+                        not a receipt. */}
+                    {shortRuntimeName(mission.runtime)} / {modelDisplayName(mission.runtime, mission.model)}
                   </span>
                   <span className="lc-missionrow__stats lc-mono">
                     {mission.checkpoints.length} checkpoint{mission.checkpoints.length === 1 ? '' : 's'} · {elapsed}
                   </span>
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
-                    {costLine(runCostOf(mission.events)) ?? '—'}
+                    {costLine(runCostOf(mission.events)) ?? COST_NOT_REPORTED_SHORT}
                   </span>
                   <span className={`lc-missionrow__tag lc-mono lc-tone-${view.tone}`}>{view.tag}</span>
                 </button>
@@ -406,7 +412,7 @@ export function TeammatesScreen({
                   ) : (
                     <>
                       <span className="lc-rostercard__model">
-                        {runtimeDisplayName(teammate.route.runtime)} / {teammate.route.model}
+                        {shortRuntimeName(teammate.route.runtime)} / {modelDisplayName(teammate.route.runtime, teammate.route.model)}
                       </span>
                       <span>{modeLabel(teammate.route.mode)}</span>
                     </>
@@ -430,7 +436,7 @@ export function TeammatesScreen({
                 <dl className="lc-rostercard__cost">
                   <dt>Cost</dt>
                   <dd className={`lc-mono${work.cost === undefined ? ' is-unreported' : ''}`}>
-                    {costLine(work.cost) ?? 'not reported'}
+                    {costLineOrWhyNot(work.cost)}
                   </dd>
                 </dl>
                 {work.recent.length > 0 && (

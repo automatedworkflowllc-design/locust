@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { MissionRouteSummary, PublicRecoveredMission } from '../../../shared/ipc.js'
-import { costLine, runCostOf } from '../cost.js'
+import { costLineOrWhyNot, runCostOf } from '../cost.js'
 import { buildSignalRail, buildThread, producedFiles } from '../missionView.js'
 import { checkpointLabel, ledgerVerificationLabel, sandboxPhrase, shortMissionId } from '../status.js'
 import { Icon } from './Icon.js'
@@ -192,7 +192,7 @@ export function Inspector({
             <dd>{events.length} recorded in this view</dd>
             <dt>Cost</dt>
             <dd className="lc-mono">
-              {costLine(runCostOf(events)) ?? (running ? 'reported when the run ends' : 'not reported by the runtime')}
+              {costLineOrWhyNot(runCostOf(events), running)}
             </dd>
           </dl>
         )}

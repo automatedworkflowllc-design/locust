@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.107.0 - 2026-09-14
+
+- **"no word back yet" is gone from the conversation.** Added yesterday for a
+  Cursor run that sat silent for two minutes, it fired on almost every Cursor
+  run instead — noise where it was meant to be signal. Rooms still say it,
+  where it has always been on a card rather than under a working line.
+- **A waiting message says when it was sent.** A teammate's message waits for
+  its recipient's next turn, and that turn can be a conversation about
+  something else — so a paragraph about a database schema can open a
+  conversation you started to ask about something unrelated. Nothing was wrong,
+  and the card never said the one fact that made it make sense. It does now.
+- **One route, one spelling.** The Missions row and the Team roster printed raw
+  ids, so `opencode / muse-spark-1.3-contributor-free` on one screen was
+  `OpenCode / Muse Spark 1.3 Contributor Free` on another.
+- **One missing cost, one sentence.** Four surfaces each answered "the runtime
+  reported no cost" differently — `—`, `not reported`, and two longer versions
+  — with three of them in view at once.
+
 ## 0.106.0 - 2026-09-14
 
 - **A 41-second run says 41s everywhere.** The Missions row rounded to whole

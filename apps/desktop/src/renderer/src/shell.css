@@ -8655,3 +8655,12 @@ textarea {
   margin-top: var(--lc-space-2);
   padding-left: var(--lc-space-5);
 }
+
+/*
+ * When a waiting peer message was actually sent. Quiet: it is context for the
+ * card beside it, not a second headline.
+ */
+.lc-peer__when {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}

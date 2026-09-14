@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { durationText } from './missionView.js'
 import { missionPhaseView } from './status.js'
+import { COST_NOT_REPORTED_SHORT, costLineOrWhyNot } from './cost.js'
 
 /*
  * Grok's 2026-09-13 audit, findings 2 and 4. Every one of that report is the
@@ -32,5 +33,30 @@ describe('one mission, one colour', () => {
 
   it('and a clean completed run is not', () => {
     expect(missionPhaseView('completed', false).tone).toBe('blue')
+  })
+})
+
+describe('one missing cost, one sentence', () => {
+  it('says the same thing wherever a cost was not reported', () => {
+    // Four surfaces answered this themselves: `—`, `not reported`, and
+    // `not reported by the runtime` twice, three of them in view at once.
+    expect(costLineOrWhyNot(undefined)).toBe('not reported by the runtime')
+  })
+
+  it('keeps the one distinction that is real', () => {
+    // A run that has not finished has not reported a cost YET, which is a
+    // different fact from a runtime that does not report costs at all.
+    expect(costLineOrWhyNot(undefined, true)).toBe('reported when the run ends')
+  })
+
+  it('still prefers the runtime own unit when there is one', () => {
+    expect(costLineOrWhyNot({ usd: 0.42 })).toBe('$0.42')
+  })
+
+  it('the short form claims nothing, rather than claiming zero', () => {
+    // A `$0.00` in a narrow column would say the run was free. It was not
+    // said to be anything.
+    expect(COST_NOT_REPORTED_SHORT).not.toContain('0')
+    expect(COST_NOT_REPORTED_SHORT).not.toContain('$')
   })
 })

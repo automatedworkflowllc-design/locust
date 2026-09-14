@@ -169,3 +169,28 @@ export function contextReading(cost: RunCost | undefined): ContextReading | unde
 export function contextSentence(reading: ContextReading): string {
   return `Context: ${tokens(reading.usedTokens)} of ${tokens(reading.windowTokens)} used, ${String(reading.percent)}%`
 }
+
+/**
+ * What to say when the runtime reported no cost at all.
+ *
+ * Four surfaces each answered this themselves and each answered differently:
+ * the Missions row drew `—`, the Team card said `not reported`, the thread's
+ * receipt and the inspector said `not reported by the runtime`, and the
+ * inspector alone knew to say something else while a run was still going.
+ * One absence, four spellings, three of which are in view at the same time
+ * (Grok's finding 6, 2026-09-13).
+ *
+ * `running` is the one real distinction and it is kept: a run that has not
+ * finished has not reported a cost YET, which is a different fact from a
+ * runtime that does not report costs. Everything else is the same sentence.
+ */
+export function costLineOrWhyNot(cost: RunCost | undefined, running = false): string {
+  return costLine(cost) ?? (running ? 'reported when the run ends' : 'not reported by the runtime')
+}
+
+/**
+ * The same fact where only a few characters fit -- a table cell, a row's
+ * trailing column. An em dash on its own says "nothing here" without
+ * claiming the run was free, which is the thing a `$0.00` would claim.
+ */
+export const COST_NOT_REPORTED_SHORT = '—'

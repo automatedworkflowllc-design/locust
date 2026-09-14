@@ -9,6 +9,8 @@ import { AgentText, LiveRegisterLine } from './ThreadItems.js'
 import { Icon } from './Icon.js'
 import { PixelFace } from './PixelFace.js'
 import { footLine } from '../roomExchange.js'
+import { modelDisplayName, shortRuntimeName } from '../routeName.js'
+import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { useFollowBottom } from '../useFollowBottom.js'
 import { QUIET_SECONDS_BEFORE_SAYING_SO } from '../quiet.js'
 import { JumpToBottom } from './JumpToBottom.js'
@@ -355,7 +357,6 @@ export function RoomScreen({
   answersFor,
   exchangeFor,
   exchangeCostText,
-  runtimeNameOf,
   onSelectRoom,
   onCreateRoom,
   onRemoveRoom,
@@ -382,7 +383,6 @@ export function RoomScreen({
   readonly exchangeFor?: (room: PublicRoom, postId: string) => RoomExchange | undefined
   /** What the exchange cost, in the runtime's own unit, already worded. */
   readonly exchangeCostText?: (room: PublicRoom, postId: string) => string | undefined
-  readonly runtimeNameOf: (id: string) => string
   readonly onSelectRoom: (roomId: string | undefined) => void
   readonly onCreateRoom: (name: string, teammateIds: readonly string[]) => Promise<string | undefined>
   readonly onRemoveRoom: (roomId: string) => void
@@ -1049,7 +1049,13 @@ export function RoomScreen({
                         )}
                         <span className="lc-roomanswer__name">{name}</span>
                         <span className="lc-roomanswer__route lc-mono">
-                          {runtimeNameOf(answer.runtime)} / {answer.model === 'account-default' ? 'default' : answer.model}
+                          {/* The composer's spelling, not the catalog's full
+                              display name and a raw model id. One route, one
+                              name, on every surface (Grok's finding 1). */}
+                          {shortRuntimeName(answer.runtime as MissionRuntimeId)} /{' '}
+                          {answer.model === 'account-default'
+                            ? 'default'
+                            : modelDisplayName(answer.runtime, answer.model)}
                         </span>
                         {answer.phase === 'failed' ? (
                           <span className="lc-roomanswer__phase lc-mono lc-tone-red">{answer.phase}</span>

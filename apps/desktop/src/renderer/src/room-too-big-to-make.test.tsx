@@ -58,7 +58,6 @@ function open(members: number): string {
       teammates={ROSTER}
       currentRoomId="room_standup"
       answersFor={() => []}
-      runtimeNameOf={(id) => id}
       onSelectRoom={() => undefined}
       onCreateRoom={async () => undefined}
       onRemoveRoom={() => undefined}
