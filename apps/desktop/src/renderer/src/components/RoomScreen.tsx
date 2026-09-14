@@ -7,6 +7,7 @@ import { ThreadItems } from './Thread.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
 import { AgentText, LiveRegisterLine } from './ThreadItems.js'
 import { Icon } from './Icon.js'
+import type { ContextMenuState } from './ContextMenu.js'
 import { PixelFace } from './PixelFace.js'
 import { footLine } from '../roomExchange.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
@@ -360,6 +361,7 @@ export function RoomScreen({
   onSelectRoom,
   onCreateRoom,
   onRemoveRoom,
+  onMenu,
   onRenameRoom,
   onPost,
   onOpenMission,
@@ -386,6 +388,8 @@ export function RoomScreen({
   readonly onSelectRoom: (roomId: string | undefined) => void
   readonly onCreateRoom: (name: string, teammateIds: readonly string[]) => Promise<string | undefined>
   readonly onRemoveRoom: (roomId: string) => void
+  /** Opens the app's one context menu, so a room's header matches a conversation's. */
+  readonly onMenu?: (menu: ContextMenuState) => void
   /** Give the room a name. Absent where renaming is not offered. */
   readonly onRenameRoom?: (roomId: string, name: string) => void
   readonly onPost: (roomId: string, text: string) => Promise<string | undefined>
@@ -617,59 +621,102 @@ export function RoomScreen({
         * leaving is navigation and sits apart from both.
         */}
       <div className="lc-screen__header lc-room__header">
-        {/* A way back, pointing back: the only chevron in the icon set points
-          * forward, and it read as "go deeper" on the way out. */}
-        <button type="button" className="lc-ghostbutton lc-room__back" onClick={() => onSelectRoom(undefined)} title="All rooms">
-          ← Rooms
-        </button>
-        <span className="lc-room__heading">
+        <div className="lc-workroom__identity lc-room__identity">
+          {/*
+            * The name, which is also where it is changed.
+            *
+            * A room made from an ask starts as `Untitled room` on purpose --
+            * charging a name before a room has a purpose is most of why
+            * nobody made one (design agent, 2026-09-10) -- so the composer
+            * promises "you can rename it there", and this is there. Click it.
+            */}
+          <div style={{ minWidth: 0 }}>
+            {renaming ? (
+              <input
+                className="lc-input lc-room__rename"
+                defaultValue={room.name}
+                maxLength={60}
+                aria-label="Room name"
+                autoFocus
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setRenaming(false)
+                  if (event.key === 'Enter') {
+                    const next = event.currentTarget.value.trim()
+                    setRenaming(false)
+                    if (next.length > 0 && next !== room.name) onRenameRoom?.(room.roomId, next)
+                  }
+                }}
+                onBlur={(event) => {
+                  const next = event.currentTarget.value.trim()
+                  setRenaming(false)
+                  if (next.length > 0 && next !== room.name) onRenameRoom?.(room.roomId, next)
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="lc-workroom__name lc-room__name"
+                onClick={() => setRenaming(true)}
+                title="Rename this room"
+                disabled={onRenameRoom === undefined}
+              >
+                {room.name}
+              </button>
+            )}
+            <div className="lc-workroom__role lc-room__members">
+              {members.filter((entry) => entry !== undefined).map((entry) => entry!.name).join(' · ')}
+            </div>
+          </div>
+        </div>
         {/*
-          * The name, which is also where it is changed.
+          * The same header a conversation has: who this is on the left, the
+          * occasional actions behind one control on the right.
           *
-          * A room made from an ask starts as `Untitled room` on purpose --
-          * charging a name before a room has a purpose is most of why nobody
-          * made one (design agent, 2026-09-10) -- so the composer promises
-          * "you can rename it there", and this is there. Click the title.
+          * It was a boxed `Rooms` button, the title, a mono list of names and
+          * a boxed `Remove room` -- four things competing across the top, and
+          * the one in red text was the destructive one. Colin, 2026-09-14:
+          * "wtf is all this just make it like our regular teammates chat,
+          * include the triple dot dropdown and activity if needed".
+          *
+          * Going back is in the menu rather than beside the title for the
+          * reason the conversation header has no back button either: the
+          * sidebar is how you move between things, and a room is not deeper
+          * than a conversation. Activity is left out because "if needed" --
+          * there is no inspector panel for a room to toggle.
           */}
-        {renaming ? (
-          <input
-            className="lc-input lc-room__rename"
-            defaultValue={room.name}
-            maxLength={60}
-            aria-label="Room name"
-            autoFocus
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') setRenaming(false)
-              if (event.key === 'Enter') {
-                const next = event.currentTarget.value.trim()
-                setRenaming(false)
-                if (next.length > 0 && next !== room.name) onRenameRoom?.(room.roomId, next)
-              }
-            }}
-            onBlur={(event) => {
-              const next = event.currentTarget.value.trim()
-              setRenaming(false)
-              if (next.length > 0 && next !== room.name) onRenameRoom?.(room.roomId, next)
-            }}
-          />
-        ) : (
+        <div className="lc-workroom__actions">
           <button
             type="button"
-            className="lc-screen__title lc-room__name"
-            onClick={() => setRenaming(true)}
-            title="Rename this room"
-            disabled={onRenameRoom === undefined}
+            className="lc-button"
+            aria-label="More actions"
+            aria-haspopup="menu"
+            title="More actions"
+            onClick={(event) => {
+              const at = event.currentTarget.getBoundingClientRect()
+              onMenu?.({
+                x: Math.round(Math.max(8, at.right - 220)),
+                y: Math.round(at.bottom + 4),
+                title: 'This room',
+                items: [
+                  { label: 'All rooms', onSelect: () => onSelectRoom(undefined) },
+                  ...(onRenameRoom === undefined
+                    ? []
+                    : [{ label: 'Rename this room', onSelect: () => setRenaming(true) }]),
+                  {
+                    label: 'Remove this room',
+                    // The same second press the header button asked for.
+                    // Nothing about the asking changed by moving it here.
+                    confirmLabel: 'Remove for good?',
+                    danger: true,
+                    onSelect: () => onRemoveRoom(room.roomId)
+                  }
+                ]
+              })
+            }}
           >
-            {room.name}
+            <Icon name="dots" size={13} />
           </button>
-        )}
-          <span className="lc-room__members lc-mono">
-            {members.filter((entry) => entry !== undefined).map((entry) => entry!.name).join(' · ')}
-          </span>
-        </span>
-        <button type="button" className="lc-ghostbutton lc-room__remove" onClick={() => onRemoveRoom(room.roomId)} title="Remove this room. The conversations it started stay.">
-          Remove room
-        </button>
+        </div>
       </div>
       <div className="lc-screen__scroll lc-room__thread" ref={follow.ref} onScroll={follow.onScroll}>
         {/*

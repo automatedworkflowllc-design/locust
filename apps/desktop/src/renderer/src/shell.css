@@ -348,6 +348,19 @@ textarea {
 }
 
 /*
+ * Motion means "happening now" everywhere in this app, so it has to be
+ * turn-off-able everywhere too. The pulsing dot is used by the sidebar's
+ * working teammate and, since 0.115.0, by the plan step underway; a reader
+ * who has asked their system for less motion gets the colour and the border
+ * and no movement, which still tells them which step it is.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .lc-dot.is-pulsing {
+    animation: none;
+  }
+}
+
+/*
  * Three nav buttons and the connection count, in a 267px sidebar.
  *
  * MEASURED 2026-09-03, twice. Adding Missions and Teammates put three
@@ -1677,6 +1690,26 @@ textarea {
  */
 .lc-room__header {
   gap: var(--lc-space-4);
+}
+
+/*
+ * A room's header is a conversation's header.
+ *
+ * It was a boxed `Rooms` button, the title, a mono member list and a boxed
+ * `Remove room`: four things competing across the top, with the destructive
+ * one drawn in red text at the right edge. Colin, 2026-09-14: "wtf is all
+ * this just make it like our regular teammates chat, include the triple dot
+ * dropdown and activity if needed."
+ *
+ * So it borrows `.lc-workroom__identity` and `.lc-workroom__actions` rather
+ * than restating them -- the point is that the two headers ARE the same
+ * header, and a copy that drifts is the defect Grok's audit kept finding.
+ * This adds only what a room has and a conversation does not: no avatar, so
+ * the name starts at the left edge.
+ */
+.lc-room__identity {
+  min-width: 0;
+  flex: 1;
 }
 
 /*

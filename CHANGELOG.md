@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.115.0 - 2026-09-14
+
+- **A room's header is a conversation's header.** It was a boxed Rooms button,
+  the title, a list of names and a boxed Remove room, all competing across the
+  top. It is now the room's name with its members under it, and one dropdown on
+  the right holding All rooms, Rename and Remove — the same shape a teammate
+  conversation has.
+- **The plan step underway pulses.** It already had the colour and the border,
+  and it was the only motionless thing in a view where motion means "happening
+  now", so on a six-step plan nothing drew your eye to the row that was
+  actually moving. It uses the same pulse the sidebar uses for a working
+  teammate, and it stops entirely if your system asks for reduced motion.
+
 ## 0.114.0 - 2026-09-14
 
 - **Links in a reply are clickable, and they say where they go.** They were

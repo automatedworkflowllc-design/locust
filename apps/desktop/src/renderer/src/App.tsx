@@ -3675,6 +3675,7 @@ export default function App(): ReactElement {
               }}
               onCreateRoom={createRoom}
               onRemoveRoom={removeRoom}
+              onMenu={setRowMenu}
               onRenameRoom={renameRoom}
               onPost={postToRoom}
               onTask={updateRoomTask}

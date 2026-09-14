@@ -377,7 +377,24 @@ export function PlanSteps({
         {steps.map((step, index) => (
           <li key={`${String(index)}-${step.text}`} className={`lc-plan__step is-${step.state}`}>
             <span className="lc-plan__marker" aria-hidden="true">
-              {step.state === 'done' ? <Icon name="check" size={11} /> : <span className="lc-dot" />}
+              {/*
+                * The step underway PULSES, with the same `lcPulse` the sidebar
+                * uses for a working teammate and the design package uses for
+                * the teammate writing now ("the same pulsing lime pip the
+                * sidebar uses"). Colin, 2026-09-14: "wasnt there an animation
+                * to show which part of the task/plan was underway like a light
+                * pulse?"
+                *
+                * The running step already had the colour and the border and
+                * was the only motionless thing in a view where motion means
+                * "happening now" -- so on a six-step plan there was nothing to
+                * catch the eye at the one row that was actually moving.
+                */}
+              {step.state === 'done' ? (
+                <Icon name="check" size={11} />
+              ) : (
+                <span className={`lc-dot${step.state === 'running' ? ' is-pulsing' : ''}`} />
+              )}
             </span>
             <span>{step.text}</span>
           </li>
