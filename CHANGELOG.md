@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.111.0 - 2026-09-14
+
+- **A teammate that fails to forget something says so.** When a teammate
+  corrected itself, it quoted the memory it was replacing -- and if the quote
+  was not word-for-word, nothing was removed and nobody was told. The wrong
+  memory stayed in every brief, the correction landed beside it, and both were
+  read by every mission afterwards. It now says what it could not forget, and
+  that the memory is still there.
+- **Quoting a memory no longer has to be exact.** Dropping a trailing clause or
+  quoting half the line finds it. What it will not do is guess: if the quote
+  could mean two different memories, it removes neither and names both, so you
+  can see what it was reaching for.
+- **Memories say how old they are.** A note from three weeks ago read exactly
+  like one written an hour ago. Each line in a teammate's brief now carries its
+  age, and teammates are told that when two notes disagree the newer one is
+  usually the correction.
+
 ## 0.110.0 - 2026-09-14
 
 - **Ask your teammates to keep a plan.** New in Settings, under Plans, off by

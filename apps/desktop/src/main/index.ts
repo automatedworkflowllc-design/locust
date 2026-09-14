@@ -646,7 +646,10 @@ if (!ownsSingleInstanceLock) {
             text: memory.text,
             scope: memory.scope,
             by: memory.by.name,
-            where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined
+            where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
+            // So a teammate can tell a note from this morning from one that
+            // has been sitting there since August.
+            at: memory.createdAt
           })),
           askFirst: settings.memoryMode === 'ask'
         })

@@ -4,7 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import type { MemoryScope, PublicMemory } from '../shared/ipc.js'
-import { boundedMemoryText, memoryKey } from '../shared/memory.js'
+import { boundedMemoryText, forgetMatch, memoryKey } from '../shared/memory.js'
 import { safeId } from './teammate-store.js'
 
 /**
@@ -45,10 +45,28 @@ export interface MemoryStore {
   /** Edit the text, switch it on or off, or keep a proposed one. */
   update(input: { readonly memoryId: unknown; readonly text?: unknown; readonly enabled?: unknown; readonly keep?: unknown }): Promise<PublicMemory>
   remove(memoryId: unknown): Promise<void>
-  /** Forget by text, in this folder and everywhere. Returns how many were removed. */
-  forget(text: string, workspaceId: string): Promise<number>
+  /**
+   * Forget by quote, in this folder and everywhere.
+   *
+   * Says what HAPPENED rather than how many rows moved. A quote that matches
+   * nothing, or matches several, removes nothing and is reported as such --
+   * see `forgetMatch`. It used to return 0 for both, indistinguishable from
+   * "there was nothing to do", and the caller only reported successes.
+   */
+  forget(text: string, workspaceId: string): Promise<ForgetResult>
   /** Everything for one folder, or everything. */
   clear(input: { readonly workspaceId?: string }): Promise<number>
+}
+
+export interface ForgetResult {
+  /** The memories actually removed, in the store's own words. */
+  readonly removed: readonly string[]
+  /**
+   * Why nothing was removed. `ambiguous` carries the memories it could have
+   * meant, so the teammate can quote one of them properly next time.
+   */
+  readonly refusal: 'nothing-matched' | 'ambiguous' | undefined
+  readonly candidates: readonly string[]
 }
 
 interface StoredFile {
@@ -241,17 +259,37 @@ export function createMemoryStore(options: {
       })
     },
 
-    forget(text, workspaceId): Promise<number> {
+    forget(text, workspaceId): Promise<ForgetResult> {
       return serialize(async () => {
-        const key = memoryKey(text)
-        if (key.length === 0) return 0
         const file = await read()
-        const kept = file.memories.filter(
-          (memory) => !((memory.scope === 'global' || memory.workspaceId === workspaceId) && memoryKey(memory.text) === key)
+        // Only what this mission could be talking about: this folder's and
+        // everywhere's. A memory in another project is not a candidate and
+        // must not make a quote look ambiguous.
+        const reachable = file.memories.filter(
+          (memory) => memory.scope === 'global' || memory.workspaceId === workspaceId
         )
-        const removed = file.memories.length - kept.length
-        if (removed > 0) await write({ ...file, memories: kept })
-        return removed
+        const match = forgetMatch(text, reachable.map((memory) => memoryKey(memory.text)))
+        if (match.refusal !== undefined) {
+          return {
+            removed: [],
+            refusal: match.refusal,
+            // Named, not counted: a teammate told "that was ambiguous" and
+            // nothing else cannot write a better quote. These are what it
+            // could have meant.
+            candidates:
+              match.refusal === 'ambiguous'
+                ? reachable
+                    .filter((memory) => forgetMatch(text, [memoryKey(memory.text)]).matched.length > 0)
+                    .map((memory) => memory.text)
+                : []
+          }
+        }
+        const hit = new Set(match.matched)
+        const goes = (memory: PublicMemory): boolean =>
+          (memory.scope === 'global' || memory.workspaceId === workspaceId) && hit.has(memoryKey(memory.text))
+        const removed = file.memories.filter(goes).map((memory) => memory.text)
+        if (removed.length > 0) await write({ ...file, memories: file.memories.filter((memory) => !goes(memory)) })
+        return { removed, refusal: undefined, candidates: [] }
       })
     },
 

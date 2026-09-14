@@ -84,7 +84,11 @@ describe('what the team remembers', () => {
     await memories.add({ text: 'The API is on port 3000', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })
     await memories.add({ text: 'The API is on port 3000', scope: 'global', ...SHOP, by: WREN, status: 'kept' })
     await memories.add({ text: 'The API is on port 3000', scope: 'workspace', ...LEDGER, by: WREN, status: 'kept' })
-    expect(await memories.forget('the api is on port 3000!', 'ws_shop')).toBe(2)
+    // Both copies -- this folder's and everywhere's -- named rather than
+    // counted, so a caller can say WHICH memory went.
+    const gone = await memories.forget('the api is on port 3000!', 'ws_shop')
+    expect(gone.removed).toHaveLength(2)
+    expect(gone.refusal).toBeUndefined()
     expect((await memories.list()).map((m) => m.workspaceId)).toEqual(['ws_ledger'])
     await memories.add({ text: 'a', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })
     await memories.add({ text: 'b', scope: 'global', ...SHOP, by: WREN, status: 'kept' })

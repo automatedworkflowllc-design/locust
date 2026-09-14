@@ -47,6 +47,73 @@ export function memoryKey(text: string): string {
     .trim()
 }
 
+/**
+ * Which stored memory a `forget` is pointing at.
+ *
+ * `forget` asks a teammate to QUOTE the line it is correcting, and until now
+ * the quote had to match the whole stored text exactly, normalised. A word
+ * out of place removed nothing -- and removed it SILENTLY, returning zero to
+ * a caller that only reported successes. The teammate then wrote the
+ * corrected memory, which landed BESIDE the wrong one, and both were briefed
+ * to every mission afterwards. The store could not tell a correction from an
+ * addition, so it kept both and told nobody.
+ *
+ * This is `volcengine/OpenViking`'s anchor rule, which is the right one and
+ * costs nothing: an edit anchor must resolve to EXACTLY ONE target, and an
+ * anchor that resolves to none, or to several, is a REFUSAL rather than a
+ * guess. Their merge policy carries the other half -- similarity is not
+ * identity, and where identity is unclear you leave both alone -- so this
+ * deliberately does not reach for the nearest thing it can find.
+ *
+ * Widened only as far as containment: every significant word of one is in
+ * the other, in any order. That covers what a teammate actually gets wrong
+ * (dropping a trailing clause, quoting the first half, adding "the") and
+ * stops well short of "these two sentences are about the same topic", which
+ * is where a memory store starts deleting things nobody asked it to.
+ */
+export interface ForgetMatch {
+  /** The one memory to remove, when exactly one answers to the quote. */
+  readonly matched: readonly string[]
+  /** Why nothing was removed, when nothing was. */
+  readonly refusal: 'nothing-matched' | 'ambiguous' | undefined
+}
+
+/** The words a key is made of, ignoring the ones that carry no identity. */
+function significantWords(key: string): readonly string[] {
+  return key.split(' ').filter((word) => word.length > 2)
+}
+
+/**
+ * Every stored key the quote could mean, and whether that is a usable answer.
+ *
+ * Exact first, always: an exact key match is the answer even if other
+ * memories also contain those words.
+ */
+export function forgetMatch(quote: string, storedKeys: readonly string[]): ForgetMatch {
+  const key = memoryKey(quote)
+  if (key.length === 0) return { matched: [], refusal: 'nothing-matched' }
+  const exact = storedKeys.filter((stored) => stored === key)
+  if (exact.length > 0) return { matched: exact, refusal: undefined }
+
+  const wanted = significantWords(key)
+  if (wanted.length === 0) return { matched: [], refusal: 'nothing-matched' }
+  const near = storedKeys.filter((stored) => {
+    const has = new Set(significantWords(stored))
+    // The quote is contained in the memory, or the memory in the quote.
+    const quoteInMemory = wanted.every((word) => has.has(word))
+    const wantedSet = new Set(wanted)
+    const memoryInQuote =
+      significantWords(stored).length > 0 && significantWords(stored).every((word) => wantedSet.has(word))
+    return quoteInMemory || memoryInQuote
+  })
+  if (near.length === 0) return { matched: [], refusal: 'nothing-matched' }
+  // Several memories answer to it, so the quote does not identify one. Leaving
+  // both alone is the whole point: a store that guesses here deletes something
+  // the person never agreed to lose.
+  if (new Set(near).size > 1) return { matched: [], refusal: 'ambiguous' }
+  return { matched: near, refusal: undefined }
+}
+
 /** Memory text as the store keeps it: one line, bounded, no control characters. */
 export function boundedMemoryText(text: string): string {
   const clean = text
@@ -107,6 +174,38 @@ export interface MemoryLine {
   readonly by: string
   /** The folder it came from, by name, for a global memory written elsewhere. */
   readonly where: string | undefined
+  /** When it was written, ISO. Absent for a memory whose date cannot be read. */
+  readonly at?: string
+}
+
+/**
+ * How old a memory is, said the way a colleague would say it.
+ *
+ * A brief listed every memory identically, so a note from three weeks ago
+ * read exactly like one written an hour ago and a teammate had no way to
+ * weigh them against each other. That matters most in precisely the case
+ * memory is for: two notes that disagree, where the newer one is usually the
+ * correction. Nothing here decides anything -- it hands the reader the fact
+ * and lets it judge, which is what a date on a colleague's note does.
+ *
+ * This is the gap in `OpenViking`'s own design, noted while reading it: it
+ * has provenance and timestamps but nothing that reaches the model at recall
+ * time, so a fact contradicted months ago still presents as current.
+ * Copying the mechanism without the missing piece would import the bug.
+ */
+export function memoryAge(at: string | undefined, now: Date): string | undefined {
+  if (at === undefined) return undefined
+  const written = Date.parse(at)
+  if (Number.isNaN(written)) return undefined
+  const days = Math.floor((now.getTime() - written) / 86_400_000)
+  // Negative means a clock moved; saying nothing is better than "in -2 days".
+  if (days < 0) return undefined
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 14) return `${String(days)} days ago`
+  if (days < 60) return `${String(Math.floor(days / 7))} weeks ago`
+  if (days < 365) return `${String(Math.floor(days / 30))} months ago`
+  return 'over a year ago'
 }
 
 /**
@@ -129,6 +228,8 @@ export function memorySection(input: {
   readonly memories: readonly MemoryLine[]
   /** Whether a new memory is kept at once or shown to the person first. */
   readonly askFirst: boolean
+  /** Test seam, so an age in a brief is a fact rather than a moving target. */
+  readonly now?: Date
 }): string {
   /*
    * BOUNDED, and it was not.
@@ -171,7 +272,9 @@ export function memorySection(input: {
           .map((memory) => {
             // "you" is how the screen names the person; in a brief it would read as the model itself.
             memory = memory.by === 'you' ? { ...memory, by: 'the person' } : memory
-            const origin = memory.scope === 'global' ? `everywhere, by ${memory.by}${memory.where === undefined ? '' : ` in ${memory.where}`}` : `this folder, by ${memory.by}`
+            const place = memory.scope === 'global' ? `everywhere, by ${memory.by}${memory.where === undefined ? '' : ` in ${memory.where}`}` : `this folder, by ${memory.by}`
+            const age = memoryAge(memory.at, input.now ?? new Date())
+            const origin = age === undefined ? place : `${place}, ${age}`
             return `- ${memory.text} (${origin})`
           })
           .join(NEWLINE)
@@ -183,7 +286,7 @@ export function memorySection(input: {
       ? 'Your team keeps a shared memory. What is remembered for this project and everywhere:'
       : `Your team keeps a shared memory. What is remembered for the folder "${input.workspaceName}" and everywhere:`,
     listed,
-    "These are notes your team wrote earlier. Use them as you would a colleague's notes: when one answers what the person asks, answer from it and say it came from memory; do not demand that the workspace confirm it. Do not bring up a memory that has nothing to do with what was asked, and never report another teammate's work as something you are confirming: a person who asked you to change one file did not ask what anyone else did to another one.",
+    "These are notes your team wrote earlier, each with when it was written. Use them as you would a colleague's notes: when one answers what the person asks, answer from it and say it came from memory; do not demand that the workspace confirm it. When two of them disagree, the newer one is usually the correction, and it is worth saying which you went with. Do not bring up a memory that has nothing to do with what was asked, and never report another teammate's work as something you are confirming: a person who asked you to change one file did not ask what anyone else did to another one.",
     `If this work taught you something the next conversation in this folder would need -- a convention, a correction the person gave, where something lives that the code does not say -- use exactly this block and ${BLOCK_PLACEMENT}, one line per memory, at most ${String(MAX_MEMORY_OPS_PER_REPLY)}:`,
     `<${MEMORY_TAG}>`,
     'remember :: one sentence, specific enough to act on',

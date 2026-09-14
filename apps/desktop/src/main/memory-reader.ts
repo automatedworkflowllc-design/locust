@@ -75,11 +75,36 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       const kept: string[] = []
       const proposed: string[] = []
       const forgotten: string[] = []
+      /*
+       * A forget that removed NOTHING, said out loud.
+       *
+       * This was `if (removed > 0) forgotten.push(...)` and no else, which is
+       * the worst shape a correction path can have: the teammate quoted a
+       * memory it had decided was wrong, the quote missed, nothing was
+       * removed, and nobody was told. The wrong memory stayed in every brief
+       * afterwards, and the corrected memory the teammate wrote next landed
+       * beside it, so both were briefed and neither was marked. A person
+       * reading the reply saw a teammate confidently correcting itself.
+       *
+       * Silence about a failed write is the one thing a memory store must
+       * never do, because every other surface here is built from what the
+       * store HAS -- a memory that was not removed is invisible as a failure
+       * and indistinguishable from a memory nobody tried to remove.
+       */
+      const missed: string[] = []
       for (const op of ops) {
         try {
           if (op.kind === 'forget') {
-            const removed = await options.memories.forget(op.text, recovered.metadata.workspaceId)
-            if (removed > 0) forgotten.push(op.text)
+            const result = await options.memories.forget(op.text, recovered.metadata.workspaceId)
+            if (result.removed.length > 0) {
+              forgotten.push(...result.removed)
+            } else if (result.refusal === 'ambiguous') {
+              missed.push(
+                `"${op.text}" matches more than one memory (${quoted(result.candidates)}), so none was forgotten. Quote one of them exactly.`
+              )
+            } else {
+              missed.push(`"${op.text}" matches nothing that is remembered, so nothing was forgotten.`)
+            }
             continue
           }
           const result = await options.memories.add({
@@ -98,7 +123,7 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
           // reply itself is untouched and the person can still read it.
         }
       }
-      if (kept.length === 0 && proposed.length === 0 && forgotten.length === 0) return
+      if (kept.length === 0 && proposed.length === 0 && forgotten.length === 0 && missed.length === 0) return
 
       /*
        * Only what the memory card cannot say.
@@ -115,6 +140,16 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
        * that was forgotten is exactly the one it cannot draw.
        */
       options.notify({ kind: 'memory-changed', by: by.name, kept, proposed, forgotten })
+      if (missed.length > 0) {
+        // Amber: a person may need to act. The memory that was meant to go is
+        // still there, and only they can settle what it should say.
+        options.notify({
+          kind: 'relay-notice',
+          runId: recovered.metadata.runId,
+          missionId: mission.missionId,
+          message: `${by.name} tried to forget something and could not. ${missed.join(' ')} It is still remembered.`
+        })
+      }
       if (forgotten.length > 0) {
         options.notify({
           kind: 'relay-notice',

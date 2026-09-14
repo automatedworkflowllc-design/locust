@@ -33,7 +33,9 @@ function harness(input: {
       },
       forget: async (text) => {
         forgotten.push(text)
-        return text.includes('port') ? 1 : 0
+        return text.includes('port')
+          ? { removed: [text], refusal: undefined, candidates: [] }
+          : { removed: [], refusal: 'nothing-matched' as const, candidates: [] }
       }
     },
     ledger: {
@@ -64,13 +66,26 @@ describe('reading a reply for memory', () => {
       ['Colin wants diffs.', 'global', 'kept', 'ws_shop', 'Wren', 'mission_1']
     ])
     expect(h.forgotten).toEqual(['The API is on port 3000', 'nothing like this'])
-    const notice = h.updates.find((u) => u.kind === 'relay-notice')
-    expect(notice).toMatchObject({ kind: 'relay-notice', runId: 'run_1', missionId: 'mission_1' })
+    const notices = h.updates.filter((u) => u.kind === 'relay-notice') as { message: string }[]
+    expect(notices[0]).toMatchObject({ kind: 'relay-notice', runId: 'run_1', missionId: 'mission_1' })
+    /*
+     * TWO notices, and the first one is new.
+     *
+     * This fixture has always ended with `forget :: nothing like this`, which
+     * matches nothing -- and until 2026-09-14 that produced NO output at all,
+     * so this suite asserted a single notice and never noticed that half the
+     * block had quietly failed. That is the defect in miniature: a forget
+     * that misses is invisible, and the memory it meant to remove goes on
+     * being briefed.
+     */
+    expect(notices[0]?.message).toContain('tried to forget something and could not')
+    expect(notices[0]?.message).toContain('nothing like this')
+    expect(notices[0]?.message).toContain('It is still remembered.')
     // Colin, 2026-09-13: one memory announced twice, an amber line quoting it
     // in full directly above the card holding the same sentence. The notice
     // now carries only what the card cannot draw -- a memory that is gone.
-    expect((notice as { message: string }).message).toBe('Wren forgot "The API is on port 3000".')
-    expect((notice as { message: string }).message).not.toContain('remembered')
+    expect(notices[1]?.message).toBe('Wren forgot "The API is on port 3000".')
+    expect(notices[1]?.message).not.toContain('remembered')
     expect(h.updates.find((u) => u.kind === 'memory-changed')).toEqual({
       kind: 'memory-changed',
       by: 'Wren',
