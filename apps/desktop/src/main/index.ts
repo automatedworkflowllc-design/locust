@@ -20,6 +20,8 @@ import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
+import { release } from 'node:os'
+import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
 import { createApprovalChannel } from './approval-channel.js'
@@ -69,6 +71,7 @@ import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
+import { bootOutcome, createDiscoveryLog } from './discovery-log.js'
 import { createRuntimeInstaller } from './runtime-installer.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
@@ -122,6 +125,8 @@ import {
   ROOM_REMOVE_CHANNEL,
   ROOM_RENAME_CHANNEL,
   ROOM_POST_CHANNEL,
+  RUNTIME_DISCOVERY_EVENT_CHANNEL,
+  RUNTIME_DISCOVERY_LOG_CHANNEL,
   ROOM_TASK_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
@@ -138,6 +143,7 @@ import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { createUpdateService } from './updates.js'
 import type {
   CodexMissionCancelRequest,
+  DiscoveryEvent,
   CodexMissionStartData,
   CodexMissionStartRequest,
   CodexMissionUpdate,
@@ -190,7 +196,44 @@ const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
 const antigravityProbe = createAntigravityHostProbe()
 const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
   const [found, antigravity] = await Promise.all([
-    discoverInstalledRuntimes({ runner: probeRunner, locator: executableLocator, includeOmniRoute: true }),
+    discoverInstalledRuntimes({
+      runner: probeRunner,
+      locator: executableLocator,
+      includeOmniRoute: true,
+      /*
+       * `started` reaches the window BEFORE the subprocess is spawned --
+       * that is the whole contract. A screen told about the start and the
+       * result at the same moment has nothing to draw during the wait, and
+       * the wait is the only thing it exists for.
+       */
+      watch: {
+        started: (runtime) => {
+          discoveryLog.emit({
+            kind: 'probe.started',
+            bin: runtime.bin,
+            product: runtime.displayName,
+            at: Date.now()
+          })
+        },
+        finished: (runtime, discovery) => {
+          const installed = discovery.availability === 'available'
+          discoveryLog.emit({
+            kind: 'probe.finished',
+            bin: runtime.id,
+            at: Date.now(),
+            outcome: bootOutcome({
+              installed,
+              status: discovery.readiness === 'ready'
+                ? 'ready'
+                : discovery.readiness === 'authentication-required'
+                  ? 'auth-required'
+                  : 'other'
+            }),
+            ...(discovery.version?.version === undefined ? {} : { version: discovery.version.version })
+          })
+        }
+      }
+    }),
     antigravityProbe.discoveryRecord().catch(() => undefined)
   ])
   return antigravity === undefined ? found : [...found, antigravity]
@@ -249,9 +292,20 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
   const held = discoveryCache
   if (held !== undefined && Date.now() - held.at < DISCOVERY_TTL_MS) return Promise.resolve(held.value)
   if (discoveryInFlight !== undefined) return discoveryInFlight
+  /*
+   * The sweep announces itself, one probe at a time.
+   *
+   * Emitted from the ONE place a real sweep happens, so the boot screen can
+   * never show a sweep that did not occur, and a cached answer emits nothing
+   * -- there is no wait to narrate.
+   */
+  discoveryLog.emit({ kind: 'started', at: Date.now() })
   const running = discoverRuntimes()
     .then((value) => {
       discoveryCache = { at: Date.now(), value }
+      const ready = value.filter((runtime) => runtime.readiness === 'ready').length
+      const needsYou = value.filter((runtime) => runtime.readiness === 'authentication-required').length
+      discoveryLog.emit({ kind: 'finished', at: Date.now(), ready, needsYou })
       return value
     })
     .finally(() => {
@@ -283,6 +337,9 @@ const npmPresent = async (): Promise<boolean> => {
   })
   return npmSeen
 }
+
+/** Recorded and replayed, so a window created mid-sweep sees the whole log. */
+const discoveryLog = createDiscoveryLog()
 
 const runtimeDiscovery = createRuntimeDiscoveryService({
   probe: discoverForWork,
@@ -840,6 +897,78 @@ if (!ownsSingleInstanceLock) {
       }
     }
 
+    /*
+     * Discovery, pushed to the window as it happens.
+     *
+     * Everything already recorded goes first, because the window is created
+     * while the first sweep is running and a screen that joined halfway
+     * would be missing the beginning of its own log.
+     */
+    const sendDiscovery = (event: DiscoveryEvent): void => {
+      const target = approvalWindow
+      if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+        target.webContents.send(RUNTIME_DISCOVERY_EVENT_CHANNEL, event)
+      }
+    }
+    discoveryLog.subscribe(sendDiscovery)
+    /*
+     * REPLAY WHEN THERE IS A WINDOW, not when this line runs.
+     *
+     * `approvalWindow` is assigned at the end of startup, so everything
+     * emitted before then -- `context` among it, which is emitted once per
+     * launch -- reached a `sendDiscovery` with nowhere to send. Measured on
+     * the first drive: the screen opened at "scanning PATH" with no
+     * preamble above it, because the three lines above it had already been
+     * spoken to an empty room.
+     */
+    const replayDiscoveryToWindow = (): void => {
+      for (const event of discoveryLog.replay()) sendDiscovery(event)
+    }
+    // And the renderer can ask, which is what actually works: a replay sent
+    // at window creation lands before the page has mounted a listener.
+    ipcMain.handle(RUNTIME_DISCOVERY_LOG_CHANNEL, () => discoveryLog.replay())
+
+    /*
+     * What this launch is, said once and only while somebody is waiting.
+     *
+     * Every value here is read, never composed for the screen: the version
+     * the app reports, the platform it is on, the folder it opened, the
+     * branch that folder is on, and whether the ledger directory can
+     * actually be written to. `ledgerOk` is a real write test rather than a
+     * guess, because "your ledger is fine" is exactly the kind of
+     * reassurance that must not be invented.
+     */
+    void (async () => {
+      const readGit = (args: readonly string[]): Promise<string | undefined> =>
+        new Promise((resolve) => {
+          execFile('git', [...args], { cwd: workspacePath, windowsHide: true }, (error, stdout) => {
+            resolve(error === null ? stdout.trim() : undefined)
+          })
+        })
+      const branch = await readGit(['rev-parse', '--abbrev-ref', 'HEAD'])
+      const dirty = await readGit(['status', '--porcelain'])
+      // A real write test, not a guess. "Your ledger is fine" is exactly the
+      // kind of reassurance that must not be invented.
+      let ledgerOk = false
+      try {
+        await mkdir(ledgerDirectory, { recursive: true })
+        await writeFile(join(ledgerDirectory, '.writable'), '', 'utf8')
+        ledgerOk = true
+      } catch {
+        ledgerOk = false
+      }
+      discoveryLog.emit({
+        kind: 'context',
+        version: app.getVersion(),
+        platform: `${process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux'} ${release()}`,
+        workspace: workspaceChosen ? basename(workspacePath) || workspacePath : 'no folder',
+        ...(branch === undefined || branch.length === 0 || branch === 'HEAD' ? {} : { branch }),
+        ...(dirty === undefined ? {} : { clean: dirty.length === 0 }),
+        ledgerPath: ledgerDirectory,
+        ledgerOk
+      })
+    })()
+
     // One definition of how an app-server process is started and stopped, used
     // by both the mission transport and the model probe. Killing the TREE
     // matters: app-server starts children that outlive their parent.
@@ -1360,12 +1489,12 @@ if (!ownsSingleInstanceLock) {
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
 
     ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto' } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' } as const
       try {
         return await teammates.readSettings()
       } catch {
         // An unreadable switch reads as its default: swarm off, replies on.
-        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto' } as const
+        return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' } as const
       }
     })
 
@@ -1777,7 +1906,7 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
-      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto' } as const
+      if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' } as const
       try {
         return await teammates.writeSettings(settings)
       } catch {
@@ -2714,12 +2843,14 @@ ${taskSection({
 
     createWindow(codexMissions, (window) => {
       approvalWindow = window
+      replayDiscoveryToWindow()
     })
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createWindow(codexMissions, (window) => {
           approvalWindow = window
+          replayDiscoveryToWindow()
         })
       }
     })

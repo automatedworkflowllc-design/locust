@@ -17,8 +17,7 @@ import type {
   LayoutPreference,
   PublicRuntimeSetup,
   PublicWorkspaceBrief,
-  PublicWorktree
-} from '../../../shared/ipc.js'
+  PublicWorktree, TubePreference } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { TeammateStatusView } from '../status.js'
 import {
@@ -822,6 +821,8 @@ export function SettingsScreen({
   onKeepATodoListChange,
   onAskConnectorsChange,
   swarm,
+  tube,
+  onTubeChange,
   onSwarmChange,
   onAutoModeChange,
   relayHopCap,
@@ -878,6 +879,8 @@ export function SettingsScreen({
   /** Workspace-wide: every mission at its model's maximum effort. */
   readonly swarm: boolean
   readonly onSwarmChange: (swarm: boolean) => void
+  readonly tube: TubePreference
+  readonly onTubeChange: (tube: TubePreference) => void
   readonly onAutoModeChange: (autoMode: boolean) => void
   readonly askConnectors: boolean
   readonly onAskConnectorsChange: (askConnectors: boolean) => void
@@ -1128,6 +1131,55 @@ export function SettingsScreen({
         </section>
 
         <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">The boot screen</h2>
+          <p className="lc-settings__lede">
+            {tube === 'off'
+              ? 'Off. Locust goes straight to the workspace while it finds your runtimes.'
+              : tube === 'subtle'
+                ? 'Subtle. The screen without the flicker or the glare.'
+                : 'Full. The whole monitor while your runtimes are found.'}
+          </p>
+          <More>
+            <p>
+              Finding the runtimes on this machine takes as long as it takes -- each one is a real command
+              and some of them are slow to answer. The screen shows that happening rather than a spinner
+              standing in for it, and every line on it is something the app actually read.
+            </p>
+            <p>
+              It only ever covers the empty middle of the window. The sidebar, the folder and the message
+              box stay where they are, so you can pick a teammate or start typing without waiting for it,
+              and clicking anywhere on it puts it away.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">How much of it to draw.</span>
+              {/* `lc-button is-active` is what every other segmented choice
+                * in this app already uses -- inventing a class for this one
+                * would be a second spelling of a solved thing. */}
+              <div className="lc-segmented" role="radiogroup" aria-label="How much of the boot screen to draw">
+                {(
+                  [
+                    ['full', 'Full'],
+                    ['subtle', 'Subtle'],
+                    ['off', 'Off']
+                  ] as const
+                ).map(([option, label]) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={tube === option}
+                    className={`lc-button${tube === option ? ' is-active' : ''}`}
+                    onClick={() => onTubeChange(option)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <h2 className="lc-settings__heading">Swarm</h2>
           <p className="lc-settings__lede">
             {swarm

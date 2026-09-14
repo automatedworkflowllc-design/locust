@@ -7719,6 +7719,18 @@ textarea {
 /* What is waiting to be sent when the running mission finishes. Sits above
    the composer, in the composer's own well, because it is about the next
    thing you will say rather than about the work on screen. */
+/*
+ * A MESSAGE WAITING ITS TURN IS NOT AN ALERT.
+ *
+ * Colin, 2026-09-14: "our steer/queued message is brutal looking". It was a
+ * full-width bordered card on a raised ground with two 32px bordered
+ * buttons in it -- the weight of an error, for the most ordinary thing in
+ * the app: something you typed that will send by itself in a moment.
+ *
+ * So it takes the quiet-note register the thread already has: a left rule,
+ * no card, no fill. Nothing is hidden -- both controls are still there and
+ * still reachable by keyboard -- they simply stop shouting.
+ */
 .lc-queued {
   display: grid;
   /* Label, the message, then the actions -- with the reason on a second row
@@ -7728,10 +7740,25 @@ textarea {
   gap: 0.2rem 0.5rem;
   align-items: center;
   margin-bottom: 0.4rem;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-control);
-  background: var(--lc-bg-raised);
+  padding: 0.3rem 0 0.3rem 0.6rem;
+  border-left: 2px solid var(--lc-border-button);
+}
+
+/* Quieter than the app's ordinary ghost button, which is 32px with a strong
+   border: two of those is what made this read as an alert. The border
+   arrives on hover and on keyboard focus, so nothing is lost. */
+.lc-queued .lc-ghostbutton {
+  height: 24px;
+  padding: 0 9px;
+  border-color: transparent;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+
+.lc-queued .lc-ghostbutton:hover,
+.lc-queued .lc-ghostbutton:focus-visible {
+  border-color: var(--lc-border-control);
+  color: var(--lc-text-secondary);
 }
 
 .lc-queued__label {
@@ -8895,4 +8922,598 @@ textarea {
 
 .lc-board__addlink:hover {
   color: var(--lc-text-primary);
+}
+
+/* --- The boot screen ----------------------------------------------------
+ *
+ * A phosphor monitor in the content pane while discovery runs. It never
+ * covers the sidebar, the title bar or the composer -- that is what makes
+ * "every launch" safe, because nothing is hidden in order to show it. A
+ * person can click a teammate or start typing while it is still probing.
+ *
+ * Colin, 2026-09-14: "i just wanted something cool to keep the users
+ * attention as the runtimes connect, sometimes it takes a while." So the
+ * SLOW case is the one this is for. On a fast machine it is a flash, and
+ * that is correct: the animation ends a wait, it is never a reason to have
+ * one.
+ */
+.lc-boot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  position: relative;
+  transition: opacity var(--lc-motion-panel) var(--lc-ease);
+}
+
+.lc-boot.is-dissolving {
+  opacity: 0;
+}
+
+.lc-boot__bezel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  border-radius: 24px;
+  background: linear-gradient(170deg, var(--lc-boot-bezel-hi) 8%, var(--lc-boot-bezel-lo) 100%);
+  border: 1px solid var(--lc-border-hairline);
+  box-shadow: var(--lc-shadow-window);
+}
+
+.lc-boot__screen {
+  position: relative;
+  width: 724px;
+  height: 500px;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--lc-boot-screen-cold);
+  background: radial-gradient(
+    130% 100% at 50% 40%,
+    var(--lc-boot-screen-hot) 0%,
+    var(--lc-boot-screen-mid) 58%,
+    var(--lc-boot-screen-cold) 100%
+  );
+  box-shadow: inset 0 0 0 1px var(--lc-boot-glow-soft), inset 0 2px 14px var(--lc-boot-screen-cold);
+}
+
+.lc-boot.is-tube-full .lc-boot__screen {
+  animation: lcBootFlicker 5s linear infinite;
+}
+
+/* An infinite animation on a screen that has gone is a background repaint
+ * that costs battery for nothing. */
+.lc-boot.is-dissolving .lc-boot__screen,
+.lc-boot.is-dissolving .lc-boot__sweep,
+.lc-boot.is-dissolving .lc-boot__block,
+.lc-boot.is-dissolving .lc-boot__wait {
+  animation: none;
+}
+
+.lc-boot__scan,
+.lc-boot__sweep,
+.lc-boot__vignette,
+.lc-boot__glare {
+  position: absolute;
+  pointer-events: none;
+  display: block;
+}
+
+.lc-boot__scan {
+  inset: 0;
+  z-index: 3;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--lc-boot-scan) 0px,
+    var(--lc-boot-scan) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+.lc-boot__sweep {
+  left: 0;
+  right: 0;
+  height: 26%;
+  z-index: 4;
+  background: linear-gradient(to bottom, transparent, var(--lc-boot-sweep), transparent);
+  animation: lcBootSweep 7s linear infinite;
+}
+
+.lc-boot__vignette {
+  inset: 0;
+  z-index: 5;
+  box-shadow: inset 0 0 80px 26px var(--lc-boot-screen-cold);
+}
+
+.lc-boot__glare {
+  top: -40%;
+  left: -20%;
+  width: 90%;
+  height: 120%;
+  z-index: 6;
+  transform: rotate(18deg);
+  background: linear-gradient(to right, var(--lc-boot-glow-soft), transparent 60%);
+  opacity: 0.12;
+}
+
+/* Subtle keeps the wash and the sweep and drops the flicker and the glare;
+ * Off is the information with none of the theatre. */
+.lc-boot.is-tube-subtle .lc-boot__glare,
+.lc-boot.is-tube-off .lc-boot__glare,
+.lc-boot.is-tube-off .lc-boot__scan,
+.lc-boot.is-tube-off .lc-boot__sweep {
+  display: none;
+}
+
+.lc-boot__inner {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-boot__lockuprow {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 26px 24px 20px;
+}
+
+.lc-boot__lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  padding: 20px 52px 22px;
+  border: 1px solid var(--lc-boot-frame);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-boot-lockup);
+}
+
+/* The mark and wordmark are black SVGs, so they are TINTED to the tube's
+ * phosphor rather than left white -- a white logo on a green screen is the
+ * one thing on here that would not be coming out of the tube. */
+.lc-boot__mark,
+.lc-boot__word {
+  height: auto;
+  filter: brightness(0) saturate(100%) invert(84%) sepia(52%) saturate(720%) hue-rotate(21deg)
+    brightness(104%) contrast(96%);
+}
+
+.lc-boot__mark {
+  width: 158px;
+}
+
+.lc-boot__word {
+  width: 286px;
+}
+
+.lc-boot.is-tube-full .lc-boot__mark,
+.lc-boot.is-tube-subtle .lc-boot__mark {
+  filter: brightness(0) saturate(100%) invert(84%) sepia(52%) saturate(720%) hue-rotate(21deg)
+    brightness(104%) contrast(96%) drop-shadow(0 0 13px var(--lc-boot-glow));
+}
+
+.lc-boot__divider {
+  flex: none;
+  height: 1px;
+  margin: 0 22px;
+  background: linear-gradient(to right, transparent, var(--lc-boot-frame), transparent);
+  display: block;
+}
+
+/*
+ * The terminal scrolls and pins to the bottom.
+ *
+ * The screen is a fixed size and the log is not. Clipping instead would hide
+ * the newest line, which on a boot log is the only one anybody is waiting
+ * for. Growing the screen is not the fix either: one row per runtime plus
+ * the preamble means a seventh runtime would put it back over the edge.
+ *
+ * Settled, it centres -- the settled table is about half the height of the
+ * probing log and would otherwise hang from the top over dead space.
+ */
+.lc-boot__terminal {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: 16px 28px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  font-family: var(--lc-font-mono);
+  font-size: 12.5px;
+  white-space: pre;
+}
+
+.lc-boot__terminal.is-settled {
+  justify-content: center;
+}
+
+.lc-boot__terminal::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/*
+ * EVERY ROW IS `flex: none`.
+ *
+ * They are flex items in a column container, so without this the browser
+ * redistributes height when the log overflows: collapsed rows keep their
+ * 19px while a LIVE row is squashed to zero, and `max-height` is silently
+ * overruled by `flex-shrink`. The design pass hit exactly this, and the
+ * settle left the preamble on screen.
+ *
+ * Rows collapse because they are told to, never because space ran out.
+ */
+.lc-boot__pre,
+.lc-boot__row,
+.lc-boot__caret,
+.lc-boot__summary {
+  flex: none;
+}
+
+.lc-boot__pre {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  overflow: hidden;
+  max-height: 20px;
+  opacity: 1;
+  transition: max-height var(--lc-motion-panel) var(--lc-ease), opacity var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-boot__pre.is-settled {
+  max-height: 0;
+  opacity: 0;
+}
+
+.lc-boot__prekey {
+  width: 92px;
+  flex: none;
+  color: var(--lc-lime);
+}
+
+/* `white-space: pre` on the terminal means nothing wraps, so a long value
+ * -- the ledger path, on a machine with a deep home folder -- ran off the
+ * right edge and into the tag beside it. It truncates instead. */
+.lc-boot__preval {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--lc-text-secondary);
+}
+
+.lc-boot__pretag {
+  flex: none;
+  color: var(--lc-text-muted);
+}
+
+.lc-boot__pre.is-green .lc-boot__pretag {
+  color: var(--lc-green-text);
+}
+
+.lc-boot__row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  height: 20px;
+}
+
+.lc-boot__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--lc-neutral);
+  display: block;
+  transition: max-width var(--lc-motion-panel) var(--lc-ease), opacity var(--lc-motion-panel) var(--lc-ease);
+}
+
+.lc-boot__row.is-settled .lc-boot__dot {
+  max-width: 6px;
+  opacity: 1;
+}
+
+.lc-boot__row.is-ready .lc-boot__dot {
+  background: var(--lc-green);
+}
+
+.lc-boot__row.is-needs-signin .lc-boot__dot {
+  background: var(--lc-amber);
+}
+
+.lc-boot__row.is-error .lc-boot__dot {
+  background: var(--lc-red);
+}
+
+/* An absence should not shine. */
+.lc-boot__row.is-missing .lc-boot__dot {
+  background: var(--lc-neutral);
+  box-shadow: none;
+}
+
+.lc-boot__prompt,
+.lc-boot__arg {
+  flex: none;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-width var(--lc-motion-panel) var(--lc-ease), opacity var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-boot__prompt {
+  max-width: 10px;
+  color: var(--lc-lime);
+}
+
+.lc-boot__arg {
+  max-width: 84px;
+  color: var(--lc-text-muted);
+}
+
+.lc-boot__row.is-settled .lc-boot__prompt,
+.lc-boot__row.is-settled .lc-boot__arg {
+  max-width: 0;
+  opacity: 0;
+}
+
+/* 112px holds `cursor-agent`, the longest binary. Fixed width, so the one
+ * swap on this screen -- binary to product name -- reflows nothing. */
+.lc-boot__name {
+  position: relative;
+  flex: none;
+  width: 112px;
+  height: 16px;
+  display: block;
+}
+
+.lc-boot__bin,
+.lc-boot__product {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.lc-boot__bin {
+  color: var(--lc-lime);
+  opacity: 1;
+  transition: opacity var(--lc-motion-panel) var(--lc-ease);
+}
+
+.lc-boot__product {
+  color: var(--lc-text-muted);
+  opacity: 0;
+  transition: opacity var(--lc-motion-panel) var(--lc-ease) 120ms;
+}
+
+.lc-boot__row.is-settled .lc-boot__bin {
+  opacity: 0;
+}
+
+.lc-boot__row.is-settled .lc-boot__product {
+  opacity: 1;
+}
+
+.lc-boot__row.is-settled:not(.is-missing) .lc-boot__product {
+  color: var(--lc-text-secondary);
+}
+
+.lc-boot__leader {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  letter-spacing: 2px;
+  color: var(--lc-neutral);
+  text-align: left;
+  opacity: 0;
+  transition: opacity var(--lc-motion-panel) var(--lc-ease) 120ms;
+}
+
+.lc-boot__row.is-settled .lc-boot__leader {
+  opacity: 1;
+}
+
+.lc-boot__wait {
+  flex: none;
+  width: 7px;
+  height: 12px;
+  background: var(--lc-lime);
+  opacity: 0.8;
+  display: block;
+  animation: lcBootPulse 900ms ease-in-out infinite;
+}
+
+.lc-boot__elapsed {
+  flex: none;
+  color: var(--lc-text-muted);
+}
+
+.lc-boot__result {
+  flex: none;
+  color: var(--lc-text-muted);
+  transition: color var(--lc-motion-panel) var(--lc-ease);
+}
+
+.lc-boot__row.is-ready .lc-boot__result {
+  color: var(--lc-green-text);
+}
+
+.lc-boot__row.is-needs-signin .lc-boot__result {
+  color: var(--lc-amber-text);
+}
+
+.lc-boot__row.is-error .lc-boot__result {
+  color: var(--lc-red-text);
+}
+
+.lc-boot__caret {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  overflow: hidden;
+  max-height: 20px;
+  opacity: 1;
+  transition: max-height var(--lc-motion-hover) var(--lc-ease), opacity var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-boot__caret.is-done {
+  max-height: 0;
+  opacity: 0;
+}
+
+.lc-boot__caretlabel {
+  color: var(--lc-lime);
+}
+
+.lc-boot__block {
+  width: 7px;
+  height: 13px;
+  background: var(--lc-lime);
+  display: block;
+  animation: lcBootCaret 1s step-end infinite;
+}
+
+.lc-boot__summary {
+  overflow: hidden;
+  white-space: normal;
+  color: var(--lc-lime-text);
+  text-align: center;
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  transition: max-height var(--lc-motion-panel) var(--lc-ease), opacity var(--lc-motion-panel) var(--lc-ease) 160ms;
+}
+
+.lc-boot__summary.is-settled {
+  max-height: 44px;
+  opacity: 1;
+  padding-top: 12px;
+}
+
+.lc-boot__led {
+  position: absolute;
+  right: 22px;
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--lc-lime);
+  display: block;
+  transition: background var(--lc-motion-panel) var(--lc-ease);
+}
+
+.lc-boot__led.is-done {
+  background: var(--lc-green);
+}
+
+.lc-boot__skip {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-control);
+  color: var(--lc-text-control-fg);
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-boot__skip:hover {
+  border-color: var(--lc-border-hover);
+}
+
+@keyframes lcBootFlicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  48% {
+    opacity: 0.94;
+  }
+  49% {
+    opacity: 1;
+  }
+  73% {
+    opacity: 0.975;
+  }
+  74% {
+    opacity: 1;
+  }
+}
+
+@keyframes lcBootSweep {
+  0% {
+    transform: translateY(-12%);
+  }
+  100% {
+    transform: translateY(112%);
+  }
+}
+
+@keyframes lcBootCaret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lcBootPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/*
+ * Reduced motion makes the settle INSTANT, not absent.
+ *
+ * The end state is information: what is installed and what needs you. A
+ * person with vestibular sensitivity still needs to know it. So the
+ * flicker, the sweep, the pulse and every transition go; the phase change
+ * stays.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .lc-boot__screen,
+  .lc-boot__sweep,
+  .lc-boot__block,
+  .lc-boot__wait {
+    animation: none;
+  }
+
+  .lc-boot,
+  .lc-boot__pre,
+  .lc-boot__dot,
+  .lc-boot__prompt,
+  .lc-boot__arg,
+  .lc-boot__bin,
+  .lc-boot__product,
+  .lc-boot__leader,
+  .lc-boot__result,
+  .lc-boot__caret,
+  .lc-boot__summary,
+  .lc-boot__led {
+    transition: none;
+  }
 }

@@ -20,6 +20,8 @@ import {
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL,
+  RUNTIME_DISCOVERY_EVENT_CHANNEL,
+  RUNTIME_DISCOVERY_LOG_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
@@ -58,6 +60,7 @@ import {
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
+  DiscoveryEvent,
   CodexMissionCancelResponse,
   CodexMissionStartRequest,
   CodexMissionStartResponse,
@@ -258,6 +261,16 @@ const desktopApi: DesktopApi = {
     ipcRenderer.on(CODEX_MISSION_UPDATE_CHANNEL, wrapped)
     return () => {
       ipcRenderer.removeListener(CODEX_MISSION_UPDATE_CHANNEL, wrapped)
+    }
+  },
+  discoveryLog: () => ipcRenderer.invoke(RUNTIME_DISCOVERY_LOG_CHANNEL) as Promise<readonly DiscoveryEvent[]>,
+  onDiscoveryEvent: (listener: (event: DiscoveryEvent) => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, update: DiscoveryEvent): void => {
+      listener(update)
+    }
+    ipcRenderer.on(RUNTIME_DISCOVERY_EVENT_CHANNEL, wrapped)
+    return () => {
+      ipcRenderer.removeListener(RUNTIME_DISCOVERY_EVENT_CHANNEL, wrapped)
     }
   },
   recoverRoutine: (request: RoutineRecoveryRequest) => ipcRenderer.invoke(ROUTINE_RECOVERY_CHANNEL, request) as Promise<RoutineRecoveryResponse>

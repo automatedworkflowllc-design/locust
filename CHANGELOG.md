@@ -6,6 +6,27 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.127.0 - 2026-09-14
+
+- **Finding your runtimes is something you can watch now.** Locust opens on a
+  terminal that shows what it is actually doing: the version and folder it
+  opened, then each runtime as its command is issued, with a counter running
+  while that one is out. When they have all answered it settles into the
+  table of what you have. Nothing on it is invented — every line is something
+  the app read.
+  - It only ever fills the empty middle of the window. The sidebar, the
+    folder and the message box stay put, so you can pick a teammate or start
+    typing without waiting for it, and clicking anywhere on it puts it away.
+  - If discovery is quick you get a flash and you are straight in. If a
+    runtime takes more than six seconds the counter stops pretending and says
+    it has not answered, and a Skip appears.
+  - **Settings → The boot screen** turns it down to Subtle or off entirely.
+- **Runtimes are now checked one at a time** instead of all at once, so the
+  log reads in the order things happened.
+- **A queued message is no longer drawn like an error.** It was a bordered
+  card with two heavy buttons for the most ordinary thing in the app —
+  something you typed that will send by itself in a moment.
+
 ## 0.126.0 - 2026-09-14
 
 - **Text no longer bleeds across the composer's controls.** The `effort ·

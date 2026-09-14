@@ -98,6 +98,44 @@ export type MemoryListResponse =
   | { readonly ok: false; readonly error: { readonly code: 'MEMORY_REJECTED'; readonly message: string } }
 
 export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
+/** Incremental discovery, pushed as it happens rather than answered once. */
+export const RUNTIME_DISCOVERY_EVENT_CHANNEL = 'runtime-discovery:event'
+/** The backlog, for a renderer that mounts mid-sweep. */
+export const RUNTIME_DISCOVERY_LOG_CHANNEL = 'runtime-discovery:log'
+
+/**
+ * What discovery is doing, while it is doing it.
+ *
+ * The boot screen is a view of THESE, not of a timer: nothing on it is
+ * invented and no line is typed out that the app already has in full.
+ *
+ * `probe.started` is emitted before the subprocess is spawned. That is the
+ * contract, not an implementation detail -- the screen exists to show the
+ * gap between issuing a command and hearing back, and if both arrive
+ * together there is nothing to show during the wait.
+ */
+export type DiscoveryEvent =
+  | { readonly kind: 'started'; readonly at: number }
+  | {
+      readonly kind: 'context'
+      readonly version: string
+      readonly platform: string
+      readonly workspace: string
+      readonly branch?: string
+      readonly clean?: boolean
+      readonly ledgerPath: string
+      readonly ledgerOk: boolean
+    }
+  | { readonly kind: 'probe.started'; readonly bin: string; readonly product: string; readonly at: number }
+  | {
+      readonly kind: 'probe.finished'
+      readonly bin: string
+      readonly at: number
+      readonly outcome: 'missing' | 'needs-signin' | 'ready' | 'error'
+      readonly version?: string
+      readonly detail?: string
+    }
+  | { readonly kind: 'finished'; readonly at: number; readonly ready: number; readonly needsYou: number }
 export const CODEX_MISSION_START_CHANNEL = 'codex-mission:start'
 export const CODEX_MISSION_CANCEL_CHANNEL = 'codex-mission:cancel'
 export const MISSION_HANDOFF_CHANNEL = 'mission:hand-off'
@@ -882,6 +920,8 @@ export type ModelCatalogResponse =
  */
 /** The shell layout a person has asked for. `auto` follows the window width. */
 export type LayoutPreference = 'auto' | 'compact' | 'wide'
+/** How much theatre the boot screen is allowed. */
+export type TubePreference = 'full' | 'subtle' | 'off'
 
 export interface WorkspaceSettings {
   readonly swarm: boolean
@@ -954,6 +994,15 @@ export interface WorkspaceSettings {
    * malformed reads as `auto`, which is what it did before the choice existed.
    */
   readonly layout: LayoutPreference
+  /**
+   * How much of the boot screen to draw while runtimes are found.
+   *
+   * A real preference because a person will see this on every launch --
+   * hundreds of times. `full` is the phosphor tube, `subtle` keeps the wash
+   * and drops the flicker and glare, `off` skips the ceremony entirely and
+   * goes straight to the pane. Absent or malformed reads as `full`.
+   */
+  readonly tube: TubePreference
 }
 
 /*
@@ -1608,6 +1657,21 @@ export interface DesktopApi {
   handOffMission(request: MissionHandoffRequest): Promise<MissionHandoffResponse>
   resumeMission(request: MissionResumeRequest): Promise<MissionHandoffResponse>
   onCodexMissionUpdate(listener: (update: CodexMissionUpdate) => void): () => void
+  /**
+   * Discovery, as it happens. Replays whatever has already been emitted
+   * before this launch's sweep, so a renderer that subscribes late still
+   * sees the whole log rather than joining halfway.
+   */
+  onDiscoveryEvent(listener: (event: DiscoveryEvent) => void): () => void
+  /**
+   * Everything discovery has said so far this launch.
+   *
+   * Pushing alone is not enough and this was measured: the host replays its
+   * log the moment the window is created, and the renderer has not mounted
+   * yet, so those messages arrive at a page with no listener and are gone.
+   * Push carries what happens next; this carries what already happened.
+   */
+  discoveryLog(): Promise<readonly DiscoveryEvent[]>
   recoverRoutine(request: import('./routine-recovery.js').RoutineRecoveryRequest): Promise<import('./routine-recovery.js').RoutineRecoveryResponse>
 }
 

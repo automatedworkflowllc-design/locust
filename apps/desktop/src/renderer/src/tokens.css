@@ -275,6 +275,33 @@
    * the exchange work, so peer names appear far more often and in more
    * places than when this was two rules. */
   --lc-violet-text: #c9b8f3;
+
+  /* --- The boot tube ---------------------------------------------------
+   *
+   * A phosphor monitor is a look this palette has no words for: it needs a
+   * warm centre falling to cold corners, a bezel with a light edge and a
+   * dark one, and three transparencies for the glow, the scan lines and the
+   * sweep. Literal hex in `shell.css` would fail the gate that exists to
+   * stop exactly that (static sweep, 2026-09-14, A5), so they live here.
+   *
+   * The greens are the lime already in the system at three strengths, not a
+   * new hue -- the tube is the app's own colour behind glass.
+   */
+  --lc-boot-screen-hot: #141a0f;
+  --lc-boot-screen-mid: #0a0c0a;
+  --lc-boot-screen-cold: #060706;
+  --lc-boot-bezel-hi: #1a1d1e;
+  --lc-boot-bezel-lo: #0e1011;
+  --lc-boot-glow: rgba(201, 234, 74, 0.55);
+  --lc-boot-glow-soft: rgba(201, 234, 74, 0.2);
+  --lc-boot-frame: rgba(201, 234, 74, 0.26);
+  --lc-boot-scan: rgba(0, 0, 0, 0.13);
+  --lc-boot-sweep: rgba(201, 234, 74, 0.045);
+  /* The lockup's own fill. The handoff's ten did not name one, and reusing
+   * `--lc-boot-glow-soft` for it put a 0.20 wash behind the mark -- nearly
+   * ten times too strong, and the logo read as a green slab rather than as
+   * something lit from behind glass (measured on the first drive). */
+  --lc-boot-lockup: rgba(201, 234, 74, 0.022);
   --lc-clay-text: #f0aea6;
 
   /* --- Typography ------------------------------------------------------

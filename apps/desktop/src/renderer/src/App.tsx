@@ -7,6 +7,7 @@ import type { AvatarSpec } from '../../shared/avatar.js'
 
 import type {
   LayoutPreference,
+  TubePreference,
   CodexMissionUpdate,
   MissionRouteSummary,
   PublicRecoveredMission,
@@ -65,6 +66,9 @@ import { refusalNotice } from './components/RoomScreen.js'
 import { exchangeAcross, exchangeOf } from './exchange.js'
 import type { ExchangeMission } from './exchange.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
+import { BootScreen } from './components/BootScreen.js'
+import { applyDiscoveryEvent, bootView, emptyBoot, phaseAt, SETTLE_DELAY_MS, SETTLE_MS } from './bootView.js'
+import type { BootState } from './bootView.js'
 import { CommandPalette } from './components/CommandPalette.js'
 import type { PaletteAction } from './components/CommandPalette.js'
 import { IdleTeammate } from './components/IdleTeammate.js'
@@ -462,6 +466,27 @@ const INSTALL_LOG_LINES = 500
 
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
+  /*
+   * THE BOOT SCREEN.
+   *
+   * `boot` is folded from real discovery events; `bootNow` is a clock that
+   * only ticks while something is actually being waited on, so the elapsed
+   * counters are live during the probe and nothing repaints afterwards.
+   */
+  const [boot, setBoot] = useState<BootState>(emptyBoot)
+  const [bootNow, setBootNow] = useState(() => Date.now())
+  const [skippedAt, setSkippedAt] = useState<number>()
+  const [tube, setTube] = useState<TubePreference>('full')
+  /*
+   * Skipping still leaves you knowing what is installed.
+   *
+   * It jumps to the settled table and dissolves from there, rather than to
+   * nothing -- a skip that blanked the screen would punish the person for
+   * not wanting to wait by taking the answer away too.
+   */
+  const skipBoot = (): void => {
+    setSkippedAt((held) => held ?? Date.now())
+  }
   // Declared HERE, right under its state, not a thousand lines down: a
   // helper above it closed over `runtimes` and was called during render,
   // which is a ReferenceError at boot -- and it fired only on a profile
@@ -773,11 +798,20 @@ export default function App(): ReactElement {
     return () => window.removeEventListener('resize', onResize)
   }, [])
   const layoutMode = resolveLayout(layout, windowWidth)
+  /** The boot screen's own setting, persisted the way the layout one is. */
+  const chooseTube = (next: TubePreference): void => {
+    const before = tube
+    setTube(next)
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube: next })
+      .then((settings) => setTube(settings.tube))
+      .catch(() => setTube(before))
+  }
   const chooseLayout = (next: LayoutPreference): void => {
     const before = layout
     setLayout(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout: next })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout: next, tube })
       .then((settings) => setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto'))
       .catch(() => setLayout(before))
   }
@@ -1522,6 +1556,7 @@ export default function App(): ReactElement {
           setInterrupt(settings.interrupt)
           setMemoryMode(settings.memoryMode)
           setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto')
+          setTube(settings.tube)
         }
       })
       .catch(() => undefined)
@@ -2009,7 +2044,7 @@ export default function App(): ReactElement {
     const before = memoryMode
     setMemoryMode(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode: next, autoMode, askConnectors, keepATodoList, layout })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode: next, autoMode, askConnectors, keepATodoList, layout, tube })
       .then((settings) => setMemoryMode(settings.memoryMode))
       .catch(() => setMemoryMode(before))
   }
@@ -2814,6 +2849,55 @@ export default function App(): ReactElement {
       })
       .catch(() => undefined)
   }
+
+  /*
+   * WHICH PHASE THE BOOT SCREEN IS IN, derived rather than stored.
+   *
+   * Stored, it would be a second copy of a fact the events already carry,
+   * and the two would disagree the first time a re-check arrived mid-settle
+   * -- the shape this app keeps paying for. A skip pins it to `settled` and
+   * lets the same timeline dissolve it, so skipping and waiting end the
+   * same way.
+   */
+  const bootPhase = ((): ReturnType<typeof phaseAt> => {
+    if (skippedAt !== undefined) return phaseAt(skippedAt - SETTLE_DELAY_MS - SETTLE_MS, bootNow)
+    if (boot.finished !== undefined) return phaseAt(boot.finished.at, bootNow)
+    return boot.phase === 'idle' ? 'idle' : 'probing'
+  })()
+
+  /*
+   * Subscribe once, and replay: the window is created while the first sweep
+   * is already running, so the host sends everything it has recorded before
+   * anything new.
+   */
+  useEffect(() => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    // The backlog first, then everything that happens next. Both, because
+    // the host replays at window creation and this has not mounted yet.
+    void bridge
+      .discoveryLog()
+      .then((events) => {
+        setBoot((current) => events.reduce(applyDiscoveryEvent, current))
+      })
+      .catch(() => undefined)
+    return bridge.onDiscoveryEvent((event) => {
+      setBoot((current) => applyDiscoveryEvent(current, event))
+    })
+  }, [])
+
+  /*
+   * A clock that only ticks while something is being waited on.
+   *
+   * The elapsed counters have to be live during a probe, and nothing should
+   * repaint once the screen is gone -- a timer left running behind a
+   * dismissed screen is a battery cost for nothing.
+   */
+  useEffect(() => {
+    if (bootPhase === 'gone' || tube === 'off') return
+    const tick = window.setInterval(() => setBootNow(Date.now()), 100)
+    return () => window.clearInterval(tick)
+  }, [bootPhase, tube])
 
   const running = liveRunIsActive(liveRun)
   /**
@@ -3766,12 +3850,14 @@ export default function App(): ReactElement {
               onInstallUpdate={installUpdate}
               relay={relay}
               swarm={swarm}
-              onSwarmChange={(next) => {
+              tube={tube}
+            onTubeChange={chooseTube}
+            onSwarmChange={(next) => {
                 // The same write the composer mark performs: optimistic, then
                 // reconciled with what the store actually saved.
                 setSwarm(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
+                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
                   .then((settings) => setSwarm(settings.swarm === true))
                   .catch(() => setSwarm(!next))
               }}
@@ -3779,7 +3865,7 @@ export default function App(): ReactElement {
               onAutoModeChange={(next) => {
                 setAutoMode(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: next, askConnectors, keepATodoList, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: next, askConnectors, keepATodoList, layout, tube })
                   .then((settings) => setAutoMode(settings.autoMode === true))
                   .catch(() => setAutoMode(!next))
               }}
@@ -3787,7 +3873,7 @@ export default function App(): ReactElement {
               onAskConnectorsChange={(next) => {
                 setAskConnectors(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors: next, keepATodoList, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors: next, keepATodoList, layout, tube })
                   .then((settings) => setAskConnectors(settings.askConnectors === true))
                   .catch(() => setAskConnectors(!next))
               }}
@@ -3795,7 +3881,7 @@ export default function App(): ReactElement {
               onKeepATodoListChange={(next) => {
                 setKeepATodoList(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList: next, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList: next, layout, tube })
                   .then((settings) => setKeepATodoList(settings.keepATodoList === true))
                   .catch(() => setKeepATodoList(!next))
               }}
@@ -3811,14 +3897,14 @@ export default function App(): ReactElement {
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
                   .then((settings) => setRelayHopCap(settings.relayHopCap))
                   .catch(() => undefined)
               }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -3826,7 +3912,7 @@ export default function App(): ReactElement {
             onInterruptChange={(next) => {
               setInterrupt(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt: next, memoryMode, autoMode, askConnectors, keepATodoList, layout })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt: next, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
                 .then((settings) => setInterrupt(settings.interrupt === true))
                 .catch(() => setInterrupt(!next))
             }}
@@ -3878,6 +3964,21 @@ export default function App(): ReactElement {
                 onStarter={(prompt) => {
                   void startMission(prompt)
                 }}
+              />
+            ) : bootPhase !== 'gone' && tube !== 'off' ? (
+              /*
+               * The boot screen replaces the empty state, IN THE PANE ONLY.
+               *
+               * It never covers the sidebar, the title bar or the composer,
+               * which is what makes showing it on every launch safe: nothing
+               * is hidden to display it, and a person can click a teammate
+               * or start typing while it is still probing. It occupies space
+               * that was empty anyway.
+               */
+              <BootScreen
+                view={bootView(boot, bootPhase, bootNow)}
+                tube={tube}
+                onSkip={skipBoot}
               />
             ) : (
               <FirstLaunch
@@ -4306,7 +4407,7 @@ export default function App(): ReactElement {
               // same answer the composer just showed.
               setAutoMode(true)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: true, askConnectors, keepATodoList, layout: 'auto' })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: true, askConnectors, keepATodoList, layout: 'auto', tube: 'full' })
                 .then((settings) => setAutoMode(settings.autoMode === true))
                 .catch(() => setAutoMode(false))
             }}
@@ -4348,7 +4449,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}
@@ -4436,7 +4537,7 @@ export default function App(): ReactElement {
                   const next = !swarm
                   setSwarm(next)
                   void window.desktop
-                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout })
+                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
                     .then((settings) => setSwarm(settings.swarm === true))
                     .catch(() => setSwarm(!next))
                 }

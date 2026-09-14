@@ -4,7 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import { isAvatarSpec, seedAvatar } from '../shared/avatar.js'
-import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode, LayoutPreference } from '../shared/ipc.js'
+import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode, LayoutPreference, TubePreference } from '../shared/ipc.js'
 import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
 
@@ -97,11 +97,16 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto' }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
   return value === 'compact' || value === 'wide' || value === 'auto' ? value : 'auto'
+}
+
+/** How much of the boot screen to draw, or the default. Never trusts the file. */
+function parsedTube(value: unknown): TubePreference {
+  return value === 'full' || value === 'subtle' || value === 'off' ? value : 'full'
 }
 
 function parsedMemoryMode(value: unknown): MemoryMode {
@@ -331,7 +336,10 @@ function parsedFile(text: string): StoredFile {
       : false,
     layout: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedLayout((rawSettings as Record<string, unknown>).layout)
-      : 'auto'
+      : 'auto',
+    tube: typeof rawSettings === 'object' && rawSettings !== null
+      ? parsedTube((rawSettings as Record<string, unknown>).tube)
+      : 'full'
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, settings }
@@ -596,6 +604,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           keepATodoList: typeof settings === 'object' && settings !== null
             ? (settings as Record<string, unknown>).keepATodoList === true
             : false,
+          tube: typeof settings === 'object' && settings !== null
+            ? parsedTube((settings as Record<string, unknown>).tube)
+            : 'full',
           layout: typeof settings === 'object' && settings !== null
             ? parsedLayout((settings as Record<string, unknown>).layout)
             : 'auto'

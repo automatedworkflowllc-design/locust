@@ -81,6 +81,7 @@ export type {
 } from "./claude-events.js";
 export type {
   DiscoverInstalledRuntimesOptions,
+  RuntimeProbeWatcher,
 } from "./discovery.js";
 export type {
   NodeProbeRunnerOptions,

@@ -425,19 +425,55 @@ async function discoverOne(
   return version ? { ...base, version } : base;
 }
 
+/**
+ * Told as each probe begins and ends, so a screen can show the WAIT.
+ *
+ * `started` fires BEFORE the subprocess is spawned, not after it returns.
+ * That ordering is the whole contract: the interesting moment is the gap
+ * between issuing a command and hearing back, and a caller told about both
+ * at once has nothing to show during it. The boot screen exists to fill
+ * exactly that gap (design handoff, 2026-09-15).
+ */
+export interface RuntimeProbeWatcher {
+  started(runtime: { readonly id: string; readonly displayName: string; readonly bin: string }): void;
+  finished(runtime: { readonly id: string }, discovery: RuntimeDiscovery): void;
+}
+
 export interface DiscoverInstalledRuntimesOptions {
   readonly runner: CommandRunner;
   readonly locator: ExecutableLocator;
   readonly includeOmniRoute?: boolean;
+  readonly watch?: RuntimeProbeWatcher;
 }
 
+/**
+ * SEQUENTIAL, deliberately.
+ *
+ * This was `Promise.all`, which is the faster answer to the wrong question.
+ * Probed in parallel every row appears at once, every elapsed counter ticks
+ * together, and a log that is meant to be read becomes noise. One at a time
+ * is also what a person would do by hand, which is what makes it legible.
+ * The cost is a few hundred milliseconds, spent against a screen whose only
+ * job is to fill that time.
+ */
 export async function discoverInstalledRuntimes(
   options: DiscoverInstalledRuntimesOptions,
 ): Promise<readonly RuntimeDiscovery[]> {
   const definitions = options.includeOmniRoute === false
     ? DEFINITIONS.filter((definition) => definition.id !== "omniroute")
     : DEFINITIONS;
-  return Promise.all(
-    definitions.map((definition) => discoverOne(definition, options.runner, options.locator)),
-  );
+  const found: RuntimeDiscovery[] = [];
+  for (const definition of definitions) {
+    // Before the spawn. A watcher told afterwards learns nothing it could
+    // not have read from the result.
+    options.watch?.started({
+      id: definition.id,
+      displayName: definition.displayName,
+      bin: definition.commandName,
+    });
+    const discovery = await discoverOne(definition, options.runner, options.locator);
+    options.watch?.finished({ id: definition.id }, discovery);
+    found.push(discovery);
+  }
+  return found;
 }
