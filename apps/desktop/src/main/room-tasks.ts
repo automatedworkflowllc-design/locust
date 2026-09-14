@@ -1,7 +1,7 @@
 import type { MissionLedger } from '@teammate/mission-store'
 
 import type { CodexMissionUpdate, PublicRoom, PublicTeammate } from '../shared/ipc.js'
-import { parseTaskBlocks } from '../shared/room-task.js'
+import { parseTaskBlocks, rowNamedByPost } from '../shared/room-task.js'
 import { createTranscriptTracker } from './peer-exchange.js'
 import type { RoomStore } from './room-store.js'
 
@@ -17,7 +17,7 @@ import type { RoomStore } from './room-store.js'
  * the window in one line, so the room can show it.
  */
 export interface RoomTasksOptions {
-  readonly rooms: Pick<RoomStore, 'list' | 'applyTaskOps' | 'startQueued'>
+  readonly rooms: Pick<RoomStore, 'list' | 'applyTaskOps' | 'startQueued' | 'updateTask'>
   readonly ledger: Pick<MissionLedger, 'getMission'>
   readonly teammates: { list(): Promise<readonly PublicTeammate[]> }
   readonly notify: (update: CodexMissionUpdate) => void
@@ -107,6 +107,29 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
               started += 1
               try {
                 await options.rooms.startQueued(room.roomId, post.postId, teammateId, outcome.missionId)
+                /*
+                 * Claim the row the person named, at START.
+                 *
+                 * A `locust-task` block is read from the END of a reply, so a
+                 * teammate cannot claim while it is working -- and that window
+                 * is exactly the one that matters, because the briefing sends
+                 * other teammates at unassigned rows. Grok watched a row sit
+                 * unassigned through a whole live run whose own reply said
+                 * "Starting the release notes task" (2026-09-14, finding 3).
+                 *
+                 * Only when the post names ONE open row beyond argument. A
+                 * post that says "start that board task" names nothing, and
+                 * the app does not get to decide which row somebody meant --
+                 * see `rowNamedByPost`.
+                 */
+                const named = rowNamedByPost(post.text, room.tasks)
+                if (named !== undefined) {
+                  // A claim that fails is not a reason to hold up a run that
+                  // has already started; the board is behind, not broken.
+                  await options.rooms
+                    .updateTask({ roomId: room.roomId, op: 'assign', taskId: named, ownerId: teammateId })
+                    .catch(() => undefined)
+                }
               } catch {
                 // The run is live and the post did not record it. Left to
                 // the next drain rather than stopped: a queue entry that

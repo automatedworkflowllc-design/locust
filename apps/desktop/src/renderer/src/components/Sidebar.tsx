@@ -20,6 +20,7 @@ import {
   teammateStatusView
 } from '../status.js'
 import { PixelFace } from './PixelFace.js'
+import type { TeammateStatusView } from '../status.js'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge } from '../railFlyout.js'
@@ -129,6 +130,7 @@ export function Sidebar({
   runtimes,
   missions,
   teammates,
+  viewByTeammate,
   routineStepByTeammate,
   missionOwners,
   selectedMissionId,
@@ -159,6 +161,12 @@ export function Sidebar({
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
   readonly teammates: readonly PublicTeammate[]
+  /**
+   * Every teammate's state, decided once in App. The sidebar draws it; it
+   * does not work it out, because two surfaces working out one fact is how
+   * they come to disagree.
+   */
+  readonly viewByTeammate: Readonly<Record<string, TeammateStatusView>>
   /** Which routine each teammate is replaying right now, if any. */
   readonly routineStepByTeammate: Readonly<Record<string, { readonly name: string; readonly step: number; readonly of: number }>>
   readonly missionOwners: Readonly<Record<string, string>>
@@ -390,25 +398,20 @@ export function Sidebar({
           // needed a sign-in while she was visibly working on Claude Code;
           // asking only their MISSIONS said "idle" for a teammate that had
           // never run and could not. See `runtimeOfTeammate`.
-          const theirRuntime = runtimeOfTeammate(teammate, owned)
-          const status = teammateStatusView({
-            // A teammate with no work AND no route of their own is judged by
-            // nothing in particular, so the row says idle rather than
-            // borrowing some other runtime's sign-in state.
-            runtime: theirRuntime === undefined
-              ? undefined
-              : runtimes.find((entry) => entry.id === theirRuntime),
+          /*
+           * One answer per teammate, decided in App and handed down.
+           *
+           * This row used to call `teammateStatusView` itself with inputs
+           * that had drifted from the ones the Team roster's map used -- so
+           * the same teammate read "working" here and idle there, which Grok
+           * caught on screen in 0.116.0. Nothing is computed here now.
+           */
+          const status = viewByTeammate[teammate.teammateId] ?? teammateStatusView({
+            runtime: undefined,
             anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-            // A hop the host is still starting counts as working: the row
-            // used to go idle for as long as a cold runtime takes to boot,
-            // which reads as the teammate having stopped.
-            hasRunningMission:
-              owned.some((mission) => mission.phase === 'running') || starting.includes(teammate.teammateId),
-            pendingApprovals: pendingApprovals[teammate.teammateId] ?? 0,
-            roleLabel: roleLabelOf(teammate),
-            ...(liveActivity[teammate.teammateId] === undefined ? {} : { liveActivity: liveActivity[teammate.teammateId] }),
-            recentlyDone: recentlyDone.includes(teammate.teammateId),
-            recentlyReceived: recentlyReceived.includes(teammate.teammateId)
+            hasRunningMission: false,
+            pendingApprovals: 0,
+            roleLabel: roleLabelOf(teammate)
           })
           const selected = teammate.teammateId === selectedTeammateId
           return (

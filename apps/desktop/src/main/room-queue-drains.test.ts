@@ -58,6 +58,7 @@ function harness(
     rooms: {
       list: async () => [room(queued)],
       applyTaskOps: async () => ({ changed: [], refused: [] }),
+      updateTask: async () => ({}) as never,
       startQueued: async (_roomId, _postId, teammateId, missionId) => {
         recorded.push({ teammateId, missionId })
       }
@@ -131,6 +132,7 @@ describe('when a slot frees', () => {
       rooms: {
         list: async () => [room(['tm_booty', 'tm_gem'])],
         applyTaskOps: async () => ({ changed: [], refused: [] }),
+        updateTask: async () => ({}) as never,
         startQueued: failing
       },
       ledger: { getMission: async () => undefined },

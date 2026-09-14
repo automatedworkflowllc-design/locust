@@ -1965,8 +1965,28 @@ export default function App(): ReactElement {
   }
   useEffect(() => {
     if (screen === 'memory') refreshMemories()
+    /*
+     * And every open menu closes with the screen it belongs to.
+     *
+     * Grok's beta drive, 2026-09-14, finding 7: the room header's menu was
+     * opened -- All rooms / Rename / Remove for good? -- and then Ctrl+2 and
+     * Ctrl+3 switched screens with the keyboard. The menu floated over Team
+     * and over Home, still offering to remove a room the person was no longer
+     * looking at.
+     *
+     * Dismiss-on-click-outside cannot catch this: no click happened. A menu
+     * is bound to the thing it was opened from, and that thing is gone.
+     */
+    setRowMenu(undefined)
+    setRowMenuArmed(undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen])
+  // Leaving a room is the same event as leaving a screen, as far as a menu
+  // that belongs to that room is concerned.
+  useEffect(() => {
+    setRowMenu(undefined)
+    setRowMenuArmed(undefined)
+  }, [currentRoomId])
   const refreshMemories = (): void => {
     void window.desktop
       ?.listMemories()
@@ -3468,7 +3488,23 @@ export default function App(): ReactElement {
     viewByTeammate[teammate.teammateId] = teammateStatusView({
       runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
       anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-      hasRunningMission: owned.some((mission) => mission.phase === 'running'),
+      /*
+       * Starting counts as working, because the sidebar says so.
+       *
+       * This map and the sidebar row called the SAME function with different
+       * inputs, and so gave different answers for the same teammate. Grok
+       * measured it in 0.116.0: title bar "1 running", sidebar Booty with a
+       * green ring reading "working", and the Team card beside it with no
+       * ring at all.
+       *
+       * I put that gap in. 0.109.0 gave the roster a presence dot and this
+       * map to draw it from, and the map was a THIRD assembly of a fact that
+       * already had two -- exactly the class Grok's first audit was about.
+       * The sidebar consumes this map now rather than computing its own, so
+       * there is one answer per teammate and the surfaces cannot disagree.
+       */
+      hasRunningMission:
+        owned.some((mission) => mission.phase === 'running') || Object.keys(relayStarting).includes(teammate.teammateId),
       pendingApprovals: pendingApprovalsByOwner.get(teammate.teammateId) ?? 0,
       roleLabel: roleLabelOf(teammate),
       ...(liveActivityByOwner[teammate.teammateId] === undefined ? {} : { liveActivity: liveActivityByOwner[teammate.teammateId] }),
@@ -3558,6 +3594,7 @@ export default function App(): ReactElement {
           }}
           pendingApprovals={Object.fromEntries(pendingApprovalsByOwner)}
           liveActivity={liveActivityByOwner}
+          viewByTeammate={viewByTeammate}
           starting={Object.keys(relayStarting)}
           recentlyDone={recentlyDone}
           recentlyReceived={recentlyReceived}

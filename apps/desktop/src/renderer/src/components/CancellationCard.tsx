@@ -118,11 +118,23 @@ export function CancellationCard({
         * Until that is fixed at the process level, a person reading this card
         * has to be told it can happen — a stop that is quietly partial is the
         * worst version of this feature.
+        *
+        * NOT on a run where nothing started. Grok's beta drive, 2026-09-14,
+        * finding 4: one card said "Nothing had started yet, so nothing was
+        * left half-done" and then, in amber underneath, that a command which
+        * had already started may still be running. Two sentences on one card
+        * that cannot both be the situation, and the ledger settled which: a
+        * create and a `run.cancelled` eight milliseconds later, zero records.
+        *
+        * A warning that is false here does not buy safety, it spends the
+        * reader's trust in the one warning on this card that is real.
         */}
-      <p className="lc-approval__note lc-tone-amber">
-        A command that had already started may still finish on its own. If one was running, check the
-        workspace rather than assuming it stopped when you did.
-      </p>
+      {!nothingHappened && (
+        <p className="lc-approval__note lc-tone-amber">
+          A command that had already started may still finish on its own. If one was running, check the
+          workspace rather than assuming it stopped when you did.
+        </p>
+      )}
     </div>
   )
 }

@@ -100,6 +100,27 @@ export function openCodeErrorSentence(facts: OpenCodeErrorFacts): string {
   if (facts.kind === "FreeUsageLimitError") {
     return "The free model has no usage left right now, so OpenCode stopped. Pick another model, or try the free one again later.";
   }
+  /*
+   * The one that actually meets people on the free path, said in words.
+   *
+   * Grok's beta drive, 2026-09-14, finding 8, on the only route it was
+   * allowed to spend: the FIRST turn works, and the second dies with
+   *
+   *     Upstream request failed: [invalid_request_error] reasoning
+   *     `encrypted_content` was not issued to this caller
+   *
+   * That is the provider refusing to resume a session whose reasoning blocks
+   * were issued to someone else -- so the session is gone and the next send
+   * starts a new one, which is exactly what a person needs to know and none of
+   * what that sentence says. Welcome recommends OpenCode as the no-account
+   * path, so this is the error most likely to be somebody's first impression
+   * of this app failing.
+   *
+   * Locust does not cause it and cannot fix it; the CARD is ours.
+   */
+  if (quoted !== undefined && /encrypted_content/i.test(quoted)) {
+    return "OpenCode could not continue this session, so the run stopped. Nothing was lost from the conversation; the next message starts a fresh session.";
+  }
   if (facts.statusCode === 429) {
     return `OpenCode was rate limited by the provider and stopped${quoted === undefined ? "" : `: ${quoted}`}`;
   }

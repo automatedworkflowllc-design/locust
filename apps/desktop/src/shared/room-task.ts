@@ -218,3 +218,40 @@ export function taskSection(input: {
     'Claim only what you are actually doing, mark done only what is finished, and if you touched no task, end with no block.'
   ].join('\n')
 }
+
+/**
+ * The one open row a post is plainly about, or nothing.
+ *
+ * Grok's beta drive, 2026-09-14, finding 3: a post asked a teammate to start
+ * an open board task, the room reported both teammates running, both faces
+ * read "working", the teammate's own reply said "Starting the release notes
+ * task" -- and the row said **unassigned** the whole time, through the run,
+ * after it settled, and after a restart.
+ *
+ * 0.116.0 told teammates to claim a row the moment they start it, and that is
+ * not enough on its own: a `locust-task` block is read from the END of a
+ * reply, so nothing can have claimed while the work is happening. The window
+ * where the board is wrong is exactly the window where it matters, because
+ * the rule beside it sends other teammates at unassigned rows.
+ *
+ * So the host claims it at START, when -- and only when -- the person's own
+ * words identify one open row beyond argument. The matching rule is
+ * `forgetMatch`'s and the reasons are the same: exactly one target, and none
+ * or several are a refusal rather than a guess. A post that says "start that
+ * board task" names nothing, and nothing is what this returns; the app does
+ * not get to decide which row somebody meant.
+ */
+export function rowNamedByPost(
+  postText: string,
+  tasks: readonly { readonly taskId: string; readonly text: string; readonly state: string; readonly ownerId?: string }[]
+): string | undefined {
+  const said = postText.toLowerCase();
+  const open = tasks.filter((task) => task.state === "open" && task.ownerId === undefined);
+  const named = open.filter((task) => {
+    const words = task.text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    // The row's own words, in order, inside what the person wrote. Short
+    // rows are excluded: "notes" appearing in a sentence is not a reference.
+    return words.length >= 8 && said.includes(words);
+  });
+  return named.length === 1 ? named[0]?.taskId : undefined;
+}

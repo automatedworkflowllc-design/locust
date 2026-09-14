@@ -125,3 +125,38 @@ describe("what the person is told", () => {
     }
   });
 });
+
+/*
+ * Grok's beta drive, 2026-09-14, finding 8. On the only route that pass was
+ * allowed to spend, the first turn worked and the second died with a raw
+ * provider line about `encrypted_content` not being issued to this caller.
+ * Welcome sells OpenCode as the no-account path, so this is the error most
+ * likely to be somebody's first impression of this app failing.
+ */
+describe("the free path's second turn", () => {
+  it("says what happened and what to do, not what the provider said", () => {
+    const said = openCodeErrorSentence({
+      message:
+        "Upstream request failed: [invalid_request_error] reasoning `encrypted_content` was not issued to this caller",
+      kind: undefined,
+      statusCode: undefined,
+      retryable: undefined,
+    });
+    expect(said).not.toContain("encrypted_content");
+    expect(said).not.toContain("invalid_request_error");
+    expect(said).toContain("could not continue this session");
+    // The two things a person needs: nothing was lost, and what happens next.
+    expect(said).toContain("Nothing was lost");
+    expect(said).toContain("fresh session");
+  });
+
+  it("leaves every other provider message alone", () => {
+    const said = openCodeErrorSentence({
+      message: "something else entirely",
+      kind: undefined,
+      statusCode: undefined,
+      retryable: undefined,
+    });
+    expect(said).toContain("something else entirely");
+  });
+});

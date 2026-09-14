@@ -473,10 +473,25 @@ export function Thread({
     ...(workspacePath === undefined ? {} : { workspacePath }),
     ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso })
   })
-  // A read-only run whose answer carries code is the one case where "run it
-  // again, with edits allowed" is certainly what a person wants: the runtime
-  // wrote the change and was not permitted to apply it. Asked of the parsed
-  // reply rather than of the prose, so a stray backtick cannot fake it.
+  /*
+   * A read-only run whose answer carries code is where "run it again, with
+   * edits allowed" is worth offering -- and that is ALL it is.
+   *
+   * The sentence beside it used to say the runtime "could not write to the
+   * workspace", on the reasoning quoted here for years: that it wrote the
+   * change and was not permitted to apply it. Grok measured what that costs
+   * (2026-09-14, finding 2): a plain Ask-mode question -- give me a markdown
+   * link, a fenced javascript block and a table -- answered correctly, with a
+   * banner underneath saying the run could not write to the workspace.
+   *
+   * Nothing tried to write. The person asked for an example and was told the
+   * app had attempted to edit their folder and failed. The offer is still
+   * right; the claim about what happened was invented. It says what is true
+   * of the mode now and makes no claim about an attempt.
+   *
+   * Asked of the parsed reply rather than the prose, so a stray backtick
+   * cannot fake it.
+   */
   const answeredWithCode = items.some(
     (item) => item.type === 'agent-message' && parseAgentText(item.text).some((block) => block.kind === 'code')
   )
@@ -703,7 +718,7 @@ export function Thread({
             <span>
               {wasPlan === true
                 ? 'This is the plan, not the work: nothing in the workspace has changed.'
-                : 'This run could not write to the workspace, so the change is only in the reply.'}
+                : 'Ask mode answers in the conversation, so this stayed in the reply. Nothing in the workspace has changed.'}
             </span>
             <button type="button" className="lc-button" onClick={onRunWithEdits}>
               <Icon name="diff" size={13} /> {wasPlan === true ? 'Build this plan' : 'Run again with edits allowed'}

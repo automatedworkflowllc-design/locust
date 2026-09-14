@@ -6,6 +6,33 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.118.0 - 2026-09-14
+
+Seven findings from an outside audit that drove the built app, all of them on
+screen rather than read out of the source.
+
+- **A rename that cannot be saved no longer says the room does not exist.** If
+  the rooms file could not be read, the app read zero rooms, decided your room
+  was not among them, and said so — under a window that was showing it. It now
+  says nothing was changed and every room is as it was.
+- **An Ask-mode answer with a code block is not a failed write.** Asking for an
+  example put a banner under the reply saying the run could not write to your
+  workspace. Nothing had tried to.
+- **A room task is claimed when the work starts**, where your own words named
+  the row, instead of only once a reply comes back. A post that doesn't name a
+  row still claims nothing — the app doesn't guess which one you meant.
+- **A stopped run that never started drops the warning about a command still
+  running.** One card said nothing had started and that something may still be
+  finishing.
+- **The Team roster shows the same presence as the sidebar.** One of them
+  counted a starting mission as working and the other didn't.
+- **With nothing installed, the composer says "No runtime"** instead of naming
+  one that isn't there.
+- **A room menu closes when you leave the room**, instead of floating over the
+  next screen still offering to remove it.
+- **OpenCode's session error reads as a sentence**, not as the provider's raw
+  `encrypted_content` line.
+
 ## 0.117.0 - 2026-09-14
 
 - **A Cursor teammate knows which connectors it can call, by name.** You should

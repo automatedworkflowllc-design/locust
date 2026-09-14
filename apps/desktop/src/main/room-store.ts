@@ -97,6 +97,12 @@ interface StoredFile {
   readonly rooms: readonly PublicRoom[]
 }
 
+/**
+ * Said when the rooms file exists and cannot be read. Never "does not exist":
+ * nothing has been established about any room, including whether it is there.
+ */
+const UNREADABLE = 'The rooms file could not be read, so nothing was changed. Every room is as it was.'
+
 const EMPTY: StoredFile = { schemaVersion: SCHEMA_VERSION, rooms: [] }
 
 export function validRoomName(value: unknown): value is string {
@@ -255,14 +261,34 @@ export function createRoomStore(options: {
     return next
   }
 
+  /**
+   * An empty store and an UNREADABLE one are different facts.
+   *
+   * This returned `EMPTY` for both, and Grok found what that costs (audit,
+   * 2026-09-14, finding 1): with `rooms.json` replaced by a directory, a
+   * rename read zero rooms, concluded the room was not among them, and told
+   * the person **"That room does not exist."** -- under a window that was at
+   * that moment showing the room, with its name and its tasks on screen.
+   *
+   * The reading anyone takes from "does not exist" is that it is gone. It was
+   * not gone; it was never read. This is the app's own scope-not-absence
+   * ruling broken at the layer below the sentence -- which is why the careful
+   * second clause added to the renderer's catch never ran: the store had
+   * already produced a confident, wrong answer for it to print.
+   *
+   * A file that is simply not there is genuinely empty and still returns
+   * EMPTY. Anything else throws, and every operation above says so.
+   */
   const read = async (): Promise<StoredFile> => {
+    let text: string
     try {
-      const text = await readFile(path, 'utf8')
-      if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) return EMPTY
-      return parsedFile(text)
-    } catch {
-      return EMPTY
+      text = await readFile(path, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return EMPTY
+      throw new Error(UNREADABLE)
     }
+    if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) return EMPTY
+    return parsedFile(text)
   }
 
   const write = async (file: StoredFile): Promise<void> => {
@@ -316,6 +342,7 @@ export function createRoomStore(options: {
     rename(roomId, name): Promise<PublicRoom> {
       return serialize(async () => {
         if (!validRoomName(name)) throw new Error('Give the room a name of up to 60 characters.')
+        // A read that throws says "could not be read", not "does not exist".
         const file = await read()
         const room = file.rooms.find((entry) => entry.roomId === roomId)
         if (room === undefined) throw new Error('That room does not exist.')

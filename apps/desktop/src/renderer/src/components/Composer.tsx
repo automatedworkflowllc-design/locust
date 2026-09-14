@@ -732,6 +732,8 @@ export function Composer({
   const { base: effortBase, fast: effortIsFast } = splitEffort(shownEffort ?? effortBases[0] ?? '')
   const effortIndex = Math.max(0, effortBases.indexOf(effortBase))
   const shownRuntimeStatus = runtimes.find((runtime) => runtime.id === shownRuntime)
+  /** Nothing on this machine can take work, so no route is a real answer. */
+  const nothingConnected = !runtimes.some(runtimeIsUsable)
   // The chip is a label on a control, not the Settings row that tells you
   // which program this is -- so `Cursor`, not `Cursor Agent`. See `routeName`.
   const runtimeLabel = shortRuntimeName(shownRuntime)
@@ -1232,9 +1234,32 @@ export function Composer({
                   aria-expanded={pickerOpen}
                 >
                   <span className={`lc-dot ${selectedReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
-                  {runtimeLabel}
-                  <span className="lc-separator">/</span>
-                  <span className="lc-control__mono lc-control__model">{modelLabel}</span>
+                  {/*
+                    * With NOTHING connected, this chip names no route.
+                    *
+                    * Grok's beta drive, 2026-09-14, finding 6: on a machine
+                    * with every coding CLI off PATH, the footer said "0
+                    * runtimes connected", the banner said to install one, the
+                    * send button was disabled, the placeholder said "Install
+                    * a coding agent..." -- and this chip said `OpenCode /
+                    * Account Default`. First contact, and the one control on
+                    * the screen that cannot work was the one claiming a route
+                    * was already chosen.
+                    *
+                    * The muted dot was carrying that distinction alone, which
+                    * is far too much weight for a 6px circle beside two
+                    * confident words. The picker still opens, because that is
+                    * where a person goes to see what could be installed.
+                    */}
+                  {nothingConnected ? (
+                    <span className="lc-control__model">No runtime</span>
+                  ) : (
+                    <>
+                      {runtimeLabel}
+                      <span className="lc-separator">/</span>
+                      <span className="lc-control__mono lc-control__model">{modelLabel}</span>
+                    </>
+                  )}
                   {/*
                     * The chevron the mode chip beside it has, and that the
                     * reference draws on this one too: `Codex CLI / gpt-5.6 ·

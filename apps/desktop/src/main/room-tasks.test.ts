@@ -46,6 +46,7 @@ function harness(text: string | undefined, rooms: readonly PublicRoom[] = [room(
         applied.push({ roomId, ops, actor, roster: roster.map((entry) => entry.name) })
         return { changed: ops.map((op) => `${actor.name} did ${op.kind} "${op.text}".`), refused: [] }
       },
+      updateTask: async () => ({}) as never,
       startQueued: async () => undefined
     },
     ledger: { getMission: async () => (text === undefined ? undefined : replied(text)) },
@@ -100,7 +101,7 @@ describe('when the last teammate in a room answers', () => {
   function answered(phaseOfOther: string | undefined) {
     const notices: CodexMissionUpdate[] = []
     const tasks = createRoomTasks({
-      rooms: { list: async () => [room()], applyTaskOps: async () => ({ changed: [], refused: [] }), startQueued: async () => undefined },
+      rooms: { list: async () => [room()], applyTaskOps: async () => ({ changed: [], refused: [] }), startQueued: async () => undefined, updateTask: async () => ({}) as never },
       ledger: {
         getMission: async (missionId) => {
           if (missionId === 'mission_w') return replied('All done here.')
@@ -155,7 +156,7 @@ describe('when the last teammate in a room answers', () => {
       ]
     }
     const tasks = createRoomTasks({
-      rooms: { list: async () => [big], applyTaskOps: async () => ({ changed: [], refused: [] }), startQueued: async () => undefined },
+      rooms: { list: async () => [big], applyTaskOps: async () => ({ changed: [], refused: [] }), startQueued: async () => undefined, updateTask: async () => ({}) as never },
       ledger: {
         getMission: async (missionId) => {
           if (missionId === 'mission_w') return replied('All done here.')
