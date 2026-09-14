@@ -6,6 +6,31 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.128.0 - 2026-09-14
+
+Four fixes to yesterday's boot screen, all from watching it run.
+
+- **A slow runtime no longer looks like a broken one.** Cursor's command is
+  `cursor-agent` but its name inside Locust is `cursor`, and the screen was
+  filing the answer under the wrong one — so it sat on "still waiting" for a
+  runtime that had already replied, and then showed it connected in the table
+  underneath. The wording is calmer too: a slow answer is not a refusal.
+- **The log and the table are the same list now.** Gemini was in the log
+  saying "sign-in required" while Settings called it not built yet; it is
+  roadmap, so it is out. Antigravity was in the table having never appeared
+  in the log, because it is checked differently; it is in.
+- **Starting up is quick again.** Checking one runtime at a time made the
+  wait the sum of all of them, and on a machine where they are all installed
+  that is many seconds. They now start a beat apart and run alongside each
+  other: the log still reads in order, without the slowest one holding up
+  everybody else.
+- **A teammate's message reads in their voice wherever it is quoted.** A
+  message from one teammate shown inside another's conversation was set in
+  the interface font while their replies were not.
+- **The jump-to-bottom button sits where it should**, instead of wherever the
+  layout happened to put it, and now reads as floating above the text rather
+  than punched into it.
+
 ## 0.127.0 - 2026-09-14
 
 - **Finding your runtimes is something you can watch now.** Locust opens on a

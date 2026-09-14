@@ -200,6 +200,10 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
       runner: probeRunner,
       locator: executableLocator,
       includeOmniRoute: true,
+      // A beat between starts, so the boot log reads in order without the
+      // total becoming the sum of every probe. See the note on
+      // .
+      staggerMs: 140,
       /*
        * `started` reaches the window BEFORE the subprocess is spawned --
        * that is the whole contract. A screen told about the start and the
@@ -210,6 +214,7 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
         started: (runtime) => {
           discoveryLog.emit({
             kind: 'probe.started',
+            id: runtime.id,
             bin: runtime.bin,
             product: runtime.displayName,
             at: Date.now()
@@ -219,7 +224,7 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
           const installed = discovery.availability === 'available'
           discoveryLog.emit({
             kind: 'probe.finished',
-            bin: runtime.id,
+            id: runtime.id,
             at: Date.now(),
             outcome: bootOutcome({
               installed,
@@ -234,7 +239,39 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
         }
       }
     }),
-    antigravityProbe.discoveryRecord().catch(() => undefined)
+    /*
+     * Antigravity, announced like everything else.
+     *
+     * Its readiness is whether the app is open, so it is checked by the host
+     * rather than by a CLI probe -- and being outside the swept definitions
+     * meant it emitted no events at all. It then appeared in the settled
+     * table having never been in the log above it, while Gemini was in the
+     * log and not the table (Colin, 2026-09-14). One list, or the two
+     * disagree in front of somebody.
+     */
+    (async () => {
+      discoveryLog.emit({
+        kind: 'probe.started',
+        id: 'antigravity',
+        bin: 'antigravity',
+        product: 'Antigravity',
+        at: Date.now()
+      })
+      const record = await antigravityProbe.discoveryRecord().catch(() => undefined)
+      discoveryLog.emit({
+        kind: 'probe.finished',
+        id: 'antigravity',
+        at: Date.now(),
+        outcome: record === undefined
+          ? 'missing'
+          : bootOutcome({
+              installed: record.availability === 'available',
+              status: record.readiness === 'ready' ? 'ready' : record.readiness === 'authentication-required' ? 'auth-required' : 'other'
+            }),
+        ...(record?.version?.version === undefined ? {} : { version: record.version.version })
+      })
+      return record
+    })()
   ])
   return antigravity === undefined ? found : [...found, antigravity]
 }

@@ -36,8 +36,8 @@ describe('what the screen is made of', () => {
   it('draws one row per runtime, from the moment its command is issued', () => {
     const state = fold([
       at('started', { at: 0 }),
-      at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 100 }),
-      at('probe.started', { bin: 'claude', product: 'Claude Code', at: 600 })
+      at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 100 }),
+      at('probe.started', { id: 'claude', bin: 'claude', product: 'Claude Code', at: 600 })
     ])
     const view = bootView(state, 'probing', 900)
     expect(view.rows.map((row) => row.bin)).toEqual(['codex', 'claude'])
@@ -48,13 +48,13 @@ describe('what the screen is made of', () => {
   })
 
   it('counts elapsed from the moment the command was issued', () => {
-    const state = fold([at('started', { at: 0 }), at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 100 })])
+    const state = fold([at('started', { at: 0 }), at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 100 })])
     expect(bootView(state, 'probing', 1_600).rows[0]?.elapsed).toBe('1.5s')
   })
 
   it('stops counting and says so once a probe has taken too long', () => {
     // A counter ticking past ten seconds stops being reassurance.
-    const state = fold([at('started', { at: 0 }), at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 0 })])
+    const state = fold([at('started', { at: 0 }), at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 })])
     const view = bootView(state, 'probing', STALLED_AFTER_MS + 10)
     expect(view.rows[0]?.stalled).toBe(true)
     expect(view.showSkip).toBe(true)
@@ -63,20 +63,20 @@ describe('what the screen is made of', () => {
   it('offers no Skip until something has actually taken too long', () => {
     // A Skip from the first frame would be the screen apologising for
     // existing.
-    const state = fold([at('started', { at: 0 }), at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 0 })])
+    const state = fold([at('started', { at: 0 }), at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 })])
     expect(bootView(state, 'probing', 500).showSkip).toBe(false)
   })
 
   it('never invents a summary before discovery has finished', () => {
-    const state = fold([at('started', { at: 0 }), at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 0 })])
+    const state = fold([at('started', { at: 0 }), at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 })])
     expect(bootView(state, 'probing', 500).summary).toBe('')
   })
 
   it('says what was found, once there is something to say', () => {
     const state = fold([
       at('started', { at: 0 }),
-      at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 0 }),
-      at('probe.finished', { bin: 'codex', at: 400, outcome: 'ready', version: '0.153.0' }),
+      at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 }),
+      at('probe.finished', { id: 'codex', at: 400, outcome: 'ready', version: '0.153.0' }),
       at('finished', { at: 500, ready: 1, needsYou: 2 })
     ])
     const view = bootView(state, 'settled', 900)
@@ -88,8 +88,8 @@ describe('what the screen is made of', () => {
   it('does not claim a version it was never given', () => {
     const state = fold([
       at('started', { at: 0 }),
-      at('probe.started', { bin: 'opencode', product: 'OpenCode', at: 0 }),
-      at('probe.finished', { bin: 'opencode', at: 10, outcome: 'ready' })
+      at('probe.started', { id: 'opencode', bin: 'opencode', product: 'OpenCode', at: 0 }),
+      at('probe.finished', { id: 'opencode', at: 10, outcome: 'ready' })
     ])
     expect(bootView(state, 'settled', 20).rows[0]?.result).toBe('ready')
   })
@@ -97,9 +97,9 @@ describe('what the screen is made of', () => {
   it('a second sweep is a new log, not more rows under the old one', () => {
     const state = fold([
       at('started', { at: 0 }),
-      at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 0 }),
+      at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 }),
       at('started', { at: 900 }),
-      at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 900 })
+      at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 900 })
     ])
     expect(bootView(state, 'probing', 1_000).rows).toHaveLength(1)
   })
@@ -128,8 +128,8 @@ describe('the phases', () => {
      */
     const fast = fold([
       at('started', { at: 0 }),
-      at('probe.started', { bin: 'codex', product: 'Codex CLI', at: 0 }),
-      at('probe.finished', { bin: 'codex', at: 200, outcome: 'ready' }),
+      at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 }),
+      at('probe.finished', { id: 'codex', at: 200, outcome: 'ready' }),
       at('finished', { at: 200, ready: 1, needsYou: 0 })
     ])
     expect(fast.finished?.at).toBe(200)
@@ -150,5 +150,74 @@ describe('a path a person can read', () => {
     // long one: the point of the line is that it is the real location.
     expect(homeRelative('/var/lib/locust')).toBe('/var/lib/locust')
     expect(homeRelative('D:' + String.fromCharCode(92) + 'ledger')).toBe('D:' + String.fromCharCode(92) + 'ledger')
+  })
+})
+
+describe('the two things Colin caught on a real launch', () => {
+  /*
+   * "cursor and copilot showing as struggling to connect but they are
+   * showing green on the screen after" — and, in the same launch, "gemini is
+   * showing as not connected, even though antigravity is there".
+   *
+   * Two defects, both of the same family: one fact assembled twice.
+   */
+
+  it('finds the row for a runtime whose binary is not its id', () => {
+    /*
+     * Cursor's id is `cursor` and its command is `cursor-agent`. `started`
+     * carried the command name and `finished` carried the id, so the result
+     * never found its row: the screen sat on "still waiting" for a runtime
+     * that had answered, and then showed it green in the table underneath.
+     */
+    const state = fold([
+      at('started', { at: 0 }),
+      at('probe.started', { id: 'cursor', bin: 'cursor-agent', product: 'Cursor Agent', at: 0 }),
+      at('probe.finished', { id: 'cursor', at: 900, outcome: 'ready', version: '2026.09.10' })
+    ])
+    const view = bootView(state, 'settled', 1_000)
+    expect(view.rows).toHaveLength(1)
+    expect(view.rows[0]?.result).toBe('ready · 2026.09.10')
+    // And the row still SHOWS the command, because that is what ran.
+    expect(view.rows[0]?.bin).toBe('cursor-agent')
+    expect(view.rows[0]?.stalled).toBe(false)
+  })
+
+  it('does not report a probe result for a runtime this build cannot run', () => {
+    /*
+     * Gemini probed as "sign-in required" while Settings, two clicks away,
+     * said "Not built yet. Shown so the roadmap is visible, not because it
+     * works." Both cannot be true, and the probe result is the one that
+     * misleads: there is nothing to sign in to.
+     */
+    const state = fold([
+      at('started', { at: 0 }),
+      at('probe.started', { id: 'gemini', bin: 'gemini', product: 'Gemini CLI', at: 0 }),
+      at('probe.finished', { id: 'gemini', at: 100, outcome: 'needs-signin' }),
+      at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 100 })
+    ])
+    const view = bootView(state, 'probing', 200)
+    expect(view.rows.map((row) => row.bin)).toEqual(['codex'])
+  })
+
+  it('counts only the runtimes it is actually showing', () => {
+    // The log said "checking 4 of 6" while six rows were listed and one of
+    // them was roadmap. The denominator has to be the rows on screen.
+    const state = fold([
+      at('started', { at: 0 }),
+      at('probe.started', { id: 'gemini', bin: 'gemini', product: 'Gemini CLI', at: 0 }),
+      at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 }),
+      at('probe.finished', { id: 'codex', at: 10, outcome: 'ready' })
+    ])
+    expect(bootView(state, 'probing', 20).progress).toBe('checking 1 of 1 runtimes ')
+  })
+
+  it('keeps antigravity, which is checked by the host rather than by a CLI', () => {
+    // It was in the settled table having never appeared in the log above it.
+    const state = fold([
+      at('started', { at: 0 }),
+      at('probe.started', { id: 'antigravity', bin: 'antigravity', product: 'Antigravity', at: 0 }),
+      at('probe.finished', { id: 'antigravity', at: 50, outcome: 'ready', version: '2.11.0' })
+    ])
+    expect(bootView(state, 'settled', 60).rows.map((row) => row.product)).toEqual(['Antigravity'])
   })
 })

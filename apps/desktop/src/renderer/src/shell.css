@@ -6395,10 +6395,28 @@ textarea {
    What stays different is what IS different: it sits left rather than right,
    and it carries the sender's name above it. Attribution is a label, not a
    species. */
+/*
+ * A TEAMMATE'S WORDS ARE A TEAMMATE'S WORDS, wherever they are quoted.
+ *
+ * Colin, 2026-09-14, on a thread with both on screen: the fonts "look a bit
+ * out of place". They did, and it was one teammate in two voices -- Wembley's
+ * reply in Anthropic Serif and Jimothy's message, inches above it, in the UI
+ * sans, because this rule set no family and inherited the chrome's.
+ *
+ * The rule was already settled on 2026-09-13 and this card was simply
+ * outside it: the serif carries what a teammate says, and the sans is UI
+ * chrome only. A message from a teammate is the first thing, not the second.
+ *
+ * The SIZE stays the card's own. A peer exchange is deliberately an aside --
+ * it must not read as the mission's own answer -- and serif at the reply's
+ * full measure would make a quoted line shout louder than the reply it was
+ * quoted into.
+ */
 .lc-peer__bubble {
   padding: var(--lc-space-5) var(--lc-space-6);
   border-radius: var(--lc-radius-card);
   background: var(--lc-bg-bubble-peer);
+  font-family: var(--lc-font-prose);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   text-wrap: pretty;
@@ -8813,10 +8831,25 @@ textarea {
  * Standing, not Said: a fact about the view, so it takes the raised surface
  * and the hairline every other quiet control takes and none of the accents.
  */
+/*
+ * `align-self` did nothing here, and the pill read as a glitch.
+ *
+ * `.lc-thread` is a BLOCK container -- `flex: 1; overflow-y: auto` and no
+ * `display: flex` -- so `align-self: center` was inert, and where the pill
+ * landed horizontally was whatever the block flow gave it. Auto margins
+ * centre it in a block parent, which is what this always meant.
+ *
+ * It still floats over the end of the conversation, deliberately: that is
+ * the control's whole shape. What it did not have was any sign of being
+ * ABOVE the text rather than punched into it, so a 30px opaque disc landing
+ * mid-word looked like a rendering fault (Colin's screenshot, 2026-09-14).
+ * A ring and a real shadow say which side of the page it is on.
+ */
 .lc-jumpdown {
   position: sticky;
   bottom: var(--lc-space-4);
-  align-self: center;
+  margin-left: auto;
+  margin-right: auto;
   margin-bottom: -30px;
   z-index: 3;
   display: flex;
@@ -8829,7 +8862,7 @@ textarea {
   border-radius: 999px;
   background: var(--lc-bg-raised-2);
   color: var(--lc-text-muted);
-  box-shadow: var(--lc-shadow-pending);
+  box-shadow: 0 0 0 4px var(--lc-bg-window), var(--lc-shadow-window);
   cursor: pointer;
 }
 

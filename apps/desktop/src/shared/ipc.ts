@@ -126,10 +126,26 @@ export type DiscoveryEvent =
       readonly ledgerPath: string
       readonly ledgerOk: boolean
     }
-  | { readonly kind: 'probe.started'; readonly bin: string; readonly product: string; readonly at: number }
+  /*
+   * `id` is the KEY and `bin` is what is shown.
+   *
+   * They are not the same string and that cost a real defect: `started`
+   * carried the command name and `finished` carried the runtime id, so for
+   * every runtime where those differ -- `cursor-agent` against `cursor` --
+   * the result never found its row. Colin watched Cursor sit on "still
+   * waiting" and then appear green in the table underneath (2026-09-14).
+   * One key, named once, on both events.
+   */
+  | {
+      readonly kind: 'probe.started'
+      readonly id: string
+      readonly bin: string
+      readonly product: string
+      readonly at: number
+    }
   | {
       readonly kind: 'probe.finished'
-      readonly bin: string
+      readonly id: string
       readonly at: number
       readonly outcome: 'missing' | 'needs-signin' | 'ready' | 'error'
       readonly version?: string

@@ -1,4 +1,5 @@
 import type { DiscoveryEvent } from '../../shared/ipc.js'
+import { integrationOf } from './status.js'
 
 /**
  * The boot screen, as a value.
@@ -51,6 +52,7 @@ export interface BootState {
   readonly startedAt?: number
   readonly context?: Extract<DiscoveryEvent, { kind: 'context' }>
   readonly probes: readonly {
+    readonly id: string
     readonly bin: string
     readonly product: string
     readonly at: number
@@ -77,21 +79,23 @@ export function applyDiscoveryEvent(state: BootState, event: DiscoveryEvent): Bo
     case 'context':
       return { ...state, context: event }
     case 'probe.started':
-      // A repeat for the same binary replaces rather than appends: one row
-      // per runtime is the whole shape of the log.
+      // Keyed by ID, not by the command name: those differ for Cursor, and
+      // keying on the wrong one left its result unable to find its row.
+      // A repeat replaces rather than appends -- one row per runtime is the
+      // whole shape of the log.
       return {
         ...state,
         phase: state.phase === 'idle' ? 'probing' : state.phase,
         probes: [
-          ...state.probes.filter((probe) => probe.bin !== event.bin),
-          { bin: event.bin, product: event.product, at: event.at }
+          ...state.probes.filter((probe) => probe.id !== event.id),
+          { id: event.id, bin: event.bin, product: event.product, at: event.at }
         ]
       }
     case 'probe.finished':
       return {
         ...state,
         probes: state.probes.map((probe) =>
-          probe.bin === event.bin
+          probe.id === event.id
             ? { ...probe, outcome: event.outcome, ...(event.version === undefined ? {} : { version: event.version }) }
             : probe
         )
@@ -163,7 +167,21 @@ export function bootView(state: BootState, phase: BootPhase, now: number): BootV
     preamble.push({ key: 'scanning', value: 'PATH', tone: 'plain', tag: `${String(state.probes.length)} so far` })
   }
 
-  const rows: BootRow[] = state.probes.map((probe) => {
+  /*
+   * THE LOG LISTS WHAT THIS BUILD CAN USE.
+   *
+   * Discovery probes every definition, roadmap ones included, and the boot
+   * screen was printing their results: Colin's launch showed `gemini ...
+   * sign-in required` while Settings, two clicks away, said "Not built yet.
+   * Shown so the roadmap is visible, not because it works." Both cannot be
+   * true, and the probe result is the one that misleads -- there is nothing
+   * to sign in to.
+   *
+   * Filtered here rather than at the probe, because discovery still wants
+   * to know what is on the machine; it is this SCREEN that should not offer
+   * a fact about something the app cannot run.
+   */
+  const rows: BootRow[] = state.probes.filter((probe) => integrationOf(probe.id) !== 'planned').map((probe) => {
     const waited = Math.max(0, now - probe.at)
     return {
       bin: probe.bin,

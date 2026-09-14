@@ -444,17 +444,37 @@ export interface DiscoverInstalledRuntimesOptions {
   readonly locator: ExecutableLocator;
   readonly includeOmniRoute?: boolean;
   readonly watch?: RuntimeProbeWatcher;
+  /**
+   * Milliseconds between one probe STARTING and the next.
+   *
+   * Not between one finishing and the next starting -- see below. Zero, the
+   * default, starts them all at once, which is what every caller but the
+   * app wants.
+   */
+  readonly staggerMs?: number;
 }
 
 /**
- * SEQUENTIAL, deliberately.
+ * STAGGERED, which is what "one at a time" was actually for.
  *
- * This was `Promise.all`, which is the faster answer to the wrong question.
- * Probed in parallel every row appears at once, every elapsed counter ticks
- * together, and a log that is meant to be read becomes noise. One at a time
- * is also what a person would do by hand, which is what makes it legible.
- * The cost is a few hundred milliseconds, spent against a screen whose only
- * job is to fill that time.
+ * Three versions of this, and the reasoning matters more than the code.
+ *
+ * It was `Promise.all`. Probed all at once every row appears together,
+ * every elapsed counter ticks together, and a log meant to be read is
+ * noise. So the boot-screen handoff asked for sequential, on the stated
+ * assumption that "the total cost is a few hundred ms".
+ *
+ * MEASURED, on Colin's own machine, 2026-09-14: that assumption is false
+ * where the runtimes are actually installed. `cursor-agent` ran past six
+ * seconds and copilot was still out at 1.3s, and strictly sequential makes
+ * the total the SUM of those -- so the slowest runtime became everybody
+ * else's wait, on every launch. He felt it immediately: "maybe its taking
+ * so long because its not realizing the runtimes are connected?"
+ *
+ * The stagger keeps what sequential was FOR and drops what it cost. Each
+ * probe begins a beat after the one before it, so rows still appear one at
+ * a time, in order, and the log still reads. They then overlap, so the
+ * total is the slowest probe rather than the sum of all of them.
  */
 export async function discoverInstalledRuntimes(
   options: DiscoverInstalledRuntimesOptions,
@@ -462,18 +482,22 @@ export async function discoverInstalledRuntimes(
   const definitions = options.includeOmniRoute === false
     ? DEFINITIONS.filter((definition) => definition.id !== "omniroute")
     : DEFINITIONS;
-  const found: RuntimeDiscovery[] = [];
-  for (const definition of definitions) {
-    // Before the spawn. A watcher told afterwards learns nothing it could
-    // not have read from the result.
-    options.watch?.started({
-      id: definition.id,
-      displayName: definition.displayName,
-      bin: definition.commandName,
-    });
-    const discovery = await discoverOne(definition, options.runner, options.locator);
-    options.watch?.finished({ id: definition.id }, discovery);
-    found.push(discovery);
-  }
-  return found;
+  const stagger = options.staggerMs ?? 0;
+  return Promise.all(
+    definitions.map(async (definition, index) => {
+      if (stagger > 0 && index > 0) {
+        await new Promise((resolve) => setTimeout(resolve, stagger * index));
+      }
+      // Before the spawn. A watcher told afterwards learns nothing it could
+      // not have read from the result.
+      options.watch?.started({
+        id: definition.id,
+        displayName: definition.displayName,
+        bin: definition.commandName,
+      });
+      const discovery = await discoverOne(definition, options.runner, options.locator);
+      options.watch?.finished({ id: definition.id }, discovery);
+      return discovery;
+    }),
+  );
 }

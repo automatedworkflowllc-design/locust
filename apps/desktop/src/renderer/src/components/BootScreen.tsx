@@ -61,7 +61,20 @@ function Row({ row, settling, reduced }: { readonly row: BootRow; readonly settl
         // Past six seconds the count stops being reassurance and says so.
         <>
           <span className="lc-boot__wait" aria-hidden="true" />
-          <span className="lc-boot__elapsed">{row.stalled ? 'still waiting — the runtime has not answered' : row.elapsed}</span>
+          {/*
+            * "still waiting", not "has not answered".
+            *
+            * The first wording said the runtime had not answered, which
+            * reads as a failure -- and Colin watched Cursor say it and then
+            * appear green in the table underneath: "cursor and copilot
+            * showing as struggling to connect but they are showing green on
+            * the screen after". A slow answer is not a refusal, and the
+            * elapsed count is kept beside it so the line still says how
+            * long rather than only that it is long.
+            */}
+          <span className="lc-boot__elapsed">
+            {row.stalled ? `still waiting · ${row.elapsed}` : row.elapsed}
+          </span>
         </>
       )}
       <span className="lc-boot__result">{row.result ?? ''}</span>
