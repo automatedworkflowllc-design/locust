@@ -209,11 +209,15 @@ export const COST_NOT_REPORTED_SHORT = '—'
  *
  * So: this run's own cost, unlabelled because the line it joins is already
  * about this run; nothing at all when this run reported no number, which is
- * the honest answer for a run that never reached a model. The conversation's
- * total still has a home, but only ever with the word `conversation` on it,
- * and only where there is something earlier to add -- on a first turn the
- * two are the same number and printing it twice invites back the very
- * reading this exists to remove.
+ * the honest answer for a run that never reached a model.
+ *
+ * The conversation's total is NOT here. It was, briefly, with the word
+ * `conversation` on it -- and that is what pushed a seven-fact line past its
+ * width and truncated on Colin's screen. Design ruling, 2026-09-14: it
+ * belongs in the context ring, which is already the conversation-scoped
+ * object drawing a conversation-scoped budget, because cost and context are
+ * the same KIND of fact -- how much of a finite thing this conversation has
+ * spent. See `conversationCostLine`.
  */
 export function missionCostTail(input: {
   readonly events: readonly NormalizedRuntimeEvent[]
@@ -221,9 +225,20 @@ export function missionCostTail(input: {
   readonly running: boolean
 }): string {
   const run = costLine(runCostOf(input.events))
-  const whole = input.earlierTurns.length === 0 ? undefined : costLine(conversationCost(input.earlierTurns, input.events))
-  return (
-    (run === undefined ? '' : ' · ' + (input.running ? 'so far ' : '') + run) +
-    (whole === undefined ? '' : ' · conversation ' + whole)
-  )
+  return run === undefined ? '' : ' · ' + (input.running ? 'so far ' : '') + run
+}
+
+/**
+ * The conversation's total, for the one surface that is conversation-scoped.
+ *
+ * The context ring already answers "how much of a finite thing has this
+ * conversation spent"; cost is the same question with a different unit, so
+ * it is one row inside a hover that already exists rather than a new surface
+ * anybody has to find. Design ruling, 2026-09-14.
+ */
+export function conversationCostLine(
+  earlierTurns: readonly { readonly events: readonly NormalizedRuntimeEvent[] }[],
+  events: readonly NormalizedRuntimeEvent[]
+): string | undefined {
+  return costLine(conversationCost(earlierTurns, events))
 }

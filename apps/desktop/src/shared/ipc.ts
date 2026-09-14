@@ -499,7 +499,15 @@ export interface TeammateRoute {
 export interface PublicPeerMessage {
   readonly messageId: string
   readonly direction: 'received' | 'posted'
-  readonly from: { readonly teammateId: string; readonly name: string }
+  /**
+   * `missionId` is the sender's own mission -- the work that produced this
+   * message. The store has always carried it (`WorkroomSender.missionId`);
+   * the public shape dropped it, so the receiving side could name the
+   * teammate and not reach them. Carried now, because a message is
+   * attributable to exactly one piece of work and the reader should be able
+   * to go there.
+   */
+  readonly from: { readonly teammateId: string; readonly name: string; readonly missionId?: string }
   readonly to: { readonly teammateId: string; readonly name: string }
   readonly text: string | null
   readonly at: string

@@ -99,7 +99,7 @@ import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
 import type { ReviewMaterial } from './reviewBrief.js'
-import { costLine, latestContext, missionCostTail } from './cost.js'
+import { conversationCostLine, costLine, latestContext, missionCostTail } from './cost.js'
 import { sequenceOfPost } from './roomExchange.js'
 import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
@@ -107,7 +107,7 @@ import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
 import { splitAttachments } from '../../shared/attachments.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, runtimeOfTeammate, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
@@ -2831,6 +2831,17 @@ export default function App(): ReactElement {
    * Silence when this run reported nothing, which is the honest answer for
    * a run that never reached a model -- never a zero, which reads as free.
    */
+  /**
+   * The conversation's total, for the conversation-scoped surface.
+   *
+   * Design ruling, 2026-09-14: this does not belong in the mission strip,
+   * which is present-tense and mission-scoped. It lives beside the route
+   * chip -- inside the context ring's hover where a ring exists, and stated
+   * outright in the ring's slot where one does not, which is every runtime
+   * except Claude Code.
+   */
+  const shownConversationCost =
+    liveRun === undefined ? undefined : conversationCostLine(liveRun.earlierTurns ?? [], liveRun.events)
   const shownCostTail =
     liveRun === undefined
       ? ''
@@ -3954,7 +3965,34 @@ export default function App(): ReactElement {
                         // same way the composer's chip spells it. The exact
                         // id is in the receipt below, which is where a person
                         // goes for a string to copy.
-                        : `Mission · ${shortMissionId(liveRun.data.missionId)} · ${
+                        /*
+                         * FOUR FACTS, ONE SCOPE, ONE TENSE.
+                         *
+                         * Design ruling, 2026-09-14 (`THREE-PLACEMENTS`),
+                         * after this line truncated on Colin's screen as
+                         * "… 208 out · co…". It had grown to seven facts
+                         * because it is the most VISIBLE surface, not the
+                         * right one -- "the usual reason a strip grows".
+                         *
+                         * Three things came off. The noun `Mission ·`, which
+                         * labels the line once for a first-time reader and
+                         * costs eight characters on every render after: an
+                         * eight-hex id in mono in a header is self-evidently
+                         * an id. The permission sentence, which went NOWHERE
+                         * -- the composer's mode chip already names that mode
+                         * 300px below, where it is actionable, and "a
+                         * permission is a thing you can change, so stating it
+                         * where it cannot be changed is the app talking to
+                         * itself". And the conversation's total, to the
+                         * context ring, which is already the
+                         * conversation-scoped object drawing a
+                         * conversation-scoped budget.
+                         *
+                         * Measured by the design pass off its own render at
+                         * the inspector-open width: 884px of line in 676px of
+                         * column, down to 363px.
+                         */
+                        : `${shortMissionId(liveRun.data.missionId)} · ${
                             liveRun.data.model === undefined
                               ? 'account-default'
                               : modelDisplayName(liveRun.data.runtime, liveRun.data.model)
@@ -3964,11 +4002,11 @@ export default function App(): ReactElement {
                               : liveRun.restored === true
                                 ? 'restored from the local ledger'
                                 : liveRun.phase
-                          } · ${sandboxPhrase(liveRun.data.sandbox)}${
-                            // This run's cost, then the conversation's with
-                            // the word `conversation` on it. One function,
-                            // because the reason they must not be confused
-                            // is the whole point -- see `missionCostTail`.
+                          }${
+                            // This run's own cost. The conversation's total
+                            // is NOT here any more -- it is one row inside
+                            // the context ring's hover, the surface that was
+                            // already conversation-scoped.
                             shownCostTail
                           }`}
                       {/*
@@ -4079,6 +4117,7 @@ export default function App(): ReactElement {
                   const reached = peerRunFor(messageId, history)
                   return reached === undefined ? undefined : () => openMission(reached.missionId)
                 }}
+                onOpenSenderRun={(missionId) => () => openMission(missionId)}
                 earlierTurns={liveRun.earlierTurns ?? []}
                 coldStart={liveRun.coldStart ?? false}
                 workspacePath={workspacePath}
@@ -4245,6 +4284,7 @@ export default function App(): ReactElement {
               usageWindows={usageWindows}
             discoveryPhase={runtimeState.phase}
             {...(shownContext === undefined ? {} : { context: shownContext })}
+            {...(shownConversationCost === undefined ? {} : { conversationCost: shownConversationCost })}
             running={running}
             cancelling={liveRun?.phase === 'cancelling'}
             activeRoute={liveRun?.data}

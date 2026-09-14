@@ -75,7 +75,7 @@ export function publicPeerMessage(message: WorkroomMessage, direction: 'received
   return {
     messageId: message.messageId,
     direction,
-    from: { teammateId: message.from.teammateId, name: message.from.name },
+    from: { teammateId: message.from.teammateId, name: message.from.name, missionId: message.from.missionId },
     to: { teammateId: message.to.teammateId, name: message.to.name },
     text: message.text,
     at: message.postedAt

@@ -519,6 +519,28 @@ textarea {
   margin-top: 0;
 }
 
+/* A QUIET NOTE ABOUT THE TURN BESIDE IT -- not a boundary between turns.
+ *
+ * Design ruling, 2026-09-14, naming the rule the thread had been breaking:
+ * a marker describing the boundary BETWEEN turns is centred and full-width
+ * (time markers, handoff dividers -- both say "something changed between
+ * these two things"); a note describing the turn you are ABOUT TO READ is
+ * left-aligned in the standing register, at the reply's own left edge.
+ *
+ * The cold-start note is the second kind. It is not a boundary; it is a
+ * property of what follows. So: left rule, muted, prose size -- and
+ * deliberately NOT the marker's centring or uppercase mono, which would
+ * claim it divides something. */
+.lc-thread__note {
+  align-self: flex-start;
+  max-width: 640px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--lc-border-button);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
 .lc-thread__marker {
   text-align: center;
   font-family: var(--lc-font-mono);
@@ -3594,6 +3616,20 @@ textarea {
   display: inline-flex;
   align-items: center;
   margin-right: var(--lc-space-2);
+}
+
+/* The conversation's spend, in the ring's slot, for the runtimes that report
+ * no context window -- which is every runtime but Claude Code. Muted mono so
+ * it reads as a quantity beside the route chip rather than a control. */
+.lc-composer__spend {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--lc-space-2);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
 }
 
 .lc-send {
@@ -8767,6 +8803,29 @@ textarea {
  * When a waiting peer message was actually sent. Quiet: it is context for the
  * card beside it, not a second headline.
  */
+/* Where what arrived was WRITTEN -- the sender's own conversation.
+ *
+ * A message is what a teammate CHOSE to send; their reply may be fuller, and
+ * this is how a person reaches it without the card claiming there is more.
+ * Once per card, in the header: a link under every message is what Colin
+ * called "clunky and isn't really needed" (2026-09-06). Quiet by default,
+ * because it is an exit, not the point of the card. */
+.lc-peer__origin {
+  align-self: flex-start;
+  margin: 0 0 var(--lc-space-2) var(--lc-space-3);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+  cursor: pointer;
+}
+
+.lc-peer__origin:hover {
+  color: var(--lc-text-secondary);
+}
+
 .lc-peer__when {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);

@@ -6,6 +6,28 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.123.0 - 2026-09-14
+
+Three placements, from a design review of yesterday's fixes. Each fix was
+right and each left some surface saying one thing too many.
+
+- **The mission line fits again.** It had grown to seven facts and was
+  truncating mid-word. Off it: the word `Mission`, which labelled the line
+  once and cost eight characters on every render after; the permission
+  sentence, which the composer already states where you can actually change
+  it; and the conversation's running total, which is not a fact about one
+  mission. What is left is the mission, its model, its state and what it
+  cost.
+- **The conversation's total moved to the route chip**, where the context
+  ring already tracks what this conversation has spent — in its hover where
+  a ring is drawn, and stated outright where there is none.
+- **"Started without the earlier messages" now reads as a note**, not a
+  divider — left-ruled beside the turn it describes rather than centred like
+  a boundary between turns.
+- **A message from a teammate says who *sent* it**, and offers to open the
+  conversation it was written in. What arrives is what a teammate chose to
+  send; their own reply may be fuller, and now you can go and read it.
+
 ## 0.122.0 - 2026-09-14
 
 - **A run that never started offers to run again.** When a runtime dies

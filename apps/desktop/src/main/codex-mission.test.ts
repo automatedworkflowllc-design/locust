@@ -1507,7 +1507,7 @@ describe('the workroom around a mission', () => {
       {
         messageId: 'wm_1',
         direction: 'received',
-        from: { teammateId: 'tm_atlas', name: 'Atlas' },
+        from: { teammateId: 'tm_atlas', name: 'Atlas', missionId: 'mission_a' },
         to: { teammateId: 'tm_wren', name: 'Wren' },
         text: 'pnpm check runs everything.',
         at: NOW
@@ -1655,7 +1655,7 @@ describe('the workroom around a mission', () => {
         message: {
           messageId: 'wm_out_1',
           direction: 'posted',
-          from: { teammateId: 'tm_wren', name: 'Wren' },
+          from: { teammateId: 'tm_wren', name: 'Wren', missionId: 'mission_2' },
           to: { teammateId: 'tm_atlas', name: 'Atlas' },
           text: 'pnpm check runs build, typecheck and tests.',
           at: NOW

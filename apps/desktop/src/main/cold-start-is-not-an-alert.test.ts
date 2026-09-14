@@ -51,13 +51,31 @@ describe('where the cold-start marker is drawn', () => {
     expect(at(COLD)).toBeLessThan(at('approvals.map'))
   })
 
-  it('opens the turn, beside the time marker that already does', () => {
-    const marker = at(COLD)
+  it('follows the time marker, adjacent to it, opening the turn', () => {
+    // Design ruling, 2026-09-14: the boundary marker comes first, then the
+    // note about the turn that boundary opens. Adjacent, not merely near --
+    // anything of substance between them and it stops reading as part of
+    // the turn's opening.
     const time = at('currentMarker !== undefined')
-    expect(marker).toBeLessThan(time)
-    // Adjacent, not merely earlier: anything of substance between them and
-    // it stops reading as part of the turn's opening.
-    expect(source.slice(marker, time)).not.toContain('<ThreadItems')
+    const marker = at(COLD)
+    expect(time).toBeLessThan(marker)
+    expect(source.slice(time, marker)).not.toContain('<ThreadItems')
+  })
+
+  it('is a NOTE, not a marker: the two registers must not be confused', () => {
+    /*
+     * The rule the thread had been breaking, named by the design pass:
+     * a marker describing the boundary BETWEEN turns is centred and
+     * full-width (time markers, handoff dividers -- both say "something
+     * changed between these two things"); a note describing the turn you
+     * are ABOUT TO READ is left-aligned in the standing register.
+     *
+     * Cold start is the second kind. Wearing `lc-thread__marker` -- centred,
+     * uppercase mono -- claimed it divides something, which it does not.
+     */
+    const line = source.split(String.fromCharCode(10)).find((text) => text.includes('lc-thread__note'))
+    expect(line, 'the cold-start note must use the note register').toBeDefined()
+    expect(source.slice(at(COLD) - 400, at(COLD))).not.toContain('lc-thread__marker')
   })
 
   it('still says the thing worth saying', () => {

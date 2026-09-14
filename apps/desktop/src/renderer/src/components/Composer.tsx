@@ -27,7 +27,7 @@ import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
-import { ContextRing } from './ContextRing.js'
+import { ConversationSpend, ContextRing } from './ContextRing.js'
 import type { ContextReading } from '../cost.js'
 import { Icon } from './Icon.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
@@ -144,6 +144,8 @@ export interface ComposerProps {
    * answers the original objection: it now belongs to the control it is about.
    */
   readonly context?: ContextReading
+  /** The conversation's total spend, for the ring's hover or its slot. */
+  readonly conversationCost?: string
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
   readonly running: boolean
   readonly cancelling: boolean
@@ -241,6 +243,7 @@ export function Composer({
   limitedRuntimes,
   usageWindows,
   context,
+  conversationCost,
   discoveryPhase,
   running,
   cancelling,
@@ -1179,10 +1182,15 @@ export function Composer({
               </button>
             </div>
             <div className="lc-composer__group">
-              {context !== undefined && (
+              {context !== undefined ? (
                 <span className="lc-composer__context">
-                  <ContextRing reading={context} />
+                  <ContextRing reading={context} {...(conversationCost === undefined ? {} : { conversationCost })} />
                 </span>
+              ) : conversationCost === undefined ? null : (
+                // No ring: only Claude Code reports a context window, so on
+                // every other runtime this slot is where the conversation's
+                // spend is stated outright rather than lost.
+                <ConversationSpend cost={conversationCost} />
               )}
               <span className="lc-control__anchor" ref={pickerAnchor}>
                 {pickerOpen && (

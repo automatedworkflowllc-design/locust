@@ -26,7 +26,8 @@ export function PeerThread({
   peer,
   messages,
   teammates,
-  onOpenPeerRun
+  onOpenPeerRun,
+  onOpenSenderRun
 }: {
   /** The teammate whose mission this thread belongs to. */
   readonly self: PublicTeammate | undefined
@@ -43,6 +44,19 @@ export function PeerThread({
    * otherwise.
    */
   readonly onOpenPeerRun: (messageId: string) => (() => void) | undefined
+  /**
+   * Open the conversation a message CAME FROM -- the sender's own work.
+   *
+   * The companion to `onOpenPeerRun`, which goes the other way. A message is
+   * what a teammate chose to send, and their reply may be fuller; this is
+   * how a person reaches it without the card ever claiming there is more,
+   * which is a comparison it cannot make (design ruling, 2026-09-14).
+   *
+   * Once per card, in the header, deliberately NOT under each message: a
+   * link under every message is exactly what Colin called "clunky and isn't
+   * really needed" on 2026-09-06, and that objection still stands.
+   */
+  readonly onOpenSenderRun?: (missionId: string) => () => void
 }): ReactElement {
   // A short exchange opens itself. The collapse exists so a long aside does
   // not read as the mission's own work; an ask-and-answer pair is not that,
@@ -96,6 +110,21 @@ export function PeerThread({
       ? sentAgo
       : undefined
 
+  /*
+   * The sender's own mission, from the newest message that came FROM them.
+   * `missionId` has always been on `WorkroomSender`; it simply was not
+   * carried into the public shape until now, so the receiving side could
+   * name a teammate and not reach them.
+   */
+  const senderMissionId = [...messages]
+    .reverse()
+    .find((message) => message.direction === 'received' && message.from.missionId !== undefined)
+    ?.from.missionId
+  const senderRun =
+    senderMissionId === undefined || onOpenSenderRun === undefined
+      ? undefined
+      : onOpenSenderRun(senderMissionId)
+
   const hueFor = (teammateId: string): TeammateHue =>
     teammateId === self?.teammateId
       ? self.hue
@@ -117,6 +146,13 @@ export function PeerThread({
         {waited !== undefined && <span className="lc-peer__when lc-mono">sent {waited}</span>}
         {!open && snippet !== undefined && <span className="lc-peer__snippet">{snippet}</span>}
       </button>
+      {senderRun !== undefined && (
+        // Where what arrived was WRITTEN. One per card, in the header, so the
+        // message bubbles keep the one affordance they already had.
+        <button type="button" className="lc-peer__origin" onClick={senderRun}>
+          Open {peer.name}&apos;s conversation <span aria-hidden="true">↗</span>
+        </button>
+      )}
       {open && (
         <>
           {messages.map((message) => {
@@ -129,7 +165,27 @@ export function PeerThread({
                   {/* The pill above already names the sender when every
                     * message came from one side, which is the ordinary case. */}
                   {onlyFrom === undefined && (
-                    <div className={`lc-peer__author is-${hue}`}>{message.from.name}</div>
+                    /*
+                     * "Yurt SENT", not "Yurt".
+                     *
+                     * Colin, 2026-09-14, reading a condensed message whose
+                     * sender's own conversation held a fuller answer: "his
+                     * entire reply wasnt posted". Nothing was cut -- the cap
+                     * is 1,200 characters and the message was about 200 --
+                     * the teammate chose what to pass on, which is the
+                     * design.
+                     *
+                     * So the fix is not a sentence saying there might be
+                     * more; that claim needs a comparison this card cannot
+                     * make. It is one word of attribution. Design ruling,
+                     * 2026-09-14: the two directions are not symmetric. The
+                     * reverse sentence exists because NOTHING arrived, and an
+                     * absence cannot explain itself. Here something did
+                     * arrive, and presence does not need explaining -- it
+                     * needs attributing. He thought he was reading Yurt's
+                     * REPLY; he was reading Yurt's MESSAGE.
+                     */
+                    <div className={`lc-peer__author is-${hue}`}>{message.from.name} sent</div>
                   )}
                   {/*
                     * The message itself is the way to the conversation it

@@ -348,6 +348,8 @@ export interface ThreadProps {
   readonly onRunWithEdits?: () => void
   /** Offered only where the runtime never started, so nothing can repeat. */
   readonly onRunAgain?: () => void
+  /** Open the conversation a received message was written in. */
+  readonly onOpenSenderRun?: (missionId: string) => () => void
   /** Whether that run was asked to PLAN rather than do; the offer then reads as the build step. */
   readonly wasPlan?: boolean
   /**
@@ -440,6 +442,7 @@ export function Thread({
   coldStart = false,
   onRunWithEdits,
   onRunAgain,
+  onOpenSenderRun,
   wasPlan,
   onAnswer,
   onResume,
@@ -558,6 +561,7 @@ export function Thread({
       messages={card.group.messages}
       teammates={peers.teammates}
       onOpenPeerRun={onOpenPeerRun}
+      {...(onOpenSenderRun === undefined ? {} : { onOpenSenderRun })}
     />
   )
   const cardsFor = (turnIndex: number, placement: ThreadPeerCard['placement']): readonly ThreadPeerCard[] =>
@@ -638,6 +642,9 @@ export function Thread({
           )
         })}
 
+        {currentMarker !== undefined && (
+          <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
+        )}
         {coldStart && (
           /*
            * WHERE THIS TURN BEGAN, said where the turn begins.
@@ -655,14 +662,11 @@ export function Thread({
            * fact about where this turn started, and it belongs beside the
            * time marker that opens the turn, above the work it describes.
            */
-          <div className="lc-thread__marker lc-mono">
+          <div className="lc-thread__note">
             Started without the earlier messages — the turn before this one left no session to resume
           </div>
         )}
 
-        {currentMarker !== undefined && (
-          <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
-        )}
         {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }))}
 
         {handoff !== undefined && (
