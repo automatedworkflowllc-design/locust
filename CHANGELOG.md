@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.120.0 - 2026-09-14
+
+- **A runtime that cannot save its own settings file now says so in English.**
+  Asking one Cursor teammate to ask another could end the run with two
+  absolute paths, a uuid and "EPERM: operation not permitted" — which reads
+  like Locust was refused something in your project. It wasn't: `cursor-agent`
+  rewrites its own config in your home folder each time it starts, and on
+  Windows that fails while a second copy of it still has the file open, which
+  is exactly what a message between two Cursor teammates causes. The card now
+  says whose file it was, that nothing in your workspace was denied, and that
+  running it again usually works. It deliberately does not claim your
+  workspace is untouched — the run died somewhere, and nothing here knows
+  where.
+
 ## 0.119.0 - 2026-09-14
 
 A second outside audit drove the same build again and re-ran every original

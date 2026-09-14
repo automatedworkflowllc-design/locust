@@ -2373,6 +2373,46 @@ const EXHAUSTION_PATTERNS = [
 ] as const
 
 /**
+ * A runtime that could not write its OWN settings file.
+ *
+ * Colin, 2026-09-14, 0.119.0, on a peer message between two Cursor
+ * teammates -- "this def used to work":
+ *
+ *   Cursor Agent ended without a terminal result record. The runtime's own
+ *   last word was: Error: EPERM: operation not permitted, rename
+ *   'C:\Users\...\.cursor\cli-config.json.19620.<uuid>.tmp' ->
+ *   'C:\Users\...\.cursor\cli-config.json'
+ *
+ * Which is two absolute paths, a uuid and a POSIX errno to say something a
+ * person could act on in one sentence. `cursor-agent` rewrites that file on
+ * startup by writing a temp beside it and renaming over the top, and on
+ * WINDOWS that rename fails with EPERM while another process still has the
+ * destination open. Asking one teammate to ask another starts a second
+ * `cursor-agent` while the first is live, so the room features are exactly
+ * what provokes it. There were thirteen abandoned `.tmp` files beside that
+ * config dating back to 2026-09-02, so it is intermittent and old, not new.
+ *
+ * This is NOT Locust's file and not the person's workspace -- it is the
+ * runtime's own config in their home folder -- and that is the fact the
+ * sentence has to carry, because "operation not permitted" reads like a
+ * permissions problem with THEIR project.
+ *
+ * Deliberately says nothing about whether the workspace was touched. The run
+ * died somewhere and this cannot know where; a reassuring second clause that
+ * turns out to be wrong is worse than the bare sentence it replaced.
+ */
+const CONFIG_LOCKED_PATTERNS = [/\bEPERM\b/i, /\boperation not permitted\b/i] as const
+
+/** The runtime's own settings file, as each CLI names it on disk. */
+const RUNTIME_CONFIG_FILES = ['cli-config.json', 'config.json', 'settings.json', 'auth.json'] as const
+
+function isLockedRuntimeConfig(said: string): boolean {
+  if (!said.toLowerCase().includes('rename')) return false
+  if (!CONFIG_LOCKED_PATTERNS.some((pattern) => pattern.test(said))) return false
+  return RUNTIME_CONFIG_FILES.some((name) => said.includes(name))
+}
+
+/**
  * Terminal colour codes, stripped.
  *
  * A runtime writes stderr for a terminal, so its own last word arrives
@@ -2417,6 +2457,9 @@ export function failureMessage(payload: {
   if (said === undefined) return payload.message
   if (EXHAUSTION_PATTERNS.some((pattern) => pattern.test(said))) {
     return `${payload.message} The runtime reported that it is out of capacity right now — its own limit, not this machine's: ${said}`
+  }
+  if (isLockedRuntimeConfig(said)) {
+    return `${payload.message} It could not save its own settings file, which another run of the same runtime had open — that file is the runtime's own, in your home folder, and nothing in this workspace was denied to it. Starting the run again usually works.`
   }
   return `${payload.message} The runtime's own last word was: ${said}`
 }
