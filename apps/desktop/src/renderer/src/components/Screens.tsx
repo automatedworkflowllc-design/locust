@@ -27,7 +27,8 @@ import {
   missionPhaseView,
   modeLabel,
   prunePreviewSummary,
-  routeRowStatus
+  routeRowStatus,
+  runtimeListOrder
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
 import { PixelFace } from './PixelFace.js'
@@ -1048,7 +1049,12 @@ export function SettingsScreen({
               * first, which is what a person with a working setup wants.
               */}
             {(runtimes.some((runtime) => runtime.installed)
-              ? runtimes
+              ? // What you can use, first. Frame pass, 2026-09-15: two
+                // runtimes that do not exist yet sat in the middle of six
+                // that do, so the list had to be read tag by tag.
+                runtimeListOrder(runtimes, (runtime) =>
+                  routeRowStatus(runtime, integrationOf(runtime.id), false, limitedRuntimes.get(runtime.id)).tag
+                )
               : [...runtimes].sort((left, right) =>
                   left.id === FREE_START_RUNTIME ? -1 : right.id === FREE_START_RUNTIME ? 1 : 0
                 )

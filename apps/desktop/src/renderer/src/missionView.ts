@@ -1742,6 +1742,28 @@ export function buildThread(
      * tool, and "using a connector - get_watchlists - Robinhood" is what a
      * person would say about it.
      */
+    /*
+     * ONE CLOCK FOR THE TURN, and the phase is a label on it.
+     *
+     * Two captures of one running turn, seconds apart, in the frame pass of
+     * 2026-09-15:
+     *
+     *     starting ... - 3s
+     *     working  -    0s
+     *
+     * The counter restarted when the register changed, because each branch
+     * below timed from its own beginning. That is the one thing an elapsed
+     * counter must never do, and it is worse here than in most apps: this
+     * number is how a person tells a slow runtime from a hung one.
+     *
+     * The bottom branch already ran from the turn's start and said why --
+     * "a number that only ever climbs cannot be mistaken for one" -- and the
+     * other two did not. Now all three share this.
+     *
+     * A tool's own duration is not lost; the trace states it per call, where
+     * it is a fact about that call rather than a clock a person is watching.
+     */
+    const turnStartedAt = options.startedAt ?? events[0]?.occurredAt ?? events.at(-1)?.occurredAt
     const openToolId = [...openTools.keys()].at(-1)
     const openTool = openToolId === undefined ? undefined : openTools.get(openToolId)
     const openToolMeta = openToolId === undefined ? undefined : openToolAt.get(openToolId)
@@ -1751,7 +1773,7 @@ export function buildThread(
         type: 'live-step',
         label: openTool.name,
         detail: openToolMeta.connector,
-        startedAt: openToolMeta.at,
+        startedAt: turnStartedAt ?? openToolMeta.at,
         kind: 'item',
         register: openToolMeta.connector === undefined ? 'tool' : 'connector'
       })
@@ -1761,7 +1783,7 @@ export function buildThread(
         type: 'live-step',
         label: runningStep.label,
         detail: runningStep.detail,
-        startedAt: runningStep.startedAt,
+        startedAt: turnStartedAt ?? runningStep.startedAt,
         kind: runningStep.kind,
         register: runningStep.register,
         ...(runningStep.kind === 'reasoning' ? { waiting: true } : {})
@@ -1785,7 +1807,7 @@ export function buildThread(
       // and Colin watched one count to 10 and start over, repeatedly, which
       // reads as a stuck loop rather than a run making progress. A number that
       // only ever climbs cannot be mistaken for one.
-      const since = options.startedAt ?? events[0]?.occurredAt ?? events.at(-1)?.occurredAt
+      const since = turnStartedAt
       if (since !== undefined) {
         items.push({
           key: 'live-step',

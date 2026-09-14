@@ -4520,7 +4520,11 @@ export default function App(): ReactElement {
             [
               {
                 id: 'go-workroom',
-                group: 'Go to',
+                // Its own group, because it is a promotion rather than an
+                // accident of ordering: the workroom is the likeliest thing
+                // anybody opening this wants, and a name says why it is
+                // first (frame pass, 2026-09-15).
+                group: 'This conversation',
                 label: 'Workroom',
                 run: () => setScreen('workroom')
               },

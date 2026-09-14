@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.129.0 - 2026-09-14
+
+Three from a design pass over the screenshots — each one visible in a frame
+and invisible in the source.
+
+- **The elapsed counter no longer runs backwards.** A turn showed `starting ·
+  3s` and then `working · 0s`, because the clock restarted whenever the phase
+  changed. It runs from the start of the turn now and the phase is a label on
+  it. That number is how you tell a slow runtime from a stuck one, so it must
+  only ever climb.
+- **The command palette prints each heading once.** `GO TO` appeared twice,
+  because Workroom sat in that group with an unrelated row between it and the
+  rest. Workroom now has its own heading at the top — it is first because it
+  is the likeliest thing you want, and now it looks deliberate.
+- **Settings lists what you can use first.** Two runtimes that are not built
+  yet were sitting in the middle of six that are, so the list had to be read
+  tag by tag. Ready, then experimental, then needs-sign-in, then not
+  installed, then roadmap — alphabetical inside each, so it does not shuffle
+  between launches.
+
 ## 0.128.0 - 2026-09-14
 
 Four fixes to yesterday's boot screen, all from watching it run.

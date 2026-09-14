@@ -40,6 +40,36 @@ export function CommandPalette({
     return actions.filter((action) => `${action.group} ${action.label}`.toLowerCase().includes(needle))
   }, [actions, query])
 
+  /*
+   * GROUPED BY SORTING, not by suppressing a repeat.
+   *
+   * The header was emitted whenever the group changed, which is right for a
+   * sorted list and wrong for an unsorted one: `Workroom` sat in `Go to`,
+   * the swarm action sat between it and the rest of `Go to`, and the group
+   * broke and re-opened -- so the palette printed `GO TO` twice (frame pass,
+   * 2026-09-15).
+   *
+   * Suppressing the repeated header was the other option and it is worse: it
+   * leaves `Workroom` orphaned above an unrelated row, and the reason it is
+   * first is that it is the most likely action. That would read as a mistake
+   * rather than as a promotion.
+   *
+   * Group order is the order each group FIRST appears in the actions, and
+   * order within a group is untouched, so the caller still decides both and
+   * a duplicate header becomes structurally impossible.
+   *
+   * THIS is the list, not `matches`: the arrow keys, the highlight and Enter
+   * all index it, and a palette whose selection and rendering disagree would
+   * run the row above or below the one lit up.
+   */
+  const grouped = useMemo(() => {
+    const order = new Map<string, number>()
+    for (const action of matches) {
+      if (!order.has(action.group)) order.set(action.group, order.size)
+    }
+    return [...matches].sort((left, right) => (order.get(left.group) ?? 0) - (order.get(right.group) ?? 0))
+  }, [matches])
+
   useEffect(() => {
     setIndex(0)
   }, [query])
@@ -52,17 +82,17 @@ export function CommandPalette({
     }
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setIndex((current) => (matches.length === 0 ? 0 : (current + 1) % matches.length))
+      setIndex((current) => (grouped.length === 0 ? 0 : (current + 1) % grouped.length))
       return
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault()
-      setIndex((current) => (matches.length === 0 ? 0 : (current - 1 + matches.length) % matches.length))
+      setIndex((current) => (grouped.length === 0 ? 0 : (current - 1 + grouped.length) % grouped.length))
       return
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      const action = matches[index]
+      const action = grouped[index]
       if (action !== undefined) {
         onClose()
         action.run()
@@ -91,12 +121,12 @@ export function CommandPalette({
           </button>
         </div>
         <div className="lc-palette__list">
-          {matches.length === 0 ? (
+          {grouped.length === 0 ? (
             <p className="lc-inspector__empty" style={{ padding: '10px' }}>
               Nothing matches that.
             </p>
           ) : (
-            matches.map((action, position) => {
+            grouped.map((action, position) => {
               const header = action.group === lastGroup ? undefined : action.group
               lastGroup = action.group
               return (

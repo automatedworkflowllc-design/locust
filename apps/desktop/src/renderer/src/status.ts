@@ -1303,3 +1303,35 @@ export function startRoute(
   if (model?.variants !== undefined) return { model: modelId }
   return { model: modelId, effort }
 }
+
+/**
+ * The order runtimes read in on a settings list.
+ *
+ * `READY` → `EXPERIMENTAL` → `SIGN IN` → `NOT INSTALLED` → `PLANNED`, and
+ * alphabetical inside each band so the order is stable between launches.
+ *
+ * Frame pass, 2026-09-15: the list ran Codex READY, Claude READY, Cursor
+ * READY, **Gemini PLANNED**, OpenCode READY, Copilot READY, **OmniRoute
+ * PLANNED**, Antigravity EXPERIMENTAL. Two things that do not exist sat in
+ * the middle of six that do, so a person scanning for what they can use had
+ * to read every tag. The picker already groups connected-first; Settings was
+ * the one list not doing it.
+ */
+const RUNTIME_BAND: Readonly<Record<string, number>> = {
+  READY: 0,
+  EXPERIMENTAL: 1,
+  'SIGN IN': 2,
+  'AT LIMIT': 2,
+  'NOT INSTALLED': 3,
+  PLANNED: 4
+}
+
+export function runtimeListOrder(
+  runtimes: readonly PublicRuntimeStatus[],
+  tagOf: (runtime: PublicRuntimeStatus) => string
+): readonly PublicRuntimeStatus[] {
+  return [...runtimes].sort((left, right) => {
+    const band = (RUNTIME_BAND[tagOf(left)] ?? 3) - (RUNTIME_BAND[tagOf(right)] ?? 3)
+    return band !== 0 ? band : left.displayName.localeCompare(right.displayName)
+  })
+}
