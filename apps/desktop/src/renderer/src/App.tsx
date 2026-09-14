@@ -51,6 +51,7 @@ import { createFrameBatcher } from './streamFrames.js'
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
+import { signInCommand } from '../../shared/runtime-install.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
@@ -106,7 +107,7 @@ import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
 import { splitAttachments } from '../../shared/attachments.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, runtimeOfTeammate, sandboxPhrase, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
@@ -3462,7 +3463,8 @@ export default function App(): ReactElement {
     const owned = sidebarMissions.filter(
       (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
     )
-    const theirRuntime = owned.find((mission) => mission.phase === 'running')?.runtime ?? owned.at(0)?.runtime
+    // One resolver for every surface; see `runtimeOfTeammate`.
+    const theirRuntime = runtimeOfTeammate(teammate, owned)
     viewByTeammate[teammate.teammateId] = teammateStatusView({
       runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
       anyRuntimeUsable: runtimes.some(runtimeIsUsable),
@@ -3781,6 +3783,34 @@ export default function App(): ReactElement {
               <IdleTeammate
                 teammate={pickedTeammate ?? selectedTeammate ?? teammates[0]!}
                 canStart={busyRun === undefined}
+                /*
+                 * Whether THIS teammate can actually start, which this screen
+                 * did not know at all.
+                 *
+                 * `canStart` above is only "no mission is running"; the screen
+                 * was drawn whenever ANY runtime was ready. So a Claude
+                 * teammate on a machine where Claude is signed out got the
+                 * ordinary welcome and a row of starter buttons that could
+                 * not work, while Settings said the opposite in red two
+                 * clicks away (Astra's Finding 1, 2026-09-14).
+                 */
+                blocked={(() => {
+                  const who = pickedTeammate ?? selectedTeammate ?? teammates[0]!
+                  const view = viewByTeammate[who.teammateId]
+                  if (view?.status !== 'blocked') return undefined
+                  const theirs = runtimeOfTeammate(
+                    who,
+                    sidebarMissions.filter(
+                      (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === who.teammateId
+                    )
+                  )
+                  const command = theirs === undefined ? undefined : signInCommand(theirs)
+                  const named =
+                    theirs === undefined || !isMissionRuntime(theirs) ? 'Their runtime' : runtimeDisplayName(theirs)
+                  return command === undefined
+                    ? `${named} is not signed in, so ${who.name} cannot start yet.`
+                    : `${named} is not signed in, so ${who.name} cannot start yet. In a terminal: ${command}`
+                })()}
                 mode={mode}
                 onStarter={(prompt) => {
                   void startMission(prompt)

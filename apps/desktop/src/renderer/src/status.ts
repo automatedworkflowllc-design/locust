@@ -336,6 +336,38 @@ export interface TeammateStatusView {
   readonly pulse: boolean
 }
 
+/**
+ * Which runtime a teammate is judged against, decided in ONE place.
+ *
+ * Their running mission's, then any past mission's, then the route they are
+ * SET to use. That last step is Astra's Finding 1 (2026-09-14) and it was
+ * missing from all three surfaces identically, because all three wrote this
+ * chain out by hand.
+ *
+ * What she saw: a brand-new Claude teammate on a profile where Claude is not
+ * signed in. Settings said, correctly and in red, "Installed, but Claude Code
+ * is not signed in", with `run claude` beside it. The sidebar said
+ * "Docs & QA - idle". Idle is the word for a teammate with nothing to do; this
+ * one could not do anything, the app knew, and the surface a person looks at
+ * first said the wrong word.
+ *
+ * The cause is that a teammate's runtime was read from its MISSIONS, and a
+ * teammate that has never run has none -- so the sign-in check was skipped for
+ * exactly the teammates a person is most likely to be looking at, the ones
+ * they just made. 0.109.0 made all three surfaces draw the same dot; this is
+ * the state behind the dot, which was wrong everywhere equally.
+ */
+export function runtimeOfTeammate(
+  teammate: { readonly route?: { readonly runtime: string } },
+  owned: readonly { readonly phase: string; readonly runtime?: string }[]
+): string | undefined {
+  return (
+    owned.find((mission) => mission.phase === 'running')?.runtime ??
+    owned.find((mission) => mission.runtime !== undefined)?.runtime ??
+    teammate.route?.runtime
+  )
+}
+
 export function teammateStatusView(input: {
   /**
    * The runtime this teammate's own work is on, when they have any. A
@@ -368,7 +400,9 @@ export function teammateStatusView(input: {
   }
   // A teammate whose OWN runtime cannot run is blocked, even if a mission
   // looks active in the renderer -- the sign-in wall outranks optimistic
-  // local state. One with no runtime of their own is simply idle.
+  // local state. One with no runtime AND no route is simply idle; see
+  // `runtimeOfTeammate` for why "no missions yet" used to mean the same
+  // thing and should not have.
   if (input.runtime !== undefined && !runtimeIsUsable(input.runtime)) {
     return {
       status: 'blocked',

@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.113.0 - 2026-09-14
+
+- **A teammate whose runtime is signed out no longer says "idle".** If you made
+  a Claude teammate on a machine where Claude is not signed in, the sidebar
+  said "idle" while Settings said, correctly and in red, that Claude is not
+  signed in. It now says "Runtime sign-in required" everywhere, with the red
+  dot, on the sidebar, the Team roster and the workroom header.
+- **Their welcome screen says it too, with the command.** It used to offer
+  starter buttons that could not work. It now says which runtime is signed out
+  and what to run, and the buttons are disabled rather than misleading.
+- **A mission waiting on your approval is still its own thing.** Amber, and
+  worded as a decision waiting for you — not folded in with a sign-in wall,
+  which is the app's problem rather than yours.
+
 ## 0.112.0 - 2026-09-14
 
 - **A review sees the whole conversation, not just the last turn.** If a

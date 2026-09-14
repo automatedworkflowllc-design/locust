@@ -16,6 +16,7 @@ import {
   missionsMatching,
   runtimeIsUsable,
   shortMissionId,
+  runtimeOfTeammate,
   teammateStatusView
 } from '../status.js'
 import { PixelFace } from './PixelFace.js'
@@ -384,15 +385,16 @@ export function Sidebar({
           // status still comes from ALL their work: a teammate does not stop
           // working because someone typed in a box.
           const shownOwned = missionsMatching(owned, query)
-          // The runtime this teammate's own work is on. Asking about Codex
-          // for everyone told a person their teammate needed a sign-in while
-          // she was visibly working on Claude Code.
-          const theirRuntime = owned.find((mission) => mission.phase === 'running')?.runtime
-            ?? owned.at(0)?.runtime
+          // The runtime this teammate's own work is on, or is set to use.
+          // Asking about Codex for everyone told a person their teammate
+          // needed a sign-in while she was visibly working on Claude Code;
+          // asking only their MISSIONS said "idle" for a teammate that had
+          // never run and could not. See `runtimeOfTeammate`.
+          const theirRuntime = runtimeOfTeammate(teammate, owned)
           const status = teammateStatusView({
-            // A teammate with no work of their own is judged by nothing in
-            // particular, so the roster says idle rather than borrowing some
-            // other runtime's sign-in state.
+            // A teammate with no work AND no route of their own is judged by
+            // nothing in particular, so the row says idle rather than
+            // borrowing some other runtime's sign-in state.
             runtime: theirRuntime === undefined
               ? undefined
               : runtimes.find((entry) => entry.id === theirRuntime),
@@ -603,7 +605,7 @@ export function Sidebar({
           const theirs = missions.filter(
             (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === open.teammateId
           )
-          const theirRuntime = theirs.find((mission) => mission.phase === 'running')?.runtime ?? theirs.at(0)?.runtime
+          const theirRuntime = runtimeOfTeammate(open, theirs)
           const status = teammateStatusView({
             runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
             anyRuntimeUsable: runtimes.some(runtimeIsUsable),

@@ -66,11 +66,21 @@ const STARTERS: Readonly<Record<TeammateRole, readonly string[]>> = {
 export function IdleTeammate({
   teammate,
   canStart,
+  blocked,
   onStarter,
   mode
 }: {
   readonly teammate: PublicTeammate
   readonly canStart: boolean
+  /**
+   * Why this teammate cannot start at all, when it cannot -- the runtime is
+   * installed and signed out. Absent when it can.
+   *
+   * Separate from `canStart`, which only means a mission is already running.
+   * Conflating them is what let this screen offer starter buttons to a
+   * teammate whose runtime was signed out (Astra's Finding 1, 2026-09-14).
+   */
+  readonly blocked?: string
   readonly onStarter: (prompt: string) => void
   /** The composer's current permission mode: the sentence below must say what THIS mode does. */
   readonly mode: MissionMode
@@ -92,7 +102,7 @@ export function IdleTeammate({
               key={prompt}
               type="button"
               className="lc-starter"
-              disabled={!canStart}
+              disabled={!canStart || blocked !== undefined}
               onClick={() => onStarter(prompt)}
             >
               {prompt}
@@ -100,10 +110,12 @@ export function IdleTeammate({
           ))}
         </div>
 
-        <p className="lc-footnote">
-          {canStart
-            ? 'Pick one, or describe a mission below.'
-            : 'Connect a runtime to start a mission.'}
+        <p className={`lc-footnote${blocked === undefined ? '' : ' lc-tone-red'}`}>
+          {blocked !== undefined
+            ? blocked
+            : canStart
+              ? 'Pick one, or describe a mission below.'
+              : 'Connect a runtime to start a mission.'}
         </p>
       </div>
     </div>
