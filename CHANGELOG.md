@@ -12,6 +12,10 @@ Dates are when the build was cut. Versions are the number Settings shows.
   transparent was not enough: the page drawn on it painted its own
   background, so the window was see-through and its contents were not. The
   loading screen is now the monitor and its own edge, on your desktop.
+- **A conversation's turn count keeps clear of its menu.** The `…` that
+  appears on hover sits over the right edge of the row, and the count was
+  underneath it — so the number and the dots shared the same spot. The row
+  reserves that space now, rather than the count trying to dodge it.
 
 ## 0.132.0 - 2026-09-14
 

@@ -4712,11 +4712,24 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/*
+ * ROOM FOR THE MENU, always.
+ *
+ * `.lc-teammate__missionmenu` is absolutely positioned at `right: 4px` and
+ * only appears on hover, so the row's own content ran all the way under it
+ * -- and the turn count, being last, sat exactly where the `...` lands.
+ * Colin twice: the count "blending with the dots", then "that random 15 is
+ * still hovering near the triple dots".
+ *
+ * Adding a gap to the count was treating the symptom; the row simply had no
+ * space reserved for a control that is always there and usually invisible.
+ * 22px of button, 4px of offset, and a little air.
+ */
 .lc-teammate__mission {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 5px var(--lc-space-4);
+  padding: 5px 32px 5px var(--lc-space-4);
   border: 0;
   border-radius: var(--lc-radius-control);
   background: transparent;
@@ -4744,7 +4757,6 @@ textarea {
  */
 .lc-teammate__turns {
   margin-left: var(--lc-space-3);
-  padding-left: var(--lc-space-2);
   flex: none;
   font-size: var(--lc-text-mono-label);
   font-variant-numeric: tabular-nums;
