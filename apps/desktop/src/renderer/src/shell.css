@@ -9452,24 +9452,6 @@ textarea {
   background: var(--lc-green);
 }
 
-.lc-boot__skip {
-  position: absolute;
-  right: 28px;
-  bottom: 28px;
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--lc-border-control);
-  border-radius: var(--lc-radius-control);
-  background: var(--lc-bg-control);
-  color: var(--lc-text-control-fg);
-  font-size: var(--lc-text-description);
-  cursor: pointer;
-}
-
-.lc-boot__skip:hover {
-  border-color: var(--lc-border-hover);
-}
-
 @keyframes lcBootFlicker {
   0%,
   100% {

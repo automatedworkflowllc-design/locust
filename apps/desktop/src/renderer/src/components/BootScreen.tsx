@@ -174,20 +174,6 @@ export function BootScreen({
         <span className={`lc-boot__led${view.phase === 'settled' || view.phase === 'dissolving' ? ' is-done' : ''}`} aria-hidden="true" />
       </div>
 
-      {view.showSkip && (
-        // Only once something has actually taken too long. A Skip offered
-        // immediately would be the screen apologising for existing.
-        <button
-          type="button"
-          className="lc-boot__skip"
-          onClick={(event) => {
-            event.stopPropagation()
-            onSkip()
-          }}
-        >
-          Skip
-        </button>
-      )}
     </div>
   )
 }

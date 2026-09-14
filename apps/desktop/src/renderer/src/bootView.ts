@@ -44,7 +44,6 @@ export interface BootView {
   readonly progress: string
   readonly summary: string
   readonly allAnswered: boolean
-  readonly showSkip: boolean
 }
 
 export interface BootState {
@@ -163,9 +162,6 @@ export function bootView(state: BootState, phase: BootPhase, now: number): BootV
       tag: context.ledgerOk ? 'ok' : 'not writable'
     })
   }
-  if (state.probes.length > 0) {
-    preamble.push({ key: 'scanning', value: 'PATH', tone: 'plain', tag: `${String(state.probes.length)} so far` })
-  }
 
   /*
    * THE LOG LISTS WHAT THIS BUILD CAN USE.
@@ -194,6 +190,13 @@ export function bootView(state: BootState, phase: BootPhase, now: number): BootV
     }
   })
 
+  // AFTER the rows, and counting THEM: it said "8 so far" above six rows,
+  // because it was counting every probe including the roadmap ones the list
+  // does not show (Colin's launch, 2026-09-14).
+  if (rows.length > 0) {
+    preamble.push({ key: 'scanning', value: 'PATH', tone: 'plain', tag: `${String(rows.length)} so far` })
+  }
+
   const answered = rows.filter((row) => row.result !== undefined).length
   const finished = state.finished
   const summary =
@@ -207,10 +210,7 @@ export function bootView(state: BootState, phase: BootPhase, now: number): BootV
     rows,
     progress: `checking ${String(answered)} of ${String(rows.length)} runtimes `,
     summary,
-    allAnswered: rows.length > 0 && answered === rows.length,
-    // Offered only once something has actually taken too long. A Skip shown
-    // from the first frame would be the screen apologising for existing.
-    showSkip: rows.some((row) => row.stalled)
+    allAnswered: rows.length > 0 && answered === rows.length
   }
 }
 

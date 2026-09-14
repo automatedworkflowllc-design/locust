@@ -55,16 +55,26 @@ describe('what the screen is made of', () => {
   it('stops counting and says so once a probe has taken too long', () => {
     // A counter ticking past ten seconds stops being reassurance.
     const state = fold([at('started', { at: 0 }), at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 })])
-    const view = bootView(state, 'probing', STALLED_AFTER_MS + 10)
-    expect(view.rows[0]?.stalled).toBe(true)
-    expect(view.showSkip).toBe(true)
+    expect(bootView(state, 'probing', STALLED_AFTER_MS + 10).rows[0]?.stalled).toBe(true)
+    expect(bootView(state, 'probing', 500).rows[0]?.stalled).toBe(false)
   })
 
-  it('offers no Skip until something has actually taken too long', () => {
-    // A Skip from the first frame would be the screen apologising for
-    // existing.
-    const state = fold([at('started', { at: 0 }), at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 })])
-    expect(bootView(state, 'probing', 500).showSkip).toBe(false)
+  it('counts the runtimes it shows, not every probe that ran', () => {
+    /*
+     * It said "8 so far" above six rows, because it counted every probe
+     * including the roadmap ones the list does not show (Colin's launch,
+     * 2026-09-14). The preamble and the list have to agree; they are the
+     * same fact twice otherwise.
+     */
+    const state = fold([
+      at('started', { at: 0 }),
+      at('probe.started', { id: 'codex', bin: 'codex', product: 'Codex CLI', at: 0 }),
+      at('probe.started', { id: 'gemini', bin: 'gemini', product: 'Gemini CLI', at: 0 }),
+      at('probe.started', { id: 'omniroute', bin: 'omniroute', product: 'OmniRoute', at: 0 })
+    ])
+    const view = bootView(state, 'probing', 100)
+    expect(view.rows).toHaveLength(1)
+    expect(view.preamble.find((line) => line.key === 'scanning')?.tag).toBe('1 so far')
   })
 
   it('never invents a summary before discovery has finished', () => {

@@ -20,6 +20,16 @@ and invisible in the source.
   because Workroom sat in that group with an unrelated row between it and the
   rest. Workroom now has its own heading at the top — it is first because it
   is the likeliest thing you want, and now it looks deliberate.
+- **You can actually watch the boot screen now.** It was starting before the
+  window appeared and running faster than the window takes to open, so by the
+  time you could see it the log had already happened. The runtimes are not
+  checked until there is a window to watch it in, and they start far enough
+  apart to read.
+- **The Skip button is gone.** There was nothing to skip; clicking anywhere
+  still puts the screen away.
+- **The boot screen counts what it shows.** It said "8 so far" above six
+  rows, because it was counting runtimes that are not built yet and so are
+  not listed.
 - **Settings lists what you can use first.** Two runtimes that are not built
   yet were sitting in the middle of six that are, so the list had to be read
   tag by tag. Ready, then experimental, then needs-sign-in, then not

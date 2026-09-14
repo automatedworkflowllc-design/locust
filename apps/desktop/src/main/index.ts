@@ -200,10 +200,20 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
       runner: probeRunner,
       locator: executableLocator,
       includeOmniRoute: true,
-      // A beat between starts, so the boot log reads in order without the
-      // total becoming the sum of every probe. See the note on
-      // .
-      staggerMs: 140,
+      /*
+       * A beat between starts you can actually SEE.
+       *
+       * 140ms put all six rows on screen inside 700ms -- less time than the
+       * window itself takes to appear, so the log was complete before
+       * anybody could watch it happen. Colin, with a photo taken at open:
+       * "would be cool if we actually saw the terminal pop all those up."
+       *
+       * The stagger delays each probe's START, never its finish, and they
+       * overlap: the only cost is the last row beginning about a second
+       * later than it otherwise would, against probes that take seconds
+       * anyway. That second is the thing this screen exists to fill.
+       */
+      staggerMs: 240,
       /*
        * `started` reaches the window BEFORE the subprocess is spawned --
        * that is the whole contract. A screen told about the start and the
@@ -336,8 +346,14 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
    * never show a sweep that did not occur, and a cached answer emits nothing
    * -- there is no wait to narrate.
    */
-  discoveryLog.emit({ kind: 'started', at: Date.now() })
-  const running = discoverRuntimes()
+  const running = (async () => {
+    await Promise.race([
+      waitingForWindow,
+      new Promise((resolve) => setTimeout(resolve, WINDOW_WAIT_CAP_MS))
+    ])
+    discoveryLog.emit({ kind: 'started', at: Date.now() })
+    return discoverRuntimes()
+  })()
     .then((value) => {
       discoveryCache = { at: Date.now(), value }
       const ready = value.filter((runtime) => runtime.readiness === 'ready').length
@@ -377,6 +393,30 @@ const npmPresent = async (): Promise<boolean> => {
 
 /** Recorded and replayed, so a window created mid-sweep sees the whole log. */
 const discoveryLog = createDiscoveryLog()
+
+/*
+ * THE FIRST SWEEP WAITS FOR SOMEBODY TO WATCH IT.
+ *
+ * Something in startup asked for the runtimes about three seconds before
+ * the window appeared, so by the time a person could see the boot screen
+ * the whole log had already happened and simply arrived at once. Colin,
+ * 2026-09-14, with a photo taken a second after launch: "the majority of
+ * the text is already appeared on the screen by the time the user opens it
+ * so they dont see the whole terminal effect."
+ *
+ * It is also just wrong on its own terms: six subprocesses should not be
+ * spawned before there is a window. Nothing needs the runtimes until
+ * something is on screen asking about them.
+ *
+ * Capped, because a wait with no bound is a hang: a build that never opens
+ * a window -- a smoke, a headless drive -- goes ahead after the cap rather
+ * than stalling forever.
+ */
+const WINDOW_WAIT_CAP_MS = 3_000
+let windowIsUp: () => void = () => undefined
+const waitingForWindow = new Promise<void>((resolve) => {
+  windowIsUp = resolve
+})
 
 const runtimeDiscovery = createRuntimeDiscoveryService({
   probe: discoverForWork,
@@ -2881,6 +2921,8 @@ ${taskSection({
     createWindow(codexMissions, (window) => {
       approvalWindow = window
       replayDiscoveryToWindow()
+      // The sweep may begin: there is somebody to watch it now.
+      windowIsUp()
     })
 
     app.on('activate', () => {
