@@ -102,6 +102,8 @@ export const RUNTIME_DISCOVERY_CHANNEL = 'runtime-discovery:get'
 export const RUNTIME_DISCOVERY_EVENT_CHANNEL = 'runtime-discovery:event'
 /** The backlog, for a renderer that mounts mid-sweep. */
 export const RUNTIME_DISCOVERY_LOG_CHANNEL = 'runtime-discovery:log'
+/** The loading window saying it is finished, so the app may open. */
+export const SPLASH_DONE_CHANNEL = 'splash:done'
 
 /**
  * What discovery is doing, while it is doing it.
@@ -1688,6 +1690,16 @@ export interface DesktopApi {
    * Push carries what happens next; this carries what already happened.
    */
   discoveryLog(): Promise<readonly DiscoveryEvent[]>
+  /**
+   * Said by the loading window when its sequence has finished.
+   *
+   * The app window is built but not shown until this arrives, so the
+   * runtimes are already answered by the time anybody sees the workspace --
+   * which is the whole point of a loading screen (Colin, 2026-09-14: "have
+   * just that monitor screen be the loading screen and once its done, THEN
+   * go to our app").
+   */
+  splashDone(): void
   recoverRoutine(request: import('./routine-recovery.js').RoutineRecoveryRequest): Promise<import('./routine-recovery.js').RoutineRecoveryResponse>
 }
 

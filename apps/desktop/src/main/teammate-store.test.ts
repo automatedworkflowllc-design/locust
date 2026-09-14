@@ -328,16 +328,16 @@ describe('workspace settings', () => {
       expect((await teammates.readSettings()).relay).toBe(true)
     }
     await teammates.writeSettings({ swarm: false, relay: false })
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full' })
   })
 
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full' })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full' })
   })
 
   it('only a literal true turns it on', async () => {
@@ -345,7 +345,7 @@ describe('workspace settings', () => {
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
       await teammates.writeSettings({ swarm: value, relay: false })
-      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' })
+      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full' })
     }
   })
 
@@ -358,7 +358,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full' })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 
@@ -580,5 +580,50 @@ describe("a teammate's own connectors", () => {
     const edited = await teammates.update({ teammateId: made.teammateId, name: 'Jim', hue: 'blue', role: 'Custom', avatar: seedAvatar(made.teammateId) })
     expect(edited.connectors).toEqual(['claude.ai Gmail'])
     await expect(teammates.setConnectors('tm_nobody', ['claude.ai Gmail'])).rejects.toThrow()
+  })
+})
+
+describe('the plan a teammate keeps', () => {
+  /*
+   * Colin, 2026-09-14: "plans are off by default, it should be on unless we
+   * find issues."
+   *
+   * Flipping the constant was not enough. The parse read the key with
+   * `=== true`, so an ABSENT key meant off -- and every settings file that
+   * already exists has no such key, which is every person who has ever run
+   * this. The default would have changed for nobody.
+   *
+   * Absent means never chosen, and never chosen means the default.
+   */
+  it('is on when nobody has said otherwise', async () => {
+    const { store: teammates } = await store()
+    expect((await teammates.readSettings()).keepATodoList).toBe(true)
+  })
+
+  it('is on for a settings file written before the setting existed', async () => {
+    const { root } = await store()
+    // A file from before this setting existed: no `keepATodoList` at all.
+    await writeFile(
+      join(root, 'teammates.json'),
+      JSON.stringify({ schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: true } }),
+      'utf8'
+    )
+    expect((await createTeammateStore({ rootDirectory: root }).readSettings()).keepATodoList).toBe(true)
+  })
+
+  it('stays off once somebody turns it off', async () => {
+    // The other half: a real choice has to survive, or the default is a
+    // setting that cannot be changed.
+    const { root, store: teammates } = await store()
+    await teammates.writeSettings({ keepATodoList: false })
+    expect((await createTeammateStore({ rootDirectory: root }).readSettings()).keepATodoList).toBe(false)
+  })
+
+  it('reads anything that is not a boolean as the default', async () => {
+    const { store: teammates } = await store()
+    for (const value of ['false', 0, {}, [], null]) {
+      await teammates.writeSettings({ keepATodoList: value })
+      expect((await teammates.readSettings()).keepATodoList).toBe(true)
+    }
   })
 })

@@ -22,6 +22,7 @@ import {
   RUNTIME_DISCOVERY_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
+  SPLASH_DONE_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
@@ -264,6 +265,9 @@ const desktopApi: DesktopApi = {
     }
   },
   discoveryLog: () => ipcRenderer.invoke(RUNTIME_DISCOVERY_LOG_CHANNEL) as Promise<readonly DiscoveryEvent[]>,
+  splashDone: () => {
+    ipcRenderer.send(SPLASH_DONE_CHANNEL)
+  },
   onDiscoveryEvent: (listener: (event: DiscoveryEvent) => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, update: DiscoveryEvent): void => {
       listener(update)

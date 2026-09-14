@@ -144,6 +144,7 @@ export function Sidebar({
   recentlyDone,
   recentlyReceived,
   onSelectTeammate,
+  onNewConversationWith,
   onNewTeammate,
   composerShown,
   onOpenSettings,
@@ -188,6 +189,8 @@ export function Sidebar({
   readonly recentlyDone: readonly string[]
   readonly recentlyReceived: readonly string[]
   readonly onSelectTeammate: (teammateId: string) => void
+  /** A blank page with that teammate on it, not their newest conversation. */
+  readonly onNewConversationWith: (teammateId: string) => void
   readonly onNewTeammate: () => void
   /** Whether the composer is on screen; the empty state says "below" only then. */
   readonly composerShown: boolean
@@ -656,7 +659,10 @@ export function Sidebar({
                 railClose()
               }}
               onNewConversation={() => {
-                onSelectTeammate(open.teammateId)
+                // Was `onSelectTeammate`, which selects a teammate who is
+                // already selected and opens the conversation that is
+                // already open -- so the control did nothing at all.
+                onNewConversationWith(open.teammateId)
                 railClose()
               }}
               onPointerEnter={() => window.clearTimeout(railCloseTimer.current)}

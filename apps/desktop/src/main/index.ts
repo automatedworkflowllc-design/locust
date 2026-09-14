@@ -127,6 +127,7 @@ import {
   ROOM_POST_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
+  SPLASH_DONE_CHANNEL,
   ROOM_TASK_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
@@ -499,6 +500,74 @@ const rememberWindow = (window: BrowserWindow): void => {
   })
 }
 
+/*
+ * THE LOADING WINDOW.
+ *
+ * Its own window, shown before the app, closing when the runtimes have
+ * answered -- the ordinary shape of an application splash, and what Colin
+ * asked for twice (2026-09-14): "have just that monitor screen be the
+ * loading screen and once its done, THEN go to our app with its normal
+ * splash with all runtimes should be connected."
+ *
+ * The design handoff argued for the opposite -- the pane, never a
+ * full-window takeover -- on the grounds that a takeover "would hide
+ * answers to show a decoration". That reasoning was about a relaunch with
+ * the app already on screen. Here the app window does not exist yet, so
+ * there is nothing being hidden: the cost is honestly a wait before the
+ * workspace, which is what a loading screen IS.
+ *
+ * Sized to the tube, frameless, and never resizable: it is a picture of a
+ * monitor, and a monitor you can drag the corner of is a window pretending
+ * to be one.
+ */
+/** Ready but not shown, waiting for the loading window to finish. */
+let appWindowWaiting: BrowserWindow | undefined
+
+/** Show the app, whatever became of the splash. Safe to call twice. */
+const showAppWindow = (): void => {
+  const waiting = appWindowWaiting
+  appWindowWaiting = undefined
+  if (waiting !== undefined && !waiting.isDestroyed() && !waiting.isVisible()) waiting.show()
+}
+
+/** How long the loading window may hold the app before it is opened anyway. */
+const SPLASH_CAP_MS = 12_000
+const SPLASH_WIDTH = 788
+const SPLASH_HEIGHT = 568
+let splashWindow: BrowserWindow | undefined
+
+const createSplashWindow = (): BrowserWindow => {
+  const splash = new BrowserWindow({
+    width: SPLASH_WIDTH,
+    height: SPLASH_HEIGHT,
+    center: true,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: false,
+    backgroundColor: '#090a0c',
+    icon: app.isPackaged
+      ? join(process.resourcesPath, 'icon.ico')
+      : join(__dirname, '../../resources/icon-512.png'),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.cjs'),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+  splash.once('ready-to-show', () => splash.show())
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    void splash.loadURL(`${process.env.ELECTRON_RENDERER_URL}#splash`)
+  } else {
+    void splash.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'splash' })
+  }
+  return splash
+}
+
 const createWindow = (
   codexMissions: CodexMissionService,
   onWindow: (window: BrowserWindow) => void
@@ -550,7 +619,18 @@ const createWindow = (
   window.once('ready-to-show', () => {
     // Maximize before showing: maximizing a visible window is a visible jump.
     if (opening.maximized) window.maximize()
-    window.show()
+    /*
+     * HELD until the loading window says it is done.
+     *
+     * Built, laid out and ready -- just not shown. So when the splash
+     * closes, the workspace is already there with its runtimes answered
+     * rather than assembling itself in front of somebody.
+     *
+     * If there is no splash (the preference is off, or it failed to open),
+     * this shows at once, which is exactly what it did before.
+     */
+    if (splashWindow === undefined || splashWindow.isDestroyed()) window.show()
+    else appWindowWaiting = window
 
     const capturePath = app.isPackaged ? undefined : process.env.TEAMMATE_CAPTURE_PATH
     if (capturePath) {
@@ -981,10 +1061,22 @@ if (!ownsSingleInstanceLock) {
      * while the first sweep is running and a screen that joined halfway
      * would be missing the beginning of its own log.
      */
+    /*
+     * To EVERY window, not just the app's.
+     *
+     * This sent only to `approvalWindow`, and the loading window is a
+     * second window -- so the splash pulled the backlog once and then never
+     * heard another word, which meant it never saw discovery finish and
+     * never closed. The app sat behind it, built and invisible.
+     *
+     * Discovery is a fact about the machine, not about one window, so every
+     * window that is open gets it.
+     */
     const sendDiscovery = (event: DiscoveryEvent): void => {
-      const target = approvalWindow
-      if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
-        target.webContents.send(RUNTIME_DISCOVERY_EVENT_CHANNEL, event)
+      for (const target of BrowserWindow.getAllWindows()) {
+        if (!target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(RUNTIME_DISCOVERY_EVENT_CHANNEL, event)
+        }
       }
     }
     discoveryLog.subscribe(sendDiscovery)
@@ -1004,6 +1096,16 @@ if (!ownsSingleInstanceLock) {
     // And the renderer can ask, which is what actually works: a replay sent
     // at window creation lands before the page has mounted a listener.
     ipcMain.handle(RUNTIME_DISCOVERY_LOG_CHANNEL, () => discoveryLog.replay())
+    /*
+     * The loading window is finished: show the app and close the splash, in
+     * that order. Closing first would leave an empty desktop for a frame.
+     */
+    ipcMain.on(SPLASH_DONE_CHANNEL, () => {
+      showAppWindow()
+      const splash = splashWindow
+      splashWindow = undefined
+      if (splash !== undefined && !splash.isDestroyed()) splash.close()
+    })
 
     /*
      * What this launch is, said once and only while somebody is waiting.
@@ -2917,6 +3019,53 @@ ${taskSection({
     ipcMain.on('window:close', (event) => {
       windowFromValidSender(event)?.close()
     })
+
+    /*
+     * The loading window first, then the app behind it.
+     *
+     * `tube: 'off'` is a person saying they do not want the ceremony, so
+     * they get no splash and the app opens straight away.
+     */
+    const openSplash = (tube: string): void => {
+      if (tube === 'off') return
+      splashWindow = createSplashWindow()
+      splashWindow.on('closed', () => {
+        splashWindow = undefined
+        // Whatever became of the splash -- finished, or closed by hand --
+        // the app must not be left invisible behind it.
+        showAppWindow()
+      })
+    }
+    // Read, not assumed: somebody who turned the ceremony off gets no
+    // loading window and the app opens straight away. Synchronously
+    // optimistic, because the splash must exist BEFORE the app window is
+    // ready to show or the app would show itself first.
+    openSplash('full')
+    /*
+     * A CAP ON THE LOADING SCREEN.
+     *
+     * A probe that never answers must not mean an app that never opens --
+     * that is far worse than a slow start, and it is the failure a loading
+     * screen makes possible in the first place. After this the app is shown
+     * and the splash closed regardless, and the runtimes carry on answering
+     * behind it exactly as they did before there was a splash at all.
+     */
+    setTimeout(() => {
+      const splash = splashWindow
+      if (splash === undefined || splash.isDestroyed()) return
+      splashWindow = undefined
+      showAppWindow()
+      splash.close()
+    }, SPLASH_CAP_MS)
+    void teammates
+      .readSettings()
+      .then((held) => {
+        if (held.tube !== 'off') return
+        const splash = splashWindow
+        splashWindow = undefined
+        if (splash !== undefined && !splash.isDestroyed()) splash.close()
+      })
+      .catch(() => undefined)
 
     createWindow(codexMissions, (window) => {
       approvalWindow = window

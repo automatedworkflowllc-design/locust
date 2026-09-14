@@ -66,9 +66,6 @@ import { refusalNotice } from './components/RoomScreen.js'
 import { exchangeAcross, exchangeOf } from './exchange.js'
 import type { ExchangeMission } from './exchange.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
-import { BootScreen } from './components/BootScreen.js'
-import { applyDiscoveryEvent, bootView, emptyBoot, phaseAt, SETTLE_DELAY_MS, SETTLE_MS } from './bootView.js'
-import type { BootState } from './bootView.js'
 import { CommandPalette } from './components/CommandPalette.js'
 import type { PaletteAction } from './components/CommandPalette.js'
 import { IdleTeammate } from './components/IdleTeammate.js'
@@ -466,29 +463,7 @@ const INSTALL_LOG_LINES = 500
 
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
-  /*
-   * THE BOOT SCREEN.
-   *
-   * `boot` is folded from real discovery events; `bootNow` is a clock that
-   * only ticks while something is actually being waited on, so the elapsed
-   * counters are live during the probe and nothing repaints afterwards.
-   */
-  const [boot, setBoot] = useState<BootState>(emptyBoot)
-  const [bootNow, setBootNow] = useState(() => Date.now())
-  const [skippedAt, setSkippedAt] = useState<number>()
-  /** Latched: the boot screen belongs to the launch, and a launch happens once. */
-  const bootIsOver = useRef(false)
   const [tube, setTube] = useState<TubePreference>('full')
-  /*
-   * Skipping still leaves you knowing what is installed.
-   *
-   * It jumps to the settled table and dissolves from there, rather than to
-   * nothing -- a skip that blanked the screen would punish the person for
-   * not wanting to wait by taking the answer away too.
-   */
-  const skipBoot = (): void => {
-    setSkippedAt((held) => held ?? Date.now())
-  }
   // Declared HERE, right under its state, not a thousand lines down: a
   // helper above it closed over `runtimes` and was called during render,
   // which is a ReferenceError at boot -- and it fired only on a profile
@@ -2859,65 +2834,14 @@ export default function App(): ReactElement {
   }
 
   /*
-   * WHICH PHASE THE BOOT SCREEN IS IN, derived rather than stored.
+   * The boot screen is its own WINDOW now, not part of this one.
    *
-   * Stored, it would be a second copy of a fact the events already carry,
-   * and the two would disagree the first time a re-check arrived mid-settle
-   * -- the shape this app keeps paying for. A skip pins it to `settled` and
-   * lets the same timeline dissolve it, so skipping and waiting end the
-   * same way.
+   * It used to be folded into the pane here, with a phase machine, a
+   * discovery subscription and a clock all living in the app shell. All of
+   * that moved to `SplashApp`, which is shown before this window exists and
+   * closes when the runtimes have answered. Leaving a second copy here is
+   * how the same ceremony came to play twice and finish in neither.
    */
-  const bootPhase = ((): ReturnType<typeof phaseAt> => {
-    /*
-     * ONCE IT IS GONE IT STAYS GONE.
-     *
-     * Discovery re-runs -- fifteen seconds in, again while anything is
-     * still checking, and on every window focus -- and each sweep emits
-     * `started`, which puts the log back at the beginning. Without this,
-     * focusing the window half a minute into a session would bring the boot
-     * screen back over the person's work. A launch screen that reappears is
-     * not a launch screen.
-     */
-    if (bootIsOver.current) return 'gone'
-    if (skippedAt !== undefined) return phaseAt(skippedAt - SETTLE_DELAY_MS - SETTLE_MS, bootNow)
-    if (boot.finished !== undefined) return phaseAt(boot.finished.at, bootNow)
-    return boot.phase === 'idle' ? 'idle' : 'probing'
-  })()
-  if (bootPhase === 'gone') bootIsOver.current = true
-
-  /*
-   * Subscribe once, and replay: the window is created while the first sweep
-   * is already running, so the host sends everything it has recorded before
-   * anything new.
-   */
-  useEffect(() => {
-    const bridge = window.desktop
-    if (bridge === undefined) return
-    // The backlog first, then everything that happens next. Both, because
-    // the host replays at window creation and this has not mounted yet.
-    void bridge
-      .discoveryLog()
-      .then((events) => {
-        setBoot((current) => events.reduce(applyDiscoveryEvent, current))
-      })
-      .catch(() => undefined)
-    return bridge.onDiscoveryEvent((event) => {
-      setBoot((current) => applyDiscoveryEvent(current, event))
-    })
-  }, [])
-
-  /*
-   * A clock that only ticks while something is being waited on.
-   *
-   * The elapsed counters have to be live during a probe, and nothing should
-   * repaint once the screen is gone -- a timer left running behind a
-   * dismissed screen is a battery cost for nothing.
-   */
-  useEffect(() => {
-    if (bootPhase === 'gone' || tube === 'off') return
-    const tick = window.setInterval(() => setBootNow(Date.now()), 100)
-    return () => window.clearInterval(tick)
-  }, [bootPhase, tube])
 
   const running = liveRunIsActive(liveRun)
   /**
@@ -3328,6 +3252,24 @@ export default function App(): ReactElement {
     setShownKey(live?.[0])
   }
 
+  /**
+   * A blank page with that teammate on it.
+   *
+   * "New conversation with Jimothy" called `selectTeammate`, which ends by
+   * showing that teammate's newest conversation -- and since you reach the
+   * control by clicking their avatar, they were already selected and their
+   * newest conversation was already open. So the button did nothing at all
+   * (Colin, 2026-09-14: "this new convo button does nothing").
+   *
+   * Selecting them takes their route, model, mode and effort, which is what
+   * a new conversation with them should start on; then the conversation
+   * itself is cleared, which is the part that was missing.
+   */
+  const newConversationWith = (teammateId: string): void => {
+    selectTeammate(teammateId)
+    setShownKey(undefined)
+  }
+
   const sidebarMissionsRef = useRef<readonly SidebarMission[]>([])
   // The right-click menus are built outside render, so they read the roster
   // and the routines through refs the same way they read the rows.
@@ -3728,6 +3670,7 @@ export default function App(): ReactElement {
           recentlyDone={recentlyDone}
           recentlyReceived={recentlyReceived}
           onSelectTeammate={selectTeammate}
+          onNewConversationWith={newConversationWith}
           onNewTeammate={() => {
             setTeammateError(undefined)
             setNewTeammateOpen(true)
@@ -3985,22 +3928,18 @@ export default function App(): ReactElement {
                   void startMission(prompt)
                 }}
               />
-            ) : bootPhase !== 'gone' && tube !== 'off' ? (
-              /*
-               * The boot screen replaces the empty state, IN THE PANE ONLY.
-               *
-               * It never covers the sidebar, the title bar or the composer,
-               * which is what makes showing it on every launch safe: nothing
-               * is hidden to display it, and a person can click a teammate
-               * or start typing while it is still probing. It occupies space
-               * that was empty anyway.
-               */
-              <BootScreen
-                view={bootView(boot, bootPhase, bootNow)}
-                tube={tube}
-                onSkip={skipBoot}
-              />
             ) : (
+              /*
+               * The boot screen is NOT here any more.
+               *
+               * It is its own window now -- a loading screen shown before
+               * this one exists, closing when the runtimes have answered
+               * (`SplashApp`). Drawing it in the pane as well meant it
+               * "immediately appeared and then disappeared" behind the
+               * splash, which is the app showing the same ceremony twice
+               * and finishing it in neither.
+               */
+
               <FirstLaunch
                 runtimes={runtimes}
                 limitedRuntimes={limitedRuntimes}

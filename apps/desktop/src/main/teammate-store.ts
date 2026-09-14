@@ -97,11 +97,16 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full' }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full' }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
   return value === 'compact' || value === 'wide' || value === 'auto' ? value : 'auto'
+}
+
+/** Whether a teammate keeps a plan. Absent means never chosen, so: the default. */
+function parsedTodoList(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : true
 }
 
 /** How much of the boot screen to draw, or the default. Never trusts the file. */
@@ -331,9 +336,20 @@ function parsedFile(text: string): StoredFile {
     askConnectors: typeof rawSettings === 'object' && rawSettings !== null
       ? (rawSettings as Record<string, unknown>).askConnectors === true
       : false,
-    keepATodoList: typeof rawSettings === 'object' && rawSettings !== null
-      ? (rawSettings as Record<string, unknown>).keepATodoList === true
-      : false,
+    /*
+     * ON unless it was turned off.
+     *
+     * Colin, 2026-09-14: "plans are off by default, it should be on unless
+     * we find issues." `=== true` read an ABSENT key as off, so flipping the
+     * default would have changed nothing for anybody who already has a
+     * settings file -- which is everybody who has run this. Absent means
+     * never chosen, and never chosen means the default.
+     */
+    keepATodoList: parsedTodoList(
+      typeof rawSettings === 'object' && rawSettings !== null
+        ? (rawSettings as Record<string, unknown>).keepATodoList
+        : undefined
+    ),
     layout: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedLayout((rawSettings as Record<string, unknown>).layout)
       : 'auto',
@@ -601,9 +617,11 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           askConnectors: typeof settings === 'object' && settings !== null
             ? (settings as Record<string, unknown>).askConnectors === true
             : false,
-          keepATodoList: typeof settings === 'object' && settings !== null
-            ? (settings as Record<string, unknown>).keepATodoList === true
-            : false,
+          keepATodoList: parsedTodoList(
+            typeof settings === 'object' && settings !== null
+              ? (settings as Record<string, unknown>).keepATodoList
+              : undefined
+          ),
           tube: typeof settings === 'object' && settings !== null
             ? parsedTube((settings as Record<string, unknown>).tube)
             : 'full',

@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.131.0 - 2026-09-14
+
+- **Locust opens on a loading screen.** The monitor is its own window now: it
+  comes up first, shows each runtime being checked, and closes when they have
+  answered — and the workspace behind it is already built and already knows
+  what it found. It is not drawn inside the app any more, which is why it
+  used to flash and vanish.
+  - If a runtime never answers, the app opens anyway after twelve seconds
+    rather than leaving you on a loading screen forever. Clicking the screen
+    also ends it early.
+  - **Settings → The boot screen → Off** skips it entirely.
+- **Teammates keep a plan by default.** It was off unless you found the
+  setting, and a settings file written before the setting existed counted as
+  "off" rather than "never asked".
+- **"New conversation with…" starts one.** It re-selected a teammate who was
+  already selected and opened the conversation that was already open, so it
+  did nothing at all.
+- **The turn count beside a conversation is legible**, instead of running
+  into the title's ellipsis.
+
 ## 0.130.0 - 2026-09-14
 
 - **The app stops going backwards while it is running.** Locust re-checks

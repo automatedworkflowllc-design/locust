@@ -4728,9 +4728,26 @@ textarea {
 }
 
 /* How many turns the conversation holds. A count, so it is muted. */
+/*
+ * A COUNT, not the last word of the title.
+ *
+ * `margin-left: auto` puts it hard against a title that is already
+ * truncating, so `do you have price targ... 15` read as one run of text and
+ * the number disappeared into the ellipsis. Colin, 2026-09-14: "lets touch
+ * this 15 blending with the dots".
+ *
+ * A gap it cannot lose and digits that line up between rows. NOT faint:
+ * that tone is for things which carry no information, and a turn count is
+ * the only thing on the row that varies -- the same rule that took it off
+ * the section counts in 0.125.0, which I nearly broke here five hours
+ * later.
+ */
 .lc-teammate__turns {
-  margin-left: auto;
+  margin-left: var(--lc-space-3);
+  padding-left: var(--lc-space-2);
+  flex: none;
   font-size: var(--lc-text-mono-label);
+  font-variant-numeric: tabular-nums;
   color: var(--lc-text-muted);
 }
 
@@ -9531,4 +9548,19 @@ textarea {
   .lc-boot__led {
     transition: none;
   }
+}
+
+/* The loading window: the monitor, centred, on nothing else. */
+.lc-splash {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lc-bg-app);
+  -webkit-app-region: drag;
+}
+
+.lc-splash .lc-boot {
+  padding: 0;
 }
