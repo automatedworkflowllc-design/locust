@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.106.0 - 2026-09-14
+
+- **A 41-second run says 41s everywhere.** The Missions row rounded to whole
+  minutes and read `0m` while the fold two inches below said `41s` — one
+  mission, timed twice, disagreeing.
+- **A completed run whose record is incomplete is amber wherever it is drawn.**
+  The Team screen's recent list had no way to know, so it stayed blue while the
+  same mission went amber on every other surface.
+
 ## 0.105.0 - 2026-09-14
 
 - **Stopping a run now stops what the run started.** Measured on the installed

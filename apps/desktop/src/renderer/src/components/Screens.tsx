@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { usagePercent, usageWindowSentence } from '../missionView.js'
+import { durationText, usagePercent, usageWindowSentence } from '../missionView.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type {
@@ -264,9 +264,17 @@ export function MissionsScreen({
               const owner = teammates.find(
                 (teammate) => teammate.teammateId === missionOwners[mission.missionId]
               )
-              const elapsed = Math.max(
-                0,
-                Math.round((Date.parse(mission.lastUpdatedAt) - Date.parse(mission.createdAt)) / 60000)
+              /*
+               * ONE clock, `durationText`.
+               *
+               * This rounded to whole minutes, so a 41-second run read `0m`
+               * here while the fold two inches away said `41s` -- the same
+               * mission, timed twice, disagreeing. Grok's finding 2,
+               * 2026-09-13, and the same shape as every other one in that
+               * report: two surfaces computing one fact separately.
+               */
+              const elapsed = durationText(
+                Math.max(0, Date.parse(mission.lastUpdatedAt) - Date.parse(mission.createdAt))
               )
               const secondary = secondaryOf?.(mission.missionId)
               return (
@@ -293,7 +301,7 @@ export function MissionsScreen({
                     {mission.runtime} / {mission.model}
                   </span>
                   <span className="lc-missionrow__stats lc-mono">
-                    {mission.checkpoints.length} checkpoint{mission.checkpoints.length === 1 ? '' : 's'} · {elapsed}m
+                    {mission.checkpoints.length} checkpoint{mission.checkpoints.length === 1 ? '' : 's'} · {elapsed}
                   </span>
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
                     {costLine(runCostOf(mission.events)) ?? '—'}
@@ -435,7 +443,7 @@ export function TeammatesScreen({
                         className="lc-rostercard__mission"
                         onClick={() => onOpenMission(entry.missionId)}
                       >
-                        <span className={`lc-dot lc-tone-${missionPhaseView(entry.phase, false).tone}`} />
+                        <span className={`lc-dot lc-tone-${missionPhaseView(entry.phase, entry.hasIntegrityIssues).tone}`} />
                         <span className="lc-rostercard__missiontitle">{entry.title}</span>
                         <span className="lc-rostercard__missionage lc-mono">{agoLabel(entry.at) ?? ''}</span>
                       </button>

@@ -21,6 +21,16 @@ export interface TeammateWork {
     readonly missionId: string
     readonly title: string
     readonly phase: PublicRecoveredMission['phase']
+    /**
+     * Whether its record could be read to the end.
+     *
+     * Carried because the row draws a phase DOT, and a completed mission whose
+     * ledger is incomplete is amber everywhere else in the app. This list had
+     * no way to know, so it passed `false` and stayed blue -- one mission, two
+     * colours, depending which screen you were on (Grok's finding 4,
+     * 2026-09-13).
+     */
+    readonly hasIntegrityIssues: boolean
     /** When it last changed, so a row can say how long ago it was. */
     readonly at: string
   }[]
@@ -54,6 +64,7 @@ export function teammateWork(
       missionId: mission.missionId,
       title: titleOf(mission),
       phase: mission.phase,
+      hasIntegrityIssues: mission.integrityIssueCount > 0,
       at: mission.lastUpdatedAt
     }))
   }
