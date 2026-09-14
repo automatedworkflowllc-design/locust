@@ -1587,13 +1587,23 @@ describe('the activity card reads the change, not a receipt of it', () => {
   })
 
   it('names the tool on a row whose target is the same path it edited', () => {
+    // One call each, because two consecutive plain tool calls now FOLD into a
+    // single row (`foldPlainToolRuns`). The naming rule this protects is
+    // about how a row is built, so it is checked on rows that stayed rows.
+    const read = activityEntries([{ kind: 'tool', name: 'src/billing.ts', tool: 'read', settled: true }])
+    expect(read[0]).toMatchObject({ kind: 'tool', name: 'src/billing.ts', tool: 'read' })
+    // A tool whose name IS its target says it once, not twice.
+    const grep = activityEntries([{ kind: 'tool', name: 'grep', tool: 'grep', settled: true }])
+    expect(grep[0]).toMatchObject({ tool: undefined })
+  })
+
+  it('folds a run of plain tool calls, and never the command beside them', () => {
     const entries = activityEntries([
       { kind: 'tool', name: 'src/billing.ts', tool: 'read', settled: true },
-      { kind: 'tool', name: 'grep', tool: 'grep', settled: true }
+      { kind: 'tool', name: 'src/tax.ts', tool: 'read', settled: true },
+      { kind: 'shell', name: 'pnpm test', settled: true }
     ])
-    expect(entries[0]).toMatchObject({ kind: 'tool', name: 'src/billing.ts', tool: 'read' })
-    // A tool whose name IS its target says it once, not twice.
-    expect(entries[1]).toMatchObject({ tool: undefined })
+    expect(entries.map((entry) => entry.kind)).toEqual(['tools', 'shell'])
   })
 
   it('carries a command row with its exit result', () => {

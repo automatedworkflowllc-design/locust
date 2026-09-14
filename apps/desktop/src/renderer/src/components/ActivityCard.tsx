@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, relativePath } from '../missionView.js'
+import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, foldedToolsText, relativePath } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
@@ -408,6 +408,22 @@ export function ActivityCard({
                     )}
                   </>
                 )
+              ) : entry.kind === 'tools' ? (
+                /*
+                 * A run of plain tool calls, as one row.
+                 *
+                 * Nothing here changed a file or ran a command -- the fold
+                 * refuses to absorb either, and refuses anything that failed
+                 * -- so this row is allowed to be quiet. It still NAMES what
+                 * it covers and counts what it does not show, because a list
+                 * that stops without saying it stopped is the thing this is
+                 * copying grok-build to avoid.
+                 */
+                <div className="lc-filerow is-static lc-filerow--folded">
+                  <Icon name="activity" size={14} />
+                  <span className="lc-filerow__path">{foldedToolsText(entry.names, entry.verb)}</span>
+                  <span className="lc-filerow__result is-muted">done</span>
+                </div>
               ) : (
                 // An edit the runtime recorded without the change itself. The
                 // row says so, in words: silence here would read as "nothing

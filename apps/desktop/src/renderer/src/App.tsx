@@ -93,7 +93,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  typedPrompt, buildThread, relativePath, shellCommandText, turnText } from './missionView.js'
+  typedPrompt, buildThread, lastActivityAt, relativePath, shellCommandText, turnText } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -3384,8 +3384,14 @@ export default function App(): ReactElement {
         peerMessages: run.peerMessages ?? []
       })
     }
-    // Newest first, as the recorded list is.
-    return [...live.sort((a, b) => b.createdAt.localeCompare(a.createdAt)), ...history]
+    // Most recently ACTIVE first, not most recently started: a conversation
+    // that has been working for an hour belongs above one that opened five
+    // minutes ago and has said nothing since. grok-build's `last_progress_at`,
+    // and the reason it is their dashboard's sort key.
+    return [
+      ...live.sort((a, b) => lastActivityAt(b).localeCompare(lastActivityAt(a))),
+      ...history
+    ]
   }, [history, runs, workspaceId])
 
   const shownApprovals = approvals.filter((request) => request.runId === shownRunId)

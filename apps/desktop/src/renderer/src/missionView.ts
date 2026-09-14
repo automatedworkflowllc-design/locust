@@ -52,6 +52,70 @@ export interface ActivityDetail {
  * list as an `unreported` row rather than vanishing, because a missing row
  * would understate what the teammate did.
  */
+/** How many of a folded run's names the row shows before it starts counting. */
+export const FOLDED_TOOL_NAMES_SHOWN = 3
+
+/**
+ * Fold runs of consecutive plain tool rows into one.
+ *
+ * The rule is narrow on purpose: a row folds only if it is a plain `tool`,
+ * SETTLED and not failed. A command, a file change, an unreported change, a
+ * helper, anything still running and anything that failed keeps its own row.
+ * So the fold can never hide work that changed something or went wrong -- it
+ * only ever quietens rows that were already quiet.
+ *
+ * A single row is left alone: folding one thing into "1 tool call" would be
+ * the same row with the name taken off it.
+ */
+export function foldPlainToolRuns(entries: readonly ActivityEntry[]): readonly ActivityEntry[] {
+  const foldable = (entry: ActivityEntry): boolean =>
+    entry.kind === 'tool' && entry.settled && !entry.failed
+  const out: ActivityEntry[] = []
+  let index = 0
+  while (index < entries.length) {
+    const entry = entries[index]
+    if (entry === undefined) break
+    if (!foldable(entry)) {
+      out.push(entry)
+      index += 1
+      continue
+    }
+    let end = index + 1
+    while (end < entries.length && foldable(entries[end]!)) end += 1
+    const run = entries.slice(index, end)
+    if (run.length < 2) {
+      out.push(entry)
+    } else {
+      const names = run.map((row) => (row.kind === 'tool' ? row.name : '')).filter((name) => name.length > 0)
+      const verbs = new Set(run.map((row) => (row.kind === 'tool' ? row.tool : undefined)))
+      const verb = verbs.size === 1 ? [...verbs][0] : undefined
+      out.push({
+        kind: 'tools',
+        key: `tools_${entry.key}`,
+        names,
+        ...(verb === undefined ? { verb: undefined } : { verb })
+      })
+    }
+    index = end
+  }
+  return out
+}
+
+/**
+ * The names a folded row shows, and what it says about the rest.
+ *
+ * grok-build's rule, which this repo did not have written down anywhere:
+ * never truncate silently. An over-long list ends by saying how much of it is
+ * not being shown, so a reader can tell a short list from a cut one.
+ */
+export function foldedToolsText(names: readonly string[], verb: string | undefined): string {
+  const shown = names.slice(0, FOLDED_TOOL_NAMES_SHOWN).join(', ')
+  const rest = names.length - FOLDED_TOOL_NAMES_SHOWN
+  const tail = rest > 0 ? `${shown} … ${String(rest)} more` : shown
+  const lead = verb === undefined ? `${String(names.length)} tool calls` : `${verb} ${String(names.length)}`
+  return `${lead} — ${tail}`
+}
+
 export type ActivityEntry =
   | {
       readonly kind: 'file'
@@ -116,6 +180,28 @@ export type ActivityEntry =
       readonly description: string
       readonly settled: boolean
       readonly failed: boolean
+    }
+  | {
+      /**
+       * A run of consecutive plain tool calls, folded into one row.
+       *
+       * grok-build's `group_tool_verbs`, read 2026-09-13: runs of read /
+       * search / list fold into one line while edits keep their own, and
+       * `collapsed_edit_blocks` keeps `+N/-M` visible even collapsed. A turn
+       * that reads eleven files drew eleven rows of equal weight here, and
+       * the one edit among them looked exactly like the ten reads.
+       *
+       * Only rows that changed NOTHING fold. A command, a file change, an
+       * unreported change, a helper and anything that FAILED all keep their
+       * own row, always -- the fold may only ever quieten what was already
+       * quiet.
+       */
+      readonly kind: 'tools'
+      readonly key: string
+      /** Every name in the run, in order. The row shows some and counts the rest. */
+      readonly names: readonly string[]
+      /** The shared verb when they all share one, so the row can lead with it. */
+      readonly verb: string | undefined
     }
   | {
       readonly kind: 'unreported' | 'tool'
@@ -269,7 +355,7 @@ export function activityEntries(
       })
     })
   })
-  return entries
+  return foldPlainToolRuns(entries)
 }
 
 /**
@@ -2694,4 +2780,25 @@ export function producedFiles(
     })
   }
   return rows
+}
+
+/**
+ * When a mission last DID something, rather than when it started.
+ *
+ * grok-build keeps `last_progress_at` and documents it as the dashboard's
+ * sort key. Sorting by start time puts a conversation that has been working
+ * for an hour below one that opened five minutes ago and has been idle since
+ * -- the list claims to show what is happening and shows what began most
+ * recently instead.
+ *
+ * The last event's own timestamp, falling back to when the mission was made
+ * for one that has no events yet. Never the clock: a list that reorders
+ * itself because time passed would move under the reader.
+ */
+export function lastActivityAt(mission: {
+  readonly createdAt: string
+  readonly events: readonly NormalizedRuntimeEvent[]
+}): string {
+  const last = mission.events.at(-1)?.occurredAt
+  return last !== undefined && last > mission.createdAt ? last : mission.createdAt
 }

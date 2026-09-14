@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.103.0 - 2026-09-14
+
+- **A run of plain tool calls is one row.** A turn that read eleven files drew
+  eleven rows of equal weight, and the one edit among them looked exactly like
+  the ten reads. Reads, searches and lists that happen in a row now fold into a
+  single quiet line. A command, a file change, anything still running and
+  anything that **failed** always keeps its own row — the fold can only ever
+  quieten what was already quiet.
+- **That row says what it is not showing.** It names the first few and then
+  counts the rest (`… 8 more`), rather than stopping without saying it stopped.
+- **Conversations are ordered by what is happening, not by what started last.**
+  A conversation working for an hour sat below one that opened five minutes ago
+  and had been idle since.
+
 ## 0.102.0 - 2026-09-14
 
 - **A stopped run no longer claims nothing was in flight.** It said "Nothing

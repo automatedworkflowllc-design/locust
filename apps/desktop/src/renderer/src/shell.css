@@ -8635,3 +8635,14 @@ textarea {
 .lc-livestep__quiet {
   color: var(--lc-amber-text);
 }
+
+/*
+ * A run of plain tool calls, folded to one row.
+ *
+ * Quieter than a file row and than a command row, because that is the whole
+ * point: nothing in it changed anything. It sits at the same indent so the
+ * rows still read as one list.
+ */
+.lc-filerow--folded .lc-filerow__path {
+  color: var(--lc-text-secondary);
+}
