@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.130.0 - 2026-09-14
+
+- **The app stops going backwards while it is running.** Locust re-checks
+  your runtimes every so often and whenever you focus the window, and each
+  check was throwing away what it already knew — so a runtime that had
+  reported its version dropped back to "checking" with no version, and the
+  welcome panel flickered. A check that has not answered yet now keeps what
+  the last one established. Signing out, or uninstalling, still shows at
+  once: those are answers, not silence.
+- **The boot screen belongs to the launch.** A re-check could bring it back
+  over your work half a minute into a session. It appears once.
+
 ## 0.129.0 - 2026-09-14
 
 Three from a design pass over the screenshots — each one visible in a frame

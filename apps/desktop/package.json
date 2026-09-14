@@ -1,6 +1,6 @@
 {
   "name": "@teammate/desktop",
-  "version": "0.129.0",
+  "version": "0.130.0",
   "private": true,
   "description": "Run AI coding agents as a team you can watch, on runtimes and models you choose.",
   "author": "Automated Workflow",
@@ -11,11 +11,12 @@
     "dev": "electron-vite dev",
     "prebuild": "pnpm --filter @teammate/runtime-adapters build && pnpm --filter @teammate/mission-store build",
     "build": "electron-vite build",
-    "package": "electron-vite build && electron-builder --config electron-builder.yml",
+    "package": "electron-vite build && electron-builder --config electron-builder.yml && node scripts/prune-releases.mjs",
     "package:dir": "electron-vite build && electron-builder --config electron-builder.yml --dir",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prune:releases": "node scripts/prune-releases.mjs"
   },
   "dependencies": {
     "@teammate/mission-store": "workspace:*",

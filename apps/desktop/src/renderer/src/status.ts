@@ -1335,3 +1335,47 @@ export function runtimeListOrder(
     return band !== 0 ? band : left.displayName.localeCompare(right.displayName)
   })
 }
+
+/**
+ * What we knew, kept until something better is known.
+ *
+ * Discovery re-runs: fifteen seconds in, again while anything is still
+ * checking, and every time the window is focused. Each answer replaced the
+ * last wholesale — so a runtime that had reported `ready · 2.1.270` went
+ * back to `CHECKING` with no version the moment a re-sweep began, and the
+ * welcome grid flickered between three different kinds of thing in one
+ * column. Colin, 2026-09-14: *"randomly checking for cursor and claude...
+ * some showing ready, some showing version code, and the box just popped up
+ * again randomly."*
+ *
+ * It got worse when probes were staggered, because a sweep now takes long
+ * enough to watch — but the bug was always there, and it is the same one
+ * this project keeps meeting: **absence of a fresh answer is not evidence
+ * that the old one stopped being true.**
+ *
+ * So a probe that has not come back yet — `probe-failed` and `offline` are
+ * the two states that mean "no answer", not "a bad answer" — keeps whatever
+ * the last completed sweep established. Every DEFINITE outcome wins
+ * immediately, including the bad ones: signed out, not installed and ready
+ * all replace what came before, because each of those is an answer.
+ */
+const NO_ANSWER_YET: ReadonlySet<string> = new Set(['probe-failed', 'offline'])
+
+export function keepWhatWasKnown(
+  previous: readonly PublicRuntimeStatus[],
+  next: readonly PublicRuntimeStatus[]
+): readonly PublicRuntimeStatus[] {
+  const before = new Map(previous.map((runtime) => [runtime.id, runtime]))
+  return next.map((runtime) => {
+    const held = before.get(runtime.id)
+    if (held === undefined) return runtime
+    // Still out. Keep the last thing this runtime actually said.
+    if (NO_ANSWER_YET.has(runtime.status) && !NO_ANSWER_YET.has(held.status)) return held
+    // Answered, but without a version it had told us before. A version does
+    // not stop being true because one probe did not print it.
+    if (runtime.version === null && held.version !== null && runtime.installed && held.installed) {
+      return { ...runtime, version: held.version }
+    }
+    return runtime
+  })
+}

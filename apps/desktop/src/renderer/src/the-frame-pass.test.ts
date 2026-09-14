@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildThread } from './missionView.js'
-import { runtimeListOrder } from './status.js'
+import { keepWhatWasKnown, runtimeListOrder } from './status.js'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import type { PublicRuntimeStatus } from '../../shared/ipc.js'
 
@@ -125,5 +125,53 @@ describe('A3 · what you can use comes first', () => {
       () => 'READY'
     ).map((entry) => entry.displayName)
     expect(order).toEqual(['Claude Code', 'Codex CLI', 'Cursor Agent'])
+  })
+})
+
+describe('a re-check does not make the screen go backwards', () => {
+  /*
+   * Discovery re-runs fifteen seconds in, again while anything is still
+   * checking, and on every window focus. Each answer replaced the last
+   * wholesale, so a runtime that had said `ready · 2.1.270` went back to
+   * CHECKING with no version the moment a re-sweep began. Colin, 2026-09-14:
+   * "randomly checking for cursor and claude... some showing ready, some
+   * showing version code, and the box just popped up again randomly."
+   *
+   * Absence of a fresh answer is not evidence that the old one stopped being
+   * true — the same rule the rooms file and the mission header already
+   * learned.
+   */
+  const at = (id: string, status: string, version: string | null, installed = true): PublicRuntimeStatus =>
+    ({ id, displayName: id, installed, version, auth: 'unknown', ready: status === 'ready', status }) as PublicRuntimeStatus
+
+  it('keeps a known result while the next probe is still out', () => {
+    const kept = keepWhatWasKnown([at('claude', 'ready', '2.1.270')], [at('claude', 'probe-failed', null)])
+    expect(kept[0]?.status).toBe('ready')
+    expect(kept[0]?.version).toBe('2.1.270')
+  })
+
+  it('keeps a version the new answer simply did not print', () => {
+    const kept = keepWhatWasKnown([at('codex', 'ready', '0.153.0')], [at('codex', 'ready', null)])
+    expect(kept[0]?.version).toBe('0.153.0')
+  })
+
+  it('takes every DEFINITE answer at once, including the unwelcome ones', () => {
+    // Signing out, or uninstalling, must show immediately: those are
+    // answers, not silence, and holding the old one would be the same lie
+    // in the other direction.
+    expect(keepWhatWasKnown([at('claude', 'ready', '2.1.270')], [at('claude', 'auth-required', '2.1.270')])[0]?.status)
+      .toBe('auth-required')
+    expect(keepWhatWasKnown([at('cursor', 'ready', '1.0')], [at('cursor', 'not-installed', null, false)])[0]?.status)
+      .toBe('not-installed')
+  })
+
+  it('lets a runtime that was out come back when it answers', () => {
+    const kept = keepWhatWasKnown([at('opencode', 'probe-failed', null)], [at('opencode', 'ready', '1.18.27')])
+    expect(kept[0]?.status).toBe('ready')
+    expect(kept[0]?.version).toBe('1.18.27')
+  })
+
+  it('passes through a runtime it has never seen', () => {
+    expect(keepWhatWasKnown([], [at('gemini', 'ready', '0.58.0')])[0]?.version).toBe('0.58.0')
   })
 })

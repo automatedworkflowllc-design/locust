@@ -111,7 +111,7 @@ import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
 import { splitAttachments } from '../../shared/attachments.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
@@ -476,6 +476,8 @@ export default function App(): ReactElement {
   const [boot, setBoot] = useState<BootState>(emptyBoot)
   const [bootNow, setBootNow] = useState(() => Date.now())
   const [skippedAt, setSkippedAt] = useState<number>()
+  /** Latched: the boot screen belongs to the launch, and a launch happens once. */
+  const bootIsOver = useRef(false)
   const [tube, setTube] = useState<TubePreference>('full')
   /*
    * Skipping still leaves you knowing what is installed.
@@ -1524,7 +1526,13 @@ export default function App(): ReactElement {
         .getLocalRuntimes()
         .then((response) => {
           if (!active || !response.ok) return
-          setRuntimeState({ phase: 'ready', runtimes: response.data.runtimes, npmPresent: response.data.npmPresent })
+          // A re-check must not make the screen go backwards: a probe that
+          // has not answered yet keeps whatever the last sweep established.
+          setRuntimeState((held) => ({
+            phase: 'ready',
+            runtimes: keepWhatWasKnown(held.phase === 'ready' ? held.runtimes : [], response.data.runtimes),
+            npmPresent: response.data.npmPresent
+          }))
           const stillChecking = response.data.runtimes.some(
             (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
           )
@@ -2860,10 +2868,22 @@ export default function App(): ReactElement {
    * same way.
    */
   const bootPhase = ((): ReturnType<typeof phaseAt> => {
+    /*
+     * ONCE IT IS GONE IT STAYS GONE.
+     *
+     * Discovery re-runs -- fifteen seconds in, again while anything is
+     * still checking, and on every window focus -- and each sweep emits
+     * `started`, which puts the log back at the beginning. Without this,
+     * focusing the window half a minute into a session would bring the boot
+     * screen back over the person's work. A launch screen that reappears is
+     * not a launch screen.
+     */
+    if (bootIsOver.current) return 'gone'
     if (skippedAt !== undefined) return phaseAt(skippedAt - SETTLE_DELAY_MS - SETTLE_MS, bootNow)
     if (boot.finished !== undefined) return phaseAt(boot.finished.at, bootNow)
     return boot.phase === 'idle' ? 'idle' : 'probing'
   })()
+  if (bootPhase === 'gone') bootIsOver.current = true
 
   /*
    * Subscribe once, and replay: the window is created while the first sweep
