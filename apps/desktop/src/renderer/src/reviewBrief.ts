@@ -66,6 +66,29 @@ export interface ReviewMaterial {
   readonly changed: readonly string[]
   /** Commands it ran, first word and exit code, in order. */
   readonly commands: readonly { readonly name: string; readonly exitCode: number | undefined }[]
+  /**
+   * Paths changed EARLIER in the same conversation, that this turn did not
+   * touch.
+   *
+   * The range was one turn, and a conversation is not one turn. A teammate
+   * that creates a file on turn two and adjusts it on turn four has its turn
+   * four reviewed against a WHAT CHANGED naming one path -- and a reviewer
+   * asked whether the request and the evidence agree will correctly say they
+   * do not, because it was shown a quarter of the work and told that was the
+   * work.
+   *
+   * The exact mirror of the defect Astra measured on 2026-09-14: that one was
+   * the right evidence judged against the wrong request, this one is the right
+   * request judged against partial evidence. Both make correct work read as a
+   * violation.
+   *
+   * Kept SEPARATE from `changed` rather than merged into it, for the reason
+   * `openedWith` is kept separate from `request`: a reviewer handed one list
+   * cannot tell which turn it is judging, and this turn's work is still what
+   * it was asked about. (tech-leads-club's rule, read 2026-09-14: the
+   * verification range is the whole feature rather than the last batch.)
+   */
+  readonly changedEarlier?: readonly string[]
   /** The conditions, from `ranOnLine`. */
   readonly ranOn: string
   /** Who did the work, so the reviewer knows whose turn it is challenging. */
@@ -148,6 +171,10 @@ export function reviewBrief(material: ReviewMaterial): string {
     lines.push('WHAT IT DID IN THE WORKSPACE')
     lines.push('This turn answered in the conversation; it changed no files and ran no commands.')
     lines.push('')
+    // Even here -- ESPECIALLY here. A turn that only answered, in a
+    // conversation whose earlier turns built something, is exactly where a
+    // reviewer shown nothing concludes nothing was done.
+    lines.push(...earlierWorkLines(material))
     lines.push('WHERE IT RAN')
     lines.push(material.ranOn)
     lines.push('')
@@ -177,12 +204,32 @@ export function reviewBrief(material: ReviewMaterial): string {
   }
   lines.push('')
 
+  lines.push(...earlierWorkLines(material))
+
   lines.push('WHERE IT RAN')
   lines.push(material.ranOn)
   lines.push('')
 
   lines.push(...jobLines())
   return lines.join('\n')
+}
+
+/**
+ * What the conversation built before this turn, labelled as before.
+ *
+ * Never merged into WHAT CHANGED: this turn's work is still the thing being
+ * judged, and a reviewer handed one undifferentiated list cannot tell which
+ * turn it is reviewing. Same discipline as `openedWith`.
+ */
+function earlierWorkLines(material: ReviewMaterial): readonly string[] {
+  const earlier = (material.changedEarlier ?? []).filter((path) => !material.changed.includes(path))
+  if (earlier.length === 0) return []
+  const lines = ['CHANGED EARLIER IN THIS CONVERSATION (already done, not this turn)']
+  for (const path of earlier.slice(0, MAX_PATHS)) lines.push(`- ${path}`)
+  const rest = earlier.length - MAX_PATHS
+  if (rest > 0) lines.push(`- and ${String(rest)} more`)
+  lines.push('')
+  return lines
 }
 
 /**

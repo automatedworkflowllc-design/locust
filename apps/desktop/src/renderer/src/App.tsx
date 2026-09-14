@@ -3042,6 +3042,31 @@ export default function App(): ReactElement {
       said: turnText(events),
       changed,
       commands: commands.map((command) => ({ name: command.name, exitCode: command.exitCode })),
+      /*
+       * What the CONVERSATION built, not just this turn.
+       *
+       * `changed` above is this run's events alone, which is the whole work
+       * only when the conversation is one turn long. A teammate that created
+       * a file on turn two and adjusted it on turn four had its turn four
+       * reviewed against a single path, and a reviewer asked whether the
+       * request and the evidence agree says -- correctly, on what it was
+       * shown -- that they do not.
+       *
+       * Read from the same `earlierTurns` the thread draws, so this costs no
+       * new source of truth, and handed over as its own labelled list rather
+       * than merged, so the reviewer can still tell which turn is its job.
+       */
+      changedEarlier: [
+        ...new Set(
+          (run.earlierTurns ?? []).flatMap((turn) => {
+            const earlier = buildThread(turn.events, { running: false }).find((item) => item.type === 'activity')
+            const theirs = earlier?.type === 'activity' ? earlier.details : []
+            return theirs
+              .filter((detail) => detail.kind === 'edit' && detail.failed !== true)
+              .map((detail) => relativePath(detail.name, workspacePath))
+          })
+        )
+      ],
       ranOn: ranOnLine({
         platform: window.desktop?.platform ?? '',
         ...(folderName(workspacePath) === undefined ? {} : { folder: folderName(workspacePath)! })

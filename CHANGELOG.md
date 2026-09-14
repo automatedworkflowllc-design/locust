@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.112.0 - 2026-09-14
+
+- **A review sees the whole conversation, not just the last turn.** If a
+  teammate created a file on turn two and adjusted it on turn four, a review of
+  turn four was shown one path and told that was the work — so a reviewer doing
+  its job properly reported the work as incomplete. Files changed earlier now
+  travel with the brief, listed separately so the reviewer can still tell which
+  turn it is judging.
+- **This matters most for a turn that only answered.** In a conversation that
+  had already built something, the brief used to say "it changed no files and
+  ran no commands" and stop, which is exactly where a reviewer concludes the
+  work was never done.
+
 ## 0.111.0 - 2026-09-14
 
 - **A teammate that fails to forget something says so.** When a teammate
