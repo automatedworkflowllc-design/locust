@@ -6,6 +6,33 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.119.0 - 2026-09-14
+
+A second outside audit drove the same build again and re-ran every original
+repro rather than the new happy path. Seven of the eight earlier findings held
+up. These are the three that did not.
+
+- **The teammate you named claims the row you named.** A post like "Wren,
+  start Write the release notes" recorded Wren's run without ever reaching the
+  claim, so the board said unassigned for the whole time she was visibly
+  working it — and the claim only landed when her reply came back, which is
+  what the previous build already did. The claim now happens where the run
+  actually starts. It goes to the teammate the sentence names, not to whoever
+  starts first: on a post that also says "Booty, reply OK and do not touch the
+  board", first-past-the-post would have handed Booty the row. A post that
+  names no row still claims nothing.
+- **A cancelled or failed run no longer wears the previous turn's tokens.** A
+  run stopped before anything started showed "1.8k in · 189 out" beside its
+  own id — the counts from the turn before it, which its own record does not
+  contain. The number beside a mission is now that mission's, or nothing at
+  all when it never reached a model. The conversation's running total is still
+  there and now says the word "conversation".
+- **A link the app refuses to open says so.** Locust declines addresses it
+  won't hand to your browser, and it had a sentence ready for each one — which
+  the window threw away. A refused link and a link that opened looked
+  identical: nothing happened either way. The reason now appears beside the
+  link you pressed.
+
 ## 0.118.0 - 2026-09-14
 
 Seven findings from an outside audit that drove the built app, all of them on

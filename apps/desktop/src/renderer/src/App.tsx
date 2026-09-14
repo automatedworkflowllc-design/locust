@@ -99,7 +99,7 @@ import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
 import type { ReviewMaterial } from './reviewBrief.js'
-import { conversationCost, costLine, latestContext } from './cost.js'
+import { costLine, latestContext, missionCostTail } from './cost.js'
 import { sequenceOfPost } from './roomExchange.js'
 import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
@@ -2816,11 +2816,25 @@ export default function App(): ReactElement {
   }
 
   const running = liveRunIsActive(liveRun)
-  /** The conversation's recorded cost, shown in the header while it is going. */
-  const shownCost =
+  /**
+   * What THIS mission cost, for the line that is about this mission.
+   *
+   * It used to be the conversation's total, and Grok measured what that
+   * does (2026-09-14, finding 2): a mission cancelled before anything
+   * started -- its own ledger holding a create, a cancel and no usage at
+   * all -- wore "1.8k in · 189 out", which were the previous turn's exact
+   * counts. A run that failed on a provider error wore the turn before
+   * it. Every other part of that line is a fact about this mission: its
+   * id, its model, its phase, its sandbox. A stranger reads the number
+   * beside them as this run's, and it was not.
+   *
+   * Silence when this run reported nothing, which is the honest answer for
+   * a run that never reached a model -- never a zero, which reads as free.
+   */
+  const shownCostTail =
     liveRun === undefined
-      ? undefined
-      : costLine(conversationCost(liveRun.earlierTurns ?? [], liveRun.events))
+      ? ''
+      : missionCostTail({ events: liveRun.events, earlierTurns: liveRun.earlierTurns ?? [], running })
   /**
    * How full the model's context is, from the newest turn that reported it.
    * Not the conversation's summed tokens: the window holds one prompt, so
@@ -3951,10 +3965,11 @@ export default function App(): ReactElement {
                                 ? 'restored from the local ledger'
                                 : liveRun.phase
                           } · ${sandboxPhrase(liveRun.data.sandbox)}${
-                            // What the conversation has actually cost, while it
-                            // is still going. Silence when no turn reported a
-                            // number -- never a zero, which would read as free.
-                            shownCost === undefined ? '' : ` · ${running ? 'so far ' : ''}${shownCost}`
+                            // This run's cost, then the conversation's with
+                            // the word `conversation` on it. One function,
+                            // because the reason they must not be confused
+                            // is the whole point -- see `missionCostTail`.
+                            shownCostTail
                           }`}
                       {/*
                         * The context ring is NOT here.

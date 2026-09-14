@@ -6923,6 +6923,16 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* What the host said when it would not open a link. Inline beside the link
+ * that was pressed, because a person pressing one citation among several
+ * needs to know WHICH one did not open -- and amber, because nothing is
+ * broken and nothing needs fixing; an address was simply refused. */
+.lc-link__refusal {
+  margin-left: 0.4em;
+  font-size: 0.86em;
+  color: var(--lc-amber-text);
+}
+
 /* --- 4. The rerun offer -------------------------------------------------
  * Replaces .lc-rerun, .lc-rerun span. Not a card. Same register as
  * .lc-diagnostic (a note about the run, left-ruled), in green because the

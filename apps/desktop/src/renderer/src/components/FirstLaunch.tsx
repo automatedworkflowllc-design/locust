@@ -35,8 +35,18 @@ import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFact
  * A button rather than an anchor, because that is what it is: it makes a
  * request the host may refuse, and it never navigates.
  */
-function openLink(url: string): void {
-  void window.desktop?.openLink(url)
+function openLink(url: string, onRefused: (message: string) => void): void {
+  const bridge = window.desktop
+  if (bridge === undefined) return
+  void bridge
+    .openLink(url)
+    // The host refuses addresses it will not hand to a browser and says so.
+    // Dropping that answer is how a refused press and a press that worked
+    // came to look identical (Grok, 2026-09-14, finding 3).
+    .then((answer) => {
+      if (!answer.ok) onRefused(answer.message)
+    })
+    .catch(() => onRefused('That link could not be opened. Nothing on this machine changed.'))
 }
 
 /** Where a runtime that is not a package comes from. */
@@ -93,6 +103,8 @@ export function FirstLaunch({
   // what the design asks for: someone who wanted the trace once wants it
   // for the next one too.
   const [outputOpen, setOutputOpen] = useState(false)
+  /** What the host said when it would not open a link. Cleared on the next press. */
+  const [linkRefusal, setLinkRefusal] = useState<string>()
   // Signed-in first, exceptions last -- the reference's own order, and the
   // one that reads: a person scanning this wants "what can I use" before
   // "what is not built yet". Discovery's order is alphabetical by id, which
@@ -284,7 +296,10 @@ export function FirstLaunch({
                     <button
                       type="button"
                       className="lc-runtimecell__install"
-                      onClick={() => openLink(vendorUrl(runtime.id) ?? '')}
+                      onClick={() => {
+                        setLinkRefusal(undefined)
+                        openLink(vendorUrl(runtime.id) ?? '', setLinkRefusal)
+                      }}
                       title={`Open ${vendorUrl(runtime.id) ?? ''} in your browser`}
                     >
                       Get it ↗
@@ -324,9 +339,17 @@ export function FirstLaunch({
         {discoveryPhase === 'ready' && npmMissing && (
           <p className="lc-installnote lc-tone-amber">
             Node.js is not on this machine, so the Install buttons below cannot run.{' '}
-            <button type="button" className="lc-linkbutton" onClick={() => openLink('https://nodejs.org')}>
+            <button type="button" className="lc-linkbutton" onClick={() => {
+                setLinkRefusal(undefined)
+                openLink('https://nodejs.org', setLinkRefusal)
+              }}>
               Get Node.js ↗
             </button>
+          </p>
+        )}
+        {linkRefusal !== undefined && (
+          <p className="lc-installnote lc-tone-amber" role="status">
+            {linkRefusal}
           </p>
         )}
         {installFailure !== undefined && (

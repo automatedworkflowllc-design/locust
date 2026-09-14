@@ -194,3 +194,36 @@ export function costLineOrWhyNot(cost: RunCost | undefined, running = false): st
  * claiming the run was free, which is the thing a `$0.00` would claim.
  */
 export const COST_NOT_REPORTED_SHORT = '—'
+
+/**
+ * The cost part of the mission header line.
+ *
+ * Every other part of that line is a fact about ONE mission -- its id, its
+ * model, its phase, its sandbox -- and the cost used to be the whole
+ * conversation's. Grok measured what that does (2026-09-14, finding 2): a
+ * mission cancelled before anything started, whose own ledger holds a
+ * create, a cancel and no usage at all, wore "1.8k in · 189 out" -- the
+ * previous completed turn's exact counts. A run that died on a provider
+ * error wore the turn before IT. A stranger reads a number sitting beside a
+ * mission id as that mission's, and it was not.
+ *
+ * So: this run's own cost, unlabelled because the line it joins is already
+ * about this run; nothing at all when this run reported no number, which is
+ * the honest answer for a run that never reached a model. The conversation's
+ * total still has a home, but only ever with the word `conversation` on it,
+ * and only where there is something earlier to add -- on a first turn the
+ * two are the same number and printing it twice invites back the very
+ * reading this exists to remove.
+ */
+export function missionCostTail(input: {
+  readonly events: readonly NormalizedRuntimeEvent[]
+  readonly earlierTurns: readonly { readonly events: readonly NormalizedRuntimeEvent[] }[]
+  readonly running: boolean
+}): string {
+  const run = costLine(runCostOf(input.events))
+  const whole = input.earlierTurns.length === 0 ? undefined : costLine(conversationCost(input.earlierTurns, input.events))
+  return (
+    (run === undefined ? '' : ' · ' + (input.running ? 'so far ' : '') + run) +
+    (whole === undefined ? '' : ' · conversation ' + whole)
+  )
+}

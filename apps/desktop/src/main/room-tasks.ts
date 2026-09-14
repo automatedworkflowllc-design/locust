@@ -1,7 +1,7 @@
 import type { MissionLedger } from '@teammate/mission-store'
 
 import type { CodexMissionUpdate, PublicRoom, PublicTeammate } from '../shared/ipc.js'
-import { parseTaskBlocks, rowNamedByPost } from '../shared/room-task.js'
+import { parseTaskBlocks, rowToClaimAtStart } from '../shared/room-task.js'
 import { createTranscriptTracker } from './peer-exchange.js'
 import type { RoomStore } from './room-store.js'
 
@@ -120,9 +120,16 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
                  * Only when the post names ONE open row beyond argument. A
                  * post that says "start that board task" names nothing, and
                  * the app does not get to decide which row somebody meant --
-                 * see `rowNamedByPost`.
+                 * see `rowToClaimAtStart`, and the teammate must be the one named too.
                  */
-                const named = rowNamedByPost(post.text, room.tasks)
+                const named = rowToClaimAtStart({
+                  postText: post.text,
+                  tasks: room.tasks,
+                  members: (await options.teammates.list().catch(() => [])).filter((mate) =>
+                    room.teammateIds.includes(mate.teammateId)
+                  ),
+                  startedTeammateId: teammateId
+                })
                 if (named !== undefined) {
                   // A claim that fails is not a reason to hold up a run that
                   // has already started; the board is behind, not broken.

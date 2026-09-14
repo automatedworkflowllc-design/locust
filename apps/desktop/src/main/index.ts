@@ -37,7 +37,7 @@ import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
-import { taskSection } from '../shared/room-task.js'
+import { rowToClaimAtStart, taskSection } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { createWorktreeManager } from './worktrees.js'
@@ -2096,6 +2096,36 @@ ${taskSection({
           continue
         }
         await rooms.startQueued(roomId, post.postId, teammateId, attempt.data.missionId).catch(() => undefined)
+        /*
+         * Claim the row the person named, at START -- on THIS path.
+         *
+         * `room-tasks` has done this since 0.116.0, but only where a queued
+         * member is drained after some other run ends. Grok measured the
+         * hole on the second pass (2026-09-14, finding 1): the post that
+         * actually starts the named teammate comes through here, so the one
+         * member the person pointed at was the one member the claim never
+         * saw. The row sat unassigned through the whole live run and was
+         * claimed only by the reply's own end-of-text block, which is what
+         * 0.116.0 already had.
+         *
+         * Read fresh: members ahead of this one in the loop may have moved
+         * the board since the post was made.
+         */
+        const current = await rooms.get(roomId).catch(() => undefined)
+        const named =
+          current === undefined
+            ? undefined
+            : rowToClaimAtStart({
+                postText: text,
+                tasks: current.tasks,
+                members: roster.filter((mate) => current.teammateIds.includes(mate.teammateId)),
+                startedTeammateId: teammateId
+              })
+        if (named !== undefined) {
+          // A claim that fails does not hold up a run that has already
+          // started: the board is behind, not broken.
+          await rooms.updateTask({ roomId, op: 'assign', taskId: named, ownerId: teammateId }).catch(() => undefined)
+        }
         // Said HERE, not after the loop: this is the moment the row can
         // appear, and every member after this one is still to be asked.
         sendToWindow({

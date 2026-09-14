@@ -11,6 +11,71 @@ import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
 
+/**
+ * A link in a reply, and what the host said if it would not open it.
+ *
+ * The click used to be `void window.desktop?.openLink(href)` -- the host
+ * answers `{ok:false, message}` for every address it refuses, and the window
+ * dropped it on the floor. Grok measured it on the second pass (2026-09-14,
+ * finding 3): `file:`, `javascript:` and `ftp:` all came back with "Locust
+ * does not open that address." and nothing whatsoever appeared on screen. A
+ * refused link and a link that worked looked identical, which is the shape
+ * this project keeps paying for -- a feature silently dead rather than wrong.
+ *
+ * The sentence belongs HERE rather than in some banner far from the press:
+ * the person pressed one link among many and needs to know which one did not
+ * open. It clears on the next press, because a stale refusal beside a link
+ * that now works is the same lie in the other direction.
+ */
+function OutboundLink({
+  href,
+  text,
+  host
+}: {
+  readonly href: string
+  readonly text: string
+  readonly host: string
+}): ReactElement {
+  const [refused, setRefused] = useState<string>()
+  return (
+    <>
+      <button
+        type="button"
+        className="lc-link"
+        title={href}
+        onClick={() => {
+          setRefused(undefined)
+          const bridge = window.desktop
+          if (bridge === undefined) return
+          void bridge
+            .openLink(href)
+            .then((answer) => {
+              setRefused(answer.ok ? undefined : answer.message)
+            })
+            // The host never answered. Say what is still true: the browser
+            // did not open, and nothing here changed.
+            .catch(() => setRefused('That link could not be opened. Nothing in the conversation changed.'))
+        }}
+      >
+        {text}
+        {/*
+          * The host, beside the label, because the label is the MODEL's
+          * words and the target is not. A citation reading "his essay"
+          * that goes somewhere unrelated is the only real hazard in
+          * making these clickable, and saying where it goes before the
+          * person decides is the whole fix.
+          */}
+        <span className="lc-link__host"> ({host})</span>
+      </button>
+      {refused !== undefined && (
+        <span className="lc-link__refusal" role="status">
+          {refused}
+        </span>
+      )}
+    </>
+  )
+}
+
 /** One fixed face for the runtime itself, when a mission belongs to nobody. */
 const RUNTIME_FACE = seedAvatar('locust-runtime')
 
@@ -99,27 +164,7 @@ function inline(text: string): ReactElement {
            * this is -- something you press, which asks the host to open your
            * browser.
            */
-          return (
-            <button
-              type="button"
-              className="lc-link"
-              key={`s${String(index)}`}
-              title={span.href}
-              onClick={() => {
-                void window.desktop?.openLink(span.href)
-              }}
-            >
-              {span.text}
-              {/*
-                * The host, beside the label, because the label is the MODEL's
-                * words and the target is not. A citation reading "his essay"
-                * that goes somewhere unrelated is the only real hazard in
-                * making these clickable, and saying where it goes before the
-                * person decides is the whole fix.
-                */}
-              <span className="lc-link__host"> ({host})</span>
-            </button>
-          )
+          return <OutboundLink key={`s${String(index)}`} href={span.href} text={span.text} host={host} />
         }
         if (span.kind === 'strong') {
           return <strong key={`s${String(index)}`}>{span.text}</strong>

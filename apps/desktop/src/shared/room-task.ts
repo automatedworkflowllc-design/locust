@@ -255,3 +255,86 @@ export function rowNamedByPost(
   });
   return named.length === 1 ? named[0]?.taskId : undefined;
 }
+
+/**
+ * The one member a post is plainly addressed to, or nothing.
+ *
+ * The companion to `rowNamedByPost`, and it exists because of what Grok
+ * found on the second pass (2026-09-14, finding 1): claiming the named row
+ * for whoever happens to start first is not the same thing as claiming it
+ * for the teammate the person named. The measured post was "Wren, start
+ * Write the release notes. Booty, reply OK and do not touch the board" --
+ * every member of a room starts on one post, so a first-past-the-post claim
+ * would have handed Booty the row her own instruction forbade her.
+ *
+ * Same discipline as the row: exactly one target, and none or several are a
+ * refusal. A room with ONE member is not a guess -- there is nobody else the
+ * post could mean -- so that case answers with them.
+ */
+export function memberNamedByPost(
+  postText: string,
+  members: readonly { readonly teammateId: string; readonly name: string }[]
+): string | undefined {
+  if (members.length === 1) return members[0]?.teammateId
+  const flatten = (text: string): string => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  const said = ' ' + flatten(postText) + ' '
+  const named = members.filter((member) => {
+    const name = flatten(member.name)
+    // Whole words only, so "Wren" is not found inside "wrench", and a name
+    // too short to be a reference is not one.
+    return name.length >= 2 && said.includes(' ' + name + ' ')
+  })
+  return named.length === 1 ? named[0]?.teammateId : undefined
+}
+
+/**
+ * The row a teammate that is starting RIGHT NOW should be given, or nothing.
+ *
+ * Both halves must resolve to exactly one thing: the post names one open
+ * unassigned row, AND the post names one member, AND that member is the one
+ * whose run just started. Anything else claims nothing, which is the same
+ * refusal `forgetMatch` makes and for the same reason -- the app does not
+ * get to decide which row, or whose, somebody meant.
+ */
+export function rowToClaimAtStart(input: {
+  readonly postText: string
+  readonly tasks: readonly { readonly taskId: string; readonly text: string; readonly state: string; readonly ownerId?: string }[]
+  readonly members: readonly { readonly teammateId: string; readonly name: string }[]
+  readonly startedTeammateId: string
+}): string | undefined {
+  const row = rowNamedByPost(input.postText, input.tasks)
+  if (row === undefined) return undefined
+  const text = input.tasks.find((task) => task.taskId === row)?.text
+  if (text === undefined) return undefined
+  /*
+   * WHICH SENTENCE the row is in, before the whole post.
+   *
+   * Grok's measured post names two members -- "Wren, start Write the
+   * release notes. Booty, reply OK and do not touch the board." -- so
+   * asking whether the post names one teammate answers "no" and refuses
+   * the exact case this exists for. What is unambiguous is smaller than
+   * the post and bigger than a word: the sentence the row is named in
+   * says who was asked to do it, and Booty's sentence does not mention
+   * the row at all.
+   */
+  const flat = (value: string): string => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  const wanted = flat(text)
+  const about = splitSentences(input.postText).filter((sentence) => flat(sentence).includes(wanted))
+  const member =
+    memberNamedByPost(about.join(' '), input.members) ?? memberNamedByPost(input.postText, input.members)
+  if (member === undefined || member !== input.startedTeammateId) return undefined
+  return row
+}
+
+/**
+ * A post, cut where a person would cut it.
+ *
+ * Sentence enders and line breaks, because room posts are written both ways
+ * -- one paragraph of instructions, or a line per teammate.
+ */
+function splitSentences(postText: string): readonly string[] {
+  return postText
+    .split(/[.!?\n\r]+/u)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+}
