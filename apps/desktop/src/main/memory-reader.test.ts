@@ -81,11 +81,20 @@ describe('reading a reply for memory', () => {
     expect(notices[0]?.message).toContain('tried to forget something and could not')
     expect(notices[0]?.message).toContain('nothing like this')
     expect(notices[0]?.message).toContain('It is still remembered.')
-    // Colin, 2026-09-13: one memory announced twice, an amber line quoting it
-    // in full directly above the card holding the same sentence. The notice
-    // now carries only what the card cannot draw -- a memory that is gone.
-    expect(notices[1]?.message).toBe('Wren forgot "The API is on port 3000".')
-    expect(notices[1]?.message).not.toContain('remembered')
+    /*
+     * And there is only ONE notice now.
+     *
+     * A forget that worked used to get its own amber line quoting the memory
+     * in full, directly above the card. Colin, 2026-09-14: "these two yellow
+     * texts are both unneccessary, the remember thing is more than enough."
+     * Nobody has to act on a memory a teammate correctly dropped, and amber
+     * here means a person may need to act.
+     *
+     * The failed one above stays, for the opposite reason: a memory that was
+     * meant to go and did not is still being briefed to every mission.
+     */
+    expect(notices).toHaveLength(1)
+    expect(notices[0]?.message).not.toContain('Wren forgot')
     expect(h.updates.find((u) => u.kind === 'memory-changed')).toEqual({
       kind: 'memory-changed',
       by: 'Wren',

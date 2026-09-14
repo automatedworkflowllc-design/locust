@@ -133,6 +133,7 @@ import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { routeAtStart } from '../shared/route-at-start.js'
 import { roleLabelOf } from '../shared/ipc.js'
 import { isOutboundLink, isWebLink } from '../shared/outbound-links.js'
+import { cursorReadyConnectors } from './cursor-connector-notice.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { createUpdateService } from './updates.js'
 import type {
@@ -764,6 +765,7 @@ if (!ownsSingleInstanceLock) {
       // switch reaches the next mission without a restart.
       askConnectors: async () => (await teammates.readSettings()).askConnectors === true,
       keepATodoList: async () => (await teammates.readSettings()).keepATodoList === true,
+      readyConnectors: cursorReadyConnectors,
       discover: discoverForWork,
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,

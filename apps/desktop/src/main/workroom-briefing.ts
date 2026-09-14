@@ -79,6 +79,8 @@ export interface RuntimePromptInput {
    * see `RUNTIMES_THAT_KEEP_A_TODO_LIST`.
    */
   readonly keepATodoList?: boolean
+  /** Connectors this teammate can call, by name. Standing, so it caches. */
+  readonly connectors?: string
 }
 
 export interface RuntimePrompt {
@@ -274,6 +276,9 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
     if (input.memory !== undefined) sections.push(input.memory)
     // Standing, like the ask format beside it: the same sentence every turn,
     // so it sits in the cached prefix rather than ahead of the person's words.
+    // Standing, beside memory: what this machine has does not change turn to
+    // turn, so it belongs in the cached prefix rather than ahead of the ask.
+    if (input.connectors !== undefined) sections.push(input.connectors)
     if (input.keepATodoList === true) sections.push(todoSection())
     sections.push(askSection())
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))

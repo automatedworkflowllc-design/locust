@@ -13,6 +13,7 @@ export { discoverInstalledRuntimes } from "./discovery.js";
 export {
   allowRuleFor,
   cursorConnectorSentence,
+  cursorReadyConnectorLine,
   parseClaudeConnectors,
   parseCursorMcpList,
   toolPrefixFor,

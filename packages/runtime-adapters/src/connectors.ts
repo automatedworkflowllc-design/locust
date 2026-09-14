@@ -197,3 +197,35 @@ export function cursorConnectorSentence(
     names.length === 1 ? "it" : "them"
   }. Signing in inside the Cursor app does not cover the CLI; they keep separate credentials.`;
 }
+
+/**
+ * The connectors a Cursor teammate can actually call, named for the teammate.
+ *
+ * Colin, 2026-09-14, after the bridge finally worked: "that worked, i asked it
+ * to try rh local." He had to TELL it the name. That is the last piece of this
+ * whole saga and it is its own defect: a teammate asked about Robinhood looks
+ * for the obvious name, and the obvious name on this machine was the broken
+ * entry -- so it reported "needsAuth, 0 tools" and concluded the connector was
+ * dead, which was true of the one it checked and false of the one beside it.
+ *
+ * A person should not have to know what a server is called in a config file.
+ * The CLI knows which ones are ready; the teammate should be told, by name,
+ * before it goes looking. Ready only -- a name it cannot use is worse than no
+ * name at all, because it will try.
+ *
+ * Undefined when nothing is ready, so a machine with no connectors gets no
+ * sentence rather than an empty one.
+ */
+export function cursorReadyConnectorLine(
+  connectors: readonly CursorConnector[],
+): string | undefined {
+  const ready = connectors.filter(
+    (connector) => !connector.needsAuthentication && /ready|connected/i.test(connector.status),
+  );
+  if (ready.length === 0) return undefined;
+  const names = ready.map((connector) => connector.name);
+  const list = names.length === 1
+    ? String(names[0])
+    : `${names.slice(0, -1).join(", ")} and ${String(names[names.length - 1])}`;
+  return `Connectors you can call on this machine, by name: ${list}. Use these exact names -- another server with a similar name may exist and not work.`;
+}

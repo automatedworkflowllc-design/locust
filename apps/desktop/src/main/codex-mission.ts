@@ -275,6 +275,8 @@ interface CodexMissionServiceOptions {
   readonly askConnectors?: () => Promise<boolean>
   /** The person's opt-in for a runtime-kept todo list. Absent reads as off. */
   readonly keepATodoList?: () => Promise<boolean>
+  /** Connectors a Cursor teammate can call, by name, for its briefing. */
+  readonly readyConnectors?: () => Promise<string | undefined>
   /**
    * How many missions are live on the OTHER transports right now.
    *
@@ -471,7 +473,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           workroom: options.workroom,
           ledger: options.ledger,
           ...(options.memory === undefined ? {} : { memory: options.memory }),
-          ...(options.keepATodoList === undefined ? {} : { keepATodoList: options.keepATodoList })
+          ...(options.keepATodoList === undefined ? {} : { keepATodoList: options.keepATodoList }),
+          ...(options.readyConnectors === undefined ? {} : { readyConnectors: options.readyConnectors })
         })
 
   const clearActive = (candidate: ActiveCodexMission): void => {

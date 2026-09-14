@@ -155,6 +155,13 @@ export function createPeerExchange(options: {
   readonly memory?: MemoryBriefing
   /** The person's opt-in, read when a mission starts rather than cached. */
   readonly keepATodoList?: () => Promise<boolean>
+  /**
+   * The connectors this machine's Cursor CLI can actually call, by name.
+   *
+   * Cursor only: the others either have no connector story here or read their
+   * own. Absent, or throwing, means the brief simply does not mention any.
+   */
+  readonly readyConnectors?: () => Promise<string | undefined>
 }): PeerExchange {
   return {
     async prepare(prompt, peer, runtime) {
@@ -170,6 +177,17 @@ export function createPeerExchange(options: {
         runtime !== undefined &&
         runtimeKeepsATodoList(runtime) &&
         (await options.keepATodoList?.().catch(() => false)) === true
+      /*
+       * Which connectors it can call, by NAME.
+       *
+       * Colin had to tell a teammate to "try rh local" -- because the obvious
+       * name on his machine was a broken entry, so the teammate looked at
+       * that one, read `needsAuth, 0 tools`, and reported the connector dead
+       * while a working one sat beside it. A person should not have to know
+       * what a server is called in a config file.
+       */
+      const connectors =
+        runtime === 'cursor' ? await options.readyConnectors?.().catch(() => undefined) : undefined
       try {
         const unread = await options.workroom.unread(peer.self.teammateId, MAX_INBOUND_MESSAGES)
         const composed = composeRuntimePrompt({
@@ -178,6 +196,7 @@ export function createPeerExchange(options: {
           inbound: unread.messages,
           remaining: unread.remaining,
           ...(memory === undefined ? {} : { memory }),
+          ...(connectors === undefined ? {} : { connectors }),
           keepATodoList: todos
         })
         return { runtimePrompt: composed.prompt, delivered: composed.delivered, failed: false }
@@ -190,6 +209,7 @@ export function createPeerExchange(options: {
           inbound: [],
           remaining: 0,
           ...(memory === undefined ? {} : { memory }),
+          ...(connectors === undefined ? {} : { connectors }),
           keepATodoList: todos
         })
         return { runtimePrompt: composed.prompt, delivered: [], failed: true }
@@ -249,11 +269,25 @@ export function createPeerExchange(options: {
            * documented there. All three are the app failing to read
            * something unambiguous.
            */
-          failed(
-            `${peer.self.name} addressed a message to "${block.to}", which is ${peer.self.name}'s own ${
-              peer.self.name.toLowerCase() === block.to.toLowerCase() ? 'name' : 'role'
-            } rather than another teammate. Nothing was sent.`
-          )
+          /*
+           * Said to nobody, because nobody has to do anything about it.
+           *
+           * This drew an amber line -- `Jimothy addressed a message to
+           * "Finance Bro", which is Jimothy's own role rather than another
+           * teammate. Nothing was sent.` -- and Colin, 2026-09-14: "these two
+           * yellow texts are both unneccessary".
+           *
+           * Amber in this app means A PERSON MAY NEED TO ACT, and this fails
+           * that test on its own terms: a teammate addressed ITSELF, so no
+           * message was lost, nobody is waiting on one, and there is nothing
+           * a person could usefully do. It is a model talking to itself, which
+           * is a curiosity rather than an event.
+           *
+           * The roster miss below is NOT this. There, a teammate meant to
+           * reach someone and the name was invented or stale -- something a
+           * person thought was delivered was not, and to a real intended
+           * recipient. That one still speaks.
+           */
           continue
         }
         if (target === undefined) {

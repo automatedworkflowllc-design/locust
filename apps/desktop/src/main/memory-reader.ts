@@ -150,14 +150,23 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
           message: `${by.name} tried to forget something and could not. ${missed.join(' ')} It is still remembered.`
         })
       }
-      if (forgotten.length > 0) {
-        options.notify({
-          kind: 'relay-notice',
-          runId: recovered.metadata.runId,
-          missionId: mission.missionId,
-          message: `${by.name} forgot ${quoted(forgotten)}.`
-        })
-      }
+      /*
+       * A forget that WORKED says nothing here.
+       *
+       * It used to quote every forgotten memory in full on an amber line,
+       * directly above the memory card. Colin, 2026-09-14: "these two yellow
+       * texts are both unneccessary, the remember thing is more than enough."
+       *
+       * The note that kept this line argued the card cannot draw a memory
+       * that is gone, which is true and is not the point: nobody has to DO
+       * anything about a memory a teammate correctly dropped, and amber in
+       * this app means a person may need to act. The Memory screen holds what
+       * is remembered, and what is not there is not there.
+       *
+       * The failed forget above still speaks, and for exactly the reason this
+       * one does not: a memory that was MEANT to go and did not is still
+       * being briefed to every mission, and only a person can settle it.
+       */
     }
   }
 }

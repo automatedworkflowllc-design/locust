@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process'
 import {
   createPathExecutableLocator,
   cursorConnectorSentence,
+  cursorReadyConnectorLine,
   parseCursorMcpList
 } from '@teammate/runtime-adapters'
 
@@ -32,7 +33,7 @@ const TTL_MS = 5 * 60_000
 /** A reading that has not answered by here is not going to help this run. */
 const TIMEOUT_MS = 8_000
 
-let held: { readonly at: number; readonly sentence: string | undefined } | undefined
+let held: { readonly at: number; readonly text: string } | undefined
 
 export type McpLister = () => Promise<string>
 
@@ -73,16 +74,21 @@ const runCursorMcpList: McpLister = async () => {
  * across missions, because the answer is about the machine rather than the
  * run.
  */
+/** The reading itself, held across missions: it is about the machine. */
+async function cachedList(lister: McpLister, now: () => number): Promise<string> {
+  const at = now()
+  if (held !== undefined && at - held.at < TTL_MS) return held.text
+  const text = await lister()
+  held = { at, text }
+  return text
+}
+
 export async function cursorConnectorsNeedingLogin(
   lister: McpLister = runCursorMcpList,
   now: () => number = Date.now
 ): Promise<string | undefined> {
-  const at = now()
-  if (held !== undefined && at - held.at < TTL_MS) return held.sentence
   try {
-    const sentence = cursorConnectorSentence(parseCursorMcpList(await lister()))
-    held = { at, sentence }
-    return sentence
+    return cursorConnectorSentence(parseCursorMcpList(await cachedList(lister, now)))
   } catch {
     // A CLI that is missing or refuses to answer says nothing about
     // connectors, which is different from saying they are fine -- so nothing
@@ -94,4 +100,27 @@ export async function cursorConnectorsNeedingLogin(
 /** Test seam: forget the held reading. */
 export function forgetCursorConnectorReading(): void {
   held = undefined
+}
+
+/**
+ * The connectors a Cursor teammate can actually call, named for its briefing.
+ *
+ * Colin, 2026-09-14, after the bridge finally worked: "that worked, i asked it
+ * to try rh local." He had to TELL it the name, and that is its own defect --
+ * a teammate asked about Robinhood looks for the obvious name, and the obvious
+ * name on that machine was the broken entry, so it reported the connector dead
+ * when a working one sat beside it.
+ *
+ * Same cached reading as the notice above, so a run pays for one `mcp list` at
+ * most and only once every five minutes.
+ */
+export async function cursorReadyConnectors(
+  lister: McpLister = runCursorMcpList,
+  now: () => number = Date.now
+): Promise<string | undefined> {
+  try {
+    return cursorReadyConnectorLine(parseCursorMcpList(await cachedList(lister, now)))
+  } catch {
+    return undefined
+  }
 }

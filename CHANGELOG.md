@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.117.0 - 2026-09-14
+
+- **A Cursor teammate knows which connectors it can call, by name.** You should
+  not have to tell it. If a machine has a working connector and a broken one
+  with a similar name, a teammate asked about it would find the obvious name,
+  read "0 tools", and report the whole thing dead — which was true of the one
+  it checked and false of the one beside it. Only connectors that are actually
+  ready are named.
+- **Two amber lines are gone.** A teammate addressing a message to its own role
+  said so in amber; nothing was lost, nobody was waiting, and there was nothing
+  to do about it. A memory a teammate successfully forgot was quoted in full
+  above the card that already said it. Amber here means a person may need to
+  act, and neither of those did. A message to a name that is not on the roster
+  still speaks, and so does a forget that failed — those are things somebody
+  has to settle.
+
 ## 0.116.0 - 2026-09-14
 
 - **A teammate claims the task it starts.** Ask one to do something a row on
