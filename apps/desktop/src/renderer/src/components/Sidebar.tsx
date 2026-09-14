@@ -304,8 +304,23 @@ export function Sidebar({
         <Icon name="search" size={13} />
         <input
           type="text"
-          placeholder="Search missions"
-          aria-label="Search missions"
+          /*
+           * CONVERSATIONS, because that is what this list holds.
+           *
+           * Astra's acceptance pass, 2026-09-14, finding 2: typing here left
+           * the screen titled Missions showing all twelve, while the sidebar
+           * said "No missions match that". Two surfaces, one word, one of
+           * them not responding -- and the reasonable conclusion from the
+           * page you are looking at is that search is broken.
+           *
+           * The sidebar collapses missions into conversations; the Missions
+           * screen lists missions. Naming each for what it holds is the
+           * smaller and truer fix, and the different noun is itself the
+           * signal that the scopes differ. Sharing one query between them is
+           * a product decision, not a wording repair.
+           */
+          placeholder="Search conversations"
+          aria-label="Search conversations"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           autoComplete="off"
@@ -770,7 +785,7 @@ export function Sidebar({
           "none of them match".
         */}
         {query.trim().length > 0 && missionsMatching(missions, query).length === 0 && (
-          <p className="lc-sidebar__empty lc-row__meta">No missions match that.</p>
+          <p className="lc-sidebar__empty lc-row__meta">No conversations match that.</p>
         )}
 
         {/*

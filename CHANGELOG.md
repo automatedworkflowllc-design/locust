@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.124.0 - 2026-09-14
+
+Two findings from the first acceptance pass to reach routines.
+
+- **A routine held for a question now says what running it again would do.**
+  It said "Answer it, then run the routine again when you are ready", which
+  reads as *carry on from here*. It isn't: the attempt is held and cannot be
+  continued, and a later Run starts from step 1. If your steps are not safe
+  to repeat, that is the sentence you needed before you pressed anything.
+- **The sidebar search says it searches conversations**, because that is
+  what the sidebar holds. It said "Search missions" while the screen actually
+  titled Missions carried on showing everything — so from that screen, search
+  looked broken.
+
 ## 0.123.0 - 2026-09-14
 
 Three placements, from a design review of yesterday's fixes. Each fix was

@@ -381,7 +381,22 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         await hold(stored, execution, 'The step asked you something. Review its mission before proceeding.')
         notice(
           progress,
-          `Routine "${progress.name}" stopped at step ${String(progress.step)} of ${String(progress.of)}: it asked you something. Answer it, then run the routine again when you are ready.`
+          /*
+           * WHAT RUNNING IT AGAIN WOULD ACTUALLY DO.
+           *
+           * Astra's acceptance pass, 2026-09-14, finding 1. This said
+           * "Answer it, then run the routine again when you are ready" --
+           * which reads as "carry on from here" and is not what happens. The
+           * attempt is HELD with `canContinue: false`, Routines asks you to
+           * acknowledge or abandon it, and a later Run starts at step one.
+           *
+           * She did not answer and rerun, so no duplicate side effect is
+           * claimed -- and that is exactly why the wording matters: a person
+           * recovering work that is not repeatable needs to know whether the
+           * next action continues or repeats, BEFORE they press it. Durable
+           * state that is correct does not excuse instructions that are not.
+           */
+          `Routine "${progress.name}" stopped at step ${String(progress.step)} of ${String(progress.of)}: it asked you something. Answer it in that mission, then deal with the held attempt under Routines — this attempt cannot be continued, so running the routine again starts from step 1.`
         )
         return
       }
