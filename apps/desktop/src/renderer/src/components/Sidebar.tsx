@@ -138,6 +138,9 @@ export function Sidebar({
   selectedTeammateId,
   onSelectMission,
   onMissionMenu,
+  renamingMissionId,
+  onRenameMission,
+  onRenameDone,
   onTeammateMenu,
   pendingApprovals,
   liveActivity,
@@ -178,6 +181,11 @@ export function Sidebar({
   readonly onSelectMission: (missionId: string) => void
   /** Right-click on a mission row, so it can be acted on without opening it. */
   readonly onMissionMenu: (missionId: string, at: { readonly x: number; readonly y: number }) => void
+  /** The conversation being renamed in place, if any. */
+  readonly renamingMissionId?: string
+  /** Commit a new name. An empty string clears it back to what was typed. */
+  readonly onRenameMission?: (missionId: string, title: string) => void
+  readonly onRenameDone?: () => void
   /** Right-click on a teammate. Same menu shape as a mission row, on the row above them. */
   readonly onTeammateMenu: (teammateId: string, at: { readonly x: number; readonly y: number }) => void
   /** Approvals waiting on each teammate's live run, by teammate id. */
@@ -937,6 +945,40 @@ export function Sidebar({
               const age = shortAgo(mission.lastAt, now)
               return (
                 <div className="lc-convrow" key={mission.missionId}>
+                  {/*
+                    * Renaming replaces the row rather than sitting on top of
+                    * it, the same shape the room header already uses: Enter
+                    * commits, Escape abandons, and losing focus commits too,
+                    * because a half-typed name left on screen with no way to
+                    * finish is worse than either.
+                    *
+                    * The starting value is the name on screen. Clearing it
+                    * and pressing Enter is how you get the typed sentence
+                    * back -- nothing was ever overwritten to lose.
+                    */}
+                  {renamingMissionId !== undefined
+                  && (mission.memberIds ?? [mission.missionId]).includes(renamingMissionId) ? (
+                    <input
+                      className="lc-input lc-conv__rename"
+                      defaultValue={mission.title}
+                      maxLength={120}
+                      aria-label="Name this conversation"
+                      autoFocus
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') onRenameDone?.()
+                        if (event.key === 'Enter') {
+                          const next = event.currentTarget.value
+                          onRenameDone?.()
+                          if (next.trim() !== mission.title) onRenameMission?.(mission.missionId, next)
+                        }
+                      }}
+                      onBlur={(event) => {
+                        const next = event.currentTarget.value
+                        onRenameDone?.()
+                        if (next.trim() !== mission.title) onRenameMission?.(mission.missionId, next)
+                      }}
+                    />
+                  ) : (
                   <button
                     type="button"
                     className={`lc-conv${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
@@ -965,6 +1007,7 @@ export function Sidebar({
                     <span className="lc-conv__title">{mission.title}</span>
                     {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
                   </button>
+                  )}
                   <button
                     type="button"
                     className="lc-teammate__missionmenu"

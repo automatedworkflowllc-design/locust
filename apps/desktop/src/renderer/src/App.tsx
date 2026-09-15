@@ -563,6 +563,36 @@ export default function App(): ReactElement {
       .catch(() => setDeleteError('That mission could not be assigned. It still belongs to whoever had it.'))
   }
 
+  /** Which conversation is being renamed in place, if any. */
+  const [renamingMissionId, setRenamingMissionId] = useState<string>()
+
+  /**
+   * Name a conversation, or clear the name with an empty one.
+   *
+   * Keyed by the conversation -- `rootId` where there is one -- so a reply
+   * cannot carry a different name from the exchange it belongs to.
+   */
+  const renameMission = async (missionId: string, title: string): Promise<void> => {
+    const row = sidebarMissionsRef.current.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(missionId))
+    const key = row?.rootId ?? row?.missionId ?? missionId
+    const trimmed = title.trim()
+    // Optimistic, and corrected by the roster read if the host refuses: the
+    // input has already closed by the time the answer lands, and a row that
+    // snapped back to its old name with no word would read as a lost edit.
+    setMissionTitles((current) => {
+      if (trimmed.length === 0) {
+        const { [key]: _gone, ...rest } = current
+        return rest
+      }
+      return { ...current, [key]: trimmed }
+    })
+    const answer = await window.desktop?.renameMission(key, trimmed)
+    if (answer !== undefined && !answer.ok) {
+      const roster = await window.desktop?.listTeammates()
+      if (roster?.ok === true) setMissionTitles(roster.data.missionTitles)
+    }
+  }
+
   const openMissionMenu = (missionId: string, at: { readonly x: number; readonly y: number }): void => {
     const live = [...runsRef.current.values()].some(
       (run) => liveRunIsActive(run) && run.data?.missionId === missionId
@@ -592,6 +622,10 @@ export default function App(): ReactElement {
       title,
       items: [
         { label: 'Open', onSelect: () => openMission(missionId) },
+        {
+          label: 'Rename',
+          onSelect: () => setRenamingMissionId(missionId)
+        },
         // Hand a conversation to a teammate after the fact. Flat items, one
         // per teammate, so the menu stays one press deep; a roster longer
         // than six says where the rest are.
@@ -708,6 +742,7 @@ export default function App(): ReactElement {
       applyHistory(listed)
       seedLimitsFrom(listed)
       if (roster.ok) setMissionOwners(roster.data.missionOwners)
+      if (roster.ok) setMissionTitles(roster.data.missionTitles)
     }
     return response
   }
@@ -751,6 +786,7 @@ export default function App(): ReactElement {
   }
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
+  const [missionTitles, setMissionTitles] = useState<Readonly<Record<string, string>>>({})
   /**
    * Replies the host has decided on and is still starting, by teammate.
    *
@@ -3370,8 +3406,22 @@ export default function App(): ReactElement {
     }
     // One row per conversation. The ledger still holds one mission per run;
     // this is only how the exchange is listed.
-    return collapseConversations(rows)
-  }, [history, historyById, runs, workspaceId])
+    /*
+     * A name someone typed wins over the one derived from their first
+     * sentence -- applied AFTER the collapse and keyed by `rootId`, because
+     * the thing being named is the conversation and not the turn. Naming a
+     * reply and having only that reply change its name would be a rename
+     * that did not do what it said.
+     *
+     * Applied here rather than in the sidebar so every surface agrees: the
+     * header, the search that filters on `title`, and the row all read the
+     * same string.
+     */
+    return collapseConversations(rows).map((row) => {
+      const chosen = missionTitles[row.rootId ?? row.missionId]
+      return chosen === undefined ? row : { ...row, title: chosen }
+    })
+  }, [history, historyById, runs, workspaceId, missionTitles])
   // The right-click menu is built outside render and names the row it was
   // opened on, so it reads the rows through this.
   sidebarMissionsRef.current = sidebarMissions
@@ -3672,6 +3722,9 @@ export default function App(): ReactElement {
           selectedTeammateId={pickedTeammate?.teammateId}
           onSelectMission={openMission}
           onMissionMenu={openMissionMenu}
+          renamingMissionId={renamingMissionId}
+          onRenameMission={(missionId, title) => void renameMission(missionId, title)}
+          onRenameDone={() => setRenamingMissionId(undefined)}
           onTeammateMenu={openTeammateMenu}
           rooms={rooms}
           currentRoomId={screen === 'rooms' ? currentRoomId : undefined}

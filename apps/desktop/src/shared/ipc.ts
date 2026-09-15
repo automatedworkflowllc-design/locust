@@ -287,6 +287,17 @@ export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
 export const TEAMMATE_UPDATE_CHANNEL = 'teammates:update'
 export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
+/**
+ * Give a conversation a name of your own.
+ *
+ * It rides with the roster rather than the ledger on purpose: the ledger is
+ * an append-only record of what was asked and what happened, and a title
+ * someone changed afterwards is neither. An empty name clears it, and the
+ * conversation falls back to the first line that was typed -- which was
+ * never overwritten, so nothing is lost by renaming and nothing is lost by
+ * undoing it.
+ */
+export const TEAMMATE_RENAME_MISSION_CHANNEL = 'teammates:renameMission'
 export const ROUTINE_LIST_CHANNEL = 'routines:list'
 export const ROUTINE_CREATE_CHANNEL = 'routines:create'
 export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
@@ -620,6 +631,8 @@ export type TeammateListResponse =
       readonly data: {
         readonly teammates: readonly PublicTeammate[]
         readonly missionOwners: Readonly<Record<string, string>>
+        /** Names people typed for conversations, by mission id. */
+        readonly missionTitles: Readonly<Record<string, string>>
       }
     }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATES_UNAVAILABLE'; readonly message: string } }
@@ -1625,6 +1638,8 @@ export interface DesktopApi {
   updateTeammate(request: TeammateUpdateRequest): Promise<TeammateMutationResponse>
   removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
+  /** Name a conversation. An empty name clears it back to what was typed. */
+  renameMission(missionId: string, title: string): Promise<TeammateMutationResponse>
   listRoutines(): Promise<RoutineListResponse>
   createRoutine(request: RoutineCreateRequest): Promise<RoutineMutationResponse>
   updateRoutine(request: RoutineUpdateRequest): Promise<RoutineMutationResponse>

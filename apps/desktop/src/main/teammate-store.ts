@@ -45,6 +45,18 @@ export const MAX_CONNECTORS = 16
  * prevent. Five thousand is still more than a dozen missions a day for a year.
  */
 export const MAX_MISSION_OWNERS = 5_000
+
+/**
+ * How many conversations may carry a name a person typed, and how long one
+ * may be.
+ *
+ * Bounded for the same reason ownership is: this file has a size cliff past
+ * which it reads as EMPTY, and the next write saves that empty file over the
+ * real one. A title is far bigger than an assignment -- a whole sentence
+ * rather than two ids -- so it gets a tighter count and a hard length.
+ */
+export const MAX_MISSION_TITLES = 1_000
+export const MAX_MISSION_TITLE_LENGTH = 120
 const MAX_FILE_BYTES = 1_000_000
 const SCHEMA_VERSION = 1 as const
 
@@ -84,6 +96,9 @@ export interface TeammateStore {
   /** Forget which teammate a mission belonged to, once the mission is gone. */
   unassignMission(missionId: unknown): Promise<void>
   missionOwners(): Promise<Readonly<Record<string, string>>>
+  missionTitles(): Promise<Readonly<Record<string, string>>>
+  /** An empty or blank name CLEARS it, back to the words that were typed. */
+  renameMission(missionId: string, title: string): Promise<void>
   readSettings(): Promise<WorkspaceSettings>
   writeSettings(settings: unknown): Promise<WorkspaceSettings>
 }
@@ -92,6 +107,8 @@ interface StoredFile {
   readonly schemaVersion: typeof SCHEMA_VERSION
   readonly teammates: readonly PublicTeammate[]
   readonly missionOwners: Readonly<Record<string, string>>
+  /** Names people typed for conversations, by mission id. */
+  readonly missionTitles: Readonly<Record<string, string>>
   readonly settings: WorkspaceSettings
 }
 
@@ -260,6 +277,7 @@ function parsedFile(text: string): StoredFile {
     schemaVersion: SCHEMA_VERSION,
     teammates: [],
     missionOwners: {},
+    missionTitles: {},
     settings: DEFAULT_SETTINGS
   }
   let value: unknown
@@ -300,6 +318,30 @@ function parsedFile(text: string): StoredFile {
       if (!safeId(missionId) || !safeId(teammateId)) continue
       if (!teammates.some((teammate) => teammate.teammateId === teammateId)) continue
       owners[missionId] = teammateId
+    }
+  }
+
+  /*
+   * A name somebody typed for a conversation.
+   *
+   * NOT in the ledger, and that is the point. The ledger is an append-only
+   * record of what was actually asked and what actually happened, and a
+   * title a person changed afterwards is neither -- writing it there would
+   * be editing history to make a list easier to read. It lives here, beside
+   * ownership, which is the other per-conversation fact the ledger does not
+   * own.
+   *
+   * Read as untrusted like everything else in this file: a title that is not
+   * a string, or is empty once trimmed, is dropped rather than drawn.
+   */
+  const titles: Record<string, string> = {}
+  if (typeof record.missionTitles === 'object' && record.missionTitles !== null) {
+    for (const [missionId, title] of Object.entries(record.missionTitles as Record<string, unknown>)) {
+      if (Object.keys(titles).length >= MAX_MISSION_TITLES) break
+      if (!safeId(missionId) || typeof title !== 'string') continue
+      const trimmed = title.trim().slice(0, MAX_MISSION_TITLE_LENGTH)
+      if (trimmed.length === 0) continue
+      titles[missionId] = trimmed
     }
   }
 
@@ -358,7 +400,7 @@ function parsedFile(text: string): StoredFile {
       : 'full'
   }
 
-  return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, settings }
+  return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, missionTitles: titles, settings }
 }
 
 export function createTeammateStore(options: { readonly rootDirectory: string }): TeammateStore {
@@ -380,11 +422,11 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
     try {
       const text = await readFile(path, 'utf8')
       if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) {
-        return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, settings: DEFAULT_SETTINGS }
+        return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, missionTitles: {}, settings: DEFAULT_SETTINGS }
       }
       return parsedFile(text)
     } catch {
-      return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, settings: DEFAULT_SETTINGS }
+      return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, missionTitles: {}, settings: DEFAULT_SETTINGS }
     }
   }
 
@@ -582,6 +624,37 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
 
     missionOwners(): Promise<Readonly<Record<string, string>>> {
       return serialize(async () => (await read()).missionOwners)
+    },
+
+    missionTitles(): Promise<Readonly<Record<string, string>>> {
+      return serialize(async () => (await read()).missionTitles)
+    },
+
+    renameMission(missionId, title): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(missionId)) throw new Error('Mission id is invalid')
+        const file = await read()
+        const trimmed = title.trim().slice(0, MAX_MISSION_TITLE_LENGTH)
+        /*
+         * Clearing is renaming to nothing, not a separate verb. What the
+         * conversation falls back to is the title it always had -- the first
+         * line of what was typed -- which is still in the ledger and was
+         * never overwritten.
+         */
+        if (trimmed.length === 0) {
+          if (!(missionId in file.missionTitles)) return
+          const { [missionId]: _gone, ...missionTitles } = file.missionTitles
+          await write({ ...file, missionTitles })
+          return
+        }
+        if (
+          file.missionTitles[missionId] === undefined
+          && Object.keys(file.missionTitles).length >= MAX_MISSION_TITLES
+        ) {
+          throw new Error('Too many renamed conversations')
+        }
+        await write({ ...file, missionTitles: { ...file.missionTitles, [missionId]: trimmed } })
+      })
     },
 
     readSettings(): Promise<WorkspaceSettings> {

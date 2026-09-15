@@ -95,6 +95,7 @@ import {
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
+  TEAMMATE_RENAME_MISSION_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
@@ -2257,8 +2258,12 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(TEAMMATE_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return teammatesUnavailable
       try {
-        const [list, missionOwners] = await Promise.all([teammates.list(), teammates.missionOwners()])
-        return { ok: true, data: { teammates: list, missionOwners } } as const
+        const [list, missionOwners, missionTitles] = await Promise.all([
+          teammates.list(),
+          teammates.missionOwners(),
+          teammates.missionTitles()
+        ])
+        return { ok: true, data: { teammates: list, missionOwners, missionTitles } } as const
       } catch {
         return teammatesUnavailable
       }
@@ -2320,6 +2325,17 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch {
         return teammateRejected('That mission could not be assigned.')
+      }
+    })
+
+    ipcMain.handle(TEAMMATE_RENAME_MISSION_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return teammateRejected('The conversation could not be renamed.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await teammates.renameMission(String(input.missionId ?? ''), String(input.title ?? ''))
+        return { ok: true, data: {} } as const
+      } catch {
+        return teammateRejected('That conversation could not be renamed.')
       }
     })
 

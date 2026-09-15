@@ -40,6 +40,7 @@ import {
   ROOM_POST_CHANNEL,
   ROOM_TASK_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
+  TEAMMATE_RENAME_MISSION_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
@@ -186,6 +187,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TEAMMATE_UPDATE_CHANNEL, request) as Promise<TeammateMutationResponse>,
   assignMission: (teammateId: string, missionId: string) =>
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
+  renameMission: (missionId: string, title: string) =>
+    ipcRenderer.invoke(TEAMMATE_RENAME_MISSION_CHANNEL, { missionId, title }) as Promise<TeammateMutationResponse>,
   listRoutines: () => ipcRenderer.invoke(ROUTINE_LIST_CHANNEL) as Promise<RoutineListResponse>,
   createRoutine: (request: RoutineCreateRequest) =>
     ipcRenderer.invoke(ROUTINE_CREATE_CHANNEL, request) as Promise<RoutineMutationResponse>,

@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.141.0 - 2026-09-15
+
+- **You can name a conversation.** Right-click one in the sidebar and choose
+  **Rename**. Until now its title was whatever your first sentence happened to
+  be, which is fine to type and hard to find a week later — and since the
+  sidebar flattened, that title is the only thing on the row.
+- **Clearing the name gives you the original back.** Empty the box and press
+  Enter. Nothing was overwritten to lose: the words you typed are in the
+  mission's own record and renaming never touches it.
+
 ## 0.140.0 - 2026-09-15
 
 - **Rooms and Routines are back.** Flattening the sidebar in 0.139.0 left

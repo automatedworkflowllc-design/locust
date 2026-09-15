@@ -9916,3 +9916,14 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Renaming a conversation, in the row's own place and at its own height, so
+   the list does not jump while one row is being edited. */
+.lc-conv__rename {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0 32px 0 var(--lc-space-3);
+  padding: 0 var(--lc-space-3);
+  font-size: var(--lc-text-description);
+}
