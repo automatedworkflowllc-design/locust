@@ -2741,7 +2741,42 @@ ${taskSection({
         } as const
       }
       // The window's own folder decides which conversation it opens on.
-      return readMissionHistory(missionLedger, workroom, workspacePath)
+      const history = await readMissionHistory(missionLedger, workroom, workspacePath)
+      /*
+       * DID A DELETED MISSION COME BACK?
+       *
+       * Colin, 2026-09-15: "im having this issue where when i delete a
+       * mission i feel like it keeps coming back, im not sure whats
+       * happening or if i can prove it" -- and later, the detail that
+       * matters: "usually it reappeared after a little bit."
+       *
+       * I could not reproduce it. Driven through the real menu, a
+       * three-turn conversation lost all three records and the row went. So
+       * rather than guess, make the next occurrence evidence itself: the
+       * host remembers the ids it deleted this session and says so if one is
+       * ever read back out of the ledger.
+       *
+       * The answer is useful in BOTH directions, which is why it is worth
+       * the six lines. A line here means a record genuinely returned and
+       * something is rewriting it. NO line, while a row that looks like the
+       * deleted one is on screen, means it is a different mission that
+       * merely reads the same -- which is easy to believe on a list where
+       * every relayed turn is titled "Jimothy asked: ..." and the title is
+       * the first line of a prompt.
+       *
+       * Ids only. They are uuids, not content, and this file is written to
+       * be handed to someone.
+       */
+      if (history.ok && deletedThisSession.size > 0) {
+        const back = history.data.missions
+          .map((mission) => mission.missionId)
+          .filter((missionId) => deletedThisSession.has(missionId))
+        if (back.length > 0) {
+          for (const missionId of back) deletedThisSession.delete(missionId)
+          note('deleted-mission-returned', back.join(' '))
+        }
+      }
+      return history
     })
 
     ipcMain.handle(APP_INFO_CHANNEL, (event) => {
@@ -2896,6 +2931,14 @@ ${taskSection({
       return response
     })
 
+    /**
+     * Missions deleted in this session, by id, so a record that returns can
+     * be recognised rather than argued about. In memory only -- it answers a
+     * question about one run of the app, and a list of ids surviving restart
+     * would be a record of deletions, which is the opposite of the point.
+     */
+    const deletedThisSession = new Set<string>()
+
     ipcMain.handle(MISSION_DELETE_CHANNEL, async (event, missionId: unknown) => {
       if (!fromOwnWindow(event)) {
         return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The deletion was rejected.' } } as const
@@ -2909,6 +2952,8 @@ ${taskSection({
       // mission that no longer exists.
       if (response.ok && typeof missionId === 'string') {
         await teammates.unassignMission(missionId).catch(() => undefined)
+        deletedThisSession.add(missionId)
+        note('mission-deleted', missionId)
       }
       return response
     })

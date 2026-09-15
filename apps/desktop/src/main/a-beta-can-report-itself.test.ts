@@ -212,3 +212,59 @@ describe('a person can find the log before they need it', () => {
     expect(handler.slice(0, 80)).toContain('() =>')
   })
 })
+
+describe('a mission that comes back says so', () => {
+  /*
+   * Colin, 2026-09-15: "im having this issue where when i delete a mission i
+   * feel like it keeps coming back... usually it reappeared after a little
+   * bit."
+   *
+   * I could not reproduce it. Driven through the real menu, a three-turn
+   * conversation lost all three records and its row went, and both earlier
+   * "findings" turned out to be my own fixture -- an invalid `continuesFrom`
+   * that the store rightly rejected, then calling the IPC directly, which
+   * bypasses the renderer's state update entirely.
+   *
+   * So instead of guessing, the host remembers what it deleted and says so
+   * if one is ever read back. The answer is useful both ways: a line means a
+   * record genuinely returned; NO line, with a row that looks like the
+   * deleted one on screen, means it is a different mission that merely reads
+   * the same -- easy to believe on a list where every relayed turn is titled
+   * "Jimothy asked: ..." from the first line of a prompt.
+   *
+   * Proven by forging the event rather than trusting the code: a deleted
+   * record was written back to the ledger and the log answered
+   * `deleted-mission-returned: m_t2`.
+   */
+  it('remembers what it deleted', () => {
+    expect(MAIN).toContain('deletedThisSession')
+    expect(MAIN).toContain("note('mission-deleted'")
+  })
+
+  it('checks every history read against that list', () => {
+    expect(MAIN).toContain("note('deleted-mission-returned'")
+  })
+
+  it('records ids and never a prompt, because this file is made to be sent', () => {
+    /*
+     * Asserted on what the call PASSES, not on the surrounding block. A
+     * first version read the whole block and failed on its own comment,
+     * which contains the word "prompt" while explaining why no prompt is
+     * logged -- the same way an earlier guard here failed on a doc comment
+     * explaining why `getPath` is absent. A test that reads prose fails for
+     * reasons unrelated to the thing it guards.
+     */
+    const call = MAIN.slice(MAIN.indexOf("note('deleted-mission-returned'"))
+    const args = call.slice(0, call.indexOf(')') + 1)
+    expect(args).toContain('back.join')
+    expect(args).not.toContain('prompt')
+    expect(args).not.toContain('title')
+    // And what is collected into `back` is ids, nothing else.
+    expect(MAIN).toContain('.map((mission) => mission.missionId)')
+  })
+
+  it('forgets across restarts, since a durable list of deletions is the opposite of the point', () => {
+    const declared = MAIN.slice(MAIN.indexOf('const deletedThisSession'), MAIN.indexOf('const deletedThisSession') + 120)
+    expect(declared).toContain('new Set<string>()')
+  })
+})

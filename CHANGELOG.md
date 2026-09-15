@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.143.0 - 2026-09-15
+
+- **If a deleted conversation ever comes back, Locust now says so.** It
+  remembers what you deleted while the app is open and writes a line to the
+  log if one is read back out of the record. Nothing found so far — deleting
+  a conversation does remove every one of its turns from the ledger, checked
+  by driving it — so this is here to settle it the next time it happens, in
+  either direction: a line means a record really returned, and no line means
+  the row you are looking at is a different conversation that reads the same.
+  Settings · This app · Report a problem shows the log.
+
 ## 0.142.0 - 2026-09-15
 
 - **Hovering a teammate shows their card again, not a sentence.** Pointing at
