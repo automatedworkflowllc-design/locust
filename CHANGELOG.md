@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.137.0 - 2026-09-14
+
+- **The narrow sidebar works now.** Both of yesterday's complaints are
+  closed, this time after driving the built app and measuring the controls
+  rather than shipping and hoping. The locust mark at the top is the way
+  home again — it had been rendering two pixels wide and no pixels tall, so
+  there was nothing to click. And the single `+` opens: it was drawing two
+  pixels tall, then, once it had height, getting clipped at the edge of the
+  64px rail, which left half of "New teammate" and "New room" unpressable.
+
 ## 0.136.0 - 2026-09-14
 
 - **A plan no longer claims nothing changed when something did.** Showing the

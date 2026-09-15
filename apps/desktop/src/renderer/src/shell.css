@@ -4095,10 +4095,32 @@ textarea {
  */
 .lc-shell.is-compact .lc-sidebar {
     width: var(--lc-sidebar-rail-width);
+    /*
+     * ...and it may not clip what hangs out of it.
+     *
+     * `.lc-sidebar` carries a belt-and-braces `overflow: hidden` so that no
+     * row miscalculating its width paints outside a fixed-width column. At
+     * this width that column is 63px and the add menu is 168px, so the brace
+     * caught the one thing that is SUPPOSED to hang out: the menu's own box
+     * measured 168x84 while everything past x=63 was clipped, leaving half
+     * of each item unpressable -- hit-testable at x=40, the workroom
+     * answering at x=120.
+     *
+     * Safe to lift because `.lc-sidebar__scroll` is the scrolling child; the
+     * nav itself never scrolled, so nothing depended on the clip.
+     */
+    overflow: visible;
   }
 
+/* STACKED in the rail, because two things do not fit across 64px.
+ *
+ * Side by side the mark was jammed flush against the left edge with the `+`
+ * crowding it -- measured at x=0 in a 63px block. On its own row it is
+ * centred and readable, and the control sits under it. */
 .lc-shell.is-compact .lc-sidebar__brand {
+    flex-direction: column;
     justify-content: center;
+    gap: var(--lc-space-3);
     padding: var(--lc-space-5) 0 var(--lc-space-4);
   }
 
@@ -4121,7 +4143,7 @@ textarea {
  * two pluses are indistinguishable -- and they are still open. What is not
  * open is shipping another guess at them: the drive I use to see the rail
  * hangs, so this needs a way of looking at it first. */
-.lc-shell.is-compact .lc-sidebar__brand img,
+.lc-shell.is-compact .lc-brand__wordmark,
 .lc-shell.is-compact .lc-sidebar .lc-row__text,
 .lc-shell.is-compact .lc-sidebar .lc-sectionlabel,
 .lc-shell.is-compact .lc-search,
@@ -4130,6 +4152,70 @@ textarea {
 .lc-shell.is-compact .lc-sidebar__empty {
     display: none;
   }
+
+/* The rail keeps the mark, and the mark is the way home.
+ *
+ * Hiding every image in the brand block took this with the wordmark, so the
+ * rail opened with an invisible 2x0 button where the app's own name should
+ * be -- measured, not guessed. Sized explicitly in BOTH directions: the
+ * base rule sets a height and leaves the width automatic, and inside a 64px
+ * rail an automatic width is how a mark ends up wider than the rail it is
+ * in. */
+.lc-shell.is-compact .lc-brand__mark {
+    width: 26px;
+    height: 15px;
+  }
+
+.lc-shell.is-compact .lc-brand__lockup {
+    padding: 0;
+    gap: 0;
+  }
+
+/* The Rooms row's second bare `+`. Its words are hidden at this width, so
+   it cannot be told from the one above it; the header's menu carries New
+   room instead. */
+.lc-shell.is-compact .lc-roomrow--new {
+    display: none;
+  }
+
+/* The menu hangs OUT of a 64px rail, so it cannot be clipped by it. */
+.lc-sidebar__add {
+  position: relative;
+}
+
+/*
+ * Opens DOWNWARD, and says so at a specificity that survives source order.
+ *
+ * `.lc-menu` is the composer's menu: it opens UPWARD off a control at the
+ * foot of the window (`bottom: calc(100% + ...)`) and is a fixed 306px wide.
+ * This menu hangs off a button at the TOP of the rail, so both have to go.
+ *
+ * Written first as a plain `.lc-sidebar__addmenu` block, which did nothing
+ * at all -- one class against one class, and `.lc-menu` is declared 1,300
+ * lines further down, so it won every property they share. `bottom` stayed
+ * pinned while `top` was added, the box stretched between both edges, and
+ * the menu opened `306x2` -- present, and to a person indistinguishable
+ * from a button that does nothing, which is exactly what Colin reported:
+ * "the + doesnt even function".
+ *
+ * Two classes rather than moving the block, because a rule whose
+ * correctness depends on staying below another rule in an 8,700-line file
+ * is a rule that breaks the next time someone tidies.
+ */
+.lc-menu.lc-sidebar__addmenu {
+  position: absolute;
+  top: calc(100% + var(--lc-space-2));
+  bottom: auto;
+  left: 0;
+  z-index: 40;
+  width: max-content;
+  min-width: 168px;
+}
+
+.lc-shell.is-compact .lc-sidebar__brand {
+    overflow: visible;
+  }
+
 
 .lc-shell.is-compact .lc-row {
     justify-content: center;

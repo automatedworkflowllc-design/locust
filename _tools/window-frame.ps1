@@ -44,6 +44,9 @@ public class LcWin {
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
   [DllImport("user32.dll")] public static extern int GetWindowTextLength(IntPtr h);
+  public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr l);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, ref uint pid);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
 }
 '@
@@ -51,19 +54,41 @@ public class LcWin {
 # The app's main window: the visible one with a title. Electron keeps hidden
 # helper windows around, and picking one of those would resize nothing a
 # person can see.
-# STRICTLY the pid given, and nothing else.
+# STRICTLY the pid given, and the BIGGEST window it owns.
 #
-# This first searched by process NAME as a fallback, which is a way to resize
-# and photograph somebody else's window: the operator has their own copy of
-# this app open while the harness drives a second one. A test that can reach
-# outside its own instance is not a test. If the named process has no visible
-# window yet, that is a failure to report, not a reason to go looking.
+# Two rules, both learned the hard way.
+#
+# Strictly the pid: this once searched by process NAME as a fallback, which
+# is a way to resize and photograph somebody else's window -- the operator
+# has their own copy of this app open while a harness drives a second one.
+#
+# The biggest window: `MainWindowHandle` returns whichever window Windows
+# thinks is primary, and since the app grew a loading splash that is often
+# the splash -- 788x568, not resizable, and gone a second later. A harness
+# that resized THAT measured the app at whatever width it happened to boot
+# at and reported it as the width it asked for. Enumerating and taking the
+# largest picks the workspace every time; the splash is never the biggest
+# thing this process owns.
 $proc = Get-Process -Id $ProcessId -ErrorAction Stop
-$handle = $proc.MainWindowHandle
-if ($handle -eq [IntPtr]::Zero -or -not [LcWin]::IsWindowVisible($handle)) {
-  Write-Error "pid $ProcessId has no visible main window"
+$script:found = @()
+$callback = [LcWin+EnumProc]{
+  param($h, $l)
+  $owner = 0
+  [void][LcWin]::GetWindowThreadProcessId($h, [ref]$owner)
+  if ($owner -eq $ProcessId -and [LcWin]::IsWindowVisible($h)) {
+    $r = New-Object LcWin+RECT
+    [void][LcWin]::GetWindowRect($h, [ref]$r)
+    $area = ($r.Right - $r.Left) * ($r.Bottom - $r.Top)
+    if ($area -gt 0) { $script:found += [pscustomobject]@{ Handle = $h; Area = $area } }
+  }
+  return $true
+}
+[void][LcWin]::EnumWindows($callback, [IntPtr]::Zero)
+if ($script:found.Count -eq 0) {
+  Write-Error "pid $ProcessId has no visible window"
   exit 2
 }
+$handle = ($script:found | Sort-Object Area -Descending | Select-Object -First 1).Handle
 
 if ($Maximize) {
   [void][LcWin]::ShowWindow($handle, 3)   # SW_MAXIMIZE

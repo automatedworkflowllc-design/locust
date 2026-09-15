@@ -46,7 +46,7 @@ try {
     await sleep(500)
     try {
       const list = await (await fetch(`http://127.0.0.1:${String(PORT)}/json/list`)).json()
-      page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl)
+      page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl && !t.url.includes('#splash'))
     } catch { /* not up */ }
   }
   const socket = new WebSocket(page.webSocketDebuggerUrl)

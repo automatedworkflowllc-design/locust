@@ -65,7 +65,7 @@ try {
     if (child.exitCode !== null) throw new Error(`app exited ${child.exitCode}: ${output.join('').slice(-400)}`)
     try {
       const list = await (await fetch('http://127.0.0.1:9290/json/list')).json()
-      page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl)
+      page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl && !t.url.includes('#splash'))
     } catch {
       // not up yet
     }

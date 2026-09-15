@@ -132,7 +132,7 @@ async function runOnce(prompt, port) {
       if (child.exitCode !== null) throw new Error(`app exited ${child.exitCode}`)
       try {
         const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
-        page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl)
+        page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl && !t.url.includes('#splash'))
       } catch { /* not listening yet */ }
     }
     if (page === undefined) throw new Error('renderer never came up')

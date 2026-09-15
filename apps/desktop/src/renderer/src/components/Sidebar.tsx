@@ -278,6 +278,8 @@ export function Sidebar({
     setRailHovered(undefined)
   }
   const railOpenFor = compact ? (railPinned ?? railHovered) : undefined
+  /** The rail's single `+`, which has to say what it would add. */
+  const [addOpen, setAddOpen] = useState(false)
   // Which groups are open. All three start open, which is how the sidebar
   // has always read; folding is for making room, not a new default.
   const [openSections, setOpenSections] = useState({ rooms: true, teammates: true, missions: true, automations: true })
@@ -292,15 +294,67 @@ export function Sidebar({
           <img className="lc-brand__mark" src={mark} alt="" aria-hidden="true" />
           <img className="lc-brand__wordmark" src={wordmark} alt="Locust" />
         </button>
-        <button
-          type="button"
-          className="lc-iconbutton"
-          aria-label="New teammate"
-          title="New teammate"
-          onClick={onNewTeammate}
-        >
-          <Icon name="plus" size={14} />
-        </button>
+        {/*
+          * ONE `+` in the rail, and it says what it would add.
+          *
+          * At 64px the header's plus (new teammate) and the Rooms section's
+          * plus (new room) both collapse to a bare icon, stacked, with
+          * nothing to tell them apart -- Colin, 2026-09-14: "consolidate
+          * room and teammate add into one +, looks clunky". Widened out,
+          * both rows carry their own words and neither needs a menu, so the
+          * menu exists only where the words do not.
+          */}
+        {compact ? (
+          <span className="lc-control__anchor lc-sidebar__add">
+            <button
+              type="button"
+              className="lc-iconbutton"
+              aria-label="Add"
+              title="Add"
+              aria-haspopup="menu"
+              aria-expanded={addOpen}
+              onClick={() => setAddOpen((open) => !open)}
+            >
+              <Icon name="plus" size={14} />
+            </button>
+            {addOpen && (
+              <div className="lc-menu lc-sidebar__addmenu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="lc-menu__item"
+                  onClick={() => {
+                    setAddOpen(false)
+                    onNewTeammate()
+                  }}
+                >
+                  New teammate
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="lc-menu__item"
+                  onClick={() => {
+                    setAddOpen(false)
+                    onOpenRooms()
+                  }}
+                >
+                  New room
+                </button>
+              </div>
+            )}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="lc-iconbutton"
+            aria-label="New teammate"
+            title="New teammate"
+            onClick={onNewTeammate}
+          >
+            <Icon name="plus" size={14} />
+          </button>
+        )}
       </div>
 
       <div className="lc-search">
