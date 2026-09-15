@@ -98,3 +98,55 @@ describe('the roster is one row, and the rail is left alone', () => {
     expect(SIDEBAR).toContain('lc-convlist')
   })
 })
+
+describe('nothing loses its way in', () => {
+  /*
+   * THIS IS THE ONE I SHIPPED BROKEN.
+   *
+   * 0.139.0 flattened the sidebar into a conversation list and moved every
+   * old section behind `compact`, which left Rooms and Routines with nowhere
+   * to be in the wide sidebar at all. Driven after release: no button, no
+   * label, and a room that existed drawn nowhere.
+   *
+   * It is the exact failure the design brief warned about, because it had
+   * already happened once -- rooms reachable only from the palette, and
+   * Colin, 2026-09-09: "sorry if this is dumb but how does one create a room
+   * for teammates, i cant figure it out lol." Not dumb; there was nothing on
+   * screen to find.
+   *
+   * A feature with no way in is not a smaller feature. It is an absent one.
+   */
+  for (const name of ['Missions', 'Rooms', 'Routines', 'Teammates', 'Settings']) {
+    it(`${name} has a button in the footer`, () => {
+      const footer = SIDEBAR.slice(SIDEBAR.indexOf('lc-sidebar__footer'))
+      expect(footer).toContain(`<span>${name}</span>`)
+    })
+  }
+
+  it('gives the roster its full word back, which the narrow row could not hold', () => {
+    /*
+     * "Team" was the shorter answer when three labelled cells shared 266px
+     * and "Teammates" rendered as "Teamma…". Measured at two rows: the cell
+     * is 82px and the word is 55px of ink.
+     *
+     * Scoped to the FOOTER. The faces row has its own `Team` beside the
+     * avatars and that one is right -- it sits in a 26px-tall strip next to
+     * four faces, where the long word would be the loudest thing in the row.
+     * A first version of this test asserted on the whole file and failed on
+     * that button, which is a guard measuring the wrong control.
+     */
+    const footer = SIDEBAR.slice(SIDEBAR.indexOf('lc-sidebar__footer'))
+    expect(footer).not.toContain('<span>Team</span>')
+  })
+
+  it('keeps every footer cell sharing the width rather than claiming it', () => {
+    /*
+     * The scar this row carries: laid out by content, three labelled buttons
+     * came to 371px inside a 266px column and pushed the count clean off the
+     * edge. Two rows of equal thirds is what lets five labels fit; a cell
+     * that sizes itself would reopen it.
+     */
+    expect(rule('.lc-sidebar__nav {')).toContain('repeat(3, minmax(0, 1fr))')
+    expect(rule('.lc-sidebar__nav .lc-connected {')).toContain('min-width: 0')
+  })
+})

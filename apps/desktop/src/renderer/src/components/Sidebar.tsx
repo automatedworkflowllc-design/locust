@@ -1043,29 +1043,70 @@ export function Sidebar({
           * merely squeezed. Cells that share the width cannot overflow
           * whatever the labels ever say.
           */}
+        {/*
+          * TWO ROWS of the same equal thirds, not five cells in one.
+          *
+          * The one-row grid is a scar: laid out by content it came to 371px
+          * inside a 266px column, and even at three equal cells the full word
+          * "Teammates" starved to "Teamma…". Five cells would be ~47px each
+          * and "Routines" does not survive that.
+          *
+          * The design agent's answer, 2026-09-15, picked rather than left to
+          * implementation: keep the grid exactly as delivered and give it a
+          * second row. Nothing is content-sized, so the scar cannot reopen.
+          *
+          * WHY THESE TWO ARE HERE AT ALL. 0.139.0 flattened the sidebar into
+          * a conversation list and left Rooms and Routines with nowhere to
+          * be -- measured after shipping it: no button, no label, and an
+          * existing room not drawn anywhere in the wide sidebar. That is the
+          * exact failure the design brief warned about, because it had
+          * happened before: rooms reachable only from the palette, and Colin,
+          * 2026-09-09, "sorry if this is dumb but how does one create a room
+          * for teammates, i cant figure it out lol". A labelled footer button
+          * beats a fold under 300px of roster; no button at all beats
+          * nothing.
+          */}
         <div className="lc-sidebar__nav">
           <button type="button" onClick={onOpenMissions} title="All missions (Ctrl 1)">
             <Icon name="inbox" size={14} />
             <span>Missions</span>
           </button>
-          <button type="button" onClick={onOpenTeammates} title="Team (Ctrl 2)">
+          <button type="button" onClick={onOpenRooms} title="Rooms — ask several teammates at once (Ctrl 4)">
             <Icon name="users" size={14} />
-            {/* "Team", not "Teammates": Colin's call, and the design agent's
-              * original. The full name needed 63px of a cell and rendered as
-              * "Teamma…"; the screen it opens is still titled Teammates, and
-              * the tooltip says so. */}
-            <span>Team</span>
+            <span>Rooms</span>
+          </button>
+          <button type="button" onClick={onOpenAutomations} title="Routines — work that repeats">
+            <Icon name="clock" size={14} />
+            <span>Routines</span>
+          </button>
+        </div>
+        <div className="lc-sidebar__nav">
+          <button type="button" onClick={onOpenTeammates} title="Teammates (Ctrl 2)">
+            <Icon name="users" size={14} />
+            {/* "Team" was the shorter answer when three labelled cells had to
+              * share 266px and the full word rendered as "Teamma…". At 74px
+              * it fits: the design agent measured it at 63px of ink. */}
+            <span>Teammates</span>
           </button>
           <button type="button" onClick={onOpenSettings} title="Settings (Ctrl 3)">
             <Icon name="settings" size={14} />
             <span>Settings</span>
           </button>
-        </div>
-        <div className="lc-connected">
-          <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
-          <span>
-            {connected} runtime{connected === 1 ? '' : 's'} connected
-          </span>
+          {/*
+            * The connected count takes the third cell rather than a line of
+            * its own. The full sentence is the tooltip: "6 runtimes
+            * connected" is far more ink than a cell holds, and a count that
+            * truncates is worse than one that is merely short.
+            *
+            * Measured rather than guessed at: the cell came out 82px and the
+            * widest label in the grid is "Teammates" at 55px, so there was
+            * room for a real word. The first attempt said "6 on", which is
+            * short and means nothing.
+            */}
+          <div className="lc-connected" title={`${connected} runtime${connected === 1 ? '' : 's'} connected`}>
+            <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
+            <span>{connected} connected</span>
+          </div>
         </div>
       </div>
     </nav>

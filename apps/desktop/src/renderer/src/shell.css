@@ -9893,3 +9893,26 @@ textarea {
 .lc-faces__clear:hover {
   color: var(--lc-text-secondary);
 }
+
+/* The footer is two rows of the same equal thirds now, so they need to be
+   spaced from each other rather than from a line that no longer exists. */
+.lc-sidebar__footer .lc-sidebar__nav + .lc-sidebar__nav {
+  margin-top: var(--lc-space-2);
+}
+
+/* In the grid, the connected cell is a cell: it may not set its own width or
+   it stops sharing and the row is content-sized again -- which is the exact
+   shape that overflowed this column by 105px. */
+.lc-sidebar__nav .lc-connected {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  justify-content: center;
+}
+
+.lc-sidebar__nav .lc-connected > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

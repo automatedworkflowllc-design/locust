@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.140.0 - 2026-09-15
+
+- **Rooms and Routines are back.** Flattening the sidebar in 0.139.0 left
+  them with nowhere to be: in a normal window there was no button, no
+  heading, and a room you had already made was drawn nowhere at all. They are
+  in the footer now, beside Missions, Teammates and Settings — and in the
+  narrow window too, where Rooms had never been reachable.
+- **The roster button says Teammates again.** It was shortened to "Team"
+  because three labelled buttons could not share 266px without the word
+  breaking. The footer is two rows now, so it fits.
+
 ## 0.139.0 - 2026-09-15
 
 - **The sidebar lists your conversations, newest first.** They used to sit
