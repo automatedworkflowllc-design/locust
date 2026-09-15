@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
 import type { PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
@@ -23,7 +23,8 @@ import { PixelFace } from './PixelFace.js'
 import type { TeammateStatusView } from '../status.js'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
-import { railCountBadge } from '../railFlyout.js'
+import { railCountBadge, shortAgo } from '../railFlyout.js'
+import { conversationRows, ownerOf } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
 
@@ -277,6 +278,17 @@ export function Sidebar({
     setRailPinned(undefined)
     setRailHovered(undefined)
   }
+  const [faceFilter, setFaceFilter] = useState<string>()
+  /*
+   * The age column has to move on its own. `2m` that stays `2m` for an hour
+   * is worse than no age at all, because most-recent-first is only legible
+   * if the numbers agree with the order they claim.
+   */
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(tick)
+  }, [])
   const railOpenFor = compact ? (railPinned ?? railHovered) : undefined
   /** The rail's single `+`, which has to say what it would add. */
   const [addOpen, setAddOpen] = useState(false)
@@ -284,6 +296,18 @@ export function Sidebar({
   // has always read; folding is for making room, not a new default.
   const [openSections, setOpenSections] = useState({ rooms: true, teammates: true, missions: true, automations: true })
   const connected = connectedRuntimeCount(runtimes)
+  /*
+   * The flat list: every conversation in this folder, live first then newest
+   * first, filtered by the same query the nested layout used.
+   *
+   * `faceFilter` is the roster row acting as a filter rather than a
+   * container -- clicking a face narrows the list to that teammate and
+   * clicking it again clears it. The teammate is still a property of every
+   * row either way.
+   */
+  const shownConversations = conversationRows(missionsMatching(missions, query)).filter(
+    (mission) => faceFilter === undefined || ownerOf(mission, missionOwners) === faceFilter
+  )
   const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
   const shownUnowned = missionsMatching(unowned, query)
   return (
@@ -384,456 +408,581 @@ export function Sidebar({
         />
       </div>
 
-      <div className="lc-sidebar__scroll">
-        {/*
-          * Rooms sit above the roster: a room is where several teammates
-          * are written to at once, so it reads before any one of them. Only
-          * DRAWN EVEN WITH NO ROOMS, which is the opposite of what this
-          * comment used to say. It said the way in is the Rooms screen, "one
-          * palette entry or Ctrl 4 away, so an empty section has nothing to
-          * say here" -- and that is exactly backwards. An empty section's
-          * whole job is to say the feature exists.
-          *
-          * The result was a feature nobody could reach without already having
-          * used it: rooms appeared in the sidebar only once you had made one,
-          * and the only ways to make a first one were a keyboard shortcut and
-          * a palette entry. Colin, who owns the app and had watched a day of
-          * work go into rooms, 2026-09-09: "sorry if this is dumb but how
-          * does one create a room for teammates, i cant figure it out lol."
-          * Not dumb -- there was nothing on screen to find.
-          */}
-        {/*
-          * The same section as its neighbours: a fold and a count. It was a
-          * bare label over the rows, so TEAMMATES 3 and ROUTINES 0 folded and
-          * counted while ROOMS did neither (design agent, 2026-09-10).
-          * Always drawn and foldable are not in tension -- the section is
-          * always THERE; whether it is open is the person's.
-          */}
-        <SidebarSection
-          label="Rooms"
-          count={rooms.length}
-          open={openSections.rooms}
-          onToggle={() => setOpenSections((current) => ({ ...current, rooms: !current.rooms }))}
-        >
-          <>
-            {rooms.map((room) => (
+      {/*
+        * The roster, one row tall.
+        *
+        * It used to be 200px of the scroll: four teammates each spending
+        * three lines on themselves -- name, role, and a route line truncated
+        * in every one of them -- above the conversations people actually came
+        * for. The face is the whole identity; the route line went to the Team
+        * roster, which is where comparing models is the task.
+        */}
+      {!compact && teammates.length > 0 && (
+        <div className="lc-faces">
+          {teammates.map((teammate) => {
+            const on = faceFilter === teammate.teammateId
+            const status = viewByTeammate[teammate.teammateId]
+            return (
               <button
-                key={room.roomId}
+                key={teammate.teammateId}
                 type="button"
-                className={`lc-row lc-row--button lc-roomrow${currentRoomId === room.roomId ? ' is-selected' : ''}`}
-                aria-current={currentRoomId === room.roomId ? 'true' : undefined}
-                title={`Open ${room.name}`}
-                onClick={() => onOpenRoom(room.roomId)}
-              >
-                <Icon name="users" size={14} />
-                <span className="lc-row__text">
-                  <span className="lc-row__name">{room.name}</span>
-                  <span className="lc-row__meta">
-                    {String(room.teammateIds.length)} teammate{room.teammateIds.length === 1 ? '' : 's'}
-                    {room.posts.length > 0 ? ` · ${String(room.posts.length)} post${room.posts.length === 1 ? '' : 's'}` : ''}
-                  </span>
-                </span>
-              </button>
-            ))}
-            {/*
-              * Two words, and the sentence on hover. It read "New room — ask
-              * several teammates at once", which the rail ellipsised mid-word
-              * -- on the one sentence carrying a feature nobody could find
-              * (design agent, 2026-09-10). Since 0.62.0 a room is made from
-              * the ask, so this row is the way BACK to rooms, not the way in,
-              * and it no longer has to carry the whole explanation.
-              */}
-            <button type="button" className="lc-row lc-row--button lc-roomrow lc-roomrow--new" onClick={onOpenRooms} title="New room — ask several teammates at once, or tick two names in the message box">
-              <Icon name="plus" size={12} />
-              <span className="lc-row__text">
-                <span className="lc-row__meta">New room</span>
-              </span>
-            </button>
-          </>
-        </SidebarSection>
-        <SidebarSection
-          label="Teammates"
-          count={teammates.length}
-          open={openSections.teammates}
-          onToggle={() => setOpenSections((current) => ({ ...current, teammates: !current.teammates }))}
-        >
-        {teammates.map((teammate) => {
-          const owned = missions.filter(
-            (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
-          )
-          // What this teammate's rows show while a search is running. Their
-          // status still comes from ALL their work: a teammate does not stop
-          // working because someone typed in a box.
-          const shownOwned = missionsMatching(owned, query)
-          // The runtime this teammate's own work is on, or is set to use.
-          // Asking about Codex for everyone told a person their teammate
-          // needed a sign-in while she was visibly working on Claude Code;
-          // asking only their MISSIONS said "idle" for a teammate that had
-          // never run and could not. See `runtimeOfTeammate`.
-          /*
-           * One answer per teammate, decided in App and handed down.
-           *
-           * This row used to call `teammateStatusView` itself with inputs
-           * that had drifted from the ones the Team roster's map used -- so
-           * the same teammate read "working" here and idle there, which Grok
-           * caught on screen in 0.116.0. Nothing is computed here now.
-           */
-          const status = viewByTeammate[teammate.teammateId] ?? teammateStatusView({
-            runtime: undefined,
-            anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
-            hasRunningMission: false,
-            pendingApprovals: 0,
-            roleLabel: roleLabelOf(teammate)
-          })
-          const selected = teammate.teammateId === selectedTeammateId
-          return (
-            <div
-              key={teammate.teammateId}
-              className={`lc-teammate lc-railslot${selected ? ' is-selected' : ''}`}
-              ref={(node) => {
-                if (node === null) railSlots.current.delete(teammate.teammateId)
-                else railSlots.current.set(teammate.teammateId, node)
-              }}
-              onMouseEnter={() => railEnter(teammate.teammateId)}
-              onMouseLeave={railLeave}
-            >
-              {/* The rail's one new mark: how many conversations sit behind
-                  this face, drawn only past one. Hidden outside the rail. */}
-              {railCountBadge(owned.length) !== undefined && (
-                <span className="lc-railbadge" aria-hidden="true">{railCountBadge(owned.length)}</span>
-              )}
-              {/*
-                * The hover says name, role AND model -- not just the name. In
-                * the compact rail all three are drawn as text and the rail
-                * hides text, so an avatar there was a coloured square with no
-                * way to find out whose it was (Colin, 2026-09-07).
-                */}
-              <button
-                type="button"
-                className="lc-row lc-row--button"
-                aria-current={selected ? 'true' : undefined}
-                // No native title in the rail: the flyout says the same three
-                // facts as real text, and a tooltip fading in over a panel is
-                // two answers to one question. The full sidebar keeps it.
-                {...(compact ? { 'aria-label': teammateTooltip(teammate) } : { title: teammateTooltip(teammate) })}
-                aria-expanded={compact ? railOpenFor === teammate.teammateId : undefined}
+                className={`lc-faces__one${on ? ' is-on' : ''}`}
+                aria-pressed={on}
+                title={`${teammateTooltip(teammate)} — click to show only their conversations`}
                 onClick={() => {
+                  setFaceFilter(on ? undefined : teammate.teammateId)
                   onSelectTeammate(teammate.teammateId)
-                  railPin(teammate.teammateId)
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault()
                   onTeammateMenu(teammate.teammateId, { x: event.clientX, y: event.clientY })
                 }}
               >
-                <PixelFace
-                  hue={teammate.hue}
-                  avatar={teammate.avatar}
-                  size={30}
-                  activity={status.activity}
-                  presence={facePresenceFor(status.status)}
-                  teammateId={teammate.teammateId}
-                />
-                <span className="lc-row__text">
-                  <span className="lc-row__name">
-                    {teammate.name}
-                    {status.pulse && <span className={`lc-dot is-pulsing lc-tone-${status.tone} lc-namedot`} />}
-                  </span>
-                  {status.activity === 'delegating' ? (
-                    // "subagent working" is the news; the role gives way to it
-                    // when the line is short, instead of the other way round.
-                    <span className="lc-row__meta is-delegating">
-                      {/* One glyph app-wide for "there is another agent in this" -- the same one the helper row uses. */}
-                      <span className="lc-teammate__delegating" aria-hidden="true">
-                        <Icon name="users" size={11} />
-                      </span>
-                      {/* The role stays muted here too: it is identity and has no
-                          state to borrow. This branch tinted the whole line while
-                          the ordinary one had already been split (RULINGS 2026-09-10). */}
-                      <span className="lc-row__metarole">{labelRole(status.label)}</span>
-                      <span className={`lc-row__metastate lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
-                        {labelState(status.label)}
-                      </span>
-                    </span>
-                  ) : (
-                    /*
-                     * The role in muted, the STATE in the tone -- never the
-                     * whole line. "Finance Bro · thinking" was lime end to
-                     * end, so the role was wearing the state's colour and a
-                     * reader could not tell which word the lime was about
-                     * (design agent, 2026-09-10). The delegating branch above
-                     * already split it this way; the ordinary line now does
-                     * too, through the same two helpers.
-                     */
-                    <span className="lc-row__meta">
-                      <span className="lc-row__metarole">{labelRole(status.label)}</span>
-                      <span className={`lc-row__metastate lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
-                        {labelState(status.label)}
-                      </span>
-                    </span>
-                  )}
-                  {/*
-                    * Which step of which routine is running. Derived in the
-                    * shell from the live runs, so it disappears when the work
-                    * does rather than being cleared by hand.
-                    */}
-                  {teammate.route !== undefined && (
-                    // Which model this teammate IS. People pit models against
-                    // each other on purpose, and that only reads if each row
-                    // says who is who without opening a thread. This line
-                    // earns its place; the two below it were one line's worth
-                    // of fact spread over two.
-                    <span
-                      className="lc-row__route lc-mono"
-                      title={`${runtimeDisplayName(teammate.route.runtime)} / ${teammate.route.model}`}
-                    >
-                      {/*
-                        * Spelled as a name, the same way the composer's chip
-                        * spells it -- `Cursor / Grok 4.6`, not `Cursor Agent
-                        * / cursor-grok-4.6-medium`, which says cursor twice
-                        * and then spells a product in lowercase. The exact id
-                        * is the tooltip.
-                        */}
-                      {shortRuntimeName(teammate.route.runtime)} / {modelDisplayName(teammate.route.runtime, teammate.route.model)}
-                    </span>
-                  )}
-                  {/*
-                    * ONE situational line, never two.
-                    *
-                    * The routine step and the worktree branch answer the same
-                    * question -- where and how is this teammate working right
-                    * now -- and the row was drawing both, so a teammate on its
-                    * own branch replaying a routine stacked five lines in a
-                    * 268px rail. Four teammates made it a wall of mono
-                    * (design review, 2026-09-06).
-                    *
-                    * The routine step wins while one is running, because it is
-                    * the thing that is changing; the branch is a standing
-                    * fact and comes back when the routine finishes.
-                    */}
-                  {routineStepByTeammate[teammate.teammateId] !== undefined ? (
-                    <span className="lc-row__route lc-mono" title={routineStepByTeammate[teammate.teammateId]!.name}>
-                      {routineStepLabel(routineStepByTeammate[teammate.teammateId]!)}
-                    </span>
-                  ) : (
-                    teammate.worktree === true && (
-                      <span className="lc-row__route lc-mono" title="Works on its own branch, in its own worktree of the folder">
-                        on {branchNameFor(teammate.name)}
-                      </span>
-                    )
-                  )}
-                </span>
+                <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={26} teammateId={teammate.teammateId} />
+                {status !== undefined && (
+                  <span className={`lc-faces__pip lc-tone-${status.tone}`} aria-hidden="true" />
+                )}
               </button>
-              {shownOwned.length > 0 && (
-                <div className="lc-teammate__missions">
-                  {shownOwned.map((mission) => (
-                    <div className="lc-teammate__missionrow" key={mission.missionId}>
-                    <button
-                      type="button"
-                      className={`lc-teammate__mission${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
-                      onContextMenu={(event) => {
-                        event.preventDefault()
-                        onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
-                      }}
-                      onClick={() => onSelectMission(mission.missionId)}
-                    >
-                      <span
-                        className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}`}
-                      />
-                      <span className="lc-teammate__title">{mission.title}</span>
-                      {(mission.turns ?? 1) > 1 && (
-                        <span className="lc-teammate__turns lc-mono">{mission.turns}</span>
-                      )}
-                    </button>
-                    {/*
-                      * The same menu the right-click opens, with something to
-                      * press. `Save as routine` lives in there and had no
-                      * visible way in at all: a tester concluded routines did
-                      * not exist (2026-09-07). Shown on hover and whenever it
-                      * has focus, so it is reachable by keyboard and does not
-                      * add a permanent object to every row.
-                      */}
-                    <button
-                      type="button"
-                      className="lc-teammate__missionmenu"
-                      aria-label={`Actions for ${mission.title}`}
-                      title="Actions — including Save as routine"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        const box = event.currentTarget.getBoundingClientRect()
-                        onMissionMenu(mission.missionId, { x: box.right, y: box.bottom })
-                      }}
-                    >
-                      <Icon name="dots" size={13} />
-                    </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
+            )
           })}
-        </SidebarSection>
-        {railOpenFor !== undefined && railAnchor !== undefined && (() => {
-          const open = teammates.find((entry) => entry.teammateId === railOpenFor)
-          if (open === undefined) return null
-          const theirs = missions.filter(
-            (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === open.teammateId
-          )
-          const theirRuntime = runtimeOfTeammate(open, theirs)
-          const status = teammateStatusView({
-            runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
-            anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
-            hasRunningMission:
-              theirs.some((mission) => mission.phase === 'running') || starting.includes(open.teammateId),
-            pendingApprovals: pendingApprovals[open.teammateId] ?? 0,
-            roleLabel: roleLabelOf(open),
-            ...(liveActivity[open.teammateId] === undefined ? {} : { liveActivity: liveActivity[open.teammateId] }),
-            recentlyDone: recentlyDone.includes(open.teammateId),
-            recentlyReceived: recentlyReceived.includes(open.teammateId)
-          })
-          return (
-            <RailFlyout
-              teammate={open}
-              statusLabel={status.label}
-              statusTone={status.tone === 'muted' ? 'muted' : status.tone}
-              route={open.route === undefined ? undefined : `${shortRuntimeName(open.route.runtime)} / ${modelDisplayName(open.route.runtime, open.route.model)}`}
-              missions={theirs}
-              selectedMissionId={selectedMissionId}
-              top={railAnchor.top}
-              left={railAnchor.left}
-              pinned={railPinned !== undefined}
-              onSelectMission={(missionId) => {
-                onSelectMission(missionId)
-                railClose()
-              }}
-              onMissionMenu={onMissionMenu}
-              onOpenMissions={() => {
-                onOpenMissions()
-                railClose()
-              }}
-              onNewConversation={() => {
-                // Was `onSelectTeammate`, which selects a teammate who is
-                // already selected and opens the conversation that is
-                // already open -- so the control did nothing at all.
-                onNewConversationWith(open.teammateId)
-                railClose()
-              }}
-              onPointerEnter={() => window.clearTimeout(railCloseTimer.current)}
-              onPointerLeave={railLeave}
-              onClose={railClose}
-            />
-          )
-        })()}
+          <button type="button" className="lc-faces__team" onClick={onOpenTeammates} title="Team (Ctrl 2)">
+            <Icon name="users" size={13} />
+            <span>Team</span>
+          </button>
+        </div>
+      )}
+      {/* What the face filter is doing, in words, because a filtered list
+        * that does not say it is filtered reads as a list that lost things. */}
+      {!compact && faceFilter !== undefined && (
+        <button type="button" className="lc-faces__clear" onClick={() => setFaceFilter(undefined)}>
+          Showing {teammates.find((entry) => entry.teammateId === faceFilter)?.name ?? 'one teammate'} only — show all
+        </button>
+      )}
 
+      <div className="lc-sidebar__scroll">
         {/*
-          "Missions", not "Other missions". The old label drew a distinction
-          that only makes sense from inside the code -- these are the ones no
-          teammate owns -- and Colin read it the way anyone would: "just have
-          it say missions lol, why other missions?"
-
-          Drawn only when it holds something, which is the answer to his next
-          question: are these two redundant? Not in content -- every
-          conversation appears exactly once, under its teammate or here, and
-          all of them stay on the sidebar either way. But once a person has
-          teammates almost nothing is unowned, so this stood as a heading
-          reading 0 for good. Automations keeps its empty holder because an
-          empty Automations teaches what the app can do; an empty Missions
-          teaches nothing.
-        */}
-        {shownUnowned.length > 0 && (
-        <SidebarSection
-          label="Missions"
-          count={shownUnowned.length}
-          open={openSections.missions}
-          onToggle={() => setOpenSections((current) => ({ ...current, missions: !current.missions }))}
-        >
+          * TWO LAYOUTS, because 268px and 64px are different problems.
+          *
+          * Wide, the list IS the sidebar: conversations flat and newest
+          * first, with the teammate as a face on the row rather than a
+          * folder around it. Measured on a light week -- 330px spent before
+          * the first conversation became 0px, and 7 of 14 visible became 14.
+          *
+          * The rail is left exactly as it was, and deliberately. Four pixels
+          * of a title is not a smaller list, it is a decoration that lies
+          * about being one, so at 64px the avatar remains the teammate and
+          * their conversations open in the flyout. Grok drove that rail on
+          * 2026-09-15 and it holds; the measured win here is entirely in the
+          * wide layout, and rebuilding a working rail to match a change it
+          * does not share is how the last rail attempt broke.
+          */}
+        {compact ? (
           <>
-            {shownUnowned.map((mission) => {
-              const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
-              return (
+          {/*
+            * Rooms sit above the roster: a room is where several teammates
+            * are written to at once, so it reads before any one of them. Only
+            * DRAWN EVEN WITH NO ROOMS, which is the opposite of what this
+            * comment used to say. It said the way in is the Rooms screen, "one
+            * palette entry or Ctrl 4 away, so an empty section has nothing to
+            * say here" -- and that is exactly backwards. An empty section's
+            * whole job is to say the feature exists.
+            *
+            * The result was a feature nobody could reach without already having
+            * used it: rooms appeared in the sidebar only once you had made one,
+            * and the only ways to make a first one were a keyboard shortcut and
+            * a palette entry. Colin, who owns the app and had watched a day of
+            * work go into rooms, 2026-09-09: "sorry if this is dumb but how
+            * does one create a room for teammates, i cant figure it out lol."
+            * Not dumb -- there was nothing on screen to find.
+            */}
+          {/*
+            * The same section as its neighbours: a fold and a count. It was a
+            * bare label over the rows, so TEAMMATES 3 and ROUTINES 0 folded and
+            * counted while ROOMS did neither (design agent, 2026-09-10).
+            * Always drawn and foldable are not in tension -- the section is
+            * always THERE; whether it is open is the person's.
+            */}
+          <SidebarSection
+            label="Rooms"
+            count={rooms.length}
+            open={openSections.rooms}
+            onToggle={() => setOpenSections((current) => ({ ...current, rooms: !current.rooms }))}
+          >
+            <>
+              {rooms.map((room) => (
                 <button
+                  key={room.roomId}
                   type="button"
-                  key={mission.missionId}
-                  className="lc-row lc-row--mission"
-                  aria-current={isShown(mission, selectedMissionId)}
-                  onClick={() => onSelectMission(mission.missionId)}
-                  onContextMenu={(event) => {
-                    event.preventDefault()
-                    onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
-                  }}
+                  className={`lc-row lc-row--button lc-roomrow${currentRoomId === room.roomId ? ' is-selected' : ''}`}
+                  aria-current={currentRoomId === room.roomId ? 'true' : undefined}
+                  title={`Open ${room.name}`}
+                  onClick={() => onOpenRoom(room.roomId)}
                 >
-                  <span
-                    className={`lc-dot lc-tone-${view.tone}${mission.phase === 'running' ? ' is-pulsing' : ''}`}
-                  />
+                  <Icon name="users" size={14} />
                   <span className="lc-row__text">
-                    <span className="lc-row__name">{mission.title}</span>
+                    <span className="lc-row__name">{room.name}</span>
                     <span className="lc-row__meta">
-                      {view.label}
-                      {(mission.turns ?? 1) > 1 && ` · ${String(mission.turns)} turns`} ·{' '}
-                      <span className="lc-mono">{shortMissionId(mission.missionId)}</span>
+                      {String(room.teammateIds.length)} teammate{room.teammateIds.length === 1 ? '' : 's'}
+                      {room.posts.length > 0 ? ` · ${String(room.posts.length)} post${room.posts.length === 1 ? '' : 's'}` : ''}
                     </span>
                   </span>
                 </button>
-              )
-            })}
-          </>
-        </SidebarSection>
-        )}
-
-        <SidebarSection
-          label="Routines"
-          count={routines.length}
-          open={openSections.automations}
-          onToggle={() => setOpenSections((current) => ({ ...current, automations: !current.automations }))}
-        >
-          {routines.length === 0 ? (
-            /*
-              * The empty row is a DOOR, not a status.
-              *
-              * It read "Nothing saved yet", which is a fact about the shelf
-              * and tells nobody that pressing it goes anywhere -- the same
-              * mistake the Rooms row made until 0.60.0. It now says what is
-              * behind it, which is the screen that lists the finished
-              * conversations you can save.
-              *
-              * Not "New routine": a routine cannot be made from nothing, so a
-              * button promising a blank one would lie about what it is.
-              */
-            <button
-              type="button"
-              className="lc-row lc-row--button lc-roomrow lc-roomrow--new"
-              onClick={onOpenAutomations}
-              title="Save a finished conversation so a teammate can replay it"
-            >
-              <Icon name="clock" size={12} />
-              <span className="lc-row__text">
-                <span className="lc-row__meta">Save one from a finished conversation</span>
-              </span>
-            </button>
-          ) : (
-            routines.map((routine) => (
-              <button
-                key={routine.routineId}
-                type="button"
-                className="lc-row lc-row--button"
-                title={`Open Routines · ${routine.name}`}
-                onClick={onOpenAutomations}
-              >
-                <Icon name="clock" size={14} />
+              ))}
+              {/*
+                * Two words, and the sentence on hover. It read "New room — ask
+                * several teammates at once", which the rail ellipsised mid-word
+                * -- on the one sentence carrying a feature nobody could find
+                * (design agent, 2026-09-10). Since 0.62.0 a room is made from
+                * the ask, so this row is the way BACK to rooms, not the way in,
+                * and it no longer has to carry the whole explanation.
+                */}
+              <button type="button" className="lc-row lc-row--button lc-roomrow lc-roomrow--new" onClick={onOpenRooms} title="New room — ask several teammates at once, or tick two names in the message box">
+                <Icon name="plus" size={12} />
                 <span className="lc-row__text">
-                  <span className="lc-row__name">{routine.name}</span>
-                  <span className="lc-row__meta">
-                    {String(routine.steps.length)} step{routine.steps.length === 1 ? '' : 's'}
-                    {routine.schedule === undefined ? '' : ' · scheduled'}
-                  </span>
+                  <span className="lc-row__meta">New room</span>
                 </span>
               </button>
-            ))
+            </>
+          </SidebarSection>
+          <SidebarSection
+            label="Teammates"
+            count={teammates.length}
+            open={openSections.teammates}
+            onToggle={() => setOpenSections((current) => ({ ...current, teammates: !current.teammates }))}
+          >
+          {teammates.map((teammate) => {
+            const owned = missions.filter(
+              (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
+            )
+            // What this teammate's rows show while a search is running. Their
+            // status still comes from ALL their work: a teammate does not stop
+            // working because someone typed in a box.
+            const shownOwned = missionsMatching(owned, query)
+            // The runtime this teammate's own work is on, or is set to use.
+            // Asking about Codex for everyone told a person their teammate
+            // needed a sign-in while she was visibly working on Claude Code;
+            // asking only their MISSIONS said "idle" for a teammate that had
+            // never run and could not. See `runtimeOfTeammate`.
+            /*
+             * One answer per teammate, decided in App and handed down.
+             *
+             * This row used to call `teammateStatusView` itself with inputs
+             * that had drifted from the ones the Team roster's map used -- so
+             * the same teammate read "working" here and idle there, which Grok
+             * caught on screen in 0.116.0. Nothing is computed here now.
+             */
+            const status = viewByTeammate[teammate.teammateId] ?? teammateStatusView({
+              runtime: undefined,
+              anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+              anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
+              hasRunningMission: false,
+              pendingApprovals: 0,
+              roleLabel: roleLabelOf(teammate)
+            })
+            const selected = teammate.teammateId === selectedTeammateId
+            return (
+              <div
+                key={teammate.teammateId}
+                className={`lc-teammate lc-railslot${selected ? ' is-selected' : ''}`}
+                ref={(node) => {
+                  if (node === null) railSlots.current.delete(teammate.teammateId)
+                  else railSlots.current.set(teammate.teammateId, node)
+                }}
+                onMouseEnter={() => railEnter(teammate.teammateId)}
+                onMouseLeave={railLeave}
+              >
+                {/* The rail's one new mark: how many conversations sit behind
+                    this face, drawn only past one. Hidden outside the rail. */}
+                {railCountBadge(owned.length) !== undefined && (
+                  <span className="lc-railbadge" aria-hidden="true">{railCountBadge(owned.length)}</span>
+                )}
+                {/*
+                  * The hover says name, role AND model -- not just the name. In
+                  * the compact rail all three are drawn as text and the rail
+                  * hides text, so an avatar there was a coloured square with no
+                  * way to find out whose it was (Colin, 2026-09-07).
+                  */}
+                <button
+                  type="button"
+                  className="lc-row lc-row--button"
+                  aria-current={selected ? 'true' : undefined}
+                  // No native title in the rail: the flyout says the same three
+                  // facts as real text, and a tooltip fading in over a panel is
+                  // two answers to one question. The full sidebar keeps it.
+                  {...(compact ? { 'aria-label': teammateTooltip(teammate) } : { title: teammateTooltip(teammate) })}
+                  aria-expanded={compact ? railOpenFor === teammate.teammateId : undefined}
+                  onClick={() => {
+                    onSelectTeammate(teammate.teammateId)
+                    railPin(teammate.teammateId)
+                  }}
+                  onContextMenu={(event) => {
+                    event.preventDefault()
+                    onTeammateMenu(teammate.teammateId, { x: event.clientX, y: event.clientY })
+                  }}
+                >
+                  <PixelFace
+                    hue={teammate.hue}
+                    avatar={teammate.avatar}
+                    size={30}
+                    activity={status.activity}
+                    presence={facePresenceFor(status.status)}
+                    teammateId={teammate.teammateId}
+                  />
+                  <span className="lc-row__text">
+                    <span className="lc-row__name">
+                      {teammate.name}
+                      {status.pulse && <span className={`lc-dot is-pulsing lc-tone-${status.tone} lc-namedot`} />}
+                    </span>
+                    {status.activity === 'delegating' ? (
+                      // "subagent working" is the news; the role gives way to it
+                      // when the line is short, instead of the other way round.
+                      <span className="lc-row__meta is-delegating">
+                        {/* One glyph app-wide for "there is another agent in this" -- the same one the helper row uses. */}
+                        <span className="lc-teammate__delegating" aria-hidden="true">
+                          <Icon name="users" size={11} />
+                        </span>
+                        {/* The role stays muted here too: it is identity and has no
+                            state to borrow. This branch tinted the whole line while
+                            the ordinary one had already been split (RULINGS 2026-09-10). */}
+                        <span className="lc-row__metarole">{labelRole(status.label)}</span>
+                        <span className={`lc-row__metastate lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
+                          {labelState(status.label)}
+                        </span>
+                      </span>
+                    ) : (
+                      /*
+                       * The role in muted, the STATE in the tone -- never the
+                       * whole line. "Finance Bro · thinking" was lime end to
+                       * end, so the role was wearing the state's colour and a
+                       * reader could not tell which word the lime was about
+                       * (design agent, 2026-09-10). The delegating branch above
+                       * already split it this way; the ordinary line now does
+                       * too, through the same two helpers.
+                       */
+                      <span className="lc-row__meta">
+                        <span className="lc-row__metarole">{labelRole(status.label)}</span>
+                        <span className={`lc-row__metastate lc-tone-${status.tone === 'muted' ? 'muted' : status.tone}`}>
+                          {labelState(status.label)}
+                        </span>
+                      </span>
+                    )}
+                    {/*
+                      * Which step of which routine is running. Derived in the
+                      * shell from the live runs, so it disappears when the work
+                      * does rather than being cleared by hand.
+                      */}
+                    {teammate.route !== undefined && (
+                      // Which model this teammate IS. People pit models against
+                      // each other on purpose, and that only reads if each row
+                      // says who is who without opening a thread. This line
+                      // earns its place; the two below it were one line's worth
+                      // of fact spread over two.
+                      <span
+                        className="lc-row__route lc-mono"
+                        title={`${runtimeDisplayName(teammate.route.runtime)} / ${teammate.route.model}`}
+                      >
+                        {/*
+                          * Spelled as a name, the same way the composer's chip
+                          * spells it -- `Cursor / Grok 4.6`, not `Cursor Agent
+                          * / cursor-grok-4.6-medium`, which says cursor twice
+                          * and then spells a product in lowercase. The exact id
+                          * is the tooltip.
+                          */}
+                        {shortRuntimeName(teammate.route.runtime)} / {modelDisplayName(teammate.route.runtime, teammate.route.model)}
+                      </span>
+                    )}
+                    {/*
+                      * ONE situational line, never two.
+                      *
+                      * The routine step and the worktree branch answer the same
+                      * question -- where and how is this teammate working right
+                      * now -- and the row was drawing both, so a teammate on its
+                      * own branch replaying a routine stacked five lines in a
+                      * 268px rail. Four teammates made it a wall of mono
+                      * (design review, 2026-09-06).
+                      *
+                      * The routine step wins while one is running, because it is
+                      * the thing that is changing; the branch is a standing
+                      * fact and comes back when the routine finishes.
+                      */}
+                    {routineStepByTeammate[teammate.teammateId] !== undefined ? (
+                      <span className="lc-row__route lc-mono" title={routineStepByTeammate[teammate.teammateId]!.name}>
+                        {routineStepLabel(routineStepByTeammate[teammate.teammateId]!)}
+                      </span>
+                    ) : (
+                      teammate.worktree === true && (
+                        <span className="lc-row__route lc-mono" title="Works on its own branch, in its own worktree of the folder">
+                          on {branchNameFor(teammate.name)}
+                        </span>
+                      )
+                    )}
+                  </span>
+                </button>
+                {shownOwned.length > 0 && (
+                  <div className="lc-teammate__missions">
+                    {shownOwned.map((mission) => (
+                      <div className="lc-teammate__missionrow" key={mission.missionId}>
+                      <button
+                        type="button"
+                        className={`lc-teammate__mission${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
+                        onContextMenu={(event) => {
+                          event.preventDefault()
+                          onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
+                        }}
+                        onClick={() => onSelectMission(mission.missionId)}
+                      >
+                        <span
+                          className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}`}
+                        />
+                        <span className="lc-teammate__title">{mission.title}</span>
+                        {(mission.turns ?? 1) > 1 && (
+                          <span className="lc-teammate__turns lc-mono">{mission.turns}</span>
+                        )}
+                      </button>
+                      {/*
+                        * The same menu the right-click opens, with something to
+                        * press. `Save as routine` lives in there and had no
+                        * visible way in at all: a tester concluded routines did
+                        * not exist (2026-09-07). Shown on hover and whenever it
+                        * has focus, so it is reachable by keyboard and does not
+                        * add a permanent object to every row.
+                        */}
+                      <button
+                        type="button"
+                        className="lc-teammate__missionmenu"
+                        aria-label={`Actions for ${mission.title}`}
+                        title="Actions — including Save as routine"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          const box = event.currentTarget.getBoundingClientRect()
+                          onMissionMenu(mission.missionId, { x: box.right, y: box.bottom })
+                        }}
+                      >
+                        <Icon name="dots" size={13} />
+                      </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+            })}
+          </SidebarSection>
+          {railOpenFor !== undefined && railAnchor !== undefined && (() => {
+            const open = teammates.find((entry) => entry.teammateId === railOpenFor)
+            if (open === undefined) return null
+            const theirs = missions.filter(
+              (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === open.teammateId
+            )
+            const theirRuntime = runtimeOfTeammate(open, theirs)
+            const status = teammateStatusView({
+              runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
+              anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+              anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
+              hasRunningMission:
+                theirs.some((mission) => mission.phase === 'running') || starting.includes(open.teammateId),
+              pendingApprovals: pendingApprovals[open.teammateId] ?? 0,
+              roleLabel: roleLabelOf(open),
+              ...(liveActivity[open.teammateId] === undefined ? {} : { liveActivity: liveActivity[open.teammateId] }),
+              recentlyDone: recentlyDone.includes(open.teammateId),
+              recentlyReceived: recentlyReceived.includes(open.teammateId)
+            })
+            return (
+              <RailFlyout
+                teammate={open}
+                statusLabel={status.label}
+                statusTone={status.tone === 'muted' ? 'muted' : status.tone}
+                route={open.route === undefined ? undefined : `${shortRuntimeName(open.route.runtime)} / ${modelDisplayName(open.route.runtime, open.route.model)}`}
+                missions={theirs}
+                selectedMissionId={selectedMissionId}
+                top={railAnchor.top}
+                left={railAnchor.left}
+                pinned={railPinned !== undefined}
+                onSelectMission={(missionId) => {
+                  onSelectMission(missionId)
+                  railClose()
+                }}
+                onMissionMenu={onMissionMenu}
+                onOpenMissions={() => {
+                  onOpenMissions()
+                  railClose()
+                }}
+                onNewConversation={() => {
+                  // Was `onSelectTeammate`, which selects a teammate who is
+                  // already selected and opens the conversation that is
+                  // already open -- so the control did nothing at all.
+                  onNewConversationWith(open.teammateId)
+                  railClose()
+                }}
+                onPointerEnter={() => window.clearTimeout(railCloseTimer.current)}
+                onPointerLeave={railLeave}
+                onClose={railClose}
+              />
+            )
+          })()}
+
+          {/*
+            "Missions", not "Other missions". The old label drew a distinction
+            that only makes sense from inside the code -- these are the ones no
+            teammate owns -- and Colin read it the way anyone would: "just have
+            it say missions lol, why other missions?"
+
+            Drawn only when it holds something, which is the answer to his next
+            question: are these two redundant? Not in content -- every
+            conversation appears exactly once, under its teammate or here, and
+            all of them stay on the sidebar either way. But once a person has
+            teammates almost nothing is unowned, so this stood as a heading
+            reading 0 for good. Automations keeps its empty holder because an
+            empty Automations teaches what the app can do; an empty Missions
+            teaches nothing.
+          */}
+          {shownUnowned.length > 0 && (
+          <SidebarSection
+            label="Missions"
+            count={shownUnowned.length}
+            open={openSections.missions}
+            onToggle={() => setOpenSections((current) => ({ ...current, missions: !current.missions }))}
+          >
+            <>
+              {shownUnowned.map((mission) => {
+                const view = missionPhaseView(mission.phase, mission.integrityIssueCount > 0)
+                return (
+                  <button
+                    type="button"
+                    key={mission.missionId}
+                    className="lc-row lc-row--mission"
+                    aria-current={isShown(mission, selectedMissionId)}
+                    onClick={() => onSelectMission(mission.missionId)}
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
+                    }}
+                  >
+                    <span
+                      className={`lc-dot lc-tone-${view.tone}${mission.phase === 'running' ? ' is-pulsing' : ''}`}
+                    />
+                    <span className="lc-row__text">
+                      <span className="lc-row__name">{mission.title}</span>
+                      <span className="lc-row__meta">
+                        {view.label}
+                        {(mission.turns ?? 1) > 1 && ` · ${String(mission.turns)} turns`} ·{' '}
+                        <span className="lc-mono">{shortMissionId(mission.missionId)}</span>
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </>
+          </SidebarSection>
           )}
-        </SidebarSection>
+
+          <SidebarSection
+            label="Routines"
+            count={routines.length}
+            open={openSections.automations}
+            onToggle={() => setOpenSections((current) => ({ ...current, automations: !current.automations }))}
+          >
+            {routines.length === 0 ? (
+              /*
+                * The empty row is a DOOR, not a status.
+                *
+                * It read "Nothing saved yet", which is a fact about the shelf
+                * and tells nobody that pressing it goes anywhere -- the same
+                * mistake the Rooms row made until 0.60.0. It now says what is
+                * behind it, which is the screen that lists the finished
+                * conversations you can save.
+                *
+                * Not "New routine": a routine cannot be made from nothing, so a
+                * button promising a blank one would lie about what it is.
+                */
+              <button
+                type="button"
+                className="lc-row lc-row--button lc-roomrow lc-roomrow--new"
+                onClick={onOpenAutomations}
+                title="Save a finished conversation so a teammate can replay it"
+              >
+                <Icon name="clock" size={12} />
+                <span className="lc-row__text">
+                  <span className="lc-row__meta">Save one from a finished conversation</span>
+                </span>
+              </button>
+            ) : (
+              routines.map((routine) => (
+                <button
+                  key={routine.routineId}
+                  type="button"
+                  className="lc-row lc-row--button"
+                  title={`Open Routines · ${routine.name}`}
+                  onClick={onOpenAutomations}
+                >
+                  <Icon name="clock" size={14} />
+                  <span className="lc-row__text">
+                    <span className="lc-row__name">{routine.name}</span>
+                    <span className="lc-row__meta">
+                      {String(routine.steps.length)} step{routine.steps.length === 1 ? '' : 's'}
+                      {routine.schedule === undefined ? '' : ' · scheduled'}
+                    </span>
+                  </span>
+                </button>
+              ))
+            )}
+          </SidebarSection>
+
+          </>
+        ) : (
+          <div className="lc-convlist">
+            {shownConversations.map((mission) => {
+              const owner = ownerOf(mission, missionOwners)
+              const by = owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)
+              const age = shortAgo(mission.lastAt, now)
+              return (
+                <div className="lc-convrow" key={mission.missionId}>
+                  <button
+                    type="button"
+                    className={`lc-conv${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
+                    title={mission.title}
+                    aria-current={isShown(mission, selectedMissionId) ? 'true' : undefined}
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
+                    }}
+                    onClick={() => onSelectMission(mission.missionId)}
+                  >
+                    <span
+                      className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}`}
+                    />
+                    {/*
+                      * The face answers "which teammate" and costs no words.
+                      * It is the same glyph as the roster above and the
+                      * workroom header, so it identifies rather than labels
+                      * -- which is what let the route line go.
+                      */}
+                    {by === undefined ? (
+                      <span className="lc-conv__nobody" aria-hidden="true" />
+                    ) : (
+                      <PixelFace hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} />
+                    )}
+                    <span className="lc-conv__title">{mission.title}</span>
+                    {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
+                  </button>
+                  <button
+                    type="button"
+                    className="lc-teammate__missionmenu"
+                    aria-label={`Actions for ${mission.title}`}
+                    title="Actions — including Save as routine"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      const box = event.currentTarget.getBoundingClientRect()
+                      onMissionMenu(mission.missionId, { x: box.right, y: box.bottom })
+                    }}
+                  >
+                    <Icon name="dots" size={13} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/*
           Only one empty state, and only when it is true: no missions at all.

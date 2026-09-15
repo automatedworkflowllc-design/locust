@@ -447,7 +447,19 @@ function missionTitle(prompt: string): string {
   // and in the header. The title is what the person typed.
   const { text } = splitAttachments(prompt)
   const trimmed = text.trim().split('\n')[0] ?? text
-  return trimmed.length > 44 ? `${trimmed.slice(0, 44).trimEnd()}…` : trimmed
+  /*
+   * NOT cut here. The column does the cutting.
+   *
+   * This used to stop at 44 characters, which CSS then ellipsised again down
+   * to whatever the column was -- about 22 in the nested layout. The second
+   * cut was invisible and the first one was a ceiling: widening the column
+   * could never show more than 44 characters however much room it had, which
+   * is why the flat list's extra 47px would have bought nothing on its own.
+   *
+   * The first line and the attachment split stay, because those are about
+   * WHAT the title is rather than how long it may be.
+   */
+  return trimmed
 }
 
 /** Discovery is asked again while a runtime is still CHECKING, and on focus after this gap. */
@@ -3310,7 +3322,21 @@ export default function App(): ReactElement {
         ...(rootId === undefined ? {} : { rootId }),
         ...(parentId === undefined ? {} : { parentId }),
         ...(run.teammateId === undefined ? {} : { ownerId: run.teammateId }),
-        ...(run.startedAtIso === undefined ? {} : { lastAt: run.startedAtIso }),
+        /*
+         * When this run started, or when the mission it restored last moved.
+         *
+         * `startedAtIso` is stamped when WE start a run, so a run that was
+         * restored from the ledger rather than started has none -- and the
+         * newest conversation is precisely the one the app restores on
+         * launch. In the nested sidebar that cost nothing, because rows were
+         * grouped by teammate and the age was not drawn. In a list ordered
+         * most-recent-first it put the most recent conversation LAST, with
+         * no age beside it, which is the one row the ordering exists to put
+         * at the top. Seen on the first drive of the flat list, 2026-09-15.
+         */
+        ...(run.startedAtIso ?? run.restoredMission?.lastUpdatedAt) === undefined
+          ? {}
+          : { lastAt: (run.startedAtIso ?? run.restoredMission?.lastUpdatedAt)! },
         // A run's thread already shows the root's words for a continuation.
         // A relayed run's prompt is the host's briefing to a runtime, never a
         // sentence to name a conversation with.

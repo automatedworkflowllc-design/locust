@@ -6,6 +6,29 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.139.0 - 2026-09-15
+
+- **The sidebar lists your conversations, newest first.** They used to sit
+  folded under whichever teammate owned them, so finding one meant first
+  remembering who you gave it to. On a light week — fourteen conversations
+  over four days — that layout spent **330px before the first conversation**,
+  nearly half the column, and showed **7 of 14**. It now spends 4px and shows
+  all fourteen.
+- **Conversation titles are no longer cut short before they reach the
+  screen.** The title was trimmed to 44 characters in code and then trimmed
+  again by the column, so widening it could never have helped. The column
+  does the trimming now, and rows say `2m` / `4h` / `3d` so the order you are
+  looking at is one you can check.
+- **Your teammates are a row of faces under the search box.** Click one to
+  see only their conversations; **Team** opens the full roster, which is where
+  the runtime and model belong — that line used to be repeated, and truncated,
+  once per teammate.
+- **The newest conversation is now actually at the top.** The one the app
+  reopens for you had no timestamp of its own, so it sorted to the bottom of
+  a list that says it is newest-first.
+- The narrow window is unchanged: at 64px the avatars and their flyout are
+  still the way to a conversation.
+
 ## 0.138.0 - 2026-09-15
 
 - **There is a way to say "this broke".** Settings · This app now has

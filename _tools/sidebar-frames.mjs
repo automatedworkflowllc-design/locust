@@ -179,7 +179,7 @@ try {
     const text = document.querySelector('.lc-sidebar__scroll')?.textContent ?? ''
     return JSON.stringify(${JSON.stringify(WORK.map(([, title]) => title))}.filter((title) => text.includes(title.slice(0, 16))))
   })()`))
-  say('titles: ' + await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-teammate__title')].map((el) => (el.textContent || '').trim()).slice(0, 6))`))
+  say('titles: ' + await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-conv__title, .lc-teammate__title')].map((el) => (el.textContent || '').trim()).slice(0, 6))`))
   say(`workspaceId ${workspaceId}`)
   say(`conversations on screen: ${String(seen.length)} of ${String(WORK.length)}`)
   if (seen.length < WORK.length) {
@@ -214,19 +214,19 @@ try {
       sidebar: box('.lc-sidebar'),
       scroll: box('.lc-sidebar__scroll'),
       sections,
-      rowsDrawn: document.querySelectorAll('.lc-sidebar__scroll .lc-row').length,
+      rowsDrawn: document.querySelectorAll('.lc-conv, .lc-sidebar__scroll .lc-row').length,
       // How much of the column is spent BEFORE the first conversation, and
       // how much of a conversation's title survives the indent.
-      firstConversationTop: (() => { const el = document.querySelector('.lc-teammate__missionrow'); return el === null ? null : Math.round(el.getBoundingClientRect().top) })(),
+      firstConversationTop: (() => { const el = document.querySelector('.lc-conv, .lc-teammate__missionrow'); return el === null ? null : Math.round(el.getBoundingClientRect().top) })(),
       scrollTop: Math.round(document.querySelector('.lc-sidebar__scroll')?.getBoundingClientRect().top ?? 0),
-      titleWidth: (() => { const el = document.querySelector('.lc-teammate__title'); return el === null ? null : Math.round(el.getBoundingClientRect().width) })(),
-      titlesShown: [...document.querySelectorAll('.lc-teammate__title')].map((el) => (el.textContent || '').trim()),
+      titleWidth: (() => { const el = document.querySelector('.lc-conv__title, .lc-teammate__title'); return el === null ? null : Math.round(el.getBoundingClientRect().width) })(),
+      titlesShown: [...document.querySelectorAll('.lc-conv__title, .lc-teammate__title')].map((el) => (el.textContent || '').trim()),
       // Conversations actually on screen without scrolling, at this width.
       visible: (() => {
         const scroll = document.querySelector('.lc-sidebar__scroll')
         if (scroll === null) return null
         const box = scroll.getBoundingClientRect()
-        return [...document.querySelectorAll('.lc-teammate__missionrow')]
+        return [...document.querySelectorAll('.lc-conv, .lc-teammate__missionrow')]
           .filter((el) => { const r = el.getBoundingClientRect(); return r.top >= box.top && r.bottom <= box.bottom }).length
       })(),
       // How far past the viewport the list runs: the scrolling cost of the

@@ -12,6 +12,7 @@
  * which rows, in which order, how many, and what the count says.
  */
 
+import { byLiveThenRecent } from './conversationList.js'
 import type { SidebarMission } from './components/Sidebar.js'
 
 /**
@@ -35,14 +36,10 @@ export interface RailRows {
  * unknown age must not outrank a known recent one.
  */
 export function railRows(missions: readonly SidebarMission[]): RailRows {
-  const ordered = [...missions].sort((a, b) => {
-    const liveA = a.phase === 'running' ? 1 : 0
-    const liveB = b.phase === 'running' ? 1 : 0
-    if (liveA !== liveB) return liveB - liveA
-    const atA = a.lastAt === undefined ? 0 : Date.parse(a.lastAt)
-    const atB = b.lastAt === undefined ? 0 : Date.parse(b.lastAt)
-    return (Number.isNaN(atB) ? 0 : atB) - (Number.isNaN(atA) ? 0 : atA)
-  })
+  // The same comparator the sidebar's flat list uses. The rail shows these
+  // conversations in a narrower place, not different ones, and two orderings
+  // meant to agree are two orderings that will not.
+  const ordered = [...missions].sort(byLiveThenRecent)
   const shown = ordered.slice(0, RAIL_ROWS_SHOWN)
   return {
     shown,
