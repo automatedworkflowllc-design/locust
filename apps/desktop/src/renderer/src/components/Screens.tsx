@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { durationText, usagePercent, usageWindowSentence } from '../missionView.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type {
   AppUpdateResponse,
+  DiagnosticsReport,
   AppUpdateState,
   MissionPruneResponse,
   PublicRecoveredMission,
@@ -791,6 +792,61 @@ function RuntimeSetupLine({ setup }: { readonly setup: PublicRuntimeSetup }): Re
     <div className="lc-runtimerow__detail lc-runtimerow__setup" title={title.length === 0 ? 'No configuration files found' : title}>
       {text}
     </div>
+  )
+}
+
+/**
+ * The way a person says "this broke".
+ *
+ * Until 0.138.0 there was none. An uncaught exception raised a dialog that
+ * named `locust-errors.log`, which meant the only people who knew the file
+ * existed were the ones who had already hit a crash the main process could
+ * throw -- and a renderer crash, the one a person would describe as "Locust
+ * disappeared", raised no dialog and wrote no line at all.
+ *
+ * So this exists to be found BEFORE it is needed. It says where the file is,
+ * how big it is, and what is in it, because a person deciding whether to
+ * send a log to someone is entitled to know what they are sending.
+ *
+ * Reveals, never opens -- `main/reveal-file.ts` sets that rule out at
+ * length. And it takes no path: the host knows the only answer, so there is
+ * nothing for the renderer to propose.
+ */
+function ProblemReport(): ReactElement {
+  const [report, setReport] = useState<DiagnosticsReport>()
+  useEffect(() => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    void bridge.diagnosticsReport().then(setReport).catch(() => undefined)
+  }, [])
+  return (
+    <>
+      <dl className="lc-receipt lc-receipt--flush">
+        <dt>Log</dt>
+        <dd className="lc-mono">{report?.path ?? 'in this profile'}</dd>
+        <dt>On disk</dt>
+        <dd className="lc-mono">
+          {report === undefined ? 'measuring…' : report.exists ? formatBytes(report.byteTotal) : 'nothing yet'}
+        </dd>
+      </dl>
+      <More>
+        <p>
+          The log records what happened, never what was said. Crashes, a window that stopped answering,
+          and the version you were on — no messages, no file contents, and nothing from a mission. That is
+          what makes it safe to send.
+        </p>
+        <p>It is capped, and rolls over once. Nothing in it leaves this machine unless you send it.</p>
+      </More>
+      <button
+        type="button"
+        className="lc-button"
+        onClick={() => {
+          void window.desktop?.revealDiagnostics()
+        }}
+      >
+        Show the log
+      </button>
+    </>
   )
 }
 
@@ -1626,6 +1682,13 @@ export function SettingsScreen({
             </p>
           </More>
           <RetentionControl report={storage} onPreview={onPreviewPrune} onPrune={onPrune} />
+        </section>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Report a problem</h2>
+          <p className="lc-settings__lede">
+            If Locust crashes or behaves oddly, this is the file to send.
+          </p>
+          <ProblemReport />
         </section>
 
       </div>

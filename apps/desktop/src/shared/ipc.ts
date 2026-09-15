@@ -354,6 +354,27 @@ export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
  * for why that check is the whole point of the channel.
  */
 export const WORKSPACE_REVEAL_CHANNEL = 'workspace:reveal'
+
+/**
+ * Show the diagnostics log, so a person can send it.
+ *
+ * Takes NO path. `workspace:reveal` has to check the renderer's path against
+ * the folders a mission ran in, because the renderer proposes the
+ * destination; here the host already knows the only answer -- its own profile
+ * -- so there is nothing to propose and nothing to check. The rule the app
+ * runs under is that the renderer names no destinations, and the strongest
+ * form of that is a channel with no argument at all.
+ */
+export const DIAGNOSTICS_REVEAL_CHANNEL = 'diagnostics:reveal'
+
+/** Where the log is and whether anything has been written to it yet. */
+export interface DiagnosticsReport {
+  readonly path: string
+  /** False before the first run has written its opening line. */
+  readonly exists: boolean
+  readonly byteTotal: number
+}
+export const DIAGNOSTICS_REPORT_CHANNEL = 'diagnostics:report'
 /**
  * Choose files to attach to the next message.
  *
@@ -1626,6 +1647,10 @@ export interface DesktopApi {
    * card can say something rather than appear to do nothing.
    */
   revealFile(path: string): Promise<RevealFileResponse>
+  /** Show the diagnostics log in the file manager. Names no path. */
+  revealDiagnostics(): Promise<void>
+  /** Where the log is, for the sentence that tells a person what to send. */
+  diagnosticsReport(): Promise<DiagnosticsReport>
   /** Open one of the addresses the host allows, in the person's browser. */
   openLink(url: string): Promise<OpenLinkResponse>
   /** Open the picker for files to attach; answers workspace-relative paths. */

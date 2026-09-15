@@ -208,7 +208,24 @@ export function bootView(state: BootState, phase: BootPhase, now: number): BootV
     phase,
     preamble,
     rows,
-    progress: `checking ${String(answered)} of ${String(rows.length)} runtimes `,
+    /*
+     * `checking 0 of 0 runtimes` is arithmetic about an empty set, and on a
+     * bare machine it is the ONLY frame anyone sees: a probe for a binary
+     * that is not on PATH answers in about 10ms, so the whole ceremony is
+     * over in half a second and this is the line it flashes.
+     *
+     * Grok's pass 4, 2026-09-15, driving exactly that machine: "The readout
+     * in that flash is empty arithmetic, not reassurance... if the splash is
+     * going to exist for Ian at all, `checking 0 of 0` is the wrong line;
+     * the welcome already has the right one."
+     *
+     * So when there is nothing to count, say what is true instead of
+     * counting it. The welcome behind this says the rest.
+     */
+    progress:
+      rows.length === 0
+        ? 'looking for coding agents on this machine '
+        : `checking ${String(answered)} of ${String(rows.length)} runtimes `,
     summary,
     allAnswered: rows.length > 0 && answered === rows.length
   }

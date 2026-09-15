@@ -481,6 +481,7 @@ export function Sidebar({
           const status = viewByTeammate[teammate.teammateId] ?? teammateStatusView({
             runtime: undefined,
             anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
             hasRunningMission: false,
             pendingApprovals: 0,
             roleLabel: roleLabelOf(teammate)
@@ -684,6 +685,7 @@ export function Sidebar({
           const status = teammateStatusView({
             runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
             anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
             hasRunningMission:
               theirs.some((mission) => mission.phase === 'running') || starting.includes(open.teammateId),
             pendingApprovals: pendingApprovals[open.teammateId] ?? 0,

@@ -378,6 +378,12 @@ export function teammateStatusView(input: {
   readonly runtime: PublicRuntimeStatus | undefined
   /** Whether ANY runtime could take work right now. */
   readonly anyRuntimeUsable?: boolean
+  /**
+   * Whether ANY runtime is on this machine at all -- which is a different
+   * question from whether one is usable, and the difference is the whole of
+   * Grok's finding 2 (2026-09-15).
+   */
+  readonly anyRuntimeInstalled?: boolean
   readonly hasRunningMission: boolean
   readonly pendingApprovals: number
   readonly roleLabel: string
@@ -393,10 +399,24 @@ export function teammateStatusView(input: {
     recentlyDone: input.recentlyDone === true,
     recentlyReceived: input.recentlyReceived === true
   })
-  // Nobody can work when nothing is signed in, whatever this teammate has
-  // done before.
+  /*
+   * Nobody can work when nothing is usable, whatever this teammate has done
+   * before -- but WHY nothing is usable decides what the row should say.
+   *
+   * Grok's pass 4, 2026-09-15, driving the case this app is about to meet:
+   * a machine with no coding CLI at all. Settings said OpenCode **NOT
+   * INSTALLED**; the roster row beside it said **Runtime sign-in required**,
+   * in red. "There is nothing to sign in to. The CLI is not there."
+   *
+   * Two facts wore one sentence, and the wrong one was on the screen a
+   * person stares at after naming their first teammate -- while the screen
+   * that knew the truth was two clicks away. Telling someone to sign in to
+   * software they have not installed is an instruction they cannot follow.
+   */
   if (input.anyRuntimeUsable === false) {
-    return { status: 'blocked', activity, label: 'Runtime sign-in required', tone: 'red', pulse: false }
+    return input.anyRuntimeInstalled === false
+      ? { status: 'blocked', activity, label: 'No runtime installed', tone: 'red', pulse: false }
+      : { status: 'blocked', activity, label: 'Runtime sign-in required', tone: 'red', pulse: false }
   }
   // A teammate whose OWN runtime cannot run is blocked, even if a mission
   // looks active in the renderer -- the sign-in wall outranks optimistic
@@ -404,10 +424,13 @@ export function teammateStatusView(input: {
   // `runtimeOfTeammate` for why "no missions yet" used to mean the same
   // thing and should not have.
   if (input.runtime !== undefined && !runtimeIsUsable(input.runtime)) {
+    // Same distinction, for the teammate's OWN runtime: absent is not
+    // unsigned. `installed` is the runtime's own answer, so this needs
+    // nothing passed in.
     return {
       status: 'blocked',
       activity,
-      label: 'Runtime sign-in required',
+      label: input.runtime.installed ? 'Runtime sign-in required' : 'Runtime not installed',
       tone: 'red',
       pulse: false
     }

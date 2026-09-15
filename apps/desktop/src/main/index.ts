@@ -2,7 +2,7 @@ import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from './window-size.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, screen, session, shell } from 'electron'
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeTheme, Notification, screen, session, shell } from 'electron'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -17,7 +17,7 @@ import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-s
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
-import { appendFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { release } from 'node:os'
@@ -28,6 +28,7 @@ import { createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
 import { createModelCatalog } from './model-catalog.js'
+import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagnostics.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal } from './reveal-file.js'
@@ -117,6 +118,8 @@ import {
   WORKSPACE_PASTE_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
+  DIAGNOSTICS_REVEAL_CHANNEL,
+  DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
@@ -706,16 +709,44 @@ const createWindow = (
  * dialog says so, names the log, and the app goes on unless it cannot.
  */
 const errorLog = (): string => join(app.getPath('userData'), 'locust-errors.log')
-let toldAboutTrouble = false
-const noteTrouble = (label: string, error: unknown): void => {
-  const detail = error instanceof Error ? `${error.stack ?? error.message}` : String(error)
-  const line = `${new Date().toISOString()} ${label}: ${detail}\n`
+
+/**
+ * Append one line, rolling the file first if it has grown past its cap.
+ *
+ * Every failure in here is swallowed on purpose. This runs while something
+ * is already going wrong, and a diagnostics file that throws on its way to
+ * recording a crash would replace a report with a second crash.
+ */
+const note = (label: string, detail: string): void => {
   try {
     mkdirSync(app.getPath('userData'), { recursive: true })
-    appendFileSync(errorLog(), line, 'utf8')
+    const path = errorLog()
+    let bytes: number | undefined
+    try {
+      bytes = statSync(path).size
+    } catch {
+      // No file yet, or it cannot be measured. Either way, do not roll.
+    }
+    if (shouldRoll(bytes)) {
+      // One generation. `renameSync` over an existing `.1` replaces it, so
+      // the oldest is dropped rather than accumulating for ever.
+      try {
+        renameSync(path, path + '.1')
+      } catch {
+        // Could not roll -- appending to an oversized log still beats
+        // losing the line.
+      }
+    }
+    appendFileSync(path, diagnosticLine(new Date(), label, detail), 'utf8')
   } catch {
-    // Nowhere to write; the dialog still says what happened.
+    // Nowhere to write at all.
   }
+}
+
+let toldAboutTrouble = false
+const noteTrouble = (label: string, error: unknown): void => {
+  const detail = error instanceof Error ? (error.stack ?? error.message) : String(error)
+  note(label, detail)
   if (toldAboutTrouble) return
   toldAboutTrouble = true
   try {
@@ -730,6 +761,54 @@ const noteTrouble = (label: string, error: unknown): void => {
 process.on('uncaughtException', (error) => noteTrouble('uncaughtException', error))
 process.on('unhandledRejection', (reason) => noteTrouble('unhandledRejection', reason))
 
+/*
+ * THE CRASHES THE TWO LINES ABOVE CANNOT SEE.
+ *
+ * A renderer crash does NOT raise `uncaughtException` in the main process.
+ * The window goes blank or disappears and main carries on healthy with
+ * nothing to report -- so the single most recognisable way for this app to
+ * break, the one a beta tester would describe as "Locust vanished", was the
+ * one failure that wrote no line at all.
+ *
+ * These are `app`-level and so cover every window, including the loading
+ * screen, without either of them having to know about this.
+ */
+app.on('render-process-gone', (_event, _contents, details) => {
+  // `clean-exit` is a window being closed on purpose; it is not trouble and
+  // a log full of it is a log nobody reads.
+  if (details.reason === 'clean-exit') return
+  note('render-process-gone', describeGone(details))
+})
+app.on('child-process-gone', (_event, details) => {
+  if (details.reason === 'clean-exit') return
+  note('child-process-gone', `${details.type} ${describeGone(details)}${details.name === undefined ? '' : ` name=${details.name}`}`)
+})
+
+/*
+ * A window that stops answering is not dead and gets no dialog: it usually
+ * comes back, and Windows draws its own "not responding" on the frame. It IS
+ * worth a line, because "it froze for a bit" is otherwise unanswerable.
+ */
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('unresponsive', () => note('unresponsive', 'a window stopped answering'))
+  contents.on('responsive', () => note('responsive', 'it started answering again'))
+})
+
+/*
+ * Native crash dumps, kept on this machine.
+ *
+ * `uploadToServer: false` is not a default being restated -- it is a promise
+ * the app already makes on screen. Settings says "Every mission is recorded
+ * to an append-only ledger on this machine. Nothing is uploaded." A crash
+ * reporter that phoned home would make that sentence false.
+ *
+ * Started before `whenReady` because a crash during startup is exactly the
+ * one worth catching, and it must be running before there is anything to
+ * crash.
+ */
+crashReporter.start({ uploadToServer: false })
+
+
 if (!ownsSingleInstanceLock) {
   app.quit()
 } else {
@@ -741,6 +820,19 @@ if (!ownsSingleInstanceLock) {
   })
 
   void app.whenReady().then(() => {
+    /*
+     * The first line of every run.
+     *
+     * A log that reaches us with no version in it can only be answered with
+     * a question, and by the time we ask, the person has usually updated.
+     */
+    note('start', startupDetail({
+      version: app.getVersion(),
+      platform: process.platform,
+      release: release(),
+      electron: process.versions.electron ?? 'unknown',
+      packaged: app.isPackaged
+    }))
     nativeTheme.themeSource = 'dark'
     // Windows shows a notification only for an app it can name. Development
     // runs get an id of their own: a dev electron.exe once left a Start-menu
@@ -1893,6 +1985,26 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    /*
+     * Reveal, never open -- the same rule `reveal-file.ts` sets out. A log is
+     * a text file and opening one is harmless, but the rule is worth keeping
+     * whole: the app never hands a path to the operating system and asks it
+     * to decide what running it means.
+     *
+     * The file is guaranteed to exist by the time anyone can press this,
+     * because every run writes its opening line before a window is shown.
+     */
+    ipcMain.handle(DIAGNOSTICS_REVEAL_CHANNEL, () => {
+      shell.showItemInFolder(errorLog())
+    })
+    ipcMain.handle(DIAGNOSTICS_REPORT_CHANNEL, () => {
+      const path = errorLog()
+      try {
+        return { path, exists: true, byteTotal: statSync(path).size }
+      } catch {
+        return { path, exists: false, byteTotal: 0 }
+      }
+    })
     ipcMain.handle(WORKSPACE_REVEAL_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       // The roots are the host's, never the renderer's. The workspace and

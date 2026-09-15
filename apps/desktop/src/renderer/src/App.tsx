@@ -3559,6 +3559,7 @@ export default function App(): ReactElement {
     viewByTeammate[teammate.teammateId] = teammateStatusView({
       runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
       anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
       /*
        * Starting counts as working, because the sidebar says so.
        *
@@ -3597,6 +3598,7 @@ export default function App(): ReactElement {
       : teammateStatusView({
           runtime: runtimes.find((entry) => entry.id === liveRun?.data?.runtime),
           anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
           hasRunningMission: running,
           pendingApprovals: shownApprovals.length,
           roleLabel: roleLabelOf(missionOwner),

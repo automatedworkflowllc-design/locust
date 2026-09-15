@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.138.0 - 2026-09-15
+
+- **There is a way to say "this broke".** Settings · This app now has
+  **Report a problem**: it names the log, says how big it is, says what is in
+  it, and shows it in your file manager. The log records what happened, never
+  what was said — crashes, a window that stopped answering, and the version
+  you were on. No messages, no file contents, nothing from a mission.
+- **A crash that takes the window now leaves a record.** Locust has always
+  logged an error it threw itself, but the window dying is a different thing
+  and it wrote nothing at all — the app would vanish and leave no trace of
+  why. It writes a line now, as does a helper process that dies and a window
+  that stops answering. The log is capped and rolls over once.
+- **A teammate on a machine with no coding agent stopped asking you to sign
+  in.** It said *Runtime sign-in required*, in red, about software that was
+  not installed — an instruction you could not follow, on the first screen
+  you see after naming a teammate. It now says what is actually true.
+- **The loading screen stopped counting nothing.** With no coding agents
+  installed it flashed "checking 0 of 0 runtimes", which is arithmetic about
+  an empty set. It says what it is doing instead.
+
 ## 0.137.0 - 2026-09-14
 
 - **The narrow sidebar works now.** Both of yesterday's complaints are
