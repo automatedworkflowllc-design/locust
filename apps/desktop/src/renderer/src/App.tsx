@@ -743,6 +743,7 @@ export default function App(): ReactElement {
       seedLimitsFrom(listed)
       if (roster.ok) setMissionOwners(roster.data.missionOwners)
       if (roster.ok) setMissionTitles(roster.data.missionTitles)
+      if (roster.ok) setMissionTitles(roster.data.missionTitles)
     }
     return response
   }
@@ -1608,7 +1609,22 @@ export default function App(): ReactElement {
       .then((response) => {
         if (!active || !response.ok) return
         setTeammates(response.data.teammates)
+        /*
+         * BOTH maps, every time, and this one is why.
+         *
+         * `missionTitles` shipped in 0.141.0 read by one refresh path and
+         * not by this one -- the roster read that runs at startup. So a name
+         * you typed was written to disk correctly and never loaded again:
+         * it survived until the window reloaded and then the row went back
+         * to the first line of the prompt. Colin, 2026-09-15: "i renamed
+         * some of my missions and the name didnt save."
+         *
+         * It saved. It was never read. The drive that passed had checked
+         * `listTeammates()` returned the title and had never restarted the
+         * app, which is the only place the difference shows.
+         */
         setMissionOwners(response.data.missionOwners)
+        setMissionTitles(response.data.missionTitles)
       })
       .catch(() => {
         // The roster is optional at startup; missions still run without it.
@@ -2629,6 +2645,7 @@ export default function App(): ReactElement {
           if (!listed.ok) return
           setTeammates(listed.data.teammates)
           setMissionOwners(listed.data.missionOwners)
+          setMissionTitles(listed.data.missionTitles)
         })
       })
       .catch(() => setTeammateError('That teammate could not be created. Nobody was added.'))
@@ -2653,6 +2670,7 @@ export default function App(): ReactElement {
           if (!listed.ok) return
           setTeammates(listed.data.teammates)
           setMissionOwners(listed.data.missionOwners)
+          setMissionTitles(listed.data.missionTitles)
         })
       })
       .catch(() => setTeammateError('That teammate could not be updated. Their details are unchanged.'))
@@ -2698,6 +2716,7 @@ export default function App(): ReactElement {
           if (!listed.ok) return
           setTeammates(listed.data.teammates)
           setMissionOwners(listed.data.missionOwners)
+          setMissionTitles(listed.data.missionTitles)
         })
       })
       .catch(() => setFolderNotice('That could not be changed. The setting is as it was.'))
@@ -2720,6 +2739,7 @@ export default function App(): ReactElement {
           if (!listed.ok) return
           setTeammates(listed.data.teammates)
           setMissionOwners(listed.data.missionOwners)
+          setMissionTitles(listed.data.missionTitles)
         })
       })
       .catch(() => setFolderNotice('That folder could not be chosen. The workspace is unchanged.'))
@@ -2875,6 +2895,7 @@ export default function App(): ReactElement {
         if (!listed.ok) return
         setTeammates(listed.data.teammates)
         setMissionOwners(listed.data.missionOwners)
+        setMissionTitles(listed.data.missionTitles)
         // Their routines went with them; the host drops those, so re-read.
         await reloadRoutines()
       })

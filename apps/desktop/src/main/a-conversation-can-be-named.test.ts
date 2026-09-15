@@ -4,6 +4,9 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { createTeammateStore, MAX_MISSION_TITLE_LENGTH, MAX_MISSION_TITLES } from './teammate-store.js'
 
 /**
@@ -156,5 +159,57 @@ describe('the file is read as untrusted, like everything else in it', () => {
       'utf8'
     )
     expect(await teammates.missionTitles()).toEqual({})
+  })
+})
+
+describe('a name that was saved is read back', () => {
+  /*
+   * THE BUG THIS EXISTS FOR, shipped in 0.141.0 and found by Colin the same
+   * day: "i renamed some of my missions and the name didnt save."
+   *
+   * It saved. It was never read. `missionTitles` travels on the roster
+   * response beside `missionOwners`, and of the seven places that apply a
+   * roster read, I taught ONE of them about titles -- a refresh path -- and
+   * missed the read that runs at startup. So a chosen name was written to
+   * disk correctly, survived until the window reloaded, and then the row
+   * went back to the first line of the prompt.
+   *
+   * The drive that passed had asked `listTeammates()` whether the title came
+   * back and had never restarted the app, which is the only place the
+   * difference shows. The reload is the test.
+   *
+   * So the guard is structural rather than behavioural: the two maps arrive
+   * together and must be applied together, everywhere, or one of them is a
+   * setting that quietly does not persist.
+   */
+  const APP = readFileSync(fileURLToPath(new URL('../renderer/src/App.tsx', import.meta.url)), 'utf8')
+  const count = (needle: RegExp): number => (APP.match(needle) ?? []).length
+
+  it('never applies ownership from a roster read without applying titles too', () => {
+    /*
+     * Counting the two calls and comparing totals is the obvious test and
+     * the wrong one -- it went red at 9 against 7, because the rename's own
+     * recovery path reads titles alone and legitimately has no ownership
+     * counterpart. Equal counts was never the invariant.
+     *
+     * The invariant is directional: wherever a WHOLE roster read is applied,
+     * both maps must come off it. So find each ownership application and
+     * require a titles application within the next few lines.
+     */
+    const lines = APP.split(String.fromCharCode(10))
+    const missed: string[] = []
+    lines.forEach((line, index) => {
+      if (!/setMissionOwners\((?:response|roster|listed)\.data\.missionOwners\)/.test(line)) return
+      const near = lines.slice(index, index + 4).join(' ')
+      if (!near.includes('.data.missionTitles')) missed.push(`App.tsx:${String(index + 1)}: ${line.trim()}`)
+    })
+    expect(missed).toEqual([])
+  })
+
+  it('reads them in the load that runs at startup, not only on a refresh', () => {
+    // The specific miss. `listTeammates` on mount is the only read that
+    // happens before anyone can look at a row.
+    const mount = APP.slice(APP.indexOf('.listTeammates()'), APP.indexOf('.listTeammates()') + 1600)
+    expect(mount).toContain('setMissionTitles')
   })
 })

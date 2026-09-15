@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.145.0 - 2026-09-15
+
+- **A conversation you renamed keeps its name.** Renaming saved it correctly
+  and then never read it back when the app started, so the name lasted until
+  you next opened Locust and the row went back to your first sentence. It
+  loads now, and names you set before this will reappear — they were on disk
+  the whole time.
+
 ## 0.144.0 - 2026-09-15
 
 - **You can delete more than one mission at a time.** Tick the box beside any
