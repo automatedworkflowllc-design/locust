@@ -593,6 +593,18 @@ export type ThreadItem =
   | {
       readonly key: string
       readonly type: 'plan'
+      /**
+       * Whether this turn did nothing but plan.
+       *
+       * Was implicit and is now stated. The plan item only ever existed on a
+       * turn with no activity, so "nothing was changed" was true by
+       * construction -- and when the plan was lifted out of the fold so it
+       * shows on every turn, that sentence started appearing over runs that
+       * had just made thirty tool calls (Colin, 2026-09-14: "this is
+       * definitely a bug", with a plan, the sentence, and `9 tool calls` in
+       * one frame).
+       */
+      readonly touchedNothing?: boolean
       readonly steps: readonly PlanStep[]
       readonly doneCount: number
     }
@@ -1684,7 +1696,10 @@ export function buildThread(
       key: 'plan',
       type: 'plan',
       steps: planSteps.steps,
-      doneCount: planSteps.doneCount
+      doneCount: planSteps.doneCount,
+      // A turn that ran nothing planned and stopped. Anything else has
+      // changed something, whatever its plan says.
+      ...(activity.length === 0 ? { touchedNothing: true } : {})
     })
   }
 

@@ -2760,3 +2760,40 @@ describe('everything a teammate said in one turn', () => {
     expect(turnText(said([{ text: '   ', final: true }]))).toBe('')
   })
 })
+
+describe('a plan does not claim nothing changed when something did', () => {
+  /*
+   * Lifting the plan out of the fold so it is always visible had a cost I
+   * did not see: the plan item also carries "Plan mode — nothing was
+   * changed", and it only ever existed on a turn with NO activity, so that
+   * sentence was true by construction. Shown on every turn, it started
+   * appearing over runs that had just made thirty tool calls.
+   *
+   * Colin, 2026-09-14, with a plan, the sentence, and `9 tool calls` in one
+   * frame: "this is definitely a bug".
+   *
+   * The fact is now carried rather than assumed.
+   */
+  const planned = { plan: [{ step: 'Read it', status: 'pending' }] }
+
+  it('says so when the turn really did only plan', () => {
+    const thread = buildThread([event('plan.updated', planned), event('run.completed', {})], { running: false })
+    const shown = thread.find((item) => item.type === 'plan')
+    expect(shown?.type === 'plan' ? shown.touchedNothing : undefined).toBe(true)
+  })
+
+  it('does not say so when the turn ran tools', () => {
+    const thread = buildThread(
+      [
+        event('plan.updated', planned),
+        event('tool.started', { itemId: 'i1', name: 'edit', command: 'src/a.ts' }),
+        event('tool.completed', { itemId: 'i1', name: 'edit', command: 'src/a.ts', status: 'ok' }),
+        event('run.completed', {})
+      ],
+      { running: false }
+    )
+    const shown = thread.find((item) => item.type === 'plan')
+    expect(shown, 'the plan is still shown').toBeDefined()
+    expect(shown?.type === 'plan' ? shown.touchedNothing : 'missing').toBeUndefined()
+  })
+})

@@ -441,14 +441,18 @@
    *
    * A 2px lime edge is right on a small control and wrong on the message
    * box: Colin, 2026-09-14, "the yellow outline for clicking the chat box
-   * is pointless and clunky, just do what claude does, a very subtle
-   * highlight/glow of the same color". Same hue, a fraction of the weight
-   * -- the indicator stays, which is the part that matters, because an
+   * is pointless and clunky". The first attempt kept the lime at a lower
+   * alpha and was still too much -- "you still went overboard with the
+   * color, just make it work exactly as claude code, very subtle".
+   *
+   * So: NO hue at all. Claude Code's field does not colour on focus, it
+   * lightens -- the border comes up a step and the ground barely lifts. The
+   * indicator survives, which is the part that matters, because an
    * invisible focus ring was the only accessibility defect the static sweep
-   * found.
+   * found; it simply stops announcing itself.
    */
-  --lc-focus-glow: rgba(201, 240, 74, 0.18);
-  --lc-focus-edge: rgba(201, 240, 74, 0.38);
+  --lc-focus-glow: rgba(255, 255, 255, 0.05);
+  --lc-focus-edge: rgba(255, 255, 255, 0.22);
 }
 
 /*

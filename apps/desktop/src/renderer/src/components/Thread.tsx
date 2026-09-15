@@ -118,7 +118,7 @@ export function ThreadItems({
                   * which is a product decision to answer before anything is
                   * drawn.
                   */}
-                {item.steps.length > 0 && (
+                {item.steps.length > 0 && item.touchedNothing === true && (
                   <p className="lc-planmode">
                     Plan mode — nothing was changed. Switch the mode below and send again to have{' '}
                     {owner?.name ?? 'your teammate'} do it.

@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.136.0 - 2026-09-14
+
+- **A plan no longer claims nothing changed when something did.** Showing the
+  plan on every turn brought its "Plan mode — nothing was changed" line with
+  it, over runs that had just made thirty tool calls. The plan stays visible;
+  that sentence appears only on a turn that really did nothing but plan.
+- **Clicking the message box no longer tints it.** It lightens, the way
+  Claude Code's does — the border comes up a step and the ground barely
+  lifts. It still says where the keyboard is.
+- **The narrow sidebar is back to how it was.** Yesterday's attempt at it
+  stretched the mark across the top and stopped the `+` working. Both of the
+  original complaints — no way home, and two pluses you cannot tell apart —
+  are still open and will be done with a way to see them first.
+
 ## 0.135.0 - 2026-09-14
 
 - **Settings is organised.** It was thirteen subjects in one unbroken scroll,
