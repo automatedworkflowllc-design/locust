@@ -3785,6 +3785,15 @@ export default function App(): ReactElement {
               }
               titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
               secondaryOf={missionDoing}
+              /*
+               * One at a time, through the same path a single delete takes.
+               * The host refuses a live mission per id, so a batch that
+               * happens to contain one loses that one and keeps the rest,
+               * rather than the whole batch failing on its account.
+               */
+              onDeleteMissions={(missionIds) => {
+                for (const missionId of missionIds) deleteMissionById(missionId)
+              }}
               teammates={teammates}
               missionOwners={missionOwners}
               onOpen={openMission}

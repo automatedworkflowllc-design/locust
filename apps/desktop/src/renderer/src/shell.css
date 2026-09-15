@@ -9945,3 +9945,81 @@ textarea {
   padding: 0;
   overflow: hidden;
 }
+
+/* --- Selecting missions to delete ------------------------------------- */
+
+.lc-missionrowwrap {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
+/* The row keeps the whole width it had; only the checkbox is new beside it. */
+.lc-missionrowwrap > .lc-missionrow {
+  flex: 1;
+  min-width: 0;
+}
+
+.lc-missionrow__pick {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--lc-lime);
+  cursor: pointer;
+}
+
+.lc-missionrow__pick:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.lc-missionrowwrap.is-picked > .lc-missionrow {
+  border-color: var(--lc-focus-edge);
+  background: var(--lc-bg-selected);
+}
+
+.lc-pickbar {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  margin: 0 var(--lc-space-6) var(--lc-space-3);
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised);
+}
+
+.lc-pickbar__count {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-name);
+}
+
+.lc-pickbar__link {
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+  cursor: pointer;
+}
+
+.lc-pickbar__link:hover {
+  color: var(--lc-text-secondary);
+}
+
+/* Pushed to the far end, away from Clear: the destructive control should not
+   sit under the pointer that just finished doing something harmless. */
+.lc-pickbar__delete {
+  margin-left: auto;
+  padding: 4px var(--lc-space-4);
+  border: 1px solid var(--lc-red-border);
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-red-text);
+  font-size: var(--lc-text-mono-caption);
+  cursor: pointer;
+}
+
+.lc-pickbar__delete:hover,
+.lc-pickbar__delete.is-armed {
+  background: var(--lc-red-tint);
+}

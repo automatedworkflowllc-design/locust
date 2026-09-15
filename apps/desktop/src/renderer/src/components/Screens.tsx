@@ -124,7 +124,8 @@ export function MissionsScreen({
   secondaryOf,
   onOpen,
   unreadableLedgers = 0,
-  ledgerUnreadable = false
+  ledgerUnreadable = false,
+  onDeleteMissions
 }: {
   readonly missions: readonly PublicRecoveredMission[]
   /** The folder this window is open on, so the header can say how many are its own. */
@@ -169,8 +170,16 @@ export function MissionsScreen({
    * directory replaced by a plain file (2026-09-08).
    */
   readonly ledgerUnreadable?: boolean
+  /**
+   * Delete these records for good. Absent means the screen offers no
+   * selection at all -- a list with checkboxes and nowhere to take them is
+   * worse than a list without.
+   */
+  readonly onDeleteMissions?: (missionIds: readonly string[]) => void
 }): ReactElement {
   const [filter, setFilter] = useState<Filter>('All')
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
+  const [armed, setArmed] = useState(false)
   const shown = missions.filter((mission) => matchesFilter(mission, filter, runningMissionIds))
   const withIssues = missions.filter((mission) => mission.integrityIssueCount > 0).length
   /*
@@ -204,6 +213,30 @@ export function MissionsScreen({
   const priced = costs.filter((cost) => cost !== undefined).length
   const total = costLine(sumCosts(costs))
 
+  /*
+   * A running mission cannot be deleted -- the host refuses, because
+   * deleting one would orphan a process still writing into a file that no
+   * longer exists and take away the only control that stops it. So they are
+   * not selectable here either: offering a checkbox for something that will
+   * be refused is an offer the screen knows it cannot keep.
+   */
+  const deletable = shown.filter((mission) => !runningMissionIds.has(mission.missionId))
+  const pickedHere = deletable.filter((mission) => picked.has(mission.missionId))
+  const allPicked = deletable.length > 0 && pickedHere.length === deletable.length
+  const toggle = (missionId: string): void => {
+    setArmed(false)
+    setPicked((current) => {
+      const next = new Set(current)
+      if (next.has(missionId)) next.delete(missionId)
+      else next.add(missionId)
+      return next
+    })
+  }
+  const clear = (): void => {
+    setPicked(new Set())
+    setArmed(false)
+  }
+
   return (
     <div className="lc-screen">
       <ScreenHeader
@@ -236,6 +269,59 @@ export function MissionsScreen({
           </button>
         ))}
       </div>
+      )}
+      {/*
+        * The selection bar, drawn only once something is selected.
+        *
+        * Colin, 2026-09-15: "can we add a check and delete, so we can delete
+        * missions from here or delete more than once." Deleting one at a
+        * time through a right-click menu is fine for one and absurd for
+        * seventeen.
+        *
+        * Two steps, the same shape the row menu already uses: `Delete 6` and
+        * then `Delete 6 for good?`. This removes records that cannot be
+        * recovered, and a single click between a person and that is not
+        * enough -- but a modal for it would be heavier than the act
+        * deserves, and the menu settled that question already.
+        */}
+      {onDeleteMissions !== undefined && picked.size > 0 && (
+        <div className="lc-pickbar" role="status">
+          <span className="lc-pickbar__count">
+            {picked.size} selected
+          </span>
+          <button type="button" className="lc-pickbar__link" onClick={clear}>
+            Clear
+          </button>
+          <button
+            type="button"
+            className="lc-pickbar__link"
+            onClick={() => {
+              setArmed(false)
+              setPicked(allPicked ? new Set() : new Set(deletable.map((mission) => mission.missionId)))
+            }}
+          >
+            {allPicked ? 'Select none' : `Select all ${deletable.length}`}
+          </button>
+          <button
+            type="button"
+            className={`lc-pickbar__delete${armed ? ' is-armed' : ''}`}
+            onClick={() => {
+              if (!armed) {
+                setArmed(true)
+                return
+              }
+              // Only what is still selectable: a mission that started running
+              // between the click and the confirm must not go.
+              const going = deletable
+                .map((mission) => mission.missionId)
+                .filter((missionId) => picked.has(missionId))
+              onDeleteMissions(going)
+              clear()
+            }}
+          >
+            {armed ? `Delete ${picked.size} for good?` : `Delete ${picked.size}`}
+          </button>
+        </div>
       )}
       <div className="lc-screen__scroll">
         {shown.length === 0 ? (
@@ -279,10 +365,32 @@ export function MissionsScreen({
                 Math.max(0, Date.parse(mission.lastUpdatedAt) - Date.parse(mission.createdAt))
               )
               const secondary = secondaryOf?.(mission.missionId)
+              const running = runningMissionIds.has(mission.missionId)
+              const isPicked = picked.has(mission.missionId)
               return (
+                <div
+                  key={mission.missionId}
+                  className={`lc-missionrowwrap${isPicked ? ' is-picked' : ''}`}
+                >
+                  {/*
+                    * Beside the row, never inside it. The row is a button and
+                    * a checkbox nested in one is neither valid nor reachable
+                    * -- the same reason the sidebar's conversation row wraps
+                    * its `...` menu rather than nesting it.
+                    */}
+                  {onDeleteMissions !== undefined && (
+                    <input
+                      type="checkbox"
+                      className="lc-missionrow__pick"
+                      checked={isPicked}
+                      disabled={running}
+                      aria-label={running ? `${titleOf(mission)} is still running` : `Select ${titleOf(mission)}`}
+                      title={running ? 'Still running — stop it first' : undefined}
+                      onChange={() => toggle(mission.missionId)}
+                    />
+                  )}
                 <button
                   type="button"
-                  key={mission.missionId}
                   className="lc-missionrow"
                   onClick={() => onOpen(mission.missionId)}
                 >
@@ -316,6 +424,7 @@ export function MissionsScreen({
                   </span>
                   <span className={`lc-missionrow__tag lc-mono lc-tone-${view.tone}`}>{view.tag}</span>
                 </button>
+                </div>
               )
             })}
           </div>

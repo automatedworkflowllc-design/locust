@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.144.0 - 2026-09-15
+
+- **You can delete more than one mission at a time.** Tick the box beside any
+  row on the Missions screen and a bar appears: how many are selected, Clear,
+  Select all, and Delete. It asks once more before the records go.
+- A mission that is still running has no box to tick, and says why — deleting
+  one would take away the control that stops it.
+
 ## 0.143.0 - 2026-09-15
 
 - **If a deleted conversation ever comes back, Locust now says so.** It
