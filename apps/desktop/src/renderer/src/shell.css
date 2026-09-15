@@ -9927,3 +9927,16 @@ textarea {
   padding: 0 var(--lc-space-3);
   font-size: var(--lc-text-description);
 }
+
+/* Finished, and nothing to say about it. The footprint stays so every title
+   in the list starts on the same x; only the colour goes. */
+.lc-conv .lc-dot.is-quiet {
+  background: transparent;
+}
+
+/* The second footer row carries two destinations, so it shares the width two
+   ways. Still equal cells -- nothing is content-sized, so the row cannot
+   overflow whatever its labels ever say. */
+.lc-sidebar__nav--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}

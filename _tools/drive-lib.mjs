@@ -283,16 +283,35 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
      */
     if (seed?.teammates?.length) {
       const names = seed.teammates.map((member) => member.name)
-      const drawn = JSON.parse(await evaluate(`JSON.stringify(
-        [...document.querySelectorAll('button')]
-          .map((b) => b.getAttribute('title') ?? '')
-          .filter((t) => t.startsWith('Message '))
-          .map((t) => t.slice('Message '.length).split(' ')[0])
-      )`))
+      /*
+       * ASK THE APP, do not infer from a tooltip.
+       *
+       * This used to read every button's `title` and keep the ones starting
+       * with "Message ". That worked only for as long as a teammate control
+       * carried a native tooltip naming them -- and on 2026-09-15 the wide
+       * sidebar's faces row dropped its `title` for a hover card, because
+       * Windows was drawing "Message Wembley - Research & Briefs - Cursor
+       * Agent / cursor-grok-4.6-medium - click to show only their
+       * conversations" as one unbroken line.
+       *
+       * Every drive then failed with "the app did not accept 1 seeded
+       * teammate(s)" about a roster the app had loaded perfectly. A premise
+       * check that reads a tooltip is a premise check coupled to a
+       * presentation detail, and it failed in the most misleading direction
+       * available: it accused the product of dropping records.
+       *
+       * The bridge is the honest question. "Did the app accept this roster"
+       * is a question about what the app LOADED, so ask it what it loaded.
+       */
+      const drawn = JSON.parse(await evaluate(`(async () => {
+        const roster = await window.desktop.listTeammates()
+        return JSON.stringify(roster?.ok === true ? roster.data.teammates.map((t) => t.name) : [])
+      })()`))
       const missing = names.filter((name) => !drawn.includes(name))
       if (missing.length > 0) {
         say(`the app did not accept ${String(missing.length)} seeded teammate(s): ${missing.join(', ')}`)
         say('a record is dropped when its hue or role is not one the roster knows.')
+        say('(this now asks the app what it loaded, so a missing name is the app dropping it.)')
         say(`hues: lime, blue, violet, clay -- roles: Code & Migrations, Research & Briefs, Ops & Scheduling, Docs & QA, Data & Reporting, Custom`)
         process.exit(1)
       }

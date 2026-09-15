@@ -236,7 +236,7 @@ export function Sidebar({
   const [railAnchor, setRailAnchor] = useState<{ readonly top: number; readonly left: number } | undefined>(undefined)
   const railOpenTimer = useRef<number | undefined>(undefined)
   const railCloseTimer = useRef<number | undefined>(undefined)
-  const railSlots = useRef(new Map<string, HTMLDivElement>())
+  const railSlots = useRef(new Map<string, HTMLElement>())
   const measureRail = (teammateId: string): void => {
     // From the trigger's MEASURED rect, never a row-pitch constant: the mock's
     // first draft guessed a pitch and drifted 4px further out with every
@@ -252,7 +252,20 @@ export function Sidebar({
     setRailAnchor({ top: Math.max(8, box.top - 6), left: (rail?.right ?? box.right) + 8 })
   }
   const railEnter = (teammateId: string): void => {
-    if (!compact) return
+    /*
+     * Hover opens the card in BOTH layouts now.
+     *
+     * The wide faces row first shipped with a native `title`, which Windows
+     * draws as one unbroken line: "Message Wembley · Research & Briefs ·
+     * Cursor Agent / cursor-grok-4.6-medium — click to show only their
+     * conversations". Colin, 2026-09-15: "maybe the little profile cards
+     * that we had built previously for the teammates can be hoverable as
+     * opposed to this massive text line."
+     *
+     * The card already existed and already says all of it, laid out, with
+     * their conversations under it. One answer to "who is this" rather than
+     * two, and the tooltip was the worse of them.
+     */
     window.clearTimeout(railCloseTimer.current)
     window.clearTimeout(railOpenTimer.current)
     railOpenTimer.current = window.setTimeout(() => {
@@ -268,6 +281,9 @@ export function Sidebar({
     railCloseTimer.current = window.setTimeout(() => setRailHovered(undefined), 160)
   }
   const railPin = (teammateId: string): void => {
+    // Pinning stays a RAIL affordance. Wide, a click on a face filters the
+    // list, so a click that also pinned a panel over it would be two
+    // answers to one press.
     if (!compact) return
     window.clearTimeout(railOpenTimer.current)
     window.clearTimeout(railCloseTimer.current)
@@ -297,7 +313,7 @@ export function Sidebar({
     const tick = window.setInterval(() => setNow(new Date()), 30_000)
     return () => window.clearInterval(tick)
   }, [])
-  const railOpenFor = compact ? (railPinned ?? railHovered) : undefined
+  const railOpenFor = railPinned ?? railHovered
   /** The rail's single `+`, which has to say what it would add. */
   const [addOpen, setAddOpen] = useState(false)
   // Which groups are open. All three start open, which is how the sidebar
@@ -436,7 +452,21 @@ export function Sidebar({
                 type="button"
                 className={`lc-faces__one${on ? ' is-on' : ''}`}
                 aria-pressed={on}
-                title={`${teammateTooltip(teammate)} — click to show only their conversations`}
+                // No native `title`: the card that opens on hover says all of
+                // this laid out, and a tooltip drawing the same facts as one
+                // unbroken line underneath it is the worse of two answers.
+                // The label stays for anyone who cannot see either.
+                aria-label={`${teammate.name} — show only their conversations`}
+                ref={(node) => {
+                  if (node === null) railSlots.current.delete(teammate.teammateId)
+                  else railSlots.current.set(teammate.teammateId, node)
+                }}
+                onMouseEnter={() => railEnter(teammate.teammateId)}
+                onMouseLeave={railLeave}
+                // Keyboard reaches it too: tabbing to a face is the same
+                // question as pointing at one.
+                onFocus={() => railEnter(teammate.teammateId)}
+                onBlur={railLeave}
                 onClick={() => {
                   setFaceFilter(on ? undefined : teammate.teammateId)
                   onSelectTeammate(teammate.teammateId)
@@ -776,58 +806,6 @@ export function Sidebar({
             )
             })}
           </SidebarSection>
-          {railOpenFor !== undefined && railAnchor !== undefined && (() => {
-            const open = teammates.find((entry) => entry.teammateId === railOpenFor)
-            if (open === undefined) return null
-            const theirs = missions.filter(
-              (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === open.teammateId
-            )
-            const theirRuntime = runtimeOfTeammate(open, theirs)
-            const status = teammateStatusView({
-              runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
-              anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-              anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
-              hasRunningMission:
-                theirs.some((mission) => mission.phase === 'running') || starting.includes(open.teammateId),
-              pendingApprovals: pendingApprovals[open.teammateId] ?? 0,
-              roleLabel: roleLabelOf(open),
-              ...(liveActivity[open.teammateId] === undefined ? {} : { liveActivity: liveActivity[open.teammateId] }),
-              recentlyDone: recentlyDone.includes(open.teammateId),
-              recentlyReceived: recentlyReceived.includes(open.teammateId)
-            })
-            return (
-              <RailFlyout
-                teammate={open}
-                statusLabel={status.label}
-                statusTone={status.tone === 'muted' ? 'muted' : status.tone}
-                route={open.route === undefined ? undefined : `${shortRuntimeName(open.route.runtime)} / ${modelDisplayName(open.route.runtime, open.route.model)}`}
-                missions={theirs}
-                selectedMissionId={selectedMissionId}
-                top={railAnchor.top}
-                left={railAnchor.left}
-                pinned={railPinned !== undefined}
-                onSelectMission={(missionId) => {
-                  onSelectMission(missionId)
-                  railClose()
-                }}
-                onMissionMenu={onMissionMenu}
-                onOpenMissions={() => {
-                  onOpenMissions()
-                  railClose()
-                }}
-                onNewConversation={() => {
-                  // Was `onSelectTeammate`, which selects a teammate who is
-                  // already selected and opens the conversation that is
-                  // already open -- so the control did nothing at all.
-                  onNewConversationWith(open.teammateId)
-                  railClose()
-                }}
-                onPointerEnter={() => window.clearTimeout(railCloseTimer.current)}
-                onPointerLeave={railLeave}
-                onClose={railClose}
-              />
-            )
-          })()}
 
           {/*
             "Missions", not "Other missions". The old label drew a distinction
@@ -990,8 +968,32 @@ export function Sidebar({
                     }}
                     onClick={() => onSelectMission(mission.missionId)}
                   >
+                    {/*
+                      * A dot only where there is something to say.
+                      *
+                      * This draws the mission's PHASE: lime running, red
+                      * failed or interrupted, amber finished with an
+                      * incomplete record, muted cancelled -- and blue for
+                      * completed, which is almost every row almost all of
+                      * the time.
+                      *
+                      * A coloured dot at the left edge of a list row is the
+                      * universal unread mark, so a permanent blue one reads
+                      * as a notification that will not clear. Colin,
+                      * 2026-09-15, doing exactly that: "correct me if im
+                      * wrong but this blue dot would be a notification, but
+                      * it stays there when i click on the convo." The
+                      * reading was right; the meaning was not.
+                      *
+                      * So the ordinary outcome goes quiet and the dot keeps
+                      * its footprint, which holds every title on one x. What
+                      * is left is true: a mark here means this one wants
+                      * something.
+                      */}
                     <span
-                      className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}`}
+                      className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}${
+                        missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone === 'blue' ? ' is-quiet' : ''
+                      }`}
                     />
                     {/*
                       * The face answers "which teammate" and costs no words.
@@ -1026,6 +1028,68 @@ export function Sidebar({
             })}
           </div>
         )}
+
+        {/*
+          * ONE card, drawn for whichever layout asked for it.
+          *
+          * It used to live inside the rail's branch, because the rail was the
+          * only thing that opened it. The wide faces row opens it now too, so
+          * a copy in each branch would be two panels that drift; this is the
+          * same component, the same measured anchor, and the same close
+          * behaviour in both.
+          */}
+        {railOpenFor !== undefined && railAnchor !== undefined && (() => {
+          const open = teammates.find((entry) => entry.teammateId === railOpenFor)
+          if (open === undefined) return null
+          const theirs = missions.filter(
+            (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === open.teammateId
+          )
+          const theirRuntime = runtimeOfTeammate(open, theirs)
+          const status = teammateStatusView({
+            runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
+            anyRuntimeUsable: runtimes.some(runtimeIsUsable),
+            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
+            hasRunningMission:
+              theirs.some((mission) => mission.phase === 'running') || starting.includes(open.teammateId),
+            pendingApprovals: pendingApprovals[open.teammateId] ?? 0,
+            roleLabel: roleLabelOf(open),
+            ...(liveActivity[open.teammateId] === undefined ? {} : { liveActivity: liveActivity[open.teammateId] }),
+            recentlyDone: recentlyDone.includes(open.teammateId),
+            recentlyReceived: recentlyReceived.includes(open.teammateId)
+          })
+          return (
+            <RailFlyout
+              teammate={open}
+              statusLabel={status.label}
+              statusTone={status.tone === 'muted' ? 'muted' : status.tone}
+              route={open.route === undefined ? undefined : `${shortRuntimeName(open.route.runtime)} / ${modelDisplayName(open.route.runtime, open.route.model)}`}
+              missions={theirs}
+              selectedMissionId={selectedMissionId}
+              top={railAnchor.top}
+              left={railAnchor.left}
+              pinned={railPinned !== undefined}
+              onSelectMission={(missionId) => {
+                onSelectMission(missionId)
+                railClose()
+              }}
+              onMissionMenu={onMissionMenu}
+              onOpenMissions={() => {
+                onOpenMissions()
+                railClose()
+              }}
+              onNewConversation={() => {
+                // Was `onSelectTeammate`, which selects a teammate who is
+                // already selected and opens the conversation that is
+                // already open -- so the control did nothing at all.
+                onNewConversationWith(open.teammateId)
+                railClose()
+              }}
+              onPointerEnter={() => window.clearTimeout(railCloseTimer.current)}
+              onPointerLeave={railLeave}
+              onClose={railClose}
+            />
+          )
+        })()}
 
         {/*
           Only one empty state, and only when it is true: no missions at all.
@@ -1123,33 +1187,46 @@ export function Sidebar({
             <span>Routines</span>
           </button>
         </div>
-        <div className="lc-sidebar__nav">
+        {/*
+          * TWO CELLS in this row, not three.
+          *
+          * The first version put Teammates, Settings and the connected count
+          * in one more row of equal thirds, on a measurement that "Teammates
+          * is 63px of ink and now fits". It does not: at three cells the
+          * label is given 55px, because the button also carries a 14px icon
+          * and its gaps. It shipped truncated -- "Teamma…" and "6 connect…"
+          * -- and Colin's screenshot is what caught it.
+          *
+          * The check that missed it compared the label's RENDERED width to
+          * its cell, and a truncated element reports the truncated width, so
+          * that test could only ever pass. `scrollWidth` against
+          * `clientWidth` is the honest question and now says 63 against 55.
+          *
+          * Two rows bought room for two more destinations; they did not buy
+          * eight more pixels of label. Two cells do: 129px each, and the word
+          * fits with room to spare.
+          */}
+        <div className="lc-sidebar__nav lc-sidebar__nav--two">
           <button type="button" onClick={onOpenTeammates} title="Teammates (Ctrl 2)">
             <Icon name="users" size={14} />
-            {/* "Team" was the shorter answer when three labelled cells had to
-              * share 266px and the full word rendered as "Teamma…". At 74px
-              * it fits: the design agent measured it at 63px of ink. */}
             <span>Teammates</span>
           </button>
           <button type="button" onClick={onOpenSettings} title="Settings (Ctrl 3)">
             <Icon name="settings" size={14} />
             <span>Settings</span>
           </button>
-          {/*
-            * The connected count takes the third cell rather than a line of
-            * its own. The full sentence is the tooltip: "6 runtimes
-            * connected" is far more ink than a cell holds, and a count that
-            * truncates is worse than one that is merely short.
-            *
-            * Measured rather than guessed at: the cell came out 82px and the
-            * widest label in the grid is "Teammates" at 55px, so there was
-            * room for a real word. The first attempt said "6 on", which is
-            * short and means nothing.
-            */}
-          <div className="lc-connected" title={`${connected} runtime${connected === 1 ? '' : 's'} connected`}>
-            <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
-            <span>{connected} connected</span>
-          </div>
+        </div>
+        {/*
+          * Status, on its own line again. It is not a destination and it was
+          * only ever in the grid because there was a third cell going spare
+          * -- which is a reason to fill a cell, not a reason to shorten a
+          * sentence. Full width, so it can say the whole thing.
+          */}
+        <div className="lc-connected">
+          <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
+          <span>
+            {connected} runtime{connected === 1 ? '' : 's'} connected
+          </span>
         </div>
       </div>
     </nav>
