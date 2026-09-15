@@ -6,6 +6,27 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.142.0 - 2026-09-15
+
+- **Hovering a teammate shows their card again, not a sentence.** Pointing at
+  a face in the sidebar drew one long tooltip — name, role, runtime and an
+  instruction, all on a single line. It opens the profile card instead, which
+  already existed for the narrow window and says the same things laid out,
+  with their conversations under them.
+- **Their faces move again.** The new roster row was drawn without the state
+  that animates them, so the whole team sat still.
+- **The dot beside a conversation means something now.** It showed the run's
+  outcome, and *completed* was blue — so nearly every row carried a permanent
+  coloured dot that reads like an unread mark and never clears. A finished
+  conversation has no dot; one that is running, failed or left an incomplete
+  record still does.
+- **The sidebar footer stopped cutting its own labels.** It said "Teamma…"
+  and "6 connect…". Teammates has left the footer — the faces row is the way
+  to the roster — and the runtimes line now says its whole sentence.
+- **A running step names the command, not the shell.** It read
+  `cmd /c "dir /s /b …"`, spending the front of every row on the same nine
+  characters and pushing the actual command off the end.
+
 ## 0.141.0 - 2026-09-15
 
 - **You can name a conversation.** Right-click one in the sidebar and choose

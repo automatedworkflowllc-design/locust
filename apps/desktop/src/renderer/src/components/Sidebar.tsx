@@ -476,7 +476,27 @@ export function Sidebar({
                   onTeammateMenu(teammate.teammateId, { x: event.clientX, y: event.clientY })
                 }}
               >
-                <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={26} teammateId={teammate.teammateId} />
+                {/*
+                  * The face MOVES again.
+                  *
+                  * The old roster row passed `activity` and `presence`
+                  * through, which is what made a working teammate's face
+                  * animate and a signed-out one look absent. The faces row
+                  * was built without them, so the whole roster went still --
+                  * Colin, 2026-09-15: "the teammates face used to also be
+                  * animated on the sidebar, lets bring that back as well."
+                  *
+                  * It is the same component and the same state the rest of
+                  * the app reads, so a face here cannot disagree with the
+                  * same teammate's face in the workroom header.
+                  */}
+                <PixelFace
+                  hue={teammate.hue}
+                  avatar={teammate.avatar}
+                  size={26}
+                  teammateId={teammate.teammateId}
+                  {...(status === undefined ? {} : { activity: status.activity, presence: facePresenceFor(status.status) })}
+                />
                 {status !== undefined && (
                   <span className={`lc-faces__pip lc-tone-${status.tone}`} aria-hidden="true" />
                 )}
@@ -1188,45 +1208,40 @@ export function Sidebar({
           </button>
         </div>
         {/*
-          * TWO CELLS in this row, not three.
+          * The second row is Settings and the status, and no Teammates.
           *
-          * The first version put Teammates, Settings and the connected count
-          * in one more row of equal thirds, on a measurement that "Teammates
-          * is 63px of ink and now fits". It does not: at three cells the
-          * label is given 55px, because the button also carries a 14px icon
-          * and its gaps. It shipped truncated -- "Teamma…" and "6 connect…"
-          * -- and Colin's screenshot is what caught it.
+          * Three answers to one collision, and the third is the right one.
+          * 0.140.0 put Teammates, Settings and the count in equal thirds and
+          * shipped truncated -- "Teamma..." and "6 connect..." -- on a fit
+          * check that compared a label's RENDERED width to its cell, which a
+          * truncated element always passes. I then gave the row two cells,
+          * which fit but kept a door nobody needed.
           *
-          * The check that missed it compared the label's RENDERED width to
-          * its cell, and a truncated element reports the truncated width, so
-          * that test could only ever pass. `scrollWidth` against
-          * `clientWidth` is the honest question and now says 63 against 55.
+          * The design agent's answer, once Colin's faces row existed: take
+          * `Teammates` out altogether. The faces and their `Team` pill ARE
+          * the way to the roster, so a footer link is a second door to one
+          * room -- and removing it frees two cells for the status line, which
+          * then reads in full instead of "6 connect...". One removal, both
+          * truncations gone.
           *
-          * Two rows bought room for two more destinations; they did not buy
-          * eight more pixels of label. Two cells do: 129px each, and the word
-          * fits with room to spare.
+          * Measured: nav cells 74px against a widest label of 48px, status
+          * 156px against 145px of ink. Nothing content-sized, so the
+          * 371px-into-266px scar cannot reopen.
           */}
-        <div className="lc-sidebar__nav lc-sidebar__nav--two">
-          <button type="button" onClick={onOpenTeammates} title="Teammates (Ctrl 2)">
-            <Icon name="users" size={14} />
-            <span>Teammates</span>
-          </button>
+        <div className="lc-sidebar__nav">
           <button type="button" onClick={onOpenSettings} title="Settings (Ctrl 3)">
             <Icon name="settings" size={14} />
             <span>Settings</span>
           </button>
-        </div>
-        {/*
-          * Status, on its own line again. It is not a destination and it was
-          * only ever in the grid because there was a third cell going spare
-          * -- which is a reason to fill a cell, not a reason to shorten a
-          * sentence. Full width, so it can say the whole thing.
-          */}
-        <div className="lc-connected">
-          <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
-          <span>
-            {connected} runtime{connected === 1 ? '' : 's'} connected
-          </span>
+          {/* The status spans the two cells the removed label freed. It stays
+              mono and muted while the nav labels stay sentence case, so the
+              row reads as one fact beside places rather than three peers. */}
+          <div className="lc-connected lc-connected--wide" title={`${connected} runtime${connected === 1 ? '' : 's'} connected`}>
+            <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
+            <span>
+              {connected} runtime{connected === 1 ? '' : 's'} connected
+            </span>
+          </div>
         </div>
       </div>
     </nav>

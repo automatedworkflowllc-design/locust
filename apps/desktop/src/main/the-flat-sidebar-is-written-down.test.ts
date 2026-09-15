@@ -116,12 +116,28 @@ describe('nothing loses its way in', () => {
    *
    * A feature with no way in is not a smaller feature. It is an absent one.
    */
-  for (const name of ['Missions', 'Rooms', 'Routines', 'Teammates', 'Settings']) {
+  for (const name of ['Missions', 'Rooms', 'Routines', 'Settings']) {
     it(`${name} has a button in the footer`, () => {
       const footer = SIDEBAR.slice(SIDEBAR.indexOf('lc-sidebar__footer'))
       expect(footer).toContain(`<span>${name}</span>`)
     })
   }
+
+  it('the roster is reachable too, from the faces row rather than the footer', () => {
+    /*
+     * The rule is REACHABILITY, not a location. This test listed Teammates
+     * among the footer buttons until 0.142.0, when it came out of the footer
+     * on purpose: the faces row and its `Team` pill are the way to the
+     * roster, so a footer link was a second door to one room -- and removing
+     * it freed the two cells that let the status line say its whole
+     * sentence.
+     *
+     * Asserted where the door actually is, so the guard still fails if the
+     * roster loses its way in, and does not fail merely because it moved.
+     */
+    expect(SIDEBAR).toContain('lc-faces__team')
+    expect(SIDEBAR).toContain('onOpenTeammates')
+  })
 
   it('gives the roster its full word back, which the narrow row could not hold', () => {
     /*
@@ -137,6 +153,8 @@ describe('nothing loses its way in', () => {
      */
     const footer = SIDEBAR.slice(SIDEBAR.indexOf('lc-sidebar__footer'))
     expect(footer).not.toContain('<span>Team</span>')
+    // And no full word either: the footer stopped carrying the roster at all.
+    expect(footer).not.toContain('<span>Teammates</span>')
   })
 
   it('keeps every footer cell sharing the width rather than claiming it', () => {

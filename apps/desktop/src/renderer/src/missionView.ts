@@ -1269,6 +1269,44 @@ function prettyServer(raw: string): string {
  * Matched case-blind, because the two spellings differ only in case and the
  * next runtime will pick one of them.
  */
+/**
+ * The command a person would recognise, with the shell wrapper taken off.
+ *
+ * A runtime does not run `dir /s /b`; it runs
+ * `cmd /c "dir /s /b /o-d .locust sessions backups"`, and on this Windows box
+ * every single shell call arrives wearing that prefix. The row then spends
+ * its first nine characters on a fact that is true of every row, and the
+ * command itself is what gets ellipsised off the end -- Colin, 2026-09-15,
+ * looking at exactly that: "is this working as intended with the txt there,
+ * i feel like claude code portrays it cleaner usually."
+ *
+ * It is right: the wrapper is transport, the same species as `mcp__` on a
+ * connector name, which this file already strips for the same reason.
+ *
+ * Deliberately conservative. Only the wrappers this app itself spawns are
+ * matched, only at the very start, and the quotes come off only when they
+ * enclose the WHOLE remainder -- `cmd /c "a" && "b"` keeps its quotes,
+ * because taking them off there would change what the line says. Anything
+ * unrecognised is returned untouched: a command shown in full is never
+ * wrong, only long.
+ */
+export function withoutShellWrapper(command: string): string {
+  const trimmed = command.trim()
+  const wrapper = /^(?:cmd(?:\.exe)?\s+\/[cCkK]|powershell(?:\.exe)?(?:\s+-\w+)*\s+-[cC]ommand|pwsh(?:\s+-\w+)*\s+-[cC]ommand|(?:\/bin\/)?(?:ba|z)?sh\s+-[lic]*c)\s+/.exec(trimmed)
+  if (wrapper === null) return trimmed
+  const rest = trimmed.slice(wrapper[0].length).trim()
+  if (rest.length === 0) return trimmed
+  for (const quote of ['"', "'"]) {
+    if (rest.startsWith(quote) && rest.endsWith(quote) && rest.length > 1) {
+      const inner = rest.slice(1, -1)
+      // Only when the quotes wrap the whole thing: an inner quote means the
+      // outer pair is punctuation inside a larger line, not a wrapper.
+      if (!inner.includes(quote)) return inner.trim()
+    }
+  }
+  return rest
+}
+
 export function isShellTool(name: string, toolKind: string | undefined): boolean {
   // `run_command` is Antigravity's word, and leaving it out cost every one of
   // its runs their commands: MEASURED 2026-09-13 across the recorded ledgers,
@@ -1503,7 +1541,10 @@ export function buildThread(
         const mcp = mcpToolParts(event.payload.name)
         const detail: ActivityDetail = {
           kind: toolKindOf(event),
-          name: mcp?.tool ?? event.payload.command ?? event.payload.name,
+          name:
+            mcp?.tool
+            ?? (event.payload.command === undefined ? undefined : withoutShellWrapper(event.payload.command))
+            ?? event.payload.name,
           tool: mcp?.server ?? event.payload.name,
           // Only Claude Code and OpenCode send one; the others leave it
           // undefined and their rows read exactly as they always have.

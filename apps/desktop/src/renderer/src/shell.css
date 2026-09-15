@@ -9937,6 +9937,11 @@ textarea {
 /* The second footer row carries two destinations, so it shares the width two
    ways. Still equal cells -- nothing is content-sized, so the row cannot
    overflow whatever its labels ever say. */
-.lc-sidebar__nav--two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+/* The status line takes the two cells the removed Teammates label freed, so
+   it can say the whole sentence rather than "6 connect...". */
+.lc-connected--wide {
+  grid-column: span 2;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
 }
