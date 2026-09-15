@@ -10023,3 +10023,69 @@ textarea {
 .lc-pickbar__delete.is-armed {
   background: var(--lc-red-tint);
 }
+
+/* --- Groups in the sidebar -------------------------------------------- */
+
+/* The group and its rows are one block, so a fold cannot leave a row of one
+   group sitting under the header of another. */
+.lc-convgroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-convgroup__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lc-convgroup__head > .lc-sectionlabel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Only on hover or focus, like the conversation row's own menu: a permanent
+   control on every group header is three permanent controls. */
+.lc-convgroup__menu {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.lc-convgroup__head:hover .lc-convgroup__menu,
+.lc-convgroup__menu:focus-visible {
+  opacity: 1;
+}
+
+.lc-convgroup__menu:hover {
+  background: var(--lc-hover-surface);
+  color: var(--lc-text-secondary);
+}
+
+.lc-convgroup__empty {
+  padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3) 28px;
+}
+
+.lc-convgroup__rename {
+  width: calc(100% - var(--lc-space-3) * 2);
+  margin: var(--lc-space-2) var(--lc-space-3);
+  height: 26px;
+  padding: 0 var(--lc-space-3);
+  font-size: var(--lc-text-description);
+}
+
+/* A plain heading, not a fold: Ungrouped is always open, so a chevron would
+   offer something that does not happen. */
+.lc-sectionlabel--plain {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+}

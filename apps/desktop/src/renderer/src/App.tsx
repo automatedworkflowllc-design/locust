@@ -10,6 +10,7 @@ import type {
   TubePreference,
   CodexMissionUpdate,
   MissionRouteSummary,
+  PublicGroup,
   PublicRecoveredMission,
   PublicRuntimeStatus,
   PublicStorageReport,
@@ -593,6 +594,33 @@ export default function App(): ReactElement {
     }
   }
 
+  /** Which group is being renamed in place, if any. */
+  const [renamingGroupId, setRenamingGroupId] = useState<string>()
+
+  const openGroupMenu = (groupId: string, at: { readonly x: number; readonly y: number }): void => {
+    const group = groupsRef.current.find((entry) => entry.groupId === groupId)
+    if (group === undefined) return
+    setRowMenuArmed(undefined)
+    setRowMenu({
+      x: at.x,
+      y: at.y,
+      title: group.name,
+      items: [
+        { label: 'Rename', onSelect: () => setRenamingGroupId(groupId) },
+        {
+          label: 'Remove group',
+          confirmLabel: 'Remove for good?',
+          danger: true,
+          // Worth saying on the control itself: removing a container must
+          // never read as removing its contents.
+          onSelect: () => {
+            void window.desktop?.removeGroup(groupId).then(refreshGroups)
+          }
+        }
+      ]
+    })
+  }
+
   const openMissionMenu = (missionId: string, at: { readonly x: number; readonly y: number }): void => {
     const live = [...runsRef.current.values()].some(
       (run) => liveRunIsActive(run) && run.data?.missionId === missionId
@@ -626,6 +654,34 @@ export default function App(): ReactElement {
           label: 'Rename',
           onSelect: () => setRenamingMissionId(missionId)
         },
+        /*
+         * Moving a conversation is listed the way assigning one is -- one
+         * entry per destination rather than a submenu, which is the shape
+         * this menu already uses for `Assign to <teammate>`.
+         *
+         * Keyed by the CONVERSATION. Filing a reply somewhere its exchange
+         * is not would be a group that lies about what it holds.
+         */
+        ...groupsRef.current
+          .filter((group) => groupMembersRef.current[conversationKeyOf(missionId)] !== group.groupId)
+          .map((group) => ({
+            label: `Move to ${group.name}`,
+            onSelect: () => {
+              void window.desktop
+                ?.assignGroup(conversationKeyOf(missionId), group.groupId)
+                .then(refreshGroups)
+            }
+          })),
+        ...(groupMembersRef.current[conversationKeyOf(missionId)] === undefined
+          ? []
+          : [
+              {
+                label: 'Take out of group',
+                onSelect: () => {
+                  void window.desktop?.assignGroup(conversationKeyOf(missionId), undefined).then(refreshGroups)
+                }
+              }
+            ]),
         // Hand a conversation to a teammate after the fact. Flat items, one
         // per teammate, so the menu stays one press deep; a roster longer
         // than six says where the rest are.
@@ -788,6 +844,18 @@ export default function App(): ReactElement {
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [missionTitles, setMissionTitles] = useState<Readonly<Record<string, string>>>({})
+  const [groups, setGroups] = useState<readonly PublicGroup[]>([])
+  const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, string>>>({})
+  const refreshGroups = (): void => {
+    void window.desktop
+      ?.listGroups()
+      .then((response) => {
+        if (!response.ok) return
+        setGroups(response.data.groups)
+        setGroupMembers(response.data.members)
+      })
+      .catch(() => undefined)
+  }
   /**
    * Replies the host has decided on and is still starting, by teammate.
    *
@@ -1163,6 +1231,21 @@ export default function App(): ReactElement {
   const [recentlyDone, setRecentlyDone] = useState<readonly string[]>([])
   const [recentlyReceived, setRecentlyReceived] = useState<readonly string[]>([])
   const missionOwnersRef = useRef<Readonly<Record<string, string>>>({})
+  const groupsRef = useRef<readonly PublicGroup[]>([])
+  const groupMembersRef = useRef<Readonly<Record<string, string>>>({})
+  /**
+   * The id a group membership is keyed by: the conversation, not the turn.
+   *
+   * The same key `renameMission` uses. A sidebar row stands for an exchange,
+   * and filing one reply of it somewhere else would be a group that lies
+   * about what it holds.
+   */
+  const conversationKeyOf = (missionId: string): string => {
+    const row = sidebarMissionsRef.current.find((entry) =>
+      (entry.memberIds ?? [entry.missionId]).includes(missionId)
+    )
+    return row?.rootId ?? row?.missionId ?? missionId
+  }
   // Read inside the update listener, which is bound once.
   const historyByIdRef = useRef<ReadonlyMap<string, PublicRecoveredMission>>(new Map())
   const [teammateError, setTeammateError] = useState<string>()
@@ -1628,6 +1711,18 @@ export default function App(): ReactElement {
       })
       .catch(() => {
         // The roster is optional at startup; missions still run without it.
+      })
+
+    void bridge
+      .listGroups()
+      .then((response) => {
+        if (!active || !response.ok) return
+        setGroups(response.data.groups)
+        setGroupMembers(response.data.members)
+      })
+      .catch(() => {
+        // Groups are optional at startup; every conversation is simply
+        // ungrouped until they are read.
       })
 
     void bridge
@@ -3445,6 +3540,12 @@ export default function App(): ReactElement {
   }, [history, historyById, runs, workspaceId, missionTitles])
   // The right-click menu is built outside render and names the row it was
   // opened on, so it reads the rows through this.
+  /*
+   * The menu is built outside render, so it reads groups through refs for
+   * the same reason it reads rows and teammates through them.
+   */
+  groupsRef.current = groups
+  groupMembersRef.current = groupMembers
   sidebarMissionsRef.current = sidebarMissions
   teammatesRef.current = teammates
   routinesRef.current = routines
@@ -3743,6 +3844,17 @@ export default function App(): ReactElement {
           selectedTeammateId={pickedTeammate?.teammateId}
           onSelectMission={openMission}
           onMissionMenu={openMissionMenu}
+          groups={groups}
+          groupMembers={groupMembers}
+          onGroupMenu={openGroupMenu}
+          renamingGroupId={renamingGroupId}
+          onRenameGroup={(groupId, name) => {
+            void window.desktop?.renameGroup(groupId, name).then(refreshGroups)
+          }}
+          onGroupRenameDone={() => setRenamingGroupId(undefined)}
+          onNewGroup={(name) => {
+            void window.desktop?.createGroup(name).then(refreshGroups)
+          }}
           renamingMissionId={renamingMissionId}
           onRenameMission={(missionId, title) => void renameMission(missionId, title)}
           onRenameDone={() => setRenamingMissionId(undefined)}

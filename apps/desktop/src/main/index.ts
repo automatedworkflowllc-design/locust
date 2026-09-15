@@ -29,6 +29,7 @@ import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
 import { createModelCatalog } from './model-catalog.js'
 import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagnostics.js'
+import { createGroupStore } from './group-store.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal } from './reveal-file.js'
@@ -96,6 +97,11 @@ import {
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
+  GROUP_LIST_CHANNEL,
+  GROUP_CREATE_CHANNEL,
+  GROUP_RENAME_CHANNEL,
+  GROUP_REMOVE_CHANNEL,
+  GROUP_ASSIGN_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
@@ -923,6 +929,7 @@ if (!ownsSingleInstanceLock) {
     // reveal root that lets someone open the folder when a write to it fails.
     // A person told "Locust cannot write its ledger" and given no way to go
     // and look at the folder has been informed and not helped.
+    const groups = createGroupStore({ rootDirectory: app.getPath('userData') })
     const ledgerDirectory = join(app.getPath('userData'), 'mission-ledger')
     const missionLedger = createFileMissionLedger({ rootDirectory: ledgerDirectory })
     // Its own directory: the ledger treats every `.jsonl` in ITS directory as
@@ -2336,6 +2343,68 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch {
         return teammateRejected('That conversation could not be renamed.')
+      }
+    })
+
+    /*
+     * Groups. The store answers; this layer only decides who may ask.
+     *
+     * Each mutation refuses with a sentence rather than throwing, and a read
+     * that cannot be done says the file could not be READ rather than
+     * returning an empty list -- an empty store and an unreadable one are
+     * different facts, and conflating them is how a rename once told
+     * somebody a room did not exist while the room was on their screen.
+     */
+    const groupRejected = (message: string) => ({ ok: false, error: { code: 'GROUP_REJECTED', message } }) as const
+
+    ipcMain.handle(GROUP_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return groupRejected('Groups are unavailable.')
+      try {
+        return { ok: true, data: await groups.list() } as const
+      } catch {
+        return { ok: false, error: { code: 'GROUPS_UNAVAILABLE', message: 'Groups could not be read.' } } as const
+      }
+    })
+
+    ipcMain.handle(GROUP_CREATE_CHANNEL, async (event, name: unknown) => {
+      if (!fromOwnWindow(event)) return groupRejected('The group could not be created.')
+      try {
+        await groups.create(name)
+        return { ok: true, data: {} } as const
+      } catch (error) {
+        return groupRejected(error instanceof Error ? error.message : 'That group could not be created.')
+      }
+    })
+
+    ipcMain.handle(GROUP_RENAME_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return groupRejected('The group could not be renamed.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await groups.rename(input.groupId, input.name)
+        return { ok: true, data: {} } as const
+      } catch (error) {
+        return groupRejected(error instanceof Error ? error.message : 'That group could not be renamed.')
+      }
+    })
+
+    ipcMain.handle(GROUP_REMOVE_CHANNEL, async (event, groupId: unknown) => {
+      if (!fromOwnWindow(event)) return groupRejected('The group could not be removed.')
+      try {
+        await groups.remove(groupId)
+        return { ok: true, data: {} } as const
+      } catch {
+        return groupRejected('That group could not be removed.')
+      }
+    })
+
+    ipcMain.handle(GROUP_ASSIGN_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return groupRejected('The conversation could not be moved.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await groups.assign(input.missionId, input.groupId)
+        return { ok: true, data: {} } as const
+      } catch (error) {
+        return groupRejected(error instanceof Error ? error.message : 'That conversation could not be moved.')
       }
     })
 

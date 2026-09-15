@@ -41,6 +41,11 @@ import {
   ROOM_TASK_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
+  GROUP_LIST_CHANNEL,
+  GROUP_CREATE_CHANNEL,
+  GROUP_RENAME_CHANNEL,
+  GROUP_REMOVE_CHANNEL,
+  GROUP_ASSIGN_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
@@ -92,6 +97,8 @@ import type {
   OpenLinkResponse,
   RevealFileResponse,
   DiagnosticsReport,
+  GroupListResponse,
+  GroupMutationResponse,
   WorkspaceImageResponse,
   RoomListResponse,
   RoomMutationResponse,
@@ -189,6 +196,13 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
   renameMission: (missionId: string, title: string) =>
     ipcRenderer.invoke(TEAMMATE_RENAME_MISSION_CHANNEL, { missionId, title }) as Promise<TeammateMutationResponse>,
+  listGroups: () => ipcRenderer.invoke(GROUP_LIST_CHANNEL) as Promise<GroupListResponse>,
+  createGroup: (name: string) => ipcRenderer.invoke(GROUP_CREATE_CHANNEL, name) as Promise<GroupMutationResponse>,
+  renameGroup: (groupId: string, name: string) =>
+    ipcRenderer.invoke(GROUP_RENAME_CHANNEL, { groupId, name }) as Promise<GroupMutationResponse>,
+  removeGroup: (groupId: string) => ipcRenderer.invoke(GROUP_REMOVE_CHANNEL, groupId) as Promise<GroupMutationResponse>,
+  assignGroup: (missionId: string, groupId: string | undefined) =>
+    ipcRenderer.invoke(GROUP_ASSIGN_CHANNEL, { missionId, groupId }) as Promise<GroupMutationResponse>,
   listRoutines: () => ipcRenderer.invoke(ROUTINE_LIST_CHANNEL) as Promise<RoutineListResponse>,
   createRoutine: (request: RoutineCreateRequest) =>
     ipcRenderer.invoke(ROUTINE_CREATE_CHANNEL, request) as Promise<RoutineMutationResponse>,

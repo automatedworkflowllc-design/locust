@@ -782,6 +782,51 @@ export interface RoomTask {
   readonly at: string
 }
 
+/**
+ * A named set of conversations, in this folder.
+ *
+ * More than a folder, by Colin's ruling of 2026-09-15: a group carries
+ * standing instructions and a default route, so filing a conversation into
+ * one buys something. `instructions` and `route` are part of the shape from
+ * the start even while nothing writes them yet -- a group that learned about
+ * them later would mean migrating a file people already had.
+ *
+ * The route is a SEED, not an override: it applies once, when a conversation
+ * is created in the group, and the conversation owns its route from then on.
+ * So changing a group's default can never reach back and silently rewrite
+ * the route of work that has already run.
+ */
+export interface PublicGroup {
+  readonly groupId: string
+  readonly name: string
+  readonly createdAt: string
+  /** What every conversation started in this group is briefed with. */
+  readonly instructions: string
+  /** What a conversation started here begins on. Absent means no default. */
+  readonly route?: TeammateRoute
+}
+
+export const GROUP_LIST_CHANNEL = 'groups:list'
+export const GROUP_CREATE_CHANNEL = 'groups:create'
+export const GROUP_RENAME_CHANNEL = 'groups:rename'
+export const GROUP_REMOVE_CHANNEL = 'groups:remove'
+/** Move a conversation into a group, or out of one with no group id. */
+export const GROUP_ASSIGN_CHANNEL = 'groups:assign'
+
+export type GroupListResponse =
+  | {
+      readonly ok: true
+      readonly data: {
+        readonly groups: readonly PublicGroup[]
+        readonly members: Readonly<Record<string, string>>
+      }
+    }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
+
+export type GroupMutationResponse =
+  | { readonly ok: true; readonly data: Record<string, never> }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
+
 export interface PublicRoom {
   readonly roomId: string
   readonly name: string
@@ -1640,6 +1685,12 @@ export interface DesktopApi {
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   /** Name a conversation. An empty name clears it back to what was typed. */
   renameMission(missionId: string, title: string): Promise<TeammateMutationResponse>
+  listGroups(): Promise<GroupListResponse>
+  createGroup(name: string): Promise<GroupMutationResponse>
+  renameGroup(groupId: string, name: string): Promise<GroupMutationResponse>
+  removeGroup(groupId: string): Promise<GroupMutationResponse>
+  /** Pass no group id to take a conversation out of its group. */
+  assignGroup(missionId: string, groupId: string | undefined): Promise<GroupMutationResponse>
   listRoutines(): Promise<RoutineListResponse>
   createRoutine(request: RoutineCreateRequest): Promise<RoutineMutationResponse>
   updateRoutine(request: RoutineUpdateRequest): Promise<RoutineMutationResponse>

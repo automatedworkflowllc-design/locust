@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.146.0 - 2026-09-15
+
+- **Groups.** Make one from the `+` beside the logo, then right-click any
+  conversation and choose **Move to** it. Groups sit at the top of the
+  sidebar, folded, with everything else under **Ungrouped**, newest first.
+- The `+` now offers the same three things in any window size — New teammate,
+  New room, New group.
+- **Removing a group never removes conversations.** They go back to
+  Ungrouped. Rename or remove one from the `⋯` on its header.
+
 ## 0.145.0 - 2026-09-15
 
 - **A conversation you renamed keeps its name.** Renaming saved it correctly

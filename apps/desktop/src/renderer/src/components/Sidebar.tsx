@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
-import type { PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
+import type { PublicGroup, PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
@@ -141,6 +141,13 @@ export function Sidebar({
   renamingMissionId,
   onRenameMission,
   onRenameDone,
+  groups = [],
+  groupMembers = {},
+  onGroupMenu,
+  renamingGroupId,
+  onRenameGroup,
+  onGroupRenameDone,
+  onNewGroup,
   onTeammateMenu,
   pendingApprovals,
   liveActivity,
@@ -186,6 +193,18 @@ export function Sidebar({
   /** Commit a new name. An empty string clears it back to what was typed. */
   readonly onRenameMission?: (missionId: string, title: string) => void
   readonly onRenameDone?: () => void
+  /** Named sets of conversations, in this folder. */
+  readonly groups?: readonly PublicGroup[]
+  /** Which group each conversation is in, by conversation id. */
+  readonly groupMembers?: Readonly<Record<string, string>>
+  /** The header menu for a group: rename it, or remove it. */
+  readonly onGroupMenu?: (groupId: string, at: { readonly x: number; readonly y: number }) => void
+  /** The group being renamed in place, if any. */
+  readonly renamingGroupId?: string
+  readonly onRenameGroup?: (groupId: string, name: string) => void
+  readonly onGroupRenameDone?: () => void
+  /** Make a new group. Absent means the `+` offers none. */
+  readonly onNewGroup?: (name: string) => void
   /** Right-click on a teammate. Same menu shape as a mission row, on the row above them. */
   readonly onTeammateMenu: (teammateId: string, at: { readonly x: number; readonly y: number }) => void
   /** Approvals waiting on each teammate's live run, by teammate id. */
@@ -302,6 +321,22 @@ export function Sidebar({
     setRailPinned(undefined)
     setRailHovered(undefined)
   }
+  /*
+   * Which groups are folded. Named groups start FOLDED and Ungrouped starts
+   * open, which is the design's order and is also right: a group is
+   * something you chose to put away, so it costs one line until you want it,
+   * and the list you actually scan stays at the top of the column.
+   */
+  const [foldedGroups, setFoldedGroups] = useState<ReadonlySet<string>>(new Set())
+  /*
+   * A new group is named before it exists.
+   *
+   * The alternative is creating "Untitled group" and making someone rename
+   * it -- which rooms deliberately do, because a room made from an ask
+   * should not cost a name first. A group is made on purpose from a menu, so
+   * there is nothing to interrupt and the name is the whole act.
+   */
+  const [naming, setNaming] = useState(false)
   const [faceFilter, setFaceFilter] = useState<string>()
   /*
    * The age column has to move on its own. `2m` that stays `2m` for an hour
@@ -314,6 +349,7 @@ export function Sidebar({
     return () => window.clearInterval(tick)
   }, [])
   const railOpenFor = railPinned ?? railHovered
+
   /** The rail's single `+`, which has to say what it would add. */
   const [addOpen, setAddOpen] = useState(false)
   // Which groups are open. All three start open, which is how the sidebar
@@ -332,8 +368,137 @@ export function Sidebar({
   const shownConversations = conversationRows(missionsMatching(missions, query)).filter(
     (mission) => faceFilter === undefined || ownerOf(mission, missionOwners) === faceFilter
   )
+  /*
+   * Everything not in a group, keyed by the CONVERSATION rather than the
+   * turn -- the same key the rename uses, because filing a reply somewhere
+   * its exchange is not would be a group that lies about what it holds.
+   *
+   * A membership pointing at a group that has been removed is already
+   * dropped by the store, so a row can never be missing from both lists.
+   */
+  const ungroupedConversations = shownConversations.filter(
+    (mission) => groupMembers[mission.rootId ?? mission.missionId] === undefined
+  )
   const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
   const shownUnowned = missionsMatching(unowned, query)
+  /*
+   * One row, drawn the same wherever it sits.
+   *
+   * Grouped and ungrouped conversations are the SAME thing in different
+   * places, so they must not be two pieces of markup that drift -- the way
+   * a conversation used to read one way nested under a teammate and another
+   * way in the Missions section.
+   */
+  const conversationRow = (mission: SidebarMission): ReactElement => {
+              const owner = ownerOf(mission, missionOwners)
+              const by = owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)
+              const age = shortAgo(mission.lastAt, now)
+              return (
+                <div className="lc-convrow" key={mission.missionId}>
+                  {/*
+                    * Renaming replaces the row rather than sitting on top of
+                    * it, the same shape the room header already uses: Enter
+                    * commits, Escape abandons, and losing focus commits too,
+                    * because a half-typed name left on screen with no way to
+                    * finish is worse than either.
+                    *
+                    * The starting value is the name on screen. Clearing it
+                    * and pressing Enter is how you get the typed sentence
+                    * back -- nothing was ever overwritten to lose.
+                    */}
+                  {renamingMissionId !== undefined
+                  && (mission.memberIds ?? [mission.missionId]).includes(renamingMissionId) ? (
+                    <input
+                      className="lc-input lc-conv__rename"
+                      defaultValue={mission.title}
+                      maxLength={120}
+                      aria-label="Name this conversation"
+                      autoFocus
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') onRenameDone?.()
+                        if (event.key === 'Enter') {
+                          const next = event.currentTarget.value
+                          onRenameDone?.()
+                          if (next.trim() !== mission.title) onRenameMission?.(mission.missionId, next)
+                        }
+                      }}
+                      onBlur={(event) => {
+                        const next = event.currentTarget.value
+                        onRenameDone?.()
+                        if (next.trim() !== mission.title) onRenameMission?.(mission.missionId, next)
+                      }}
+                    />
+                  ) : (
+                  <button
+                    type="button"
+                    className={`lc-conv${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
+                    title={mission.title}
+                    aria-current={isShown(mission, selectedMissionId) ? 'true' : undefined}
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
+                    }}
+                    onClick={() => onSelectMission(mission.missionId)}
+                  >
+                    {/*
+                      * A dot only where there is something to say.
+                      *
+                      * This draws the mission's PHASE: lime running, red
+                      * failed or interrupted, amber finished with an
+                      * incomplete record, muted cancelled -- and blue for
+                      * completed, which is almost every row almost all of
+                      * the time.
+                      *
+                      * A coloured dot at the left edge of a list row is the
+                      * universal unread mark, so a permanent blue one reads
+                      * as a notification that will not clear. Colin,
+                      * 2026-09-15, doing exactly that: "correct me if im
+                      * wrong but this blue dot would be a notification, but
+                      * it stays there when i click on the convo." The
+                      * reading was right; the meaning was not.
+                      *
+                      * So the ordinary outcome goes quiet and the dot keeps
+                      * its footprint, which holds every title on one x. What
+                      * is left is true: a mark here means this one wants
+                      * something.
+                      */}
+                    <span
+                      className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}${
+                        missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone === 'blue' ? ' is-quiet' : ''
+                      }`}
+                    />
+                    {/*
+                      * The face answers "which teammate" and costs no words.
+                      * It is the same glyph as the roster above and the
+                      * workroom header, so it identifies rather than labels
+                      * -- which is what let the route line go.
+                      */}
+                    {by === undefined ? (
+                      <span className="lc-conv__nobody" aria-hidden="true" />
+                    ) : (
+                      <PixelFace hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} />
+                    )}
+                    <span className="lc-conv__title">{mission.title}</span>
+                    {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
+                  </button>
+                  )}
+                  <button
+                    type="button"
+                    className="lc-teammate__missionmenu"
+                    aria-label={`Actions for ${mission.title}`}
+                    title="Actions — including Save as routine"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      const box = event.currentTarget.getBoundingClientRect()
+                      onMissionMenu(mission.missionId, { x: box.right, y: box.bottom })
+                    }}
+                  >
+                    <Icon name="dots" size={13} />
+                  </button>
+                </div>
+              )
+              }
+
   return (
     <nav className="lc-sidebar" aria-label="Workspace">
       <div className="lc-sidebar__brand">
@@ -389,19 +554,83 @@ export function Sidebar({
                 >
                   New room
                 </button>
+                {onNewGroup !== undefined && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="lc-menu__item"
+                    onClick={() => {
+                      setAddOpen(false)
+                      setNaming(true)
+                    }}
+                  >
+                    New group
+                  </button>
+                )}
               </div>
             )}
           </span>
         ) : (
-          <button
-            type="button"
-            className="lc-iconbutton"
-            aria-label="New teammate"
-            title="New teammate"
-            onClick={onNewTeammate}
-          >
-            <Icon name="plus" size={14} />
-          </button>
+          /*
+            * The wide `+` offers the same three things the rail's does.
+            *
+            * It used to make a teammate and nothing else, which was fine
+            * while a teammate was the only thing you could add. With groups
+            * there are three, and one `+` that says what it adds beats a
+            * button whose meaning depends on which layout you are in.
+            */
+          <span className="lc-control__anchor lc-sidebar__add">
+            <button
+              type="button"
+              className="lc-iconbutton"
+              aria-label="Add"
+              title="Add"
+              aria-haspopup="menu"
+              aria-expanded={addOpen}
+              onClick={() => setAddOpen((open) => !open)}
+            >
+              <Icon name="plus" size={14} />
+            </button>
+            {addOpen && (
+              <div className="lc-menu lc-sidebar__addmenu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="lc-menu__item"
+                  onClick={() => {
+                    setAddOpen(false)
+                    onNewTeammate()
+                  }}
+                >
+                  New teammate
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="lc-menu__item"
+                  onClick={() => {
+                    setAddOpen(false)
+                    onOpenRooms()
+                  }}
+                >
+                  New room
+                </button>
+                {onNewGroup !== undefined && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="lc-menu__item"
+                    onClick={() => {
+                      setAddOpen(false)
+                      setNaming(true)
+                    }}
+                  >
+                    New group
+                  </button>
+                )}
+              </div>
+            )}
+          </span>
         )}
       </div>
 
@@ -935,119 +1164,131 @@ export function Sidebar({
           </SidebarSection>
 
           </>
-        ) : (
-          <div className="lc-convlist">
-            {shownConversations.map((mission) => {
-              const owner = ownerOf(mission, missionOwners)
-              const by = owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)
-              const age = shortAgo(mission.lastAt, now)
+        ) : (          <div className="lc-convlist">
+            {naming && (
+              <input
+                className="lc-input lc-convgroup__rename"
+                placeholder="Name this group"
+                aria-label="Name this group"
+                maxLength={60}
+                autoFocus
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setNaming(false)
+                  if (event.key === 'Enter') {
+                    const next = event.currentTarget.value
+                    setNaming(false)
+                    if (next.trim().length > 0) onNewGroup?.(next)
+                  }
+                }}
+                onBlur={() => setNaming(false)}
+              />
+            )}
+            {/*
+              * Named groups first, folded; Ungrouped last and open.
+              *
+              * Colin's reference and also the right order: a group is
+              * something you chose to put away, so it costs one line until
+              * you want it, and the list you actually scan stays at the top
+              * of the column.
+              */}
+            {groups.map((group) => {
+              const theirs = shownConversations.filter(
+                (mission) => groupMembers[mission.rootId ?? mission.missionId] === group.groupId
+              )
+              const open = !foldedGroups.has(group.groupId)
               return (
-                <div className="lc-convrow" key={mission.missionId}>
-                  {/*
-                    * Renaming replaces the row rather than sitting on top of
-                    * it, the same shape the room header already uses: Enter
-                    * commits, Escape abandons, and losing focus commits too,
-                    * because a half-typed name left on screen with no way to
-                    * finish is worse than either.
-                    *
-                    * The starting value is the name on screen. Clearing it
-                    * and pressing Enter is how you get the typed sentence
-                    * back -- nothing was ever overwritten to lose.
-                    */}
-                  {renamingMissionId !== undefined
-                  && (mission.memberIds ?? [mission.missionId]).includes(renamingMissionId) ? (
-                    <input
-                      className="lc-input lc-conv__rename"
-                      defaultValue={mission.title}
-                      maxLength={120}
-                      aria-label="Name this conversation"
-                      autoFocus
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') onRenameDone?.()
-                        if (event.key === 'Enter') {
+                <div className="lc-convgroup" key={group.groupId}>
+                  <div className="lc-convgroup__head">
+                    {renamingGroupId === group.groupId ? (
+                      /* The same shape a conversation rename uses: Enter
+                         commits, Escape abandons, blur commits too. */
+                      <input
+                        className="lc-input lc-convgroup__rename"
+                        defaultValue={group.name}
+                        maxLength={60}
+                        aria-label="Group name"
+                        autoFocus
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') onGroupRenameDone?.()
+                          if (event.key === 'Enter') {
+                            const next = event.currentTarget.value
+                            onGroupRenameDone?.()
+                            if (next.trim().length > 0 && next.trim() !== group.name) {
+                              onRenameGroup?.(group.groupId, next)
+                            }
+                          }
+                        }}
+                        onBlur={(event) => {
                           const next = event.currentTarget.value
-                          onRenameDone?.()
-                          if (next.trim() !== mission.title) onRenameMission?.(mission.missionId, next)
-                        }
-                      }}
-                      onBlur={(event) => {
-                        const next = event.currentTarget.value
-                        onRenameDone?.()
-                        if (next.trim() !== mission.title) onRenameMission?.(mission.missionId, next)
-                      }}
-                    />
-                  ) : (
-                  <button
-                    type="button"
-                    className={`lc-conv${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
-                    title={mission.title}
-                    aria-current={isShown(mission, selectedMissionId) ? 'true' : undefined}
-                    onContextMenu={(event) => {
-                      event.preventDefault()
-                      onMissionMenu(mission.missionId, { x: event.clientX, y: event.clientY })
-                    }}
-                    onClick={() => onSelectMission(mission.missionId)}
-                  >
-                    {/*
-                      * A dot only where there is something to say.
-                      *
-                      * This draws the mission's PHASE: lime running, red
-                      * failed or interrupted, amber finished with an
-                      * incomplete record, muted cancelled -- and blue for
-                      * completed, which is almost every row almost all of
-                      * the time.
-                      *
-                      * A coloured dot at the left edge of a list row is the
-                      * universal unread mark, so a permanent blue one reads
-                      * as a notification that will not clear. Colin,
-                      * 2026-09-15, doing exactly that: "correct me if im
-                      * wrong but this blue dot would be a notification, but
-                      * it stays there when i click on the convo." The
-                      * reading was right; the meaning was not.
-                      *
-                      * So the ordinary outcome goes quiet and the dot keeps
-                      * its footprint, which holds every title on one x. What
-                      * is left is true: a mark here means this one wants
-                      * something.
-                      */}
-                    <span
-                      className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}${
-                        missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone === 'blue' ? ' is-quiet' : ''
-                      }`}
-                    />
-                    {/*
-                      * The face answers "which teammate" and costs no words.
-                      * It is the same glyph as the roster above and the
-                      * workroom header, so it identifies rather than labels
-                      * -- which is what let the route line go.
-                      */}
-                    {by === undefined ? (
-                      <span className="lc-conv__nobody" aria-hidden="true" />
+                          onGroupRenameDone?.()
+                          if (next.trim().length > 0 && next.trim() !== group.name) {
+                            onRenameGroup?.(group.groupId, next)
+                          }
+                        }}
+                      />
                     ) : (
-                      <PixelFace hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} />
+                    <button
+                      type="button"
+                      className={`lc-sectionlabel lc-sectionlabel--fold${open ? ' is-open' : ''}`}
+                      aria-expanded={open}
+                      onClick={() =>
+                        setFoldedGroups((current) => {
+                          const next = new Set(current)
+                          if (next.has(group.groupId)) next.delete(group.groupId)
+                          else next.add(group.groupId)
+                          return next
+                        })
+                      }
+                    >
+                      <Icon name={open ? 'chevron-down' : 'chevron-right'} size={11} />
+                      <span>{group.name}</span>
+                      <span className="lc-sectionlabel__count">{String(theirs.length)}</span>
+                    </button>
                     )}
-                    <span className="lc-conv__title">{mission.title}</span>
-                    {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
-                  </button>
+                    {onGroupMenu !== undefined && renamingGroupId !== group.groupId && (
+                      <button
+                        type="button"
+                        className="lc-convgroup__menu"
+                        aria-label={`Actions for ${group.name}`}
+                        title="Rename or remove this group"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          const box = event.currentTarget.getBoundingClientRect()
+                          onGroupMenu(group.groupId, { x: box.right, y: box.bottom })
+                        }}
+                      >
+                        <Icon name="dots" size={13} />
+                      </button>
+                    )}
+                  </div>
+                  {/*
+                    * An empty group says what to do with it. It is the one
+                    * container in this app worth drawing empty, because the
+                    * person made it deliberately a moment ago and an empty
+                    * fold would read as a mistake.
+                    */}
+                  {open && theirs.length === 0 && (
+                    <p className="lc-convgroup__empty lc-row__meta">Nothing in here yet.</p>
                   )}
-                  <button
-                    type="button"
-                    className="lc-teammate__missionmenu"
-                    aria-label={`Actions for ${mission.title}`}
-                    title="Actions — including Save as routine"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      const box = event.currentTarget.getBoundingClientRect()
-                      onMissionMenu(mission.missionId, { x: box.right, y: box.bottom })
-                    }}
-                  >
-                    <Icon name="dots" size={13} />
-                  </button>
+                  {open && theirs.map(conversationRow)}
                 </div>
               )
             })}
+            {/*
+              * Ungrouped carries a heading only when a group exists to be
+              * ungrouped FROM. With no groups at all this is the whole
+              * sidebar and a label over it would name the only thing there.
+              */}
+            {groups.length > 0 && ungroupedConversations.length > 0 && (
+              <div className="lc-sectionlabel lc-sectionlabel--plain">
+                <span>Ungrouped</span>
+                <span className="lc-sectionlabel__count">{String(ungroupedConversations.length)}</span>
+              </div>
+            )}
+            {ungroupedConversations.map(conversationRow)}
           </div>
         )}
+
 
         {/*
           * ONE card, drawn for whichever layout asked for it.
