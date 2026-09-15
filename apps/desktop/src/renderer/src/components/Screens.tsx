@@ -922,6 +922,23 @@ export function SettingsScreen({
           * (Colin, 2026-09-05). The composer carries a chip for the same
           * thing, the way Claude Code states its own folder on the bar.
           */}
+        {/*
+          * GROUPED BY WHAT A SETTING IS ABOUT, and ordered by how often it
+          * is touched.
+          *
+          * Colin, 2026-09-14: "our settings page is a disaster, just copy
+          * how claude code does and organize theirs". It was thirteen
+          * subjects in one unbroken scroll, in the order they happened to be
+          * built: Updates third, the two appearance settings at opposite
+          * ends, and one section stacking the boot screen, Swarm and Auto
+          * mode together because they were added on the same day.
+          *
+          * Five areas now, each named for what is in it. The prose stays
+          * where it was -- behind `More` -- because the problem was never
+          * that a setting explained itself, it was that you could not find
+          * the setting.
+          */}
+        <h1 className="lc-settings__group">Your workspace</h1>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Project folder</h2>
           <p className="lc-settings__lede">
@@ -1011,7 +1028,111 @@ export function SettingsScreen({
           )}
           </div>
         </section>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Teammates</h2>
+          <p className="lc-settings__lede">
+            Teammates answer each other on their own, each on its own route, and stop after {String(relayHopCap)} automatic {relayHopCap === 1 ? 'reply' : 'replies'}.
+          </p>
+          <More>
+            <p>
+              When a teammate writes to another, the other can answer on their own: Locust starts a run for
+              them with the message as its brief, and their answer starts the sender&rsquo;s next turn, so it
+              lands in the thread that asked. They keep going while a reply helps finish the work, and stop
+              when one has nothing more to say, or when the budget below is spent.
+            </p>
+            <p>
+              Each teammate answers on their own route -- their runtime, model and mode, not the sender&rsquo;s --
+              which is how two models end up on one piece of work. Switch replies off to make messages wait
+              for you instead.
+            </p>
+            <p>
+              A teammate does one thing at a time, so a message that arrives while they are working waits
+              until that run ends. A sender can mark a message urgent when waiting would make it useless --
+              &ldquo;stop, I am editing that file&rdquo; is the case it exists for. Letting that stop the
+              recipient part-way throws away whatever they had in flight, so it is off until you turn it on;
+              their unfinished work stays in their own conversation either way.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                {relay ? 'Teammates reply to each other until the work is done.' : 'Messages wait for the recipient\'s next run.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-switch${relay ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={relay}
+                aria-label={relay ? 'Switch this off' : 'Switch this on'}
+                onClick={() => onRelayChange(!relay)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+            {/*
+              * Waiting their turn, or not.
+              *
+              * A teammate runs one mission at a time, so a message that
+              * arrives mid-run waits for that run to end. Usually right, and
+              * sometimes far too late: the message worth interrupting for is
+              * "stop, I am editing that file", and delivering it once the
+              * conflicting work is finished delivers it after the damage.
+              *
+              * Off by default and described as what it costs, because it
+              * DISCARDS: the recipient's turn stops where it stands. Only a
+              * sender that asked -- `when="now"` on its message -- can spend
+              * it, and the message still goes through the ordinary waiting
+              * path afterwards, so nothing here widens how far teammates may
+              * go on their own.
+              */}
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                {interrupt
+                  ? 'An urgent message stops the recipient part-way. Their unfinished work stays in their own conversation.'
+                  : 'An urgent message still waits for the recipient to finish.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-switch${interrupt ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={interrupt}
+                aria-label={interrupt ? 'Switch this off' : 'Switch this on'}
+                disabled={!relay}
+                onClick={() => onInterruptChange(!interrupt)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+            {/*
+              * The autonomy budget. Six was a constant nobody could see or
+              * change; the 0.21.2 QA pass (rec. 6) asked for a budget the
+              * person owns. Fixed steps rather than a free number: each is
+              * a real answer to "how far may they go without me".
+              */}
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                Automatic replies per exchange before they wait for you
+              </span>
+              <div className="lc-segmented" role="radiogroup" aria-label="Automatic replies per exchange">
+                {[2, 4, 8, 12, 16, 24].map((cap) => (
+                  <button
+                    key={cap}
+                    type="button"
+                    role="radio"
+                    aria-checked={relayHopCap === cap}
+                    className={`lc-button${relayHopCap === cap ? ' is-active' : ''}`}
+                    disabled={!relay}
+                    onClick={() => onRelayHopCapChange(cap)}
+                  >
+                    {String(cap)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
 
+        <h1 className="lc-settings__group">Runtimes</h1>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>
           <p className="lc-settings__lede">
@@ -1121,71 +1242,83 @@ export function SettingsScreen({
             })}
           </div>
         </section>
-
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Updates</h2>
+          <h2 className="lc-settings__heading">Connectors</h2>
           <p className="lc-settings__lede">
-            Locust checks for a new version on its own and downloads it quietly.
+            {askConnectors
+              ? 'Asking. A Claude Code teammate stops and asks before every connector call.'
+              : 'Not asking. A teammate may use any connector your Claude Code can reach, without asking.'}
           </p>
           <More>
             <p>
-              It never installs one while a mission is running: restarting then would cut the run off and
-              leave its record without a receipt.
-            </p>
-          </More>
-          <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
-        </section>
-
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">The boot screen</h2>
-          <p className="lc-settings__lede">
-            {tube === 'off'
-              ? 'Off. Locust goes straight to the workspace while it finds your runtimes.'
-              : tube === 'subtle'
-                ? 'Subtle. The screen without the flicker or the glare.'
-                : 'Full. The whole monitor while your runtimes are found.'}
-          </p>
-          <More>
-            <p>
-              Finding the runtimes on this machine takes as long as it takes -- each one is a real command
-              and some of them are slow to answer. The screen shows that happening rather than a spinner
-              standing in for it, and every line on it is something the app actually read.
+              A connector is not on this machine: it acts on the service it reaches, so no permission mode
+              governs it. By default a teammate may use whichever connectors your own Claude Code has, the
+              way you can -- the question was answered when you connected them.
             </p>
             <p>
-              It only ever covers the empty middle of the window. The sidebar, the folder and the message
-              box stay where they are, so you can pick a teammate or start typing without waiting for it,
-              and clicking anywhere on it puts it away.
+              Switch this on and every connector call stops the run and asks you first, with the exact
+              input it would send. Approve once, allow that connector for the rest of the mission, or deny
+              with a reason the teammate reads. It is checked when a run starts, so the next mission
+              follows the switch without a restart. Auto never asks either way.
             </p>
           </More>
           <div className="lc-settingrows">
             <div className="lc-settingrow">
-              <span className="lc-settings__note">How much of it to draw.</span>
-              {/* `lc-button is-active` is what every other segmented choice
-                * in this app already uses -- inventing a class for this one
-                * would be a second spelling of a solved thing. */}
-              <div className="lc-segmented" role="radiogroup" aria-label="How much of the boot screen to draw">
-                {(
-                  [
-                    ['full', 'Full'],
-                    ['subtle', 'Subtle'],
-                    ['off', 'Off']
-                  ] as const
-                ).map(([option, label]) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={tube === option}
-                    className={`lc-button${tube === option ? ' is-active' : ''}`}
-                    onClick={() => onTubeChange(option)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <span className="lc-settings__note">
+                {askConnectors
+                  ? 'On. Every connector call raises an approval card first.'
+                  : 'Off. Connectors you have are used without asking.'}
+              </span>
+              <button
+                type="button"
+                className={`lc-switch${askConnectors ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={askConnectors}
+                aria-label={askConnectors ? 'Stop asking before connector calls' : 'Ask before every connector call'}
+                onClick={() => onAskConnectorsChange(!askConnectors)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
             </div>
           </div>
+        </section>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">When a route hits its limit</h2>
+          <p className="lc-settings__lede">
+            A run that hits its account&rsquo;s limit stops at a checkpoint and waits for you. Nothing switches provider on its own.
+          </p>
+          <More>
+            <p>
+              You choose where the work continues, and Locust carries it there with a briefing of what was
+              done and what was left unsettled. Two ways to do that exist today; the third is not built.
+            </p>
+          <div className="lc-settingcard">
+          <div className="lc-policyrow">
+            <span className="lc-tag">HAND OFF</span>
+            <span className="lc-settings__note">
+              Pick another runtime from the composer while a mission is running. The run is stopped,
+              reconciled, and continued there.
+            </span>
+          </div>
+          <div className="lc-policyrow">
+            <span className="lc-tag">CONTINUE ELSEWHERE</span>
+            <span className="lc-settings__note">
+              After a run has stopped, change the route and reply. The next turn starts on the new
+              runtime from the old one&rsquo;s checkpoint, with your reply as its first instruction.
+            </span>
+          </div>
+          <div className="lc-policyrow">
+            <span className="lc-tag">AUTOMATIC</span>
+            <span className="lc-settings__note">
+              Not built. Locust will not move your work to a provider you did not choose.
+            </span>
+          </div>
+          </div>
+          </More>
+        </section>
 
+        <h1 className="lc-settings__group">How teammates work</h1>
+        <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Swarm</h2>
           <p className="lc-settings__lede">
             {swarm
@@ -1224,6 +1357,8 @@ export function SettingsScreen({
             </div>
           </div>
 
+        </section>
+        <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Auto mode</h2>
           <p className="lc-settings__lede">
             {autoMode
@@ -1266,48 +1401,6 @@ export function SettingsScreen({
             </div>
           </div>
         </section>
-
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Connectors</h2>
-          <p className="lc-settings__lede">
-            {askConnectors
-              ? 'Asking. A Claude Code teammate stops and asks before every connector call.'
-              : 'Not asking. A teammate may use any connector your Claude Code can reach, without asking.'}
-          </p>
-          <More>
-            <p>
-              A connector is not on this machine: it acts on the service it reaches, so no permission mode
-              governs it. By default a teammate may use whichever connectors your own Claude Code has, the
-              way you can -- the question was answered when you connected them.
-            </p>
-            <p>
-              Switch this on and every connector call stops the run and asks you first, with the exact
-              input it would send. Approve once, allow that connector for the rest of the mission, or deny
-              with a reason the teammate reads. It is checked when a run starts, so the next mission
-              follows the switch without a restart. Auto never asks either way.
-            </p>
-          </More>
-          <div className="lc-settingrows">
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">
-                {askConnectors
-                  ? 'On. Every connector call raises an approval card first.'
-                  : 'Off. Connectors you have are used without asking.'}
-              </span>
-              <button
-                type="button"
-                className={`lc-switch${askConnectors ? ' is-on' : ''}`}
-                role="switch"
-                aria-checked={askConnectors}
-                aria-label={askConnectors ? 'Stop asking before connector calls' : 'Ask before every connector call'}
-                onClick={() => onAskConnectorsChange(!askConnectors)}
-              >
-                <span className="lc-switch__knob" />
-              </button>
-            </div>
-          </div>
-        </section>
-
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Plans</h2>
           <p className="lc-settings__lede">
@@ -1350,148 +1443,6 @@ export function SettingsScreen({
                 <span className="lc-switch__knob" />
               </button>
             </div>
-          </div>
-        </section>
-
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Teammates</h2>
-          <p className="lc-settings__lede">
-            Teammates answer each other on their own, each on its own route, and stop after {String(relayHopCap)} automatic {relayHopCap === 1 ? 'reply' : 'replies'}.
-          </p>
-          <More>
-            <p>
-              When a teammate writes to another, the other can answer on their own: Locust starts a run for
-              them with the message as its brief, and their answer starts the sender&rsquo;s next turn, so it
-              lands in the thread that asked. They keep going while a reply helps finish the work, and stop
-              when one has nothing more to say, or when the budget below is spent.
-            </p>
-            <p>
-              Each teammate answers on their own route -- their runtime, model and mode, not the sender&rsquo;s --
-              which is how two models end up on one piece of work. Switch replies off to make messages wait
-              for you instead.
-            </p>
-            <p>
-              A teammate does one thing at a time, so a message that arrives while they are working waits
-              until that run ends. A sender can mark a message urgent when waiting would make it useless --
-              &ldquo;stop, I am editing that file&rdquo; is the case it exists for. Letting that stop the
-              recipient part-way throws away whatever they had in flight, so it is off until you turn it on;
-              their unfinished work stays in their own conversation either way.
-            </p>
-          </More>
-          <div className="lc-settingrows">
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">
-                {relay ? 'Teammates reply to each other until the work is done.' : 'Messages wait for the recipient\'s next run.'}
-              </span>
-              <button
-                type="button"
-                className={`lc-switch${relay ? ' is-on' : ''}`}
-                role="switch"
-                aria-checked={relay}
-                aria-label={relay ? 'Switch this off' : 'Switch this on'}
-                onClick={() => onRelayChange(!relay)}
-              >
-                <span className="lc-switch__knob" />
-              </button>
-            </div>
-            {/*
-              * Waiting their turn, or not.
-              *
-              * A teammate runs one mission at a time, so a message that
-              * arrives mid-run waits for that run to end. Usually right, and
-              * sometimes far too late: the message worth interrupting for is
-              * "stop, I am editing that file", and delivering it once the
-              * conflicting work is finished delivers it after the damage.
-              *
-              * Off by default and described as what it costs, because it
-              * DISCARDS: the recipient's turn stops where it stands. Only a
-              * sender that asked -- `when="now"` on its message -- can spend
-              * it, and the message still goes through the ordinary waiting
-              * path afterwards, so nothing here widens how far teammates may
-              * go on their own.
-              */}
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">
-                {interrupt
-                  ? 'An urgent message stops the recipient part-way. Their unfinished work stays in their own conversation.'
-                  : 'An urgent message still waits for the recipient to finish.'}
-              </span>
-              <button
-                type="button"
-                className={`lc-switch${interrupt ? ' is-on' : ''}`}
-                role="switch"
-                aria-checked={interrupt}
-                aria-label={interrupt ? 'Switch this off' : 'Switch this on'}
-                disabled={!relay}
-                onClick={() => onInterruptChange(!interrupt)}
-              >
-                <span className="lc-switch__knob" />
-              </button>
-            </div>
-            {/*
-              * The autonomy budget. Six was a constant nobody could see or
-              * change; the 0.21.2 QA pass (rec. 6) asked for a budget the
-              * person owns. Fixed steps rather than a free number: each is
-              * a real answer to "how far may they go without me".
-              */}
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">
-                Automatic replies per exchange before they wait for you
-              </span>
-              <div className="lc-segmented" role="radiogroup" aria-label="Automatic replies per exchange">
-                {[2, 4, 8, 12, 16, 24].map((cap) => (
-                  <button
-                    key={cap}
-                    type="button"
-                    role="radio"
-                    aria-checked={relayHopCap === cap}
-                    className={`lc-button${relayHopCap === cap ? ' is-active' : ''}`}
-                    disabled={!relay}
-                    onClick={() => onRelayHopCapChange(cap)}
-                  >
-                    {String(cap)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Sidebar</h2>
-          <div className="lc-settingrows">
-          {/*
-            * The shell layout. It was decided by window width alone, so the
-            * only way to get the compact rail was to shrink the window and the
-            * only way out of it was to grow one (Colin, 2026-09-07: "can we
-            * have it be an optional toggle as well?"). Auto still follows the
-            * width, and it is what everyone gets until they choose.
-            */}
-          <div className="lc-settingrow">
-            <span className="lc-settings__note">
-              Sidebar layout{layout === 'auto' ? ` — following this window, currently ${layoutMode}` : ''}
-            </span>
-            <div className="lc-segmented" role="radiogroup" aria-label="Sidebar layout">
-              {(
-                [
-                  ['auto', 'Auto'],
-                  ['wide', 'Full'],
-                  ['compact', 'Rail']
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={layout === value}
-                  className={`lc-button${layout === value ? ' is-active' : ''}`}
-                  onClick={() => onLayoutChange(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
           </div>
         </section>
         <section className="lc-settings__section">
@@ -1542,41 +1493,110 @@ export function SettingsScreen({
           </div>
         </section>
 
+        <h1 className="lc-settings__group">Appearance</h1>
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">When a route hits its limit</h2>
+          <h2 className="lc-settings__heading">Sidebar</h2>
+          <div className="lc-settingrows">
+          {/*
+            * The shell layout. It was decided by window width alone, so the
+            * only way to get the compact rail was to shrink the window and the
+            * only way out of it was to grow one (Colin, 2026-09-07: "can we
+            * have it be an optional toggle as well?"). Auto still follows the
+            * width, and it is what everyone gets until they choose.
+            */}
+          <div className="lc-settingrow">
+            <span className="lc-settings__note">
+              Sidebar layout{layout === 'auto' ? ` — following this window, currently ${layoutMode}` : ''}
+            </span>
+            <div className="lc-segmented" role="radiogroup" aria-label="Sidebar layout">
+              {(
+                [
+                  ['auto', 'Auto'],
+                  ['wide', 'Full'],
+                  ['compact', 'Rail']
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={layout === value}
+                  className={`lc-button${layout === value ? ' is-active' : ''}`}
+                  onClick={() => onLayoutChange(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          </div>
+        </section>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">The boot screen</h2>
           <p className="lc-settings__lede">
-            A run that hits its account&rsquo;s limit stops at a checkpoint and waits for you. Nothing switches provider on its own.
+            {tube === 'off'
+              ? 'Off. Locust goes straight to the workspace while it finds your runtimes.'
+              : tube === 'subtle'
+                ? 'Subtle. The screen without the flicker or the glare.'
+                : 'Full. The whole monitor while your runtimes are found.'}
           </p>
           <More>
             <p>
-              You choose where the work continues, and Locust carries it there with a briefing of what was
-              done and what was left unsettled. Two ways to do that exist today; the third is not built.
+              Finding the runtimes on this machine takes as long as it takes -- each one is a real command
+              and some of them are slow to answer. The screen shows that happening rather than a spinner
+              standing in for it, and every line on it is something the app actually read.
             </p>
-          <div className="lc-settingcard">
-          <div className="lc-policyrow">
-            <span className="lc-tag">HAND OFF</span>
-            <span className="lc-settings__note">
-              Pick another runtime from the composer while a mission is running. The run is stopped,
-              reconciled, and continued there.
-            </span>
-          </div>
-          <div className="lc-policyrow">
-            <span className="lc-tag">CONTINUE ELSEWHERE</span>
-            <span className="lc-settings__note">
-              After a run has stopped, change the route and reply. The next turn starts on the new
-              runtime from the old one&rsquo;s checkpoint, with your reply as its first instruction.
-            </span>
-          </div>
-          <div className="lc-policyrow">
-            <span className="lc-tag">AUTOMATIC</span>
-            <span className="lc-settings__note">
-              Not built. Locust will not move your work to a provider you did not choose.
-            </span>
-          </div>
-          </div>
+            <p>
+              It only ever covers the empty middle of the window. The sidebar, the folder and the message
+              box stay where they are, so you can pick a teammate or start typing without waiting for it,
+              and clicking anywhere on it puts it away.
+            </p>
           </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">How much of it to draw.</span>
+              {/* `lc-button is-active` is what every other segmented choice
+                * in this app already uses -- inventing a class for this one
+                * would be a second spelling of a solved thing. */}
+              <div className="lc-segmented" role="radiogroup" aria-label="How much of the boot screen to draw">
+                {(
+                  [
+                    ['full', 'Full'],
+                    ['subtle', 'Subtle'],
+                    ['off', 'Off']
+                  ] as const
+                ).map(([option, label]) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={tube === option}
+                    className={`lc-button${tube === option ? ' is-active' : ''}`}
+                    onClick={() => onTubeChange(option)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
         </section>
 
+        <h1 className="lc-settings__group">This app</h1>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Updates</h2>
+          <p className="lc-settings__lede">
+            Locust checks for a new version on its own and downloads it quietly.
+          </p>
+          <More>
+            <p>
+              It never installs one while a mission is running: restarting then would cut the run off and
+              leave its record without a receipt.
+            </p>
+          </More>
+          <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
+        </section>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Privacy &amp; local data</h2>
           <p className="lc-settings__lede">
@@ -1607,6 +1627,7 @@ export function SettingsScreen({
           </More>
           <RetentionControl report={storage} onPreview={onPreviewPrune} onPrune={onPrune} />
         </section>
+
       </div>
     </div>
   )

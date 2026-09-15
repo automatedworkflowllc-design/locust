@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.135.0 - 2026-09-14
+
+- **Settings is organised.** It was thirteen subjects in one unbroken scroll,
+  in the order they happened to get built — Updates third, the two appearance
+  settings at opposite ends, and the boot screen sharing a block with Swarm
+  and Auto mode because they were added the same day. Five areas now, each
+  named for what is in it: **Your workspace**, **Runtimes**, **How teammates
+  work**, **Appearance**, **This app**.
+  - The explanations have not moved or grown. The problem was never that a
+    setting explained itself; it was that you could not find the setting.
+
 ## 0.134.0 - 2026-09-14
 
 - **The loading screen is quick on a machine without the runtimes.** Checking

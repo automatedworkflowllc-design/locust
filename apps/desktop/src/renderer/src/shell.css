@@ -5161,6 +5161,37 @@ textarea {
   margin-bottom: var(--lc-space-8);
 }
 
+/*
+ * The name of an AREA, above the settings in it.
+ *
+ * Deliberately not another `__heading`: a subject's heading is the biggest
+ * type on this page, and an area that used the same size would compete with
+ * the things it contains rather than gather them. It reads as a label on a
+ * drawer -- the same register the sidebar's section labels use, which is
+ * already the app's word for "here is a group of things".
+ *
+ * The rule above it does the separating, so the areas are told apart by a
+ * line rather than by a bigger font.
+ */
+.lc-settings__group {
+  max-width: 660px;
+  margin: 0 0 var(--lc-space-5);
+  padding-top: var(--lc-space-6);
+  border-top: 1px solid var(--lc-border-hairline);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  font-weight: 400;
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+/* The first area needs no rule: there is nothing above it to separate from. */
+.lc-settings__group:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .lc-settings__heading {
   margin: 0 0 var(--lc-space-4);
   font-size: var(--lc-text-screen-title);
