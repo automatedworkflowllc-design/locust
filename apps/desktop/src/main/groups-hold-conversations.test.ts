@@ -182,6 +182,24 @@ describe('the file is read as untrusted', () => {
     await expect(groups.list()).rejects.toThrow(GROUPS_UNREADABLE)
   })
 
+  it('treats a file that does not parse as unreadable too, and refuses to write over it', async () => {
+    /*
+     * Astra, 2026-09-16, on 0.154.0, with the file cut off mid-array: the
+     * store read it as no groups and the sidebar drew none. Her ask was the
+     * important half -- "do not let subsequent saves silently replace
+     * unreadable state" -- and every write here reads first, so the one
+     * `return EMPTY` on a parse failure was the whole distance between a
+     * torn file and a torn file replaced by an empty one.
+     */
+    const { store: groups, root } = await store()
+    const torn = '{"schemaVersion":1,"groups":['
+    await writeFile(join(root, 'groups.json'), torn, 'utf8')
+    await expect(groups.list()).rejects.toThrow(GROUPS_UNREADABLE)
+    await expect(groups.create('Trading')).rejects.toThrow(GROUPS_UNREADABLE)
+    await expect(groups.assign('mission_1', undefined)).rejects.toThrow(GROUPS_UNREADABLE)
+    expect(readFileSync(join(root, 'groups.json'), 'utf8')).toBe(torn)
+  })
+
   it('is genuinely empty when there is simply no file yet', async () => {
     const { store: groups } = await store()
     expect(await groups.list()).toEqual({ groups: [], members: {} })

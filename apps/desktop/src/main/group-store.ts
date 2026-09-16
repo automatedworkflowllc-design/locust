@@ -76,17 +76,24 @@ const cleanName = (value: unknown): string | undefined => {
 /**
  * Read as untrusted, like every other file in this profile.
  *
- * A record that does not parse is DROPPED rather than taken, and never
+ * A RECORD that does not parse is DROPPED rather than taken, and never
  * raised: one bad group must not cost someone the rest of them.
+ *
+ * A FILE that does not parse is a different fact, and it is UNREADABLE, not
+ * empty. Astra, 2026-09-16, with the file cut off mid-array: the store read
+ * it as no groups, the sidebar drew no groups, and the next write would have
+ * saved that emptiness over whatever the file used to hold. That is the
+ * "subsequent saves silently replace unreadable state" she asked us not to
+ * allow, and it was exactly one `return EMPTY` away.
  */
 function parsedFile(text: string): StoredFile {
   let record: Record<string, unknown>
   try {
     const parsed: unknown = JSON.parse(text)
-    if (typeof parsed !== 'object' || parsed === null) return EMPTY
+    if (typeof parsed !== 'object' || parsed === null) throw new Error(GROUPS_UNREADABLE)
     record = parsed as Record<string, unknown>
   } catch {
-    return EMPTY
+    throw new Error(GROUPS_UNREADABLE)
   }
 
   const groups: PublicGroup[] = []

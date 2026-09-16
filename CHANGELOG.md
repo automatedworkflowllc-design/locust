@@ -18,9 +18,11 @@ Dates are when the build was cut. Versions are the number Settings shows.
   look exactly like having no groups: every conversation listed ungrouped
   and not a word about why. Nothing is lost when this happens — nothing is
   saved over the file until it reads again — and now the sidebar tells you,
-  instead of leaving you to wonder where your groups went. Found by Astra,
-  who replaced the file with a directory, a truncated copy and an oversize
-  one, and got the same silent sidebar all three times.
+  instead of leaving you to wonder where your groups went. A file cut off
+  part-way now counts as unreadable too — it used to read as empty, and the
+  next save would have made it so. Found by Astra, who replaced the file with
+  a directory, a truncated copy and an oversize one, and got the same silent
+  sidebar all three times.
 
 ## 0.154.0 - 2026-09-16
 
