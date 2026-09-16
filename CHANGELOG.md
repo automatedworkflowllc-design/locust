@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.156.0 - 2026-09-16
+
+- **Thinking is not counted as a tool call — on the line you actually read.**
+  0.153.0 fixed the count in one place and missed the header of the fold,
+  so two reads and a thought still said `3 tool calls`, and a run that only
+  thought said `1 tool call`. Found by Grok on 0.154.0.
+- **The filter count is the pile you are standing in.** With a teammate’s
+  face selected and a search typed, the line said `1 of 20` — the whole
+  folder — next to a list of that teammate’s one match. It now says `1 of
+  5` when five is what that teammate has. Search alone still counts against
+  the whole folder. Found by Grok.
+- **On a machine with nothing installed, the message box no longer tells
+  you to sign in.** There is nothing to sign in to; it says install a coding
+  agent, and keeps “and sign in” for a runtime that is present and signed
+  out. Found by Grok on the original bare-machine route.
+
 ## 0.155.0 - 2026-09-16
 
 - **A file summary counts each file once.** When a teammate changed one

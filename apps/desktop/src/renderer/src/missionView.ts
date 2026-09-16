@@ -925,7 +925,14 @@ export function activityTrace(
    * them, and counting them twice ("6 tool calls · ran 4 commands") would say
    * one fact in two places, which this line does not do.
    */
-  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit' && detail.kind !== 'shell').length
+  //
+  // And thinking is not a call HERE either. 0.153.0 took reasoning out of
+  // `activitySummary` and left this line -- the one a person reads at the
+  // head of the fold -- counting it. Grok, pass 5 on 0.154.0: two reads and
+  // a thought said `3 tool calls`; a run that only thought said `1 tool
+  // call`. Two functions, one fact, and the visible one was the unfixed
+  // one; the summary's green test is how a one-hour regression came back.
+  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit' && detail.kind !== 'shell' && detail.kind !== 'reasoning').length
     + details.filter((detail) => detail.kind === 'edit' && detail.failed === true).length
   const diagnostics = events.filter(
     (event): event is Extract<NormalizedRuntimeEvent, { type: 'adapter.diagnostic' }> => event.type === 'adapter.diagnostic' && !/\.usage_window$/.test(event.payload.code)

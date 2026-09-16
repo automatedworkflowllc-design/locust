@@ -103,6 +103,32 @@ export function conversationKeys(mission: SidebarMission): readonly string[] {
   return [...new Set(keys.filter((key): key is string => key !== undefined))]
 }
 
+/**
+ * The sentence above a narrowed list: what narrowed it, and the count.
+ *
+ * `of` is the pile the person is standing in. With a face on, that is the
+ * teammate's conversations, not the folder's -- Grok, pass 5 on 0.154.0:
+ * Atlas's face and "invoice" typed said `Atlas · "invoice" — 1 of 20` next
+ * to a list of one, which reads as the unfiltered world when the person had
+ * already chosen Atlas. The brief's sentence was `1 of 5` because five is
+ * Atlas's. Search alone keeps the whole list as its `of`.
+ */
+export function narrowingLine(input: {
+  readonly faceName: string | undefined
+  readonly query: string
+  readonly shown: number
+  readonly inFace: number
+  readonly all: number
+}): string | undefined {
+  const narrowedBy: string[] = []
+  if (input.faceName !== undefined) narrowedBy.push(input.faceName)
+  const query = input.query.trim()
+  if (query.length > 0) narrowedBy.push(`"${query}"`)
+  if (narrowedBy.length === 0) return undefined
+  const of = input.faceName === undefined ? input.all : input.inFace
+  return `${narrowedBy.join(' · ')} — ${String(input.shown)} of ${String(of)}`
+}
+
 /** The first value stored against any id this conversation has worn. */
 export function heldFor<T>(mission: SidebarMission, byKey: Readonly<Record<string, T>>): T | undefined {
   for (const key of conversationKeys(mission)) {

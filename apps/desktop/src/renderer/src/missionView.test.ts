@@ -2098,6 +2098,41 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     expect(segments.find((seg) => seg.key === 'subagents')?.tone).toBeUndefined()
   })
 
+  it('does not count thinking as a tool call, on the line a person reads', () => {
+    // Grok, pass 5 on 0.154.0: `activitySummary` had stopped counting
+    // reasoning in 0.153.0 and this line had not. Two reads plus a thought
+    // said `3 tool calls`; a think-only run said `1 tool call`. The
+    // thought must be its own row and nothing else.
+    const thinking = [
+      ev(1, 'run.started', { runtimeThreadId: 't' }, 0),
+      ev(2, 'step.started', { stepKind: 'reasoning', itemId: 'r1' }, 1),
+      ev(3, 'step.completed', { stepKind: 'reasoning', itemId: 'r1', message: 'Need two reads, then answer.' }, 8),
+      ev(4, 'tool.started', { itemId: 'a', toolKind: 'read', name: 'read', command: 'README.md', phase: 'started' }, 9),
+      ev(5, 'tool.completed', { itemId: 'a', toolKind: 'read', name: 'read', command: 'README.md', phase: 'completed' }, 10),
+      ev(6, 'tool.started', { itemId: 'b', toolKind: 'read', name: 'read', command: 'package.json', phase: 'started' }, 11),
+      ev(7, 'tool.completed', { itemId: 'b', toolKind: 'read', name: 'read', command: 'package.json', phase: 'completed' }, 12),
+      ev(8, 'run.completed', { runtimeThreadId: 't', process: {} }, 13)
+    ]
+    const thread = buildThread(thinking, { running: false })
+    const activity = thread.find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    expect(details.some((detail) => detail.kind === 'reasoning')).toBe(true)
+    expect(joined(activityTrace(details, thinking, traceOutcome(thinking, false)))).toBe('13s · thought 7s · 2 tool calls')
+
+    const only = [
+      ev(1, 'run.started', { runtimeThreadId: 't' }, 0),
+      ev(2, 'step.started', { stepKind: 'reasoning', itemId: 'r1' }, 1),
+      ev(3, 'step.completed', { stepKind: 'reasoning', itemId: 'r1', message: 'Just thinking.' }, 8),
+      ev(4, 'run.completed', { runtimeThreadId: 't', process: {} }, 9)
+    ]
+    const onlyThread = buildThread(only, { running: false })
+    const onlyActivity = onlyThread.find((item) => item.type === 'activity')
+    const onlyDetails = onlyActivity?.type === 'activity' ? onlyActivity.details : []
+    const line = joined(activityTrace(onlyDetails, only, traceOutcome(only, false)))
+    expect(line).not.toMatch(/tool call/)
+    expect(onlyActivity?.type === 'activity' && onlyActivity.summary).toBe('No tool activity')
+  })
+
   it('names the one command it ran, rather than counting it', () => {
     /*
      * "1 tool call" counts a thing you cannot see without opening the fold --

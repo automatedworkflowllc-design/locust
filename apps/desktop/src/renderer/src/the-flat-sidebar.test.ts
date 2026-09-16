@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { byLiveThenRecent, conversationRows, ownerOf } from './conversationList.js'
+import { byLiveThenRecent, conversationRows, ownerOf, narrowingLine } from './conversationList.js'
 import { railRows } from './railFlyout.js'
 import type { SidebarMission } from './components/Sidebar.js'
 
@@ -122,5 +122,16 @@ describe('who a conversation belongs to', () => {
     expect(ownerOf(row({ missionId: 'm', ownerId: 'tm_live' }), { m: 'tm_host' })).toBe('tm_live')
     expect(ownerOf(row({ missionId: 'm' }), { m: 'tm_host' })).toBe('tm_host')
     expect(ownerOf(row({ missionId: 'm' }), {})).toBeUndefined()
+  })
+})
+
+describe('the sentence above a narrowed list', () => {
+  it('counts against the face when a face is on, and against the folder when only search is', () => {
+    // Grok, pass 5 on 0.154.0: Atlas's face plus "invoice" said `1 of 20`
+    // over a list of one, when the pile the person stood in was Atlas's five.
+    expect(narrowingLine({ faceName: 'Atlas', query: '', shown: 5, inFace: 5, all: 20 })).toBe('Atlas — 5 of 5')
+    expect(narrowingLine({ faceName: 'Atlas', query: 'invoice', shown: 1, inFace: 5, all: 20 })).toBe('Atlas · "invoice" — 1 of 5')
+    expect(narrowingLine({ faceName: undefined, query: 'invoice', shown: 3, inFace: 20, all: 20 })).toBe('"invoice" — 3 of 20')
+    expect(narrowingLine({ faceName: undefined, query: '  ', shown: 20, inFace: 20, all: 20 })).toBeUndefined()
   })
 })

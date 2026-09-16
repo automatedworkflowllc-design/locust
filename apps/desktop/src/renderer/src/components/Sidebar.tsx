@@ -24,7 +24,7 @@ import type { TeammateStatusView } from '../status.js'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
-import { conversationRows, heldFor, ownerOf } from '../conversationList.js'
+import { conversationRows, heldFor, narrowingLine, ownerOf } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
 
@@ -451,14 +451,14 @@ export function Sidebar({
    * it, and a permanent one would be a control that is almost always saying
    * "everything".
    */
-  const narrowedBy: string[] = []
   const filteredTo = teammates.find((entry) => entry.teammateId === faceFilter)
-  if (filteredTo !== undefined) narrowedBy.push(filteredTo.name)
-  if (query.trim().length > 0) narrowedBy.push(`"${query.trim()}"`)
-  const narrowing =
-    narrowedBy.length === 0
-      ? undefined
-      : `${narrowedBy.join(' · ')} — ${String(shownConversations.length)} of ${String(missions.length)}`
+  const narrowing = narrowingLine({
+    faceName: filteredTo?.name,
+    query,
+    shown: shownConversations.length,
+    inFace: missions.filter((mission) => ownerOf(mission, missionOwners) === faceFilter).length,
+    all: missions.length
+  })
 
   const shownFaces = facesByRecency.slice(
     0,

@@ -483,7 +483,13 @@ export function Composer({
               // deliberately and it has since stopped being usable.
               readyElsewhere !== undefined
               ? `${readyElsewhere.displayName} is ready — switch the route to it…`
-              : 'Install a coding agent and sign in to start a mission…'
+              : // "and sign in" only when there is something to sign in to.
+                // Pass 4 took this instruction off the roster; pass 5 found
+                // it still in the box you type into, two inches under a
+                // welcome saying OpenCode needs no account (Grok, 0.154.0).
+                runtimes.some((runtime) => runtime.installed)
+                ? 'Install a coding agent and sign in to start a mission…'
+                : 'Install a coding agent to start a mission…'
 
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()
