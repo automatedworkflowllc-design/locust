@@ -9821,7 +9821,10 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--lc-space-2);
-  padding: var(--lc-space-2) var(--lc-space-5) var(--lc-space-3);
+  /* Side padding matched to the conversation rows below, so the faces line
+     up with the titles they filter -- and so the strip has the width its
+     own arithmetic assumes. */
+  padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3);
 }
 
 .lc-faces__one {
@@ -9862,7 +9865,9 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--lc-space-2);
-  padding: 4px var(--lc-space-3);
+  /* Tighter than a footer button on purpose: this pill shares its row with
+     five faces and a count, and the row is 267px. */
+  padding: 4px var(--lc-space-2);
   border: 0;
   border-radius: var(--lc-radius-control);
   background: transparent;
@@ -10088,4 +10093,24 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--lc-space-2);
+}
+
+/* What the six faces do not show. Same height as a face so the strip stays
+   one line, and mono because it is a count. */
+.lc-faces__more {
+  flex: none;
+  height: 26px;
+  padding: 0 var(--lc-space-2);
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  cursor: pointer;
+}
+
+.lc-faces__more:hover {
+  color: var(--lc-text-secondary);
+  background: var(--lc-hover-surface);
 }

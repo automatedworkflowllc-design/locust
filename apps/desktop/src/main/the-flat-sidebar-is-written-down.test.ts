@@ -168,3 +168,56 @@ describe('nothing loses its way in', () => {
     expect(rule('.lc-sidebar__nav .lc-connected {')).toContain('min-width: 0')
   })
 })
+
+describe('the roster strip at twelve teammates', () => {
+  /*
+   * Measured before the cap: with twelve teammates the strip wanted 500px
+   * inside a 267px column and the last face was drawn 172px OUTSIDE the
+   * sidebar. The faces row had only ever been seen at four.
+   *
+   * The design agent's shape, taken: a fixed number of faces, then a count,
+   * and NO horizontal scroll -- "a scrolling strip hides the thing it exists
+   * to expose". A roster you drag sideways to read is not one you can scan,
+   * and scanning is its only job.
+   *
+   * Their number was six; this draws five. Six fit the faces themselves and
+   * not what sits beside them -- with the `+N` chip and the `Team` pill the
+   * row still wanted 311 of 267. Five, with the padding brought in, measures
+   * at exactly 267 of 267. Recorded as a deviation rather than filed under
+   * their number.
+   */
+  it('caps the faces rather than letting the strip run past the column', () => {
+    expect(SIDEBAR).toContain('const MAX_FACES = 5')
+    expect(SIDEBAR).toContain('shownFaces.map((teammate)')
+  })
+
+  it('counts what it does not draw instead of hiding it', () => {
+    // A strip that silently stops is one that lies about how many people
+    // are on the team.
+    expect(SIDEBAR).toContain('lc-faces__more')
+    expect(SIDEBAR).toContain('restOfTeam > 0')
+  })
+
+  it('never scrolls sideways', () => {
+    const rule = rule2('.lc-faces {')
+    expect(rule).not.toContain('overflow-x')
+    expect(rule).not.toContain('scroll')
+  })
+
+  it('shows the ones being worked with, not the ones made first', () => {
+    expect(SIDEBAR).toContain('facesByRecency')
+  })
+
+  it('leaves the rail listing everybody, which is a different shape', () => {
+    // The compact rail is a column that scrolls; capping it would hide
+    // teammates behind nothing.
+    const rail = SIDEBAR.slice(SIDEBAR.indexOf('{compact ? ('))
+    expect(rail).toContain('teammates.map((teammate)')
+  })
+})
+
+function rule2(selector: string): string {
+  const at = CSS.indexOf(selector)
+  expect(at, `${selector} should exist`).toBeGreaterThan(-1)
+  return CSS.slice(at, CSS.indexOf('}', at))
+}

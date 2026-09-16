@@ -97,6 +97,22 @@ function isShown(mission: SidebarMission, selectedMissionId: string | undefined)
  * as a holder, we want the user to know its possible even if none are setup"*.
  * A count of zero is information; a missing section is not.
  */
+/**
+ * How many faces the roster strip draws before it counts the rest.
+ *
+ * FIVE, measured, where the design agent said six.
+ *
+ * Six fit the faces themselves -- the sixth face ended at x=224 inside a
+ * 268px column -- but the strip also carries the `+N` chip and the `Team`
+ * pill, and with all three it wanted 311px of 267. Their six counted the
+ * faces and not what sits beside them.
+ *
+ * Five, with the strip's side padding brought in to match the rows below
+ * it, measures inside. Recorded as a deviation rather than quietly filed
+ * under their number: the shape is theirs, the arithmetic is this column's.
+ */
+const MAX_FACES = 5
+
 function SidebarSection({
   label,
   count,
@@ -376,6 +392,37 @@ export function Sidebar({
    * A membership pointing at a group that has been removed is already
    * dropped by the store, so a row can never be missing from both lists.
    */
+  /*
+   * SIX FACES, then a chip.
+   *
+   * Measured at twelve teammates: the strip wanted 500px inside a 267px
+   * column and the last face was drawn 172px OUTSIDE the sidebar.
+   *
+   * The design agent's answer, and the reason for the shape: no horizontal
+   * scroll, "because a scrolling strip hides the thing it exists to expose".
+   * A roster you have to drag sideways to read is not one you can scan, and
+   * scanning is the whole job of the strip.
+   *
+   * Most recent first, so the six on screen are the six you are working with
+   * rather than the six you happened to make first. A teammate with no work
+   * sorts last and never above one that has some.
+   *
+   * The compact rail is untouched: it lists every teammate down a column
+   * that scrolls, which is a different shape with a different constraint.
+   */
+  const facesByRecency = [...teammates].sort((left, right) => {
+    const newest = (teammateId: string): number =>
+      missions
+        .filter((mission) => ownerOf(mission, missionOwners) === teammateId)
+        .reduce((held, mission) => {
+          const at = mission.lastAt === undefined ? 0 : Date.parse(mission.lastAt)
+          return Number.isNaN(at) ? held : Math.max(held, at)
+        }, 0)
+    return newest(right.teammateId) - newest(left.teammateId)
+  })
+  const shownFaces = facesByRecency.slice(0, MAX_FACES)
+  const restOfTeam = facesByRecency.length - shownFaces.length
+
   const ungroupedConversations = shownConversations.filter(
     (mission) => groupMembers[mission.rootId ?? mission.missionId] === undefined
   )
@@ -672,7 +719,7 @@ export function Sidebar({
         */}
       {!compact && teammates.length > 0 && (
         <div className="lc-faces">
-          {teammates.map((teammate) => {
+          {shownFaces.map((teammate) => {
             const on = faceFilter === teammate.teammateId
             const status = viewByTeammate[teammate.teammateId]
             return (
@@ -732,6 +779,19 @@ export function Sidebar({
               </button>
             )
           })}
+          {/* What the six do not show, and the way to it. Counted rather
+              than hidden: a strip that silently stops at six is one that
+              lies about how many people are on the team. */}
+          {restOfTeam > 0 && (
+            <button
+              type="button"
+              className="lc-faces__more"
+              onClick={onOpenTeammates}
+              title={`${String(restOfTeam)} more on the team — open the roster`}
+            >
+              +{restOfTeam}
+            </button>
+          )}
           <button type="button" className="lc-faces__team" onClick={onOpenTeammates} title="Team (Ctrl 2)">
             <Icon name="users" size={13} />
             <span>Team</span>

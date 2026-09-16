@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.147.0 - 2026-09-15
+
+- **The teammate faces stay inside the sidebar.** With a big team the row
+  ran off the edge of the column — at twelve teammates the last face was
+  drawn well outside it. It shows the five you have worked with most
+  recently and counts the rest, and the count opens the roster.
+
 ## 0.146.0 - 2026-09-15
 
 - **Groups.** Make one from the `+` beside the logo, then right-click any
