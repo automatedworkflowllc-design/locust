@@ -204,6 +204,23 @@ describe('the brief a relayed run is started with', () => {
     expect(prompt).toContain('Do not use a <locust-ask> block here')
   })
 
+  it('tells the reply that lands in the person\'s own conversation to say what it means for them', () => {
+    // MEASURED 2026-09-16, Colin's ledger: "ask wembley to research aadx ...
+    // and get back to you". Wembley's brief came back; Jimothy, told nobody
+    // was watching, ended with a memory block and nothing for Colin.
+    const prompt = relayPrompt({ sender: BOOTY, recipient: WREN, hop: 2, readByPerson: true })
+    expect(prompt).toContain('the person who started this conversation reads it')
+    expect(prompt).toContain('say in a line or two what Booty\'s reply means')
+    expect(prompt).not.toContain('none of that reaches a person')
+    expect(prompt).not.toContain('nobody is watching this run')
+    expect(prompt).toContain('a <locust-ask> block reaches them here')
+    // The peer's side of the same exchange is still nobody's conversation.
+    const peer = relayPrompt({ sender: WREN, recipient: BOOTY, hop: 3, readByPerson: false })
+    expect(peer).toContain('none of that reaches a person')
+    // And a first message is never "read by the person", whoever it is for.
+    expect(relayPrompt({ sender: WREN, recipient: BOOTY, hop: 1, readByPerson: true })).not.toContain('reads it')
+  })
+
   it('says the same after a meeting, where several teammates could be asked', () => {
     const prompt = meetingPrompt({ repliers: ['Atlas', 'Juno'], silent: [] })
     expect(prompt).toContain('There is no person in this exchange')
@@ -891,5 +908,36 @@ describe('telling a teammate where in the budget it is', () => {
       cap: 6
     })
     expect(brief).toContain('One more would be the last')
+  })
+})
+
+describe('the reply that lands back in the person\'s conversation', () => {
+  it('is briefed as read by the person, and the hop after it is not', async () => {
+    // Colin, 2026-09-16: "ask wembley to research aadx ... and get back to
+    // you". The whole chain ran; the reply into his conversation was told
+    // nobody was watching and said nothing to him. The person-started
+    // mission is the first entry in `lastMissionOf`, and that teammate's
+    // conversation is the one the person is reading.
+    const { relay, starts } = harness()
+    await relay.onShared(sharing(), [message(BOOTY)])
+    expect(starts).toHaveLength(1)
+    const bootyOrigin = starts[0]?.relay
+    expect(bootyOrigin?.lastMissionOf).toEqual({ tm_wren: 'mission_wren1' })
+    // Booty answers Wren: hop 2, into the conversation Colin started.
+    await relay.onShared(
+      { runId: 'run_1', missionId: 'mission_1', peer: bootyPeer, relay: bootyOrigin!, runtime: 'claude', sandbox: 'read-only', model: 'sonnet' },
+      [message(WREN)]
+    )
+    expect(starts).toHaveLength(2)
+    expect(starts[1]?.prompt).toContain('the person who started this conversation reads it')
+    expect(starts[1]?.prompt).not.toContain('nobody is watching this run')
+    // Wren writes back to Booty: hop 3, Booty's own conversation, nobody's.
+    await relay.onShared(
+      { runId: 'run_2', missionId: 'mission_2', peer: wrenPeer, relay: starts[1]!.relay!, runtime: 'cursor', sandbox: 'workspace-write', model: 'composer-2.5' },
+      [message(BOOTY)]
+    )
+    expect(starts).toHaveLength(3)
+    expect(starts[2]?.prompt).toContain('none of that reaches a person')
+    expect(starts[2]?.prompt).not.toContain('reads it')
   })
 })

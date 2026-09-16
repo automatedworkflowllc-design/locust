@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.158.0 - 2026-09-16
+
+- **When a teammate’s reply lands back in your conversation, the teammate
+  you asked now tells you what it means.** Ask Jimothy to get a brief from
+  Wembley and get back to you: the brief came back, and Jimothy — briefed
+  that nobody was watching — ended with a note to itself and not one word
+  to you. The reply that lands in the conversation you started is now told
+  that you read it, and to say in a line or two what the answer was, where
+  it is, and what is still open. Replies between two teammates are still
+  told to end quietly, so exchanges do not run to the budget.
+
 ## 0.157.0 - 2026-09-16
 
 - **A local file that cannot be read is never treated as empty — and never

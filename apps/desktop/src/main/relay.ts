@@ -150,11 +150,25 @@ export function relayPrompt(input: {
   readonly hop: number
   /** The exchange's budget, so the brief can say where in it this reply is. */
   readonly cap?: number
+  /**
+   * This reply lands in the conversation the PERSON started, which they are
+   * reading. Everything the brief says about nobody watching is false there.
+   *
+   * MEASURED 2026-09-16 in Colin's own ledger. He asked Jimothy: "can you
+   * ask wembley to research aadx, assemble a report and get back to you".
+   * Wembley ran seven minutes, wrote the brief, shared it back. Jimothy,
+   * told "none of that reaches a person" and "nobody is watching this run",
+   * ended with a memory block and not one word to Colin. The exchange
+   * finished exactly as the brief asked, and the person it was for got
+   * nothing.
+   */
+  readonly readByPerson?: boolean
 }): string {
   const who = `${input.sender.name} (${input.sender.role})`
   const opening = input.hop <= 1
     ? `${who} sent you a message; it is quoted below with anything else waiting for you.`
     : `${who} replied to you; it is quoted below.`
+  const readByPerson = input.readByPerson === true && input.hop > 1
   return [
     opening,
     // Said only to a REPLY, where the whole failure lives.
@@ -174,10 +188,16 @@ export function relayPrompt(input: {
     // a plea.
     ...(input.hop <= 1
       ? []
-      : [
-          `${input.sender.name} is a MODEL, not a person, and every reply you send starts another whole mission that costs money.`,
-          'If their message answers you, or needs nothing from you, END HERE with no share block. Do not thank them, do not confirm receipt, do not summarise what you both agreed -- none of that reaches a person and each one costs a run.'
-        ]),
+      : readByPerson
+        ? [
+            `${input.sender.name} is a MODEL, not a person, and every reply you send THEM starts another whole mission that costs money.`,
+            `But the person who started this conversation reads it, and this is what they were waiting for: say in a line or two what ${input.sender.name}'s reply means for what they asked -- the answer, where it is, what is still open -- and then stop.`,
+            `Do not thank ${input.sender.name} or confirm receipt; write back to them only if the work genuinely needs it.`
+          ]
+        : [
+            `${input.sender.name} is a MODEL, not a person, and every reply you send starts another whole mission that costs money.`,
+            'If their message answers you, or needs nothing from you, END HERE with no share block. Do not thank them, do not confirm receipt, do not summarise what you both agreed -- none of that reaches a person and each one costs a run.'
+          ]),
     'Do what it asks if that is within your role and this workspace, using what you actually know; if you cannot help, say so briefly.',
     `Write back only if that helps finish the work: end with one <locust-share to="${input.sender.name}"> block holding your reply.`,
     // The one case where waiting is worse than interrupting, said as a rule
@@ -191,7 +211,9 @@ export function relayPrompt(input: {
     // a thread nobody was watching, no share went back, and the exchange
     // ended in silence. The right recipient of that question is the
     // teammate who asked, and the share block is how to reach them.
-    noPersonHere(input.sender.name),
+    readByPerson
+      ? `If you need the person's decision, a <locust-ask> block reaches them here; anything for ${input.sender.name} goes in the share block.`
+      : noPersonHere(input.sender.name),
     'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
     budgetSentence(input.hop, input.cap),
     'Do not start unrelated work.'
@@ -819,7 +841,11 @@ export function createRelay(options: RelayOptions): Relay {
             rootMissionId: root,
             lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
           }
-          const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap })
+          // The person-started mission is the first entry in `lastMissionOf`
+          // (documented on RelayOrigin), so its teammate is the one whose
+          // conversation the person is reading.
+          const readByPerson = Object.keys(origin.lastMissionOf)[0] === recipientId
+          const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap, readByPerson })
           const result = await startFor({ recipient, prompt, from: mission, origin, notice })
           if (result.kind === 'busy') {
             defer({
