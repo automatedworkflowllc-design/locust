@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.155.0 - 2026-09-16
+
+- **A file summary counts each file once.** When a teammate changed one
+  file in several steps, the run’s card added the steps together and then
+  added the file’s final change on top — two lines changed in two edits read
+  as `+3 −3`, over a file git reported as two and two. Now the final change
+  to a file is the count, and the steps that led to it are inside it. Found
+  by Astra on 0.154.0.
+- **If your groups file cannot be read, the sidebar says so.** It used to
+  look exactly like having no groups: every conversation listed ungrouped
+  and not a word about why. Nothing is lost when this happens — nothing is
+  saved over the file until it reads again — and now the sidebar tells you,
+  instead of leaving you to wonder where your groups went. Found by Astra,
+  who replaced the file with a directory, a truncated copy and an oversize
+  one, and got the same silent sidebar all three times.
+
 ## 0.154.0 - 2026-09-16
 
 - **A conversation keeps the name you gave it, and stays in the group you put

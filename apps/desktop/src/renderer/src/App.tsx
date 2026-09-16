@@ -890,10 +890,13 @@ export default function App(): ReactElement {
   const [missionTitles, setMissionTitles] = useState<Readonly<Record<string, string>>>({})
   const [groups, setGroups] = useState<readonly PublicGroup[]>([])
   const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, GroupMembership>>>({})
+  /** The groups file refused to read. Held apart from "no groups" so the sidebar can say so. */
+  const [groupsUnreadable, setGroupsUnreadable] = useState(false)
   const refreshGroups = (): void => {
     void window.desktop
       ?.listGroups()
       .then((response) => {
+        setGroupsUnreadable(!response.ok)
         if (!response.ok) return
         setGroups(response.data.groups)
         setGroupMembers(response.data.members)
@@ -1768,7 +1771,9 @@ export default function App(): ReactElement {
     void bridge
       .listGroups()
       .then((response) => {
-        if (!active || !response.ok) return
+        if (!active) return
+        setGroupsUnreadable(!response.ok)
+        if (!response.ok) return
         setGroups(response.data.groups)
         setGroupMembers(response.data.members)
       })
@@ -3901,6 +3906,7 @@ export default function App(): ReactElement {
           onMissionMenu={openMissionMenu}
           groups={groups}
           groupMembers={groupMembers}
+          groupsUnreadable={groupsUnreadable}
           onGroupMenu={openGroupMenu}
           renamingGroupId={renamingGroupId}
           onRenameGroup={(groupId, name) => {

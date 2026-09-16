@@ -161,6 +161,7 @@ export function Sidebar({
   onRenameDone,
   groups = [],
   groupMembers = {},
+  groupsUnreadable = false,
   onGroupMenu,
   renamingGroupId,
   onRenameGroup,
@@ -218,6 +219,18 @@ export function Sidebar({
   readonly groups?: readonly PublicGroup[]
   /** Which group each conversation is in, by conversation id. */
   readonly groupMembers?: Readonly<Record<string, GroupMembership>>
+  /**
+   * The groups file could not be read AT ALL -- not the same as having none.
+   *
+   * The store has told them apart since 0.146.0 and the host relayed it, and
+   * the sidebar dropped the answer on the floor: `if (!response.ok) return`
+   * left the list looking exactly like a folder with no groups. Astra,
+   * 2026-09-16, with `groups.json` as a directory, truncated, and oversize:
+   * "in all three cases the group disappeared and the conversation appeared
+   * as an ordinary ungrouped row." The rooms lesson, applied a layer down
+   * and then not applied at the top.
+   */
+  readonly groupsUnreadable?: boolean
   /** The header menu for a group: rename it, or remove it. */
   readonly onGroupMenu?: (groupId: string, at: { readonly x: number; readonly y: number }) => void
   /** The group being renamed in place, if any. */
@@ -1303,6 +1316,12 @@ export function Sidebar({
               * you want it, and the list you actually scan stays at the top
               * of the column.
               */}
+            {groupsUnreadable && (
+              <p className="lc-convgroup__unreadable lc-row__meta" role="status">
+                Groups could not be read, so every conversation is listed here ungrouped. Nothing is
+                lost: nothing is saved over the groups file until it reads again.
+              </p>
+            )}
             {groups.map((group) => {
               const theirs = shownConversations.filter(
                 (mission) => heldFor(mission, groupMembers)?.groupId === group.groupId

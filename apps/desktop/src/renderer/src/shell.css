@@ -10117,6 +10117,13 @@ textarea {
   padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3) 28px;
 }
 
+/* A file that would not read is a sentence, not an empty list. */
+.lc-convgroup__unreadable {
+  padding: var(--lc-space-2) var(--lc-space-3);
+  white-space: normal;
+  line-height: 1.4;
+}
+
 .lc-convgroup__rename {
   width: calc(100% - var(--lc-space-3) * 2);
   margin: var(--lc-space-2) var(--lc-space-3);

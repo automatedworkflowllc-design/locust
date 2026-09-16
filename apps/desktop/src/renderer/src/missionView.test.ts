@@ -2003,6 +2003,52 @@ describe("the host's disk observation of a path the runtime named", () => {
     expect(details.filter((detail) => /report\.md/.test(detail.name))).toHaveLength(1)
     expect(activity?.type === 'activity' && activity.summary).toBe('Edited 1 file')
   })
+
+  it('supersedes every other edit row for that file, so the card counts the file once', () => {
+    // MEASURED 2026-09-16 by Astra on 0.154.0 (mission_2e14e822): OpenCode
+    // changed two lines of one README in two edits, +1 -1 each. The host's
+    // observation (+2 -2) attached to the FIRST row and the second stayed,
+    // so the card said `1 file +3 -3` over a file git reported as `2 2`.
+    const first = { text: '--- a/README.md\n+++ b/README.md\n@@ -3 +3 @@\n-Colour: blue\n+Colour: green\n', added: 1, removed: 1, truncated: false }
+    const second = { text: '--- a/README.md\n+++ b/README.md\n@@ -4 +4 @@\n-Status: draft\n+Status: ready\n', added: 1, removed: 1, truncated: false }
+    const observed = { text: '--- a/README.md\n+++ b/README.md\n@@ -3,2 +3,2 @@\n-Colour: blue\n-Status: draft\n+Colour: green\n+Status: ready\n', added: 2, removed: 2, truncated: false }
+    const absolute = 'C:\\work\\README.md'
+    const thread = buildThread(
+      [
+        event('tool.started', { itemId: 'e1', toolKind: 'edit', name: 'edit', command: absolute, phase: 'started' }),
+        event('tool.completed', { itemId: 'e1', toolKind: 'edit', name: 'edit', command: absolute, phase: 'completed', patch: first }),
+        event('tool.started', { itemId: 'e2', toolKind: 'edit', name: 'edit', command: absolute, phase: 'started' }),
+        event('tool.completed', { itemId: 'e2', toolKind: 'edit', name: 'edit', command: absolute, phase: 'completed', patch: second }),
+        event('tool.started', { itemId: 'obs', toolKind: 'observed_edit', name: 'edit', command: 'README.md', status: 'reported by the runtime, read from disk', phase: 'started' }),
+        event('tool.completed', { itemId: 'obs', toolKind: 'observed_edit', name: 'edit', command: 'README.md', status: 'reported by the runtime, read from disk', phase: 'completed', patch: observed })
+      ],
+      { running: false }
+    )
+    const activity = thread.find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    expect(details.filter((detail) => /README/.test(detail.name))).toHaveLength(1)
+    expect(activityCounts(details)).toEqual({ added: 2, removed: 2 })
+    expect(activity?.type === 'activity' && activity.summary).toBe('Edited 1 file')
+  })
+
+  it('leaves two edits to one file alone when no observation arrives', () => {
+    // Without the disk's word, each runtime row is the only evidence there
+    // is, and both are drawn and counted -- as the fold has always done.
+    const first = { text: '--- a/README.md\n+++ b/README.md\n@@ -3 +3 @@\n-Colour: blue\n+Colour: green\n', added: 1, removed: 1, truncated: false }
+    const second = { text: '--- a/README.md\n+++ b/README.md\n@@ -4 +4 @@\n-Status: draft\n+Status: ready\n', added: 1, removed: 1, truncated: false }
+    const thread = buildThread(
+      [
+        event('tool.started', { itemId: 'e1', toolKind: 'edit', name: 'edit', command: 'README.md', phase: 'started' }),
+        event('tool.completed', { itemId: 'e1', toolKind: 'edit', name: 'edit', command: 'README.md', phase: 'completed', patch: first }),
+        event('tool.started', { itemId: 'e2', toolKind: 'edit', name: 'edit', command: 'README.md', phase: 'started' }),
+        event('tool.completed', { itemId: 'e2', toolKind: 'edit', name: 'edit', command: 'README.md', phase: 'completed', patch: second })
+      ],
+      { running: false }
+    )
+    const activity = thread.find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    expect(activityCounts(details)).toEqual({ added: 2, removed: 2 })
+  })
 })
 
 describe('a usage window, as a person reads it', () => {

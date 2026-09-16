@@ -1527,6 +1527,15 @@ export function buildThread(
    * false`). The register was honest and useless, which is the worst of both.
    */
   const openToolAt = new Map<string, { readonly at: string; readonly connector: string | undefined }>()
+  /**
+   * Disk observations that landed on a row the runtime drew, by item id, with
+   * the file's name. When the observation's patch arrives it is the NET
+   * change to that file for the whole run, so every other edit row the
+   * runtime drew for the same file is a step already inside it.
+   */
+  const observedNet = new Map<string, string>()
+  /** The file's own name, however the runtime spelt the path to it. */
+  const nameTail = (name: string): string => name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) ?? name
   const activity: ActivityDetail[] = []
   let runningStep:
     | {
@@ -1565,10 +1574,11 @@ export function buildThread(
         if (event.payload.toolKind === 'observed_edit' && /reported by the runtime/.test(event.payload.status ?? '')) {
           const path = (event.payload.command ?? '').toLowerCase()
           const tail = path.split('/').at(-1) ?? path
-          const own = activity.find((detail) => detail.kind === 'edit' && detail.name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) === tail)
+          const own = activity.find((detail) => detail.kind === 'edit' && nameTail(detail.name) === tail)
           if (own !== undefined) {
             openTools.set(event.payload.itemId, own)
             openToolAt.set(event.payload.itemId, { at: event.occurredAt, connector: undefined })
+            observedNet.set(event.payload.itemId, tail)
             break
           }
         }
@@ -1622,7 +1632,28 @@ export function buildThread(
                 ? {}
                 : { name: event.payload.command })
             }
+            /*
+             * The observation is the whole change to that file, so the
+             * runtime's OTHER rows for it are steps inside it, not more of it.
+             *
+             * MEASURED 2026-09-16 by Astra on 0.154.0, OpenCode changing two
+             * lines of one README in two edits: the observation attached to
+             * the first row (+2 -2), the second row stayed (+1 -1), and the
+             * card said `1 file +3 -3` over a file git reported as `2 2`.
+             * Each runtime row was true on its own; together with the net
+             * they counted the second line twice. The attach was written for
+             * one edit per file and never said so.
+             */
+            const tail = observedNet.get(event.payload.itemId)
+            if (tail !== undefined && patch !== undefined) {
+              const keep = activity[index]
+              for (let at = activity.length - 1; at >= 0; at -= 1) {
+                const other = activity[at]
+                if (other !== keep && other.kind === 'edit' && nameTail(other.name) === tail) activity.splice(at, 1)
+              }
+            }
           }
+          observedNet.delete(event.payload.itemId)
           openTools.delete(event.payload.itemId)
         }
         openToolAt.delete(event.payload.itemId)
