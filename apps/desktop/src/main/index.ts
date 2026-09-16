@@ -104,6 +104,7 @@ import {
   GROUP_REMOVE_CHANNEL,
   GROUP_ASSIGN_CHANNEL,
   GROUP_INSTRUCTIONS_CHANNEL,
+  GROUP_ROUTE_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
@@ -2456,6 +2457,17 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch (error) {
         return groupRejected(error instanceof Error ? error.message : 'Those instructions could not be saved.')
+      }
+    })
+
+    ipcMain.handle(GROUP_ROUTE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return groupRejected('The route could not be saved.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await groups.setRoute(input.groupId, input.route)
+        return { ok: true, data: {} } as const
+      } catch (error) {
+        return groupRejected(error instanceof Error ? error.message : 'That route could not be saved.')
       }
     })
 

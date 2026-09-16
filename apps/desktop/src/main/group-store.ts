@@ -4,6 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import type { PublicGroup } from '../shared/ipc.js'
+import { isTeammateRoute } from './teammate-store.js'
 
 /**
  * Groups: named sets of conversations, per folder.
@@ -157,6 +158,8 @@ export interface GroupStore {
   assign(missionId: unknown, groupId: unknown): Promise<void>
   /** What every conversation in this group is briefed with. Empty clears it. */
   setInstructions(groupId: unknown, instructions: unknown): Promise<void>
+  /** What a conversation filed here begins on. `undefined` clears it. */
+  setRoute(groupId: unknown, route: unknown): Promise<void>
 }
 
 export function createGroupStore(options: {
@@ -305,6 +308,25 @@ export function createGroupStore(options: {
         await write({
           ...file,
           members: { ...file.members, [missionId]: { groupId, at: now().toISOString() } }
+        })
+      })
+    },
+
+    setRoute(groupId, route): Promise<void> {
+      return serialize(async () => {
+        // Validated where routes are validated, and refused rather than
+        // trimmed: a route with an absurd field is written into a command
+        // line later, and this file must never be the thing that let it in.
+        if (route !== undefined && !isTeammateRoute(route)) throw new Error('That route is not one a mission can start on')
+        const file = await read()
+        const held = file.groups.find((group) => group.groupId === groupId)
+        if (held === undefined) throw new Error('That group does not exist')
+        const { route: _gone, ...bare } = held
+        await write({
+          ...file,
+          groups: file.groups.map((group) =>
+            group.groupId === held.groupId ? (route === undefined ? bare : { ...bare, route }) : group
+          )
         })
       })
     },

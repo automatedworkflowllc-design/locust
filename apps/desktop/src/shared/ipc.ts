@@ -814,6 +814,7 @@ export const GROUP_REMOVE_CHANNEL = 'groups:remove'
 export const GROUP_ASSIGN_CHANNEL = 'groups:assign'
 /** Set what every conversation in a group is briefed with. Empty clears it. */
 export const GROUP_INSTRUCTIONS_CHANNEL = 'groups:instructions'
+export const GROUP_ROUTE_CHANNEL = 'groups:route'
 
 /**
  * Which group a conversation is in, and when it joined.
@@ -1706,6 +1707,8 @@ export interface DesktopApi {
   /** Pass no group id to take a conversation out of its group. */
   assignGroup(missionId: string, groupId: string | undefined): Promise<GroupMutationResponse>
   setGroupInstructions(groupId: string, instructions: string): Promise<GroupMutationResponse>
+  /** Pass no route to clear the group's default. */
+  setGroupRoute(groupId: string, route: TeammateRoute | undefined): Promise<GroupMutationResponse>
   listRoutines(): Promise<RoutineListResponse>
   createRoutine(request: RoutineCreateRequest): Promise<RoutineMutationResponse>
   updateRoutine(request: RoutineUpdateRequest): Promise<RoutineMutationResponse>

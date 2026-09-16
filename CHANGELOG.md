@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.161.0 - 2026-09-16
+
+- **A group can carry a default route.** Right-click a group · *Use
+  current route as default* records the runtime, model, mode and effort
+  the composer is set to right now, and says so on the control. When you
+  move the conversation on screen into that group, the composer switches
+  to the group’s route for the next turn — and only the next turn: nothing
+  about a turn already run changes, and a conversation you are not looking
+  at is never touched. *Clear default route* takes it away.
+
 ## 0.160.0 - 2026-09-16
 
 - **The thread says where a group’s instructions began.** A conversation

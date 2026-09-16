@@ -47,6 +47,7 @@ import {
   GROUP_REMOVE_CHANNEL,
   GROUP_ASSIGN_CHANNEL,
   GROUP_INSTRUCTIONS_CHANNEL,
+  GROUP_ROUTE_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
@@ -70,6 +71,7 @@ import {
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
+  TeammateRoute,
   DiscoveryEvent,
   CodexMissionCancelResponse,
   CodexMissionStartRequest,
@@ -206,6 +208,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(GROUP_ASSIGN_CHANNEL, { missionId, groupId }) as Promise<GroupMutationResponse>,
   setGroupInstructions: (groupId: string, instructions: string) =>
     ipcRenderer.invoke(GROUP_INSTRUCTIONS_CHANNEL, { groupId, instructions }) as Promise<GroupMutationResponse>,
+  setGroupRoute: (groupId: string, route: TeammateRoute | undefined) =>
+    ipcRenderer.invoke(GROUP_ROUTE_CHANNEL, { groupId, route }) as Promise<GroupMutationResponse>,
   listRoutines: () => ipcRenderer.invoke(ROUTINE_LIST_CHANNEL) as Promise<RoutineListResponse>,
   createRoutine: (request: RoutineCreateRequest) =>
     ipcRenderer.invoke(ROUTINE_CREATE_CHANNEL, request) as Promise<RoutineMutationResponse>,

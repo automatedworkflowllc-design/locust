@@ -627,6 +627,23 @@ export default function App(): ReactElement {
           label: group.instructions.trim().length > 0 ? 'Edit instructions…' : 'Add instructions…',
           onSelect: () => setInstructingGroupId(groupId)
         },
+        // The group's default route is whatever the composer is set to NOW:
+        // the same runtime, model, mode and effort a mission would start on
+        // if you pressed send. Naming it on the control keeps it honest.
+        {
+          label:
+            group.route === undefined
+              ? `Use current route as default (${route.runtime} / ${route.model})`
+              : `Default route is ${group.route.runtime} / ${group.route.model} — set to current`,
+          onSelect: () => {
+            void window.desktop
+              ?.setGroupRoute(groupId, { runtime: route.runtime, model: route.model, mode, ...(effort === undefined ? {} : { effort }) })
+              .then(refreshGroups)
+          }
+        },
+        ...(group.route === undefined
+          ? []
+          : [{ label: 'Clear default route', onSelect: () => void window.desktop?.setGroupRoute(groupId, undefined).then(refreshGroups) }]),
         { label: 'Rename', onSelect: () => setRenamingGroupId(groupId) },
         {
           label: 'Remove group',
@@ -706,7 +723,16 @@ export default function App(): ReactElement {
                     onSelect: () => {
                       void window.desktop
                         ?.assignGroup(conversationKeyOf(missionId), group.groupId)
-                        .then(refreshGroups)
+                        .then((moved) => {
+                          refreshGroups()
+                          // Only the conversation on screen: seeding a route
+                          // for one you are not looking at would change the
+                          // composer under you.
+                          const shown = liveRun?.data?.missionId ?? liveRun?.restoredMission?.missionId
+                          if (moved?.ok === true && shown !== undefined && conversationKeyOf(shown) === conversationKeyOf(missionId)) {
+                            seedRouteFromGroup(group)
+                          }
+                        })
                     }
                   })),
                   {
@@ -903,6 +929,19 @@ export default function App(): ReactElement {
    * look exactly like a fresh install.
    */
   const [unreadableStores, setUnreadableStores] = useState<readonly string[]>([])
+  /**
+   * A group's default route becomes the composer's pending selection when a
+   * conversation joins it -- the ruling's "seeding it on join rewrites
+   * nothing": a route is recorded per mission, so this is the selection for
+   * the NEXT turn and nothing about any turn already run.
+   */
+  const seedRouteFromGroup = (group: PublicGroup): void => {
+    if (group.route === undefined) return
+    setRoute({ runtime: group.route.runtime, model: group.route.model })
+    setMode(group.route.mode)
+    // Named, not spread: `undefined` clears an effort the group's runtime has no levels for.
+    setEffort(group.route.effort)
+  }
   const noteStore = (name: string, ok: boolean): void => {
     setUnreadableStores((held) => (ok ? held.filter((entry) => entry !== name) : held.includes(name) ? held : [...held, name]))
   }

@@ -207,6 +207,22 @@ describe('the file is read as untrusted', () => {
 })
 
 describe('what a group is, beyond a folder', () => {
+  it('takes a default route, refuses one a mission could not start on, and clears it', async () => {
+    // A group is not only a folder: filing a conversation into one buys a
+    // route as well as a brief. The composer's pending selection seeds from
+    // it on join, rewriting nothing (design ruling, 2026-09-15).
+    const { store: groups } = await store()
+    const made = await groups.create('Trading')
+    const route = { runtime: 'opencode', model: 'opencode/muse-spark-1.3-contributor-free', mode: 'ask', effort: 'low' }
+    await groups.setRoute(made.groupId, route)
+    expect((await groups.list()).groups[0]?.route).toEqual(route)
+    await expect(groups.setRoute(made.groupId, { runtime: 'opencode', model: '', mode: 'ask' })).rejects.toThrow('not one a mission can start on')
+    await expect(groups.setRoute('grp_missing', route)).rejects.toThrow('does not exist')
+    expect((await groups.list()).groups[0]?.route).toEqual(route)
+    await groups.setRoute(made.groupId, undefined)
+    expect((await groups.list()).groups[0]?.route).toBeUndefined()
+  })
+
   it('carries standing instructions from the start', async () => {
     // Read and written before anything sets them, because they are part of
     // what a group IS -- a store that learned about them later would mean
