@@ -329,7 +329,7 @@ export function createPeerExchange(options: {
           missionId: input.missionId,
           message: publicPeerMessage(message, 'posted')
         })
-        posted.push({ ...message, urgent: block.urgent })
+        posted.push({ ...message, urgent: block.urgent, ...(block.defer === true ? { defer: true } : {}) })
       }
       return posted
     }

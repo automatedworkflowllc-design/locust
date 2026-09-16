@@ -98,6 +98,13 @@ export type RelayDecision =
  */
 export function decideRelay(input: {
   readonly enabled: boolean
+  /**
+   * The sender said `when="later"`: tell them, do not page them.
+   *
+   * Checked before the budget, because a message that was never going to
+   * start a run should not spend an exchange's allowance on deciding not to.
+   */
+  readonly defer?: boolean
   readonly hop: number
   readonly recipientName: string
   /** The person's own budget for one exchange; the constant is only the default. */
@@ -112,6 +119,12 @@ export function decideRelay(input: {
   readonly spent?: number
 }): RelayDecision {
   const cap = input.cap ?? MAX_RELAY_HOPS
+  if (input.defer === true) {
+    return {
+      start: false,
+      reason: `Sent to ${input.recipientName} to read on their next run, rather than starting one.`
+    }
+  }
   if (!input.enabled) {
     return { start: false, reason: 'Teammate replies are switched off in Settings; the message waits for their next run.' }
   }
@@ -313,7 +326,7 @@ export interface EndedMission {
 }
 
 /** A message as the relay receives it: the record, plus what its sender asked for. */
-export type RelayedMessage = WorkroomMessage & { readonly urgent?: boolean }
+export type RelayedMessage = WorkroomMessage & { readonly urgent?: boolean; readonly defer?: boolean }
 
 export interface Relay {
   onShared(mission: SharingMission, posted: readonly RelayedMessage[]): Promise<void>
@@ -775,7 +788,14 @@ export function createRelay(options: RelayOptions): Relay {
         if (seen.has(recipientId) || held.has(recipientId)) continue
         seen.add(recipientId)
 
-        const decision = decideRelay({ enabled, hop, recipientName: message.to.name, cap, spent: spendOf(root, hop) })
+        const decision = decideRelay({
+          enabled,
+          hop,
+          recipientName: message.to.name,
+          cap,
+          spent: spendOf(root, hop),
+          ...(message.defer === true ? { defer: true } : {})
+        })
         if (!decision.start) {
           // Kept: this is the sentence that explains why a conversation the
           // person comes back to simply stopped.

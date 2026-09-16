@@ -68,6 +68,25 @@ export interface ShareBlock {
   readonly to: string
   readonly text: string
   /**
+   * `when="later"`: the sender is telling, not asking.
+   *
+   * A share starts a RUN on the recipient -- a whole mission, on their
+   * route, costing whatever that costs. Right for "the person asked you to
+   * hand this to Wren"; wrong for "here are the version notes you wanted",
+   * and until now there was no way to say which.
+   *
+   * Found from inside a room, 2026-09-15, by a Cursor teammate dogfooding
+   * the app: "Telling a teammate anything starts a paid mission... Locust
+   * auto-replied him into my thread with 'confirmed, no help needed.' Each
+   * of those is another run. FYI shares should not page a model."
+   *
+   * Deferring is not a new delivery path. It is the one a spent hop budget
+   * or a switched-off relay already takes -- the message waits and is read
+   * on the recipient's next run -- so this can only decline to interrupt,
+   * never lose anything.
+   */
+  readonly defer?: boolean
+  /**
    * `when="now"`: the sender is asking for this to be taken before the
    * recipient finishes what they are doing.
    *
@@ -91,7 +110,11 @@ export function parseShareBlocks(text: string): readonly ShareBlock[] {
     // Exactly one word means it, so a model reaching for emphasis with
     // `when="soon"` or `when="urgent"` gets the ordinary treatment rather
     // than an interruption it did not know it was asking for.
-    blocks.push({ to, text: body, urgent: (attributes.when ?? '').trim().toLowerCase() === 'now' })
+    const when = (attributes.when ?? '').trim().toLowerCase()
+    // Exactly one word means it, in both directions: a model reaching for
+    // emphasis with `when="soon"` gets the ordinary treatment rather than an
+    // interruption, and one reaching for `when="whenever"` still pages.
+    blocks.push({ to, text: body, urgent: when === 'now', ...(when === 'later' ? { defer: true } : {}) })
   }
   return blocks
 }
