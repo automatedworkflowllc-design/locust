@@ -279,7 +279,13 @@ describe('moving a conversation is one row, not one row per group', () => {
   })
 
   it('ticks the one it is already in, so the list also answers where it is', () => {
-    expect(APP).toContain('checked: groupMembersRef.current[conversationKeyOf(missionId)]?.groupId === group.groupId')
+    /*
+     * Read through `groupOfConversation`, which asks under EVERY id the
+     * conversation has worn -- not only its root. A membership saved while
+     * the row was keyed by a live turn is otherwise never found again, which
+     * is how a conversation "left the group" on its own (2026-09-16).
+     */
+    expect(APP).toContain('checked: groupOfConversation(missionId)?.groupId === group.groupId')
   })
 
   it('offers Ungrouped as a destination rather than a separate verb', () => {

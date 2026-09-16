@@ -75,3 +75,39 @@ export function ownerOf(
 ): string | undefined {
   return mission.ownerId ?? missionOwners[mission.missionId]
 }
+
+/**
+ * Every id this row has ever been keyed by, newest identity first.
+ *
+ * A conversation is a chain of turns, and which id the app uses for it
+ * depends on WHEN you ask. A live run does not always know its earlier turns,
+ * so its row is keyed by the turn itself; once the ledger is re-read, the
+ * same conversation is keyed by its ROOT. Anything saved against the first
+ * key is then looked up under the second and found missing.
+ *
+ * Colin, 2026-09-16: "ive named a conversation 'code' and moved it to a group
+ * named locust twice and it keeps disappearing" -- then, exactly: "it
+ * actually didnt disappear it just renamed itself and left the group."
+ *
+ * Both symptoms, one cause. His ledger has it in the open:
+ * `mission_77ef58ad` carries `continuesFrom`, so it is a follow-up turn, and
+ * both his chosen name and his group membership were stored against it while
+ * the row later keyed by the root.
+ *
+ * So a lookup asks for all of them. Writing still uses the root when it is
+ * known -- that is the stable identity -- and reading tolerates whichever id
+ * was current when the person acted.
+ */
+export function conversationKeys(mission: SidebarMission): readonly string[] {
+  const keys = [mission.rootId, mission.missionId, ...(mission.memberIds ?? [])]
+  return [...new Set(keys.filter((key): key is string => key !== undefined))]
+}
+
+/** The first value stored against any id this conversation has worn. */
+export function heldFor<T>(mission: SidebarMission, byKey: Readonly<Record<string, T>>): T | undefined {
+  for (const key of conversationKeys(mission)) {
+    const held = byKey[key]
+    if (held !== undefined) return held
+  }
+  return undefined
+}

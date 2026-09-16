@@ -110,6 +110,9 @@ import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
 import { splitAttachments } from '../../shared/attachments.js'
+// Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
+// different question from who owns a recorded mission.
+import { heldFor } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -692,7 +695,7 @@ export default function App(): ReactElement {
                 submenu: [
                   ...groupsRef.current.map((group) => ({
                     label: group.name,
-                    checked: groupMembersRef.current[conversationKeyOf(missionId)]?.groupId === group.groupId,
+                    checked: groupOfConversation(missionId)?.groupId === group.groupId,
                     onSelect: () => {
                       void window.desktop
                         ?.assignGroup(conversationKeyOf(missionId), group.groupId)
@@ -1281,6 +1284,14 @@ export default function App(): ReactElement {
    * and filing one reply of it somewhere else would be a group that lies
    * about what it holds.
    */
+  /** What group this conversation is in, under any id it has worn. */
+  const groupOfConversation = (missionId: string): GroupMembership | undefined => {
+    const row = sidebarMissionsRef.current.find((entry) =>
+      (entry.memberIds ?? [entry.missionId]).includes(missionId)
+    )
+    return row === undefined ? groupMembersRef.current[missionId] : heldFor(row, groupMembersRef.current)
+  }
+
   const conversationKeyOf = (missionId: string): string => {
     const row = sidebarMissionsRef.current.find((entry) =>
       (entry.memberIds ?? [entry.missionId]).includes(missionId)
@@ -3575,7 +3586,10 @@ export default function App(): ReactElement {
      * same string.
      */
     return collapseConversations(rows).map((row) => {
-      const chosen = missionTitles[row.rootId ?? row.missionId]
+      // Asked for under every id this conversation has worn, not only its
+      // root -- a name typed while the row was keyed by a live turn was
+      // stored against that turn and is otherwise never found again.
+      const chosen = heldFor(row, missionTitles)
       return chosen === undefined ? row : { ...row, title: chosen }
     })
   }, [history, historyById, runs, workspaceId, missionTitles])

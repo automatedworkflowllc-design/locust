@@ -24,7 +24,7 @@ import type { TeammateStatusView } from '../status.js'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
-import { conversationRows, ownerOf } from '../conversationList.js'
+import { conversationRows, heldFor, ownerOf } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
 
@@ -454,7 +454,7 @@ export function Sidebar({
   const restOfTeam = facesByRecency.length - shownFaces.length
 
   const ungroupedConversations = shownConversations.filter(
-    (mission) => groupMembers[mission.rootId ?? mission.missionId] === undefined
+    (mission) => heldFor(mission, groupMembers) === undefined
   )
   const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
   const shownUnowned = missionsMatching(unowned, query)
@@ -1305,7 +1305,7 @@ export function Sidebar({
               */}
             {groups.map((group) => {
               const theirs = shownConversations.filter(
-                (mission) => groupMembers[mission.rootId ?? mission.missionId]?.groupId === group.groupId
+                (mission) => heldFor(mission, groupMembers)?.groupId === group.groupId
               )
               const open = !foldedGroups.has(group.groupId)
               return (

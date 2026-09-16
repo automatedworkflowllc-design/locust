@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.154.0 - 2026-09-16
+
+- **A conversation keeps the name you gave it, and stays in the group you put
+  it in.** If you renamed one or moved it into a group while it was still
+  running, both could come undone on their own a little later — the name
+  reverting to your first sentence and the conversation quietly leaving its
+  group. Names and groups you set before this will come back; nothing was
+  lost, it was being filed under the turn that was live at the time instead of
+  under the conversation.
+
 ## 0.153.0 - 2026-09-16
 
 - **Thinking no longer breaks up the list of tool calls.** Yesterday's change
