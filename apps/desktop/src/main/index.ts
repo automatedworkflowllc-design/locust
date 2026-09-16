@@ -46,7 +46,8 @@ import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { createWorktreeManager } from './worktrees.js'
 import { readRuntimeSetup } from './runtime-setup.js'
-import { briefSection, readWorkspaceBrief, whereSection, worktreeSection } from './workspace-brief.js'
+import { briefSection, readWorkspaceBrief, whereSection, worktreeSection, groupSection } from './workspace-brief.js'
+import { createConversationChain, groupBriefFor } from './conversation-chain.js'
 import { createMemoryReader } from './memory-reader.js'
 import { createAttentionReader } from './attention-reader.js'
 import { parseDecision } from '../shared/decision.js'
@@ -933,6 +934,8 @@ if (!ownsSingleInstanceLock) {
     const groups = createGroupStore({ rootDirectory: app.getPath('userData') })
     const ledgerDirectory = join(app.getPath('userData'), 'mission-ledger')
     const missionLedger = createFileMissionLedger({ rootDirectory: ledgerDirectory })
+    /** From a turn back to its conversation's root, one ledger read per hop, remembered. */
+    const conversationChain = createConversationChain(missionLedger)
     // Its own directory: the ledger treats every `.jsonl` in ITS directory as
     // a mission, and the channel is not one.
     // Team memory: kept per folder in the app's own data, briefed to every
@@ -945,7 +948,7 @@ if (!ownsSingleInstanceLock) {
     // The folder's own LOCUST.md rides in the same slot, first: read fresh at
     // every start so an edit lands on the next mission (parity row 45).
     const memoryBriefing: MemoryBriefing = {
-      section: async (peer) => {
+      section: async (peer, conversation) => {
         if (!workspaceChosen) return undefined
         const sections: string[] = []
         const brief = await readWorkspaceBrief(workspacePath).catch(() => undefined)
@@ -980,6 +983,20 @@ if (!ownsSingleInstanceLock) {
          */
         if (peer.cwd === undefined && brief === undefined) {
           sections.push(whereSection(memoryWorkspaceName))
+        }
+        /*
+         * The group's standing instructions, after the folder's and before
+         * memory. Only when this conversation is in a group that has some:
+         * the sidebar says nothing about instructions being in effect, and
+         * this is the one place that makes such a sentence true.
+         *
+         * A groups file that will not read briefs nothing, the same as no
+         * group -- a turn is never refused over a brief it could do without.
+         */
+        const listedGroups = await groups.list().catch(() => undefined)
+        if (listedGroups !== undefined) {
+          const inGroup = groupBriefFor(await conversationChain.keysBefore(conversation?.previousMissionId), listedGroups)
+          if (inGroup !== undefined) sections.push(groupSection(inGroup.name, inGroup.instructions))
         }
         const settings = await teammates.readSettings()
         if (settings.memoryMode !== 'off') sections.push(await memoryPart(peer))

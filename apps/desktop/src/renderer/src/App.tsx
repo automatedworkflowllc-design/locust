@@ -78,6 +78,7 @@ import { composerRouteFor } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
+import { GroupInstructionsDialog } from './components/GroupInstructionsDialog.js'
 import { PixelFace } from './components/PixelFace.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
@@ -620,6 +621,12 @@ export default function App(): ReactElement {
       y: at.y,
       title: group.name,
       items: [
+        // What a group IS beyond a folder. Named by state so the menu says
+        // whether this group briefs anything before it is opened.
+        {
+          label: group.instructions.trim().length > 0 ? 'Edit instructions…' : 'Add instructions…',
+          onSelect: () => setInstructingGroupId(groupId)
+        },
         { label: 'Rename', onSelect: () => setRenamingGroupId(groupId) },
         {
           label: 'Remove group',
@@ -920,6 +927,8 @@ export default function App(): ReactElement {
    */
   const [relayStarting, setRelayStarting] = useState<Readonly<Record<string, StartingReply>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
+  /** The group whose standing instructions are being edited, if any. */
+  const [instructingGroupId, setInstructingGroupId] = useState<string>()
   const [routines, setRoutines] = useState<readonly PublicRoutine[]>([])
   /** Rooms: a named set of teammates a person writes to at once (vision #2). */
   const [rooms, setRooms] = useState<readonly PublicRoom[]>([])
@@ -4886,6 +4895,20 @@ export default function App(): ReactElement {
           }
         />
       )}
+      {(() => {
+        const instructing = groups.find((entry) => entry.groupId === instructingGroupId)
+        return instructing === undefined ? null : (
+          <GroupInstructionsDialog
+            key={instructing.groupId}
+            group={instructing}
+            onCancel={() => setInstructingGroupId(undefined)}
+            onSave={(instructions) => {
+              setInstructingGroupId(undefined)
+              void window.desktop?.setGroupInstructions(instructing.groupId, instructions).then(refreshGroups)
+            }}
+          />
+        )
+      })()}
       {newTeammateOpen && (
         <NewTeammateDialog
           error={teammateError}

@@ -390,7 +390,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false
         if (peer !== undefined && peerExchange !== undefined) {
-          const prepared = await peerExchange.prepare(prompt, peer, 'antigravity')
+          const prepared = await peerExchange.prepare(prompt, peer, 'antigravity', route.followUpOf === undefined ? {} : { previousMissionId: route.followUpOf })
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered
           peerDeliveryFailed = prepared.failed

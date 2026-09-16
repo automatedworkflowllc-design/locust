@@ -97,6 +97,16 @@ export function whereSection(workspaceName: string): string {
   return `You are working in the folder "${workspaceName}". Everything you read or change belongs to it unless you are told otherwise.`
 }
 
+/**
+ * A group's standing instructions, given to every turn of a conversation in
+ * it. One sentence of preamble: this rides in the same budget as a waiting
+ * peer message, and the words that matter are the person's.
+ */
+export function groupSection(groupName: string, instructions: string): string {
+  return `Standing instructions for the group "${groupName}", which this conversation is in. Every turn of it is given these:
+${instructions}`
+}
+
 export function worktreeSection(): string {
   return 'Your missions run in your own copy of this project, so work only inside the folder you were started in.'
 }

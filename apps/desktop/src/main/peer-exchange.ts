@@ -47,7 +47,7 @@ export interface PeerExchange {
    * is the person's answer, but the runtime is what makes it answerable. See
    * `RUNTIMES_THAT_KEEP_A_TODO_LIST`.
    */
-  prepare(prompt: string, peer: MissionPeerContext, runtime?: string): Promise<PreparedPeerPrompt>
+  prepare(prompt: string, peer: MissionPeerContext, runtime?: string, conversation?: ConversationHint): Promise<PreparedPeerPrompt>
   /** Throws when the ledger refuses: a mission must not run on messages it cannot record. */
   recordReceived(missionId: string, delivered: readonly WorkroomMessage[], occurredAt: string): Promise<void>
   /** Never throws: a delivery that cannot be marked is shown again next time, which is the safe direction. */
@@ -114,9 +114,18 @@ export function createTranscriptTracker(): TranscriptTracker {
   }
 }
 
+/**
+ * Which conversation a turn belongs to, as the host knows it at start: the
+ * turn it continues from. Absent for the first turn of a new conversation.
+ * The briefing slot walks back from here to find the group, if any.
+ */
+export interface ConversationHint {
+  readonly previousMissionId?: string
+}
+
 /** What the team remembers, worded for a runtime; undefined when memory is off. */
 export interface MemoryBriefing {
-  section(peer: MissionPeerContext): Promise<string | undefined>
+  section(peer: MissionPeerContext, conversation?: ConversationHint): Promise<string | undefined>
 }
 
 /**
@@ -164,9 +173,9 @@ export function createPeerExchange(options: {
   readonly readyConnectors?: () => Promise<string | undefined>
 }): PeerExchange {
   return {
-    async prepare(prompt, peer, runtime) {
+    async prepare(prompt, peer, runtime, conversation) {
       // Memory that cannot be read is left out, never a refusal to run.
-      const memory = options.memory === undefined ? undefined : await options.memory.section(peer).catch(() => undefined)
+      const memory = options.memory === undefined ? undefined : await options.memory.section(peer, conversation).catch(() => undefined)
       /*
        * Both halves must be true, and the runtime half is not negotiable.
        * A setting that is on does not make Claude Code able to keep a list;

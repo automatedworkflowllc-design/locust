@@ -10117,6 +10117,30 @@ textarea {
   padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3) 28px;
 }
 
+/* A group's standing instructions: the words are the person's, so the box is roomy. */
+.lc-groupinstructions__help {
+  margin: 0 0 var(--lc-space-3);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.45;
+}
+
+.lc-groupinstructions__text {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.45;
+}
+
+.lc-groupinstructions__count {
+  display: block;
+  margin-top: var(--lc-space-2);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+  text-align: right;
+}
+
 /* A file that would not read is a sentence, not an empty list. */
 .lc-sidebar__unreadable {
   padding: var(--lc-space-2) var(--lc-space-3);

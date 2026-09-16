@@ -1178,7 +1178,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false
         if (peer !== undefined && peerExchange !== undefined) {
-          const prepared = await peerExchange.prepare(prompt, peer, runtime)
+          // The turn this one continues, so the brief can find the
+          // conversation's group. A route switch names it in `continuation`;
+          // a follow-up in `resumedMissionId`; a first turn has none.
+          const prepared = await peerExchange.prepare(prompt, peer, runtime, {
+            ...(continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
+              ? {}
+              : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }
+          })
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered
           peerDeliveryFailed = prepared.failed

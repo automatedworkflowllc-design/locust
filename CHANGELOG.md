@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.159.0 - 2026-09-16
+
+- **Groups carry standing instructions.** Right-click a group · *Add
+  instructions…* and write what every conversation in it should be told —
+  "quote sizes in shares", "analysis only, never propose a trade". Every
+  turn started from then on in a conversation in that group is briefed with
+  them, after the folder’s own LOCUST.md and before memory. Turns already
+  run were not briefed, and nothing claims they were. Clear the text and the
+  group is a plain folder again. A group is no longer only a place to file
+  things: filing a conversation into one buys something.
+
 ## 0.158.0 - 2026-09-16
 
 - **When a teammate’s reply lands back in your conversation, the teammate
