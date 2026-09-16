@@ -11,7 +11,7 @@ import type {
   PublicTeammate
 } from '../../../shared/ipc.js'
 import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine } from '../missionView.js'
-import type { LiveStarter } from '../missionView.js'
+import type { GroupBoundary, LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
 import { useFollowBottom } from '../useFollowBottom.js'
@@ -408,6 +408,12 @@ export interface ThreadProps {
     /** Who started it. A host-briefed turn is not drawn as the person's words. */
     readonly startedBy?: LiveStarter
   }[]
+  /**
+   * Where this conversation's group began briefing it, if it is in one with
+   * instructions and the join was recorded. Drawn at that point in the
+   * thread -- after the last turn that ran without them -- never at the top.
+   */
+  readonly groupBoundary?: GroupBoundary
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean
   readonly restoredMission: PublicRecoveredMission | undefined
@@ -466,6 +472,7 @@ export function Thread({
   startedBy,
   onOpenPeerRun,
   earlierTurns,
+  groupBoundary,
   coldStart = false,
   onRunWithEdits,
   onRunAgain,
@@ -531,6 +538,30 @@ export function Thread({
   // The current turn is the last in the sequence, so its own marker is the
   // one whose index is past every earlier turn.
   const markers = threadMarkers([...earlierTurns.map((turn) => turn.events), events])
+  /*
+   * The group's line, and its instructions on request -- shown AS THE
+   * GROUP'S: read-only here, with the way to edit going to the group's own
+   * header, so nobody edits shared text believing it is their own.
+   */
+  const [viewingGroup, setViewingGroup] = useState(false)
+  const groupNote =
+    groupBoundary === undefined ? null : (
+      <div className="lc-thread__note lc-thread__groupnote">
+        <span>
+          {groupBoundary.groupName}&apos;s standing instructions brief every turn from here
+          {' · '}
+          <button type="button" className="lc-linkbutton" onClick={() => setViewingGroup((held) => !held)}>
+            {viewingGroup ? 'hide' : 'view'}
+          </button>
+        </span>
+        {viewingGroup && (
+          <blockquote className="lc-thread__groupwords">
+            {groupBoundary.instructions}
+            <span className="lc-thread__groupedit lc-mono">edit from the group&apos;s header in the sidebar</span>
+          </blockquote>
+        )}
+      </div>
+    )
   const currentMarker = markers.find((marker) => marker.beforeTurn === earlierTurns.length)
   // Every turn's exchange, not only the last one: the message a teammate SENT
   // was written on an earlier turn than the reply it drew, so a thread that
@@ -659,6 +690,7 @@ export function Thread({
               {marker !== undefined && (
                 <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
               )}
+              {groupBoundary?.beforeTurn === index && groupNote}
               {userTurn(turnPromptLine(turn), turnAttachments(turn))}
               {cardsFor(index, 'before-work').map(peerCard)}
               <ThreadItems items={buildThread(turn.events, { running: false, mayEdit, ...(workspacePath === undefined ? {} : { workspacePath }) })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
@@ -672,6 +704,7 @@ export function Thread({
         {currentMarker !== undefined && (
           <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
         )}
+        {groupBoundary?.beforeTurn === earlierTurns.length && groupNote}
         {coldStart && (
           /*
            * WHERE THIS TURN BEGAN, said where the turn begins.
@@ -739,6 +772,8 @@ export function Thread({
           * 2026-09-11).
           */}
         <MemoryCard lines={memoriesOfTurn(peers.memories ?? [], shownMissionId)} />
+        {/* Joined after the last turn started: the NEXT turn is the first briefed, so the line sits below this one. */}
+        {groupBoundary !== undefined && groupBoundary.beforeTurn > earlierTurns.length && groupNote}
 
         {/*
           Approvals sit at the END of the thread, after everything that has

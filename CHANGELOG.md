@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.160.0 - 2026-09-16
+
+- **The thread says where a group’s instructions began.** A conversation
+  in a group with standing instructions now carries one line at the point
+  it joined — *“Trading’s standing instructions brief every turn from here
+  · view”* — after the last turn that ran without them, never at the top,
+  because the turns above genuinely were not briefed. *view* shows the
+  group’s words read-only; editing goes through the group’s own header, so
+  nobody changes shared text believing it is their own. Conversations filed
+  before the app recorded join times get no line rather than a guessed one.
+
 ## 0.159.0 - 2026-09-16
 
 - **Groups carry standing instructions.** Right-click a group · *Add

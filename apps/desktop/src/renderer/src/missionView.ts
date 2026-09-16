@@ -520,6 +520,55 @@ export function threadMarkers(turns: readonly (readonly NormalizedRuntimeEvent[]
   return markers
 }
 
+/**
+ * Where a group's standing instructions began to apply, in a thread.
+ *
+ * The design agent's ruling of 2026-09-15, and the reason membership records
+ * WHEN it happened: instructions brief from joining onward and never
+ * retroactively, so the thread marks that boundary rather than claiming the
+ * turns above it were briefed. A line at the top of a thread would claim
+ * they were.
+ */
+export interface GroupBoundary {
+  /** Index of the first turn briefed; equal to the turn count when none is yet. */
+  readonly beforeTurn: number
+  readonly groupName: string
+  readonly instructions: string
+  readonly joinedAt: string
+}
+
+/**
+ * The boundary for a conversation, or nothing to draw.
+ *
+ * Nothing when the membership's moment is unknown (a file from before it was
+ * recorded), and nothing when the group has no instructions -- a folder
+ * briefs nothing, and a line saying it does would be the one thing this app
+ * does not do. `turnStarts` are ISO instants, oldest first; a turn with no
+ * known start is treated as before the join, which is the honest side to be
+ * wrong on.
+ */
+export function groupBoundary(
+  turnStarts: readonly (string | undefined)[],
+  membership: { readonly at?: string } | undefined,
+  group: { readonly name: string; readonly instructions: string } | undefined
+): GroupBoundary | undefined {
+  if (membership?.at === undefined || group === undefined) return undefined
+  const instructions = group.instructions.trim()
+  if (instructions.length === 0) return undefined
+  const joined = Date.parse(membership.at)
+  if (Number.isNaN(joined)) return undefined
+  let beforeTurn = turnStarts.length
+  for (let index = 0; index < turnStarts.length; index += 1) {
+    const started = turnStarts[index]
+    const at = started === undefined ? NaN : Date.parse(started)
+    if (!Number.isNaN(at) && at >= joined) {
+      beforeTurn = index
+      break
+    }
+  }
+  return { beforeTurn, groupName: group.name, instructions, joinedAt: membership.at }
+}
+
 export interface PlanStep {
   readonly text: string
   readonly state: 'done' | 'running' | 'pending'

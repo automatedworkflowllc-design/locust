@@ -584,6 +584,28 @@ textarea {
   text-wrap: pretty;
 }
 
+/* Where a group's standing instructions began: a note at the join point, never at the top. */
+.lc-thread__groupnote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-thread__groupwords {
+  margin: 0;
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-left: 2px solid var(--lc-border-button);
+  white-space: pre-wrap;
+  color: var(--lc-text-primary);
+}
+
+.lc-thread__groupedit {
+  display: block;
+  margin-top: var(--lc-space-2);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+}
+
 .lc-thread__marker {
   text-align: center;
   font-family: var(--lc-font-mono);

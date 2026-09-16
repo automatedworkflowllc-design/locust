@@ -98,7 +98,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, shellCommandText, turnText } from './missionView.js'
+  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, shellCommandText, turnText, groupBoundary } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -4517,6 +4517,24 @@ export default function App(): ReactElement {
                 }}
                 onOpenSenderRun={(missionId) => () => openMission(missionId)}
                 earlierTurns={liveRun.earlierTurns ?? []}
+                groupBoundary={(() => {
+                  // Where this conversation's group began briefing it. The
+                  // row knows every id the conversation has worn; the
+                  // membership is read against all of them, the way the
+                  // sidebar reads it; the turns' start times place the line.
+                  const shownId = liveRun.data?.missionId ?? liveRun.restoredMission?.missionId
+                  const row =
+                    shownId === undefined
+                      ? undefined
+                      : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(shownId))
+                  const membership = row === undefined ? undefined : heldFor(row, groupMembers)
+                  const group = membership === undefined ? undefined : groups.find((entry) => entry.groupId === membership.groupId)
+                  const starts = [
+                    ...(liveRun.earlierTurns ?? []).map((turn) => historyByIdRef.current.get(turn.missionId)?.createdAt),
+                    liveRun.startedAtIso ?? liveRun.restoredMission?.createdAt
+                  ]
+                  return groupBoundary(starts, membership, group)
+                })()}
                 coldStart={liveRun.coldStart ?? false}
                 workspacePath={workspacePath}
                 {...(workspaceId === undefined ? {} : { workspaceId })}
