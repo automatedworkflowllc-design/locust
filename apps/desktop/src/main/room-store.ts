@@ -218,16 +218,23 @@ export function parsedRoom(value: unknown): PublicRoom | undefined {
   }
 }
 
+/**
+ * A ROOM that does not parse is dropped; a FILE that does not parse is
+ * unreadable. The two used to be one `return EMPTY`, and since every write
+ * here reads first, a torn or foreign file was one save away from being
+ * replaced by an empty one. Found in the groups store on 2026-09-16 (Astra,
+ * with the file cut off mid-array); this is the same three lines, carried.
+ */
 export function parsedFile(text: string): StoredFile {
   let value: unknown
   try {
     value = JSON.parse(text)
   } catch {
-    return EMPTY
+    throw new Error(UNREADABLE)
   }
-  if (typeof value !== 'object' || value === null) return EMPTY
+  if (typeof value !== 'object' || value === null) throw new Error(UNREADABLE)
   const record = value as Record<string, unknown>
-  if (record.schemaVersion !== SCHEMA_VERSION || !Array.isArray(record.rooms)) return EMPTY
+  if (record.schemaVersion !== SCHEMA_VERSION || !Array.isArray(record.rooms)) throw new Error(UNREADABLE)
   const rooms: PublicRoom[] = []
   const seen = new Set<string>()
   for (const entry of record.rooms) {
@@ -287,7 +294,9 @@ export function createRoomStore(options: {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return EMPTY
       throw new Error(UNREADABLE)
     }
-    if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) return EMPTY
+    // Oversize is unreadable too: "empty" here would be written back over
+    // whatever the file held, which is the one thing a size cap must not do.
+    if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) throw new Error(UNREADABLE)
     return parsedFile(text)
   }
 

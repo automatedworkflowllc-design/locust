@@ -129,6 +129,28 @@ export function narrowingLine(input: {
   return `${narrowedBy.join(' · ')} — ${String(input.shown)} of ${String(of)}`
 }
 
+/** The order the sidebar names them in, which is the order they sit in. */
+const STORE_ORDER = ['teammates', 'groups', 'rooms', 'routines'] as const
+
+/**
+ * One sentence for every local file that exists and would not read.
+ *
+ * Each store tells unreadable apart from empty; the host relays it; and the
+ * sidebar used to drop every one of those answers on the floor, so a roster
+ * file with a torn byte looked like a fresh install. Names the files, says
+ * nothing is lost, and says the one thing that makes it true: nothing is
+ * written over them until they read again.
+ */
+export function unreadableSentence(stores: readonly string[]): string | undefined {
+  const named = STORE_ORDER.filter((store) => stores.includes(store))
+  if (named.length === 0) return undefined
+  const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`
+  const subject = list.charAt(0).toUpperCase() + list.slice(1)
+  return named.length === 1
+    ? `${subject} could not be read. Nothing is lost: nothing is saved over that file until it reads again.`
+    : `${subject} could not be read. Nothing is lost: nothing is saved over those files until they read again.`
+}
+
 /** The first value stored against any id this conversation has worn. */
 export function heldFor<T>(mission: SidebarMission, byKey: Readonly<Record<string, T>>): T | undefined {
   for (const key of conversationKeys(mission)) {

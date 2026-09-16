@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.157.0 - 2026-09-16
+
+- **A local file that cannot be read is never treated as empty — and never
+  written over.** This morning’s groups fix turned out to be one of four:
+  your teammates, rooms and routines files had the same habit. The worst
+  was the teammate roster: if it could not be read for a moment (a lock, a
+  scan, a torn byte), the app showed you a fresh install, and the next
+  mission start would have saved that empty roster over the real one. Now
+  every one of those files is either read or refused, nothing is saved over
+  a refused one, and the sidebar names the files that would not read.
+
 ## 0.156.0 - 2026-09-16
 
 - **Thinking is not counted as a tool call — on the line you actually read.**

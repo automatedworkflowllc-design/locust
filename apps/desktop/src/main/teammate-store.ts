@@ -32,9 +32,11 @@ export const MAX_CONNECTORS = 16
  * How many mission-to-teammate assignments the roster will hold.
  *
  * Teammates were capped and assignments were not, and the file has a size
- * cliff: past `MAX_FILE_BYTES` it reads as EMPTY, and the next write saves
- * that empty file over the real one. A window that assigned missions in a
- * loop could therefore delete the person's whole roster.
+ * cliff: past `MAX_FILE_BYTES` it USED to read as EMPTY, and the next
+ * write saved that empty file over the real one. A window that assigned
+ * missions in a loop could therefore delete the person's whole roster. (It
+ * reads as UNREADABLE now, and no write happens; the cap stays because a
+ * roster that stops working is still a roster that stops working.)
  *
  * The number has to sit well UNDER that cliff to be worth anything. An entry
  * is roughly 65 bytes (a `mission_<uuid>` key and a teammate id), so five
@@ -58,6 +60,17 @@ export const MAX_MISSION_OWNERS = 5_000
 export const MAX_MISSION_TITLES = 1_000
 export const MAX_MISSION_TITLE_LENGTH = 120
 const MAX_FILE_BYTES = 1_000_000
+/**
+ * What a caller sees when the roster file exists and cannot be read.
+ *
+ * NOT "no teammates". Every write here reads first, so a roster that read as
+ * empty was one save away from being replaced by an empty one -- and the
+ * save that would have done it is `assignMission`, which runs at every
+ * mission start. A transient lock at the wrong moment would have been the
+ * whole roster. Found by sweeping for the class on 2026-09-16, after Astra
+ * found the same shape in the groups store.
+ */
+export const TEAMMATES_UNREADABLE = 'TEAMMATES_UNREADABLE'
 const SCHEMA_VERSION = 1 as const
 
 export const TEAMMATE_HUES: readonly TeammateHue[] = ['lime', 'blue', 'violet', 'clay']
@@ -272,23 +285,20 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
   }
 }
 
+/**
+ * A RECORD that does not parse is dropped; a FILE that does not parse -- or
+ * one from a schema this build does not know -- is unreadable, never empty.
+ */
 function parsedFile(text: string): StoredFile {
-  const empty: StoredFile = {
-    schemaVersion: SCHEMA_VERSION,
-    teammates: [],
-    missionOwners: {},
-    missionTitles: {},
-    settings: DEFAULT_SETTINGS
-  }
   let value: unknown
   try {
     value = JSON.parse(text) as unknown
   } catch {
-    return empty
+    throw new Error(TEAMMATES_UNREADABLE)
   }
-  if (typeof value !== 'object' || value === null) return empty
+  if (typeof value !== 'object' || value === null) throw new Error(TEAMMATES_UNREADABLE)
   const record = value as Record<string, unknown>
-  if (record.schemaVersion !== SCHEMA_VERSION) return empty
+  if (record.schemaVersion !== SCHEMA_VERSION) throw new Error(TEAMMATES_UNREADABLE)
 
   const teammates: PublicTeammate[] = []
   let dropped = 0
@@ -418,16 +428,20 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
     return next
   }
 
+  // A file that is simply not there is genuinely empty. Anything else that
+  // stops it being read is UNREADABLE, and no write goes over it.
   const read = async (): Promise<StoredFile> => {
+    let text: string
     try {
-      const text = await readFile(path, 'utf8')
-      if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) {
+      text = await readFile(path, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, missionTitles: {}, settings: DEFAULT_SETTINGS }
       }
-      return parsedFile(text)
-    } catch {
-      return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, missionTitles: {}, settings: DEFAULT_SETTINGS }
+      throw new Error(TEAMMATES_UNREADABLE)
     }
+    if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) throw new Error(TEAMMATES_UNREADABLE)
+    return parsedFile(text)
   }
 
   const write = async (file: StoredFile): Promise<void> => {

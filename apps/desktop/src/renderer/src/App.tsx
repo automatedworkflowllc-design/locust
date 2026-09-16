@@ -841,8 +841,8 @@ export default function App(): ReactElement {
       if (next.ok) setStorage(next.data)
       applyHistory(listed)
       seedLimitsFrom(listed)
+      noteStore('teammates', roster.ok)
       if (roster.ok) setMissionOwners(roster.data.missionOwners)
-      if (roster.ok) setMissionTitles(roster.data.missionTitles)
       if (roster.ok) setMissionTitles(roster.data.missionTitles)
     }
     return response
@@ -890,13 +890,20 @@ export default function App(): ReactElement {
   const [missionTitles, setMissionTitles] = useState<Readonly<Record<string, string>>>({})
   const [groups, setGroups] = useState<readonly PublicGroup[]>([])
   const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, GroupMembership>>>({})
-  /** The groups file refused to read. Held apart from "no groups" so the sidebar can say so. */
-  const [groupsUnreadable, setGroupsUnreadable] = useState(false)
+  /**
+   * Local files that exist and refused to read, by store name. Held apart
+   * from "empty" so the sidebar can say so -- an unreadable roster used to
+   * look exactly like a fresh install.
+   */
+  const [unreadableStores, setUnreadableStores] = useState<readonly string[]>([])
+  const noteStore = (name: string, ok: boolean): void => {
+    setUnreadableStores((held) => (ok ? held.filter((entry) => entry !== name) : held.includes(name) ? held : [...held, name]))
+  }
   const refreshGroups = (): void => {
     void window.desktop
       ?.listGroups()
       .then((response) => {
-        setGroupsUnreadable(!response.ok)
+        noteStore('groups', response.ok)
         if (!response.ok) return
         setGroups(response.data.groups)
         setGroupMembers(response.data.members)
@@ -1745,7 +1752,9 @@ export default function App(): ReactElement {
     void bridge
       .listTeammates()
       .then((response) => {
-        if (!active || !response.ok) return
+        if (!active) return
+        noteStore('teammates', response.ok)
+        if (!response.ok) return
         setTeammates(response.data.teammates)
         /*
          * BOTH maps, every time, and this one is why.
@@ -1772,7 +1781,7 @@ export default function App(): ReactElement {
       .listGroups()
       .then((response) => {
         if (!active) return
-        setGroupsUnreadable(!response.ok)
+        noteStore('groups', response.ok)
         if (!response.ok) return
         setGroups(response.data.groups)
         setGroupMembers(response.data.members)
@@ -1785,7 +1794,9 @@ export default function App(): ReactElement {
     void bridge
       .listRoutines()
       .then((response) => {
-        if (!active || !response.ok) return
+        if (!active) return
+        noteStore('routines', response.ok)
+        if (!response.ok) return
         setRoutines(response.data.routines)
       })
       .catch(() => {
@@ -1795,7 +1806,9 @@ export default function App(): ReactElement {
     void bridge
       .listRooms()
       .then((response) => {
-        if (!active || !response.ok) return
+        if (!active) return
+        noteStore('rooms', response.ok)
+        if (!response.ok) return
         setRooms(response.data.rooms)
       })
       .catch(() => {
@@ -2185,6 +2198,7 @@ export default function App(): ReactElement {
     void window.desktop
       ?.listRooms()
       .then((response) => {
+        noteStore('rooms', response.ok)
         if (response.ok) setRooms(response.data.rooms)
       })
       .catch(() => undefined)
@@ -2901,6 +2915,7 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     if (!bridge) return
     const listed = await bridge.listRoutines()
+    noteStore('routines', listed.ok)
     if (listed.ok) setRoutines(listed.data.routines)
   }
 
@@ -3906,7 +3921,7 @@ export default function App(): ReactElement {
           onMissionMenu={openMissionMenu}
           groups={groups}
           groupMembers={groupMembers}
-          groupsUnreadable={groupsUnreadable}
+          unreadable={unreadableStores}
           onGroupMenu={openGroupMenu}
           renamingGroupId={renamingGroupId}
           onRenameGroup={(groupId, name) => {

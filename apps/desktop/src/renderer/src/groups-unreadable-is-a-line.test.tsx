@@ -30,7 +30,7 @@ const group: PublicGroup = { groupId: 'grp_1', name: 'State control', createdAt:
 
 const noop = (): void => undefined
 
-function sidebar(props: { readonly groups?: readonly PublicGroup[]; readonly groupsUnreadable?: boolean }): string {
+function sidebar(props: { readonly groups?: readonly PublicGroup[]; readonly unreadable?: readonly string[] }): string {
   return renderToStaticMarkup(
     <Sidebar
       runtimes={[]}
@@ -64,16 +64,16 @@ function sidebar(props: { readonly groups?: readonly PublicGroup[]; readonly gro
       onOpenAutomations={noop}
       onHome={noop}
       groups={props.groups ?? []}
-      groupsUnreadable={props.groupsUnreadable}
+      unreadable={props.unreadable}
     />
   )
 }
 
 describe('the groups file that would not read', () => {
   it('is said in the sidebar, above the conversations it could not sort', () => {
-    const html = sidebar({ groupsUnreadable: true })
+    const html = sidebar({ unreadable: ['groups'] })
     expect(html).toContain('Groups could not be read')
-    expect(html).toContain('lc-convgroup__unreadable')
+    expect(html).toContain('lc-sidebar__unreadable')
     // The conversation is still there to work with -- unreadable groups
     // never hide work -- and it carries no group heading it cannot vouch for.
     expect(html).toContain('Control renamed conversation')
@@ -86,6 +86,14 @@ describe('the groups file that would not read', () => {
     const html = sidebar({})
     expect(html).not.toContain('Groups could not be read')
     expect(html).toContain('Control renamed conversation')
+  })
+
+  it('names every file that would not read, in one sentence, roster first', () => {
+    // The roster is the one that matters: unreadable, it used to look like a
+    // fresh install, and the next mission start would have made it one.
+    const html = sidebar({ unreadable: ['routines', 'teammates'] })
+    expect(html).toContain('Teammates and routines could not be read')
+    expect(html).toContain('those files until they read again')
   })
 
   it('is not said when the groups read fine', () => {

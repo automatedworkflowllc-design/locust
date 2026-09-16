@@ -1755,7 +1755,14 @@ if (!ownsSingleInstanceLock) {
       startQueued: async (room, postId, teammateId) => {
         const post = room.posts.find((entry) => entry.postId === postId)
         if (post === undefined) return 'refused'
-        const attempt = await startRoomMember(room, teammateId, post.text, await teammates.list())
+        // A roster that cannot be read cannot say who this member is.
+        let roster: Awaited<ReturnType<typeof teammates.list>>
+        try {
+          roster = await teammates.list()
+        } catch {
+          return 'refused'
+        }
+        const attempt = await startRoomMember(room, teammateId, post.text, roster)
         if (!attempt.ok) return attempt.retryable ? 'no-slot' : 'refused'
         sendToWindow({
           kind: 'mission-started',
@@ -2598,14 +2605,24 @@ ${taskSection({
       const roomId = typeof input.roomId === 'string' ? input.roomId : undefined
       const text = typeof input.text === 'string' ? input.text : ''
       if (roomId === undefined || text.trim().length === 0) return roomRejected('Write something to post.')
-      const room = await rooms.get(roomId)
+      let room: Awaited<ReturnType<typeof rooms.get>>
+      try {
+        room = await rooms.get(roomId)
+      } catch {
+        return roomRejected('The rooms file could not be read, so nothing was posted.')
+      }
       if (room === undefined) return roomRejected('That room no longer exists.')
 
       // One run per teammate, each on THEIR route. A teammate with no route
       // of their own yet -- never started by a person -- runs on Codex's
       // account default in read-only, the same as a fresh teammate would.
       const refusals: { teammateId: string; name: string; message: string }[] = []
-      const roster = await teammates.list()
+      let roster: Awaited<ReturnType<typeof teammates.list>>
+      try {
+        roster = await teammates.list()
+      } catch {
+        return roomRejected('The teammate roster could not be read, so nothing was posted.')
+      }
 
       /*
        * THE POST EXISTS BEFORE ANYONE IS ASKED.

@@ -136,9 +136,16 @@ describe('the routine store', () => {
     expect(JSON.parse(text).schemaVersion).toBe(1)
   })
 
-  it('treats a damaged or foreign file as empty rather than repairing it', async () => {
-    expect(parsedFile('not json').routines).toEqual([])
-    expect(parsedFile(JSON.stringify({ schemaVersion: 2, routines: [] })).routines).toEqual([])
+  it('treats a damaged or foreign file as unreadable, and a damaged routine as absent', async () => {
+    // Unreadable, not empty: every write reads first, and a file read as
+    // empty is saved back empty on the next change (2026-09-16 sweep).
+    expect(() => parsedFile('not json')).toThrow('ROUTINES_UNREADABLE')
+    expect(() => parsedFile(JSON.stringify({ schemaVersion: 2, routines: [] }))).toThrow('ROUTINES_UNREADABLE')
+    const torn = await root()
+    await writeFile(join(torn, 'routines.json'), '{"schemaVersion":1,"routines":[', 'utf8')
+    await expect(createRoutineStore({ rootDirectory: torn }).list()).rejects.toThrow('ROUTINES_UNREADABLE')
+    await expect(createRoutineStore({ rootDirectory: torn }).create(fresh())).rejects.toThrow('ROUTINES_UNREADABLE')
+    expect(await readFile(join(torn, 'routines.json'), 'utf8')).toBe('{"schemaVersion":1,"routines":[')
     const bad = JSON.stringify({
       schemaVersion: 1,
       routines: [
@@ -153,7 +160,7 @@ describe('the routine store', () => {
     expect(parsedFile(bad).routines.map((routine) => routine.routineId)).toEqual(['rt_ok'])
     const directory = await root()
     await writeFile(join(directory, 'routines.json'), '{{{', 'utf8')
-    expect(await createRoutineStore({ rootDirectory: directory }).list()).toEqual([])
+    await expect(createRoutineStore({ rootDirectory: directory }).list()).rejects.toThrow('ROUTINES_UNREADABLE')
   })
 })
 

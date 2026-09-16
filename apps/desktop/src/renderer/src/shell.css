@@ -10118,7 +10118,7 @@ textarea {
 }
 
 /* A file that would not read is a sentence, not an empty list. */
-.lc-convgroup__unreadable {
+.lc-sidebar__unreadable {
   padding: var(--lc-space-2) var(--lc-space-3);
   white-space: normal;
   line-height: 1.4;

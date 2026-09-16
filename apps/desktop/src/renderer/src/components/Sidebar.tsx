@@ -24,7 +24,7 @@ import type { TeammateStatusView } from '../status.js'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
-import { conversationRows, heldFor, narrowingLine, ownerOf } from '../conversationList.js'
+import { conversationRows, heldFor, narrowingLine, ownerOf, unreadableSentence } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
 
@@ -161,7 +161,7 @@ export function Sidebar({
   onRenameDone,
   groups = [],
   groupMembers = {},
-  groupsUnreadable = false,
+  unreadable = [],
   onGroupMenu,
   renamingGroupId,
   onRenameGroup,
@@ -220,7 +220,8 @@ export function Sidebar({
   /** Which group each conversation is in, by conversation id. */
   readonly groupMembers?: Readonly<Record<string, GroupMembership>>
   /**
-   * The groups file could not be read AT ALL -- not the same as having none.
+   * Local files that exist and would not read -- `teammates`, `groups`,
+   * `rooms`, `routines` -- which is not the same as any of them being empty.
    *
    * The store has told them apart since 0.146.0 and the host relayed it, and
    * the sidebar dropped the answer on the floor: `if (!response.ok) return`
@@ -230,7 +231,7 @@ export function Sidebar({
    * as an ordinary ungrouped row." The rooms lesson, applied a layer down
    * and then not applied at the top.
    */
-  readonly groupsUnreadable?: boolean
+  readonly unreadable?: readonly string[]
   /** The header menu for a group: rename it, or remove it. */
   readonly onGroupMenu?: (groupId: string, at: { readonly x: number; readonly y: number }) => void
   /** The group being renamed in place, if any. */
@@ -1316,10 +1317,9 @@ export function Sidebar({
               * you want it, and the list you actually scan stays at the top
               * of the column.
               */}
-            {groupsUnreadable && (
-              <p className="lc-convgroup__unreadable lc-row__meta" role="status">
-                Groups could not be read, so every conversation is listed here ungrouped. Nothing is
-                lost: nothing is saved over the groups file until it reads again.
+            {unreadable.length > 0 && (
+              <p className="lc-sidebar__unreadable lc-row__meta" role="status">
+                {unreadableSentence(unreadable)}
               </p>
             )}
             {groups.map((group) => {

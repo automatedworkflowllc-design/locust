@@ -119,20 +119,30 @@ describe('teammate store', () => {
     expect(said).toEqual([])
   })
 
-  it('treats a file from an unknown schema as empty rather than guessing', async () => {
+  it('treats a file from an unknown schema as unreadable rather than guessing -- or overwriting', async () => {
     const { root } = await store()
-    await writeFile(
-      join(root, 'teammates.json'),
-      JSON.stringify({ schemaVersion: 99, teammates: [{ teammateId: 'tm_x' }] }),
-      'utf8'
-    )
-    expect(await createTeammateStore({ rootDirectory: root }).list()).toEqual([])
+    const foreign = JSON.stringify({ schemaVersion: 99, teammates: [{ teammateId: 'tm_x' }] })
+    await writeFile(join(root, 'teammates.json'), foreign, 'utf8')
+    const reopened = createTeammateStore({ rootDirectory: root })
+    await expect(reopened.list()).rejects.toThrow('TEAMMATES_UNREADABLE')
+    await expect(reopened.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })).rejects.toThrow('TEAMMATES_UNREADABLE')
+    expect(await readFile(join(root, 'teammates.json'), 'utf8')).toBe(foreign)
   })
 
-  it('survives a corrupt file', async () => {
+  it('treats a corrupt file as unreadable, and refuses to write over it', async () => {
+    /*
+     * This used to read as an empty roster. Every write reads first, and
+     * `assignMission` writes at every mission start, so a file that could
+     * not be read for a moment -- a lock, a scan, a torn byte -- would have
+     * been replaced by an empty one on the next start. Found sweeping for
+     * the class on 2026-09-16.
+     */
     const { root } = await store()
     await writeFile(join(root, 'teammates.json'), 'not json at all', 'utf8')
-    expect(await createTeammateStore({ rootDirectory: root }).list()).toEqual([])
+    const reopened = createTeammateStore({ rootDirectory: root })
+    await expect(reopened.list()).rejects.toThrow('TEAMMATES_UNREADABLE')
+    await expect(reopened.assignMission('tm_x', 'mission_1')).rejects.toThrow('TEAMMATES_UNREADABLE')
+    expect(await readFile(join(root, 'teammates.json'), 'utf8')).toBe('not json at all')
   })
 
   it('assigns missions and forgets them when the teammate is removed', async () => {

@@ -99,10 +99,17 @@ describe('a room', () => {
     expect(await rooms.list()).toHaveLength(0)
   })
 
-  it('reads a damaged file as empty rather than crashing, and skips a bad room but keeps the good ones', async () => {
+  it('treats a file that does not parse as unreadable, refuses to write over it, and skips a bad room but keeps the good ones', async () => {
+    // A torn file used to read as empty -- and since every write reads first,
+    // the next save would have replaced it with an empty one. Same ruling as
+    // the groups store took on 2026-09-16; the directory case below it has
+    // said "could not be read" since Grok's finding of the 14th.
     const rooms = await store()
-    await writeFile(join(root, 'rooms.json'), '{not json', 'utf8')
-    expect(await rooms.list()).toEqual([])
+    const torn = '{not json'
+    await writeFile(join(root, 'rooms.json'), torn, 'utf8')
+    await expect(rooms.list()).rejects.toThrow('could not be read')
+    await expect(rooms.create({ name: 'A', teammateIds: ['tm_wren'] })).rejects.toThrow('could not be read')
+    expect(await readFile(join(root, 'rooms.json'), 'utf8')).toBe(torn)
     const good = { roomId: 'room_a', name: 'A', teammateIds: ['tm_wren'], createdAt: NOW, posts: [], tasks: [] }
     const bad = { roomId: 'room_b', name: '', teammateIds: [], createdAt: NOW, posts: [] }
     expect(parsedFile(JSON.stringify({ schemaVersion: 1, rooms: [bad, good, good] })).rooms).toEqual([good])

@@ -21,6 +21,8 @@ import type { RoutineExecution } from '../shared/routine-recovery.js'
 
 const SCHEMA_VERSION = 1 as const
 const MAX_FILE_BYTES = 4 * 1024 * 1024
+/** The file exists and cannot be read. Not "no routines": nothing is written over it. */
+export const ROUTINES_UNREADABLE = 'ROUTINES_UNREADABLE'
 export const MAX_ROUTINES = 64
 export const MAX_STEPS = 12
 export const MAX_STEP_LENGTH = 20_000
@@ -147,20 +149,21 @@ function parsedExecution(value: unknown, steps: readonly string[], route: Teamma
 }
 
 /**
- * A file that does not parse is treated as empty rather than repaired: the
- * roster store made the same call, and a routine silently altered by a
- * reader is worse than one that is missing and says so on the next save.
+ * A ROUTINE that does not parse is dropped rather than repaired. A FILE that
+ * does not parse is unreadable -- it used to read as empty, "the same call
+ * the roster store made", and the roster store's call was the bug: every
+ * write reads first, so empty-on-failure is overwrite-on-failure.
  */
 export function parsedFile(text: string): StoredFile {
   let value: unknown
   try {
     value = JSON.parse(text)
   } catch {
-    return EMPTY
+    throw new Error(ROUTINES_UNREADABLE)
   }
-  if (typeof value !== 'object' || value === null) return EMPTY
+  if (typeof value !== 'object' || value === null) throw new Error(ROUTINES_UNREADABLE)
   const record = value as Record<string, unknown>
-  if (record.schemaVersion !== SCHEMA_VERSION || !Array.isArray(record.routines)) return EMPTY
+  if (record.schemaVersion !== SCHEMA_VERSION || !Array.isArray(record.routines)) throw new Error(ROUTINES_UNREADABLE)
   const routines: PublicRoutine[] = []
   const seen = new Set<string>()
   for (const entry of record.routines) {
@@ -189,13 +192,15 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
   }
 
   const read = async (): Promise<StoredFile> => {
+    let text: string
     try {
-      const text = await readFile(path, 'utf8')
-      if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) return EMPTY
-      return parsedFile(text)
-    } catch {
-      return EMPTY
+      text = await readFile(path, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return EMPTY
+      throw new Error(ROUTINES_UNREADABLE)
     }
+    if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) throw new Error(ROUTINES_UNREADABLE)
+    return parsedFile(text)
   }
 
   const write = async (file: StoredFile): Promise<void> => {
