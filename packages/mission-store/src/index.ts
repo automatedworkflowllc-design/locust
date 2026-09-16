@@ -1228,7 +1228,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
     const expectedBytes = nextByteOffsets.get(missionId)
     if (expectedBytes === undefined) throw new Error('Mission ledger offset is unavailable')
     try {
-      const handle = await open(missionPath(rootDirectory, missionId), APPEND_FLAGS, 0o600)
+      const handle = await openForAppend(missionPath(rootDirectory, missionId))
       try {
         const file = await handle.stat()
         if (!file.isFile() || file.size !== expectedBytes) {
@@ -1249,6 +1249,46 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       // next append re-hydrates from the file instead of wedging the mission.
       invalidateCaches(missionId)
       throw error
+    }
+  }
+
+  /**
+   * Open the ledger for appending, waiting out a transient lock.
+   *
+   * On Windows a file can refuse to open for a few milliseconds because
+   * something else is holding it -- a virus scanner reading it as it grows,
+   * an indexer, a backup agent. Nothing is wrong with the ledger; the moment
+   * is wrong.
+   *
+   * Before this there was no retry, so one such moment ended the run. Colin,
+   * 2026-09-15, on a live Cursor mission: "Stopped -- the mission ledger
+   * could not be written." His file was perfectly intact afterwards -- 449
+   * records, every one parsing, sequence contiguous 1 to 449, 454KB against
+   * a 64MB cap -- which is what says the failure was the open and not the
+   * contents.
+   *
+   * ONLY THE OPEN IS RETRIED, and that is the whole safety argument. Nothing
+   * has been written at this point, so trying again cannot tear a record. A
+   * failure during `writeFile` or `sync` still throws immediately, because
+   * there the on-disk state is genuinely uncertain and the app's answer --
+   * stop rather than continue without a durable record -- is the right one.
+   *
+   * And only for codes that mean "busy". `ENOSPC` is a full disk and
+   * `EROFS` a read-only one; retrying those is waiting for a fact to change
+   * that will not, and it would turn a clear failure into a slow one.
+   */
+  async function openForAppend(path: string): Promise<FileHandle> {
+    const BUSY = new Set(['EBUSY', 'EPERM', 'EACCES'])
+    const WAITS = [25, 50, 100]
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await open(path, APPEND_FLAGS, 0o600)
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? ''
+        const wait = WAITS[attempt]
+        if (!BUSY.has(code) || wait === undefined) throw error
+        await new Promise((resolve) => setTimeout(resolve, wait))
+      }
     }
   }
 

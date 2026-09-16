@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.151.0 - 2026-09-15
+
+- **A mission is no longer stopped by a file that was busy for a moment.**
+  "The mission ledger could not be written" could fire because something else
+  on the machine — a virus scanner, an indexer, a backup agent — held the
+  file for a few milliseconds while it was being written to. Locust waits and
+  tries again now. A real failure, like a full disk, still stops the run at
+  once, and a failure part-way through a write still stops it, because there
+  the record really is uncertain.
+
 ## 0.150.0 - 2026-09-15
 
 - **Move a conversation into a group from its own menu.** Right-click it and
