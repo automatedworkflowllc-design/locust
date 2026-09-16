@@ -91,9 +91,12 @@ describe('the roster is one row, and the rail is left alone', () => {
      * "there's no way to be filtered without seeing why".
      */
     expect(SIDEBAR).toContain('lc-faces__clear')
-    expect(SIDEBAR).toContain('const narrowedBy')
-    expect(SIDEBAR).toContain('filteredTo.name')
-    expect(SIDEBAR).toContain('query.trim()')
+    // The sentence itself moved to `narrowingLine` in 0.156.0 so its
+    // denominator could be tested as a value (Grok, pass 5: `1 of 20`
+    // beside Atlas's five). The sidebar still hands it both filters.
+    expect(SIDEBAR).toContain('narrowingLine({')
+    expect(SIDEBAR).toContain('faceName: filteredTo?.name')
+    expect(SIDEBAR).toContain('query,')
   })
 
   it('carries the count, which is what separates filtered from empty', () => {
