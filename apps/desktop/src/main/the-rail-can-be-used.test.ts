@@ -70,7 +70,20 @@ describe('the add menu in the rail', () => {
      * child -- the nav itself never scrolled, so nothing depended on the
      * clip.
      */
-    expect(rule('.lc-shell.is-compact .lc-sidebar {')).toContain('overflow: visible')
+    /*
+     * AT EVERY WIDTH, and that is the whole correction.
+     *
+     * This asserted `overflow: visible` on `.lc-shell.is-compact
+     * .lc-sidebar` -- the rail only -- because the rail was the only place
+     * the menu existed. When the wide `+` learned to offer the same three
+     * things in 0.147.0, the same brace clipped the same menu again: 168x125
+     * running to x=393 against a column ending at 268, with all three items
+     * reporting `reachable: false`. Colin's screenshot, "minor issue".
+     *
+     * So the guard is on the base rule now. A fix scoped to one width is a
+     * fix that waits for the other width to arrive.
+     */
+    expect(rule(String.fromCharCode(10) + '.lc-sidebar {')).toContain('overflow: visible')
     expect(CSS, 'the brand must not clip it either').toContain('.lc-shell.is-compact .lc-sidebar__brand {')
   })
 

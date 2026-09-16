@@ -132,6 +132,32 @@ textarea {
 }
 
 .lc-sidebar {
+  /*
+   * DOES NOT CLIP, at any width, and that is a decision rather than an
+   * oversight.
+   *
+   * It used to carry a belt-and-braces `overflow: hidden` further down the
+   * file so that no row miscalculating its width could paint outside a
+   * fixed-width column. That brace caught the same thing twice, both times a
+   * MENU -- the one kind of child that is supposed to hang out:
+   *
+   *   0.137.0  the rail's `+` menu: 168x84, everything past x=63 clipped,
+   *            half of each item unpressable.
+   *   0.147.0  the same menu in the WIDE sidebar, once the `+` learned to
+   *            offer three things there too: 168x125 running to x=393
+   *            against a column ending at 268, all three items reporting
+   *            `reachable: false`.
+   *
+   * The first was patched for compact only, which is exactly why the second
+   * happened the moment the menu appeared at the other width. A fix scoped
+   * to one width is a fix waiting for the other width to arrive.
+   *
+   * Safe to lift because `.lc-sidebar__scroll` is the scrolling child: the
+   * nav itself never scrolled, so nothing depended on it clipping. Folded
+   * into this rule rather than added as a second `.lc-sidebar` block, so the
+   * selector appears once and a guard cannot read the wrong one.
+   */
+  overflow: visible;
   width: var(--lc-sidebar-width);
   flex-shrink: 0;
   background: var(--lc-bg-sidebar);
@@ -7634,11 +7660,7 @@ textarea {
   white-space: nowrap;
 }
 
-/* Belt and braces: the sidebar is a fixed width, so nothing inside it may
-   paint outside it even if a future row miscalculates. */
-.lc-sidebar {
-  overflow: hidden;
-}
+
 
 /* --- 2. Short threads sit on the composer -----------------------------
  * A conversation grows upward out of the box you type in; top-aligning it
@@ -9881,22 +9903,38 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/* One line, the sentence on the left and the way out on the right. */
 .lc-faces__clear {
-  display: block;
-  width: calc(100% - var(--lc-space-5) * 2);
-  margin: 0 var(--lc-space-5) var(--lc-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  margin: 0 var(--lc-space-3) var(--lc-space-2);
   padding: 4px var(--lc-space-3);
-  border: 0;
   border-radius: var(--lc-radius-control);
   background: var(--lc-hover-surface);
-  color: var(--lc-text-muted);
   font-size: var(--lc-text-mono-caption);
-  text-align: left;
+}
+
+.lc-faces__clearsaid {
+  flex: 1;
+  min-width: 0;
+  color: var(--lc-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-faces__clearlink {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-size: inherit;
   cursor: pointer;
 }
 
-.lc-faces__clear:hover {
-  color: var(--lc-text-secondary);
+.lc-faces__clearlink:hover {
+  color: var(--lc-text-name);
 }
 
 /* The footer is two rows of the same equal thirds now, so they need to be

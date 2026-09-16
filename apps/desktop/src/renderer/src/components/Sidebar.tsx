@@ -420,6 +420,22 @@ export function Sidebar({
         }, 0)
     return newest(right.teammateId) - newest(left.teammateId)
   })
+  /*
+   * What is narrowing the list, said once, with the count.
+   *
+   * Undefined when nothing is -- an unfiltered list needs no sentence above
+   * it, and a permanent one would be a control that is almost always saying
+   * "everything".
+   */
+  const narrowedBy: string[] = []
+  const filteredTo = teammates.find((entry) => entry.teammateId === faceFilter)
+  if (filteredTo !== undefined) narrowedBy.push(filteredTo.name)
+  if (query.trim().length > 0) narrowedBy.push(`"${query.trim()}"`)
+  const narrowing =
+    narrowedBy.length === 0
+      ? undefined
+      : `${narrowedBy.join(' · ')} — ${String(shownConversations.length)} of ${String(missions.length)}`
+
   const shownFaces = facesByRecency.slice(0, MAX_FACES)
   const restOfTeam = facesByRecency.length - shownFaces.length
 
@@ -800,10 +816,32 @@ export function Sidebar({
       )}
       {/* What the face filter is doing, in words, because a filtered list
         * that does not say it is filtered reads as a list that lost things. */}
-      {!compact && faceFilter !== undefined && (
-        <button type="button" className="lc-faces__clear" onClick={() => setFaceFilter(undefined)}>
-          Showing {teammates.find((entry) => entry.teammateId === faceFilter)?.name ?? 'one teammate'} only — show all
-        </button>
+      {/*
+        * ONE sentence for everything narrowing the list.
+        *
+        * There are two filters -- a face and the search box -- and they
+        * compose, so with both on there were two reasons the list was short
+        * and only one of them was stated. The design agent's shape, and the
+        * reason for it: "there's no way to be filtered without seeing why".
+        *
+        * It also carries the arithmetic. `3 of 14` is what tells you the
+        * list is filtered rather than empty, which is the difference between
+        * "I have no conversations" and "none of mine match this word".
+        */}
+      {!compact && narrowing !== undefined && (
+        <div className="lc-faces__clear">
+          <span className="lc-faces__clearsaid">{narrowing}</span>
+          <button
+            type="button"
+            className="lc-faces__clearlink"
+            onClick={() => {
+              setFaceFilter(undefined)
+              setQuery('')
+            }}
+          >
+            Clear
+          </button>
+        </div>
       )}
 
       <div className="lc-sidebar__scroll">

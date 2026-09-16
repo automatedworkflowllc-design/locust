@@ -81,9 +81,33 @@ describe('the roster is one row, and the rail is left alone', () => {
     expect(rule('.lc-faces__team {')).toContain('margin-left: auto')
   })
 
-  it('says when the list is filtered, because a filtered list that does not looks like a list that lost things', () => {
+  it('says when the list is filtered, in one sentence covering both filters', () => {
+    /*
+     * A filtered list that does not say so reads as a list that lost things.
+     *
+     * There are TWO filters -- a face and the search box -- and they
+     * compose, so with both on there were two reasons the list was short and
+     * the line named only one. One sentence now, from the design agent:
+     * "there's no way to be filtered without seeing why".
+     */
     expect(SIDEBAR).toContain('lc-faces__clear')
-    expect(SIDEBAR).toContain('show all')
+    expect(SIDEBAR).toContain('const narrowedBy')
+    expect(SIDEBAR).toContain('filteredTo.name')
+    expect(SIDEBAR).toContain('query.trim()')
+  })
+
+  it('carries the count, which is what separates filtered from empty', () => {
+    // "3 of 14" is the difference between "I have no conversations" and
+    // "none of mine match this word".
+    const built = SIDEBAR.slice(SIDEBAR.indexOf('const narrowing ='), SIDEBAR.indexOf('const shownFaces'))
+    expect(built).toContain('shownConversations.length')
+    expect(built).toContain('missions.length')
+  })
+
+  it('clears both at once, since it offered one way out of two filters', () => {
+    const clear = SIDEBAR.slice(SIDEBAR.indexOf('lc-faces__clearlink'))
+    expect(clear.slice(0, 400)).toContain('setFaceFilter(undefined)')
+    expect(clear.slice(0, 400)).toContain("setQuery('')")
   })
 
   it('still gives the rail the layout it already had', () => {

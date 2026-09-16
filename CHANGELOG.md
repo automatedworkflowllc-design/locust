@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.148.0 - 2026-09-15
+
+- **The `+` menu opens properly in a normal window.** It was being cut off at
+  the edge of the sidebar, and its three items could not be clicked at all.
+- **The sidebar says what it is filtering, in one line.** Picking a teammate
+  and typing in the search box are two filters, and only one of them was
+  mentioned — so a short list had an unexplained reason. It now reads
+  `Atlas · "invoice" — 1 of 5`, with one **Clear** that undoes both.
+
 ## 0.147.0 - 2026-09-15
 
 - **The teammate faces stay inside the sidebar.** With a big team the row
