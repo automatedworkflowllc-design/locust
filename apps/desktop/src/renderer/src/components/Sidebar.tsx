@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
-import type { PublicGroup, PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
+import type { GroupMembership, PublicGroup, PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
@@ -217,7 +217,7 @@ export function Sidebar({
   /** Named sets of conversations, in this folder. */
   readonly groups?: readonly PublicGroup[]
   /** Which group each conversation is in, by conversation id. */
-  readonly groupMembers?: Readonly<Record<string, string>>
+  readonly groupMembers?: Readonly<Record<string, GroupMembership>>
   /** The header menu for a group: rename it, or remove it. */
   readonly onGroupMenu?: (groupId: string, at: { readonly x: number; readonly y: number }) => void
   /** The group being renamed in place, if any. */
@@ -1305,7 +1305,7 @@ export function Sidebar({
               */}
             {groups.map((group) => {
               const theirs = shownConversations.filter(
-                (mission) => groupMembers[mission.rootId ?? mission.missionId] === group.groupId
+                (mission) => groupMembers[mission.rootId ?? mission.missionId]?.groupId === group.groupId
               )
               const open = !foldedGroups.has(group.groupId)
               return (

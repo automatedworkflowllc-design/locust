@@ -41,8 +41,24 @@ export const GROUPS_UNREADABLE = 'GROUPS_UNREADABLE'
 interface StoredFile {
   readonly schemaVersion: 1
   readonly groups: readonly PublicGroup[]
-  /** Which group each conversation is in, by the conversation's own id. */
-  readonly members: Readonly<Record<string, string>>
+  /**
+   * Which group each conversation is in, and WHEN it joined.
+   *
+   * The time is not bookkeeping. Instructions brief from the moment of
+   * joining onward and never retroactively, so the thread has to say where
+   * that boundary is -- "the turns above this genuinely were not briefed".
+   * A line at the top of a thread would claim they were.
+   *
+   * A bare string is the shape this file had before joining was timed, and
+   * is read as a membership whose moment is unknown.
+   */
+  readonly members: Readonly<Record<string, GroupMembership>>
+}
+
+export interface GroupMembership {
+  readonly groupId: string
+  /** ISO, or absent for a membership recorded before this was kept. */
+  readonly at?: string
 }
 
 const EMPTY: StoredFile = { schemaVersion: 1, groups: [], members: {} }
@@ -99,16 +115,25 @@ function parsedFile(text: string): StoredFile {
     })
   }
 
-  const members: Record<string, string> = {}
+  const members: Record<string, GroupMembership> = {}
   if (typeof record.members === 'object' && record.members !== null) {
-    for (const [missionId, groupId] of Object.entries(record.members as Record<string, unknown>)) {
+    for (const [missionId, held] of Object.entries(record.members as Record<string, unknown>)) {
       if (Object.keys(members).length >= MAX_GROUP_MEMBERS) break
+      // A bare string is the pre-0.152.0 shape: a membership with no moment.
+      const groupId = typeof held === 'string'
+        ? held
+        : typeof held === 'object' && held !== null
+          ? (held as Record<string, unknown>).groupId
+          : undefined
+      const at = typeof held === 'object' && held !== null && typeof (held as Record<string, unknown>).at === 'string'
+        ? ((held as Record<string, unknown>).at as string)
+        : undefined
       if (!safeId(missionId) || !safeId(groupId)) continue
       // A membership pointing at a group that is gone is not a membership.
       // Dropping it here is what makes removing a group safe: the file does
       // not have to be swept, and nothing later reads a dangling id.
       if (!groups.some((group) => group.groupId === groupId)) continue
-      members[missionId] = groupId
+      members[missionId] = at === undefined ? { groupId } : { groupId, at }
     }
   }
 
@@ -116,13 +141,15 @@ function parsedFile(text: string): StoredFile {
 }
 
 export interface GroupStore {
-  list(): Promise<{ readonly groups: readonly PublicGroup[]; readonly members: Readonly<Record<string, string>> }>
+  list(): Promise<{ readonly groups: readonly PublicGroup[]; readonly members: Readonly<Record<string, GroupMembership>> }>
   create(name: unknown): Promise<PublicGroup>
   rename(groupId: unknown, name: unknown): Promise<PublicGroup>
   /** Removing a group never removes a conversation; they become Ungrouped. */
   remove(groupId: unknown): Promise<void>
   /** `undefined` takes a conversation out of whatever group it is in. */
   assign(missionId: unknown, groupId: unknown): Promise<void>
+  /** What every conversation in this group is briefed with. Empty clears it. */
+  setInstructions(groupId: unknown, instructions: unknown): Promise<void>
 }
 
 export function createGroupStore(options: {
@@ -268,7 +295,32 @@ export function createGroupStore(options: {
         if (file.members[missionId] === undefined && Object.keys(file.members).length >= MAX_GROUP_MEMBERS) {
           throw new Error('Too many conversations in groups')
         }
-        await write({ ...file, members: { ...file.members, [missionId]: groupId } })
+        await write({
+          ...file,
+          members: { ...file.members, [missionId]: { groupId, at: now().toISOString() } }
+        })
+      })
+    },
+
+    setInstructions(groupId, instructions): Promise<void> {
+      return serialize(async () => {
+        if (typeof instructions !== 'string') throw new Error('Instructions must be text')
+        const file = await read()
+        const held = file.groups.find((group) => group.groupId === groupId)
+        if (held === undefined) throw new Error('That group does not exist')
+        /*
+         * Bounded, and trimmed rather than refused when empty: clearing the
+         * instructions is how a group stops briefing, and that has to be as
+         * easy as setting them. A group with no instructions is an ordinary
+         * folder again, which is a real thing to want.
+         */
+        const text = instructions.trim().slice(0, MAX_GROUP_INSTRUCTIONS_LENGTH)
+        await write({
+          ...file,
+          groups: file.groups.map((group) =>
+            group.groupId === held.groupId ? { ...group, instructions: text } : group
+          )
+        })
       })
     }
   }

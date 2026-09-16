@@ -102,6 +102,7 @@ import {
   GROUP_RENAME_CHANNEL,
   GROUP_REMOVE_CHANNEL,
   GROUP_ASSIGN_CHANNEL,
+  GROUP_INSTRUCTIONS_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
@@ -2420,6 +2421,17 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch (error) {
         return groupRejected(error instanceof Error ? error.message : 'That conversation could not be moved.')
+      }
+    })
+
+    ipcMain.handle(GROUP_INSTRUCTIONS_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return groupRejected('The instructions could not be saved.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await groups.setInstructions(input.groupId, input.instructions)
+        return { ok: true, data: {} } as const
+      } catch (error) {
+        return groupRejected(error instanceof Error ? error.message : 'Those instructions could not be saved.')
       }
     })
 

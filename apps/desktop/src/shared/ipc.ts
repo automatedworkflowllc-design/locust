@@ -812,13 +812,27 @@ export const GROUP_RENAME_CHANNEL = 'groups:rename'
 export const GROUP_REMOVE_CHANNEL = 'groups:remove'
 /** Move a conversation into a group, or out of one with no group id. */
 export const GROUP_ASSIGN_CHANNEL = 'groups:assign'
+/** Set what every conversation in a group is briefed with. Empty clears it. */
+export const GROUP_INSTRUCTIONS_CHANNEL = 'groups:instructions'
+
+/**
+ * Which group a conversation is in, and when it joined.
+ *
+ * The moment matters: instructions brief from joining onward and never
+ * retroactively, so the thread marks the boundary rather than claiming the
+ * turns above it were briefed too.
+ */
+export interface GroupMembership {
+  readonly groupId: string
+  readonly at?: string
+}
 
 export type GroupListResponse =
   | {
       readonly ok: true
       readonly data: {
         readonly groups: readonly PublicGroup[]
-        readonly members: Readonly<Record<string, string>>
+        readonly members: Readonly<Record<string, GroupMembership>>
       }
     }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
@@ -1691,6 +1705,7 @@ export interface DesktopApi {
   removeGroup(groupId: string): Promise<GroupMutationResponse>
   /** Pass no group id to take a conversation out of its group. */
   assignGroup(missionId: string, groupId: string | undefined): Promise<GroupMutationResponse>
+  setGroupInstructions(groupId: string, instructions: string): Promise<GroupMutationResponse>
   listRoutines(): Promise<RoutineListResponse>
   createRoutine(request: RoutineCreateRequest): Promise<RoutineMutationResponse>
   updateRoutine(request: RoutineUpdateRequest): Promise<RoutineMutationResponse>

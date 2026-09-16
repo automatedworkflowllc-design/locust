@@ -46,6 +46,7 @@ import {
   GROUP_RENAME_CHANNEL,
   GROUP_REMOVE_CHANNEL,
   GROUP_ASSIGN_CHANNEL,
+  GROUP_INSTRUCTIONS_CHANNEL,
   ROUTINE_LIST_CHANNEL,
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
@@ -203,6 +204,8 @@ const desktopApi: DesktopApi = {
   removeGroup: (groupId: string) => ipcRenderer.invoke(GROUP_REMOVE_CHANNEL, groupId) as Promise<GroupMutationResponse>,
   assignGroup: (missionId: string, groupId: string | undefined) =>
     ipcRenderer.invoke(GROUP_ASSIGN_CHANNEL, { missionId, groupId }) as Promise<GroupMutationResponse>,
+  setGroupInstructions: (groupId: string, instructions: string) =>
+    ipcRenderer.invoke(GROUP_INSTRUCTIONS_CHANNEL, { groupId, instructions }) as Promise<GroupMutationResponse>,
   listRoutines: () => ipcRenderer.invoke(ROUTINE_LIST_CHANNEL) as Promise<RoutineListResponse>,
   createRoutine: (request: RoutineCreateRequest) =>
     ipcRenderer.invoke(ROUTINE_CREATE_CHANNEL, request) as Promise<RoutineMutationResponse>,

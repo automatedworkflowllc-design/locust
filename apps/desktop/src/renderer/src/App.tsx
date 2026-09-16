@@ -10,6 +10,7 @@ import type {
   TubePreference,
   CodexMissionUpdate,
   MissionRouteSummary,
+  GroupMembership,
   PublicGroup,
   PublicRecoveredMission,
   PublicRuntimeStatus,
@@ -691,7 +692,7 @@ export default function App(): ReactElement {
                 submenu: [
                   ...groupsRef.current.map((group) => ({
                     label: group.name,
-                    checked: groupMembersRef.current[conversationKeyOf(missionId)] === group.groupId,
+                    checked: groupMembersRef.current[conversationKeyOf(missionId)]?.groupId === group.groupId,
                     onSelect: () => {
                       void window.desktop
                         ?.assignGroup(conversationKeyOf(missionId), group.groupId)
@@ -885,7 +886,7 @@ export default function App(): ReactElement {
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [missionTitles, setMissionTitles] = useState<Readonly<Record<string, string>>>({})
   const [groups, setGroups] = useState<readonly PublicGroup[]>([])
-  const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, string>>>({})
+  const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, GroupMembership>>>({})
   const refreshGroups = (): void => {
     void window.desktop
       ?.listGroups()
@@ -1272,7 +1273,7 @@ export default function App(): ReactElement {
   const [recentlyReceived, setRecentlyReceived] = useState<readonly string[]>([])
   const missionOwnersRef = useRef<Readonly<Record<string, string>>>({})
   const groupsRef = useRef<readonly PublicGroup[]>([])
-  const groupMembersRef = useRef<Readonly<Record<string, string>>>({})
+  const groupMembersRef = useRef<Readonly<Record<string, GroupMembership>>>({})
   /**
    * The id a group membership is keyed by: the conversation, not the turn.
    *

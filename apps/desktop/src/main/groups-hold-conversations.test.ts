@@ -6,7 +6,13 @@ import { fileURLToPath } from 'node:url'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createGroupStore, GROUPS_UNREADABLE, MAX_GROUPS, MAX_GROUP_NAME_LENGTH } from './group-store.js'
+import {
+  createGroupStore,
+  GROUPS_UNREADABLE,
+  MAX_GROUPS,
+  MAX_GROUP_INSTRUCTIONS_LENGTH,
+  MAX_GROUP_NAME_LENGTH
+} from './group-store.js'
 
 /**
  * Groups: named sets of conversations, per folder.
@@ -78,7 +84,7 @@ describe('putting a conversation in one', () => {
     const { store: groups } = await store()
     const made = await groups.create('Investments')
     await groups.assign('m_1', made.groupId)
-    expect((await groups.list()).members.m_1).toBe(made.groupId)
+    expect((await groups.list()).members.m_1?.groupId).toBe(made.groupId)
   })
 
   it('takes it out again with no group', async () => {
@@ -96,7 +102,7 @@ describe('putting a conversation in one', () => {
     await groups.assign('m_1', one.groupId)
     await groups.assign('m_1', two.groupId)
     const listed = await groups.list()
-    expect(listed.members.m_1).toBe(two.groupId)
+    expect(listed.members.m_1?.groupId).toBe(two.groupId)
     expect(Object.keys(listed.members)).toHaveLength(1)
   })
 
@@ -273,7 +279,7 @@ describe('moving a conversation is one row, not one row per group', () => {
   })
 
   it('ticks the one it is already in, so the list also answers where it is', () => {
-    expect(APP).toContain('checked: groupMembersRef.current[conversationKeyOf(missionId)] === group.groupId')
+    expect(APP).toContain('checked: groupMembersRef.current[conversationKeyOf(missionId)]?.groupId === group.groupId')
   })
 
   it('offers Ungrouped as a destination rather than a separate verb', () => {
@@ -292,5 +298,88 @@ describe('moving a conversation is one row, not one row per group', () => {
     // The store answers with `{}` rather than the group, so the one just
     // made is found by name -- and names are not unique.
     expect(APP).toContain('Date.parse(right.createdAt) - Date.parse(left.createdAt)')
+  })
+})
+
+describe('standing instructions on a group', () => {
+  it('keeps what was written', async () => {
+    const { store: groups } = await store()
+    const made = await groups.create('Trading')
+    await groups.setInstructions(made.groupId, 'Analysis only. Never place an order.')
+    expect((await groups.list()).groups[0]?.instructions).toContain('Never place an order')
+  })
+
+  it('clears with empty text, so a group can stop briefing', async () => {
+    // As easy to stop as to start: a group with no instructions is an
+    // ordinary folder again, which is a real thing to want.
+    const { store: groups } = await store()
+    const made = await groups.create('Trading')
+    await groups.setInstructions(made.groupId, 'something')
+    await groups.setInstructions(made.groupId, '   ')
+    expect((await groups.list()).groups[0]?.instructions).toBe('')
+  })
+
+  it('caps the length', async () => {
+    const { store: groups } = await store()
+    const made = await groups.create('Trading')
+    await groups.setInstructions(made.groupId, 'x'.repeat(9_000))
+    expect((await groups.list()).groups[0]?.instructions.length).toBe(MAX_GROUP_INSTRUCTIONS_LENGTH)
+  })
+
+  it('refuses a group that does not exist, rather than writing nowhere', async () => {
+    const { store: groups } = await store()
+    await expect(groups.setInstructions('grp_nope', 'x')).rejects.toThrow()
+  })
+})
+
+describe('when a conversation joined', () => {
+  /*
+   * Recorded because instructions brief from joining ONWARD and never
+   * retroactively. The thread has to mark that boundary -- the turns above
+   * it genuinely were not briefed, and a line at the top of a thread would
+   * claim they were.
+   */
+  it('is kept with the membership', async () => {
+    const { store: groups } = await store()
+    const made = await groups.create('Trading')
+    await groups.assign('m_1', made.groupId)
+    const held = (await groups.list()).members.m_1
+    expect(held?.groupId).toBe(made.groupId)
+    expect(Date.parse(held?.at ?? '')).not.toBeNaN()
+  })
+
+  it('is updated when a conversation moves to another group', async () => {
+    // Moving is joining somewhere else, so the boundary moves with it.
+    const { store: groups } = await store()
+    const one = await groups.create('One')
+    const two = await groups.create('Two')
+    await groups.assign('m_1', one.groupId)
+    const first = (await groups.list()).members.m_1?.at
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    await groups.assign('m_1', two.groupId)
+    const second = (await groups.list()).members.m_1?.at
+    expect(second).not.toBe(first)
+  })
+
+  it('reads an older file that recorded no moment', async () => {
+    /*
+     * The shape before 0.152.0 was a bare `missionId: groupId` string. It
+     * still means "this conversation is in that group"; it just cannot say
+     * since when, so the thread will not draw a boundary for it rather than
+     * inventing one.
+     */
+    const { store: groups, root } = await store()
+    await writeFile(
+      join(root, 'groups.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        groups: [{ groupId: 'grp_a', name: 'Trading', createdAt: '2026-09-15T00:00:00.000Z' }],
+        members: { m_1: 'grp_a' }
+      }),
+      'utf8'
+    )
+    const held = (await groups.list()).members.m_1
+    expect(held?.groupId).toBe('grp_a')
+    expect(held?.at).toBeUndefined()
   })
 })
