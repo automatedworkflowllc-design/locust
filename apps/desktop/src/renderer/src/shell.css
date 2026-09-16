@@ -10152,3 +10152,34 @@ textarea {
   color: var(--lc-text-secondary);
   background: var(--lc-hover-surface);
 }
+
+/* --- A context menu row that opens a list ----------------------------- */
+
+.lc-context__row {
+  position: relative;
+}
+
+.lc-context__more {
+  margin-left: auto;
+  color: var(--lc-text-muted);
+}
+
+/* To the RIGHT of the row it belongs to, overlapping it by a pixel so the
+   pointer can cross without the gap closing the panel. */
+.lc-context__sub {
+  position: absolute;
+  left: calc(100% - 1px);
+  top: -4px;
+  min-width: 180px;
+  padding: var(--lc-space-2);
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  box-shadow: var(--lc-shadow-menu);
+  z-index: 1;
+}
+
+.lc-context__tick {
+  margin-left: auto;
+  color: var(--lc-lime);
+}

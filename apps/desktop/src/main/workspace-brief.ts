@@ -73,6 +73,30 @@ export async function readWorkspaceBrief(
  * is the ordinary case for someone who has just installed the app, which is
  * exactly who the worktree fix was for.
  */
+/**
+ * Where a teammate is standing, when nothing else has told it.
+ *
+ * The folder is named inside `briefSection` -- and `briefSection` only
+ * exists when the folder HAS a LOCUST.md. A default install does not, which
+ * means the ordinary case is a coding teammate told its own name, its role,
+ * its runtime, who else is on the roster, and nothing whatsoever about which
+ * folder it is about to edit.
+ *
+ * Found from the teammate's own seat, 2026-09-15, by a Cursor model
+ * dogfooding the app as a member of a room: "I am standing in the wrong
+ * house... I only know that from memory. A coding teammate will edit
+ * Claude's junk drawer unless someone already taught it the path."
+ *
+ * One line, and deliberately one. This file's own tests sit at a boundary
+ * where forty more characters push a waiting peer message out of the prompt
+ * entirely, so the fix for "the brief says too little" cannot be an essay.
+ * The folder is the fact a teammate cannot obtain any other way; its name,
+ * role and peers it is already given.
+ */
+export function whereSection(workspaceName: string): string {
+  return `You are working in the folder "${workspaceName}". Everything you read or change belongs to it unless you are told otherwise.`
+}
+
 export function worktreeSection(): string {
   return 'Your missions run in your own copy of this project, so work only inside the folder you were started in.'
 }

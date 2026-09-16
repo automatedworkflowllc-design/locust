@@ -244,3 +244,53 @@ describe('groups are read back when the app opens', () => {
     expect(APP).toContain('setGroupMembers(response.data.members)')
   })
 })
+
+describe('moving a conversation is one row, not one row per group', () => {
+  /*
+   * Colin's reference, 2026-09-15, is Claude's own menu: one **Move to
+   * group** row opening a list with a tick on the one it is already in,
+   * `Ungrouped` to take it out, and `New group...` at the bottom.
+   *
+   * It was a flat `Move to <name>` per group -- the shape the menu already
+   * used for `Assign to <teammate>` -- which does not survive many groups:
+   * five of them buried Open, Rename and Delete under five near-identical
+   * lines.
+   *
+   * Driven: the menu reads Open / Rename / Move to group > / Copy mission id
+   * / Save as routine / Delete, the submenu reads `Ungrouped checked` and
+   * `New group...`, and choosing the latter made "Investments 1" with the
+   * conversation already in it.
+   */
+  const APP = readFileSync(fileURLToPath(new URL('../renderer/src/App.tsx', import.meta.url)), 'utf8')
+
+  it('offers the row even when no group exists yet', () => {
+    // `New group...` lives inside it, so the empty case is the one that
+    // needs it most. Suppressing the row until a group existed left the `+`
+    // beside the logo as the only way in -- the Rooms discoverability
+    // problem with a different noun.
+    expect(APP).not.toContain('groupsRef.current.length === 0 && groupMembersRef.current')
+    expect(APP).toContain("label: 'Move to group'")
+  })
+
+  it('ticks the one it is already in, so the list also answers where it is', () => {
+    expect(APP).toContain('checked: groupMembersRef.current[conversationKeyOf(missionId)] === group.groupId')
+  })
+
+  it('offers Ungrouped as a destination rather than a separate verb', () => {
+    const submenu = APP.slice(APP.indexOf("label: 'Move to group'"))
+    expect(submenu.slice(0, 2400)).toContain("label: 'Ungrouped'")
+  })
+
+  it('makes the group AND puts the conversation in it', () => {
+    // Creating a group from a conversation's own menu and not moving that
+    // conversation into it would be an item doing half of what it says.
+    expect(APP).toContain('setNewGroupFor(conversationKeyOf(missionId))')
+    expect(APP).toContain('assignGroup(waiting, mine.groupId)')
+  })
+
+  it('picks the newest match when two groups share a name', () => {
+    // The store answers with `{}` rather than the group, so the one just
+    // made is found by name -- and names are not unique.
+    expect(APP).toContain('Date.parse(right.createdAt) - Date.parse(left.createdAt)')
+  })
+})

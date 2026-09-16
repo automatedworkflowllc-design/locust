@@ -98,20 +98,22 @@ function isShown(mission: SidebarMission, selectedMissionId: string | undefined)
  * A count of zero is information; a missing section is not.
  */
 /**
- * How many faces the roster strip draws before it counts the rest.
+ * How many faces the roster strip draws, and when it starts counting.
  *
- * FIVE, measured, where the design agent said six.
+ * Two thresholds, not one, from the design agent's ruling of 2026-09-15:
+ * five teammates or fewer draws five faces and NO chip; six or more draws
+ * four and then `+N`. The chip appears only when it has something to
+ * report, which is the rule everywhere else in this app.
  *
- * Six fit the faces themselves -- the sixth face ended at x=224 inside a
- * 268px column -- but the strip also carries the `+N` chip and the `Team`
- * pill, and with all three it wanted 311px of 267. Their six counted the
- * faces and not what sits beside them.
- *
- * Five, with the strip's side padding brought in to match the rows below
- * it, measures inside. Recorded as a deviation rather than quietly filed
- * under their number: the shape is theirs, the arithmetic is this column's.
+ * The reason it is four rather than five once the chip exists is the whole
+ * lesson of the first attempt. Their original six was a face-width
+ * calculation that ignored its own neighbours: with the `+N` chip and the
+ * `Team` pill sharing the row it wanted 311px of 267. Five measured at
+ * exactly 267 of 267 -- true, and with no margin at all, which a wider count
+ * like `+55` would spend. Four leaves room for the count to grow.
  */
-const MAX_FACES = 5
+const FACES_WITHOUT_CHIP = 5
+const FACES_WITH_CHIP = 4
 
 function SidebarSection({
   label,
@@ -164,6 +166,9 @@ export function Sidebar({
   onRenameGroup,
   onGroupRenameDone,
   onNewGroup,
+  namingGroup = false,
+  onNamingGroupDone,
+  onStartNamingGroup,
   onTeammateMenu,
   pendingApprovals,
   liveActivity,
@@ -221,6 +226,12 @@ export function Sidebar({
   readonly onGroupRenameDone?: () => void
   /** Make a new group. Absent means the `+` offers none. */
   readonly onNewGroup?: (name: string) => void
+  /** Whether to ask for a new group's name now; the host owns this, because
+      the conversation menu can start it too. */
+  readonly namingGroup?: boolean
+  readonly onNamingGroupDone?: () => void
+  /** Ask for the name box; the `+` menu and the conversation menu both do. */
+  readonly onStartNamingGroup?: () => void
   /** Right-click on a teammate. Same menu shape as a mission row, on the row above them. */
   readonly onTeammateMenu: (teammateId: string, at: { readonly x: number; readonly y: number }) => void
   /** Approvals waiting on each teammate's live run, by teammate id. */
@@ -352,7 +363,7 @@ export function Sidebar({
    * should not cost a name first. A group is made on purpose from a menu, so
    * there is nothing to interrupt and the name is the whole act.
    */
-  const [naming, setNaming] = useState(false)
+
   const [faceFilter, setFaceFilter] = useState<string>()
   /*
    * The age column has to move on its own. `2m` that stays `2m` for an hour
@@ -436,7 +447,10 @@ export function Sidebar({
       ? undefined
       : `${narrowedBy.join(' · ')} — ${String(shownConversations.length)} of ${String(missions.length)}`
 
-  const shownFaces = facesByRecency.slice(0, MAX_FACES)
+  const shownFaces = facesByRecency.slice(
+    0,
+    facesByRecency.length <= FACES_WITHOUT_CHIP ? FACES_WITHOUT_CHIP : FACES_WITH_CHIP
+  )
   const restOfTeam = facesByRecency.length - shownFaces.length
 
   const ungroupedConversations = shownConversations.filter(
@@ -624,7 +638,7 @@ export function Sidebar({
                     className="lc-menu__item"
                     onClick={() => {
                       setAddOpen(false)
-                      setNaming(true)
+                      onStartNamingGroup?.()
                     }}
                   >
                     New group
@@ -685,7 +699,7 @@ export function Sidebar({
                     className="lc-menu__item"
                     onClick={() => {
                       setAddOpen(false)
-                      setNaming(true)
+                      onStartNamingGroup?.()
                     }}
                   >
                     New group
@@ -1263,7 +1277,7 @@ export function Sidebar({
 
           </>
         ) : (          <div className="lc-convlist">
-            {naming && (
+            {namingGroup && (
               <input
                 className="lc-input lc-convgroup__rename"
                 placeholder="Name this group"
@@ -1271,14 +1285,14 @@ export function Sidebar({
                 maxLength={60}
                 autoFocus
                 onKeyDown={(event) => {
-                  if (event.key === 'Escape') setNaming(false)
+                  if (event.key === 'Escape') onNamingGroupDone?.()
                   if (event.key === 'Enter') {
                     const next = event.currentTarget.value
-                    setNaming(false)
+                    onNamingGroupDone?.()
                     if (next.trim().length > 0) onNewGroup?.(next)
                   }
                 }}
-                onBlur={() => setNaming(false)}
+                onBlur={() => onNamingGroupDone?.()}
               />
             )}
             {/*

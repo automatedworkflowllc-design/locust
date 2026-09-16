@@ -46,7 +46,7 @@ import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { createWorktreeManager } from './worktrees.js'
 import { readRuntimeSetup } from './runtime-setup.js'
-import { briefSection, readWorkspaceBrief, worktreeSection } from './workspace-brief.js'
+import { briefSection, readWorkspaceBrief, whereSection, worktreeSection } from './workspace-brief.js'
 import { createMemoryReader } from './memory-reader.js'
 import { createAttentionReader } from './attention-reader.js'
 import { parseDecision } from '../shared/decision.js'
@@ -964,6 +964,21 @@ if (!ownsSingleInstanceLock) {
         // about where the run is, not about the project's instructions.
         if (peer.cwd !== undefined && brief === undefined) {
           sections.push(worktreeSection())
+        }
+        /*
+         * And a teammate in the FOLDER, with no LOCUST.md, is told which
+         * folder -- which until now nothing said.
+         *
+         * `briefSection` names it, and only exists when the folder has a
+         * LOCUST.md; `worktreeSection` covers a teammate on its own branch.
+         * The ordinary case -- a default install, no brief, no worktree --
+         * fell between them and said nothing at all. A Cursor teammate
+         * dogfooding the app on 2026-09-15 reported exactly that from the
+         * inside: it had been editing the wrong folder and only knew the
+         * right one from memory.
+         */
+        if (peer.cwd === undefined && brief === undefined) {
+          sections.push(whereSection(memoryWorkspaceName))
         }
         const settings = await teammates.readSettings()
         if (settings.memoryMode !== 'off') sections.push(await memoryPart(peer))

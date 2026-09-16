@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.150.0 - 2026-09-15
+
+- **Move a conversation into a group from its own menu.** Right-click it and
+  **Move to group** opens the list, with a tick on the one it is already in,
+  **Ungrouped** to take it out, and **New group…** at the bottom — which makes
+  the group and puts that conversation in it.
+- **A teammate is told which folder it is working in.** That was only ever
+  said inside a folder's `LOCUST.md`, so on a machine without one — every new
+  install — a coding teammate was told its name, its role and its colleagues,
+  and nothing about which folder it was about to edit.
+- The teammate faces show five when the team is five or fewer, and four plus
+  a count when it is larger, so the count never crowds the row.
+
 ## 0.149.0 - 2026-09-15
 
 - **A plan now shows what happened to it.** Every plan was drawn as a plain

@@ -204,14 +204,17 @@ describe('the roster strip at twelve teammates', () => {
    * to expose". A roster you drag sideways to read is not one you can scan,
    * and scanning is its only job.
    *
-   * Their number was six; this draws five. Six fit the faces themselves and
-   * not what sits beside them -- with the `+N` chip and the `Team` pill the
-   * row still wanted 311 of 267. Five, with the padding brought in, measures
-   * at exactly 267 of 267. Recorded as a deviation rather than filed under
-   * their number.
+   * Their number was six; this draws five, and they took the arithmetic --
+   * "the constraint was never the faces, it was the `+N` chip and the `Team`
+   * pill sharing the row". Their ruling then split it in two: five or fewer
+   * teammates draws five and no chip, six or more draws FOUR and a count.
+   * Four rather than five once the chip exists because five measured 267 of
+   * 267 exactly, and a wider count like `+55` would spend a margin that is
+   * not there.
    */
   it('caps the faces rather than letting the strip run past the column', () => {
-    expect(SIDEBAR).toContain('const MAX_FACES = 5')
+    expect(SIDEBAR).toContain('const FACES_WITHOUT_CHIP = 5')
+    expect(SIDEBAR).toContain('const FACES_WITH_CHIP = 4')
     expect(SIDEBAR).toContain('shownFaces.map((teammate)')
   })
 

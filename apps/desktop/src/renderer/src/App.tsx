@@ -596,6 +596,16 @@ export default function App(): ReactElement {
 
   /** Which group is being renamed in place, if any. */
   const [renamingGroupId, setRenamingGroupId] = useState<string>()
+  /** Whether the sidebar is asking for a new group's name. */
+  const [namingGroup, setNamingGroup] = useState(false)
+  /**
+   * A conversation waiting for the group about to be made.
+   *
+   * Set only by `New group…` on a conversation's own menu, where creating a
+   * group and not putting that conversation in it would be a menu item that
+   * did half of what it said.
+   */
+  const [newGroupFor, setNewGroupFor] = useState<string>()
 
   const openGroupMenu = (groupId: string, at: { readonly x: number; readonly y: number }): void => {
     const group = groupsRef.current.find((entry) => entry.groupId === groupId)
@@ -655,33 +665,63 @@ export default function App(): ReactElement {
           onSelect: () => setRenamingMissionId(missionId)
         },
         /*
-         * Moving a conversation is listed the way assigning one is -- one
-         * entry per destination rather than a submenu, which is the shape
-         * this menu already uses for `Assign to <teammate>`.
+         * ONE row that opens the list, not one row per group.
          *
-         * Keyed by the CONVERSATION. Filing a reply somewhere its exchange
-         * is not would be a group that lies about what it holds.
+         * This was a flat `Move to <name>` per group plus `Take out of
+         * group`, which is the shape the menu already used for `Assign to
+         * <teammate>`. It does not survive many groups: five of them buried
+         * Open, Rename and Delete under five near-identical lines.
+         *
+         * Colin's reference, 2026-09-15, is Claude's own: one **Move to
+         * group** row opening a list with a tick on the one it is already
+         * in, `Ungrouped` to take it out, and `New group...` at the bottom.
+         * The tick matters as much as the moving -- it makes the list answer
+         * "where is this?" as well as offering to change it.
          */
-        ...groupsRef.current
-          .filter((group) => groupMembersRef.current[conversationKeyOf(missionId)] !== group.groupId)
-          .map((group) => ({
-            label: `Move to ${group.name}`,
-            onSelect: () => {
-              void window.desktop
-                ?.assignGroup(conversationKeyOf(missionId), group.groupId)
-                .then(refreshGroups)
-            }
-          })),
-        ...(groupMembersRef.current[conversationKeyOf(missionId)] === undefined
-          ? []
-          : [
+        /*
+         * Shown even with NO groups yet, because `New group...` lives inside
+         * it -- which is the case where a person most needs it. Suppressing
+         * the row until a group existed meant the only way to make a first
+         * one was the `+` beside the logo, which is the Rooms
+         * discoverability problem with a different noun.
+         */
+        ...[
               {
-                label: 'Take out of group',
-                onSelect: () => {
-                  void window.desktop?.assignGroup(conversationKeyOf(missionId), undefined).then(refreshGroups)
-                }
+                label: 'Move to group',
+                submenu: [
+                  ...groupsRef.current.map((group) => ({
+                    label: group.name,
+                    checked: groupMembersRef.current[conversationKeyOf(missionId)] === group.groupId,
+                    onSelect: () => {
+                      void window.desktop
+                        ?.assignGroup(conversationKeyOf(missionId), group.groupId)
+                        .then(refreshGroups)
+                    }
+                  })),
+                  {
+                    label: 'Ungrouped',
+                    checked: groupMembersRef.current[conversationKeyOf(missionId)] === undefined,
+                    onSelect: () => {
+                      void window.desktop?.assignGroup(conversationKeyOf(missionId), undefined).then(refreshGroups)
+                    }
+                  },
+                  {
+                    /*
+                     * Makes the group AND puts this conversation in it,
+                     * which is the only reading of choosing it from here.
+                     * The name is asked for in the sidebar, where a new
+                     * group is named anyway -- one naming affordance, not
+                     * two that drift.
+                     */
+                    label: 'New group…',
+                    onSelect: () => {
+                      setNewGroupFor(conversationKeyOf(missionId))
+                      setNamingGroup(true)
+                    }
+                  }
+                ]
               }
-            ]),
+            ],
         // Hand a conversation to a teammate after the fact. Flat items, one
         // per teammate, so the menu stays one press deep; a roster longer
         // than six says where the rest are.
@@ -3852,8 +3892,38 @@ export default function App(): ReactElement {
             void window.desktop?.renameGroup(groupId, name).then(refreshGroups)
           }}
           onGroupRenameDone={() => setRenamingGroupId(undefined)}
+          namingGroup={namingGroup}
+          onStartNamingGroup={() => {
+            // From the `+`, the new group takes no conversation with it.
+            setNewGroupFor(undefined)
+            setNamingGroup(true)
+          }}
+          onNamingGroupDone={() => {
+            setNamingGroup(false)
+            setNewGroupFor(undefined)
+          }}
           onNewGroup={(name) => {
-            void window.desktop?.createGroup(name).then(refreshGroups)
+            const waiting = newGroupFor
+            setNewGroupFor(undefined)
+            void window.desktop
+              ?.createGroup(name)
+              .then(async (made) => {
+                /*
+                 * The store answers with `{}` rather than the group, so the
+                 * one just made is found by name from a fresh read. Names
+                 * are not unique, so the NEWEST match wins -- making a
+                 * second group called "Trading" must move the conversation
+                 * into the one that was just created, not the older one.
+                 */
+                if (!made.ok || waiting === undefined) return
+                const listed = await window.desktop?.listGroups()
+                if (listed?.ok !== true) return
+                const mine = listed.data.groups
+                  .filter((group) => group.name === name.trim())
+                  .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0]
+                if (mine !== undefined) await window.desktop?.assignGroup(waiting, mine.groupId)
+              })
+              .finally(refreshGroups)
           }}
           renamingMissionId={renamingMissionId}
           onRenameMission={(missionId, title) => void renameMission(missionId, title)}

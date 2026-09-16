@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
 import type { ReactElement } from 'react'
@@ -18,12 +18,23 @@ import type { ReactElement } from 'react'
 
 export interface ContextMenuItem {
   readonly label: string
+  /**
+   * A nested list, opened from this row rather than replacing the menu.
+   *
+   * For a choice with many destinations -- "Move to group" over every group
+   * there is -- where listing each one at the top level would bury the
+   * handful of things a person came to this menu for. An item with a submenu
+   * has no `onSelect` of its own: choosing it means choosing from it.
+   */
+  readonly submenu?: readonly ContextMenuItem[]
+  /** Ticked, for a submenu that shows which one is already chosen. */
+  readonly checked?: boolean
   /** Shown instead of `label` once the item has been pressed once. */
   readonly confirmLabel?: string
   readonly danger?: boolean
   /** When set, the item is shown but cannot be chosen, and says why. */
   readonly disabledReason?: string
-  readonly onSelect: () => void
+  readonly onSelect?: () => void
 }
 
 export interface ContextMenuState {
@@ -76,6 +87,8 @@ export function ContextMenu({
    * that press does its own work, or a right-click on a second row stacks
    * two menus.
    */
+  const [openSub, setOpenSub] = useState<string>()
+
   useDismissOnOutsidePress(true, onClose, ref)
 
   return (
@@ -92,6 +105,63 @@ export function ContextMenu({
       <div className="lc-context__title">{state.title}</div>
       {state.items.map((item) => {
         const armed = armedLabel === item.label
+        if (item.submenu !== undefined) {
+          /*
+           * A row that opens a list rather than doing something.
+           *
+           * Opened on HOVER as well as on press, because that is what a
+           * submenu does everywhere else and a person reaching for it will
+           * not think to click. It stays open while the pointer is anywhere
+           * in the row or the panel, which is why both live inside one
+           * element with the handler on it.
+           */
+          const open = openSub === item.label
+          return (
+            <div
+              key={item.label}
+              className="lc-context__row"
+              onMouseEnter={() => setOpenSub(item.label)}
+              onMouseLeave={() => setOpenSub(undefined)}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                className="lc-context__item"
+                onClick={() => setOpenSub(open ? undefined : item.label)}
+              >
+                <span className="lc-context__label">{item.label}</span>
+                <span className="lc-context__more" aria-hidden="true">›</span>
+              </button>
+              {open && (
+                <div className="lc-context__sub" role="menu" aria-label={item.label}>
+                  {item.submenu.map((entry) => (
+                    <button
+                      key={entry.label}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={entry.checked === true}
+                      className="lc-context__item"
+                      onClick={() => {
+                        entry.onSelect?.()
+                        onClose()
+                      }}
+                    >
+                      <span className="lc-context__label">{entry.label}</span>
+                      {/* The tick says which one it is already in, so the
+                          list answers "where is this?" as well as offering
+                          to move it. */}
+                      {entry.checked === true && (
+                        <span className="lc-context__tick" aria-hidden="true">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        }
         return (
           <button
             key={item.label}
@@ -107,7 +177,7 @@ export function ContextMenu({
                 onArm(item.label)
                 return
               }
-              item.onSelect()
+              item.onSelect?.()
               onClose()
             }}
           >
