@@ -937,7 +937,21 @@ export default function App(): ReactElement {
    */
   const seedRouteFromGroup = (group: PublicGroup): void => {
     if (group.route === undefined) return
-    setRoute({ runtime: group.route.runtime, model: group.route.model })
+    const next = { runtime: group.route.runtime, model: group.route.model }
+    /*
+     * The same three writes the composer's own route picker makes, or the
+     * seed does not show. MEASURED 2026-09-16 driving 0.161.0 before release:
+     * `setRoute` alone left the composer reading "Codex / Account Default"
+     * after the join, because what the composer draws is
+     * `composerRouteFor(route, pickedTeammate, pickerRoutes)` -- the picked
+     * teammate's own entry wins over the bare route state. A seed that only
+     * wrote the bare state was overruled on the next render.
+     */
+    routeChosen.current = true
+    setRoute(next)
+    if (pickedTeammate !== undefined) {
+      setPickerRoutes((current) => new Map(current).set(pickedTeammate.teammateId, next))
+    }
     setMode(group.route.mode)
     // Named, not spread: `undefined` clears an effort the group's runtime has no levels for.
     setEffort(group.route.effort)
