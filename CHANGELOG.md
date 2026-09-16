@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.149.0 - 2026-09-15
+
+- **A plan now shows what happened to it.** Every plan was drawn as a plain
+  numbered list — no ticks, no `2 of 3 done` — which is right for a turn that
+  only planned and wrong for one that carried the plan out. So a finished
+  plan looked exactly like an untouched one, while the fold underneath said
+  "3 of 3 steps".
+
 ## 0.148.0 - 2026-09-15
 
 - **The `+` menu opens properly in a normal window.** It was being cut off at

@@ -106,7 +106,34 @@ export function ThreadItems({
             <div className="lc-agentline" key={item.key}>
               <AgentAvatar teammate={owner} />
               <div className="lc-agentline__body">
-                <PlanSteps steps={item.steps} doneCount={item.doneCount} outcomes={false} />
+                {/*
+                  * OUTCOMES WHEN THE PLAN WAS ACTUALLY CARRIED OUT.
+                  *
+                  * This passed `false` unconditionally, which draws the
+                  * plain numbered list above -- no markers, no `N of M
+                  * done`. That is right for a Plan-MODE turn, where the plan
+                  * IS the answer and nothing ran, and it is what the comment
+                  * above describes. It was wrong for every other turn.
+                  *
+                  * Measured in Colin's own ledger, 2026-09-15: 29
+                  * `plan.updated` events across his Cursor missions, and the
+                  * last update of each one all `TODO_STATUS_COMPLETED`. So
+                  * the app knew three of three steps were done and drew
+                  * three identical lines that looked exactly like a plan
+                  * nothing had happened to -- while the fold underneath
+                  * quietly said "3 of 3 steps". "plans are still bugged and
+                  * not showing in the UI" is the fair reading of that.
+                  *
+                  * `touchedNothing` is the distinction the code already
+                  * makes and already carries: set only when the turn had no
+                  * activity at all. So it decides this too, rather than a
+                  * second flag meaning the same thing.
+                  */}
+                <PlanSteps
+                  steps={item.steps}
+                  doneCount={item.doneCount}
+                  outcomes={item.touchedNothing !== true}
+                />
                 {/*
                   * Derived, and true: this run changed nothing, and the mode is
                   * why. The same class of fact the trace line carries, said in
