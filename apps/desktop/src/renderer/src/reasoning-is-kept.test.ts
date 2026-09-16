@@ -69,3 +69,56 @@ describe('reasoning in the fold', () => {
     expect(JSON.stringify(item ?? {})).toContain('thought')
   })
 })
+
+describe('reasoning is not a tool call', () => {
+  /*
+   * THE REGRESSION THIS EXISTS FOR, introduced and caught within the hour.
+   *
+   * Making reasoning an activity entry put it in `other`, which
+   * `activitySummary` computes by subtraction -- so the fold read "6 tool
+   * calls" over five, with `thought` listed among their names. Colin, from a
+   * screenshot: "i remember it being able to list all the tool calls
+   * individually like it does in claude code/cursor."
+   *
+   * Doubly wrong, because the same line already says `thought 24s` two
+   * segments earlier: reported twice and counted once too often.
+   */
+  const detail = (kind: string, name: string) =>
+    ({ kind, name, settled: true }) as never
+
+  it('does not count thinking among the tool calls', async () => {
+    const { activitySummary } = await import('./missionView.js')
+    const withThought = activitySummary([
+      detail('reasoning', 'thought'),
+      detail('tool', 'mcp'),
+      detail('tool', 'mcp')
+    ])
+    expect(withThought).toContain('2 tool calls')
+    expect(withThought).not.toContain('3 tool calls')
+  })
+
+  it('says nothing about tool calls when a turn only thought', () => {
+    // A run that thought and did nothing else ran no tools, and a summary
+    // claiming one would be inventing work.
+    return import('./missionView.js').then(({ activitySummary }) => {
+      expect(activitySummary([detail('reasoning', 'thought')])).toBe('No tool activity')
+    })
+  })
+
+  it('gives thinking its own row rather than folding it in with tools', async () => {
+    /*
+     * `foldedToolsText` gathers CONSECUTIVE foldable rows, and thinking sits
+     * between tool calls constantly -- so left foldable it would not only be
+     * named among them, it would break their runs in two and stop them
+     * collapsing at all.
+     */
+    const { activityEntries } = await import('./missionView.js')
+    const entries = activityEntries([
+      detail('tool', 'mcp'),
+      detail('reasoning', 'thought'),
+      detail('tool', 'mcp')
+    ])
+    expect(entries.some((entry) => entry.kind === 'thought')).toBe(true)
+    expect(entries.filter((entry) => entry.kind === 'thought')).toHaveLength(1)
+  })
+})

@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.153.0 - 2026-09-16
+
+- **Thinking no longer breaks up the list of tool calls.** Yesterday's change
+  put a teammate's reasoning in the run's fold, and it landed in the middle of
+  the tool calls — so it was counted as one, listed among their names, and
+  split a single run of calls into several. A turn that made five calls said
+  six, and a fold that should have been one line became three. Thinking has
+  its own row now, and the count is of tool calls again.
+
 ## 0.152.0 - 2026-09-16
 
 - **You can read what a teammate was thinking.** Reasoning was thrown away

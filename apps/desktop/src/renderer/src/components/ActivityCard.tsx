@@ -408,6 +408,18 @@ export function ActivityCard({
                     )}
                   </>
                 )
+              ) : entry.kind === 'thought' ? (
+                /*
+                 * What the model thought, in the fold with the rest of the
+                 * work. Not a tool row: it has no verb, no outcome and
+                 * nothing to succeed or fail at, so it borrows none of that
+                 * furniture. Muted and quoted, because it is the model
+                 * talking to itself rather than reporting to anyone.
+                 */
+                <div className="lc-filerow is-static lc-filerow--thought">
+                  <Icon name="activity" size={14} />
+                  <span className="lc-filerow__thought">{entry.text}</span>
+                </div>
               ) : entry.kind === 'tools' ? (
                 /*
                  * A run of plain tool calls, as one row.

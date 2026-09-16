@@ -118,6 +118,12 @@ export function foldedToolsText(names: readonly string[], verb: string | undefin
 
 export type ActivityEntry =
   | {
+      /** What a model thought, when its runtime reported it. Never a tool. */
+      readonly kind: 'thought'
+      readonly key: string
+      readonly text: string
+    }
+  | {
       readonly kind: 'file'
       readonly key: string
       readonly file: DiffFile
@@ -246,6 +252,22 @@ export function activityEntries(
   const seenFiles = new Set<string>()
   details.forEach((detail, index) => {
     const failed = detail.failed === true
+    /*
+     * A row of its own, so it is never folded into a run of tool calls.
+     *
+     * `foldedToolsText` gathers consecutive foldable rows and names them --
+     * which is how `thought` ended up in "6 tool calls - thought, mcp, mcp".
+     * Thinking sits between tool calls constantly, so left foldable it would
+     * also BREAK those runs in two and stop them collapsing at all.
+     */
+    if (detail.kind === 'reasoning') {
+      entries.push({
+        kind: 'thought',
+        key: `thought_${String(index)}`,
+        text: detail.output ?? ''
+      })
+      return
+    }
     if (detail.kind === 'shell') {
       entries.push({
         kind: 'shell',
@@ -1055,7 +1077,21 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
     .reduce((sum, detail) => sum + Math.max(1, detail.name.split('\n').filter((line) => line.length > 0).length), 0)
   const commands = details.filter((detail) => detail.kind === 'shell').length
   const helpers = details.filter((detail) => detail.kind === 'helper').length
-  const other = details.length - edits - commands - helpers
+  /*
+   * REASONING IS NOT A TOOL CALL.
+   *
+   * It became an entry in 0.152.0 so the fold could show what a model
+   * thought, and `other` is computed by subtraction -- so thinking was
+   * counted as a tool call and the summary read "6 tool calls" over five,
+   * with `thought` listed among their names. Colin, within the hour: "i
+   * remember it being able to list all the tool calls individually."
+   *
+   * The count was doubly wrong, because the same line already says
+   * `thought 24s` two segments earlier. A thing reported twice and counted
+   * once too often.
+   */
+  const thinking = details.filter((detail) => detail.kind === 'reasoning').length
+  const other = details.length - edits - commands - helpers - thinking
   const parts: string[] = []
   if (edits > 0) parts.push(`Edited ${pluralize(edits, 'file')}`)
   if (commands > 0) parts.push(`ran ${pluralize(commands, 'command')}`)
