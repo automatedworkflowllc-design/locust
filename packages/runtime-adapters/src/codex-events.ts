@@ -254,7 +254,6 @@ const MAX_EVIDENCE_OBJECT_KEYS = 100;
 const MAX_EVIDENCE_DEPTH = 8;
 
 const SENSITIVE_KEY = /^(?:api[_-]?key|access[_-]?token|refresh[_-]?token|auth(?:orization)?|password|passwd|secret|cookie|set-cookie|credential|session[_-]?token)$/i;
-const REASONING_KEY = /^(?:reasoning|thinking|chain[_-]?of[_-]?thought|analysis)$/i;
 
 const QUOTA_PATTERNS = [
   /\byou(?:'ve| have) hit your usage limit\b/i,
@@ -385,7 +384,18 @@ export function sanitizeJson(
   depth = 0,
   key?: string,
 ): RedactedJsonValue {
-  if (key !== undefined && (SENSITIVE_KEY.test(key) || REASONING_KEY.test(key))) {
+  /*
+   * SECRETS ONLY. Reasoning used to be redacted in this same branch -- the
+   * model's working-out treated as the same species as an API key -- so the
+   * app could report that a run had thought and never what about.
+   *
+   * Colin's call, 2026-09-16: keep it. The cost is that a ledger sent to
+   * somebody carries the working-out too; the gain is that the run can be
+   * read. Secrets are still scrubbed from it by the very next branch, so a
+   * token a model happened to repeat while thinking is redacted exactly as
+   * it would be anywhere else.
+   */
+  if (key !== undefined && SENSITIVE_KEY.test(key)) {
     state.redacted = true;
     return "[redacted]";
   }

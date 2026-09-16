@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.152.0 - 2026-09-16
+
+- **You can read what a teammate was thinking.** Reasoning was thrown away
+  before it was recorded — Cursor's was replaced with "[redacted]" and
+  Codex's was stripped alongside API keys and passwords — so a run that
+  thought for a minute could tell you how long and nothing about what. It is
+  kept now, and appears in the run's fold beside the tool calls. Secrets are
+  still removed from it.
+- A note on what that means: your mission records will be larger, and a
+  record you send to someone now carries the model's working-out as well as
+  its answer.
+- **Telling a teammate something need not start a paid run.** A share marked
+  `when="later"` waits for their next mission instead of starting one. (The
+  models are not told about it yet — see below.)
+
 ## 0.151.0 - 2026-09-15
 
 - **A mission is no longer stopped by a file that was busy for a moment.**

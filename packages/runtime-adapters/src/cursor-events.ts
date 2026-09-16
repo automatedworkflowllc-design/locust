@@ -211,6 +211,8 @@ export function createCursorEventNormalizer(
   /** Which message the next fragment belongs to; closed by a complete message. */
   let messageIndex = 0;
   let thinking = false;
+  /** Reasoning text gathered across this turn's deltas, emitted once. */
+  let reasoning = "";
   /** How much of each message the fragments have already put in the ledger. */
   const deliveredLength = new Map<string, number>();
   /*
@@ -261,15 +263,46 @@ export function createCursorEventNormalizer(
     if (type === undefined) return [];
 
     if (type === "thinking") {
-      // The reasoning text never reaches the ledger. The record is rebuilt
-      // without it, and the evidence is marked redacted for having been.
-      const scrubbed = { type, subtype: parsed.subtype, text: "[redacted]" };
-      const evidence = { ...evidenceFor(record, scrubbed, type), redacted: true };
+      /*
+       * THE REASONING IS KEPT NOW.
+       *
+       * It used to be replaced with "[redacted]" before the record was
+       * rebuilt, so the app knew a model had thought for fifty-eight seconds
+       * and could say nothing about what it thought. Colin, 2026-09-15: "i
+       * feel like it gives way more insight into the thinking and structure
+       * of what its doing... i wanted to sacrifice nothing."
+       *
+       * He is right, and the objection I first gave him was softer than I
+       * made it sound: his whole ledger is about 15MB across 51 missions,
+       * and roughly doubling it costs nothing against the disk. What it does
+       * cost is that a ledger sent to somebody now carries the model's
+       * working-out too -- which is a thing to know, not a reason to throw
+       * the reasoning away.
+       *
+       * `evidenceFor` still runs its secret redaction over the text, so an
+       * API key the model happened to repeat while thinking is scrubbed
+       * exactly as it would be anywhere else.
+       *
+       * The deltas still collapse into ONE step, which is unchanged and
+       * deliberate: a row per fragment is a log nobody reads. The text is
+       * accumulated and carried on the step instead.
+       */
+      const evidence = evidenceFor(record, parsed, type);
+      const fragment = stringValue(parsed.text) ?? "";
       if (stringValue(parsed.subtype) === "completed") {
         if (!thinking) return [];
         thinking = false;
-        return [emit("step.completed", { stepKind: "reasoning", evidence })];
+        const said = boundedMessageText(reasoning.trim());
+        reasoning = "";
+        return [
+          emit("step.completed", {
+            stepKind: "reasoning",
+            ...(said.length === 0 ? {} : { message: said }),
+            evidence,
+          }),
+        ];
       }
+      reasoning += fragment;
       if (thinking) return [];
       thinking = true;
       return [emit("step.started", { stepKind: "reasoning", evidence })];

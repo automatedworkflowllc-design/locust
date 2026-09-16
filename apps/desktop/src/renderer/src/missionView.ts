@@ -1627,14 +1627,37 @@ export function buildThread(
         }
         break
       }
+      case 'step.completed':
+      case 'step.failed': {
+        /*
+         * REASONING BECOMES A ROW, when the runtime sent its text.
+         *
+         * It has always contributed a `thought 52s` to the summary line and
+         * nothing else, so a run that thought for a minute could say how
+         * long and not a word about what. Colin, asked straight on
+         * 2026-09-16: keep it -- "i wanted to sacrifice nothing."
+         *
+         * It goes in the FOLD rather than above it, because the fold is the
+         * record of how the work was carried out and reasoning is exactly
+         * that. Above the fold is the answer, and thinking is not an answer.
+         *
+         * Only when there is text. Most runtimes send none, and a row
+         * reading `thought` with nothing in it would be a row that promises
+         * something it does not have.
+         */
+        if (event.payload.stepKind === 'reasoning') {
+          const said = typeof event.payload.message === 'string' ? event.payload.message.trim() : ''
+          if (said.length > 0) {
+            workBegan = true
+            activity.push({ kind: 'reasoning', name: 'thought', settled: true, output: said })
+          }
+        }
+        runningStep = undefined
+        break
+      }
       case 'plan.updated': {
         workBegan = true
         plan = readPlan(event.payload.plan)
-        break
-      }
-      case 'step.completed':
-      case 'step.failed': {
-        runningStep = undefined
         break
       }
       case 'route.limit_detected': {

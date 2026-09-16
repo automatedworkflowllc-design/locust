@@ -102,13 +102,39 @@ describe("a read-only Cursor run with partial output, as captured", () => {
     expect((tools[0]?.payload as { command: string }).command).toContain("README.md");
   });
 
-  it("shows reasoning as a step and never lets its text into the ledger", () => {
+  it("shows reasoning as a step and KEEPS its text", () => {
+    /*
+     * This asserted the opposite until 2026-09-16: the text was replaced
+     * with "[redacted]" before the record was rebuilt, so the app could say
+     * a model had thought for fifty-eight seconds and nothing about what it
+     * thought.
+     *
+     * Colin's call, asked straight and answered straight: "i wanted to
+     * sacrifice nothing." The objection I first gave him was softer than I
+     * made it sound -- his whole ledger is about 15MB across 51 missions and
+     * roughly doubling it costs nothing against the disk. What it does cost
+     * is that a ledger sent to somebody now carries the working-out too,
+     * which is a thing to know rather than a reason to throw it away.
+     */
     const steps = events.filter((event) => event.type === "step.started" || event.type === "step.completed");
     expect(steps.every((event) => (event.payload as { stepKind: string }).stepKind === "reasoning")).toBe(true);
     expect(steps.length).toBe(4);
     const serialized = JSON.stringify(events);
-    expect(serialized).not.toContain("Reading README.md to");
-    expect(serialized).not.toContain("provide a one-sentence");
+    expect(serialized).toContain("Reading README.md to");
+  });
+
+  it("carries the reasoning on the step that closes, not on every fragment", () => {
+    // The deltas still collapse into one step, which is unchanged and
+    // deliberate: a row per fragment is a log nobody reads.
+    const completed = events.filter(
+      (event) => event.type === "step.completed" && (event.payload as { stepKind: string }).stepKind === "reasoning",
+    );
+    expect(completed.length).toBeGreaterThan(0);
+    expect(completed.some((event) => ((event.payload as { message?: string }).message ?? "").length > 0)).toBe(true);
+    const started = events.filter(
+      (event) => event.type === "step.started" && (event.payload as { stepKind: string }).stepKind === "reasoning",
+    );
+    expect(started.every((event) => (event.payload as { message?: string }).message === undefined)).toBe(true);
   });
 
   it("completes the run on exit 0 with a result record", () => {
