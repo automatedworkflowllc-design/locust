@@ -478,6 +478,13 @@ export interface FileMissionLedgerOptions {
    * exactly the behaviour worth proving.
    */
   readonly removeFile?: (path: string) => Promise<void>
+  /**
+   * Test seam for the move into the trash, which is what deleting now is.
+   * The case worth proving is the one `removeFile` exists for: a file a virus
+   * scanner or sync client is holding cannot be moved either, and a bulk
+   * delete has to report that mission as failed rather than deleted.
+   */
+  readonly moveFile?: (from: string, to: string) => Promise<void>
 }
 
 interface CreatedRecord {
@@ -1186,6 +1193,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
   let directoryReady: Promise<void> | undefined
   let writeTail: Promise<void> = Promise.resolve()
   const removeFile = options.removeFile ?? ((path: string) => unlink(path))
+  const moveFile = options.moveFile ?? ((from: string, to: string) => rename(from, to))
 
   const ensureDirectory = (): Promise<void> => {
     directoryReady ??= mkdir(rootDirectory, { recursive: true, mode: 0o700 }).then(() => undefined)
@@ -1435,7 +1443,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       // older copy. Rename replaces on both platforms this ships to, but
       // saying so here is cheaper than depending on it.
       await removeFile(to).catch(() => undefined)
-      await rename(from, to)
+      await moveFile(from, to)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
       throw error
@@ -1690,7 +1698,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
           // Nothing there, which is the ordinary case.
         }
         try {
-          await rename(from, to)
+          await moveFile(from, to)
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
           throw error

@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -240,9 +240,12 @@ describe('pruning old missions', () => {
     // in the middle of a bulk delete on Windows.
     const ledger = createFileMissionLedger({
       rootDirectory: root,
-      removeFile: async (path) => {
-        if (path.includes('mission_two')) throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' })
-        await rm(path)
+      // Deleting moves the record into the trash, so the lock bites on the
+      // MOVE now. Same scenario, same contract: that mission is reported as
+      // failed rather than counted among the deleted.
+      moveFile: async (from, to) => {
+        if (from.includes('mission_two')) throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' })
+        await rename(from, to)
       }
     })
 
