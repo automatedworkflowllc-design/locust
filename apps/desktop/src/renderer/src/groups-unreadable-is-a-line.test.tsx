@@ -72,7 +72,8 @@ function sidebar(props: { readonly groups?: readonly PublicGroup[]; readonly unr
 describe('the groups file that would not read', () => {
   it('is said in the sidebar, above the conversations it could not sort', () => {
     const html = sidebar({ unreadable: ['groups'] })
-    expect(html).toContain('Groups could not be read')
+    expect(html).toContain('Groups could not be read — everything is listed ungrouped.')
+    expect(html).toContain('Nothing is saved over the file until it reads again.')
     expect(html).toContain('lc-sidebar__unreadable')
     // The conversation is still there to work with -- unreadable groups
     // never hide work -- and it carries no group heading it cannot vouch for.
@@ -92,8 +93,8 @@ describe('the groups file that would not read', () => {
     // The roster is the one that matters: unreadable, it used to look like a
     // fresh install, and the next mission start would have made it one.
     const html = sidebar({ unreadable: ['routines', 'teammates'] })
-    expect(html).toContain('Teammates and routines could not be read')
-    expect(html).toContain('those files until they read again')
+    expect(html).toContain('Teammates and routines could not be read.')
+    expect(html).toContain('Nothing is saved over them until they read again.')
   })
 
   it('is not said when the groups read fine', () => {

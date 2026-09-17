@@ -10139,35 +10139,166 @@ textarea {
   padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3) 28px;
 }
 
-/* A group's standing instructions: the words are the person's, so the box is roomy. */
-.lc-groupinstructions__help {
-  margin: 0 0 var(--lc-space-3);
-  color: var(--lc-text-muted);
-  font-size: var(--lc-text-mono-caption);
-  line-height: 1.45;
+/* Group settings: two properties, each with its claim above and its provenance below. */
+.lc-groupsettings {
+  width: min(560px, calc(100vw - 32px));
 }
 
-.lc-groupinstructions__text {
+.lc-groupsettings__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
+.lc-groupsettings__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-groupsettings__section--route {
+  padding-top: var(--lc-space-3);
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+.lc-groupsettings__labelrow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-2);
+}
+
+.lc-groupsettings__label {
+  color: var(--lc-text-name);
+  font-size: var(--lc-text-description);
+}
+
+.lc-groupsettings__count {
+  margin-left: auto;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
+}
+
+.lc-groupsettings__claim {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}
+
+.lc-groupsettings__text {
   width: 100%;
-  min-height: 160px;
+  min-height: 104px;
   resize: vertical;
   font-family: inherit;
-  line-height: 1.45;
+  line-height: 1.6;
 }
 
-.lc-groupinstructions__count {
-  display: block;
-  margin-top: var(--lc-space-2);
+.lc-groupsettings__foot {
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-mono-caption);
-  text-align: right;
+  font-size: var(--lc-text-mono-label);
 }
 
-/* A file that would not read is a sentence, not an empty list. */
+.lc-groupsettings__route {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  padding: 9px 11px;
+  background: var(--lc-bg-raised);
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-button);
+}
+
+.lc-groupsettings__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lc-neutral);
+}
+
+.lc-groupsettings__dot.is-set {
+  background: var(--lc-green);
+}
+
+.lc-groupsettings__routetext {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
+.lc-groupsettings__routetext.is-none {
+  color: var(--lc-text-muted);
+}
+
+.lc-groupsettings__routeactions {
+  display: flex;
+  gap: var(--lc-space-2);
+  flex: none;
+}
+
+.lc-groupsettings__use,
+.lc-groupsettings__clear {
+  height: 26px;
+  padding: 0 10px;
+  font-size: var(--lc-text-description);
+}
+
+/* Disabled rather than hidden, so the row never changes shape under the pointer. */
+.lc-groupsettings__clear:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lc-groupsettings__save--clearing {
+  border-color: var(--lc-red-border);
+  background: var(--lc-red-tint);
+  color: var(--lc-red-text);
+}
+
+/* A destructive menu item does not sit flush against an ordinary one. */
+.lc-context__item.is-divided {
+  position: relative;
+  margin-top: 6px;
+}
+
+.lc-context__item.is-divided::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: -3px;
+  height: 1px;
+  background: var(--lc-border-hairline);
+}
+
+/* A file that would not read: what happened at body weight, what is safe in mono, behind an amber rule --
+   the one thing in the sidebar that is not a place you can go, so it must not read as a row. */
 .lc-sidebar__unreadable {
-  padding: var(--lc-space-2) var(--lc-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 2px var(--lc-space-2) var(--lc-space-3);
+  padding: 2px 0 2px 9px;
+  border-left: 2px solid var(--lc-amber-border);
   white-space: normal;
   line-height: 1.4;
+}
+
+.lc-sidebar__unreadable-happened {
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}
+
+.lc-sidebar__unreadable-safe {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
+  text-wrap: pretty;
 }
 
 .lc-convgroup__rename {

@@ -78,7 +78,7 @@ import { composerRouteFor } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
-import { GroupInstructionsDialog } from './components/GroupInstructionsDialog.js'
+import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { PixelFace } from './components/PixelFace.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
@@ -621,34 +621,20 @@ export default function App(): ReactElement {
       y: at.y,
       title: group.name,
       items: [
-        // What a group IS beyond a folder. Named by state so the menu says
-        // whether this group briefs anything before it is opened.
-        {
-          label: group.instructions.trim().length > 0 ? 'Edit instructions…' : 'Add instructions…',
-          onSelect: () => setInstructingGroupId(groupId)
-        },
-        // The group's default route is whatever the composer is set to NOW:
-        // the same runtime, model, mode and effort a mission would start on
-        // if you pressed send. Naming it on the control keeps it honest.
-        {
-          label:
-            group.route === undefined
-              ? `Use current route as default (${route.runtime} / ${route.model})`
-              : `Default route is ${group.route.runtime} / ${group.route.model} — set to current`,
-          onSelect: () => {
-            void window.desktop
-              ?.setGroupRoute(groupId, { runtime: route.runtime, model: route.model, mode, ...(effort === undefined ? {} : { effort }) })
-              .then(refreshGroups)
-          }
-        },
-        ...(group.route === undefined
-          ? []
-          : [{ label: 'Clear default route', onSelect: () => void window.desktop?.setGroupRoute(groupId, undefined).then(refreshGroups) }]),
+        /*
+         * A menu holds actions; a dialog holds what a thing carries. The
+         * group's two properties -- instructions and default route -- used to
+         * be menu rows, and the route row did four jobs in one 560px strip
+         * (there is a default / here it is / replace it / with this). Design
+         * agent, 2026-09-16: 556px -> 208px, widest item 94px of ink.
+         */
+        { label: 'Group settings…', onSelect: () => setInstructingGroupId(groupId) },
         { label: 'Rename', onSelect: () => setRenamingGroupId(groupId) },
         {
           label: 'Remove group',
           confirmLabel: 'Remove for good?',
           danger: true,
+          dividerAbove: true,
           // Worth saying on the control itself: removing a container must
           // never read as removing its contents.
           onSelect: () => {
@@ -980,7 +966,7 @@ export default function App(): ReactElement {
    */
   const [relayStarting, setRelayStarting] = useState<Readonly<Record<string, StartingReply>>>({})
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
-  /** The group whose standing instructions are being edited, if any. */
+  /** The group whose settings -- instructions and default route -- are open, if any. */
   const [instructingGroupId, setInstructingGroupId] = useState<string>()
   const [routines, setRoutines] = useState<readonly PublicRoutine[]>([])
   /** Rooms: a named set of teammates a person writes to at once (vision #2). */
@@ -4993,13 +4979,21 @@ export default function App(): ReactElement {
       {(() => {
         const instructing = groups.find((entry) => entry.groupId === instructingGroupId)
         return instructing === undefined ? null : (
-          <GroupInstructionsDialog
+          <GroupSettingsDialog
             key={instructing.groupId}
             group={instructing}
+            // What "Use current" takes: the route a mission would start on
+            // if you pressed send now, effort included.
+            currentRoute={{ runtime: route.runtime, model: route.model, mode, ...(effort === undefined ? {} : { effort }) }}
             onCancel={() => setInstructingGroupId(undefined)}
-            onSave={(instructions) => {
+            onSave={({ instructions, route: nextRoute, routeChanged }) => {
               setInstructingGroupId(undefined)
-              void window.desktop?.setGroupInstructions(instructing.groupId, instructions).then(refreshGroups)
+              const writes: Promise<unknown>[] = []
+              if (instructions !== instructing.instructions.trim()) {
+                writes.push(window.desktop?.setGroupInstructions(instructing.groupId, instructions) ?? Promise.resolve())
+              }
+              if (routeChanged) writes.push(window.desktop?.setGroupRoute(instructing.groupId, nextRoute) ?? Promise.resolve())
+              void Promise.all(writes).then(refreshGroups)
             }}
           />
         )

@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.163.0 - 2026-09-16
+
+- **A group’s menu is three items again.** *Group settings…*, *Rename*,
+  *Remove group* — with a hairline before the destructive one. Its standing
+  instructions and default route moved into one **Group settings** dialog,
+  because a menu holds actions and a dialog holds what a thing carries. The
+  route is named the way the composer names it — *OpenCode / Muse Spark 1.3*,
+  not a model id — with *Use current* and a *Clear* that is disabled rather
+  than missing when there is nothing to clear. The counter shows only past
+  3,600 characters. (The design agent’s ruling on the 0.162.0 frames.)
+- **Two shorter sentences.** The thread’s line reads *Trading’s instructions
+  brief every turn from here*, and its edit pointer names the dialog. The
+  sidebar’s unreadable-file notice is now the fact, then the reassurance
+  underneath in small type, behind an amber rule — so it stops reading as a
+  row you could click.
+
 ## 0.162.0 - 2026-09-16
 
 - **Your effort level stays put.** The level you chose was dropped twice on

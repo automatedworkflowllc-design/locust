@@ -1317,11 +1317,15 @@ export function Sidebar({
               * you want it, and the list you actually scan stays at the top
               * of the column.
               */}
-            {unreadable.length > 0 && (
-              <p className="lc-sidebar__unreadable lc-row__meta" role="status">
-                {unreadableSentence(unreadable)}
-              </p>
-            )}
+            {(() => {
+              const said = unreadableSentence(unreadable)
+              return said === undefined ? null : (
+                <div className="lc-sidebar__unreadable" role="status">
+                  <span className="lc-sidebar__unreadable-happened">{said.happened}</span>
+                  <span className="lc-sidebar__unreadable-safe lc-mono">{said.safe}</span>
+                </div>
+              )
+            })()}
             {groups.map((group) => {
               const theirs = shownConversations.filter(
                 (mission) => heldFor(mission, groupMembers)?.groupId === group.groupId

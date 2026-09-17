@@ -141,14 +141,21 @@ const STORE_ORDER = ['teammates', 'groups', 'rooms', 'routines'] as const
  * nothing is lost, and says the one thing that makes it true: nothing is
  * written over them until they read again.
  */
-export function unreadableSentence(stores: readonly string[]): string | undefined {
+export function unreadableSentence(stores: readonly string[]): { readonly happened: string; readonly safe: string } | undefined {
   const named = STORE_ORDER.filter((store) => stores.includes(store))
   if (named.length === 0) return undefined
   const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`
   const subject = list.charAt(0).toUpperCase() + list.slice(1)
+  /*
+   * Two facts, two registers (design agent, 2026-09-16): what happened at
+   * body weight, what is safe in mono underneath. "Nothing is lost:" came
+   * out because the sentence after it IS the reassurance -- the colon was
+   * announcing it -- and "the groups file" became "the file", since the
+   * first line just named it.
+   */
   return named.length === 1
-    ? `${subject} could not be read. Nothing is lost: nothing is saved over that file until it reads again.`
-    : `${subject} could not be read. Nothing is lost: nothing is saved over those files until they read again.`
+    ? { happened: `${subject} could not be read — everything is listed ungrouped.`, safe: 'Nothing is saved over the file until it reads again.' }
+    : { happened: `${subject} could not be read.`, safe: 'Nothing is saved over them until they read again.' }
 }
 
 /** The first value stored against any id this conversation has worn. */

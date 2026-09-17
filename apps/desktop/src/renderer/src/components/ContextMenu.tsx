@@ -32,6 +32,8 @@ export interface ContextMenuItem {
   /** Shown instead of `label` once the item has been pressed once. */
   readonly confirmLabel?: string
   readonly danger?: boolean
+  /** A hairline above this row: a destructive item should not sit flush against an ordinary one. */
+  readonly dividerAbove?: boolean
   /** When set, the item is shown but cannot be chosen, and says why. */
   readonly disabledReason?: string
   readonly onSelect?: () => void
@@ -167,7 +169,7 @@ export function ContextMenu({
             key={item.label}
             type="button"
             role="menuitem"
-            className={`lc-context__item${item.danger === true ? ' is-danger' : ''}`}
+            className={`lc-context__item${item.danger === true ? ' is-danger' : ''}${item.dividerAbove === true ? ' is-divided' : ''}`}
             disabled={item.disabledReason !== undefined}
             title={item.disabledReason}
             onClick={() => {

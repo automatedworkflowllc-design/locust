@@ -548,7 +548,7 @@ export function Thread({
     groupBoundary === undefined ? null : (
       <div className="lc-thread__note lc-thread__groupnote">
         <span>
-          {groupBoundary.groupName}&apos;s standing instructions brief every turn from here
+          {groupBoundary.groupName}&apos;s instructions brief every turn from here
           {' · '}
           <button type="button" className="lc-linkbutton" onClick={() => setViewingGroup((held) => !held)}>
             {viewingGroup ? 'hide' : 'view'}
@@ -557,7 +557,7 @@ export function Thread({
         {viewingGroup && (
           <blockquote className="lc-thread__groupwords">
             {groupBoundary.instructions}
-            <span className="lc-thread__groupedit lc-mono">edit from the group&apos;s header in the sidebar</span>
+            <span className="lc-thread__groupedit lc-mono">edit in Group settings</span>
           </blockquote>
         )}
       </div>
