@@ -126,6 +126,15 @@ try {
     const settings = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Settings')
     if (!settings) return JSON.stringify({ opened: false })
     settings.click()
+    await new Promise(r => setTimeout(r, 600))
+    // Settings is a list of PAGES since 0.176.0, so Updates is no longer in
+    // whatever Settings opens on: it is on "This app". Reaching it is part of
+    // what a person does, so the smoke does it too.
+    for (let i = 0; i < 40; i += 1) {
+      const item = [...document.querySelectorAll('.lc-settings__navitem')].find(b => /This app/.test(b.innerText || ''))
+      if (item) { item.click(); break }
+      await new Promise(r => setTimeout(r, 250))
+    }
     let heading
     for (let i = 0; i < 40; i += 1) {
       await new Promise(r => setTimeout(r, 250))
