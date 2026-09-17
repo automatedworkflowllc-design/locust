@@ -343,9 +343,14 @@ const TRUNCATION_MARK = "\n\u2026[truncated]\u2026\n";
  * and the end carries the blocks the host has to parse.
  */
 export function boundedMessageText(value: string): string {
-  if (value.length <= MAX_MESSAGE_TEXT_LENGTH) return value;
-  const head = value.slice(0, MAX_MESSAGE_TEXT_LENGTH - MESSAGE_TAIL_KEPT - TRUNCATION_MARK.length);
-  return `${head}${TRUNCATION_MARK}${value.slice(-MESSAGE_TAIL_KEPT)}`;
+  // Scrubbed as well as bounded: every message text an adapter records goes
+  // through here, and a key a model repeats in its answer or its thinking
+  // is a secret wherever it sits. MEASURED 2026-09-17 on a live Cursor turn:
+  // the evidence read [redacted], the answer text carried the key verbatim.
+  const clean = redactSecrets(value);
+  if (clean.length <= MAX_MESSAGE_TEXT_LENGTH) return clean;
+  const head = clean.slice(0, MAX_MESSAGE_TEXT_LENGTH - MESSAGE_TAIL_KEPT - TRUNCATION_MARK.length);
+  return `${head}${TRUNCATION_MARK}${clean.slice(-MESSAGE_TAIL_KEPT)}`;
 }
 
 export function identityValue(value: unknown): string | undefined {
@@ -360,10 +365,24 @@ function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-export function redactText(value: string): string {
+/** Secrets only -- no size limit. What a message is scrubbed with; evidence adds a bound on top. */
+export function redactSecrets(value: string): string {
   // NUL is unpersistable: the mission ledger's reader rejects any string
   // containing it, and a rejected record stops recovery at that point. Strip
   // it here, where every persisted string already passes through.
+  const withoutNul = value.includes("\u0000") ? value.replace(/\u0000/g, "") : value;
+  return withoutNul
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [redacted]")
+    .replace(/\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b/g, "[redacted]")
+    .replace(/\b(?:gh[opusr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[A-Z0-9]{16})\b/g, "[redacted]")
+    .replace(
+      /((?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret|cookie|credential)\s*[=:]\s*["']?)([^\s,"';}]+)/gi,
+      "$1[redacted]",
+    );
+}
+
+/** Evidence: scrubbed AND bounded to the evidence limit. Not for message text, which has its own bound. */
+export function redactText(value: string): string {
   const withoutNul = value.includes("\u0000") ? value.replace(/\u0000/g, "") : value;
   const truncated = withoutNul.length > MAX_EVIDENCE_STRING_LENGTH
     ? `${withoutNul.slice(0, MAX_EVIDENCE_STRING_LENGTH)}\u2026[truncated]`
@@ -703,12 +722,16 @@ export function createCodexEventNormalizer(
     } else {
       return undefined;
     }
+    // Bounded and scrubbed in one place. This used to bound to 16,384 and
+    // then hand the result to `redactText`, which cut it again at the
+    // 8,192 EVIDENCE limit -- so every long Codex answer lost its second
+    // half in the ledger while the thread had shown all of it.
     text = boundedMessageText(text);
 
     return emit("message.delta", {
       itemId: state.id,
       operation,
-      text: redactText(text),
+      text,
       final,
       evidence,
     });

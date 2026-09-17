@@ -5,6 +5,7 @@ import {
   isObject,
   malformedEvidence,
   processEvidence,
+  redactSecrets,
   requireContextText,
   sanitizeJson,
   stringValue,
@@ -288,7 +289,17 @@ export function createCursorEventNormalizer(
        * accumulated and carried on the step instead.
        */
       const evidence = evidenceFor(record, parsed, type);
-      const fragment = stringValue(parsed.text) ?? "";
+      /*
+       * The comment above promised that a key the model repeated while
+       * thinking was scrubbed "exactly as it would be anywhere else". It was
+       * not: `evidenceFor` redacts the EVIDENCE, and this text was taken raw
+       * from the record and carried on the step as the message. MEASURED
+       * 2026-09-17 on a live Cursor turn (Grok 4.6 Low, one fake sk- key in
+       * the prompt): the evidence read `[redacted]`, the answer's
+       * `message.delta` text carried the key verbatim, and the reasoning
+       * path was the same code. Redacted here, where the text enters.
+       */
+      const fragment = redactSecrets(stringValue(parsed.text) ?? "");
       if (stringValue(parsed.subtype) === "completed") {
         if (!thinking) return [];
         thinking = false;
@@ -334,7 +345,9 @@ export function createCursorEventNormalizer(
     }
 
     if (type === "assistant") {
-      const text = assistantText(parsed);
+      // Redacted at the door, so every path below -- fragment, restatement,
+      // the bounded replace -- measures and stores the same scrubbed text.
+      const text = redactSecrets(assistantText(parsed));
       if (text.length === 0) return [];
       const itemId = `msg_${String(messageIndex)}`;
       /*

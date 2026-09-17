@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.165.0 - 2026-09-17
+
+- **A key a teammate repeats is scrubbed from what the ledger keeps — in
+  its answer and in its thinking, on every runtime.** It was scrubbed from
+  the evidence and not from the text: a live Cursor turn given a fake `sk-`
+  key wrote `[redacted]` in one field and the key verbatim in the answer.
+  Every message text now goes through the same scrub at the point it is
+  bounded. (What *you* typed is still recorded as you typed it.)
+- **Long Codex answers keep their second half.** Separating the scrub from
+  the size limit found that a Codex answer over 8,192 characters was being
+  cut in the ledger at the evidence limit after already being bounded at
+  the message limit — the thread showed all of it, the record kept half.
+
 ## 0.164.0 - 2026-09-17
 
 - **A handoff keeps your effort level too.** The third place the level was
