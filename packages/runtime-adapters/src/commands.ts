@@ -982,11 +982,25 @@ export const OPENCODE_CONFINED_CONFIG = JSON.stringify({
 /**
  * OpenCode in its non-interactive `run` mode.
  *
- * The prompt goes in ARGV, not on stdin. Measured: the positional prompt is
- * what the CLI documents and what was seen working; nothing in this repo has
- * ever seen `opencode run` read a prompt from stdin, and a prompt delivered
- * down a channel that was never tried is a mission that hangs. So the spec
- * says `stdin: "none"` and the runner closes the pipe.
+ * The prompt goes on STDIN. It went in argv until 2026-09-17, on the
+ * grounds that nothing in this repo had ever seen `opencode run` read a
+ * prompt from stdin. Then the first Chief of Staff exchange lost its last
+ * hop: the reply into the person's conversation -- a 1,200-character share
+ * quoted inside a 2,215-character standing brief plus the relay brief --
+ * was refused by `command-length.ts` at about 7,500 characters, because
+ * `cmd.exe` stops at 8,191 and this app reaches the npm `.cmd` shim through
+ * it. The person never got the report.
+ *
+ * MEASURED the same hour, against the real CLI on the free model:
+ *
+ *     echo "Reply with exactly the single word PEBBLE" | opencode run --format json
+ *     -> "text":"PEBBLE"
+ *
+ * With no positional, `opencode run` reads the message from stdin, and the
+ * JSON event stream is the same. So the prompt travels the way it does for
+ * Codex and Claude, the argv ceiling no longer applies, and `commandTooLong`
+ * skips this runtime by its own rule. The option is still required, because
+ * a run with nothing to say is a mission that hangs.
  *
  * The working directory is the workspace and there is no flag for it: OpenCode
  * takes the directory it is spawned in.
@@ -1012,7 +1026,7 @@ export function createOpenCodeRunCommand(
     // run --help, measured 2026-09-06.
     args.push("--auto");
   }
-  args.push(requireText(options.prompt ?? "", "Prompt"));
+  requireText(options.prompt ?? "", "Prompt");
   const readOnly = sandboxArgument(options.sandbox) === "read-only";
   // A worktree run needs its parent repository; a read-only one still needs
   // the denials. When both apply the config carries both, because the two
@@ -1024,7 +1038,7 @@ export function createOpenCodeRunCommand(
       ? OPENCODE_READ_ONLY_CONFIG
       : OPENCODE_CONFINED_CONFIG;
   return baseSpec("opencode", executable, options.workspacePath, args, {
-    stdin: "none",
+    stdin: "prompt",
     sandbox: sandboxArgument(options.sandbox),
     ...(config === undefined ? {} : { env: { OPENCODE_CONFIG_CONTENT: config } }),
   });

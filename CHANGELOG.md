@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.169.0 - 2026-09-17
+
+- **An OpenCode teammate can be sent a long brief.** OpenCode took its
+  prompt on the command line, and Windows stops a command line at 8,191
+  characters — so the first real Chief of Staff exchange lost its last hop:
+  the report back into your conversation, carrying the teammate’s reply
+  quoted inside the standing brief, was refused as too long and you never
+  got it. Measured against the CLI: `opencode run` reads the prompt from
+  input when none is given on the line, so that is how it is sent now, the
+  same way Codex CLI and Claude Code already are. The ceiling no longer
+  applies to OpenCode. (Copilot CLI still takes its prompt as an argument.)
+
 ## 0.168.0 - 2026-09-17
 
 - **Teammates brief each other the way you would brief a colleague.** A

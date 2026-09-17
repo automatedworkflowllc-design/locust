@@ -837,10 +837,13 @@ describe("OpenCode and Copilot CLI commands", () => {
   it("holds a read-only OpenCode mission with the permission config that actually enforces it", () => {
     const spec = createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT });
     expect(spec.runtime).toBe("opencode");
-    // The prompt is a positional argument, so the runner has nothing to send
-    // and closes stdin instead.
-    expect(spec.stdin).toBe("none");
-    expect(spec.args).toEqual(["run", "--format", "json", PROMPT]);
+    // The prompt goes on stdin, like Codex and Claude, since 2026-09-17: as
+    // a positional it hit the Windows command-line ceiling on the last hop
+    // of the first Chief of Staff exchange and the person never got the
+    // report. Measured: with no positional, `opencode run` reads stdin.
+    expect(spec.stdin).toBe("prompt");
+    expect(spec.args).toEqual(["run", "--format", "json"]);
+    expect(spec.args).not.toContain(PROMPT);
     // There is no read-only FLAG. Measured, this environment value is the
     // only thing that stops a run editing files -- with it, the write tool is
     // not offered at all.
@@ -947,7 +950,7 @@ describe("OpenCode and Copilot CLI commands", () => {
       permission: { external_directory: "deny" },
     });
     // Confinement is stated; nothing about editing inside the folder changed.
-    expect(spec.args).toEqual(["run", "--format", "json", "-m", "opencode/big-pickle", "-s", "ses_1", PROMPT]);
+    expect(spec.args).toEqual(["run", "--format", "json", "-m", "opencode/big-pickle", "-s", "ses_1"]);
     // `--auto` buys nothing: measured, `run` edits files without it.
     expect(spec.args).not.toContain("--auto");
     // Plan mode is narration, not enforcement, so it is never the read-only

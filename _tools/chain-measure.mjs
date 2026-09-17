@@ -35,7 +35,12 @@ const PROMPTS = {
   fact: 'Your teammate Booty has this workspace open. Using the share block form, ask Booty to find where this workspace records the share text limit, and to reply with the number, the file path and the line, quoting the sentence it is in. Do not read any files yourself, and do nothing else.',
   judge: 'Your teammate Booty has this workspace open. I believe the relay hop cap in this app defaults to 6, and I think the notes in this workspace say otherwise. Using the share block form, ask Booty to check the notes and tell you whether they agree with me, with the evidence quoted, so I can decide whether the notes need fixing. Do not read any files yourself, and do nothing else.'
 }
+// 'cos': Wren is a Chief of Staff and is NOT told to delegate; the role brief alone decides.
+PROMPTS.cos = 'What is the share text limit recorded in this workspace, and where? I need the number and the file.'
+// 'route': an ask that fits Booty's role (Research & Briefs) and is bigger than one file; Wren is a Chief of Staff.
+PROMPTS.route = 'I need a short written brief, for someone joining tomorrow, on what the limits recorded in this workspace mean for an exchange between two teammates and whether the three of them are consistent with each other. Name the sources.'
 const PROMPT = PROMPTS[TASK] ?? PROMPTS.fact
+const WREN_ROLE = TASK === 'cos' || TASK === 'route' ? 'Chief of Staff' : 'Code & Migrations'
 
 const say = (line) => console.error(line)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -90,7 +95,7 @@ await writeFile(
   JSON.stringify({
     schemaVersion: 1,
     teammates: [
-      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt, route },
+      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: WREN_ROLE, createdAt, route },
       { teammateId: 'tm_booty', name: 'Booty', hue: 'violet', role: 'Research & Briefs', createdAt, route }
     ],
     missionOwners: {},
