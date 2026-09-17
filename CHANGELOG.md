@@ -6,6 +6,33 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.168.0 - 2026-09-17
+
+- **Teammates brief each other the way you would brief a colleague.** A
+  message to a teammate used to be asked for as "one or two sentences"; it
+  is now asked for as what you need or found and why, the facts by name,
+  and what a good answer looks like. A reply is asked for as the answer
+  first, then its evidence, then what is still unverified — and ending the
+  exchange is named as the normal good outcome, not something to avoid.
+  Measured on the same exchange before and after: the request gained its
+  reason and an acceptance line, the reply gained its evidence and its
+  caveat, and both exchanges still ended in two hops.
+- **A role is a brief now, not a label.** Each preset tells the teammate
+  what good work in that role looks like, in a sentence or two. And there
+  is a new preset, **Chief of Staff**: a teammate whose job is to route your
+  ask to the teammate whose role fits, brief them properly, tell you who it
+  went to, and report the reply back as one message that stands on its own.
+- **The last message stands alone.** Every teammate is told that its last
+  message is what you read if you read nothing else: the answer first, then
+  what was done, then what is blocked or unverified, said plainly.
+- **Cursor connectors work in every mode.** Outside Auto, Cursor asked
+  before every connector call and nobody was there to answer, so each one
+  failed as *user rejected*. Locust now writes an allow rule per configured
+  server into the workspace’s `.cursor/cli.json` before the run starts;
+  nothing is ever removed and the deny list is never touched. Measured:
+  the same read-only call was rejected in Accept edits before and answered
+  after. The mode menu says so.
+
 ## 0.167.0 - 2026-09-17
 
 - **When a run stops because the ledger could not be written, the card says
