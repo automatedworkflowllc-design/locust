@@ -1,7 +1,13 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+
+/** "Thought for 12s", or just "Thought" when the runtime never said when it began. */
+export function thoughtLine(durationMs: number | undefined): string {
+  if (durationMs === undefined || durationMs < 500) return 'Thought'
+  return `Thought for ${durationText(durationMs)}`
+}
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, foldedToolsText, relativePath } from '../missionView.js'
+import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, foldedToolsText, relativePath, durationText } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
@@ -416,10 +422,24 @@ export function ActivityCard({
                  * furniture. Muted and quoted, because it is the model
                  * talking to itself rather than reporting to anyone.
                  */
-                <div className="lc-filerow is-static lc-filerow--thought">
-                  <Icon name="activity" size={14} />
-                  <span className="lc-filerow__thought">{entry.text}</span>
-                </div>
+                <>
+                  {/*
+                    * One line, folded. Colin, 2026-09-17: "do you remember ...
+                    * how claude code did it? it would say how long they
+                    * thought for ... and then you could just hit a dropdown
+                    * and the thoughts would show if needed, i just worry in
+                    * its current state it takes up so much real estate."
+                    * The duration is the line; the words are under it.
+                    */}
+                  <button type="button" className="lc-filerow lc-filerow--thought" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
+                    <Icon name="thought" size={14} />
+                    <span className="lc-filerow__path">{thoughtLine(entry.durationMs)}</span>
+                    <span className="lc-activity__chev" aria-hidden="true">
+                      <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
+                    </span>
+                  </button>
+                  {isOpen(entry) && <div className="lc-filerow__thought">{entry.text}</div>}
+                </>
               ) : entry.kind === 'tools' ? (
                 /*
                  * A run of plain tool calls, as one row.

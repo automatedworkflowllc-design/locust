@@ -10372,12 +10372,14 @@ textarea {
    and truncating it to one line would be keeping the reasoning and hiding it
    in the same change. */
 .lc-filerow--thought {
-  align-items: flex-start;
+  align-items: center;
 }
 
+/* The words, under the line that says how long: quoted, muted, and only when asked for. */
 .lc-filerow__thought {
-  flex: 1;
-  min-width: 0;
+  display: block;
+  margin: 0 var(--lc-space-5) var(--lc-space-4) calc(var(--lc-space-5) + 14px + var(--lc-space-5));
+  white-space: pre-wrap;
   color: var(--lc-text-muted);
   font-size: var(--lc-text-description);
   white-space: pre-wrap;

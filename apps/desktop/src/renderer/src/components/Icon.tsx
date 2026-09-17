@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
  */
 export type IconName =
   | 'activity'
+  | 'thought'
   | 'arrow-up'
   | 'attachment'
   | 'check'
@@ -39,6 +40,15 @@ export type IconName =
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }): ReactNode {
   const paths: Record<IconName, ReactNode> = {
     activity: <path d="M3 12h3l2.1-6 3.8 12L14 12h7" />,
+    // A thought bubble: the cloud, then the two trailing dots that make it a
+    // thought and not speech. Colin, 2026-09-17: "use a little thought bubble".
+    thought: (
+      <>
+        <path d="M9 3.5h6a5.5 5.5 0 0 1 0 11h-1.2l-2.3 2.3v-2.3H9a5.5 5.5 0 0 1 0-11Z" />
+        <circle cx="6.5" cy="18.5" r="1.1" />
+        <circle cx="3.6" cy="21.2" r=".7" />
+      </>
+    ),
     'arrow-up': <><path d="m6 10 6-6 6 6" /><path d="M12 4v16" /></>,
     attachment: <path d="m20.5 11.5-8.9 8.9a6 6 0 0 1-8.5-8.5l9.6-9.6a4 4 0 0 1 5.7 5.7l-9.6 9.6A2 2 0 1 1 6 14.8l8.9-8.9" />,
     check: <path d="m5 12 4 4L19 6" />,

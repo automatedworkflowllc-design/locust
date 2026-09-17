@@ -42,6 +42,8 @@ export interface ActivityDetail {
   readonly patch?: ToolPatch
   /** The runtime's own status word for the call; a subagent's type, for its launcher. */
   readonly status?: string
+  /** How long a reasoning step took, when both ends were seen. Drawn as "Thought for 12s". */
+  readonly durationMs?: number
   /** What the tool returned, when the runtime reported it in words; a subagent's summary. */
   readonly output?: string
 }
@@ -122,6 +124,7 @@ export type ActivityEntry =
       readonly kind: 'thought'
       readonly key: string
       readonly text: string
+      readonly durationMs?: number
     }
   | {
       readonly kind: 'file'
@@ -264,7 +267,8 @@ export function activityEntries(
       entries.push({
         kind: 'thought',
         key: `thought_${String(index)}`,
-        text: detail.output ?? ''
+        text: detail.output ?? '',
+        ...(detail.durationMs === undefined ? {} : { durationMs: detail.durationMs })
       })
       return
     }
@@ -1772,7 +1776,15 @@ export function buildThread(
           const said = typeof event.payload.message === 'string' ? event.payload.message.trim() : ''
           if (said.length > 0) {
             workBegan = true
-            activity.push({ kind: 'reasoning', name: 'thought', settled: true, output: said })
+            // How long, from the step that opened it. The row reads
+            // "Thought for 12s" and folds the text under it -- the shape
+            // Claude Code used, which Colin asked for on 2026-09-17: "it
+            // would say how long they thought for ... and then you could
+            // just hit a dropdown". Absent when the start was never seen.
+            const began = runningStep?.kind === 'reasoning' ? Date.parse(runningStep.startedAt) : NaN
+            const ended = Date.parse(event.occurredAt)
+            const durationMs = Number.isNaN(began) || Number.isNaN(ended) ? undefined : Math.max(0, ended - began)
+            activity.push({ kind: 'reasoning', name: 'thought', settled: true, output: said, ...(durationMs === undefined ? {} : { durationMs }) })
           }
         }
         runningStep = undefined

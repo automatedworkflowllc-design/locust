@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.166.0 - 2026-09-17
+
+- **A thought is one line.** *Thought for 12s*, with a thought-bubble beside
+  it, and the words folded underneath until you open them — the shape
+  Claude Code used. The thinking is all still kept and still one click away;
+  it just stops taking the whole screen to say it happened.
+
 ## 0.165.0 - 2026-09-17
 
 - **A key a teammate repeats is scrubbed from what the ledger keeps — in
