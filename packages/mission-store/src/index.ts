@@ -6,7 +6,7 @@ import type {
   RedactedJsonValue
 } from '@teammate/runtime-adapters'
 import { constants as fsConstants } from 'node:fs'
-import { mkdir, open, readdir, stat, unlink } from 'node:fs/promises'
+import { mkdir, open, readdir, rename, stat, unlink, utimes } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
@@ -346,19 +346,31 @@ export interface MissionLedger {
   /** Record which workroom messages this mission was shown, or produced. */
   appendPeerLinks(missionId: string, links: readonly MissionPeerLink[]): Promise<void>
   /**
-   * Remove a mission's record for good. Returns false when there was none.
+   * Move a mission's record to the trash. Returns false when there was none.
    *
-   * This is the one destructive operation the ledger has, and it is exactly
-   * as narrow as it sounds: the file goes, nothing else is rewritten. Other
-   * missions that pointed at it (a continuation, a workroom message) keep
-   * their pointers, which now resolve to nothing -- readers already treat a
-   * missing link as "stop here", so the truthful state after a deletion is a
-   * thread that ends where the deleted part began, not one that pretends the
-   * part never existed. Whether a LIVE mission may be deleted is not decided
-   * here; the store cannot know what is running, and refuses nothing it is
-   * not in a position to judge.
+   * The mission leaves every listing immediately -- it is as gone as it ever
+   * was from where a person is standing -- and the file itself is kept, byte
+   * for byte, until `emptyTrash`. Nothing else is rewritten: other missions
+   * that pointed at it (a continuation, a workroom message) keep their
+   * pointers, which resolve to nothing while it is in the trash and resolve
+   * again if it is restored. Readers already treat a missing link as "stop
+   * here", so the truthful state is a thread that ends where the deleted
+   * part began, not one that pretends the part never existed.
+   *
+   * Whether a LIVE mission may be deleted is not decided here; the store
+   * cannot know what is running, and refuses nothing it is not in a position
+   * to judge.
    */
   deleteMission(missionId: string): Promise<boolean>
+  /** What is in the trash, newest deletion first. */
+  listTrashedMissions(): Promise<readonly TrashedMission[]>
+  /**
+   * Put one back. False when it is not in the trash, or when a mission of
+   * that id is live again -- a restore must never write over a record.
+   */
+  restoreMission(missionId: string): Promise<boolean>
+  /** Delete the trash for good. Returns how many records went. */
+  emptyTrash(): Promise<number>
   /**
    * What the local history costs and how far back it goes, so a person can
    * decide about it. Reads sizes, never contents.
@@ -380,6 +392,18 @@ export interface MissionLedger {
 
 export interface MissionLedgerListOptions {
   readonly limit?: number
+}
+
+/** A mission that has been deleted and is being kept until the trash is emptied. */
+export interface TrashedMission {
+  readonly missionId: string
+  /** When it was deleted, ISO. */
+  readonly deletedAt: string
+  readonly bytes: number
+  /** The first line of what was asked, so a listing can name it. */
+  readonly prompt?: string
+  /** When the mission itself was created, ISO. */
+  readonly createdAt?: string
 }
 
 export interface MissionStorageReport {
@@ -665,6 +689,22 @@ function recordLine(record: LedgerRecord): string {
 
 function missionPath(rootDirectory: string, missionId: string): string {
   return join(rootDirectory, `${requireSafeId(missionId, 'missionId')}.jsonl`)
+}
+
+/**
+ * Where a deleted mission waits.
+ *
+ * A DIRECTORY inside the ledger, which is what makes this safe to add: every
+ * reader here lists with `entry.isFile() && entry.name.endsWith('.jsonl')`,
+ * so a folder is skipped by all of them without one of them being changed.
+ * A trashed mission is therefore invisible to `listMissions`,
+ * `storageReport` and `pruneMissions` while its bytes stay exactly as they
+ * were.
+ */
+export const MISSION_TRASH_DIR = '.trash'
+
+function trashPath(rootDirectory: string, missionId: string): string {
+  return join(rootDirectory, MISSION_TRASH_DIR, `${requireSafeId(missionId, 'missionId')}.jsonl`)
 }
 
 function publicIssue(
@@ -1365,16 +1405,100 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
    * here once; the mutation control proved no test could tell whether it ran,
    * and a line no test can see is a line nobody maintains.
    */
+  /**
+   * Move a mission's record to the trash. Returns false when there was none.
+   *
+   * MEASURED 2026-09-17: eighteen of Colin's missions went in four seconds
+   * through the app's own confirm, and the files were unlinked -- no Recycle
+   * Bin entry, no shadow copy, nothing to undo. A day of work was recovered
+   * only because those runs happened to be on Cursor, which keeps its own
+   * transcripts. A product whose claim is a durable local record cannot rely
+   * on another program's copy for that.
+   *
+   * So the file is RENAMED rather than removed. A rename inside one directory
+   * is atomic and copies no bytes, so this costs nothing on a large ledger,
+   * and the record is byte-identical if it comes back.
+   *
+   * The mtime is restamped to now, deliberately: that is what `listTrashed`
+   * reports as the moment it was deleted, and it means the trash needs no
+   * index of its own to keep in step with the files in it. Nothing reads a
+   * trashed mission's last-updated time -- `storageReport` only looks at
+   * files in the root -- so no information anyone uses is lost.
+   */
   async function removeMissionFile(missionId: string): Promise<boolean> {
     requireSafeId(missionId, 'missionId')
+    const from = missionPath(rootDirectory, missionId)
+    const to = trashPath(rootDirectory, missionId)
     try {
-      await removeFile(missionPath(rootDirectory, missionId))
+      await mkdir(join(rootDirectory, MISSION_TRASH_DIR), { recursive: true, mode: 0o700 })
+      // A mission deleted, restored and deleted again would land on its own
+      // older copy. Rename replaces on both platforms this ships to, but
+      // saying so here is cheaper than depending on it.
+      await removeFile(to).catch(() => undefined)
+      await rename(from, to)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
       throw error
     }
+    const now = new Date()
+    await utimes(to, now, now).catch(() => undefined)
     await syncDirectoryBestEffort(rootDirectory)
     return true
+  }
+
+  /** Every mission in the trash, newest deletion first. */
+  async function listTrashedFiles(): Promise<readonly TrashedMission[]> {
+    let entries
+    try {
+      entries = await readdir(join(rootDirectory, MISSION_TRASH_DIR), { withFileTypes: true })
+    } catch {
+      return []
+    }
+    const found: TrashedMission[] = []
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue
+      const missionId = entry.name.slice(0, -'.jsonl'.length)
+      const path = join(rootDirectory, MISSION_TRASH_DIR, entry.name)
+      let deletedAt: string
+      let bytes = 0
+      try {
+        const info = await stat(path)
+        deletedAt = info.mtime.toISOString()
+        bytes = info.size
+      } catch {
+        continue
+      }
+      found.push({ missionId, deletedAt, bytes, ...(await headerOf(path)) })
+    }
+    return found.sort((left, right) => (left.deletedAt < right.deletedAt ? 1 : -1))
+  }
+
+  /**
+   * The first record of a file, for a trash listing that can name what it is
+   * holding. Reads a chunk rather than the whole mission: a listing must not
+   * cost what reading the history costs.
+   */
+  async function headerOf(path: string): Promise<{ prompt?: string; createdAt?: string }> {
+    let handle: FileHandle | undefined
+    try {
+      handle = await open(path, 'r')
+      const chunk = Buffer.alloc(16_384)
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, 0)
+      const text = chunk.subarray(0, bytesRead).toString('utf8')
+      const line = text.split(String.fromCharCode(10))[0] ?? ''
+      const parsed = JSON.parse(line) as { metadata?: { prompt?: unknown; createdAt?: unknown } }
+      const prompt = parsed.metadata?.prompt
+      const createdAt = parsed.metadata?.createdAt
+      return {
+        ...(typeof prompt === 'string' ? { prompt: prompt.slice(0, 200) } : {}),
+        ...(typeof createdAt === 'string' ? { createdAt } : {})
+      }
+    } catch {
+      // A trashed mission that cannot be read is still listed, by id alone.
+      return {}
+    } finally {
+      await handle?.close().catch(() => undefined)
+    }
   }
 
   return {
@@ -1546,6 +1670,51 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
 
     deleteMission(missionId: string): Promise<boolean> {
       return serialize(() => removeMissionFile(missionId))
+    },
+
+    listTrashedMissions(): Promise<readonly TrashedMission[]> {
+      return serialize(() => listTrashedFiles())
+    },
+
+    restoreMission(missionId: string): Promise<boolean> {
+      return serialize(async () => {
+        requireSafeId(missionId, 'missionId')
+        const from = trashPath(rootDirectory, missionId)
+        const to = missionPath(rootDirectory, missionId)
+        // Never over a record that exists. A mission id is unique, so this
+        // means the same id ran again; the live one is the truth.
+        try {
+          await stat(to)
+          return false
+        } catch {
+          // Nothing there, which is the ordinary case.
+        }
+        try {
+          await rename(from, to)
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+          throw error
+        }
+        await syncDirectoryBestEffort(rootDirectory)
+        return true
+      })
+    },
+
+    emptyTrash(): Promise<number> {
+      return serialize(async () => {
+        const held = await listTrashedFiles()
+        let gone = 0
+        for (const entry of held) {
+          try {
+            await removeFile(trashPath(rootDirectory, entry.missionId))
+            gone += 1
+          } catch {
+            // One that will not go does not stop the rest.
+          }
+        }
+        await syncDirectoryBestEffort(rootDirectory)
+        return gone
+      })
     },
 
     async storageReport(): Promise<MissionStorageReport> {

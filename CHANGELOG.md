@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.175.0 - 2026-09-17
+
+- **Deleting a conversation can be undone.** It still leaves every list the
+  moment you delete it, which is what deleting means. What changed is that
+  the record itself is kept, byte for byte, until you empty the trash --
+  under **Settings → Trash**, where each one can be put back whole, owner
+  and name included. Emptying is still two presses and still permanent.
+- **Bulk retention is undoable too**, because it goes through the same path:
+  deleting missions older than N days now fills the trash rather than the
+  disk.
+
+  Why: on 2026-09-17 eighteen conversations went in four seconds through the
+  Missions screen's select-and-confirm, and the files were unlinked --
+  no Recycle Bin, no shadow copy, nothing to undo. A day of portfolio work
+  came back only because those runs happened to be on Cursor, which keeps
+  its own transcripts. A product whose claim is a durable local record
+  cannot lean on another program's copy for that.
+
 ## 0.174.0 - 2026-09-17
 
 - **A long conversation title no longer paints over the window.** A

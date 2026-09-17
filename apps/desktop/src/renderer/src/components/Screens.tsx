@@ -8,6 +8,9 @@ import type {
   DiagnosticsReport,
   AppUpdateState,
   MissionPruneResponse,
+  PublicTrashedMission,
+  TrashListResponse,
+  TrashMutationResponse,
   PublicRecoveredMission,
   PublicRoutine,
   PublicRuntimeArtifact,
@@ -643,6 +646,104 @@ export function TeammatesScreen({
 const RETENTION_CHOICES = [30, 90, 365] as const
 
 /**
+ * What has been deleted and is still here.
+ *
+ * Deleting takes a conversation out of every listing at once, which is what a
+ * person means by it. The record itself is kept until this panel is emptied,
+ * so the one thing the app could not do on 2026-09-17 -- give an accidentally
+ * deleted day of work back -- it can now do.
+ *
+ * Restoring is one press, because the case it exists for is a mistake that has
+ * already happened. Emptying is two, differently worded, because that is the
+ * press that cannot be taken back.
+ */
+function TrashControl({
+  onList,
+  onRestore,
+  onEmpty
+}: {
+  readonly onList: () => Promise<TrashListResponse>
+  readonly onRestore: (missionId: string) => Promise<TrashMutationResponse>
+  readonly onEmpty: () => Promise<TrashMutationResponse>
+}): ReactElement {
+  const [held, setHeld] = useState<readonly PublicTrashedMission[] | undefined>(undefined)
+  const [armed, setArmed] = useState(false)
+  const [message, setMessage] = useState<string | undefined>(undefined)
+
+  const load = (): void => {
+    void onList()
+      .then((response) => {
+        setHeld(response.ok ? response.data.missions : [])
+        if (!response.ok) setMessage(response.error.message)
+      })
+      .catch(() => setHeld([]))
+  }
+  useEffect(load, [])
+
+  const restore = (missionId: string): void => {
+    setMessage(undefined)
+    void onRestore(missionId)
+      .then((response) => {
+        setMessage(response.ok ? 'Put back.' : response.error.message)
+        load()
+      })
+      .catch(() => setMessage('That conversation could not be put back.'))
+  }
+
+  const empty = (): void => {
+    if (!armed) {
+      setArmed(true)
+      return
+    }
+    setArmed(false)
+    setMessage(undefined)
+    void onEmpty()
+      .then((response) => {
+        setMessage(response.ok ? `Deleted ${String(response.data.count)} for good.` : response.error.message)
+        load()
+      })
+      .catch(() => setMessage('The trash was not emptied.'))
+  }
+
+  const count = held?.length ?? 0
+  const NEWLINE = String.fromCharCode(10)
+  return (
+    <div className="lc-trash">
+      <p className="lc-settings__note">
+        {held === undefined
+          ? 'Reading the trash…'
+          : count === 0
+            ? 'Nothing deleted. A conversation you delete waits here until you empty it.'
+            : `${String(count)} deleted conversation${count === 1 ? '' : 's'}, kept until you empty this.`}
+      </p>
+      {held !== undefined && count > 0 && (
+        <>
+          <ul className="lc-trash__list">
+            {held.map((mission) => (
+              <li className="lc-trash__row" key={mission.missionId}>
+                <span className="lc-trash__what">
+                  {mission.prompt === undefined || mission.prompt.trim().length === 0
+                    ? mission.missionId
+                    : mission.prompt.split(NEWLINE)[0]}
+                </span>
+                <span className="lc-trash__when lc-mono">{mission.deletedAt.slice(0, 16).replace('T', ' ')}</span>
+                <button type="button" className="lc-button" onClick={() => restore(mission.missionId)}>
+                  Put back
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="lc-button lc-button--danger" onClick={empty}>
+            {armed ? `Delete ${String(count)} for good?` : 'Empty the trash'}
+          </button>
+        </>
+      )}
+      {message !== undefined && <p className="lc-settings__note">{message}</p>}
+    </div>
+  )
+}
+
+/**
  * Deleting old missions in bulk, in two deliberate steps.
  *
  * Nothing is ever pruned automatically, and the first press only ASKS. What
@@ -1002,6 +1103,9 @@ export function SettingsScreen({
   memoryWaiting,
   onOpenMemory,
   onPreviewPrune,
+  onListTrash,
+  onRestoreMission,
+  onEmptyTrash,
   onPrune
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
@@ -1068,6 +1172,9 @@ export function SettingsScreen({
   readonly memoryWaiting: number
   readonly onOpenMemory: () => void
   readonly onPreviewPrune: (days: number) => Promise<MissionPruneResponse>
+  readonly onListTrash: () => Promise<TrashListResponse>
+  readonly onRestoreMission: (missionId: string) => Promise<TrashMutationResponse>
+  readonly onEmptyTrash: () => Promise<TrashMutationResponse>
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
   return (
@@ -1791,6 +1898,14 @@ export function SettingsScreen({
             </p>
           </More>
           <RetentionControl report={storage} onPreview={onPreviewPrune} onPrune={onPrune} />
+        </section>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Trash</h2>
+          <p className="lc-settings__lede">
+            Deleting a conversation takes it out of every list at once. The record itself waits here, so a
+            deletion you did not mean can be undone.
+          </p>
+          <TrashControl onList={onListTrash} onRestore={onRestoreMission} onEmpty={onEmptyTrash} />
         </section>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Report a problem</h2>

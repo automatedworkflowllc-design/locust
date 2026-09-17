@@ -17,6 +17,8 @@ import type {
   PublicRuntimeStatus,
   PublicStorageReport,
   MissionPruneResponse,
+  TrashListResponse,
+  TrashMutationResponse,
   AppUpdateResponse,
   AppUpdateState,
   MissionApprovalDecision,
@@ -3492,6 +3494,44 @@ export default function App(): ReactElement {
     const clear = window.setTimeout(() => setRowNotice(undefined), 4_000)
     return () => window.clearTimeout(clear)
   }, [rowNotice])
+  /*
+   * The trash, from the window's side.
+   *
+   * A restore has to put the conversation back where a person looks for it,
+   * and that is two reads: the history the sidebar is built from, and the
+   * roster that carries who owns it and what it was renamed to. Neither is
+   * derivable from the other.
+   */
+  const listTrash = async (): Promise<TrashListResponse> => {
+    const bridge = window.desktop
+    if (!bridge) return { ok: false, error: { code: 'STORAGE_UNAVAILABLE', message: 'The trash could not be read. Nothing in it has been deleted for good.' } }
+    return bridge.listTrashedMissions()
+  }
+
+  const restoreMission = async (missionId: string): Promise<TrashMutationResponse> => {
+    const bridge = window.desktop
+    if (!bridge) return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'That conversation could not be put back. It is still in the trash.' } }
+    const response = await bridge.restoreMission(missionId)
+    if (response.ok) {
+      refreshHistory()
+      void bridge
+        .listTeammates()
+        .then((roster) => {
+          if (!roster.ok) return
+          setMissionOwners(roster.data.missionOwners)
+          setMissionTitles(roster.data.missionTitles)
+        })
+        .catch(() => undefined)
+    }
+    return response
+  }
+
+  const emptyTrash = async (): Promise<TrashMutationResponse> => {
+    const bridge = window.desktop
+    if (!bridge) return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The trash was not emptied. Everything in it is still there.' } }
+    return bridge.emptyTrash()
+  }
+
   const deleteMissionById = (missionId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -4285,6 +4325,9 @@ export default function App(): ReactElement {
                 .catch(() => setInterrupt(!next))
             }}
             onPreviewPrune={previewPrune}
+            onListTrash={listTrash}
+            onRestoreMission={restoreMission}
+            onEmptyTrash={emptyTrash}
               onPrune={prune}
             />
           ) : liveRun === undefined ? (

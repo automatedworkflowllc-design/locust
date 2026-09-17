@@ -92,6 +92,9 @@ import {
   APP_UPDATE_STATE_CHANNEL,
   MISSION_DELETE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
+  MISSION_TRASH_LIST_CHANNEL,
+  MISSION_RESTORE_CHANNEL,
+  MISSION_TRASH_EMPTY_CHANNEL,
   MISSION_STORAGE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
@@ -3109,14 +3112,80 @@ ${taskSection({
         missionId,
         (id) => codexMissions.hasMission(id) || antigravityMissions.hasMission(id)
       )
-      // Ownership follows the record out, so the roster never lists a
-      // mission that no longer exists.
+      /*
+       * Ownership is NOT dropped here any more.
+       *
+       * It used to be, so the roster could never list a mission that no
+       * longer existed -- and that still holds, because the roster is built
+       * from the missions the ledger lists and a deleted one is not among
+       * them. What changed is that the record is now kept until the trash is
+       * emptied, and a restore has to bring the conversation back exactly as
+       * it was, owner included. The owner is not in the ledger; it is in
+       * `teammates.json`. Dropping it at delete would make every restored
+       * conversation ownerless, which is a quieter kind of loss than the one
+       * the trash exists to prevent. It is dropped by `emptyTrash` instead.
+       */
       if (response.ok && typeof missionId === 'string') {
-        await teammates.unassignMission(missionId).catch(() => undefined)
         deletedThisSession.add(missionId)
         note('mission-deleted', missionId)
       }
       return response
+    })
+
+    ipcMain.handle(MISSION_TRASH_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'STORAGE_UNAVAILABLE', message: 'The trash could not be read. Nothing in it has been deleted for good.' } } as const
+      }
+      try {
+        return { ok: true, data: { missions: await missionLedger.listTrashedMissions() } } as const
+      } catch {
+        return { ok: false, error: { code: 'STORAGE_UNAVAILABLE', message: 'The trash could not be read. Nothing in it has been deleted for good.' } } as const
+      }
+    })
+
+    ipcMain.handle(MISSION_RESTORE_CHANNEL, async (event, missionId: unknown) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The restore was rejected.' } } as const
+      }
+      if (typeof missionId !== 'string' || missionId.length === 0) {
+        return { ok: false, error: { code: 'RESTORE_REFUSED', message: 'That conversation could not be put back. It is still in the trash.' } } as const
+      }
+      try {
+        const back = await missionLedger.restoreMission(missionId)
+        if (!back) {
+          return {
+            ok: false,
+            error: {
+              code: 'RESTORE_REFUSED',
+              message: 'That conversation is not in the trash, or one with the same id is live again.'
+            }
+          } as const
+        }
+        deletedThisSession.delete(missionId)
+        note('mission-restored', missionId)
+        return { ok: true, data: { count: 1 } } as const
+      } catch {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'That conversation could not be put back. It is still in the trash.' } } as const
+      }
+    })
+
+    ipcMain.handle(MISSION_TRASH_EMPTY_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The trash was not emptied. Everything in it is still there.' } } as const
+      }
+      try {
+        // The owners go WITH the records, and only now: until this point a
+        // restore had to be able to put the conversation back whole.
+        const held = await missionLedger.listTrashedMissions()
+        const gone = await missionLedger.emptyTrash()
+        for (const entry of held) {
+          await teammates.unassignMission(entry.missionId).catch(() => undefined)
+        }
+        note('trash-emptied', String(gone))
+        return { ok: true, data: { count: gone } } as const
+      } catch {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The trash was not emptied. Everything in it is still there.' } } as const
+      }
     })
 
     ipcMain.handle(CODEX_MISSION_START_CHANNEL, async (event, request: unknown) => {

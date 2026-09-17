@@ -14,6 +14,9 @@ import {
   MISSION_PRUNE_CHANNEL,
   MISSION_STORAGE_CHANNEL,
   MISSION_DELETE_CHANNEL,
+  MISSION_TRASH_LIST_CHANNEL,
+  MISSION_RESTORE_CHANNEL,
+  MISSION_TRASH_EMPTY_CHANNEL,
   MISSION_HISTORY_CHANNEL,
   MODEL_CATALOG_CHANNEL,
   RUNTIME_ARTIFACTS_CHANNEL,
@@ -88,6 +91,8 @@ import type {
   AppUpdateState,
   MissionPruneRequest,
   MissionPruneResponse,
+  TrashListResponse,
+  TrashMutationResponse,
   StorageReportResponse,
   MissionDeleteResponse,
   MissionHistoryResponse,
@@ -188,6 +193,10 @@ const desktopApi: DesktopApi = {
   getMissionHistory: () => ipcRenderer.invoke(MISSION_HISTORY_CHANNEL) as Promise<MissionHistoryResponse>,
   deleteMission: (missionId: string) =>
     ipcRenderer.invoke(MISSION_DELETE_CHANNEL, missionId) as Promise<MissionDeleteResponse>,
+  listTrashedMissions: () => ipcRenderer.invoke(MISSION_TRASH_LIST_CHANNEL) as Promise<TrashListResponse>,
+  restoreMission: (missionId: string) =>
+    ipcRenderer.invoke(MISSION_RESTORE_CHANNEL, missionId) as Promise<TrashMutationResponse>,
+  emptyTrash: () => ipcRenderer.invoke(MISSION_TRASH_EMPTY_CHANNEL) as Promise<TrashMutationResponse>,
   listTeammates: () => ipcRenderer.invoke(TEAMMATE_LIST_CHANNEL) as Promise<TeammateListResponse>,
   createTeammate: (request: TeammateCreateRequest) =>
     ipcRenderer.invoke(TEAMMATE_CREATE_CHANNEL, request) as Promise<TeammateMutationResponse>,

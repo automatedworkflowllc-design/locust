@@ -198,6 +198,34 @@ export type AppUpdateResponse =
       readonly error: { readonly code: 'UPDATE_NOT_READY' | 'UPDATE_BUSY' | 'INTERNAL_ERROR'; readonly message: string }
     }
 export const MISSION_PRUNE_CHANNEL = 'mission:prune'
+export const MISSION_TRASH_LIST_CHANNEL = 'mission:trash:list'
+export const MISSION_RESTORE_CHANNEL = 'mission:restore'
+export const MISSION_TRASH_EMPTY_CHANNEL = 'mission:trash:empty'
+
+/**
+ * A conversation that was deleted and is being kept until the trash is
+ * emptied. Deleting takes it out of every listing at once; this is what is
+ * still on disk behind that.
+ */
+export interface PublicTrashedMission {
+  readonly missionId: string
+  readonly deletedAt: string
+  readonly bytes: number
+  /** The first line of what was asked, so the list can name it. */
+  readonly prompt?: string
+  readonly createdAt?: string
+}
+
+export type TrashListResponse =
+  | { readonly ok: true; readonly data: { readonly missions: readonly PublicTrashedMission[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'STORAGE_UNAVAILABLE'; readonly message: string } }
+
+export type TrashMutationResponse =
+  | { readonly ok: true; readonly data: { readonly count: number } }
+  | {
+      readonly ok: false
+      readonly error: { readonly code: 'RESTORE_REFUSED' | 'INTERNAL_ERROR'; readonly message: string }
+    }
 
 /** What the local mission history costs on this machine. */
 export interface PublicStorageReport {
@@ -1713,6 +1741,12 @@ export interface DesktopApi {
   getMissionHistory(): Promise<MissionHistoryResponse>
   /** Remove a finished mission's record for good. Refused while it is live. */
   deleteMission(missionId: string): Promise<MissionDeleteResponse>
+  /** What is in the trash, newest deletion first. */
+  listTrashedMissions(): Promise<TrashListResponse>
+  /** Put a deleted conversation back, whole. */
+  restoreMission(missionId: string): Promise<TrashMutationResponse>
+  /** Delete the trash for good. */
+  emptyTrash(): Promise<TrashMutationResponse>
   listTeammates(): Promise<TeammateListResponse>
   createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
   updateTeammate(request: TeammateUpdateRequest): Promise<TeammateMutationResponse>
