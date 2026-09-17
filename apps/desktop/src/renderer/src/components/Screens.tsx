@@ -646,6 +646,49 @@ export function TeammatesScreen({
 const RETENTION_CHOICES = [30, 90, 365] as const
 
 /**
+ * Settings as PAGES, not one scroll.
+ *
+ * Colin asked for this twice. The first time (2026-09-14) the answer was to
+ * group thirteen subjects into five named areas, still in one column, and he
+ * said again on 2026-09-17: "our settings is a literal disaster". It was: the
+ * areas were right and you still had to scroll past four of them to reach the
+ * fifth, and nothing told you the fifth existed.
+ *
+ * So the areas become pages with a list beside them, which is the shape
+ * Claude Code uses and the one he pointed at. Nothing about the settings
+ * themselves changes -- same sections, same order, same words behind `More`.
+ * What changes is that you can see the whole map at once and land on any of
+ * it in one press.
+ *
+ * The headings are listed here so the search can find a setting by its own
+ * name rather than only by the page it lives on. `settings-pages-are-real`
+ * holds this list to the headings the file actually renders, because an index
+ * that drifts is worse than no index: it would quietly stop finding things.
+ */
+export type SettingsPageId = 'workspace' | 'runtimes' | 'teammates' | 'appearance' | 'app'
+
+export const SETTINGS_PAGES: readonly {
+  readonly id: SettingsPageId
+  readonly label: string
+  readonly headings: readonly string[]
+}[] = [
+  { id: 'workspace', label: 'Your workspace', headings: ['Project folder', 'Teammates'] },
+  { id: 'runtimes', label: 'Runtimes', headings: ['Runtimes & accounts', 'Connectors', 'When a route hits its limit'] },
+  {
+    id: 'teammates',
+    label: 'How teammates work',
+    headings: ['Swarm', 'Auto mode', 'Plans', 'What your team remembers']
+  },
+  { id: 'appearance', label: 'Appearance', headings: ['Sidebar', 'The boot screen'] },
+  { id: 'app', label: 'This app', headings: ['Updates', 'Privacy & local data', 'Trash', 'Report a problem'] }
+]
+
+/** Case- and punctuation-insensitive enough that "auto" finds "Auto mode". */
+export function matches(text: string, query: string): boolean {
+  return text.toLowerCase().includes(query.toLowerCase())
+}
+
+/**
  * What has been deleted and is still here.
  *
  * Deleting takes a conversation out of every listing at once, which is what a
@@ -1177,6 +1220,21 @@ export function SettingsScreen({
   readonly onEmptyTrash: () => Promise<TrashMutationResponse>
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
+  const [page, setPage] = useState<SettingsPageId>('workspace')
+  const [query, setQuery] = useState('')
+  const asked = query.trim()
+  // A page earns its place in the list when its name or one of its settings
+  // matches. With no search every page is there, which is the ordinary state.
+  const shownPages =
+    asked.length === 0
+      ? SETTINGS_PAGES
+      : SETTINGS_PAGES.filter(
+          (entry) => matches(entry.label, asked) || entry.headings.some((heading) => matches(heading, asked))
+        )
+  // A search that hides the page you were on moves you to the first that
+  // survived, rather than showing an empty pane beside a list of matches.
+  const shownPage = shownPages.some((entry) => entry.id === page) ? page : shownPages[0]?.id
+
   return (
     <div className="lc-screen">
       <ScreenHeader
@@ -1187,7 +1245,38 @@ export function SettingsScreen({
             : `Locust ${build.version}${build.packaged ? '' : ' · development build'} · local only`
         }
       />
-      <div className="lc-screen__scroll">
+      <div className="lc-settings">
+        <nav className="lc-settings__nav" aria-label="Settings sections">
+          <input
+            type="search"
+            className="lc-settings__search"
+            placeholder="Search settings"
+            value={query}
+            aria-label="Search settings"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          {shownPages.length === 0 ? (
+            <p className="lc-settings__note">Nothing matches. The pages are still here; clear the search to see them.</p>
+          ) : (
+            shownPages.map((entry) => (
+              <button
+                type="button"
+                key={entry.id}
+                className={`lc-settings__navitem${entry.id === shownPage ? ' is-current' : ''}`}
+                aria-current={entry.id === shownPage ? 'page' : undefined}
+                onClick={() => setPage(entry.id)}
+              >
+                <span className="lc-settings__navlabel">{entry.label}</span>
+                {query.trim().length > 0 && (
+                  <span className="lc-settings__navhits">
+                    {entry.headings.filter((heading) => matches(heading, query)).join(' · ')}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </nav>
+        <div className="lc-settings__pane">
         {/*
           * Where the teammates work. A workspace-wide fact, so it sits with
           * the other workspace-wide settings rather than on the intro screen
@@ -1210,7 +1299,8 @@ export function SettingsScreen({
           * that a setting explained itself, it was that you could not find
           * the setting.
           */}
-        <h1 className="lc-settings__group">Your workspace</h1>
+        {shownPage === 'workspace' && (
+          <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Project folder</h2>
           <p className="lc-settings__lede">
@@ -1404,7 +1494,10 @@ export function SettingsScreen({
           </div>
         </section>
 
-        <h1 className="lc-settings__group">Runtimes</h1>
+          </>
+        )}
+        {shownPage === 'runtimes' && (
+          <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>
           <p className="lc-settings__lede">
@@ -1589,7 +1682,10 @@ export function SettingsScreen({
           </More>
         </section>
 
-        <h1 className="lc-settings__group">How teammates work</h1>
+          </>
+        )}
+        {shownPage === 'teammates' && (
+          <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Swarm</h2>
           <p className="lc-settings__lede">
@@ -1765,7 +1861,10 @@ export function SettingsScreen({
           </div>
         </section>
 
-        <h1 className="lc-settings__group">Appearance</h1>
+          </>
+        )}
+        {shownPage === 'appearance' && (
+          <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Sidebar</h2>
           <div className="lc-settingrows">
@@ -1855,7 +1954,10 @@ export function SettingsScreen({
 
         </section>
 
-        <h1 className="lc-settings__group">This app</h1>
+          </>
+        )}
+        {shownPage === 'app' && (
+          <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Updates</h2>
           <p className="lc-settings__lede">
@@ -1915,6 +2017,9 @@ export function SettingsScreen({
           <ProblemReport />
         </section>
 
+          </>
+        )}
+        </div>
       </div>
     </div>
   )

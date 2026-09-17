@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.176.0 - 2026-09-17
+
+- **Settings is a list of pages, not one long scroll.** The five areas are
+  now pages with a list beside them, the way Claude Code does it: you can
+  see the whole map at once and land on any of it in one press. Nothing
+  about the settings themselves changed -- same sections, same order, same
+  explanations behind **How it works**.
+- **Search finds a setting by its own name.** Typing *auto* narrows the list
+  to the page that holds Auto mode and says so underneath it.
+
+  The areas arrived on 2026-09-14 and were the right grouping in the wrong
+  shape: four of the five sat below the fold, and nothing told you the fifth
+  was there.
+
 ## 0.175.0 - 2026-09-17
 
 - **Deleting a conversation can be undone.** It still leaves every list the

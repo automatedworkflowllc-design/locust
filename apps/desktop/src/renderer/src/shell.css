@@ -3307,6 +3307,96 @@ textarea {
  * opacity, while doing nothing. Reported by an outside tester on 0.55.0 and
  * again on 0.164.0: "the green one is the one a person presses."
  */
+/*
+ * Settings: a list of pages, and the page.
+ *
+ * The areas used to be headings in one column, so four of them were below the
+ * fold and the fifth was a scroll away from being discovered at all. The list
+ * is the map; only the chosen page is drawn beside it.
+ */
+.lc-settings {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--lc-space-7);
+  padding: 14px var(--lc-space-7) 0;
+}
+
+.lc-settings__nav {
+  flex: none;
+  width: 208px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  overflow-y: auto;
+  padding-bottom: 22px;
+}
+
+.lc-settings__search {
+  margin-bottom: var(--lc-space-4);
+  padding: 6px 10px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+}
+
+.lc-settings__search:focus-visible {
+  outline: 2px solid var(--lc-border-hover);
+  outline-offset: 1px;
+}
+
+.lc-settings__navitem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: none;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-settings__navitem:hover {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+}
+
+/* The page you are on, said by weight and ground rather than by a colour. */
+.lc-settings__navitem.is-current {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+  font-weight: 500;
+}
+
+.lc-settings__navlabel {
+  display: block;
+}
+
+/* Which settings on that page matched what you typed. */
+.lc-settings__navhits {
+  display: block;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-settings__pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 22px;
+}
+
 /* What has been deleted and is still here, until the trash is emptied. */
 .lc-trash {
   display: flex;
