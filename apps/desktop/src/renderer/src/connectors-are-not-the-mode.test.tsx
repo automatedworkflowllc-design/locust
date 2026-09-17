@@ -76,7 +76,9 @@ describe('what a mode does to a connector', () => {
   })
 
   it('says nothing on a runtime whose launcher never touches MCP', () => {
-    for (const runtime of ['codex', 'cursor', 'opencode', 'copilot', 'antigravity']) {
+    // Cursor left this list on 2026-09-16: its launcher passes `--approve-mcps`, and
+    // outside Auto each call is still refused with nobody to answer, which the note now says.
+    for (const runtime of ['codex', 'opencode', 'copilot', 'antigravity']) {
       expect(connectorsNote(runtime, 'accept-edits'), runtime).toBeUndefined()
       expect(chip('accept-edits', runtime), runtime).toBe('Permission mode')
     }
@@ -117,6 +119,17 @@ describe('a route that is not where your connectors live', () => {
       expect(said.toLowerCase()).not.toContain(wrong)
     }
     expect(said).toContain('different set')
+  })
+
+  it('tells a Cursor route outside Auto that connector calls will be refused, and where they work', () => {
+    // Colin's ledger, 2026-09-15/16: 17 rejected calls in one Accept-edits
+    // run, 0 on Auto. The menu now says so before the run does.
+    for (const mode of ['accept-edits', 'ask', 'plan'] as const) {
+      const said = connectorsNote('cursor', mode, false) ?? ''
+      expect(said).toContain('refused')
+      expect(said).toContain('Use Auto')
+    }
+    expect(connectorsNote('cursor', 'auto', false)).toBeUndefined()
   })
 
   it('stays quiet when this machine has none, because then there is nothing to place', () => {

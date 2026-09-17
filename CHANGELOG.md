@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.162.0 - 2026-09-16
+
+- **Your effort level stays put.** The level you chose was dropped twice on
+  the way to disk — the app remembered a teammate’s runtime, model and mode
+  and not the fourth field — so selecting the teammate restored three and
+  reset the effort every time. Both places keep it now.
+- **Opening a conversation puts the composer back on its mode.** A
+  conversation you last ran on Auto reopened on whatever mode the previous
+  screen left — so the stocks conversation that needs Auto for its
+  connectors quietly came back on Accept edits, and the next connector call
+  failed. The conversation’s last turn recorded its mode; the composer now
+  starts there. And the guard that knocks Auto down when Auto is switched
+  off waits until it actually knows, instead of firing in the second before
+  settings load.
+- **The mode menu says what Cursor does with connectors outside Auto.**
+  Cursor asks before each connector call, and in a Locust run nobody is
+  there to answer, so each one fails as “user rejected” — 17 in one
+  Accept-edits run, 0 on Auto, same teammate, same connector. The menu says
+  so before the run does: use Auto for connector work.
+
 ## 0.161.0 - 2026-09-16
 
 - **A group can carry a default route.** Right-click a group · *Use

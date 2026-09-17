@@ -1544,7 +1544,7 @@ if (!ownsSingleInstanceLock) {
     // sender's route cannot quietly become the recipient's own.
     const rememberRoute = async (
       teammateId: string | undefined,
-      route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly mode: MissionMode }
+      route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly mode: MissionMode; readonly effort?: string }
     ): Promise<void> => {
       if (teammateId === undefined) return
       await teammates.rememberRoute(teammateId, route).catch(() => undefined)
@@ -3217,7 +3217,7 @@ ${taskSection({
         )
         if (response.ok) {
           await assignOwner(peer?.self.teammateId, response.data.missionId)
-          await rememberRoute(peer?.self.teammateId, { runtime, model: model ?? 'account-default', mode })
+          await rememberRoute(peer?.self.teammateId, { runtime, model: model ?? 'account-default', mode, ...(effort === undefined ? {} : { effort }) })
         }
         return response
       } catch {

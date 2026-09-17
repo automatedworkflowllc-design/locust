@@ -111,6 +111,18 @@ export function connectorsNote(
   /** Whether this machine's Claude Code has any, from `listConnectors`. */
   hasConnectors = false
 ): string | undefined {
+  /*
+   * Cursor's print mode has nobody to answer an approval, so a connector
+   * call outside Auto resolves to "no". MEASURED in Colin's own ledger,
+   * 2026-09-15/16: 17, 5, 3 and 2 `user rejected MCP` per run in Accept
+   * edits (`--approve-mcps` approves the SERVER, not each call); the same
+   * connector, same teammate, on Auto: 0. His question -- "wouldnt accept
+   * edits hypothetically give you a prompt for the mcp call" -- yes in
+   * Cursor's own app, where someone is there to answer; here there is not.
+   */
+  if (runtime === 'cursor' && mode !== 'auto') {
+    return 'Connector calls are refused in this mode: Cursor asks before each one and nobody is here to answer, so each fails as "user rejected". Use Auto for connector work.'
+  }
   if (runtime !== 'claude') {
     if (!hasConnectors) return undefined
     return `Your connectors are signed in on Claude Code. A teammate on ${shortRuntimeName(runtime as MissionRuntimeId)} uses that program's own instead — a different set, signed in separately.`

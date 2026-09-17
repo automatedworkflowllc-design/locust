@@ -537,7 +537,18 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         const file = await read()
         const existing = file.teammates.find((teammate) => teammate.teammateId === teammateId)
         if (existing === undefined) return
-        const kept: TeammateRoute = { runtime: route.runtime, model: route.model, mode: route.mode }
+        // Named field by field, and the effort is one of them. It was not:
+        // this line rebuilt the route from three fields and dropped the
+        // fourth, so the level a person chose never reached the file, and
+        // selecting the teammate restored their runtime, model and mode and
+        // reset the effort every time. Colin, 2026-09-16: "my effort levels
+        // are resetting."
+        const kept: TeammateRoute = {
+          runtime: route.runtime,
+          model: route.model,
+          mode: route.mode,
+          ...(route.effort === undefined ? {} : { effort: route.effort })
+        }
         await write({
           ...file,
           teammates: file.teammates.map((teammate) =>

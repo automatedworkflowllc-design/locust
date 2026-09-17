@@ -1320,9 +1320,16 @@ export default function App(): ReactElement {
 
   // Switching Auto off takes it away from a window that was sitting on it,
   // rather than leaving a choice the host would refuse at the next send.
+  /*
+   * Only once the answer is KNOWN. Before the settings have been read,
+   * `autoMode` is its initial false, and a conversation reopened at
+   * startup on Auto was being knocked down to Accept edits in the gap --
+   * the other half of "the next time it will be accept edits".
+   */
+  const [autoModeKnown, setAutoModeKnown] = useState(false)
   useEffect(() => {
-    if (!autoMode && mode === 'auto') setMode('accept-edits')
-  }, [autoMode, mode])
+    if (autoModeKnown && !autoMode && mode === 'auto') setMode('accept-edits')
+  }, [autoModeKnown, autoMode, mode])
   const [relay, setRelay] = useState(true)
   /** The autonomy budget: automatic replies one exchange may use. */
   const [relayHopCap, setRelayHopCap] = useState(DEFAULT_RELAY_HOP_CAP)
@@ -1789,6 +1796,7 @@ export default function App(): ReactElement {
           setSwarm(settings.swarm === true)
           setRelay(settings.relay === true)
           setAutoMode(settings.autoMode === true)
+          setAutoModeKnown(true)
           setAskConnectors(settings.askConnectors === true)
           setKeepATodoList(settings.keepATodoList === true)
           setRelayHopCap(settings.relayHopCap)
@@ -3289,6 +3297,22 @@ export default function App(): ReactElement {
   const followRouteOf = (run: LiveRunState | undefined): void => {
     if (run?.data === undefined || liveRunIsActive(run)) return
     setRoute({ runtime: run.data.runtime, model: run.data.model ?? 'account-default' })
+    /*
+     * The MODE too, from the record, and the effort from the teammate.
+     *
+     * Opening a conversation used to seed the runtime and model and leave
+     * the mode wherever the last screen left it. Colin, 2026-09-16: "ill
+     * have stocks convo on auto so it can access the mcp tools, the next
+     * time it will be accept edits and fail the mcp call because i dont
+     * notice." The conversation's last turn recorded its mode; that is what
+     * the next turn should start on. Effort is not recorded per mission, so
+     * it follows the teammate's remembered route, which now keeps it.
+     */
+    const recorded = run.restoredMission?.mode
+    if (recorded !== undefined && modeRunsOn(recorded, run.data.runtime, build?.platform)) setMode(recorded)
+    const ownerId = run.teammateId ?? (run.data.missionId === undefined ? undefined : missionOwnersRef.current[run.data.missionId])
+    const own = ownerId === undefined ? undefined : teammates.find((teammate) => teammate.teammateId === ownerId)?.route
+    if (own !== undefined && own.runtime === run.data.runtime) setEffort(own.effort)
   }
 
   const openMission = (missionId: string): void => {
