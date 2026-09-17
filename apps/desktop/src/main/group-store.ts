@@ -217,7 +217,11 @@ function withLeave(file: StoredFile, missionId: string, until: string): StoredFi
 }
 
 export interface GroupStore {
-  list(): Promise<{ readonly groups: readonly PublicGroup[]; readonly members: Readonly<Record<string, GroupMembership>> }>
+  list(): Promise<{
+    readonly groups: readonly PublicGroup[]
+    readonly members: Readonly<Record<string, GroupMembership>>
+    readonly left: Readonly<Record<string, readonly LeftMembership[]>>
+  }>
   create(name: unknown): Promise<PublicGroup>
   rename(groupId: unknown, name: unknown): Promise<PublicGroup>
   /** Removing a group never removes a conversation; they become Ungrouped. */
