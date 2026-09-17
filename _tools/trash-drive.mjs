@@ -93,11 +93,16 @@ try {
   await cdp.send('Runtime.enable')
   await cdp.eval(`(async () => { for (let i = 0; i < 240; i += 1) { const c = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox'); if (c && /cursor|codex|claude|opencode/i.test(c.innerText)) return true; await new Promise(r => setTimeout(r, 500)) } return false })()`)
 
-  const openMissions = `const m = [...document.querySelectorAll('button')].find(b => /^All missions/.test(b.getAttribute('aria-label') || b.getAttribute('title') || '')); if (m) m.click(); await new Promise(r => setTimeout(r, 700));`
-  const rowCount = `[...document.querySelectorAll('.lc-missionrow')].filter(r => /Two independent tasks/.test(r.innerText || '')).length`
-
+  // Each page script is written out whole rather than composed from pieces:
+  // the harness guard parses what is sent AS WRITTEN, and a script spliced
+  // together from fragments is not the thing it can check.
   say('1. the conversation is there')
-  const present = await cdp.eval(`(async () => { ${openMissions} return ${rowCount} })()`)
+  const present = await cdp.eval(`(async () => {
+    const m = [...document.querySelectorAll('button')].find(b => /^All missions/.test(b.getAttribute('aria-label') || b.getAttribute('title') || ''))
+    if (m) m.click()
+    await new Promise(r => setTimeout(r, 700))
+    return [...document.querySelectorAll('.lc-missionrow')].filter(r => /Two independent tasks/.test(r.innerText || '')).length
+  })()`)
   check('one row for the fixture conversation', present === 1, `rows ${String(present)}`)
   check('its record is in the ledger', (await ledgerFiles('.')).length === 1)
 
@@ -116,7 +121,8 @@ try {
     const confirmLabel = second ? second.innerText : ''
     if (second) second.click()
     await new Promise(r => setTimeout(r, 1200))
-    return JSON.stringify({ ticked: true, bar: true, armedLabel, confirmLabel, rows: ${rowCount} })
+    const rows = [...document.querySelectorAll('.lc-missionrow')].filter(r => /Two independent tasks/.test(r.innerText || '')).length
+    return JSON.stringify({ ticked: true, bar: true, armedLabel, confirmLabel, rows })
   })()`)
   const d = JSON.parse(deleted)
   say(`   ${deleted}`)
@@ -144,8 +150,11 @@ try {
     if (!back) return JSON.stringify({ listed: true, button: false })
     back.click()
     await new Promise(r => setTimeout(r, 1500))
-    ${openMissions}
-    return JSON.stringify({ listed: true, button: true, rows: ${rowCount} })
+    const m = [...document.querySelectorAll('button')].find(b => /^All missions/.test(b.getAttribute('aria-label') || b.getAttribute('title') || ''))
+    if (m) m.click()
+    await new Promise(r => setTimeout(r, 700))
+    const rows = [...document.querySelectorAll('.lc-missionrow')].filter(r => /Two independent tasks/.test(r.innerText || '')).length
+    return JSON.stringify({ listed: true, button: true, rows })
   })()`)
   const r = JSON.parse(restored)
   say(`   ${restored}`)
