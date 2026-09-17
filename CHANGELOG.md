@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.164.0 - 2026-09-17
+
+- **A handoff keeps your effort level too.** The third place the level was
+  dropped on the way to disk: handing a run to another runtime remembered the
+  teammate’s new runtime, model and mode and not the effort. Found by Grok
+  reading source after an unsigned Codex would not start. Fixed.
+
 ## 0.163.0 - 2026-09-16
 
 - **A group’s menu is three items again.** *Group settings…*, *Rename*,

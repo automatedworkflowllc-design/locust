@@ -3332,7 +3332,7 @@ ${taskSection({
           // A person picked this route for this teammate, mid-run; that is
           // as much a choice as starting them on it. The sidebar read the old
           // route while the composer read the new one (seen driving, 2026-09-05).
-          await rememberRoute(ownerId, { runtime, model: model ?? 'account-default', mode })
+          await rememberRoute(ownerId, { runtime, model: model ?? 'account-default', mode, ...(effort === undefined ? {} : { effort }) })
         }
         return response
       } catch {
