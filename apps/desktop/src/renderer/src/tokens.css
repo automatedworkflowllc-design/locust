@@ -429,6 +429,15 @@
    * 1431px window.
    */
   --lc-thread-max-width: clamp(760px, 46vw, 980px);
+  /*
+   * Where one turn ends and the next begins: 22px before a person's message,
+   * against the 12px column gap inside a turn. Named rather than left as a
+   * bare 10px margin, which was the design agent's note on 2026-09-17 -- "the
+   * kind of thing that survives until someone changes --lc-space-5 and the
+   * ratio silently shifts". Expressed as the TOTAL, so the bubble's margin is
+   * derived and a change to the column gap cannot move it.
+   */
+  --lc-thread-turn-gap: 22px;
   --lc-thread-max-width-compact: 700px;
 
   /* --- Interaction ----------------------------------------------------- */

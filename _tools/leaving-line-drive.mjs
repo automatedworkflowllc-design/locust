@@ -121,7 +121,47 @@ try {
     return JSON.stringify({ opened: true, line: null, thread: (document.querySelector('.lc-thread') || { innerText: '' }).innerText.slice(-600) })
   })()`)
   say(`   ${opened.slice(0, 1500)}`)
+  const facts = await cdp.eval(`(() => {
+    const pick = (el) => {
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      const s = getComputedStyle(el)
+      return {
+        cls: (el.className || '').toString().slice(0, 60),
+        top: Math.round(r.top), height: Math.round(r.height),
+        position: s.position, overflow: s.overflow + '/' + s.overflowY,
+        transform: s.transform === 'none' ? 'none' : 'yes',
+        zIndex: s.zIndex, contain: s.contain, isolation: s.isolation
+      }
+    }
+    const bubble = document.querySelector('.lc-thread__column > .lc-bubble') || document.querySelector('.lc-bubble')
+    const chain = []
+    let node = bubble
+    for (let i = 0; node && i < 8; i += 1) { chain.push(pick(node)); node = node.parentElement }
+    return JSON.stringify({
+      chain,
+      header: pick(document.querySelector('.lc-workroom__header')),
+      thread: pick(document.querySelector('.lc-thread')),
+      column: pick(document.querySelector('.lc-thread__column')),
+      bubbleText: (bubble ? bubble.innerText : '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').slice(0, 60)
+    }, null, 1)
+  })()`)
+  say('   FACTS ' + facts)
+  // Is the overlapping text at the top REALLY in the document, or is the
+  // capture compositing a stale frame? `elementFromPoint` answers it.
+  const atTop = await cdp.eval(`(() => {
+    const where = (x, y) => {
+      const el = document.elementFromPoint(x, y)
+      if (!el) return 'nothing'
+      return (el.className || el.tagName).toString().slice(0, 40) + ' :: ' + (el.innerText || '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').slice(0, 40)
+    }
+    return JSON.stringify({ y10: where(640, 10), y40: where(640, 40), y70: where(640, 70), y110: where(640, 110) }, null, 1)
+  })()`)
+  say('   AT TOP ' + atTop)
+  // Settle, then capture twice: a stale composite differs between frames.
+  await sleep(1500)
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
+  await writeFile(new URL('../docs/chain-measure/leaving-line-settled.png', import.meta.url), Buffer.from(shot.result.data, 'base64'))
   const out = new URL('../docs/chain-measure/leaving-line-2026-09-17.png', import.meta.url)
   await writeFile(out, Buffer.from(shot.result.data, 'base64'))
   say(`   screenshot ${out.pathname.slice(1)}`)

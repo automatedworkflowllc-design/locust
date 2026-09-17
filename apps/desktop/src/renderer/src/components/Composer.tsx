@@ -1247,7 +1247,17 @@ export function Composer({
                 <button
                   type="button"
                   className={`lc-control lc-control--boxed${usagePressing ? ' is-pressing' : ''}`}
-                  title={[exactRoute, handoffTitle(handoff), usageSentence]
+                  /*
+                   * Hover said "OpenCode / account-default" while the chip
+                   * itself read "No runtime" -- the label was fixed in pass 2
+                   * and the tooltip was not (outside tester, 0.164.0). What
+                   * the mouse says and what the eye reads are now one thing.
+                   */
+                  title={[
+                    nothingConnected ? 'No runtime on this machine can run a mission yet.' : exactRoute,
+                    handoffTitle(handoff),
+                    usageSentence
+                  ]
                     .filter((part) => part !== undefined && part.length > 0)
                     .join('\n')}
                   onClick={() => {

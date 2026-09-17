@@ -4394,7 +4394,7 @@ export default function App(): ReactElement {
                     />
                   )}
                   <div style={{ minWidth: 0 }}>
-                    <div>
+                    <div className="lc-workroom__titleline">
                       <span className="lc-workroom__name">
                         {missionOwner?.name ?? missionTitle(liveRun.prompt)}
                       </span>

@@ -393,6 +393,40 @@ export function Sidebar({
 
   /** The rail's single `+`, which has to say what it would add. */
   const [addOpen, setAddOpen] = useState(false)
+  /*
+   * A menu closes the way every other menu closes.
+   *
+   * MEASURED by an outside tester on 0.164.0, and it is the first thing a new
+   * user does: press +, then try to get out. Escape did nothing, clicking the
+   * main column did nothing, pressing Home did nothing, and opening Missions,
+   * Rooms, Routines or Settings left the three items sitting over the empty
+   * copy of whatever screen they had reached. The only ways out were choosing
+   * a row or pressing + again. There was a toggle and an onClick per item,
+   * and no handler for any of the three ways a person expects to leave.
+   *
+   * Pointer-down rather than click, so it closes on the press that begins a
+   * click elsewhere, and matched by class rather than a ref because the
+   * anchor is rendered by two branches (rail and full sidebar) and only one
+   * is mounted. The + button is inside the anchor, so its own toggle still
+   * closes the menu rather than fighting this.
+   */
+  useEffect(() => {
+    if (!addOpen) return undefined
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setAddOpen(false)
+    }
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (target instanceof Element && target.closest('.lc-sidebar__add') !== null) return
+      setAddOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [addOpen])
   // Which groups are open. All three start open, which is how the sidebar
   // has always read; folding is for making room, not a new default.
   const [openSections, setOpenSections] = useState({ rooms: true, teammates: true, missions: true, automations: true })

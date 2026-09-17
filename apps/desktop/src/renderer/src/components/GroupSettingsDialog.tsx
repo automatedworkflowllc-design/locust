@@ -84,7 +84,11 @@ export function GroupSettingsDialog({
               aria-label="Standing instructions"
               rows={5}
               maxLength={MAX_GROUP_INSTRUCTIONS}
-              placeholder="Quote sizes in shares. Analysis only; never propose a trade."
+              // This read "Quote sizes in shares. Analysis only; never propose a
+              // trade." -- a leftover from a finance example, and the first
+              // sentence a person reads when they open the new feature in what
+              // is a coding-agent control room (outside tester, 0.164.0).
+              placeholder="Run the tests before calling anything done. Keep changes to the files the task names."
               value={text}
               onChange={(event) => setText(event.target.value)}
             />

@@ -6,6 +6,30 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.174.0 - 2026-09-17
+
+- **A long conversation title no longer paints over the window.** A
+  conversation with no teammate takes its title from your own first line,
+  and that line was drawn in full in a 60px header — 380px of it, across the
+  title bar and over the header beneath. It is one ellipsised line now. The
+  design agent spotted it in a frame; the cause turned out to be the title,
+  not the thread.
+- **The plus menu closes.** Escape closes it, clicking anywhere else closes
+  it, and changing screen closes it. Before this the only ways out were
+  choosing a row or pressing **+** again, so the menu sat over Missions,
+  Rooms, Routines and Settings while you tried to read them.
+- **A disabled Install looks disabled.** OpenCode's Install — the one button
+  the first screen is selling — rendered in full lime while doing nothing,
+  because the primary colour was declared after the disabled colour.
+- **The route chip does not name a route it has not got.** It reads *No
+  runtime*, and hovering it used to say *OpenCode / account-default*.
+- **Group settings asks for the right kind of instruction.** Its placeholder
+  was a finance example; this is a coding-agent control room.
+- **Thread rhythm, to the design agent's numbers:** a boundary note now has
+  24px above it and keeps 12px below, so it reads as attached to the turns
+  it governs and separated from the ones it does not. A turn still opens
+  22px down, now expressed as a named gap rather than a bare 10px.
+
 ## 0.173.0 - 2026-09-17
 
 - **A Copilot teammate can be sent a long brief too.** The command-line
