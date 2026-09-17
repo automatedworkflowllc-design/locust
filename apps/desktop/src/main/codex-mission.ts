@@ -287,6 +287,12 @@ interface CodexMissionServiceOptions {
   /** Connectors a Cursor teammate can call, by name, for its briefing. */
   readonly readyConnectors?: () => Promise<string | undefined>
   /**
+   * Let a Cursor run outside Auto call its connectors: merge an allow rule
+   * per configured server into the workspace's `.cursor/cli.json`. Returns
+   * the rules added this time. See `cursor-connector-allow.ts`.
+   */
+  readonly allowConnectors?: (workspace: string) => Promise<readonly string[]>
+  /**
    * How many missions are live on the OTHER transports right now.
    *
    * The cap is one pool, not one per transport. Each of the three services
@@ -1210,6 +1216,18 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                   sandbox: effectiveSandbox,
                   ...choice
                 })
+        }
+        /*
+         * Outside Auto, Cursor asks before every connector call and a print
+         * run has nobody to answer -- 17 "user rejected" in one Accept-edits
+         * run (Colin's ledger, 2026-09-16). Auto passes `--force` and never
+         * asks. Every other mode gets the answer written down where Cursor
+         * reads it, before the run starts. Best effort: a workspace that
+         * cannot be written leaves the run exactly as it was.
+         */
+        if (runtime === 'cursor' && effectiveSandbox !== 'full-access' && options.allowConnectors !== undefined) {
+          const added = await options.allowConnectors(runCwd).catch(() => [] as readonly string[])
+          if (added.length > 0) options.note?.('connectors-allowed', `${missionId} ${added.join(' ')}`)
         }
         try {
           command = buildCommand(prompt)

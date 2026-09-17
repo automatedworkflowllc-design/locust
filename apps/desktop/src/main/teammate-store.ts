@@ -81,6 +81,7 @@ export const TEAMMATE_ROLES: readonly TeammateRole[] = [
   'Ops & Scheduling',
   'Docs & QA',
   'Data & Reporting',
+  'Chief of Staff',
   'Custom'
 ]
 

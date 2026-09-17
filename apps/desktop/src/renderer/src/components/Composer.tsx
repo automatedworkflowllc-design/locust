@@ -120,8 +120,12 @@ export function connectorsNote(
    * edits hypothetically give you a prompt for the mcp call" -- yes in
    * Cursor's own app, where someone is there to answer; here there is not.
    */
+  // 0.168.0: Locust writes the answer down where Cursor reads it -- an allow
+  // rule per configured server in this workspace's `.cursor/cli.json` -- so
+  // the question is never asked. The sentence says what a person cannot
+  // infer from the mode: the rule is a file in their workspace.
   if (runtime === 'cursor' && mode !== 'auto') {
-    return 'Connector calls are refused in this mode: Cursor asks before each one and nobody is here to answer, so each fails as "user rejected". Use Auto for connector work.'
+    return 'Your connectors work in this mode too: Locust allows each server you configured in this workspace\'s Cursor settings, since nobody is here to answer Cursor\'s per-call prompt. What this mode limits is this machine.'
   }
   if (runtime !== 'claude') {
     if (!hasConnectors) return undefined

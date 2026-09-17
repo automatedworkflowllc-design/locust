@@ -114,6 +114,25 @@ export function forgetCursorConnectorReading(): void {
  * Same cached reading as the notice above, so a run pays for one `mcp list` at
  * most and only once every five minutes.
  */
+/**
+ * Every server the person configured that has a credential, by name -- the
+ * list an allow rule is written for. "needs approval" is NOT excluded: that
+ * is the server approval `--approve-mcps` gives, and the rejected calls in
+ * Colin's ledger were all to a server in exactly that state.
+ */
+export async function cursorConfiguredConnectorNames(
+  lister: McpLister = runCursorMcpList,
+  now: () => number = Date.now
+): Promise<readonly string[]> {
+  try {
+    return parseCursorMcpList(await cachedList(lister, now))
+      .filter((connector) => !connector.needsAuthentication)
+      .map((connector) => connector.name)
+  } catch {
+    return []
+  }
+}
+
 export async function cursorReadyConnectors(
   lister: McpLister = runCursorMcpList,
   now: () => number = Date.now

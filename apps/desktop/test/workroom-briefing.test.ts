@@ -82,8 +82,13 @@ describe('the runtime prompt a teammate is sent', () => {
   it('leaves out messages that do not fit, from the newest end, and counts them as still waiting', () => {
     const big = 'x'.repeat(3_000)
     const inbound = [message(big, 1), message(big, 2), message(big, 3)]
+    // 6,000 rather than 7,000: the standing prefix grew by about 700
+    // characters on 2026-09-17, to 2,215 with two peers (the share form says what a good message is
+    // instead of a length; the last message is told to stand alone), and
+    // that is the budget this test sits at the edge of. The claim is the
+    // same: one fits, the rest wait and are counted.
     const { prompt, delivered } = composeRuntimePrompt({
-      prompt: 'y'.repeat(7_000),
+      prompt: 'y'.repeat(6_000),
       peer: PEER,
       inbound,
       remaining: 1

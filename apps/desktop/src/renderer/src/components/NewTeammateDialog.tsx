@@ -21,6 +21,7 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
   { role: 'Ops & Scheduling', description: 'Routine jobs and reminders' },
   { role: 'Docs & QA', description: 'Written output and checking' },
   { role: 'Data & Reporting', description: 'Spreadsheets, figures, digests' },
+  { role: 'Chief of Staff', description: 'Routes work to the team, reports back' },
   { role: 'Custom', description: 'Describe the work yourself' }
 ]
 

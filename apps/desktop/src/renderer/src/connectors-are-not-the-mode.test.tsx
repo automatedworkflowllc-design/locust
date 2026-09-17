@@ -121,13 +121,16 @@ describe('a route that is not where your connectors live', () => {
     expect(said).toContain('different set')
   })
 
-  it('tells a Cursor route outside Auto that connector calls will be refused, and where they work', () => {
+  it('tells a Cursor route outside Auto that its connectors work, and how', () => {
     // Colin's ledger, 2026-09-15/16: 17 rejected calls in one Accept-edits
-    // run, 0 on Auto. The menu now says so before the run does.
+    // run, 0 on Auto. 0.162.0 said "refused, use Auto"; 0.168.0 writes an
+    // allow rule per server into the workspace's Cursor settings instead, so
+    // the sentence names the file a person would otherwise find by surprise.
     for (const mode of ['accept-edits', 'ask', 'plan'] as const) {
       const said = connectorsNote('cursor', mode, false) ?? ''
-      expect(said).toContain('refused')
-      expect(said).toContain('Use Auto')
+      expect(said).toContain('Your connectors work in this mode too')
+      expect(said).toContain('Cursor settings')
+      expect(said).not.toContain('refused')
     }
     expect(connectorsNote('cursor', 'auto', false)).toBeUndefined()
   })

@@ -1,0 +1,268 @@
+// Chain measure: what two teammates actually WRITE to each other.
+//
+//   node _tools/chain-measure.mjs --label before
+//   node _tools/chain-measure.mjs --label after
+//
+// Runs one real exchange on the FREE OpenCode route -- Wren asks Booty for a
+// fact that lives in a file only Booty will read; Booty answers; Wren's
+// follow-up decides whether to reply -- and writes every share block and every
+// final message, in order, to docs/chain-measure/<label>-<stamp>.md.
+//
+// It asserts nothing about register. It records what was said so the same
+// chain can be read before and after a change to the briefs
+// (`workroom-briefing.ts` share form, `relay.ts` reply brief), which is the
+// only way to know whether a wording change changed what the models wrote.
+// Adapted from _smoke/relay-smoke.mjs; costs nothing (free model).
+
+import '../_tools/scratch-root.mjs'
+
+import { spawn } from 'node:child_process'
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
+const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
+const PORT = 9471
+const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
+const MODEL = 'opencode/muse-spark-1.3-contributor-free'
+const LABEL = process.argv[process.argv.indexOf('--label') + 1] || 'run'
+const TASK = process.argv.includes('--task') ? process.argv[process.argv.indexOf('--task') + 1] : 'fact'
+// `fact`: one answer, one evidence line. `judge`: a verdict that needs a why,
+// evidence, and something for the person to decide -- the shape Colin's real
+// Jimothy/Wembley exchanges have.
+const PROMPTS = {
+  fact: 'Your teammate Booty has this workspace open. Using the share block form, ask Booty to find where this workspace records the share text limit, and to reply with the number, the file path and the line, quoting the sentence it is in. Do not read any files yourself, and do nothing else.',
+  judge: 'Your teammate Booty has this workspace open. I believe the relay hop cap in this app defaults to 6, and I think the notes in this workspace say otherwise. Using the share block form, ask Booty to check the notes and tell you whether they agree with me, with the evidence quoted, so I can decide whether the notes need fixing. Do not read any files yourself, and do nothing else.'
+}
+const PROMPT = PROMPTS[TASK] ?? PROMPTS.fact
+
+const say = (line) => console.error(line)
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+class Cdp {
+  constructor(ws) {
+    this.ws = ws
+    this.id = 0
+    this.pending = new Map()
+    ws.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data)
+      const waiter = this.pending.get(message.id)
+      if (waiter === undefined) return
+      this.pending.delete(message.id)
+      waiter(message)
+    })
+  }
+  send(method, params = {}) {
+    const id = ++this.id
+    this.ws.send(JSON.stringify({ id, method, params }))
+    return new Promise((resolve) => this.pending.set(id, resolve))
+  }
+  async eval(expression) {
+    const reply = await this.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+    if (reply.result?.exceptionDetails) throw new Error(reply.result.exceptionDetails.text + ' ' + JSON.stringify(reply.result.exceptionDetails.exception?.description ?? ''))
+    return reply.result?.result?.value
+  }
+}
+
+const workspace = await mkdtemp(join(tmpdir(), 'locust-chain-'))
+const profile = await mkdtemp(join(tmpdir(), 'locust-chain-profile-'))
+await mkdir(join(workspace, 'notes'), { recursive: true })
+await writeFile(join(workspace, 'README.md'), 'Scratch workspace for a teammate exchange. The project notes are in notes/.\n', 'utf8')
+await writeFile(
+  join(workspace, 'notes', 'limits.md'),
+  [
+    '# Limits',
+    '',
+    'Numbers the app holds and where each one is set.',
+    '',
+    'The share text limit is 1200 characters, set in packages/runtime-adapters/src/peer-share.ts on line 23.',
+    'The runtime prompt limit is 12000 characters, set in apps/desktop/src/main/workroom-briefing.ts on line 27.',
+    'The relay hop cap defaults to 12 automatic replies per exchange.',
+    ''
+  ].join('\n'),
+  'utf8'
+)
+const createdAt = new Date().toISOString()
+const route = { runtime: 'opencode', model: MODEL, mode: 'ask' }
+await writeFile(
+  join(profile, 'teammates.json'),
+  JSON.stringify({
+    schemaVersion: 1,
+    teammates: [
+      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt, route },
+      { teammateId: 'tm_booty', name: 'Booty', hue: 'violet', role: 'Research & Briefs', createdAt, route }
+    ],
+    missionOwners: {},
+    settings: { swarm: false, relay: true, relayHopCap: 6, autoMode: false }
+  })
+)
+const LEDGER_DIR = join(profile, 'mission-ledger')
+
+const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`], {
+  cwd: workspace,
+  env: { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}` },
+  stdio: ['ignore', 'pipe', 'pipe']
+})
+const appOutput = []
+child.stdout.on('data', (d) => appOutput.push(String(d)))
+child.stderr.on('data', (d) => appOutput.push(String(d)))
+
+const ledgers = async () => (await readdir(LEDGER_DIR).catch(() => [])).filter((name) => name.endsWith('.jsonl'))
+
+try {
+  say(`[${LABEL}] 1. app starts; workspace ${workspace}`)
+  let page
+  for (let attempt = 0; attempt < 60 && page === undefined; attempt += 1) {
+    await sleep(500)
+    if (child.exitCode !== null) break
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()
+      page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl && !t.url.includes('#splash'))
+    } catch {
+      // not up yet
+    }
+  }
+  if (page === undefined) {
+    say(appOutput.join(''))
+    throw new Error('no renderer target')
+  }
+  const socket = new WebSocket(page.webSocketDebuggerUrl)
+  await new Promise((resolve, reject) => {
+    socket.addEventListener('open', resolve, { once: true })
+    socket.addEventListener('error', reject, { once: true })
+  })
+  const cdp = new Cdp(socket)
+  await cdp.send('Runtime.enable')
+  const discovered = await cdp.eval(`(async () => {
+    for (let i = 0; i < 240; i += 1) {
+      const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+      if (control && /opencode|cursor|codex|claude/i.test(control.innerText)) return control.innerText
+      await new Promise(r => setTimeout(r, 500))
+    }
+    return ''
+  })()`)
+  say(`   discovery: ${JSON.stringify(discovered)}`)
+
+  say(`[${LABEL}] 2. select Wren; the composer should follow Wren's remembered route`)
+  const setup = await cdp.eval(`(async () => {
+    // The roster lives under the Team view (Ctrl 2); the home view shows faces only.
+    const teamView = [...document.querySelectorAll('button')].find(b => /^Team/.test(b.getAttribute('aria-label') || b.getAttribute('title') || ''))
+    if (teamView) { teamView.click(); await new Promise(r => setTimeout(r, 600)) }
+    let wren
+    for (let attempt = 0; attempt < 40 && !wren; attempt += 1) {
+      wren = [...document.querySelectorAll('button')].find(b => (b.querySelector('.lc-row__name') || { innerText: '' }).innerText.trim().startsWith('Wren'))
+        || [...document.querySelectorAll('button')].find(b => /^(Message )?Wren\\b/.test(b.getAttribute('title') || b.getAttribute('aria-label') || ''))
+      if (!wren) await new Promise(r => setTimeout(r, 250))
+    }
+    if (!wren) return JSON.stringify({
+      wren: false,
+      body: document.body.innerText.replace(/[ \\t\\r\\n]+/g, ' ').slice(0, 600),
+      buttons: [...document.querySelectorAll('button')].map(x => (x.getAttribute('aria-label') || x.getAttribute('title') || x.innerText || '').replace(/[ \\t\\r\\n]+/g, ' ').trim().slice(0, 50)).filter(Boolean).slice(0, 60),
+      team: [...document.querySelectorAll('[class*="lc-team"], [class*="lc-roster"], [class*="lc-row"]')].map(e => e.className).slice(0, 30)
+    })
+    wren.click()
+    await new Promise(r => setTimeout(r, 800))
+    const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+    let text = control ? control.innerText : ''
+    if (!/muse/i.test(text)) {
+      control.click()
+      await new Promise(r => setTimeout(r, 400))
+      let target
+      for (let attempt = 0; attempt < 90 && !target; attempt += 1) {
+        const picker = document.querySelector('.lc-picker')
+        if (!picker) { control.click(); await new Promise(r => setTimeout(r, 500)); continue }
+        const input = picker.querySelector('.lc-picker__input')
+        const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+        setInput.call(input, 'muse spark 1.3')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        await new Promise(r => setTimeout(r, 500))
+        let group = ''
+        for (const node of picker.querySelector('.lc-picker__list').children) {
+          const header = node.querySelector('.lc-picker__group')
+          if (header) group = header.innerText
+          const row = node.querySelector('.lc-picker__row')
+          const label = row ? row.innerText.trim().toLowerCase() : ''
+          if (row && !row.disabled && /opencode/i.test(group) && /muse spark 1\\.3/.test(label) && /free/.test(label)) { target = row; break }
+        }
+        if (!target) await new Promise(r => setTimeout(r, 500))
+      }
+      if (!target) return JSON.stringify({ wren: true, picked: false, text })
+      target.click()
+      await new Promise(r => setTimeout(r, 400))
+      text = control.innerText
+    }
+    return JSON.stringify({ wren: true, picked: true, text, controls: [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/[^a-z0-9 ./-]+/gi, ' ').trim()) })
+  })()`)
+  say(`   ${setup}`)
+  if (!JSON.parse(setup).picked) { say(appOutput.join('').slice(-3000)); throw new Error('route not picked') }
+
+  say(`[${LABEL}] 3. Wren is asked to send Booty the question`)
+  const submitted = await cdp.eval(`(async () => {
+    const field = document.querySelector('form.command-dock textarea')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(field, ${JSON.stringify(PROMPT)})
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    for (let i = 0; i < 120; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      const send = document.querySelector('form.command-dock .send-button')
+      if (send && !send.disabled && send.getAttribute('aria-label') === 'Start mission') { send.click(); return 'clicked' }
+    }
+    return 'send stayed disabled: ' + (field.placeholder || '')
+  })()`)
+  say(`   ${submitted}`)
+  if (submitted !== 'clicked') throw new Error(submitted)
+
+  say(`[${LABEL}] 4. waiting for the exchange to end (no new ledger for 90s and nothing running)`)
+  let names = await ledgers()
+  let quiet = 0
+  for (let i = 0; i < 900 && quiet < 90; i += 1) {
+    await sleep(1000)
+    const now = await ledgers()
+    const running = await cdp.eval(`!!document.querySelector('button[aria-label^="Stop the running"]')`).catch(() => true)
+    if (now.length !== names.length || running) { names = now; quiet = 0 } else quiet += 1
+  }
+  say(`   ledgers: ${names.length}`)
+
+  say(`[${LABEL}] 5. reading what was written`)
+  const missions = []
+  for (const name of names) {
+    const lines = (await readFile(join(LEDGER_DIR, name), 'utf8')).split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l) } catch { return undefined } }).filter(Boolean)
+    const header = lines[0]?.metadata ?? {}
+    const strings = []
+    const walk = (v) => { if (typeof v === 'string') strings.push(v); else if (v && typeof v === 'object') for (const k of Object.keys(v)) walk(v[k]) }
+    for (const line of lines.slice(1)) walk(line)
+    const shares = [...new Set(strings.flatMap((s) => [...s.matchAll(/<locust-share[^>]*>[\s\S]*?<\/locust-share>/g)].map((m) => m[0])))]
+    const longestShare = shares.sort((a, b) => b.length - a.length)[0]
+    // The final answer: the longest string that contains the share (or, with none, the longest message-like string).
+    const finals = strings.filter((s) => s.length > 40 && !s.startsWith('{') && !/^[A-Za-z_]+$/.test(s))
+    const final = (longestShare ? finals.filter((s) => s.includes(longestShare)) : finals).sort((a, b) => b.length - a.length)[0]
+    const terminal = lines.filter((l) => l.kind === 'terminal' || l.type === 'terminal' || l.status).map((l) => l.status ?? l.kind).pop()
+    missions.push({ name, createdAt: header.createdAt, startedBy: header.startedBy, runtime: header.runtime, model: header.model, prompt: header.prompt, shares, final, terminal })
+  }
+  missions.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+  const owners = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8')).missionOwners ?? {}
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+  const out = [`# Chain measure: ${LABEL} (${stamp})`, '', `Model: ${MODEL}. Person's prompt to Wren:`, '', `> ${PROMPT}`, '']
+  missions.forEach((m, i) => {
+    const owner = Object.entries(owners).find(([id]) => m.name.includes(id))?.[1] ?? '?'
+    out.push(`## ${i + 1}. ${owner} — ${m.startedBy ? `relay hop ${m.startedBy.hop}` : 'person-started'} — ${m.runtime}/${m.model}`, '')
+    out.push('**Brief (prompt recorded):**', '', '```', String(m.prompt ?? '').slice(0, 3000), '```', '')
+    out.push(`**Share blocks (${m.shares.length}):**`, '')
+    for (const s of m.shares) out.push('```', s, '```', '')
+    out.push('**Final message:**', '', '```', String(m.final ?? '(none)').slice(-2500), '```', '')
+  })
+  await mkdir(new URL('../docs/chain-measure/', import.meta.url), { recursive: true })
+  const file = new URL(`../docs/chain-measure/${LABEL}-${TASK}-${stamp}.md`, import.meta.url)
+  await writeFile(file, out.join('\n'), 'utf8')
+  say(`   wrote ${file.pathname.slice(1)}`)
+  say(`   missions: ${missions.length}; shares per mission: ${missions.map((m) => m.shares.length).join(',')}`)
+} finally {
+  child.kill()
+  await sleep(500)
+  if (process.argv.includes('--keep')) say(`profile kept at ${profile}`)
+  else {
+    await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+    await rm(workspace, { recursive: true, force: true }).catch(() => undefined)
+  }
+}

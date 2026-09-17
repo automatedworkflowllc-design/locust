@@ -192,14 +192,26 @@ export function relayPrompt(input: {
         ? [
             `${input.sender.name} is a MODEL, not a person, and every reply you send THEM starts another whole mission that costs money.`,
             `But the person who started this conversation reads it, and this is what they were waiting for: say in a line or two what ${input.sender.name}'s reply means for what they asked -- the answer, where it is, what is still open -- and then stop.`,
-            `Do not thank ${input.sender.name} or confirm receipt; write back to them only if the work genuinely needs it.`
+            `Write back to ${input.sender.name} only when the work needs it; thanks and receipts reach nobody.`
           ]
         : [
             `${input.sender.name} is a MODEL, not a person, and every reply you send starts another whole mission that costs money.`,
-            'If their message answers you, or needs nothing from you, END HERE with no share block. Do not thank them, do not confirm receipt, do not summarise what you both agreed -- none of that reaches a person and each one costs a run.'
+            // Said as what a reply IS worth, then the one case that ends it.
+            //
+            // This was a list: "Do not thank them, do not confirm receipt, do
+            // not summarise what you both agreed". Every item was earned by a
+            // measured failure and they worked -- exchanges stopped running to
+            // the cap. But a brief that is mostly "do not" produces a model
+            // writing to avoid mistakes rather than to be understood, which is
+            // the "dumbed down" Colin hears (2026-09-17). Grok Build's rule for
+            // the same reply: "Open with what is true or what to do. Do not
+            // open answers or sections with negations." Same facts, opposite
+            // register; the cure -- the exchange ends, and ending is normal --
+            // is kept, and now named as the good outcome it is.
+            'A reply is worth that only when it moves the work: an answer with its evidence, a decision, or a question they need answered before they can continue. If their message settles things or needs nothing from you, END HERE with no share block -- that is an exchange finishing, and it is the most common good outcome. Thanks, receipts and recaps reach nobody and cost a run each.'
           ]),
-    'Do what it asks if that is within your role and this workspace, using what you actually know; if you cannot help, say so briefly.',
-    `Write back only if that helps finish the work: end with one <locust-share to="${input.sender.name}"> block holding your reply.`,
+    'Do what it asks if that is within your role and this workspace, using what you actually know, and say plainly what is blocked or unverified rather than implying it is done; if you cannot help, say so and why.',
+    `When a reply is needed, end with one <locust-share to="${input.sender.name}"> block holding it, written for a capable colleague who has not seen your turn: lead with the answer, then the evidence by name (paths, numbers, names), then what you need from them, if anything, in complete sentences.`,
     // The one case where waiting is worse than interrupting, said as a rule
     // rather than as a feature -- a model told it has an urgent channel will
     // find reasons to use it.
@@ -216,7 +228,7 @@ export function relayPrompt(input: {
       : noPersonHere(input.sender.name),
     'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
     budgetSentence(input.hop, input.cap),
-    'Do not start unrelated work.'
+    'Stay on what was asked.'
   ].join(' ')
 }
 
@@ -264,10 +276,13 @@ export function budgetSentence(hop: number, cap: number | undefined): string {
  * instruction is still in its prompt, and following it strands the exchange.
  */
 function noPersonHere(sender: string): string {
+  // "nobody is watching this run" was true and licensed machine register: a
+  // writer told nobody is reading writes like nobody is reading. The fact
+  // that matters is where the question came from and where an ask would go.
   return (
-    `There is no person in this exchange to answer you: ${sender} is a teammate, and the question came from them. `
+    `The person is not in this exchange: ${sender} is a teammate, and the question came from them. `
     + `If you need a decision or more context before you can help, ask ${sender} inside that share block. `
-    + 'Do not use a <locust-ask> block here -- it reaches only a person, and nobody is watching this run.'
+    + 'A <locust-ask> block reaches only a person, so here it would strand the exchange.'
   )
 }
 

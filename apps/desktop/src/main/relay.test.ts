@@ -179,13 +179,13 @@ describe('the brief a relayed run is started with', () => {
     const prompt = relayPrompt({ sender: WREN, recipient: BOOTY, hop: 1 })
     expect(prompt).toContain('Wren (Code & Migrations) sent you a message')
     expect(prompt).toContain('<locust-share to="Wren">')
-    expect(prompt).toContain('Do not start unrelated work')
+    expect(prompt).toContain('Stay on what was asked')
   })
 
   it('every hop is told that silence is how an exchange finishes', () => {
     for (const hop of [1, 2, 5]) {
       const prompt = relayPrompt({ sender: BOOTY, recipient: WREN, hop })
-      expect(prompt).toContain('Write back only if that helps finish the work')
+      expect(prompt).toContain('When a reply is needed, end with one')
       expect(prompt).toContain('end with no share block')
     }
     expect(relayPrompt({ sender: BOOTY, recipient: WREN, hop: 2 })).toContain('Booty (Custom) replied to you')
@@ -199,9 +199,9 @@ describe('the brief a relayed run is started with', () => {
     // exchange ended in silence. The teammate who asked is the right
     // recipient, and the share block is how to reach them.
     const prompt = relayPrompt({ sender: WREN, recipient: BOOTY, hop: 1 })
-    expect(prompt).toContain('There is no person in this exchange')
+    expect(prompt).toContain('The person is not in this exchange')
     expect(prompt).toContain('ask Wren inside that share block')
-    expect(prompt).toContain('Do not use a <locust-ask> block here')
+    expect(prompt).toContain('A <locust-ask> block reaches only a person')
   })
 
   it('tells the reply that lands in the person\'s own conversation to say what it means for them', () => {
@@ -211,12 +211,12 @@ describe('the brief a relayed run is started with', () => {
     const prompt = relayPrompt({ sender: BOOTY, recipient: WREN, hop: 2, readByPerson: true })
     expect(prompt).toContain('the person who started this conversation reads it')
     expect(prompt).toContain('say in a line or two what Booty\'s reply means')
-    expect(prompt).not.toContain('none of that reaches a person')
+    expect(prompt).not.toContain('reach nobody and cost a run each')
     expect(prompt).not.toContain('nobody is watching this run')
     expect(prompt).toContain('a <locust-ask> block reaches them here')
     // The peer's side of the same exchange is still nobody's conversation.
     const peer = relayPrompt({ sender: WREN, recipient: BOOTY, hop: 3, readByPerson: false })
-    expect(peer).toContain('none of that reaches a person')
+    expect(peer).toContain('reach nobody and cost a run each')
     // And a first message is never "read by the person", whoever it is for.
     expect(relayPrompt({ sender: WREN, recipient: BOOTY, hop: 1, readByPerson: true })).not.toContain('reads it')
   })
@@ -863,8 +863,23 @@ describe('telling a reply what a reply costs', () => {
   it('names the acknowledgements by name, because those are the ones that happen', () => {
     const said = brief(3)
     expect(said).toContain('END HERE with no share block')
-    expect(said).toContain('Do not thank them')
-    expect(said).toContain('do not confirm receipt')
+    expect(said).toContain('Thanks, receipts and recaps reach nobody')
+  })
+
+  it('says what a reply IS, before what it is not', () => {
+    // Colin, 2026-09-17: "it feels a little dumbed down when agents speak to
+    // each other". The brief was eleven "do not"s across two files; Grok
+    // Build's is "what a good message is", with one anti-pattern list at the
+    // end. Same facts, and the affirmative sentence comes first.
+    const said = brief(2)
+    const worth = said.indexOf('A reply is worth that only when it moves the work')
+    const nots = said.indexOf('Thanks, receipts and recaps')
+    expect(worth).toBeGreaterThan(-1)
+    expect(nots).toBeGreaterThan(worth)
+    expect(said).toContain('written for a capable colleague who has not seen your turn')
+    expect(said).toContain('lead with the answer, then the evidence by name')
+    expect(said).not.toContain('nobody is watching')
+    expect(said).not.toContain('Do not thank')
   })
 })
 
@@ -937,7 +952,7 @@ describe('the reply that lands back in the person\'s conversation', () => {
       [message(BOOTY)]
     )
     expect(starts).toHaveLength(3)
-    expect(starts[2]?.prompt).toContain('none of that reaches a person')
+    expect(starts[2]?.prompt).toContain('reach nobody and cost a run each')
     expect(starts[2]?.prompt).not.toContain('reads it')
   })
 })

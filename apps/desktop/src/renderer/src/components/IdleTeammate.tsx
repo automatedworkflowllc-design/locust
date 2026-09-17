@@ -56,6 +56,11 @@ const STARTERS: Readonly<Record<TeammateRole, readonly string[]>> = {
     'Find every number this codebase reports and say where it comes from.',
     'What would a weekly summary of this project contain?'
   ],
+  'Chief of Staff': [
+    'Look at the team and tell me who should take what in this project.',
+    'Ask each teammate for one thing they would fix first, and bring me the list.',
+    'What is the state of this project? Delegate the reading and report back.'
+  ],
   Custom: [
     'Read this project and tell me what it does.',
     'What is the most surprising thing in this codebase?',
