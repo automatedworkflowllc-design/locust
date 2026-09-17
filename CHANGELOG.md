@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.170.0 - 2026-09-17
+
+- **A Custom role is a brief too.** A teammate you gave your own title
+  ("release manager", "finance bro") is now briefed around that title in
+  the same shape as the presets: do the work that title describes the way
+  a capable colleague with it would, bring what someone in that role would
+  know, and say plainly when an ask falls outside it. A Custom teammate
+  with no title yet gets the shared part alone.
+
 ## 0.169.0 - 2026-09-17
 
 - **An OpenCode teammate can be sent a long brief.** OpenCode took its

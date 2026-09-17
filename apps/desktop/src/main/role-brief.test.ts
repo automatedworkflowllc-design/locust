@@ -23,11 +23,21 @@ const compose = (context: MissionPeerContext): string =>
   composeRuntimePrompt({ prompt: 'Look at the repo.', peer: context, inbound: [], remaining: 0 }).prompt
 
 describe('what a role means to the teammate that has it', () => {
-  it('every preset but Custom has a brief, and Custom has none because the title is the brief', () => {
+  it('every preset has a brief, and so does Custom', () => {
     for (const role of TEAMMATE_ROLES) {
-      if (role === 'Custom') expect(roleBrief(role)).toBeUndefined()
-      else expect(roleBrief(role), role).toMatch(/^Your role is /)
+      expect(roleBrief(role, 'release manager'), role).toMatch(/^Your role is /)
     }
+  })
+
+  it('builds a Custom brief around the title the person typed', () => {
+    // Colin, 2026-09-17: "make sure we have something for if the user picks
+    // a custom role." The title is theirs; the shape is the presets'.
+    const said = roleBrief('Custom', 'release manager') ?? ''
+    expect(said).toContain('Your role is release manager, in the person\'s own words')
+    expect(said).toContain('say plainly when an ask falls outside it')
+    // No title yet: the shared part alone, never "Your role is Custom".
+    expect(roleBrief('Custom', 'Custom')).toContain('Your role is the one the person set you up for')
+    expect(roleBrief('Custom')).not.toContain('Custom')
   })
 
   it('the chief of staff is told to route, to say what was delegated, and to report back in one message', () => {
@@ -50,8 +60,8 @@ describe('what a role means to the teammate that has it', () => {
     expect(ask).toBeGreaterThan(roster)
   })
 
-  it('says nothing about a role for a Custom teammate, or one whose preset is unknown to the brief', () => {
-    expect(compose(peer('Custom', 'release manager'))).not.toContain('Your role is')
+  it('puts the Custom title into the prompt, and says nothing when the preset is unknown', () => {
+    expect(compose(peer('Custom', 'release manager'))).toContain('Your role is release manager')
     expect(compose(peer(undefined, 'Code & Migrations'))).not.toContain('Your role is')
   })
 })

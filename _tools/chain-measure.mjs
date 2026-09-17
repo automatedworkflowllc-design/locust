@@ -39,8 +39,11 @@ const PROMPTS = {
 PROMPTS.cos = 'What is the share text limit recorded in this workspace, and where? I need the number and the file.'
 // 'route': an ask that fits Booty's role (Research & Briefs) and is bigger than one file; Wren is a Chief of Staff.
 PROMPTS.route = 'I need a short written brief, for someone joining tomorrow, on what the limits recorded in this workspace mean for an exchange between two teammates and whether the three of them are consistent with each other. Name the sources.'
+// 'custom': Wren has a Custom role titled 'release manager'; the reply says what it thinks its role is.
+PROMPTS.custom = 'In one line, what is your role on this team, in your own words? Do not read any files and do not use the share block.'
 const PROMPT = PROMPTS[TASK] ?? PROMPTS.fact
-const WREN_ROLE = TASK === 'cos' || TASK === 'route' ? 'Chief of Staff' : 'Code & Migrations'
+const WREN_ROLE = TASK === 'cos' || TASK === 'route' ? 'Chief of Staff' : TASK === 'custom' ? 'Custom' : 'Code & Migrations'
+const WREN_TITLE = TASK === 'custom' ? { roleTitle: 'release manager' } : {}
 
 const say = (line) => console.error(line)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -95,7 +98,7 @@ await writeFile(
   JSON.stringify({
     schemaVersion: 1,
     teammates: [
-      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: WREN_ROLE, createdAt, route },
+      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: WREN_ROLE, ...WREN_TITLE, createdAt, route },
       { teammateId: 'tm_booty', name: 'Booty', hue: 'violet', role: 'Research & Briefs', createdAt, route }
     ],
     missionOwners: {},

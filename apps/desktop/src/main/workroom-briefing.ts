@@ -198,7 +198,7 @@ function askSection(): string {
  * the person's asks to the teammate whose role fits and report the result
  * back as one message. A Custom teammate's own title is its brief.
  */
-export function roleBrief(kind: TeammateRole): string | undefined {
+export function roleBrief(kind: TeammateRole, label?: string): string | undefined {
   switch (kind) {
     case 'Code & Migrations':
       return 'Your role is code: read before you change, keep the change to what was asked, run what proves it, and report what you verified and what you did not.'
@@ -215,13 +215,21 @@ export function roleBrief(kind: TeammateRole): string | undefined {
         'Your role is to run the team, not to do all of the work yourself. When the person asks for something a teammate\'s role fits, brief that teammate through the share block the way you would brief a senior colleague: what is needed and why, what you already know, the end state and what done looks like. Tell the person what you delegated and to whom. When a reply comes back, report the result to the person as one message that stands on its own: the answer, what is still open, and what you would do next. Do the work yourself only when no teammate\'s role fits or the brief would take longer than the task.'
       )
     case 'Custom':
-      return undefined
+      // Colin, 2026-09-17: "make sure we have something for if the user
+      // picks a custom role." The person's own title is the role, so the
+      // brief is built around it in the same shape as the presets: what
+      // good work in it looks like, and the one thing every role shares --
+      // say when an ask falls outside it rather than stretching to cover.
+      // A Custom teammate with no title yet gets the shared part alone.
+      return label === undefined || label.trim().length === 0 || label === 'Custom'
+        ? 'Your role is the one the person set you up for: do what is asked the way a capable colleague would, and say plainly when an ask falls outside what you can do here rather than stretching to cover it.'
+        : `Your role is ${label.trim()}, in the person's own words: do the work that title describes the way a capable colleague with it would, bring what someone in that role would know, and say plainly when an ask falls outside it rather than stretching to cover it.`
   }
 }
 
 function roleSection(self: PeerRosterEntry): string | undefined {
   if (self.kind === undefined) return undefined
-  return roleBrief(self.kind)
+  return roleBrief(self.kind, self.role)
 }
 
 /**
