@@ -1097,6 +1097,8 @@ if (!ownsSingleInstanceLock) {
       workspacePath,
       permissionHost,
       approvals,
+      // A ledger write that fails mid-run names its reason in locust-errors.log.
+      note,
       // Every Codex mode rides `codex app-server`, because `codex exec --json`
       // never streams an agent message -- measured 2026-09-10, the whole reply
       // arrives as one `item.completed`. Called lazily for the same reason

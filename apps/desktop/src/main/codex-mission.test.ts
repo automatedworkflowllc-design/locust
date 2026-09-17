@@ -619,6 +619,11 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     expect(aborted).toBe(true)
     expect(timeline).toEqual(['append:run.started', 'emit:run.started', 'emit:persistence-error'])
     expect(updates.filter((update) => update.kind === 'persistence-error')).toHaveLength(1)
+    // The card says WHY. It used to say only that the ledger could not be
+    // written, and nothing on the machine kept the error (Wembley's run,
+    // 2026-09-17, cause unrecoverable).
+    const failed = updates.find((update) => update.kind === 'persistence-error')
+    expect(failed?.kind === 'persistence-error' ? failed.error.message : '').toContain('disk full')
     // The service is free again as soon as the renderer hears about the failure.
     await expect(service.start('Try again.', 'codex', 'ask', {}, () => undefined)).resolves.toMatchObject({ ok: true })
   })

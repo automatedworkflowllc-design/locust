@@ -236,6 +236,15 @@ interface CodexMissionServiceOptions {
     args: readonly string[]
   ) => AppServerRunProcess
   readonly ledger: MissionLedger
+  /**
+   * Where the host writes a line nobody sees on screen. A ledger write
+   * that fails mid-run used to be reported as a card that named no cause
+   * and logged nowhere, so the one fact that would explain it -- EBUSY,
+   * ENOSPC, a directory in the file's place -- was gone with the run.
+   * Colin, 2026-09-17: "wembley never replied and his run showed an
+   * error when i checked on it". Nothing on the machine could say why.
+   */
+  readonly note?: (label: string, detail: string) => void
   /** The teammate channel. Optional: a service without one runs missions that belong to nobody. */
   readonly workroom?: Workroom
   /** What the team remembers, briefed to every teammate mission. */
@@ -335,14 +344,27 @@ function error(
   return { ok: false, error: { code, message } }
 }
 
-function persistenceFailure(active: ActiveCodexMission): void {
+/** What went wrong, in the error's own words, bounded so a card stays a card. */
+function reasonOf(error: unknown): string | undefined {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : undefined
+  const clean = message?.replace(/\s+/g, ' ').trim()
+  return clean === undefined || clean.length === 0 ? undefined : clean.slice(0, 240)
+}
+
+function persistenceFailure(active: ActiveCodexMission, reason?: string): void {
   safelyEmit(active, {
     kind: 'persistence-error',
     runId: active.runId,
     missionId: active.missionId,
     error: {
       code: 'MISSION_PERSISTENCE_FAILED',
-      message: 'The mission could not be written to the durable local ledger.'
+      // The reason rides in the sentence: the card's own wording appends
+      // "Locust stopped the run rather than continue without a durable
+      // record" to whatever is said here.
+      message:
+        reason === undefined
+          ? 'The mission could not be written to the durable local ledger.'
+          : `The mission could not be written to the durable local ledger: ${reason}.`
     }
   })
 }
@@ -552,6 +574,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
   const consume = async (mission: ActiveCodexMission): Promise<void> => {
     let persistenceFailed = false
+    let persistenceReason: string | undefined
     try {
       for await (const record of mission.process.records) {
         try {
@@ -570,10 +593,40 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ? mission.process.records.drainAvailable()
             : []
           const batch = [record, ...buffered]
-          const events = batch.flatMap((entry) => [...mission.normalizer.accept(entry)])
-          await persistAndEmit(mission, options.ledger, events)
-          await explainADeniedRead(mission, events)
-        } catch {
+          /*
+           * THREE different failures used to share one catch, and the card
+           * blamed the ledger for all of them. The adapter throwing on a
+           * record it cannot read, the ledger refusing the append, and the
+           * denied-read explainer failing are told apart here; only the
+           * middle one is a persistence failure, and it now says why.
+           */
+          let events: ReturnType<CodexEventNormalizer['accept']>
+          try {
+            events = batch.flatMap((entry) => [...mission.normalizer.accept(entry)])
+          } catch (error) {
+            const reason = reasonOf(error) ?? 'the adapter threw'
+            options.note?.('adapter-failed', `${mission.missionId} ${mission.runtime}: ${reason}`)
+            persistenceFailed = true
+            persistenceReason = `the ${mission.runtime} adapter could not read a record from the runtime (${reason})`
+            mission.controller.abort()
+            break
+          }
+          try {
+            await persistAndEmit(mission, options.ledger, events)
+          } catch (error) {
+            persistenceReason = reasonOf(error)
+            options.note?.('ledger-write-failed', `${mission.missionId}: ${persistenceReason ?? 'no message'}`)
+            persistenceFailed = true
+            mission.controller.abort()
+            break
+          }
+          // Best effort, after the durable write: a failure here must not be
+          // reported as the ledger's.
+          await explainADeniedRead(mission, events).catch(() => undefined)
+        } catch (error) {
+          // Anything else that escapes the two guarded steps above: still a
+          // stop, still with whatever reason the error carries.
+          persistenceReason = reasonOf(error)
           persistenceFailed = true
           mission.controller.abort()
           break
@@ -593,7 +646,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // Emit only after the aborted process has fully terminated so the
         // renderer's failed state and the service's availability agree: a
         // retry submitted after this update never hits RUN_ALREADY_ACTIVE.
-        persistenceFailure(mission)
+        persistenceFailure(mission, persistenceReason)
         clearActive(mission)
       }
       return

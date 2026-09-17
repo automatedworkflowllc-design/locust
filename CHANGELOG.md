@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.167.0 - 2026-09-17
+
+- **When a run stops because the ledger could not be written, the card says
+  why — and the reason is kept.** Wembley’s run stopped this morning with that
+  card and nothing on the machine could say what had failed: the error was
+  caught and dropped. Three different failures also shared that one card —
+  the ledger refusing a write, the runtime adapter choking on a record, and
+  a follow-up write — and all three were blamed on the ledger. They are told
+  apart now, the card carries the error’s own words, and
+  `locust-errors.log` gets a line.
+
 ## 0.166.0 - 2026-09-17
 
 - **A thought is one line.** *Thought for 12s*, with a thought-bubble beside
