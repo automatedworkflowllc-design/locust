@@ -34,7 +34,26 @@ import type { RuntimeCommandSpec } from '@teammate/runtime-adapters'
  * refusing at 8190 and failing at 8192.
  */
 export const WINDOWS_COMMAND_LINE_LIMIT = 8_191
+/**
+ * The ceiling WITHOUT cmd.exe: Windows' own CreateProcess limit.
+ *
+ * The 8,191 figure is cmd.exe's, and the locator resolves an npm shim PAST
+ * cmd.exe to node and the script it wraps (path-locator.ts, measured
+ * 2026-09-05). So a Copilot launched that way never sees 8,191 -- but this
+ * check refused it anyway, and on 2026-09-17 it refused the last hop of the
+ * first Chief of Staff exchange at about 7,500 characters: the report to
+ * the person never ran, for a ceiling the launch was not under. MEASURED the
+ * same day, Copilot under node directly with a 9,228-character prompt:
+ * exit 0, the answer present, one premium request. The cmd.exe figure
+ * stays for a launch that really goes through cmd.exe.
+ */
+export const WINDOWS_PROCESS_LIMIT = 32_767
 const QUOTING_RESERVE = 1_000
+
+/** Whether the launch goes through cmd.exe, where the smaller ceiling applies. */
+function throughCmd(spec: RuntimeCommandSpec): boolean {
+  return /(^|[\\/])cmd\.exe$/i.test(spec.executablePath)
+}
 
 /** How long the line will be once the arguments are joined, roughly. */
 export function commandLineLength(spec: RuntimeCommandSpec): number {
@@ -51,9 +70,10 @@ export function commandLineLength(spec: RuntimeCommandSpec): number {
 export function commandTooLong(spec: RuntimeCommandSpec): string | undefined {
   if (spec.stdin !== 'none') return undefined
   const length = commandLineLength(spec)
-  if (length + QUOTING_RESERVE <= WINDOWS_COMMAND_LINE_LIMIT) return undefined
+  const limit = throughCmd(spec) ? WINDOWS_COMMAND_LINE_LIMIT : WINDOWS_PROCESS_LIMIT
+  if (length + QUOTING_RESERVE <= limit) return undefined
   return (
-    `This runtime takes the whole request on the command line, and Windows stops at ${String(WINDOWS_COMMAND_LINE_LIMIT)} characters. `
+    `This runtime takes the whole request on the command line, and Windows stops at ${String(limit)} characters. `
     + `This one came to about ${String(length)}. Shorten the request, or use a runtime that reads it from input — Codex CLI and Claude Code both do.`
   )
 }

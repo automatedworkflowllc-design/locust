@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { RuntimeCommandSpec } from '@teammate/runtime-adapters'
-import { commandTooLong, WINDOWS_COMMAND_LINE_LIMIT } from './command-length.js'
+import { commandTooLong, WINDOWS_COMMAND_LINE_LIMIT, WINDOWS_PROCESS_LIMIT } from './command-length.js'
 
 const spec = (prompt: string, stdin: 'prompt' | 'none'): RuntimeCommandSpec =>
   ({
@@ -28,6 +28,23 @@ describe('a command that will not fit on a Windows command line', () => {
     const refusal = commandTooLong(spec('x'.repeat(9_000), 'none'))
     expect(refusal).toContain(String(WINDOWS_COMMAND_LINE_LIMIT))
     expect(refusal).toContain('Codex CLI and Claude Code')
+  })
+
+  it('applies the small ceiling only to a launch that goes through cmd.exe', () => {
+    // The locator resolves an npm shim past cmd.exe to node and the script.
+    // MEASURED 2026-09-17: Copilot under node with a 9,228-character prompt
+    // ran fine (exit 0, one premium request). The same prompt through
+    // cmd.exe was measured failing on 2026-09-05. The check follows the
+    // launch, not the runtime.
+    const underNode = (prompt: string): RuntimeCommandSpec =>
+      ({ ...spec(prompt, 'none'), executablePath: 'C:\\Program Files\\nodejs\\node.exe', args: ['C:\\npm\\node_modules\\@github\\copilot\\npm-loader.js', '-p', prompt, '--output-format', 'json'] }) as RuntimeCommandSpec
+    expect(commandTooLong(underNode('x'.repeat(9_000)))).toBeUndefined()
+    expect(commandTooLong(underNode('x'.repeat(20_000)))).toBeUndefined()
+    // Windows' own limit still holds.
+    const refusal = commandTooLong(underNode('x'.repeat(33_000)))
+    expect(refusal).toContain(String(WINDOWS_PROCESS_LIMIT))
+    // And through cmd.exe the old number is the right one.
+    expect(commandTooLong(spec('x'.repeat(9_000), 'none'))).toContain(String(WINDOWS_COMMAND_LINE_LIMIT))
   })
 
   it('never limits a runtime that reads the prompt from input', () => {

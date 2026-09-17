@@ -6,6 +6,30 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.173.0 - 2026-09-17
+
+- **A Copilot teammate can be sent a long brief too.** The command-line
+  ceiling Locust refused at, 8,191 characters, is cmd.exe’s — and Locust
+  has launched Copilot past cmd.exe, through node directly, since 0.21.
+  Measured: Copilot under node took a 9,228-character prompt and answered.
+  The check now follows the launch: the small ceiling only where a run
+  really goes through cmd.exe, Windows’ own 32,767 otherwise.
+- **A Cursor teammate can be written to on Windows even when the reply
+  would have been read-only.** A teammate on Auto lends *Ask* to a
+  teammate that has never run, and Cursor Agent cannot be held read-only on
+  Windows — so the reply was refused before it started and the exchange
+  died at the first hop, with the reason said only on screen. The relay now
+  lends *Accept edits* in that case and the thread says why.
+- **Measured on your own models.** The same two exchanges that were measured
+  on the free model were run on Cursor Grok 4.6 Low: the request carried
+  the context, the purpose and what a good answer looks like; the reply
+  quoted its evidence and said what was unverified; the chief of staff
+  delegated a newcomer's brief with an end state and "do not invent
+  limits", and reported back with Answer, Sources and Still open.
+- **Measured on Claude Code, live:** a key a teammate repeats is scrubbed
+  from the ledger — the raw value never lands, the answer reads
+  *[redacted]*.
+
 ## 0.172.0 - 2026-09-17
 
 - **Team memory is a file a teammate can read, not only a list it is

@@ -11,6 +11,7 @@ import {
   killProcessTree,
   createNodeRuntimeProcessRunner,
   createPathExecutableLocator,
+  cursorCanEnforceReadOnly,
   discoverInstalledRuntimes
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
@@ -1574,6 +1575,7 @@ if (!ownsSingleInstanceLock) {
       enabled: async () => (await teammates.readSettings()).relay === true,
       hopCap: async () => (await teammates.readSettings()).relayHopCap,
       peerContextFor,
+      cursorHoldsReadOnly: () => cursorCanEnforceReadOnly(process.platform),
       start: async (input) => {
         if (input.runtime === 'antigravity') {
           try {

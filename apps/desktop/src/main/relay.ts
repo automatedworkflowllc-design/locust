@@ -40,7 +40,9 @@ import { runtimeDisplayName } from '../shared/runtimes.js'
  *     the route a person last started them on. Grok answers as Grok, Fable
  *     as Fable; a teammate who has never run yet borrows the sender's route,
  *     and the thread says so. A route that cannot start is refused, not
- *     widened.
+ *     widened -- with one exception, said in the thread: Cursor lent `ask`
+ *     on a machine that cannot hold it read-only runs as Accept edits,
+ *     because `ask` there is a start the mission service refuses outright.
  *
  * Nothing about the record changes. A relayed run is an ordinary mission,
  * owned by the recipient, whose prompt is the host's brief; the messages it
@@ -191,7 +193,7 @@ export function relayPrompt(input: {
       : readByPerson
         ? [
             `${input.sender.name} is a MODEL, not a person, and every reply you send THEM starts another whole mission that costs money.`,
-            `But the person who started this conversation reads it, and this is what they were waiting for: say in a line or two what ${input.sender.name}'s reply means for what they asked -- the answer, where it is, what is still open -- and then stop.`,
+            `But the person who started this conversation reads it, and this is what they were waiting for: say in a line or two what ${input.sender.name}'s reply means for what they asked -- the answer, where it is, what is still open -- written to them, not about what you are going to write -- and then stop.`,
             `Write back to ${input.sender.name} only when the work needs it; thanks and receipts reach nobody.`
           ]
         : [
@@ -302,6 +304,15 @@ export interface RelayOptions {
   /** The autonomy budget for one exchange, read when a share is decided. Absent means the default. */
   readonly hopCap?: () => Promise<number>
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
+  /**
+   * Whether Cursor Agent can be held read-only on this machine. Absent
+   * reads as yes. On Windows it cannot (its sandbox needs macOS or Linux),
+   * and a relayed start in `ask` there is refused by the mission service --
+   * measured 2026-09-17: "Booty could not reply on their own: Cursor Agent
+   * cannot be held read-only on this system." A reply that can only run as
+   * Accept edits runs as Accept edits, and the thread says so.
+   */
+  readonly cursorHoldsReadOnly?: () => boolean
   readonly start: (input: {
     readonly prompt: string
     readonly runtime: MissionRuntimeId
@@ -539,10 +550,23 @@ export function createRelay(options: RelayOptions): Relay {
     // and the notice below now says which mode was lent, because a person
     // whose sender could edit anything and whose reply could not write at
     // all had no way to find out why (QA, 2026-09-06).
-    const route = own ?? {
+    const lent = own ?? {
       runtime: from.runtime,
       model: from.model ?? 'account-default',
       mode: from.sandbox === 'workspace-write' ? ('accept-edits' as const) : ('ask' as const)
+    }
+    // Cursor on a machine that cannot hold it read-only: the mission service
+    // refuses `ask` and `plan` outright, so a reply lent either would never
+    // run. Accept edits is the least it can be started as, said below.
+    const cursorWidened =
+      lent.runtime === 'cursor'
+      && (lent.mode === 'ask' || lent.mode === 'plan')
+      && options.cursorHoldsReadOnly?.() === false
+    const route = cursorWidened ? { ...lent, mode: 'accept-edits' as const } : lent
+    if (cursorWidened) {
+      input.notice(
+        `${recipient.self.name} replies in Accept edits rather than read-only: Cursor Agent cannot be held read-only on this system.`
+      )
     }
     if (own === undefined) {
       input.notice(

@@ -57,6 +57,8 @@ function harness(options: {
   mayInterrupt?: boolean
   /** Whether there was anything to stop. */
   stopWorks?: boolean
+  /** Whether Cursor can be held read-only here; absent reads as yes, the way the relay reads it. */
+  cursorHoldsReadOnly?: boolean
 } = {}) {
   const starts: Parameters<RelayOptions['start']>[0][] = []
   const owners: [string, string][] = []
@@ -66,6 +68,7 @@ function harness(options: {
   const kept: { missionId: string; message: string }[] = []
   let enabled = options.enabled ?? true
   const relay = createRelay({
+    ...(options.cursorHoldsReadOnly === undefined ? {} : { cursorHoldsReadOnly: () => options.cursorHoldsReadOnly === true }),
     enabled: async () => enabled,
     note: async (input: { missionId: string; message: string }) => {
       kept.push(input)
@@ -328,6 +331,26 @@ describe('relaying a share', () => {
     expect(starts[0]).toMatchObject({ mode: 'ask' })
     const said = notices.find((update) => update.kind === 'relay-notice')
     expect(said?.kind === 'relay-notice' ? said.message : '').toContain('read-only')
+  })
+
+  it('lends Accept edits to a Cursor recipient where read-only cannot be held, and says so', async () => {
+    // MEASURED 2026-09-17 on Windows: a relayed start in `ask` on Cursor is
+    // refused by the mission service ("cannot be held read-only on this
+    // system"), so the reply never ran and the exchange died at hop 1. A
+    // sender on Auto lends `ask`; on this platform that is a reply that
+    // cannot start. Accept edits is the least it can run as.
+    const { relay, starts, notices } = harness({ booty: newBootyPeer, cursorHoldsReadOnly: false })
+    await relay.onShared(sharing({ sandbox: 'full-access' }), [message(BOOTY)])
+    expect(starts[0]).toMatchObject({ runtime: 'cursor', mode: 'accept-edits' })
+    const said = notices.filter((update) => update.kind === 'relay-notice').map((update) => (update.kind === 'relay-notice' ? update.message : ''))
+    expect(said.some((line) => line.includes('replies in Accept edits rather than read-only: Cursor Agent cannot be held read-only'))).toBe(true)
+    // A remembered Cursor route in ask is widened the same way; a Codex one is not.
+    const remembered = harness({ booty: { ...newBootyPeer, self: { ...newBootyPeer.self, route: { runtime: 'cursor', model: 'composer-2.5', mode: 'ask' } } }, cursorHoldsReadOnly: false })
+    await remembered.relay.onShared(sharing(), [message(BOOTY)])
+    expect(remembered.starts[0]).toMatchObject({ runtime: 'cursor', mode: 'accept-edits' })
+    const codex = harness({ booty: { ...newBootyPeer, self: { ...newBootyPeer.self, route: { runtime: 'codex', model: 'account-default', mode: 'ask' } } }, cursorHoldsReadOnly: false })
+    await codex.relay.onShared(sharing(), [message(BOOTY)])
+    expect(codex.starts[0]).toMatchObject({ runtime: 'codex', mode: 'ask' })
   })
 
   it('a read-only sender gets a read-only reply when the recipient has no route', async () => {

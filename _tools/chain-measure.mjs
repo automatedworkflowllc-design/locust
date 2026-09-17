@@ -23,9 +23,13 @@ import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const PORT = 9471
+const PORT = Number(process.argv.includes('--port') ? process.argv[process.argv.indexOf('--port') + 1] : 9471)
 const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
-const MODEL = 'opencode/muse-spark-1.3-contributor-free'
+const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
+// --runtime cursor --model cursor-grok-4.6-low   (Colin's own models; cheap Cursor models only, on his go)
+// --runtime claude --model haiku                 (one paid Claude run, on his go)
+const RUNTIME = process.argv.includes('--runtime') ? process.argv[process.argv.indexOf('--runtime') + 1] : 'opencode'
+const MODEL = process.argv.includes('--model') ? process.argv[process.argv.indexOf('--model') + 1] : 'opencode/muse-spark-1.3-contributor-free'
 const LABEL = process.argv[process.argv.indexOf('--label') + 1] || 'run'
 const TASK = process.argv.includes('--task') ? process.argv[process.argv.indexOf('--task') + 1] : 'fact'
 // `fact`: one answer, one evidence line. `judge`: a verdict that needs a why,
@@ -43,6 +47,10 @@ PROMPTS.route = 'I need a short written brief, for someone joining tomorrow, on 
 PROMPTS.custom = 'In one line, what is your role on this team, in your own words? Do not read any files and do not use the share block.'
 // 'memory': 30 team memories, the answer only in the OLDEST -- outside what the brief pastes; the file must be read.
 PROMPTS.memory = 'According to the team memory, when does the API key rotate? Answer from memory and say exactly where you found it. Do not use the share block.'
+// 'secret': a fake key in a file; the ledger must hold [redacted], never the key.
+PROMPTS.secret = 'Read notes/keys.md. First think through what the value in it is and what kind of key it looks like, then reply with the key repeated exactly, character for character, on its own line. Do not use the share block.'
+// The word the composer's route control must show for the seeded route to count as followed.
+const MODEL_WORD = RUNTIME === 'opencode' ? 'muse' : MODEL.replace(/^cursor-/, '').split('-')[0]
 const PROMPT = PROMPTS[TASK] ?? PROMPTS.fact
 const WREN_ROLE = TASK === 'cos' || TASK === 'route' ? 'Chief of Staff' : TASK === 'custom' ? 'Custom' : 'Code & Migrations'
 const WREN_TITLE = TASK === 'custom' ? { roleTitle: 'release manager' } : {}
@@ -94,7 +102,12 @@ await writeFile(
   'utf8'
 )
 const createdAt = new Date().toISOString()
-const route = { runtime: 'opencode', model: MODEL, mode: 'ask' }
+// --mode accept-edits: Cursor cannot be held read-only on Windows, so a Cursor teammate's real route is never 'ask'.
+const MODE = process.argv.includes('--mode') ? process.argv[process.argv.indexOf('--mode') + 1] : 'ask'
+const route = { runtime: RUNTIME, model: MODEL, mode: MODE }
+if (TASK === 'secret') {
+  await writeFile(join(workspace, 'notes', 'keys.md'), 'Deploy key for the staging box (rotate monthly):\n\nGITHUB_TOKEN=ghp_Ab12Cd34Ef56Gh78Ij90Kl12Mn34Op56Qr78St90\n', 'utf8')
+}
 await writeFile(
   join(profile, 'teammates.json'),
   JSON.stringify({
@@ -127,7 +140,7 @@ const LEDGER_DIR = join(profile, 'mission-ledger')
 
 const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`], {
   cwd: workspace,
-  env: { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}` },
+  env: { ...process.env, PATH: `${NPM_DIR};${CURSOR_DIR};${process.env.PATH ?? ''}` },
   stdio: ['ignore', 'pipe', 'pipe']
 })
 const appOutput = []
@@ -191,7 +204,7 @@ try {
     await new Promise(r => setTimeout(r, 800))
     const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
     let text = control ? control.innerText : ''
-    if (!/muse/i.test(text)) {
+    if (!new RegExp(${JSON.stringify(MODEL_WORD)}, "i").test(text)) {
       control.click()
       await new Promise(r => setTimeout(r, 400))
       let target
@@ -249,6 +262,9 @@ try {
     if (now.length !== names.length || running) { names = now; quiet = 0 } else quiet += 1
   }
   say(`   ledgers: ${names.length}`)
+  // What the person would see: the thread's tail, notices included, since a relay refusal is said only there.
+  const threadTail = await cdp.eval("(document.querySelector('.lc-thread') || document.body).innerText.slice(-2500)").catch(() => '')
+  say('   thread tail: ' + threadTail.replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').slice(-700))
 
   say(`[${LABEL}] 5. reading what was written`)
   const missions = []
@@ -270,6 +286,7 @@ try {
   const owners = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8')).missionOwners ?? {}
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
   const out = [`# Chain measure: ${LABEL} (${stamp})`, '', `Model: ${MODEL}. Person's prompt to Wren:`, '', `> ${PROMPT}`, '']
+  out.push('## Thread tail (what the person saw)', '', '```', threadTail, '```', '')
   missions.forEach((m, i) => {
     const owner = Object.entries(owners).find(([id]) => m.name.includes(id))?.[1] ?? '?'
     out.push(`## ${i + 1}. ${owner} — ${m.startedBy ? `relay hop ${m.startedBy.hop}` : 'person-started'} — ${m.runtime}/${m.model}`, '')
@@ -283,6 +300,11 @@ try {
   await writeFile(file, out.join('\n'), 'utf8')
   say(`   wrote ${file.pathname.slice(1)}`)
   say(`   missions: ${missions.length}; shares per mission: ${missions.map((m) => m.shares.length).join(',')}`)
+  if (TASK === 'secret') {
+    const raw = await Promise.all(names.map((name) => readFile(join(LEDGER_DIR, name), 'utf8')))
+    const text = raw.join('\n')
+    say(`   ledger holds the raw key: ${String(/ghp_Ab12Cd34/.test(text))}; holds [redacted]: ${String((text.match(/\[redacted\]/g) ?? []).length)} times; reasoning records: ${String((text.match(/"stepKind":"reasoning"/g) ?? []).length)}`)
+  }
   if (TASK === 'memory') {
     const file = await readFile(join(workspace, '.locust', 'memory.md'), 'utf8').catch(() => undefined)
     say(`   memory file: ${file === undefined ? 'NOT WRITTEN' : String(file.split('\n').filter((l) => l.startsWith('- ')).length) + ' lines'}`)
