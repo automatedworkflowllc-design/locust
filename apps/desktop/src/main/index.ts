@@ -56,6 +56,7 @@ import type { AttentionReader } from './attention-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import { memorySection } from '../shared/memory.js'
+import { writeMemoryFile } from './memory-file.js'
 
 /** Scheduled routines are checked once a minute; the first check waits for runtime discovery. */
 const ROUTINE_TICK_MS = 60_000
@@ -1008,7 +1009,18 @@ if (!ownsSingleInstanceLock) {
     async function memoryPart(peer: MissionPeerContext): Promise<string> {
         const settings = await teammates.readSettings()
         const listed = await memories.briefed(memoryWorkspaceId)
+        const lines = listed.map((memory) => ({
+          text: memory.text,
+          scope: memory.scope,
+          by: memory.by.name,
+          where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
+          at: memory.createdAt
+        }))
+        // The whole list as a file where the run stands, so the brief can
+        // paste the newest few and the teammate can read the rest itself.
+        const file = await writeMemoryFile(peer.cwd ?? workspacePath, lines, new Date()).catch(() => undefined)
         return memorySection({
+          ...(file === undefined ? {} : { file }),
           selfName: peer.self.name,
           // Undefined for a worktree teammate, for the same reason the brief
           // above stopped naming it: memory's own line said "what is

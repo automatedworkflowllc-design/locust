@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.172.0 - 2026-09-17
+
+- **Team memory is a file a teammate can read, not only a list it is
+  handed.** The brief pasted up to 24 memories on every turn and told the
+  teammate the rest existed; on a folder with 33 memories that was 20 pasted
+  and 13 invisible, every time. Now Locust writes the whole list to
+  `.locust/memory.md` in the workspace before each run (kept out of git
+  through `.git/info/exclude`, rewritten only when it changes), pastes the
+  newest eight, and tells the teammate to read the file when the task
+  touches something remembered. Measured on the free model: with 30
+  memories and the answer only in the oldest, the teammate read the file and
+  answered from it, naming the file. The memory block is still the only way
+  memory changes; the file says so at the top.
+
 ## 0.171.0 - 2026-09-17
 
 - **The thread says where a group’s instructions stopped.** Move a

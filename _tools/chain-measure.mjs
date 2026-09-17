@@ -41,6 +41,8 @@ PROMPTS.cos = 'What is the share text limit recorded in this workspace, and wher
 PROMPTS.route = 'I need a short written brief, for someone joining tomorrow, on what the limits recorded in this workspace mean for an exchange between two teammates and whether the three of them are consistent with each other. Name the sources.'
 // 'custom': Wren has a Custom role titled 'release manager'; the reply says what it thinks its role is.
 PROMPTS.custom = 'In one line, what is your role on this team, in your own words? Do not read any files and do not use the share block.'
+// 'memory': 30 team memories, the answer only in the OLDEST -- outside what the brief pastes; the file must be read.
+PROMPTS.memory = 'According to the team memory, when does the API key rotate? Answer from memory and say exactly where you found it. Do not use the share block.'
 const PROMPT = PROMPTS[TASK] ?? PROMPTS.fact
 const WREN_ROLE = TASK === 'cos' || TASK === 'route' ? 'Chief of Staff' : TASK === 'custom' ? 'Custom' : 'Code & Migrations'
 const WREN_TITLE = TASK === 'custom' ? { roleTitle: 'release manager' } : {}
@@ -105,6 +107,22 @@ await writeFile(
     settings: { swarm: false, relay: true, relayHopCap: 6, autoMode: false }
   })
 )
+if (TASK === 'memory') {
+  const memories = Array.from({ length: 30 }, (_, index) => ({
+    memoryId: `mem_seed${String(index).padStart(2, '0')}`,
+    text: index === 0
+      ? 'The API key rotates on the first Monday of each month; ops posts the new one in #keys.'
+      : `Convention ${String(index)}: keep note ${String(index)} short and name the file it is about.`,
+    scope: 'global',
+    workspaceId: 'ws_elsewhere',
+    workspaceName: 'elsewhere',
+    by: { name: 'Wembley' },
+    createdAt: new Date(Date.parse('2026-08-01T00:00:00.000Z') + index * 86_400_000).toISOString(),
+    status: 'kept',
+    enabled: true
+  }))
+  await writeFile(join(profile, 'memories.json'), JSON.stringify({ schemaVersion: 1, memories }))
+}
 const LEDGER_DIR = join(profile, 'mission-ledger')
 
 const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`], {
@@ -265,6 +283,11 @@ try {
   await writeFile(file, out.join('\n'), 'utf8')
   say(`   wrote ${file.pathname.slice(1)}`)
   say(`   missions: ${missions.length}; shares per mission: ${missions.map((m) => m.shares.length).join(',')}`)
+  if (TASK === 'memory') {
+    const file = await readFile(join(workspace, '.locust', 'memory.md'), 'utf8').catch(() => undefined)
+    say(`   memory file: ${file === undefined ? 'NOT WRITTEN' : String(file.split('\n').filter((l) => l.startsWith('- ')).length) + ' lines'}`)
+    say(`   answer mentions first Monday: ${String(/first Monday/i.test(missions[0]?.final ?? ''))}; mentions the file: ${String(/memory\.md/i.test(missions[0]?.final ?? ''))}`)
+  }
 } finally {
   child.kill()
   await sleep(500)

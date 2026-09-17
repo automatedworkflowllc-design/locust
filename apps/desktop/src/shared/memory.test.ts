@@ -144,6 +144,19 @@ describe('how much of a brief the memory may take', () => {
     expect(said).toContain('Ask the person if you need one')
   })
 
+  it('pastes fewer and names the file for the rest, when the whole list is a file in the workspace', () => {
+    // Colin's folder, 2026-09-17: 33 memories, ~20 pasted per turn, 13
+    // invisible. With the file, 8 are pasted and the file holds them all.
+    const said = memorySection({ selfName: 'Wren', workspaceName: 'app', memories: many(33), askFirst: false, file: '.locust/memory.md' })
+    expect(said).toMatch(/25 older memories are in \.locust\/memory\.md/)
+    expect(said).toContain('Read that file when the task touches something remembered')
+    expect(said).toContain('never edit it')
+    expect(said).not.toContain('Ask the person if you need one')
+    expect(said.length).toBeLessThan(section(many(33)).length)
+    // Nothing dropped: no pointer needed, the list is complete either way.
+    expect(memorySection({ selfName: 'Wren', workspaceName: 'app', memories: many(3), askFirst: false, file: '.locust/memory.md' })).not.toMatch(/older mem/)
+  })
+
   it('says nothing about dropping when nothing was dropped', () => {
     expect(section(many(3))).not.toMatch(/not in this brief/)
     expect(section([])).not.toMatch(/not in this brief/)

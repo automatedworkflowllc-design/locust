@@ -164,6 +164,15 @@ export function sanitizeMemoryTags(text: string): string {
  */
 export const MEMORY_BRIEF_LINES = 24
 export const MEMORY_BRIEF_BUDGET = 4000
+/**
+ * When the whole list is also a FILE in the workspace (0.172.0), the brief
+ * pastes only the newest few and names the file for the rest -- pulled when
+ * relevant rather than paid for on every turn, which is Grok Build's
+ * `memory_search`/`memory_get` shape done with the one tool every runtime
+ * has: reading a file in its own folder.
+ */
+export const MEMORY_BRIEF_LINES_WITH_FILE = 8
+export const MEMORY_BRIEF_BUDGET_WITH_FILE = 1500
 /** Written once: a newline inside a template is a real newline. */
 const NEWLINE = String.fromCharCode(10)
 
@@ -228,6 +237,8 @@ export function memorySection(input: {
   readonly memories: readonly MemoryLine[]
   /** Whether a new memory is kept at once or shown to the person first. */
   readonly askFirst: boolean
+  /** Workspace-relative path of the file holding every memory, when one was written. */
+  readonly file?: string
   /** Test seam, so an age in a brief is a fact rather than a moving target. */
   readonly now?: Date
 }): string {
@@ -253,15 +264,17 @@ export function memorySection(input: {
    */
   const here = input.memories.filter((memory) => memory.scope !== 'global')
   const everywhere = input.memories.filter((memory) => memory.scope === 'global')
-  const candidates = [...here.slice(-MEMORY_BRIEF_LINES), ...everywhere.slice(-MEMORY_BRIEF_LINES)]
+  const maxLines = input.file === undefined ? MEMORY_BRIEF_LINES : MEMORY_BRIEF_LINES_WITH_FILE
+  const budget = input.file === undefined ? MEMORY_BRIEF_BUDGET : MEMORY_BRIEF_BUDGET_WITH_FILE
+  const candidates = [...here.slice(-maxLines), ...everywhere.slice(-maxLines)]
   const briefed: MemoryLine[] = []
   let spent = 0
   // From the FRONT: `candidates` is already folder-first, newest-within-group,
   // so taking the tail would drop exactly the folder memories the order
   // exists to prefer. Its own test caught that.
-  for (const memory of candidates.slice(0, MEMORY_BRIEF_LINES)) {
+  for (const memory of candidates.slice(0, maxLines)) {
     spent += memory.text.length + 40
-    if (spent > MEMORY_BRIEF_BUDGET && briefed.length > 0) break
+    if (spent > budget && briefed.length > 0) break
     briefed.push(memory)
   }
   const dropped = input.memories.length - briefed.length
@@ -279,7 +292,9 @@ export function memorySection(input: {
           })
           .join(NEWLINE)
         + (dropped > 0
-          ? `${NEWLINE}(${String(dropped)} older ${dropped === 1 ? 'memory is' : 'memories are'} kept but not in this brief. Ask the person if you need one.)`
+          ? input.file === undefined
+            ? `${NEWLINE}(${String(dropped)} older ${dropped === 1 ? 'memory is' : 'memories are'} kept but not in this brief. Ask the person if you need one.)`
+            : `${NEWLINE}(${String(dropped)} older ${dropped === 1 ? 'memory is' : 'memories are'} in ${input.file}, with these, newest last. Read that file when the task touches something remembered; never edit it -- the block below is how memory changes.)`
           : '')
   return [
     input.workspaceName === undefined

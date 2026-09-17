@@ -91,7 +91,8 @@ for (const mission of missions) {
     if (/budget|automatic repl(y|ies)|cap of/i.test(notice.message) && /stopp|no more|reached|ended/i.test(notice.message)) {
       findings.push({ rank: 3, line: `${head} — exchange hit its budget: ${notice.message.slice(0, 120)}` })
     } else if (notice.code === 'host.relay_ended') {
-      findings.push({ rank: 4, line: `${head} — ${notice.message.slice(0, 120)}` })
+      // The host's own notice, recorded in the conversation it was shown in -- so the head names where it LANDED, not who it is about.
+      findings.push({ rank: 4, line: `${head} — notice shown here: ${notice.message.slice(0, 120)}` })
     }
   }
 }
