@@ -156,7 +156,7 @@ try {
     if (!create || create.disabled) return 'create disabled'
     create.click()
     await new Promise(r => setTimeout(r, 600))
-    const juno = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Juno'))
+    let juno; for (let i = 0; i < 40 && !juno; i += 1) { juno = [...document.querySelectorAll('button')].find(b => (b.querySelector('.lc-row__name') || { innerText: '' }).innerText.trim().startsWith("Juno")) || [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') || b.getAttribute('aria-label') || '').startsWith("Juno" + ' ')); if (!juno) await new Promise(r => setTimeout(r, 250)) }
     if (!juno) return 'no teammate row'
     juno.click()
     await new Promise(r => setTimeout(r, 400))

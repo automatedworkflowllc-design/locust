@@ -111,7 +111,7 @@ try {
   check('the sidebar reads "on locust/wren" and "on locust/booty"', /on locust\/wren/.test(String(sidebar)) && /on locust\/booty/.test(String(sidebar)), String(sidebar).slice(0, 200))
 
   const ask = async (name) => evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}'))
+    let who; for (let i = 0; i < 40 && !who; i += 1) { who = [...document.querySelectorAll('button')].find(b => (b.querySelector('.lc-row__name') || { innerText: '' }).innerText.trim().startsWith("${name}")) || [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') || b.getAttribute('aria-label') || '').startsWith("${name}" + ' ')); if (!who) await new Promise(r => setTimeout(r, 250)) }
     who.click()
     await new Promise(r => setTimeout(r, 400))
     const field = document.querySelector('form.command-dock textarea')

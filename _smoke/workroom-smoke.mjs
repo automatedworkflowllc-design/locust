@@ -202,7 +202,7 @@ const selectTeammate = (name) => `(async () => {
   // unfindable the day the hover learned to say more, and this smoke
   // reported it as 'no row' -- a missing teammate rather than a stale
   // selector. Matched on the part that is the identity.
-  const row = [...document.querySelectorAll('.lc-row--button')].find(b => b.title.startsWith('Message ${name}'))
+  let row; for (let i = 0; i < 40 && !row; i += 1) { row = [...document.querySelectorAll('button')].find(b => (b.querySelector('.lc-row__name') || { innerText: '' }).innerText.trim().startsWith(${JSON.stringify(name)})) || [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') || b.getAttribute('aria-label') || '').startsWith(${JSON.stringify(name)} + ' ')); if (!row) await new Promise(r => setTimeout(r, 250)) }
   if (!row) return 'no row'
   row.click()
   await new Promise(r => setTimeout(r, 300))

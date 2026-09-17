@@ -170,10 +170,25 @@ try {
   check('the logo goes home', (await evaluate(`!!document.querySelector('.lc-runtimepanel')`)) === true)
 
   const ask = async (name, text) => evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}'))
-    if (!who) return 'no teammate row'
+    // \`title="Message <name>"\` has not existed for a long time, so this asked
+    // nobody and every run below reported "finished" without one ever
+    // starting. A teammate is addressed from their FACE in the sidebar
+    // ("<name> — show only their conversations"); the Team screen's roster
+    // card offers only Edit and Remove, and the sidebar's Teammates section
+    // is not open by default.
+    let who
+    for (let i = 0; i < 40 && !who; i += 1) {
+      who =
+        [...document.querySelectorAll('button')].find(b => (b.querySelector('.lc-row__name') || { innerText: '' }).innerText.trim().startsWith('${name}'))
+        || [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') || b.getAttribute('aria-label') || '').startsWith('${name} '))
+      if (!who) await new Promise(r => setTimeout(r, 250))
+    }
+    if (!who) {
+      const seen = [...document.querySelectorAll('button')].map(b => (b.getAttribute('aria-label') || b.getAttribute('title') || b.innerText || '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim().slice(0, 44)).filter(Boolean).slice(0, 40)
+      return 'no teammate row :: ' + seen.join(' | ')
+    }
     who.click()
-    await new Promise(r => setTimeout(r, 400))
+    await new Promise(r => setTimeout(r, 600))
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
     setter.call(field, ${JSON.stringify(text)})
@@ -193,7 +208,8 @@ try {
   say('A. Wren is asked to quote the memory line -- only the memory brief carries it')
   // Quoting, not trusting: the smoke proves the brief REACHED the model, and
   // leaves whether a free model believes a note to the model.
-  check('the run finished', (await ask('Wren', 'Your brief lists what your team remembers. Quote, word for word, the remembered line that mentions a secret word. If there is none, reply NONE.')) === 'finished')
+  const wrenRun = await ask('Wren', 'Your brief lists what your team remembers. Quote, word for word, the remembered line that mentions a secret word. If there is none, reply NONE.')
+  check('the run finished', wrenRun === 'finished', String(wrenRun))
   await sleep(1500)
   const answer = await newestReply()
   say(`       Wren: ${JSON.stringify(String(answer).slice(0, 160))}`)
@@ -320,6 +336,10 @@ try {
   say('D. Settings carries the same control')
   const settings = await evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
+    await new Promise(r => setTimeout(r, 600))
+    // Settings is a list of pages since 0.176.0; memory lives on this one.
+    const page = [...document.querySelectorAll('.lc-settings__navitem')].find(b => /How teammates work/.test(b.innerText))
+    if (page) page.click()
     await new Promise(r => setTimeout(r, 500))
     const heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => /remembers/.test(h.innerText))
     const section = heading?.closest('section')

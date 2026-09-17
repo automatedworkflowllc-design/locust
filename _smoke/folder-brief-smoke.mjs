@@ -132,7 +132,7 @@ try {
 
   say('3. Wren is asked to quote the code-word line -- only the brief carries it')
   const finished = await evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+    let who; for (let i = 0; i < 40 && !who; i += 1) { who = [...document.querySelectorAll('button')].find(b => (b.querySelector('.lc-row__name') || { innerText: '' }).innerText.trim().startsWith("Wren")) || [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') || b.getAttribute('aria-label') || '').startsWith("Wren" + ' ')); if (!who) await new Promise(r => setTimeout(r, 250)) }
     who.click()
     await new Promise(r => setTimeout(r, 400))
     const field = document.querySelector('form.command-dock textarea')
