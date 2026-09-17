@@ -54,7 +54,29 @@ interface StoredFile {
    * is read as a membership whose moment is unknown.
    */
   readonly members: Readonly<Record<string, GroupMembership>>
+  /**
+   * Memberships that ENDED, by conversation, oldest first.
+   *
+   * Recorded when a conversation leaves a group, is moved to another, or
+   * its group is removed. The thread draws the mirror of the join line at
+   * that moment -- "<Group>'s instructions no longer apply from here" --
+   * and the turns after it genuinely were not briefed. The group's name and
+   * words are copied in, so the line stays true after the group changes or
+   * is gone. Absent in files from before 0.171.0, read as empty.
+   */
+  readonly left: Readonly<Record<string, readonly LeftMembership[]>>
 }
+
+export interface LeftMembership {
+  readonly groupId: string
+  readonly name: string
+  readonly instructions: string
+  readonly at?: string
+  readonly until: string
+}
+
+/** Leaves kept per conversation; older ones fall off the front. */
+export const MAX_LEFT_PER_CONVERSATION = 8
 
 export interface GroupMembership {
   readonly groupId: string
@@ -62,7 +84,7 @@ export interface GroupMembership {
   readonly at?: string
 }
 
-const EMPTY: StoredFile = { schemaVersion: 1, groups: [], members: {} }
+const EMPTY: StoredFile = { schemaVersion: 1, groups: [], members: {}, left: {} }
 
 const safeId = (value: unknown): value is string =>
   typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value)
@@ -145,7 +167,53 @@ function parsedFile(text: string): StoredFile {
     }
   }
 
-  return { schemaVersion: 1, groups, members }
+  const left: Record<string, readonly LeftMembership[]> = {}
+  if (typeof record.left === 'object' && record.left !== null) {
+    for (const [missionId, held] of Object.entries(record.left as Record<string, unknown>)) {
+      if (Object.keys(left).length >= MAX_GROUP_MEMBERS) break
+      if (!safeId(missionId) || !Array.isArray(held)) continue
+      const entries: LeftMembership[] = []
+      for (const entry of held) {
+        if (typeof entry !== 'object' || entry === null) continue
+        const raw = entry as Record<string, unknown>
+        const name = cleanName(raw.name)
+        if (!safeId(raw.groupId) || name === undefined || typeof raw.until !== 'string') continue
+        entries.push({
+          groupId: raw.groupId,
+          name,
+          instructions: typeof raw.instructions === 'string' ? raw.instructions.slice(0, MAX_GROUP_INSTRUCTIONS_LENGTH) : '',
+          ...(typeof raw.at === 'string' ? { at: raw.at } : {}),
+          until: raw.until
+        })
+      }
+      if (entries.length > 0) left[missionId] = entries.slice(-MAX_LEFT_PER_CONVERSATION)
+    }
+  }
+
+  return { schemaVersion: 1, groups, members, left }
+}
+
+/**
+ * The file with one conversation's current membership recorded as ended.
+ * Nothing changes when it is in no group, or the group is unknown.
+ */
+function withLeave(file: StoredFile, missionId: string, until: string): StoredFile {
+  const held = file.members[missionId]
+  if (held === undefined) return file
+  const group = file.groups.find((entry) => entry.groupId === held.groupId)
+  if (group === undefined) return file
+  const entry: LeftMembership = {
+    groupId: group.groupId,
+    name: group.name,
+    instructions: group.instructions,
+    ...(held.at === undefined ? {} : { at: held.at }),
+    until
+  }
+  const before = file.left[missionId] ?? []
+  // Bounded on write as on read; a conversation nobody has recorded a leave
+  // for yet does not get one past the map's own bound.
+  if (before.length === 0 && Object.keys(file.left).length >= MAX_GROUP_MEMBERS) return file
+  return { ...file, left: { ...file.left, [missionId]: [...before, entry].slice(-MAX_LEFT_PER_CONVERSATION) } }
 }
 
 export interface GroupStore {
@@ -228,7 +296,7 @@ export function createGroupStore(options: {
     list() {
       return serialize(async () => {
         const file = await read()
-        return { groups: file.groups, members: file.members }
+        return { groups: file.groups, members: file.members, left: file.left }
       })
     },
 
@@ -278,10 +346,18 @@ export function createGroupStore(options: {
          * there is exactly one place in this app where records are destroyed
          * and it asks twice first.
          */
+        // Every conversation in it LEAVES it, and the thread says so from
+        // the next turn on: the words stop briefing the moment the group
+        // is gone, and the line has to say where.
+        const until = now().toISOString()
+        let next = file
+        for (const [missionId, held] of Object.entries(file.members)) {
+          if (held.groupId === groupId) next = withLeave(next, missionId, until)
+        }
         const members = Object.fromEntries(
-          Object.entries(file.members).filter(([, held]) => held !== groupId)
+          Object.entries(next.members).filter(([, held]) => held.groupId !== groupId)
         )
-        await write({ ...file, groups, members })
+        await write({ ...next, groups, members })
       })
     },
 
@@ -291,8 +367,9 @@ export function createGroupStore(options: {
         const file = await read()
         if (groupId === undefined || groupId === null) {
           if (!(missionId in file.members)) return
-          const { [missionId]: _gone, ...members } = file.members
-          await write({ ...file, members })
+          const next = withLeave(file, missionId, now().toISOString())
+          const { [missionId]: _gone, ...members } = next.members
+          await write({ ...next, members })
           return
         }
         if (!safeId(groupId)) throw new Error('Group id is invalid')
@@ -305,9 +382,13 @@ export function createGroupStore(options: {
         if (file.members[missionId] === undefined && Object.keys(file.members).length >= MAX_GROUP_MEMBERS) {
           throw new Error('Too many conversations in groups')
         }
+        const at = now().toISOString()
+        // Moving between groups is a leave and a join at the same moment;
+        // re-assigning to the group it is already in is neither.
+        const next = file.members[missionId]?.groupId === groupId ? file : withLeave(file, missionId, at)
         await write({
-          ...file,
-          members: { ...file.members, [missionId]: { groupId, at: now().toISOString() } }
+          ...next,
+          members: { ...next.members, [missionId]: { groupId, at } }
         })
       })
     },

@@ -202,7 +202,7 @@ describe('the file is read as untrusted', () => {
 
   it('is genuinely empty when there is simply no file yet', async () => {
     const { store: groups } = await store()
-    expect(await groups.list()).toEqual({ groups: [], members: {} })
+    expect(await groups.list()).toEqual({ groups: [], members: {}, left: {} })
   })
 })
 

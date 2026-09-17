@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.171.0 - 2026-09-17
+
+- **The thread says where a group’s instructions stopped.** Move a
+  conversation out of a group, into another, or remove the group, and a
+  line appears at the first turn that was not briefed: *Trading’s
+  instructions no longer apply from here* — the mirror of the line that
+  says where they began. The name and words are kept as they were, so the
+  line stays true after the group is renamed, edited or gone.
+- **A reply between teammates opens with what is true, not with a
+  negation.** One phrase in the reply brief, from Grok Build’s rule; the
+  same exchange measured before and after.
+
 ## 0.170.0 - 2026-09-17
 
 - **A Custom role is a brief too.** A teammate you gave your own title

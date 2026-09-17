@@ -829,12 +829,31 @@ export interface GroupMembership {
   readonly at?: string
 }
 
+/**
+ * A membership that ended: the conversation left the group, was moved to
+ * another, or the group was removed. The group's name and words are kept AS
+ * THEY WERE, because the line in the thread ("Trading's instructions no
+ * longer apply from here") has to stay true after the group is renamed,
+ * edited or gone.
+ */
+export interface LeftMembership {
+  readonly groupId: string
+  readonly name: string
+  readonly instructions: string
+  /** When it joined, if that was recorded. */
+  readonly at?: string
+  /** When it left, ISO. */
+  readonly until: string
+}
+
 export type GroupListResponse =
   | {
       readonly ok: true
       readonly data: {
         readonly groups: readonly PublicGroup[]
         readonly members: Readonly<Record<string, GroupMembership>>
+        /** Memberships that ended, by conversation, oldest first. */
+        readonly left: Readonly<Record<string, readonly LeftMembership[]>>
       }
     }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }

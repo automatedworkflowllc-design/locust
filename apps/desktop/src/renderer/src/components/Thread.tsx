@@ -11,7 +11,7 @@ import type {
   PublicTeammate
 } from '../../../shared/ipc.js'
 import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine } from '../missionView.js'
-import type { GroupBoundary, LiveStarter } from '../missionView.js'
+import type { GroupBoundary, GroupLeaving, LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
 import { useFollowBottom } from '../useFollowBottom.js'
@@ -414,6 +414,8 @@ export interface ThreadProps {
    * thread -- after the last turn that ran without them -- never at the top.
    */
   readonly groupBoundary?: GroupBoundary
+  /** Where earlier groups' words stopped briefing this conversation; drawn as the join line's mirror. */
+  readonly groupLeavings?: readonly GroupLeaving[]
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean
   readonly restoredMission: PublicRecoveredMission | undefined
@@ -473,6 +475,7 @@ export function Thread({
   onOpenPeerRun,
   earlierTurns,
   groupBoundary,
+  groupLeavings = [],
   coldStart = false,
   onRunWithEdits,
   onRunAgain,
@@ -562,6 +565,14 @@ export function Thread({
         )}
       </div>
     )
+  // The mirror line. A leave and a join at the same index are drawn in that
+  // order, which is the order they happened in.
+  const leavingNotes = (test: (beforeTurn: number) => boolean) =>
+    groupLeavings.filter((leaving) => test(leaving.beforeTurn)).map((leaving, index) => (
+      <div key={`left-${String(leaving.beforeTurn)}-${String(index)}`} className="lc-thread__note lc-thread__groupnote lc-thread__groupnote--left">
+        <span>{leaving.groupName}&apos;s instructions no longer apply from here</span>
+      </div>
+    ))
   const currentMarker = markers.find((marker) => marker.beforeTurn === earlierTurns.length)
   // Every turn's exchange, not only the last one: the message a teammate SENT
   // was written on an earlier turn than the reply it drew, so a thread that
@@ -690,6 +701,7 @@ export function Thread({
               {marker !== undefined && (
                 <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
               )}
+              {leavingNotes((beforeTurn) => beforeTurn === index)}
               {groupBoundary?.beforeTurn === index && groupNote}
               {userTurn(turnPromptLine(turn), turnAttachments(turn))}
               {cardsFor(index, 'before-work').map(peerCard)}
@@ -704,6 +716,7 @@ export function Thread({
         {currentMarker !== undefined && (
           <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
         )}
+        {leavingNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
         {groupBoundary?.beforeTurn === earlierTurns.length && groupNote}
         {coldStart && (
           /*
@@ -773,6 +786,7 @@ export function Thread({
           */}
         <MemoryCard lines={memoriesOfTurn(peers.memories ?? [], shownMissionId)} />
         {/* Joined after the last turn started: the NEXT turn is the first briefed, so the line sits below this one. */}
+        {leavingNotes((beforeTurn) => beforeTurn > earlierTurns.length)}
         {groupBoundary !== undefined && groupBoundary.beforeTurn > earlierTurns.length && groupNote}
 
         {/*

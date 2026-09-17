@@ -573,6 +573,45 @@ export function groupBoundary(
   return { beforeTurn, groupName: group.name, instructions, joinedAt: membership.at }
 }
 
+/** The mirror of the join line: where a group's words STOPPED briefing. */
+export interface GroupLeaving {
+  /** Index of the first turn not briefed; equal to the turn count when that is the next one. */
+  readonly beforeTurn: number
+  readonly groupName: string
+}
+
+/**
+ * Where each ended membership stops briefing, oldest first.
+ *
+ * Same rules as the join line, mirrored: a group with no words briefed
+ * nothing, so its leaving says nothing; a turn with no known start is
+ * treated as before the leave, which is the honest side to be wrong on.
+ * Design agent, 2026-09-16: "Trading's instructions no longer apply from
+ * here" -- the wording is theirs.
+ */
+export function groupLeavings(
+  turnStarts: readonly (string | undefined)[],
+  left: readonly { readonly name: string; readonly instructions: string; readonly until: string }[]
+): readonly GroupLeaving[] {
+  const out: GroupLeaving[] = []
+  for (const entry of left) {
+    if (entry.instructions.trim().length === 0) continue
+    const until = Date.parse(entry.until)
+    if (Number.isNaN(until)) continue
+    let beforeTurn = turnStarts.length
+    for (let index = 0; index < turnStarts.length; index += 1) {
+      const started = turnStarts[index]
+      const at = started === undefined ? NaN : Date.parse(started)
+      if (!Number.isNaN(at) && at >= until) {
+        beforeTurn = index
+        break
+      }
+    }
+    out.push({ beforeTurn, groupName: entry.name })
+  }
+  return out
+}
+
 export interface PlanStep {
   readonly text: string
   readonly state: 'done' | 'running' | 'pending'

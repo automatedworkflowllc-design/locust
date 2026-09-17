@@ -877,7 +877,7 @@ describe('telling a reply what a reply costs', () => {
     expect(worth).toBeGreaterThan(-1)
     expect(nots).toBeGreaterThan(worth)
     expect(said).toContain('written for a capable colleague who has not seen your turn')
-    expect(said).toContain('lead with the answer, then the evidence by name')
+    expect(said).toContain('lead with the answer, said as what is true rather than as a negation, then the evidence by name')
     expect(said).not.toContain('nobody is watching')
     expect(said).not.toContain('Do not thank')
   })

@@ -591,6 +591,11 @@ textarea {
   gap: var(--lc-space-2);
 }
 
+/* The mirror: where the words stopped. Same note, no words to show, so it sits a shade quieter. */
+.lc-thread__groupnote--left {
+  border-left-style: dashed;
+}
+
 .lc-thread__groupwords {
   margin: 0;
   padding: var(--lc-space-2) var(--lc-space-3);

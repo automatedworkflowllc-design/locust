@@ -211,7 +211,7 @@ export function relayPrompt(input: {
             'A reply is worth that only when it moves the work: an answer with its evidence, a decision, or a question they need answered before they can continue. If their message settles things or needs nothing from you, END HERE with no share block -- that is an exchange finishing, and it is the most common good outcome. Thanks, receipts and recaps reach nobody and cost a run each.'
           ]),
     'Do what it asks if that is within your role and this workspace, using what you actually know, and say plainly what is blocked or unverified rather than implying it is done; if you cannot help, say so and why.',
-    `When a reply is needed, end with one <locust-share to="${input.sender.name}"> block holding it, written for a capable colleague who has not seen your turn: lead with the answer, then the evidence by name (paths, numbers, names), then what you need from them, if anything, in complete sentences.`,
+    `When a reply is needed, end with one <locust-share to="${input.sender.name}"> block holding it, written for a capable colleague who has not seen your turn: lead with the answer, said as what is true rather than as a negation, then the evidence by name (paths, numbers, names), then what you need from them, if anything, in complete sentences.`,
     // The one case where waiting is worse than interrupting, said as a rule
     // rather than as a feature -- a model told it has an urgent channel will
     // find reasons to use it.

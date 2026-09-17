@@ -11,6 +11,7 @@ import type {
   CodexMissionUpdate,
   MissionRouteSummary,
   GroupMembership,
+  LeftMembership,
   PublicGroup,
   PublicRecoveredMission,
   PublicRuntimeStatus,
@@ -98,7 +99,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, shellCommandText, turnText, groupBoundary } from './missionView.js'
+  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, shellCommandText, turnText, groupBoundary, groupLeavings } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -909,6 +910,7 @@ export default function App(): ReactElement {
   const [missionTitles, setMissionTitles] = useState<Readonly<Record<string, string>>>({})
   const [groups, setGroups] = useState<readonly PublicGroup[]>([])
   const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, GroupMembership>>>({})
+  const [groupLeft, setGroupLeft] = useState<Readonly<Record<string, readonly LeftMembership[]>>>({})
   /**
    * Local files that exist and refused to read, by store name. Held apart
    * from "empty" so the sidebar can say so -- an unreadable roster used to
@@ -953,6 +955,7 @@ export default function App(): ReactElement {
         if (!response.ok) return
         setGroups(response.data.groups)
         setGroupMembers(response.data.members)
+        setGroupLeft(response.data.left)
       })
       .catch(() => undefined)
   }
@@ -1841,6 +1844,7 @@ export default function App(): ReactElement {
         if (!response.ok) return
         setGroups(response.data.groups)
         setGroupMembers(response.data.members)
+        setGroupLeft(response.data.left)
       })
       .catch(() => {
         // Groups are optional at startup; every conversation is simply
@@ -4580,7 +4584,7 @@ export default function App(): ReactElement {
                 }}
                 onOpenSenderRun={(missionId) => () => openMission(missionId)}
                 earlierTurns={liveRun.earlierTurns ?? []}
-                groupBoundary={(() => {
+                {...(() => {
                   // Where this conversation's group began briefing it. The
                   // row knows every id the conversation has worn; the
                   // membership is read against all of them, the way the
@@ -4596,7 +4600,14 @@ export default function App(): ReactElement {
                     ...(liveRun.earlierTurns ?? []).map((turn) => historyByIdRef.current.get(turn.missionId)?.createdAt),
                     liveRun.startedAtIso ?? liveRun.restoredMission?.createdAt
                   ]
-                  return groupBoundary(starts, membership, group)
+                  const boundary = groupBoundary(starts, membership, group)
+                  // And where earlier groups' words stopped: every id the
+                  // conversation has worn, the same way membership is read.
+                  const left = row === undefined ? undefined : heldFor(row, groupLeft)
+                  return {
+                    ...(boundary === undefined ? {} : { groupBoundary: boundary }),
+                    groupLeavings: groupLeavings(starts, left ?? [])
+                  }
                 })()}
                 coldStart={liveRun.coldStart ?? false}
                 workspacePath={workspacePath}
