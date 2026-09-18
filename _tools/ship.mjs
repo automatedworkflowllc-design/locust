@@ -211,9 +211,26 @@ if (failed === 0 && !checkOnly) {
   }
 }
 
+/*
+ * The two steps that come AFTER the release, spelled out here because this is
+ * the last thing anyone reads before doing them.
+ *
+ * `publish-changelog` is the one that is easy to forget and invisible when
+ * forgotten: the app and the site both point at the public CHANGELOG.md, and
+ * a release without it leaves both describing the previous build. Uploading
+ * the installers one at a time is not fussiness either -- a single
+ * `gh release create` carrying both stalled for fifty minutes on 2026-09-17
+ * and had to be killed, where one asset per call went through immediately.
+ */
 console.log(
   failed === 0
-    ? `\nReady to release ${version}.\n`
+    ? `\nReady to release ${version}.\n\n`
+      + `  gh release create ${version} --repo automatedworkflowllc-design/locust-releases \\\n`
+      + `    --title ${version} --notes "..." latest.yml\n`
+      + `  gh release upload ${version} Locust-${version}-setup.exe --repo ... --clobber\n`
+      + `  gh release upload ${version} Locust-Setup.exe --repo ... --clobber\n`
+      + `  node _tools/publish-changelog.mjs      # the app and the site both read this\n`
+      + `  node _smoke/update-smoke.mjs\n`
     : `\n${String(failed)} check(s) failed AFTER packaging. Do not publish this.\n`
 )
 process.exit(failed === 0 ? 0 : 1)
