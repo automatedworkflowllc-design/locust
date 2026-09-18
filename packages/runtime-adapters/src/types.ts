@@ -106,6 +106,15 @@ export interface ExecutableLaunch {
    * neither limit. See the locator for the measurement.
    */
   readonly kind: "native" | "powershell-shim" | "cmd-shim" | "node-shim";
+  /**
+   * Environment the launch itself needs, merged into the command's.
+   *
+   * One thing uses it: running an npm script under the HOST's own Node,
+   * which on Electron means running the app binary with
+   * `ELECTRON_RUN_AS_NODE=1`. Without that variable the same path opens
+   * another copy of the app, so the two travel together or not at all.
+   */
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 export interface ProbeCommand {

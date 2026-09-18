@@ -21,3 +21,6 @@ release/
 packages/mission-store/mutation-result.json
 # Written by _smoke/run-all.mjs: one run's output, not a record.
 smoke-results.json
+
+# Staged by _tools/vendor-npm.mjs before packaging; not source.
+apps/desktop/resources/npm/

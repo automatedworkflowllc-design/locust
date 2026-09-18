@@ -79,6 +79,20 @@ export interface RuntimeInstallerOptions {
    * guessing at one.
    */
   readonly nowInstalled?: (runtime: string) => Promise<boolean>
+  /**
+   * The npm to use when the machine has none of its own.
+   *
+   * Absent means "there is nothing to fall back to", which is the state
+   * every build was in before 2026-09-18 and the reason the Install buttons
+   * were disabled rather than merely slow.
+   */
+  readonly bundledNpm?: {
+    readonly nodePath: string
+    readonly cliPath: string
+    readonly env: Readonly<Record<string, string>>
+  }
+  /** Whether this machine has its own npm. Absent reads as yes. */
+  readonly systemNpm?: () => Promise<boolean>
 }
 
 /** The most output kept for the disclosure. Bounded: this is not a terminal. */
@@ -145,6 +159,57 @@ export function classifyInstallFailure(input: {
     what: `npm stopped with an error after ${String(input.seconds)}s.`,
     next: 'Show the output below — the last lines usually name the cause.'
   }
+}
+
+/**
+ * npm, run by the Node this app is made of.
+ *
+ * No shell: the binary's path holds "Program Files", and a shell would split
+ * it at the space. Nothing else about the install changes -- the registry,
+ * the prefix and the output are npm's own, so every failure this file already
+ * knows how to explain reads the same way.
+ */
+function runBundledNpm(
+  bundled: { readonly nodePath: string; readonly cliPath: string; readonly env: Readonly<Record<string, string>> },
+  args: readonly string[],
+  onLine: (line: string) => void
+): Promise<{ readonly code: number | null; readonly output: string }> {
+  const unsafe = args.find((token) => !SAFE_ARGUMENT.test(token))
+  if (unsafe !== undefined) {
+    return Promise.resolve({
+      code: null,
+      output: `Locust would not run this install: ${JSON.stringify(unsafe)} contains characters a shell reads as syntax.`
+    })
+  }
+  return new Promise((resolve) => {
+    const child = spawn(bundled.nodePath, [bundled.cliPath, ...args], {
+      shell: false,
+      windowsHide: true,
+      env: { ...process.env, ...bundled.env }
+    })
+    let output = ''
+    let pending = ''
+    const take = (chunk: Buffer): void => {
+      output += chunk.toString()
+      pending += chunk.toString()
+      const lines = pending.split(String.fromCharCode(10))
+      pending = lines.pop() ?? ''
+      for (const line of lines) {
+        const said = line.trim()
+        if (said.length > 0) onLine(said)
+      }
+    }
+    child.stdout?.on('data', take)
+    child.stderr?.on('data', take)
+    child.on('error', (error) => {
+      resolve({ code: null, output: `${output}${error.message}` })
+    })
+    child.on('close', (code) => {
+      const last = pending.trim()
+      if (last.length > 0) onLine(last)
+      resolve({ code, output })
+    })
+  })
 }
 
 /** The one case that is not an error at all until the machine is asked again. */
@@ -224,6 +289,25 @@ function runNpm(
 
 export function createRuntimeInstaller(options: RuntimeInstallerOptions = {}): RuntimeInstaller {
   const run = options.run ?? runNpm
+  /*
+   * Run npm the way this machine can.
+   *
+   * The person's own npm first: it is configured the way they expect, with
+   * their registry, their proxy and their prefix. Ours is the answer when
+   * there is no other, and it is spawned WITHOUT a shell -- the path holds
+   * "Program Files", and a shell would split it.
+   */
+  const runInstall = async (
+    command: string,
+    args: readonly string[],
+    onLine: (line: string) => void
+  ): Promise<{ readonly code: number | null; readonly output: string }> => {
+    const bundled = options.bundledNpm
+    if (bundled === undefined || options.run !== undefined) return run(command, args, onLine)
+    const hasOwn = options.systemNpm === undefined ? true : await options.systemNpm()
+    if (hasOwn) return run(command, args, onLine)
+    return runBundledNpm(bundled, args, onLine)
+  }
   let running = false
 
   return {
@@ -251,7 +335,7 @@ export function createRuntimeInstaller(options: RuntimeInstallerOptions = {}): R
         // Split from the same string the screen showed, so the argv and the
         // displayed line cannot drift apart.
         const [command, ...args] = line.split(' ')
-        const { code, output } = await run(command ?? 'npm', args, (said) => onLine({ line: said }))
+        const { code, output } = await runInstall(command ?? 'npm', args, (said) => onLine({ line: said }))
         const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
         if (code !== 0) {
           return classifyInstallFailure({

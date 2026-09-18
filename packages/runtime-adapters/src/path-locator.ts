@@ -16,6 +16,20 @@ export interface PathExecutableLocatorOptions {
    */
   readonly readFile?: (path: string) => Promise<string | undefined>;
   /**
+   * A Node to run npm scripts with when the machine has none.
+   *
+   * MEASURED 2026-09-17, and it is why Ian could not use Locust at all: the
+   * coding CLIs install through npm, so with no Node on the machine the
+   * first screen disables its own Install buttons and sends you to
+   * nodejs.org. What nobody noticed is that the app already CARRIES a Node
+   * -- an Electron binary run with `ELECTRON_RUN_AS_NODE=1` is Node 24 --
+   * and the locator was walking past it to give up.
+   *
+   * Last, never first: a Node the person installed is the one their CLIs
+   * were built against, and this is only the answer when there is no other.
+   */
+  readonly bundledNode?: { readonly executablePath: string; readonly env?: Readonly<Record<string, string>> };
+  /**
    * npm's global bin directory, when the host has asked npm where it is.
    *
    * The install roots below hardcode npm's DEFAULT prefix -- `%APPDATA%
@@ -367,6 +381,20 @@ export function createPathExecutableLocator(
               executablePath: node,
               prefixArgs: [win32.join(directory, wrapped[1])],
               kind: "node-shim",
+            };
+          }
+          // No Node on the machine. The host's own will do, and running the
+          // script directly keeps the two things cmd.exe would cost: the
+          // 8,191-character command line, and the flags after a multi-line
+          // prompt.
+          if (options.bundledNode !== undefined) {
+            return {
+              commandName,
+              discoveredPath: script,
+              executablePath: options.bundledNode.executablePath,
+              prefixArgs: [win32.join(directory, wrapped[1])],
+              kind: "node-shim",
+              ...(options.bundledNode.env === undefined ? {} : { env: options.bundledNode.env }),
             };
           }
         }

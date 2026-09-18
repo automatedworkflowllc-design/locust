@@ -295,7 +295,12 @@ function baseSpec(
     stdin: transport.stdin ?? "prompt",
     stdout: "jsonl",
     ...(transport.sandbox === undefined ? {} : { sandbox: transport.sandbox }),
-    ...(transport.env === undefined ? {} : { env: transport.env }),
+    // The launch's own environment first, so a builder's variables win a
+    // collision -- they are about this run, the launch's is about how the
+    // program is started at all.
+    ...(executable.env === undefined && transport.env === undefined
+      ? {}
+      : { env: { ...executable.env, ...transport.env } }),
   };
   assertSafeRuntimeCommand(spec, transport.sandbox);
   return spec;

@@ -29,6 +29,7 @@ import { createCodexMissionService } from './codex-mission.js'
 import { createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
+import { findBundledNpm } from './bundled-npm.js'
 import { createModelCatalog } from './model-catalog.js'
 import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagnostics.js'
 import { createGroupStore } from './group-store.js'
@@ -211,9 +212,35 @@ const probeRunner = createNodeProbeRunner()
  * changes. See `npm-prefix.ts`.
  */
 const npmBinDirectory = await readNpmBinDirectory()
+/*
+ * The Node this app is already made of.
+ *
+ * An Electron binary started with `ELECTRON_RUN_AS_NODE=1` is a Node
+ * runtime -- 24.18.1 in the packaged build, checked by running it. An
+ * npm-installed CLI is a `.cmd` shim around a node script, so without a Node
+ * on the machine the locator had nothing to run it with and fell back to
+ * cmd.exe, which costs the 8,191-character command line.
+ *
+ * Offered LAST. A Node the person installed is the one their CLIs were
+ * built against; this is the answer only when there is no other, and that is
+ * the machine Ian had.
+ */
+const bundledNode = { executablePath: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } }
+/**
+ * And the npm to install those CLIs with, for the same machine. Absent in a
+ * build that did not ship one, which is every build before 0.178.0.
+ */
+const bundledNpm = findBundledNpm({
+  resourcesPath: process.resourcesPath,
+  appPath: app.getAppPath(),
+  execPath: process.execPath
+})
 const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
   ? { find: async () => undefined }
-  : createPathExecutableLocator(npmBinDirectory === undefined ? {} : { npmBinDirectory })
+  : createPathExecutableLocator({
+      bundledNode,
+      ...(npmBinDirectory === undefined ? {} : { npmBinDirectory })
+    })
 // Antigravity has no CLI probe: its readiness is whether the app is open,
 // which the host checks itself and merges into the same sweep.
 const antigravityProbe = createAntigravityHostProbe()
@@ -1357,6 +1384,9 @@ if (!ownsSingleInstanceLock) {
     // Installing is its own service: one at a time, and it asks discovery
     // again after a clean exit rather than trusting npm's exit code alone.
     const runtimeInstaller = createRuntimeInstaller({
+      // The npm this build carries, used only when the machine has none.
+      ...(bundledNpm === undefined ? {} : { bundledNpm }),
+      systemNpm: npmPresent,
       nowInstalled: async (runtime) => {
         discoveryCache = undefined
         const found = await discoverForWork()
