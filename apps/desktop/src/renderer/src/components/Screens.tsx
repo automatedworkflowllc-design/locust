@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { durationText, usagePercent, usageWindowSentence } from '../missionView.js'
 import { AgentText } from './ThreadItems.js'
-import { SETTINGS_PAGES, matches } from '../settingsPages.js'
+import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
@@ -1192,12 +1192,38 @@ export function SettingsScreen({
   const shownPages =
     asked.length === 0
       ? SETTINGS_PAGES
-      : SETTINGS_PAGES.filter(
-          (entry) => matches(entry.label, asked) || entry.headings.some((heading) => matches(heading, asked))
-        )
+      : SETTINGS_PAGES.filter((entry) => pageMatches(entry, asked))
   // A search that hides the page you were on moves you to the first that
   // survived, rather than showing an empty pane beside a list of matches.
   const shownPage = shownPages.some((entry) => entry.id === page) ? page : shownPages[0]?.id
+  /*
+   * AND THE PANE OPENS AT WHAT WAS SEARCHED FOR, not at the top of the page.
+   *
+   * Grok, pass 9: typing "trash" switched to This app and left the pane on
+   * Updates, with Trash further down the same page. "I think switching the
+   * page is right. I think not scrolling to the heading is the miss." Five
+   * pages are short enough to survive that; the words a person types that
+   * are NOT headings are not -- someone who types "memory" and lands at the
+   * top of How teammates work has no way to tell which of four sections
+   * answered them.
+   */
+  const pane = useRef<HTMLDivElement>(null)
+  const landOn = shownPage === undefined || asked.length === 0
+    ? undefined
+    : matchedHeadings(SETTINGS_PAGES.find((entry) => entry.id === shownPage)!, asked)[0]
+  useEffect(() => {
+    if (landOn === undefined) return
+    const headings = pane.current?.querySelectorAll('.lc-settings__heading') ?? []
+    for (const heading of headings) {
+      if (heading.textContent?.trim() !== landOn) continue
+      // The section, so the heading does not land flush against the top
+      // edge with its own words half under the search box.
+      ;(heading.closest('.lc-settings__section') ?? heading).scrollIntoView({ block: 'start' })
+      return
+    }
+    // Nothing to scroll to is the ordinary case for a page-name match, and
+    // the top of the page is already the right place for it.
+  }, [landOn, shownPage])
 
   return (
     <div className="lc-screen">
@@ -1233,14 +1259,20 @@ export function SettingsScreen({
                 <span className="lc-settings__navlabel">{entry.label}</span>
                 {query.trim().length > 0 && (
                   <span className="lc-settings__navhits">
-                    {entry.headings.filter((heading) => matches(heading, query)).join(' · ')}
+                    {/*
+                      * The heading, not the word typed. Someone who types
+                      * "memory" is told "What your team remembers", which is
+                      * what they will be reading for once the page opens --
+                      * echoing their own word back would say nothing.
+                      */}
+                    {matchedHeadings(entry, asked).join(' · ')}
                   </span>
                 )}
               </button>
             ))
           )}
         </nav>
-        <div className="lc-settings__pane">
+        <div className="lc-settings__pane" ref={pane}>
         {/*
           * Where the teammates work. A workspace-wide fact, so it sits with
           * the other workspace-wide settings rather than on the intro screen

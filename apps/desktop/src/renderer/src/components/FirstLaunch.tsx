@@ -345,7 +345,14 @@ export function FirstLaunch({
           */}
         {discoveryPhase === 'ready' && npmMissing && (
           <p className="lc-installnote lc-tone-amber">
-            Node.js is not on this machine, so the Install buttons below cannot run.{' '}
+            {/*
+              * Not "below". The note renders under the list, so the buttons
+              * it is about are ABOVE it -- pointing the wrong way at the one
+              * moment a person is already lost (Grok, pass 9). Naming no
+              * direction is better than naming one: there is exactly one set
+              * of Install buttons on this screen.
+              */}
+            Node.js is not on this machine, so the Install buttons cannot run.{' '}
             <button type="button" className="lc-linkbutton" onClick={() => {
                 setLinkRefusal(undefined)
                 openLink('https://nodejs.org', setLinkRefusal)

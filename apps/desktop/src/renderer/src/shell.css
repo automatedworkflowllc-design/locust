@@ -619,7 +619,19 @@ textarea {
  * turns the note did not govern.
  */
 .lc-thread__note {
-  margin-top: var(--lc-space-7);
+  /*
+   * MEASURED 36/22 ON SCREEN, NOT 24/12 (Grok, pass 9, 2026-09-18, with the
+   * computed numbers beside the frame). Two rules were adding to this one.
+   * The column is a flex box with a 12px gap, so a plain 24px margin came out
+   * at 36 above; and a bubble opening a new turn adds 10px of its own, so
+   * below came out at 22. The note was right about everything except the two
+   * numbers the design agent was asked for.
+   *
+   * The bubble rule next door already subtracts the column gap for exactly
+   * this reason. This does the same, and the rule below stops the following
+   * bubble adding its turn gap on top of a note it is bound to.
+   */
+  margin-top: calc(var(--lc-space-7) - var(--lc-space-5));
   align-self: flex-start;
   max-width: 640px;
   padding: 2px 0 2px 10px;
@@ -627,6 +639,17 @@ textarea {
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   text-wrap: pretty;
+}
+
+/*
+ * 12 below, and only 12. A bubble opens a new turn 22px down, which is right
+ * between turns and wrong under a note: the note governs the turn beneath it,
+ * and the binding gap is the whole point of the asymmetry. The child selector
+ * makes this more specific than the rule it overrides rather than equally so
+ * -- an equal-specificity override lost a colour war in 0.174 and shipped.
+ */
+.lc-thread__column > .lc-thread__note + .lc-bubble {
+  margin-top: 0;
 }
 
 /* Where a group's standing instructions began: a note at the join point, never at the top. */

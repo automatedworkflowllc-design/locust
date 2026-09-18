@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.179.0 - 2026-09-18
+
+- **Settings search knows the words you would type.** Searching for *memory*,
+  *worktree*, *node* or *ledger* used to say nothing matched, on a screen that
+  has all four. They are all found now, and the result names the section they
+  live in rather than repeating your word back. *recycle bin* finds the Trash.
+- **The page opens where you searched,** instead of at the top. Searching for
+  *trash* lands on Trash, not on Updates further up the same page.
+- **The note where a group's instructions stop** now sits at the spacing it
+  was designed with: clearly separated from the turn above, bound to the turn
+  below. It was drifting wider than that in both directions.
+- **The first screen no longer points the wrong way.** The line explaining
+  why Install is unavailable said the buttons were below it. They are above
+  it.
+
 ## 0.178.0 - 2026-09-18
 
 - **You no longer need Node.js to install a coding CLI.** Locust carries its

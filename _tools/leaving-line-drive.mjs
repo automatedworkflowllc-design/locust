@@ -158,6 +158,78 @@ try {
     return JSON.stringify({ y10: where(640, 10), y40: where(640, 40), y70: where(640, 70), y110: where(640, 110) }, null, 1)
   })()`)
   say('   AT TOP ' + atTop)
+  /*
+   * THE TWO NUMBERS THE DESIGN AGENT WAS ASKED FOR: 24 above, 12 below.
+   *
+   * This drive screenshotted the line and never measured it, so 0.171 through
+   * 0.177 shipped it at 36/22 and nothing said so. Grok's pass 9 measured it
+   * by hand. A margin is not a gap: the column is flex with a 12px gap, and a
+   * bubble opening a new turn adds 10 of its own, so both numbers were being
+   * added to by rules that did not know the note was there.
+   *
+   * Measured as the real distance between painted boxes, which is the only
+   * version of this a person can see.
+   */
+  const airText = await cdp.eval(`(() => {
+    const note = document.querySelector('.lc-thread__note')
+    if (!note) return JSON.stringify({ note: false })
+    const box = note.getBoundingClientRect()
+    const before = note.previousElementSibling
+    const after = note.nextElementSibling
+    const gap = (a, b) => a === null || b === null ? null : Math.round(b - a)
+    return JSON.stringify({
+      note: true,
+      words: (note.innerText || '').slice(0, 60),
+      marginTop: getComputedStyle(note).marginTop,
+      above: before ? gap(before.getBoundingClientRect().bottom, box.top) : null,
+      below: after ? gap(box.bottom, after.getBoundingClientRect().top) : null,
+      afterIsBubble: after ? (after.className || '').toString().indexOf('lc-bubble') >= 0 : null
+    }, null, 1)
+  })()`)
+  say('   AIR ' + airText)
+  /*
+   * AND THE CASE GROK ACTUALLY MEASURED: a bubble under the note.
+   *
+   * The thread this drive seeds puts a card there, and a card does not add
+   * the 10px a bubble adds to open a new turn -- so the ordinary measurement
+   * above passes on a thread that never exercises the rule that was wrong.
+   * A bubble is put in beside the real note, in the real stylesheet, in the
+   * real layout engine, measured, and taken out again.
+   */
+  const bubbleAirText = await cdp.eval(`(() => {
+    const note = document.querySelector('.lc-thread__note')
+    if (!note) return JSON.stringify({ note: false })
+    const planted = document.createElement('div')
+    planted.className = 'lc-bubble'
+    planted.textContent = 'planted, to measure the gap under a note'
+    note.parentElement.insertBefore(planted, note.nextSibling)
+    const below = Math.round(planted.getBoundingClientRect().top - note.getBoundingClientRect().bottom)
+    const margin = getComputedStyle(planted).marginTop
+    planted.remove()
+    return JSON.stringify({ note: true, below, margin }, null, 1)
+  })()`)
+  say('   AIR UNDER A BUBBLE ' + bubbleAirText)
+  const bubbleAir = JSON.parse(bubbleAirText)
+  if (bubbleAir.note === true) {
+    const ok = Math.abs(bubbleAir.below - 12) <= 1
+    say(`   ${ok ? 'ok  ' : 'FAIL'} below a bubble: ${String(bubbleAir.below)}px, wanted 12`)
+    if (!ok) process.exitCode = 1
+  }
+  const air = JSON.parse(airText)
+  if (air.note !== true) {
+    say('   FAIL no note on the thread to measure')
+    process.exitCode = 1
+  } else {
+    // Only checked when there is something on the other side to measure from;
+    // a note with nothing above it has no gap above, which is not a failure.
+    for (const [side, want] of [['above', 24], ['below', 12]]) {
+      const got = air[side]
+      if (got === null) { say(`   -- ${side}: nothing to measure against`); continue }
+      const ok = Math.abs(got - want) <= 1
+      say(`   ${ok ? 'ok  ' : 'FAIL'} ${side}: ${String(got)}px, wanted ${String(want)}`)
+      if (!ok) process.exitCode = 1
+    }
+  }
   // Settle, then capture twice: a stale composite differs between frames.
   await sleep(1500)
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
