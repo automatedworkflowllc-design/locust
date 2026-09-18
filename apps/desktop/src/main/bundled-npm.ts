@@ -27,17 +27,21 @@ import { join } from 'node:path'
 export function bundledNpmPaths(resourcesPath: string, appPath: string): readonly string[] {
   return [
     /*
-     * Packaged: copied whole into `resources/npm`.
+     * Packaged: staged at `resources/npm` by `_tools/vendor-npm.mjs` (which
+     * resolves pnpm's link to the store, so the copy is real files), then
+     * carried through the asar and unpacked beside it.
      *
-     * It was `asarUnpack` first, and that shipped npm WITHOUT the 118
-     * packages it bundles -- pnpm links `node_modules/npm` at its store, and
-     * packaging the link took the folder and not the tree under it. The
-     * first run with no Node on PATH said "Cannot find module 'graceful-fs'",
-     * which is npm failing to be a program rather than Locust failing to
-     * find one. A from/to copy resolves the link and brings all of it.
+     * The route matters, and both wrong ones were measured. `asarUnpack` of
+     * `node_modules/npm` packaged pnpm's LINK and left the 111 packages npm
+     * bundles behind. `extraResources` of the resolved copy dropped
+     * `node_modules` outright -- the packager filters that name out of a
+     * plain directory copy, which also takes the 8 nested ones that carry
+     * npm's version conflicts. Either way the first run with no Node said
+     * "Cannot find module 'graceful-fs'": npm failing to be a program,
+     * rather than Locust failing to find one. Through the asar all 119
+     * directories arrive.
      */
-    join(resourcesPath, 'npm', 'bin', 'npm-cli.js'),
-    join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    join(resourcesPath, 'app.asar.unpacked', 'resources', 'npm', 'bin', 'npm-cli.js'),
     // Development: the workspace's own copy.
     join(appPath, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
     join(appPath, '..', '..', 'node_modules', 'npm', 'bin', 'npm-cli.js')

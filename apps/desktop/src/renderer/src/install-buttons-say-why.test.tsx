@@ -36,7 +36,7 @@ const runtime = (id: LocalRuntimeId, name: string, connected: boolean): PublicRu
   status: connected ? 'ready' : 'not-installed'
 })
 
-function panel(options: { connected: number; npmMissing: boolean }): string {
+function panel(options: { connected: number; npmMissing: boolean; npmIsBundled?: boolean }): string {
   // One connected runtime standing in for Codex, plus ones that are not.
   const runtimes = [
     runtime('codex', 'Codex', options.connected > 0),
@@ -54,6 +54,7 @@ function panel(options: { connected: number; npmMissing: boolean }): string {
       onChooseFolder={() => undefined}
       onInstall={() => undefined}
       npmMissing={options.npmMissing}
+      npmIsBundled={options.npmIsBundled ?? false}
     />
   )
 }
@@ -91,5 +92,54 @@ describe('when Node.js is missing', () => {
     // out offered to the person who had no Node.
     expect(withCodex).not.toContain('<a href="https://nodejs.org"')
     expect(withCodex).toContain('lc-linkbutton')
+  })
+})
+
+/**
+ * And when the app carries its own npm, the buttons are NOT switched off.
+ *
+ * Ian, 2026-09-17: he downloaded Locust and nothing worked until he
+ * installed Node.js. The screen was honest -- every button said why it could
+ * not run -- but honest about a limit that did not have to exist. An Electron
+ * binary started with ELECTRON_RUN_AS_NODE=1 is a Node runtime (24.18.1 in
+ * the packaged build), and npm is a node script, so the app had a working npm
+ * the whole time.
+ *
+ * Measured on a real packaged build, 2026-09-18: that npm installed a package
+ * with no Node anywhere on PATH, in one second.
+ *
+ * What the note must NOT do is overclaim. npm writes launcher shims that call
+ * node by name, so the CLI it installs is reachable from Locust and not from
+ * the person's own terminal until they install Node themselves.
+ */
+describe('when this app carries its own npm', () => {
+  const carried = panel({ connected: 0, npmMissing: false, npmIsBundled: true })
+
+  it('does not disable a single Install button', () => {
+    // The whole point. `npmMissing` is what disables them, and a build that
+    // ships npm has no reason to set it.
+    expect(carried).toContain('Install')
+    expect(carried).not.toContain('disabled=""')
+  })
+
+  it('does not tell the person the buttons cannot run', () => {
+    expect(carried).not.toContain('cannot run')
+  })
+
+  it('says where the install came from, since the buttons working is the surprise', () => {
+    expect(carried).toContain('the copy of npm it carries')
+  })
+
+  it('says the part that is still true: their own terminal is unchanged', () => {
+    // Without this the person installs a CLI, opens a terminal, and finds
+    // nothing -- which reads as the install having failed.
+    expect(carried).toContain('your own terminal')
+    expect(carried).toContain('lc-linkbutton')
+  })
+
+  it('says none of it on a machine that has its own Node', () => {
+    const ordinary = panel({ connected: 1, npmMissing: false })
+    expect(ordinary).not.toContain('the copy of npm it carries')
+    expect(ordinary).not.toContain('Node.js is not on this machine')
   })
 })

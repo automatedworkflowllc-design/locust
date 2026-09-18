@@ -470,7 +470,19 @@ const waitingForWindow = new Promise<void>((resolve) => {
 
 const runtimeDiscovery = createRuntimeDiscoveryService({
   probe: discoverForWork,
-  npmPresent
+  /*
+   * The question the first screen asks is "can an Install button run", not
+   * "is Node on this machine". Since 0.178.0 those differ: the app carries
+   * its own npm and runs it with its own binary as the Node, so a machine
+   * with no Node installs fine. Ian's machine was the case that made this
+   * matter -- he downloaded Locust and nothing worked until he installed
+   * Node, on a screen whose entire job is installing something.
+   */
+  npmPresent: async () => bundledNpm !== undefined || await npmPresent(),
+  // Only when it is the one that WILL run: the installer prefers a machine's
+  // own npm and falls back to this, so with Node installed the note would be
+  // saying something untrue about the install that is about to happen.
+  npmIsBundled: async () => bundledNpm !== undefined && !(await npmPresent())
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined

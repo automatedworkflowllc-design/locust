@@ -221,7 +221,13 @@ interface LiveRunState {
 
 type RuntimeDiscoveryState =
   | { readonly phase: 'loading' }
-  | { readonly phase: 'ready'; readonly runtimes: readonly PublicRuntimeStatus[]; readonly npmPresent?: boolean }
+  | {
+      readonly phase: 'ready'
+      readonly runtimes: readonly PublicRuntimeStatus[]
+      readonly npmPresent?: boolean
+      /** The npm that will run is this app's own, because the machine has none. */
+      readonly npmIsBundled?: boolean
+    }
   | { readonly phase: 'error' }
 
 type RunMap = ReadonlyMap<string, LiveRunState>
@@ -1737,7 +1743,16 @@ export default function App(): ReactElement {
       .getLocalRuntimes()
       .then((response) => {
         if (!active) return
-        setRuntimeState(response.ok ? { phase: 'ready', runtimes: response.data.runtimes, npmPresent: response.data.npmPresent } : { phase: 'error' })
+        setRuntimeState(
+          response.ok
+            ? {
+                phase: 'ready',
+                runtimes: response.data.runtimes,
+                npmPresent: response.data.npmPresent,
+                npmIsBundled: response.data.npmIsBundled
+              }
+            : { phase: 'error' }
+        )
       })
       .catch(() => {
         if (active) setRuntimeState({ phase: 'error' })
@@ -1762,7 +1777,8 @@ export default function App(): ReactElement {
           setRuntimeState((held) => ({
             phase: 'ready',
             runtimes: keepWhatWasKnown(held.phase === 'ready' ? held.runtimes : [], response.data.runtimes),
-            npmPresent: response.data.npmPresent
+            npmPresent: response.data.npmPresent,
+            npmIsBundled: response.data.npmIsBundled
           }))
           const stillChecking = response.data.runtimes.some(
             (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
@@ -4413,6 +4429,7 @@ export default function App(): ReactElement {
                 }
                 installFailure={installFailure}
                 npmMissing={runtimeState.phase === 'ready' && runtimeState.npmPresent === false}
+                npmIsBundled={runtimeState.phase === 'ready' && runtimeState.npmIsBundled === true}
               />
             )
           ) : (

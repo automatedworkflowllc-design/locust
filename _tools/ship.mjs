@@ -134,6 +134,11 @@ if (checkOnly) {
 }
 
 console.log('\nBuilding and packaging')
+// npm, staged where the packager will carry it, so a machine with no Node.js
+// can still install a coding CLI. It refuses rather than staging a half copy,
+// which is the failure that would otherwise reach a person as a broken
+// button instead of an honest "you need Node".
+if (!run('node', ['_tools/vendor-npm.mjs'], 'stage the npm this app ships')) process.exit(1)
 if (!run('pnpm', ['build'], 'pnpm build')) process.exit(1)
 if (!run('pnpm', ['--filter', '@teammate/desktop', 'package'], 'electron-builder package')) process.exit(1)
 

@@ -34,6 +34,13 @@ files:
   # until 0.32.0, so the packaged window fell back to Electron's own icon in
   # the taskbar (Colin, 2026-09-05: "app icon is showing as electron app").
   - resources/icon-512.png
+  # npm itself, so a machine with no Node.js can still install a coding CLI.
+  - resources/npm/**/*
+
+# npm has to be real files on disk: it spawns, reads its own package.json and
+# writes shims, none of which works from inside the archive.
+asarUnpack:
+  - resources/npm/**/*
 
 # Copied beside app.asar, into process.resourcesPath: the window icon has to
 # be a real file on disk, not a path inside the archive (2026-09-06).

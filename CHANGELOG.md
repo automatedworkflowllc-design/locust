@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.178.0 - 2026-09-18
+
+- **You no longer need Node.js to install a coding CLI.** Locust carries its
+  own copy of npm and runs it with its own binary, so the Install buttons on
+  the first screen work on a machine with nothing else on it. Before this
+  they were all switched off, on a screen whose entire job is installing
+  something -- the app that could not install anything was the app you had
+  just downloaded in order to install something.
+- **The screen says which npm it used.** When Node is absent Locust says the
+  install ran on the copy it carries, and says the part that is still true:
+  the CLI works inside Locust, and your own terminal will not see it until
+  you install Node.js yourself.
+- A CLI installed this way **runs without Node too** -- Locust hands it the
+  same runtime it uses itself.
+
 ## 0.177.0 - 2026-09-17
 
 - **The app says what changed.** The first time you open a new version, the

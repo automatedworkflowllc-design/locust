@@ -34,6 +34,11 @@ interface RuntimeDiscoveryServiceOptions {
    * every existing caller and test expects; the app wires it for real.
    */
   readonly npmPresent?: () => Promise<boolean>
+  /**
+   * Whether the npm that would run is this app's own copy. Absent means no,
+   * which is what every build before 0.178.0 and every existing test expect.
+   */
+  readonly npmIsBundled?: () => Promise<boolean>
 }
 
 function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
@@ -108,7 +113,8 @@ export function createRuntimeDiscoveryService(
           data: {
             checkedAt: now().toISOString(),
             runtimes: runtimes.map(publicStatus),
-            npmPresent: options.npmPresent === undefined ? true : await options.npmPresent()
+            npmPresent: options.npmPresent === undefined ? true : await options.npmPresent(),
+            npmIsBundled: options.npmIsBundled === undefined ? false : await options.npmIsBundled()
           }
         }))
         .catch(() => discoveryFailed())

@@ -4,20 +4,27 @@
 //
 // Locust installs coding CLIs with npm, and a machine with no Node has none.
 // The app's own binary is a Node runtime, so all that is missing is npm
-// itself -- and npm is a program, not a folder: it needs the ~118 packages
-// it bundles.
+// itself -- and npm is a program, not a folder: it needs the 111 packages it
+// bundles, plus the 8 nested node_modules that carry its version conflicts.
 //
-// Two ways failed before this existed, both measured:
+// Two routes were measured and both lose that tree:
 //
-//   asarUnpack: node_modules/npm/**   ->  npm arrived, its node_modules did
-//     not. pnpm links node_modules/npm at its store and the link took the
-//     folder without the tree under it.
-//   extraResources from node_modules/npm  ->  same result: the packager
-//     filters nested node_modules out of a copy.
+//   asarUnpack: node_modules/npm/**       ->  npm arrived, its packages did
+//     not. pnpm links node_modules/npm at its store, and packaging the link
+//     took the folder without the tree under it.
+//   extraResources from: resources/npm    ->  0 packages, even from a fully
+//     resolved copy. The packager filters the name `node_modules` out of a
+//     plain directory copy.
 //
-// Both produced the same first run: "Cannot find module 'graceful-fs'". So
-// npm is staged OUTSIDE node_modules, into `apps/desktop/resources/npm`,
-// where it is an ordinary directory the packager copies whole.
+// Both produced the same first run: "Cannot find module 'graceful-fs'".
+//
+// What works, measured on a real build 2026-09-18: stage npm OUTSIDE
+// node_modules, into `apps/desktop/resources/npm`, and carry it through the
+// ASAR -- `files` plus `asarUnpack`. All 111 packages and all 8 nested
+// directories arrive, and that npm installed a package with no Node anywhere
+// on PATH in one second.
+//
+// The copy dereferences pnpm's links, so what lands is real files.
 //
 // Run before packaging; `ship.mjs` does it.
 

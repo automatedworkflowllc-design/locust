@@ -67,7 +67,8 @@ export function FirstLaunch({
   installLine,
   installLog,
   installFailure,
-  npmMissing = false
+  npmMissing = false,
+  npmIsBundled = false
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -96,8 +97,14 @@ export function FirstLaunch({
     /** The line the app would have run, kept reachable however it went wrong. */
     readonly command?: string
   }
-  /** Node is not on this machine, so four of the five cannot install at all. */
+  /** Nothing can run an install: no npm on the machine, and none shipped. */
   readonly npmMissing?: boolean
+  /**
+   * The install will run on the npm this app carries, because the machine
+   * has no Node. The buttons work; what differs is where the CLI ends up
+   * reachable from, which the note below says out loud.
+   */
+  readonly npmIsBundled?: boolean
 }): ReactElement {
   // Stays open across subsequent installs once a person opens it, which is
   // what the design asks for: someone who wanted the trace once wants it
@@ -344,6 +351,28 @@ export function FirstLaunch({
                 openLink('https://nodejs.org', setLinkRefusal)
               }}>
               Get Node.js ↗
+            </button>
+          </p>
+        )}
+        {/*
+          * Node is absent and the buttons still work, which is a surprise
+          * worth explaining before it becomes one. Ian downloaded Locust
+          * and nothing worked until he installed Node; since 0.178.0 the
+          * app carries its own npm and runs it with its own binary as the
+          * Node, so the install goes through. The part that does NOT change
+          * is the person's terminal: npm writes launcher shims that call
+          * node by name, so outside Locust the CLI still needs one. Saying so
+          * here costs one sentence; being discovered costs an evening.
+          */}
+        {discoveryPhase === 'ready' && npmIsBundled && (
+          <p className="lc-installnote">
+            Node.js is not on this machine, so Locust installs with the copy of npm it carries.
+            The CLI will work here. To use it in your own terminal too, install{' '}
+            <button type="button" className="lc-linkbutton" onClick={() => {
+                setLinkRefusal(undefined)
+                openLink('https://nodejs.org', setLinkRefusal)
+              }}>
+              Node.js ↗
             </button>
           </p>
         )}

@@ -991,6 +991,14 @@ export type RuntimeDiscoveryResponse =
          * pressing the button for the first time).
          */
         readonly npmPresent?: boolean
+        /**
+         * True when the npm that will run is the one this app carries, not
+         * one on the machine. The buttons work either way; what differs is
+         * that a CLI installed this way is reachable from Locust and not
+         * from the person's own terminal, which is worth saying on screen
+         * rather than leaving to be discovered.
+         */
+        readonly npmIsBundled?: boolean
       }
     }
   | {

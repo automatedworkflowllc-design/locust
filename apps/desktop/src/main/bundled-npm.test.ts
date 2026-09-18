@@ -14,13 +14,17 @@ const APP = 'C:\\Program Files\\Locust\\resources\\app.asar'
 const EXEC = 'C:\\Program Files\\Locust\\Locust.exe'
 
 describe('the npm this app carries', () => {
-  it('is looked for in resources first, where a packaged build copies it whole', () => {
-    // Not `app.asar.unpacked`: that shipped npm without the 118 packages it
-    // bundles, because pnpm links node_modules/npm at its store and the
-    // link took the folder and not the tree. Measured as "Cannot find
-    // module 'graceful-fs'" on the first run with no Node on PATH.
+  it('is looked for beside the asar, the one route that carries the whole tree', () => {
+    // Measured 2026-09-18 on a real build: through the asar all 111 bundled
+    // packages and all 8 nested node_modules arrive, and that npm installed
+    // a package with no Node on PATH. The same staged directory copied as a
+    // plain resource arrived with 0 packages -- the packager filters
+    // `node_modules` out of a directory copy -- and died on its first run
+    // with "Cannot find module 'graceful-fs'".
     const [first] = bundledNpmPaths(PACKAGED, APP)
-    expect(first).toBe('C:\\Program Files\\Locust\\resources\\npm\\bin\\npm-cli.js')
+    expect(first).toBe(
+      'C:\\Program Files\\Locust\\resources\\app.asar.unpacked\\resources\\npm\\bin\\npm-cli.js'
+    )
   })
 
   it('is found, and comes with the variable that makes the app behave as Node', () => {
