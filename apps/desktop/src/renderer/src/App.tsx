@@ -227,6 +227,13 @@ type RuntimeDiscoveryState =
       readonly npmPresent?: boolean
       /** The npm that will run is this app's own, because the machine has none. */
       readonly npmIsBundled?: boolean
+      /**
+       * Discovery asked three more times and something installed still never
+       * answered. Grok, pass 11: five CLIs on PATH that hang forever left
+       * every row CHECKING with the Install buttons gone and no way past it.
+       * CHECKING is a moment; after the fourth sweep it is a verdict.
+       */
+      readonly gaveUp?: boolean
     }
   | { readonly phase: 'error' }
 
@@ -1786,6 +1793,10 @@ export default function App(): ReactElement {
           if (stillChecking && retries < 3) {
             retries += 1
             setTimeout(askAgain, RUNTIME_RECHECK_MS)
+          } else if (stillChecking) {
+            // Asked, asked again, and again: the screen has to stop saying
+            // "shortly" and offer a way past a CLI that will never answer.
+            setRuntimeState((held) => (held.phase === 'ready' ? { ...held, gaveUp: true } : held))
           }
         })
         .catch(() => undefined)
@@ -4449,6 +4460,7 @@ export default function App(): ReactElement {
                 installFailure={installFailure}
                 npmMissing={runtimeState.phase === 'ready' && runtimeState.npmPresent === false}
                 npmIsBundled={runtimeState.phase === 'ready' && runtimeState.npmIsBundled === true}
+                checkingGaveUp={runtimeState.phase === 'ready' && runtimeState.gaveUp === true}
               />
             )
           ) : (

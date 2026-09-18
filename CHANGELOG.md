@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.181.0 - 2026-09-18
+
+- **A coding CLI that hangs no longer blocks the first hour.** If something
+  on this machine answers to a CLI's name but never replies, its row used to
+  read CHECKING forever with no Install anywhere. After Locust has asked
+  four times the row now says NOT ANSWERING and offers Install again.
+- **The command palette closes on Escape** wherever your focus is, the way
+  the plus menu already did.
+- The message box no longer asks you to "sign in" when nothing has asked
+  for a sign-in.
+
 ## 0.180.0 - 2026-09-18
 
 - **Installing a CLI with no Node.js now finishes the job.** 0.178.0 could run

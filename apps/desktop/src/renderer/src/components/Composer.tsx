@@ -503,7 +503,12 @@ export function Composer({
                 // Pass 4 took this instruction off the roster; pass 5 found
                 // it still in the box you type into, two inches under a
                 // welcome saying OpenCode needs no account (Grok, 0.154.0).
-                runtimes.some((runtime) => runtime.installed)
+                // And "installed" was not enough either: five CLIs that
+                // hang on PATH count as installed, and the box then asked
+                // for a sign-in beside a row saying no account is needed
+                // (Grok, pass 11). Only a runtime that has SAID it wants a
+                // sign-in earns the words.
+                runtimes.some((runtime) => runtime.status === 'auth-required' || runtime.auth === 'unauthenticated')
                 ? 'Install a coding agent and sign in to start a mission…'
                 : 'Install a coding agent to start a mission…'
 

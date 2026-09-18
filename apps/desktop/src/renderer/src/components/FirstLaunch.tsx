@@ -68,7 +68,8 @@ export function FirstLaunch({
   installLog,
   installFailure,
   npmMissing = false,
-  npmIsBundled = false
+  npmIsBundled = false,
+  checkingGaveUp = false
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -105,6 +106,12 @@ export function FirstLaunch({
    * reachable from, which the note below says out loud.
    */
   readonly npmIsBundled?: boolean
+  /**
+   * Discovery has asked three more times and an installed CLI still has not
+   * answered. Until then CHECKING is honest; after it, the row has to say
+   * what is true and offer the one thing that can change it.
+   */
+  readonly checkingGaveUp?: boolean
 }): ReactElement {
   // Stays open across subsequent installs once a person opens it, which is
   // what the design asks for: someone who wanted the trace once wants it
@@ -274,6 +281,28 @@ export function FirstLaunch({
                     // it is done on its own -- discovery re-runs and the dot
                     // goes green.
                     <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
+                  ) : runtime.installed && checkingGaveUp && status.tag === 'CHECKING' && installCommand(runtime.id) !== undefined && onInstall !== undefined ? (
+                    /*
+                     * Found on this machine, and it never answered -- four
+                     * sweeps, five seconds each. Grok, pass 11: five CLIs
+                     * that hang on PATH (an antivirus hold, a half-finished
+                     * npm, a proxy) left every row CHECKING for good with
+                     * no Install anywhere, and the first hour ended there.
+                     * The tag says what is true and Install comes back as
+                     * "Install again": npm replaces what is there.
+                     */
+                    <span className="lc-runtimecell__stuck">
+                      <span className="lc-runtimecell__tag">NOT ANSWERING</span>
+                      <button
+                        type="button"
+                        className="lc-runtimecell__install"
+                        disabled={installing !== undefined || npmMissing}
+                        title={`${runtime.displayName} is on this machine but did not answer its version probe in four tries. Installing again replaces it.`}
+                        onClick={() => onInstall(runtime.id)}
+                      >
+                        Install again
+                      </button>
+                    </span>
                   ) : runtime.installed ? (
                     // Installed, but not answering yet. CHECKING is a moment,
                     // not a verdict -- Claude Code's first probe can outlast

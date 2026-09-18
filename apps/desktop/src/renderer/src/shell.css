@@ -3482,6 +3482,13 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* A CLI that is on the machine and never answers: the tag and the way past it, side by side. */
+.lc-runtimecell__stuck {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
 .lc-runtimecell__install.is-primary:disabled {
   border-color: var(--lc-border-control);
   color: var(--lc-text-muted);

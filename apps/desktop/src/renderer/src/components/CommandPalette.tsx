@@ -74,6 +74,23 @@ export function CommandPalette({
     setIndex(0)
   }, [query])
 
+  /*
+   * Escape closes it from anywhere, not only from inside it.
+   *
+   * The handler below is on the palette's own element, so it only hears a
+   * key when focus is inside. Grok, pass 11: palette open, Escape, still
+   * open. The plus menu already listens at the document, and a person who
+   * has clicked elsewhere and presses the key the rest of the app trained
+   * expects the same here.
+   */
+  useEffect(() => {
+    const onDocumentKey = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onDocumentKey)
+    return () => document.removeEventListener('keydown', onDocumentKey)
+  }, [onClose])
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === 'Escape') {
       event.preventDefault()
