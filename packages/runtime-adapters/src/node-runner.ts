@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { isAbsolute } from "node:path";
 import type { CommandResult, CommandRunner, ProbeCommand } from "./types.js";
 
@@ -12,6 +12,7 @@ export interface SpawnedProbeProcess {
   once(event: "error", listener: (error: Error) => void): unknown;
   once(event: "close", listener: (exitCode: number | null) => void): unknown;
   kill(signal?: NodeJS.Signals): boolean;
+  readonly pid?: number;
 }
 
 export type ProbeSpawn = (
@@ -30,7 +31,32 @@ export interface NodeProbeRunnerOptions {
   readonly killGraceMs?: number;
   /** Test seam; production callers should leave this undefined. */
   readonly spawnProcess?: ProbeSpawn;
+  /**
+   * How to end everything a timed-out probe started, not only the process
+   * itself. On Windows a CLI reached through a `.cmd` shim is cmd.exe with
+   * the real program as its child, and `kill()` ends cmd.exe alone: the
+   * program runs on. MEASURED 2026-09-18 with shims that ping for an hour --
+   * five leaked per sweep, fifty running after two drives, holding the
+   * folder they lived in. The default takes the tree down with taskkill on
+   * Windows and does nothing extra elsewhere; a test hands in a spy.
+   */
+  readonly killTree?: (pid: number) => void;
 }
+
+const defaultKillTree = (pid: number): void => {
+  if (process.platform !== "win32") return;
+  try {
+    // Synchronous on purpose. The first version started taskkill and sent
+    // SIGTERM in the same tick; cmd.exe died before taskkill had walked its
+    // tree, the ping was orphaned, and `/T` could no longer find it. Measured
+    // with the runner alone: "after 1", and the calling process then hung on
+    // the orphan's open pipe. The walk takes tens of milliseconds on a path
+    // that has already waited five seconds.
+    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+  } catch {
+    // The process itself still gets the signals below.
+  }
+};
 
 interface BoundedOutput {
   readonly chunks: Uint8Array[];
@@ -70,6 +96,7 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Com
   const maximumTimeoutMs = positiveInteger(options.maximumTimeoutMs, 10_000, "maximumTimeoutMs");
   const killGraceMs = positiveInteger(options.killGraceMs, 500, "killGraceMs");
   const spawnProcess = options.spawnProcess ?? defaultSpawn;
+  const killTree = options.killTree ?? defaultKillTree;
 
   return {
     run(command: ProbeCommand): Promise<CommandResult> {
@@ -113,6 +140,8 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Com
 
         const timeoutTimer = setTimeout(() => {
           timedOut = true;
+          // The tree first: what the shim started is the thing that hangs.
+          if (typeof child.pid === "number") killTree(child.pid);
           child.kill("SIGTERM");
           forceTimer = setTimeout(() => {
             child.kill("SIGKILL");

@@ -155,6 +155,12 @@ try {
   // The probes are killed on their timeout, but the ping each shim started
   // is a grandchild and outlives cmd.exe. Fifty of them were found running
   // after the first two attempts of this drive, holding the shim folder.
+  // Counted BEFORE the cleanup: with the runner killing the tree on timeout,
+  // this should be zero; before that fix it was five per sweep.
+  const listed = spawnSync('tasklist', [], { encoding: 'utf8', windowsHide: true }).stdout || ''
+  const leaked = listed.split(String.fromCharCode(10)).filter((l) => /^ping\.exe/i.test(l)).length
+  say(`   hung probes still running at exit: ${String(leaked)}`)
+  check('a timed-out probe takes its tree with it', leaked === 0, String(leaked))
   spawnSync('taskkill', ['/F', '/IM', 'ping.exe'], { stdio: 'ignore', windowsHide: true })
   await rm(root, { recursive: true, force: true }).catch(() => undefined)
 }

@@ -1228,6 +1228,47 @@ describe("bounded Node probe runner", () => {
     expect(result.timedOut).toBe(true);
     expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
   });
+
+  it("takes a timed-out probe's whole tree down, not only the shim it spawned", async () => {
+    /*
+     * MEASURED 2026-09-18 with five `.cmd` shims that ping for an hour: the
+     * signals above end cmd.exe and the ping it started runs on. Five leaked
+     * per sweep; fifty were running after two drives. The tree goes first,
+     * by the pid the child reports, and a child that reports none gets the
+     * signals alone.
+     */
+    const treeKills: number[] = [];
+    const signals: Array<NodeJS.Signals | undefined> = [];
+    const runner = createNodeProbeRunner({
+      maximumTimeoutMs: 5,
+      killGraceMs: 5,
+      killTree: (pid) => treeKills.push(pid),
+      spawnProcess: () => {
+        const process = new EventEmitter() as EventEmitter & SpawnedProbeProcess;
+        Object.assign(process, {
+          stdout: new EventEmitter(),
+          stderr: new EventEmitter(),
+          pid: 4242,
+          kill: (signal?: NodeJS.Signals) => {
+            signals.push(signal);
+            return true;
+          },
+        });
+        return process;
+      },
+    });
+
+    const result = await runner.run({
+      purpose: "readiness",
+      executablePath: "C:\\tools\\opencode.cmd",
+      args: ["--version"],
+      timeoutMs: 5,
+    });
+    expect(result.timedOut).toBe(true);
+    expect(treeKills).toEqual([4242]);
+    // The tree first, then the signals: the order in which they end things.
+    expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
 });
 
 describe("model and effort on the command line", () => {
