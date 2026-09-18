@@ -17,6 +17,7 @@ import type {
   PublicRuntimeStatus,
   PublicStorageReport,
   MissionPruneResponse,
+  AppChangelog,
   TrashListResponse,
   TrashMutationResponse,
   AppUpdateResponse,
@@ -75,7 +76,7 @@ import { CommandPalette } from './components/CommandPalette.js'
 import type { PaletteAction } from './components/CommandPalette.js'
 import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
-import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
+import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner, WhatChangedBanner } from './components/Screens.js'
 import type { RouteChoice } from './components/RoutePicker.js'
 import { composerRouteFor } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
@@ -913,6 +914,7 @@ export default function App(): ReactElement {
   const [groups, setGroups] = useState<readonly PublicGroup[]>([])
   const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, GroupMembership>>>({})
   const [groupLeft, setGroupLeft] = useState<Readonly<Record<string, readonly LeftMembership[]>>>({})
+  const [changelog, setChangelog] = useState<AppChangelog | undefined>(undefined)
   /**
    * Local files that exist and refused to read, by store name. Held apart
    * from "empty" so the sidebar can say so -- an unreadable roster used to
@@ -1810,6 +1812,11 @@ export default function App(): ReactElement {
         // default, which is what the process is launched with anyway.
       })
 
+    // What changed in this build, read from the file that shipped with it.
+    void bridge
+      .getChangelog()
+      .then((answer) => { if (active) setChangelog(answer) })
+      .catch(() => undefined)
     void bridge
       .listTeammates()
       .then((response) => {
@@ -4328,6 +4335,7 @@ export default function App(): ReactElement {
             onListTrash={listTrash}
             onRestoreMission={restoreMission}
             onEmptyTrash={emptyTrash}
+            changelog={changelog}
               onPrune={prune}
             />
           ) : liveRun === undefined ? (
@@ -4799,6 +4807,7 @@ export default function App(): ReactElement {
               )}
             </div>
           )}
+          {screen === 'workroom' && <WhatChangedBanner changelog={changelog} />}
           {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer

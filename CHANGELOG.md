@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.177.0 - 2026-09-17
+
+- **The app says what changed.** The first time you open a new version, the
+  workroom says so and you can read the entry without leaving the screen.
+  It says it once: the version is written down as soon as it is shown.
+- **Settings carries it permanently**, under **This app → Updates**, so you
+  can look up what this build was at any time.
+- **The changelog is public.** It is published to the releases repo with
+  every ship, and locust.lol links to it. Before this it existed only in the
+  private repo -- the one account of what changed that nobody could read.
+
+  The notes ship inside the installer, so what the app tells you was
+  packaged with the bytes it is telling you about, and reading it needs no
+  network.
+
 ## 0.176.0 - 2026-09-17
 
 - **Settings is a list of pages, not one long scroll.** The five areas are

@@ -44,6 +44,10 @@ extraResources:
   # file on disk, never a path inside the archive (permission-host.ts).
   - from: resources/locust-permission-bridge.mjs
     to: locust-permission-bridge.mjs
+  # What changed, packaged WITH the build it describes -- so the notes and
+  # the bytes cannot disagree, and saying so needs no network.
+  - from: ../../CHANGELOG.md
+    to: CHANGELOG.md
 
 # Never ship the caller's mission ledger, smoke profiles, or source maps.
 asar: true

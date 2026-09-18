@@ -170,7 +170,7 @@ try {
   check('the logo goes home', (await evaluate(`!!document.querySelector('.lc-runtimepanel')`)) === true)
 
   const ask = async (name, text) => evaluate(`(async () => {
-    // \`title="Message <name>"\` has not existed for a long time, so this asked
+    // A title of "Message <name>" has not existed for a long time, so this asked
     // nobody and every run below reported "finished" without one ever
     // starting. A teammate is addressed from their FACE in the sidebar
     // ("<name> — show only their conversations"); the Team screen's roster

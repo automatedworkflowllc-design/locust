@@ -162,6 +162,21 @@ export const CODEX_MISSION_UPDATE_CHANNEL = 'codex-mission:update'
 export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 export const MISSION_DELETE_CHANNEL = 'mission:delete'
 export const APP_INFO_CHANNEL = 'app:info'
+export const APP_CHANGELOG_CHANNEL = 'app:changelog'
+
+/** What changed in the build that is running. */
+export interface AppChangelog {
+  readonly version: string
+  /** The entry's markdown, without its heading; absent when the file has none for this build. */
+  readonly body?: string
+  readonly date?: string
+  /**
+   * This is the first launch on this version -- so the window may say what
+   * changed unprompted. Decided by the host, once per launch, against a
+   * version it remembers; the window has nowhere durable to keep that.
+   */
+  readonly firstRun: boolean
+}
 export const MISSION_STORAGE_CHANNEL = 'mission:storage'
 export const APP_UPDATE_CHECK_CHANNEL = 'app:update-check'
 export const APP_UPDATE_INSTALL_CHANNEL = 'app:update-install'
@@ -1732,6 +1747,8 @@ export interface DesktopApi {
   toggleMaximize(): void
   close(): void
   getAppInfo(): Promise<AppInfo>
+  /** What changed in the running build, and whether this is its first launch. */
+  getChangelog(): Promise<AppChangelog>
   readStorageReport(): Promise<StorageReportResponse>
   checkForUpdate(): Promise<AppUpdateResponse>
   installUpdate(): Promise<AppUpdateResponse>

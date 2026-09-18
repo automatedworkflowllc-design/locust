@@ -3397,6 +3397,29 @@ textarea {
   padding-bottom: 22px;
 }
 
+/* What changed in the build you are running. */
+.lc-whatchanged {
+  margin-top: var(--lc-space-4);
+}
+
+/* The banner grows when it is opened, so it stops being a single row. */
+.lc-whatchanged__banner {
+  align-items: flex-start;
+}
+
+.lc-whatchanged__actions {
+  display: flex;
+  flex: none;
+  gap: var(--lc-space-4);
+}
+
+.lc-settings__subheading {
+  margin: var(--lc-space-6) 0 var(--lc-space-4);
+  font-size: var(--lc-text-body);
+  font-weight: 500;
+  color: var(--lc-text-primary);
+}
+
 /* What has been deleted and is still here, until the trash is emptied. */
 .lc-trash {
   display: flex;

@@ -15,10 +15,11 @@ import {
   discoverInstalledRuntimes
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
+import type { AppChangelog } from '../shared/ipc.js'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
-import { appendFileSync, mkdirSync, readFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { release } from 'node:os'
@@ -64,6 +65,7 @@ const ROUTINE_TICK_MS = 60_000
 const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
 import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
+import { changelogPaths, entryFor, readChangelog } from './changelog.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createConnectorReader } from './connector-reader.js'
@@ -87,6 +89,7 @@ import {
   MISSION_HANDOFF_CHANNEL,
   MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
+  APP_CHANGELOG_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
   APP_UPDATE_STATE_CHANNEL,
@@ -2941,6 +2944,56 @@ ${taskSection({
         }
       }
       return history
+    })
+
+    /*
+     * What changed, answered once per launch.
+     *
+     * The FIRST-RUN decision is made here and written down immediately, so a
+     * window that asks twice gets the same answer and a window that never
+     * asks does not leave the app claiming to be new forever. The file is
+     * one line in the profile; losing it costs one extra "what changed",
+     * which is the harmless direction.
+     */
+    const seenVersionFile = join(app.getPath('userData'), 'seen-version.json')
+    let changelogAnswer: Promise<AppChangelog> | undefined
+    const readChangelogOnce = (): Promise<AppChangelog> => {
+      changelogAnswer ??= (async () => {
+        const version = app.getVersion()
+        let seen: string | undefined
+        try {
+          seen = JSON.parse(readFileSync(seenVersionFile, 'utf8')).version
+        } catch {
+          // Never launched, or the file is unreadable: either way this
+          // version has not been shown.
+        }
+        if (seen !== version) {
+          try {
+            mkdirSync(app.getPath('userData'), { recursive: true })
+            writeFileSync(seenVersionFile, JSON.stringify({ version }), 'utf8')
+          } catch {
+            // Remembering is a convenience; failing to must not stop a launch.
+          }
+        }
+        const text = await readChangelog(changelogPaths(process.resourcesPath, app.getAppPath()))
+        const entry = text === undefined ? undefined : entryFor(text, version)
+        return {
+          version,
+          ...(entry?.body === undefined ? {} : { body: entry.body }),
+          ...(entry?.date === undefined ? {} : { date: entry.date }),
+          firstRun: seen !== version
+        }
+      })()
+      return changelogAnswer
+    }
+
+    ipcMain.handle(APP_CHANGELOG_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { version: app.getVersion(), firstRun: false } as const
+      try {
+        return await readChangelogOnce()
+      } catch {
+        return { version: app.getVersion(), firstRun: false } as const
+      }
     })
 
     ipcMain.handle(APP_INFO_CHANNEL, (event) => {
