@@ -6,6 +6,31 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.180.0 - 2026-09-18
+
+- **Installing a CLI with no Node.js now finishes the job.** 0.178.0 could run
+  the install and then not find what it had installed. Three things were
+  wrong, and all three were measured on a machine with nothing on it: npm
+  put the CLI beside Locust's own program where nothing looked; the npm
+  Locust carries refused to run the CLI's own install step; and that step
+  needed a program called node, which was not there. Now the CLI lands in a
+  folder Locust owns and searches, the install step is allowed for the one
+  package you asked for, and a stand-in for node is supplied for the length
+  of the install. Press Install on a blank machine and about twenty seconds
+  later OpenCode reports its version.
+- **Ask mode works on the free model again.** The free OpenCode model had
+  begun refusing every run from Ask with "free tier can only be used from
+  within OpenCode", because Ask removed the shell tool and the provider no
+  longer recognised the client. The shell tool is now offered and every use
+  of it is refused by OpenCode itself, so Ask is still read-only and the
+  free model answers.
+- **Putting back one turn of a conversation puts the conversation back,**
+  even if you had opened the other turn to check what was left. Before this
+  the sidebar showed two rows for one conversation until you restarted.
+- **A single-digit answer is a single digit.** Asking for one used to draw a
+  question about whether to answer in complete sentences instead.
+- The Install tooltips no longer say the buttons are "below".
+
 ## 0.179.0 - 2026-09-18
 
 - **Settings search knows the words you would type.** Searching for *memory*,

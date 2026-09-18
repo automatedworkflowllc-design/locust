@@ -45,6 +45,11 @@ PROMPTS.cos = 'What is the share text limit recorded in this workspace, and wher
 PROMPTS.route = 'I need a short written brief, for someone joining tomorrow, on what the limits recorded in this workspace mean for an exchange between two teammates and whether the three of them are consistent with each other. Name the sources.'
 // 'custom': Wren has a Custom role titled 'release manager'; the reply says what it thinks its role is.
 PROMPTS.custom = 'In one line, what is your role on this team, in your own words? Do not read any files and do not use the share block.'
+// 'digit': Grok's pass-10 first-hour check. On 0.179.0 in Accept edits this drew
+// 25 seconds, three tool calls and a decision card offering "single digit"
+// versus "complete sentences", because the last-message brief read as a rule.
+// The answer is 2, and the measure is whether the final message IS 2.
+PROMPTS.digit = 'What is 1 plus 1? Reply with a single digit.'
 // 'memory': 30 team memories, the answer only in the OLDEST -- outside what the brief pastes; the file must be read.
 PROMPTS.memory = 'According to the team memory, when does the API key rotate? Answer from memory and say exactly where you found it. Do not use the share block.'
 // 'secret': a fake key in a file; the ledger must hold [redacted], never the key.
