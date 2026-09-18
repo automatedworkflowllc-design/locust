@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.182.0 - 2026-09-18
+
+- **A coding CLI that hangs no longer leaves processes behind.** When one
+  did not answer its version check, Locust stopped waiting but the program it
+  had started kept running: five more every time it looked again. Locust now
+  ends all of it.
+
 ## 0.181.0 - 2026-09-18
 
 - **A coding CLI that hangs no longer blocks the first hour.** If something

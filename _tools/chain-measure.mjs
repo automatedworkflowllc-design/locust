@@ -50,6 +50,12 @@ PROMPTS.custom = 'In one line, what is your role on this team, in your own words
 // versus "complete sentences", because the last-message brief read as a rule.
 // The answer is 2, and the measure is whether the final message IS 2.
 PROMPTS.digit = 'What is 1 plus 1? Reply with a single digit.'
+// 'quote': Grok's pass-11 memory check, from where the person stands. Their
+// seeded memories.json produced NONE and no .locust/memory.md; the suspect
+// was the seed's workspace id. This types the line through the Memory screen
+// instead (--remember "<line>") and asks the model to quote it back.
+PROMPTS.quote = 'Quote, word for word, the remembered line that mentions a secret word. If there is none, reply NONE. Do not use the share block.'
+const REMEMBER = process.argv.includes('--remember') ? process.argv[process.argv.indexOf('--remember') + 1] : undefined
 // 'memory': 30 team memories, the answer only in the OLDEST -- outside what the brief pastes; the file must be read.
 PROMPTS.memory = 'According to the team memory, when does the API key rotate? Answer from memory and say exactly where you found it. Do not use the share block.'
 // 'secret': a fake key in a file; the ledger must hold [redacted], never the key.
@@ -188,6 +194,38 @@ try {
   })()`)
   say(`   discovery: ${JSON.stringify(discovered)}`)
 
+  if (REMEMBER !== undefined) {
+    say(`[${LABEL}] 1b. remember a line through the Memory screen, mode Keep and tell me`)
+    const remembered = await cdp.eval(`(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '5', code: 'Digit5', ctrlKey: true, bubbles: true }))
+      await new Promise(r => setTimeout(r, 800))
+      const radio = [...document.querySelectorAll('[role="radio"]')].find(b => /Keep and tell me/.test(b.innerText))
+      if (!radio) return JSON.stringify({ screen: false, body: document.body.innerText.slice(0, 200) })
+      radio.click()
+      await new Promise(r => setTimeout(r, 400))
+      // A textarea, so the sentence can wrap; the setter has to be the
+      // textarea's own or React never hears the change.
+      const input = [...document.querySelectorAll('textarea.lc-input')].find(i => /specific enough to act on/.test(i.getAttribute('placeholder') || ''))
+      if (!input) return JSON.stringify({ screen: true, input: false })
+      const setInput = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+      setInput.call(input, ${JSON.stringify(REMEMBER)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(r => setTimeout(r, 300))
+      const button = [...document.querySelectorAll('button.lc-primarybutton')].find(b => /^Remember$/.test(b.innerText.trim()))
+      if (!button || button.disabled) return JSON.stringify({ screen: true, input: true, button: !!button, disabled: button ? button.disabled : null })
+      button.click()
+      await new Promise(r => setTimeout(r, 1200))
+      const kept = [...document.querySelectorAll('.lc-memory__text')].map(p => p.innerText.trim())
+      const mode = [...document.querySelectorAll('[role="radio"][aria-checked="true"]')].map(b => b.innerText.trim())
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '1', code: 'Digit1', ctrlKey: true, bubbles: true }))
+      await new Promise(r => setTimeout(r, 600))
+      return JSON.stringify({ screen: true, input: true, kept, mode })
+    })()`)
+    say(`   ${remembered}`)
+    const seen = JSON.parse(remembered)
+    if (!(seen.kept ?? []).some((line) => line.includes(REMEMBER))) { say(appOutput.join('').slice(-2000)); throw new Error('the line was not kept by the Memory screen') }
+  }
+
   say(`[${LABEL}] 2. select Wren; the composer should follow Wren's remembered route`)
   const setup = await cdp.eval(`(async () => {
     // The roster lives under the Team view (Ctrl 2); the home view shows faces only.
@@ -309,6 +347,15 @@ try {
     const raw = await Promise.all(names.map((name) => readFile(join(LEDGER_DIR, name), 'utf8')))
     const text = raw.join('\n')
     say(`   ledger holds the raw key: ${String(/ghp_Ab12Cd34/.test(text))}; holds [redacted]: ${String((text.match(/\[redacted\]/g) ?? []).length)} times; reasoning records: ${String((text.match(/"stepKind":"reasoning"/g) ?? []).length)}`)
+  }
+  if (TASK === 'quote') {
+    // From where the person stands: the line was typed on the Memory screen,
+    // so the brief has to paste it and the model has to say it back.
+    const file = await readFile(join(workspace, '.locust', 'memory.md'), 'utf8').catch(() => undefined)
+    const word = REMEMBER === undefined ? undefined : REMEMBER.split(' ').find((w) => /^[A-Z]{4,}\.?$/.test(w))?.replace(/\.$/, '')
+    say(`   memory file: ${file === undefined ? 'NOT WRITTEN' : 'written, holds the line: ' + String(REMEMBER !== undefined && file.includes(REMEMBER))}`)
+    say(`   answer quotes the secret word (${word ?? '?'}): ${String(word !== undefined && new RegExp(word).test(threadTail))}`)
+    if (file === undefined || (word !== undefined && !new RegExp(word).test(threadTail))) process.exitCode = 1
   }
   if (TASK === 'memory') {
     const file = await readFile(join(workspace, '.locust', 'memory.md'), 'utf8').catch(() => undefined)
