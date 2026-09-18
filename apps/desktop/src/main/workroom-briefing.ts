@@ -243,9 +243,23 @@ function roleSection(self: PeerRosterEntry): string | undefined {
  * else. One sentence, standing, so it sits in the cached prefix.
  */
 function answerSection(): string {
-  return (
-    'Your last message is what the person reads if they read nothing else: in complete sentences, lead with the answer to what they asked, then what was done and what came of it, and say plainly what is blocked or unverified rather than implying it is done.'
-  )
+  return [
+    'Your last message is what the person reads if they read nothing else: in complete sentences, lead with the answer to what they asked, then what was done and what came of it, and say plainly what is blocked or unverified rather than implying it is done.',
+    /*
+     * The person's own instruction about FORM outranks the sentence above.
+     *
+     * Grok, pass 10, on the free model in Accept edits: "What is 1 plus 1?
+     * Reply with a single digit." drew 25 seconds, three tool calls, and a
+     * decision card -- "I have not answered 1 plus 1 yet because your
+     * formatting instructions conflict" -- offering single digit versus
+     * complete sentences. The brief had made a rule for the ordinary case
+     * and the model, reading it as a rule, stopped to ask which rule wins.
+     * It should never have been a question: the sentence above describes
+     * the ordinary case, and a person who says how they want the answer
+     * has already decided.
+     */
+    'If the person said what shape the answer should take -- a single digit, one word, a list, a number -- that shape wins over the sentence above; give it in that shape and stop.'
+  ].join(' ')
 }
 
 /**

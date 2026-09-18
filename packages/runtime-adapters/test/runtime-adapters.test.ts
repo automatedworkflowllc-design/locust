@@ -852,7 +852,14 @@ describe("OpenCode and Copilot CLI commands", () => {
       permission: {
         edit: "deny",
         write: "deny",
-        bash: "deny",
+        // "ask", not "deny". Bisected on the free model 2026-09-18: a run
+        // that offers no bash tool is refused by the provider with "free
+        // tier can only be used from within OpenCode" (Grok, passes 9 and
+        // 10: four red cards from Ask mode). With "ask" the tool is listed,
+        // and `opencode run`, being non-interactive, auto-rejects every
+        // use of it -- measured: "permission requested: bash; auto-rejecting".
+        // Still read-only; refused at the call rather than by absence.
+        bash: "ask",
         patch: "deny",
         // Stated, not left to the default: an unstated refusal ends the run.
         external_directory: "deny",

@@ -927,10 +927,37 @@ export const COPILOT_MODEL_HINTS: RuntimeModelHints = {
  * anything upholds, so it is never what a read-only mission rests on.
  */
 export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
-  // `external_directory` is stated for the same reason it is stated below:
-  // left to the default, a look outside the folder ends the run rather than
-  // being refused.
-  permission: { edit: "deny", write: "deny", bash: "deny", patch: "deny", external_directory: "deny" },
+  /*
+   * `bash` is "ask", NOT "deny", and the difference is whether the free model
+   * answers at all.
+   *
+   * MEASURED 2026-09-18 on Windows, OpenCode 1.18.27, zero credentials, after
+   * Grok's passes 9 and 10 got four refusals in a row from Locust's Ask mode
+   * and named the mechanism. Bisected, one denial at a time, on
+   * `muse-spark-1.3-contributor-free`:
+   *
+   *     bash: deny                     -> 403 "OpenCode's free tier can only
+   *                                       be used from within OpenCode"
+   *     edit + write + patch: deny     -> "2"
+   *     bash: { "*": "deny" }          -> 403
+   *     bash: ask                      -> "2"; and asked to run `echo`, the
+   *                                       runtime printed "permission
+   *                                       requested: bash; auto-rejecting"
+   *                                       and the call ended in error
+   *
+   * So the provider recognises OpenCode by the tools it offers, and a run
+   * with no bash tool is refused as somebody else's client. "ask" keeps the
+   * tool on the list and `opencode run`, being non-interactive, rejects
+   * every use of it. The write is still refused; it is refused by the
+   * runtime at the moment of the call rather than by its absence from the
+   * list, and the free model that the first screen promises now answers in
+   * the mode a careful person picks first.
+   *
+   * `external_directory` is stated for the same reason it is stated below:
+   * left to the default, a look outside the folder ends the run rather than
+   * being refused.
+   */
+  permission: { edit: "deny", write: "deny", bash: "ask", patch: "deny", external_directory: "deny" },
 });
 
 /**
