@@ -48,6 +48,28 @@ export function bundledNpmPaths(resourcesPath: string, appPath: string): readonl
   ]
 }
 
+/**
+ * Where the bundled npm installs to: a folder in the profile that Locust owns.
+ *
+ * Not npm's default. Run by the app's own binary, npm derives its global
+ * prefix from that binary's location -- the app's install folder -- and Grok's
+ * pass 10 measured the result on the first day this shipped: Install ran, npm
+ * said done, and Locust said "installed, but Locust still cannot find the
+ * command", because nothing had put that folder on PATH and the locator never
+ * looked there. A folder the host names is one the host can also search.
+ */
+export function bundledNpmPrefix(userDataPath: string): string {
+  return join(userDataPath, 'npm')
+}
+
+/**
+ * The directory the CLI shims land in under that prefix. npm puts them at the
+ * prefix itself on Windows and under `bin` everywhere else.
+ */
+export function bundledNpmBinDirectory(prefix: string, platform: NodeJS.Platform): string {
+  return platform === 'win32' ? prefix : join(prefix, 'bin')
+}
+
 export interface BundledNpm {
   /** The Node to run it with: this process's own binary. */
   readonly nodePath: string

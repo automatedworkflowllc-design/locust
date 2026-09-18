@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { join } from 'node:path'
 
 import { installCommand, runtimeInstallFacts } from '../shared/runtime-install.js'
 
@@ -90,6 +91,14 @@ export interface RuntimeInstallerOptions {
     readonly nodePath: string
     readonly cliPath: string
     readonly env: Readonly<Record<string, string>>
+    /**
+     * Where it installs to. Without this npm picks a prefix from the
+     * binary's own location -- the app's install folder -- which nothing
+     * puts on PATH and the locator never searched. Grok's pass 10 measured
+     * exactly that: "opencode installed, but Locust still cannot find the
+     * command". The host owns this folder and tells the locator about it.
+     */
+    readonly prefix: string
   }
   /** Whether this machine has its own npm. Absent reads as yes. */
   readonly systemNpm?: () => Promise<boolean>
@@ -169,24 +178,70 @@ export function classifyInstallFailure(input: {
  * the prefix and the output are npm's own, so every failure this file already
  * knows how to explain reads the same way.
  */
-function runBundledNpm(
-  bundled: { readonly nodePath: string; readonly cliPath: string; readonly env: Readonly<Record<string, string>> },
+async function runBundledNpm(
+  bundled: {
+    readonly nodePath: string
+    readonly cliPath: string
+    readonly env: Readonly<Record<string, string>>
+    readonly prefix: string
+  },
   args: readonly string[],
+  packageName: string,
   onLine: (line: string) => void
 ): Promise<{ readonly code: number | null; readonly output: string }> {
-  const unsafe = args.find((token) => !SAFE_ARGUMENT.test(token))
+  const unsafe = [...args, packageName].find((token) => !SAFE_ARGUMENT.test(token))
   if (unsafe !== undefined) {
-    return Promise.resolve({
+    return {
       code: null,
       output: `Locust would not run this install: ${JSON.stringify(unsafe)} contains characters a shell reads as syntax.`
-    })
+    }
   }
+  /*
+   * TWO THINGS THE FIRST DAY OF THIS TAUGHT, both measured on the shipped
+   * build with nothing on PATH (2026-09-18, after Grok's pass 10 pressed the
+   * button and got "installed, but Locust still cannot find the command").
+   *
+   * 1. The npm this app carries is npm 12, and npm 12 does not run a
+   *    package's install scripts unless told to. OpenCode's platform binary
+   *    is placed by exactly such a script, so the install "succeeded" and
+   *    left a launcher that says "postinstall script was not run". The
+   *    package the person asked for is allowed, and only that one.
+   *
+   * 2. That script runs `node ./postinstall.mjs` -- by name, through cmd.exe
+   *    -- and there is no node on this machine. npm puts its own binary's
+   *    folder on PATH for scripts, but the binary is Locust.exe, not
+   *    node.exe. So a one-line shim called `node` is written into a folder
+   *    Locust owns and put first on PATH for this one process. It forwards
+   *    to the app's binary, which behaves as Node because the environment
+   *    says so, and the shim's folder is inside the prefix, so it lives and
+   *    dies with the install.
+   *
+   * With both: "added 3 packages in 6s", and the installed CLI answered its
+   * version with no Node on PATH.
+   */
+  const { mkdir, writeFile } = await import('node:fs/promises')
+  const shimDirectory = join(bundled.prefix, 'node-shim')
+  await mkdir(shimDirectory, { recursive: true })
+  if (process.platform === 'win32') {
+    await writeFile(join(shimDirectory, 'node.cmd'), `@"${bundled.nodePath}" %*\r\n`, 'utf8')
+  } else {
+    await writeFile(join(shimDirectory, 'node'), `#!/bin/sh\nexec "${bundled.nodePath}" "$@"\n`, { encoding: 'utf8', mode: 0o755 })
+  }
+  const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'path') ?? 'PATH'
+  const pathValue = `${shimDirectory}${process.platform === 'win32' ? ';' : ':'}${process.env[pathKey] ?? ''}`
+  // The prefix is a path -- drive letter, backslashes, a space in a user
+  // name -- so it fails the shell-safety check above on purpose. It never
+  // meets a shell: this spawn has none, and the argument arrives whole.
   return new Promise((resolve) => {
-    const child = spawn(bundled.nodePath, [bundled.cliPath, ...args], {
-      shell: false,
-      windowsHide: true,
-      env: { ...process.env, ...bundled.env }
-    })
+    const child = spawn(
+      bundled.nodePath,
+      [bundled.cliPath, ...args, `--allow-scripts=${packageName}`, '--prefix', bundled.prefix],
+      {
+        shell: false,
+        windowsHide: true,
+        env: { ...process.env, ...bundled.env, [pathKey]: pathValue }
+      }
+    )
     let output = ''
     let pending = ''
     const take = (chunk: Buffer): void => {
@@ -300,13 +355,14 @@ export function createRuntimeInstaller(options: RuntimeInstallerOptions = {}): R
   const runInstall = async (
     command: string,
     args: readonly string[],
+    packageName: string,
     onLine: (line: string) => void
   ): Promise<{ readonly code: number | null; readonly output: string }> => {
     const bundled = options.bundledNpm
     if (bundled === undefined || options.run !== undefined) return run(command, args, onLine)
     const hasOwn = options.systemNpm === undefined ? true : await options.systemNpm()
     if (hasOwn) return run(command, args, onLine)
-    return runBundledNpm(bundled, args, onLine)
+    return runBundledNpm(bundled, args, packageName, onLine)
   }
   let running = false
 
@@ -335,7 +391,7 @@ export function createRuntimeInstaller(options: RuntimeInstallerOptions = {}): R
         // Split from the same string the screen showed, so the argv and the
         // displayed line cannot drift apart.
         const [command, ...args] = line.split(' ')
-        const { code, output } = await runInstall(command ?? 'npm', args, (said) => onLine({ line: said }))
+        const { code, output } = await runInstall(command ?? 'npm', args, facts.install.packageName, (said) => onLine({ line: said }))
         const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
         if (code !== 0) {
           return classifyInstallFailure({

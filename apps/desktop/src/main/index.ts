@@ -29,7 +29,7 @@ import { createCodexMissionService } from './codex-mission.js'
 import { createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
-import { findBundledNpm } from './bundled-npm.js'
+import { bundledNpmBinDirectory, bundledNpmPrefix, findBundledNpm } from './bundled-npm.js'
 import { createModelCatalog } from './model-catalog.js'
 import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagnostics.js'
 import { createGroupStore } from './group-store.js'
@@ -230,16 +230,31 @@ const bundledNode = { executablePath: process.execPath, env: { ELECTRON_RUN_AS_N
  * And the npm to install those CLIs with, for the same machine. Absent in a
  * build that did not ship one, which is every build before 0.178.0.
  */
-const bundledNpm = findBundledNpm({
+const bundledNpmFound = findBundledNpm({
   resourcesPath: process.resourcesPath,
   appPath: app.getAppPath(),
   execPath: process.execPath
 })
+/*
+ * And WHERE it installs, said once and handed to both sides.
+ *
+ * Grok's pass 10 measured the day-one defect: Install ran, npm said done,
+ * and Locust said "installed, but Locust still cannot find the command".
+ * npm run by this binary had chosen a prefix from the binary's location and
+ * nothing searched it. Now the prefix is a folder in the profile, npm is
+ * told to install there, and the locator is told to look there -- from one
+ * value, so the two cannot disagree.
+ */
+const bundledNpmPrefixPath = bundledNpmPrefix(app.getPath('userData'))
+const bundledNpm = bundledNpmFound === undefined ? undefined : { ...bundledNpmFound, prefix: bundledNpmPrefixPath }
 const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
   ? { find: async () => undefined }
   : createPathExecutableLocator({
       bundledNode,
-      ...(npmBinDirectory === undefined ? {} : { npmBinDirectory })
+      ...(npmBinDirectory === undefined ? {} : { npmBinDirectory }),
+      ...(bundledNpm === undefined
+        ? {}
+        : { ownInstallDirectory: bundledNpmBinDirectory(bundledNpmPrefixPath, process.platform) })
     })
 // Antigravity has no CLI probe: its readiness is whether the app is open,
 // which the host checks itself and merges into the same sweep.

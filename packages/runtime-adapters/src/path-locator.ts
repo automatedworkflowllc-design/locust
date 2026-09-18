@@ -47,6 +47,21 @@ pm`
    * session. The host asks once and passes it in.
    */
   readonly npmBinDirectory?: string;
+  /**
+   * Where the host's OWN npm installs to, when the host carries one.
+   *
+   * MEASURED by Grok's pass 10, 2026-09-18, on the day after the bundled npm
+   * shipped: Install ran, npm said it was done, and Locust answered "opencode
+   * installed, but Locust still cannot find the command". npm run by the
+   * host's binary chose a prefix from that binary's location, nothing put
+   * that folder on PATH, and this locator never looked there. The install
+   * was verified; the round trip was not.
+   *
+   * So the host picks the prefix, tells npm, and tells this. Searched after
+   * PATH and after npm's own prefix, for the same reason those come first:
+   * a copy the person's terminal would find is the one they expect to run.
+   */
+  readonly ownInstallDirectory?: string;
 }
 
 /**
@@ -460,9 +475,11 @@ export function createPathExecutableLocator(
        * to agree with that.
        */
       const npmBin = options.npmBinDirectory
+      const own = options.ownInstallDirectory
       return (
         (await resolveWithin(pathOnly))
         ?? (npmBin === undefined ? undefined : await resolveWithin([npmBin]))
+        ?? (own === undefined ? undefined : await resolveWithin([own]))
         ?? (await resolveWithin(
           await installDirectories(commandName, environment, platform, readDirectory),
         ))

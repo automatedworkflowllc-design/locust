@@ -1,6 +1,33 @@
 import { describe, expect, it } from 'vitest'
 
-import { bundledNpmPaths, findBundledNpm } from './bundled-npm.js'
+import { bundledNpmBinDirectory, bundledNpmPaths, bundledNpmPrefix, findBundledNpm } from './bundled-npm.js'
+
+/**
+ * Where it installs to, and where the locator then looks.
+ *
+ * Grok's pass 10, the day after this shipped: Install ran, npm said done,
+ * Locust said "installed, but Locust still cannot find the command". npm
+ * had chosen a prefix from the binary's location and nobody searched it.
+ * The two halves below are the same folder, said twice, so they cannot
+ * drift: what npm is told and what the locator is told come from one call.
+ */
+describe('where the bundled npm installs', () => {
+  it('is a folder in the profile that Locust owns, not npm\'s guess from the binary', () => {
+    expect(bundledNpmPrefix('C:\\Users\\ian\\AppData\\Roaming\\Locust')).toBe(
+      'C:\\Users\\ian\\AppData\\Roaming\\Locust\\npm'
+    )
+  })
+
+  it('has its shims at the prefix itself on Windows, which is where npm puts them', () => {
+    expect(bundledNpmBinDirectory('C:\\Users\\ian\\AppData\\Roaming\\Locust\\npm', 'win32')).toBe(
+      'C:\\Users\\ian\\AppData\\Roaming\\Locust\\npm'
+    )
+  })
+
+  it('and under bin everywhere else', () => {
+    expect(bundledNpmBinDirectory('/home/ian/.config/Locust/npm', 'linux')).toMatch(/npm[\\/]bin$/)
+  })
+})
 
 /**
  * The app carries an npm, so a machine with no Node can still install a CLI.

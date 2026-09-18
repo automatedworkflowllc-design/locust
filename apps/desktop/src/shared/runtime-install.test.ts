@@ -41,10 +41,10 @@ describe('what a person has to do to get a runtime', () => {
     // The one that needs nothing says so, because it is the fastest way from
     // "nothing works" to "one teammate works".
     expect(installSentence('opencode', 'OpenCode')).toBe(
-      'OpenCode was not found on this machine. Install it below -- no account and no sign-in; its free model runs as soon as it is there.'
+      'OpenCode was not found on this machine. Press Install -- no account and no sign-in; its free model runs as soon as it is there.'
     )
     expect(installSentence('claude', 'Claude Code')).toBe(
-      'Claude Code was not found on this machine. Install it below, then run claude once to sign in with an Anthropic account.'
+      'Claude Code was not found on this machine. Press Install, then run claude once to sign in with an Anthropic account.'
     )
     expect(installSentence('cursor', 'Cursor Agent')).toBe(
       'Cursor Agent was not found on this machine. It installs from https://cursor.com/cli.'

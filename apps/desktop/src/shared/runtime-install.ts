@@ -116,8 +116,8 @@ export function installSentence(runtime: string, displayName: string): string {
   // line below rather than in the sentence (drive, 2026-09-06). The sentence
   // has to stand on its own and point at what follows it.
   const after = facts.signIn === undefined
-    ? 'Install it below -- no account and no sign-in; its free model runs as soon as it is there.'
-    : `Install it below, then run ${facts.signIn} once to sign in with ${facts.account ?? 'your account'}.`
+    ? 'Press Install -- no account and no sign-in; its free model runs as soon as it is there.'
+    : `Press Install, then run ${facts.signIn} once to sign in with ${facts.account ?? 'your account'}.`
   return `${displayName} was not found on this machine. ${after}`
 }
 
