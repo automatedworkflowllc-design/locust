@@ -215,6 +215,40 @@ try {
     between
   )
 
+  /*
+   * THE STEP THE FIRST VERSION SKIPPED, and the one that reproduces it.
+   *
+   * Grok, pass 10: open the surviving turn before putting the first one
+   * back. A person does exactly this -- they check what is left before they
+   * undo. Opening puts a live run in the sidebar's state beside the record,
+   * and that run remembers having no parent; after the restore, the record
+   * has two turns and the run still says one, so the sidebar drew two rows.
+   * The controls-only drive on Windows passed because it never opened.
+   */
+  say('1b. open the surviving turn, the way a person checks what is left')
+  const opened = await cdp.eval(`(async () => {
+    // The button that carries the title is the one that opens; the other
+    // button on the row is its menu.
+    const title = document.querySelector('.lc-convrow .lc-conv__title')
+    const row = title ? title.closest('button') : null
+    if (!row) return JSON.stringify({ opened: false, why: 'no row button' })
+    row.click()
+    // The thread itself, not the row: a click that highlighted a row and
+    // opened nothing would leave the suspect -- a live run in the sidebar's
+    // state -- out of the drive, and the drive would pass on the old code.
+    let thread = null
+    for (let i = 0; i < 16 && !thread; i += 1) {
+      await new Promise(r => setTimeout(r, 500))
+      thread = document.querySelector('.lc-thread, .lc-thread__column, .lc-bubble')
+    }
+    const clean = (s) => (s || '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim()
+    const main = document.querySelector('.lc-workroom, main')
+    return JSON.stringify({ opened: !!thread, thread: clean(thread && thread.innerText).slice(0, 80), main: clean(main && main.innerText).slice(0, 120) })
+  })()`)
+  say(`   ${opened}`)
+  const openedThread = JSON.parse(opened)
+  check('the surviving turn is open in the workroom', openedThread.opened === true && /alpha follow-up turn/.test(openedThread.thread), opened)
+
   say('2. put it back from Settings, WITHOUT restarting')
   const restored = await cdp.eval(`(async () => {
     const settings = [...document.querySelectorAll('button')].find(b => /^Settings/.test(b.getAttribute('aria-label') || b.getAttribute('title') || ''))

@@ -3678,8 +3678,27 @@ export default function App(): ReactElement {
       const handoffRoot = handoffFrom === undefined
         ? undefined
         : historyById.get(handoffFrom) === undefined ? handoffFrom : rootMission(historyById.get(handoffFrom)!, historyById).missionId
-      const rootId = earlier[0]?.missionId ?? handoffRoot
-      const parentId = earlier.at(-1)?.missionId ?? handoffFrom
+      /*
+       * THE RECORD OUTRANKS WHAT THE RUN REMEMBERS ABOUT ITS CHAIN.
+       *
+       * A live run takes its idea of the turns before it when it is opened,
+       * and never revisits it. Grok, passes 9 and 10: seed a two-turn
+       * conversation, delete the first turn, OPEN the surviving one, put the
+       * first turn back. The record now holds both turns again; the open run
+       * still remembers having no parent, so the sidebar draws two rows for
+       * one conversation -- and a person who then tidies the "duplicate"
+       * loses half of it for good. The drive that skipped the open step
+       * never saw this. So when the ledger knows this mission, the chain
+       * comes from the ledger; what the run remembers is only for a turn
+       * the ledger has not been re-read for yet.
+       */
+      const recorded = historyById.get(missionId)
+      const rootId = recorded === undefined
+        ? earlier[0]?.missionId ?? handoffRoot
+        : rootMission(recorded, historyById).missionId
+      const parentId = recorded === undefined
+        ? earlier.at(-1)?.missionId ?? handoffFrom
+        : recorded.continuesFrom?.missionId
       rows.push({
         missionId,
         ...(rootId === undefined ? {} : { rootId }),
