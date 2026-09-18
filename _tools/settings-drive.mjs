@@ -151,6 +151,67 @@ try {
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
   await writeFile(new URL('../docs/chain-measure/settings-search-2026-09-17.png', import.meta.url), Buffer.from(shot.result.data, 'base64'))
 
+  /*
+   * THE FOUR WORDS GROK TYPED AND GOT NOTHING FOR (pass 9, on 0.177.0).
+   *
+   * Each one is a setting that exists, and three are words the app says to
+   * people itself. The index was page names and headings, so it could only
+   * find the words we chose. Checked here from the box a person types into,
+   * because a unit test over the index would pass on a screen whose search
+   * was never wired to it.
+   */
+  say('3b. the words a person types, not the words we chose')
+  for (const [typed, page, heading] of [
+    ['memory', 'How teammates work', 'What your team remembers'],
+    ['worktree', 'Your workspace', 'Project folder'],
+    ['node', 'Runtimes', 'Runtimes & accounts'],
+    ['ledger', 'This app', 'Privacy & local data'],
+    ['recycle bin', 'This app', 'Trash']
+  ]) {
+    const found = await cdp.eval(`(async () => {
+      const box = document.querySelector('.lc-settings__search')
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+      setter.call(box, ${JSON.stringify(typed)})
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(r => setTimeout(r, 450))
+      const items = [...document.querySelectorAll('.lc-settings__navitem')]
+      // The empty-search note lives in the NAV. That class is used on the
+      // pages too, so querying the whole document found unrelated prose and
+      // called every search a miss.
+      const nav = document.querySelector('.lc-settings__nav')
+      const note = nav ? nav.querySelector('.lc-settings__note') : null
+      const pane = document.querySelector('.lc-settings__pane')
+      // Which heading is nearest the top of the pane: what the person sees
+      // first once the page opens, which is the half that was missing.
+      // Whether the heading is IN VIEW, not whether it is flush with the
+      // top: a heading near the end of a page cannot be scrolled to the top,
+      // because there is nothing under it to scroll. Visible is the thing a
+      // person can act on, and the thing that was missing.
+      const box2 = pane ? pane.getBoundingClientRect() : null
+      const wanted = box2 ? [...pane.querySelectorAll('.lc-settings__heading')]
+        .find(h => h.innerText.trim() === ${JSON.stringify(heading)}) : null
+      const seenNow = wanted && box2
+        ? wanted.getBoundingClientRect().top >= box2.top - 1 && wanted.getBoundingClientRect().top < box2.bottom
+        : false
+      const atTop = box2 ? [...pane.querySelectorAll('.lc-settings__heading')]
+        .map(h => ({ text: h.innerText.trim(), d: Math.abs(h.getBoundingClientRect().top - box2.top) }))
+        .sort((a, b) => a.d - b.d)[0] : null
+      return JSON.stringify({
+        nothingMatched: note ? note.innerText.slice(0, 40) : null,
+        pages: items.map(b => b.innerText.replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim()),
+        hits: items.map(b => { const h = b.querySelector('.lc-settings__navhits'); return h ? h.innerText.trim() : '' }),
+        nearestHeading: atTop ? atTop.text : null,
+        wantedIsInView: seenNow
+      })
+    })()`)
+    const seen = JSON.parse(found)
+    say(`   "${typed}" -> ${found}`)
+    check(`"${typed}" finds something at all`, seen.nothingMatched === null, found)
+    check(`"${typed}" finds ${page}`, seen.pages.some((name) => name.includes(page)), found)
+    check(`"${typed}" names ${heading}`, seen.hits.some((hit) => hit.includes(heading)), found)
+    check(`"${typed}" scrolls the pane to ${heading}`, seen.wantedIsInView === true, found)
+  }
+
   say('4. clearing the search puts every page back')
   const cleared = await cdp.eval(`(async () => {
     const box = document.querySelector('.lc-settings__search')
