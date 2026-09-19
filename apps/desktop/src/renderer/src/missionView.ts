@@ -2136,21 +2136,38 @@ export function buildThread(
       // only ever climbs cannot be mistaken for one.
       const since = turnStartedAt
       if (since !== undefined) {
+        /*
+         * WHETHER THE RUNTIME HAS SPOKEN, not whether the mission has events.
+         *
+         * `run.started` is the APP's own record of having launched a process.
+         * It is the first event in almost every mission and it says nothing
+         * whatsoever about the runtime, so `events.length === 0` -- which is
+         * what the label and the register were read off -- means "we have not
+         * finished spawning it yet" rather than "nothing has come back".
+         *
+         * One event later the line said **Working**, on the strength of the
+         * app having spawned something. The ledger in `quiet.ts` is the same
+         * run this is about: `mission_3848a498`, `run.started` at 3.5s and
+         * then not one runtime event until 128.7s. The line read "working"
+         * for over two minutes of silence, and that is the frame Colin sent.
+         *
+         * `spoken` -- the honest fact -- was added underneath to fix the
+         * SENTENCE while the word above it kept being drawn from the proxy.
+         * Both come from the same fact now.
+         */
+        const spoken = events.some((event) => event.type !== 'run.started')
         items.push({
           key: 'live-step',
           type: 'live-step',
-          label: events.length === 0 ? 'Starting' : 'Working',
-          register: events.length === 0 ? ('starting' as const) : ('working' as const),
+          label: spoken ? 'Working' : 'Starting',
+          register: spoken ? ('working' as const) : ('starting' as const),
           detail: undefined,
           startedAt: since,
           kind: 'turn',
           waiting: true,
-          // Whether the RUNTIME has said anything, which is not the same as
-          // whether the mission has events: 'run.started' is the app's own
-          // record of launching the process. Past twenty seconds with none,
-          // the line says so -- see quiet.ts for the measured Cursor run
-          // that showed 'working' for 128 seconds in silence.
-          spoken: events.some((event) => event.type !== 'run.started')
+          // Past twenty seconds with nothing from the runtime the line says so
+          // as well; see `quiet.ts` for the measured run above.
+          spoken
         })
       }
     }

@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.197.0 - 2026-09-19
+
+- **A run that has not answered yet says Starting, not Working.** The moment
+  Locust had launched a coding agent, the line under your message said the
+  teammate was working -- on the strength of a process having been spawned,
+  before the agent had said a word. One measured run showed "working" for over
+  two minutes of complete silence. It says Starting until the agent actually
+  reports something, which is also when the clock stops being a guess.
+
 ## 0.196.0 - 2026-09-19
 
 - **A conversation you started without picking anyone can be saved as a
