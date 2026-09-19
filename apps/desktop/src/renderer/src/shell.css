@@ -5536,7 +5536,10 @@ textarea {
  */
 @container (max-width: 960px) {
   .lc-missionrows .lc-missionrow {
-    grid-template-columns: 14px minmax(0, 1fr) 130px 104px;
+    /* Wider third and fourth columns than the wide form's 130/104: the
+       counts and the cost sit under them now, and "0 checkpoints · 1m 2s"
+       and "14k in · 1.1k out" were ellipsed at the narrower widths. */
+    grid-template-columns: 14px minmax(0, 1fr) 170px 128px;
     row-gap: 4px;
   }
   .lc-missionrows .lc-missionrow > .lc-rail__dot { grid-row: 1; grid-column: 1; }
