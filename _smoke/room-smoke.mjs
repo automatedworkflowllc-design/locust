@@ -430,7 +430,13 @@ try {
   check('and it is on disk with Wren alone', stored2.rooms.some((r) => r.name === 'Pair' && r.teammateIds.length === 1 && r.teammateIds[0] === 'tm_wren'))
 
   if (SHOT !== undefined) {
-    await evaluate(`(async () => { [...document.querySelectorAll('.lc-roomrow')].find(r => /Release/.test(r.innerText)).click(); await new Promise(r => setTimeout(r, 600)); return true })()`)
+    // Open Release from the Rooms screen, the way everything else here
+    // does; the sidebar's room rows went with the flatten.
+    await evaluate(`(async () => {
+      const card = [...document.querySelectorAll('.lc-roomcard')].find(c => /Release/.test(c.innerText))
+      if (card) { card.click(); await new Promise(r => setTimeout(r, 700)) }
+      return true
+    })()`)
     const shot = await send('Page.captureScreenshot', { format: 'png' })
     if (typeof shot.result?.data === 'string') await writeFile(SHOT, Buffer.from(shot.result.data, 'base64'))
   }
