@@ -4544,6 +4544,7 @@ export default function App(): ReactElement {
                 limitedRuntimes={limitedRuntimes}
                 discoveryPhase={runtimeState.phase}
                 workspacePath={workspacePath}
+                workspaceMade={workspaceMade}
                 teammateCount={teammates.length}
                 onChooseFolder={chooseWorkspace}
                 onInstall={installRuntime}

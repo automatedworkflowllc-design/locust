@@ -96,6 +96,32 @@ describe("the teammate's voice", () => {
     }
   })
 
+  it('never lets the browser invent a face the family does not ship', () => {
+    /*
+     * The defect this exists for, found 2026-09-19 by the design agent's
+     * release check and confirmed against the repo: only
+     * `AnthropicSerif-Variable.woff2` ships and it is `font-style: normal`,
+     * with no italic beside it -- while `agentText.ts` turns every `*text*`
+     * into an `<em>`. So every emphasis in every reply was a browser-
+     * synthesised slant of the upright, which is precisely what the comment
+     * above the rule claimed the app did not do. The comment had been true
+     * of IBM Plex and went stale the day the face changed.
+     *
+     * The invariant, which holds whichever face is chosen next: if the prose
+     * family ships no italic file, nothing in a reply may ask for one.
+     */
+    const italics = filesFor(proseFace!).filter((name) => /italic|oblique/i.test(name))
+    if (italics.length > 0) return
+    expect(shell, 'the prose face ships no italic, so synthesis must be off').toMatch(
+      /\.lc-agentline \{[^}]*font-synthesis: none/
+    )
+    // And emphasis must still be VISIBLE: `font-synthesis: none` on its own
+    // would render `<em>` identically to body text and lose the mark
+    // silently, which is a worse lie than the slant was.
+    expect(shell).toMatch(/\.lc-agentline p em[^{]*\{[^}]*font-weight:/)
+    expect(shell).toMatch(/\.lc-agentline p em[^{]*\{[^}]*font-style: normal/)
+  })
+
   it('is what the reply wears, and is not the app talking', () => {
     expect(shell).toMatch(/\.lc-agentline__body \{[^}]*font-family: var\(--lc-font-prose\)/)
     // A reply in the app's own face is the defect this token exists to fix.

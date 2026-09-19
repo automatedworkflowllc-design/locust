@@ -6,6 +6,29 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.198.0 - 2026-09-19
+
+- **A teammate's reply is set bigger, and its lines are shorter.** The reply
+  was the smallest thing on screen that you actually read rather than scan,
+  and its lines ran to 111 characters -- past the point where the eye loses
+  its place coming back to the left. It is now 18px with a shorter line.
+
+- **Emphasis in a reply is real.** The reply's typeface ships no italic, so
+  every emphasised word was a slant the browser invented by shearing the
+  upright letters. Emphasis is now carried by weight, which the typeface
+  really has.
+
+- **Locust tells you when it made a folder for you.** Opening Locust from the
+  Start menu gives it nowhere to work, so it makes a folder in Documents
+  and works there. It used to say so only if you hovered over the folder
+  button. It says so on the first screen now, with the button to point it at
+  your own project.
+
+- **The first screen shows one step instead of six.** With nothing installed
+  yet, it offers the one coding agent that needs no account, and the other
+  five are one line away when you want them. The explanation about Node.js
+  waits until you have actually started an install.
+
 ## 0.197.0 - 2026-09-19
 
 - **A run that has not answered yet says Starting, not Working.** The moment

@@ -70,7 +70,8 @@ export function FirstLaunch({
   npmMissing = false,
   npmIsBundled = false,
   checkingGaveUp = false,
-  onCheckAgain
+  onCheckAgain,
+  workspaceMade = false
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -115,6 +116,11 @@ export function FirstLaunch({
   readonly checkingGaveUp?: boolean
   /** Ask discovery again, from the top: the one repair the app can perform for a CLI that never answered. */
   readonly onCheckAgain?: () => void
+  /**
+   * Locust INVENTED the folder it is about to work in, because the one it was
+   * launched from was refused. The screen has to say so; see the card below.
+   */
+  readonly workspaceMade?: boolean
 }): ReactElement {
   // Stays open across subsequent installs once a person opens it, which is
   // what the design asks for: someone who wanted the trace once wants it
@@ -122,6 +128,14 @@ export function FirstLaunch({
   const [outputOpen, setOutputOpen] = useState(false)
   /** What the host said when it would not open a link. Cleared on the next press. */
   const [linkRefusal, setLinkRefusal] = useState<string>()
+  /*
+   * The other agents, while none of them can help yet.
+   *
+   * Closed to begin with and opened by a press -- never opened on the app's
+   * behalf, because the whole point is that the person decides when they want
+   * the list. Once anything is connected this state stops being consulted.
+   */
+  const [othersOpen, setOthersOpen] = useState(false)
   // Signed-in first, exceptions last -- the reference's own order, and the
   // one that reads: a person scanning this wants "what can I use" before
   // "what is not built yet". Discovery's order is alphabetical by id, which
@@ -260,6 +274,42 @@ export function FirstLaunch({
           </div>
         )}
 
+        {/*
+          * THE FOLDER LOCUST INVENTED, SAID WHERE SOMEBODY IS LOOKING.
+          *
+          * A fresh install is launched from the Start menu, which starts it
+          * in its own install folder; the host refuses that folder on
+          * purpose, so the app makes `Documents\Locust` and works there. The
+          * person therefore has a teammate standing in an empty folder they
+          * did not choose, while the whole promise of the product is that a
+          * teammate works in THEIR project.
+          *
+          * It was said in exactly one place: the composer chip's hover
+          * tooltip. Nobody hovers a chip in their first ten seconds, and the
+          * chip reads "Locust" -- which is also the application name and the
+          * window title, so it does not read as a folder at all, let alone
+          * one worth changing. Found by driving a first launch nobody had
+          * ever driven (`_tools/first-launch-folder-drive.mjs`, 2026-09-19).
+          *
+          * Not an alarm, and not `is-missing`: the app did something
+          * reasonable and this is the sentence that makes it visible. It
+          * disappears the moment a folder is chosen, because `workspaceMade`
+          * is false for any folder a person picked.
+          */}
+        {workspacePath !== undefined && workspaceMade && (
+          <div className="lc-folder">
+            <div className="lc-folder__text">
+              <div className="lc-folder__label">Locust made a folder to work in</div>
+              <div className="lc-folder__path" title={workspacePath}>
+                Teammates will work in {workspacePath} — it is new and empty. Point them at your own project instead.
+              </div>
+            </div>
+            <button type="button" className="lc-button" onClick={onChooseFolder}>
+              Choose folder
+            </button>
+          </div>
+        )}
+
         {discoveryPhase === 'ready' && (() => {
           /*
            * Five rows reading CHECKING were five rows saying nothing at the
@@ -286,6 +336,36 @@ export function FirstLaunch({
               : stuckAny
                 ? `${String(shown.length)} on this machine · none answering`
                 : `${String(shown.length)} known · none installed yet`
+          /*
+           * ONE STEP FIRST, AND THE CATALOGUE WHEN IT IS ASKED FOR.
+           *
+           * Colin, 2026-09-19: "i really want a new user without tech
+           * savvyness to be able to just use the software off rip, maybe even
+           * ask them how to get the other agents working." The other agents
+           * come AFTER, in his own sentence.
+           *
+           * Measured on the first frame anybody has taken of this screen on a
+           * machine with nothing installed (`_tools/bare-machine-frame.mjs`,
+           * 2026-09-19): six rows, of which five name a product attached to
+           * an account or a subscription the person does not have -- a
+           * ChatGPT account, an Anthropic account, a Cursor account, a GitHub
+           * Copilot subscription. Every one of those five is a reason not to
+           * press anything, on a screen whose sentence one line above has
+           * already said which one to press.
+           *
+           * The on-ramp emphasis was already right and is untouched. What
+           * changes is only that the five are BEHIND A PRESS while none of
+           * them can help, and the count stays visible in the head note, so
+           * nothing is hidden -- it is deferred, and says so.
+           *
+           * The instant anything is connected this stops applying and the
+           * list is the list again: by then the question "what else can this
+           * drive" is a real question, which is the one the catalogue
+           * answers well.
+           */
+          const deferOthers = connected === 0 && !checkingAny && installing === undefined && !othersOpen
+          const drawn = deferOthers ? shown.filter((row) => row.runtime.id === FREE_START_RUNTIME) : shown
+          const deferred = shown.length - drawn.length
           return (
             <>
               <div className="lc-agenthead">
@@ -293,7 +373,7 @@ export function FirstLaunch({
                 <span className={`lc-agenthead__note${connected > 0 && !checkingAny ? ' is-green' : ''}`}>{headNote}</span>
               </div>
               <div className="lc-runtimepanel">
-                {shown.map((row) => {
+                {drawn.map((row) => {
                   const { runtime, status, connected: usable } = row
                   const facts = runtimeInstallFacts(runtime.id)
                   const checking = isChecking(row)
@@ -385,6 +465,16 @@ export function FirstLaunch({
                   )
                 })}
               </div>
+              {/*
+                * Deferred, and saying so. Not a chevron on its own: the
+                * sentence is the affordance, and it names what pressing it
+                * gets you rather than making that a guess.
+                */}
+              {deferred > 0 && (
+                <button type="button" className="lc-agentmore" onClick={() => setOthersOpen(true)}>
+                  {deferred} other{deferred === 1 ? '' : 's'} Locust can drive — they each need their own account
+                </button>
+              )}
             </>
           )
         })()}
@@ -446,7 +536,28 @@ export function FirstLaunch({
           * how an install will go, under a list that offers no install, was
           * one of the three things Colin's frame had arguing at once.
           */}
-        {discoveryPhase === 'ready' && npmIsBundled && rows.some((row) => !row.runtime.installed && installCommand(row.runtime.id) !== undefined) && (
+        {/*
+          * AND ONLY ONCE AN INSTALL IS ACTUALLY UNDER WAY (2026-09-19).
+          *
+          * The condition above already stopped it appearing over a list that
+          * offered no install. It still put two sentences of technical
+          * explanation on the screen BEFORE the person had pressed anything,
+          * and it was the longest run of prose there -- measured on the first
+          * frame anybody has captured of this screen on a machine with
+          * nothing installed (`_tools/bare-machine-frame.mjs`).
+          *
+          * The sentence exists to REASSURE: the install will work anyway.
+          * That is a good thing to say to somebody watching an install, and
+          * the wrong thing to say to somebody who has not started one --
+          * "Node.js is not on this machine" reads as a problem statement to
+          * anyone who does not already know what Node.js is, which is exactly
+          * the person this screen is being rebuilt for.
+          *
+          * So it now waits for the press. An install that fails still says
+          * everything, through `installFailure` below, which carries the
+          * command and the repair.
+          */}
+        {discoveryPhase === 'ready' && (installing !== undefined || connected > 0) && npmIsBundled && rows.some((row) => !row.runtime.installed && installCommand(row.runtime.id) !== undefined) && (
           <p className="lc-installnote">
             Node.js is not on this machine, so Locust installs with the copy of npm it carries.
             The CLI will work here. To use it in your own terminal too, install{' '}

@@ -169,7 +169,15 @@ try {
     return chip ? (chip.getAttribute('title') || '') : '(no folder chip)'
   })()`)
   const saidOnScreen = /made (you )?(a|this) folder|chose this folder|new folder|Locust made/i.test(said.body)
-  say(`   OPEN: is the invented folder announced on screen? ${String(saidOnScreen)}`)
+  /*
+   * ANSWERED 2026-09-19, so it is an assertion now rather than a note.
+   *
+   * Colin took the recommendation: the first screen carries one card when
+   * the app invented its own folder -- 'Locust made a folder to work in',
+   * the path, and the same Choose folder control. The tooltip stays; what
+   * changed is that the tooltip is no longer the only place it is said.
+   */
+  check('the invented folder is announced on screen, not only on hover', saidOnScreen === true, said.body.slice(0, 200))
   say(`   OPEN: the chip's tooltip says: ${JSON.stringify(tooltip)}`)
 
   /*

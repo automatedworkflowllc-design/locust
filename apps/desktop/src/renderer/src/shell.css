@@ -900,15 +900,83 @@ textarea {
    * leading is what makes the sweep findable -- so 90ch is held at 1.7. At
    * 1.65 the same width read as too long; it was the pairing, not the width.
    */
-  max-width: 90ch;
+  /*
+   * 60ch, AND THE NUMBER CAME FROM A COUNT (2026-09-19).
+   *
+   * 90ch was never counted. It was reasoned to -- "90ch at 15px is about
+   * 670px of paragraph" -- and it is about 729px, which is more than the
+   * thread column has, so THE CEILING NEVER BOUND AT ALL. It was decorative.
+   * Below 78ch, where it did start to bind, it overstated by a quarter: 90ch
+   * rendered 111 characters.
+   *
+   * That is the third time the `ch` trap has been paid for in this one file,
+   * after 68ch and 48ch, and both of those comments are still above. The unit
+   * is right -- it moves with the face, which is the whole argument for ever
+   * changing the face -- but the VALUE has to come from counting rendered
+   * characters, every time, and this one never had been.
+   *
+   * Counted at 18px, the size this now ships at: 60ch is 666px of paragraph
+   * and renders 62 characters a line, 83 at the longest. 66ch renders 72 and
+   * 92, and 92 is past the sweep. 54ch renders 60 and 74, which is inside the
+   * band but narrower than the column, and Colin has already objected once to
+   * a reply that did not fill its box.
+   *
+   * It binds at every window width now, which is the point: the thread column
+   * clamps at 980px and 60ch is 666px, so the measure is the same on a
+   * maximised window as on a small one.
+   *
+   * `node _tools/prose-size-measure.mjs --at <size>` is the count. Re-run it
+   * whenever the size or the face changes; the two are one decision.
+   */
+  max-width: 60ch;
   line-height: 1.7;
   text-wrap: pretty;
 }
 
-/* Emphasis in the reply is the real 500, not a faux-bold of the 400; and
-   italics are the real italic, not a sheared upright. Both are bundled. */
-.lc-agentline p strong {
+/*
+ * EMPHASIS IN A REPLY, AND WHY NOTHING HERE SLANTS.
+ *
+ * This comment used to say "italics are the real italic, not a sheared
+ * upright. Both are bundled." That was true of IBM Plex, which ships
+ * `IBMPlexSans-Italic.woff2` and was the prose face when it was written. It
+ * stopped being true the day the serif replaced Plex and nobody noticed:
+ * **only `AnthropicSerif-Variable.woff2` ships, declared `font-style:
+ * normal`, and there is no italic file beside it** (confirmed against the
+ * repo 2026-09-19, and raised by the design agent's release check).
+ *
+ * `agentText.ts` turns `*text*` into `<em>`, and models emphasise constantly,
+ * so every one of those was a browser-synthesised slant of the upright --
+ * exactly the thing the old comment claimed the app did not do. The cost
+ * scales with how often a teammate emphasises something, which is often.
+ *
+ * `font-synthesis: none` is the rule, and it is the honest one: the browser
+ * may not invent a face this family does not have. But it cannot stand alone
+ * -- with no other rule, `<em>` would render identically to body text and the
+ * emphasis would silently vanish, which is a worse lie than a slant.
+ *
+ * So both marks are real points on the serif's own weight axis, which runs
+ * 300-800: `<em>` at 500 and `<strong>` at 650. Two distinct weights rather
+ * than a weight and a slant. That is a genuine compromise -- a reader's
+ * convention is that italic is not bold -- and it is the compromise available
+ * without an italic file. **If an italic face is ever licensed and bundled,
+ * this is the block to revert**: declare it in `tokens.css`, drop
+ * `font-synthesis`, and give `<em>` `font-style: italic` back.
+ */
+.lc-agentline p em,
+.lc-agentline li em,
+.lc-agentline blockquote em {
+  font-style: normal;
   font-weight: 500;
+}
+
+.lc-agentline p strong,
+.lc-agentline li strong,
+.lc-agentline blockquote strong {
+  font-weight: 650;
+}
+
+.lc-agentline {
+  font-synthesis: none;
 }
 
 /*
@@ -3595,6 +3663,31 @@ textarea {
   color: var(--lc-text-muted);
   font-size: var(--lc-text-description);
   text-wrap: pretty;
+}
+
+/*
+ * The agents held back until the first one works.
+ *
+ * Deliberately quiet: it is an offer, not a step, and it sits under the one
+ * row that IS the step. Left-aligned with the panel above it, because the
+ * first screen was redrawn around one left edge (design agent, 2026-09-19)
+ * and a centred control here would be a seventh.
+ */
+.lc-agentmore {
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lc-text-muted);
+  font-family: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-agentmore:hover {
+  color: var(--lc-text-primary);
 }
 
 .lc-installnote--failed {

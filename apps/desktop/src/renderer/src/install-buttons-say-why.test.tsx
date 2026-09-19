@@ -36,7 +36,7 @@ const runtime = (id: LocalRuntimeId, name: string, connected: boolean): PublicRu
   status: connected ? 'ready' : 'not-installed'
 })
 
-function panel(options: { connected: number; npmMissing: boolean; npmIsBundled?: boolean }): string {
+function panel(options: { connected: number; npmMissing: boolean; npmIsBundled?: boolean; installing?: string }): string {
   // One connected runtime standing in for Codex, plus ones that are not.
   const runtimes = [
     runtime('codex', 'Codex', options.connected > 0),
@@ -55,6 +55,7 @@ function panel(options: { connected: number; npmMissing: boolean; npmIsBundled?:
       onInstall={() => undefined}
       npmMissing={options.npmMissing}
       npmIsBundled={options.npmIsBundled ?? false}
+      {...(options.installing === undefined ? {} : { installing: options.installing })}
     />
   )
 }
@@ -113,7 +114,21 @@ describe('when Node.js is missing', () => {
  * the person's own terminal until they install Node themselves.
  */
 describe('when this app carries its own npm', () => {
-  const carried = panel({ connected: 0, npmMissing: false, npmIsBundled: true })
+  /*
+   * WHILE AN INSTALL IS ACTUALLY HAPPENING, which is when this sentence is
+   * for.
+   *
+   * It used to be drawn on the cold first screen, before the person had
+   * pressed anything -- and measured on the first frame anybody has taken of
+   * that screen with nothing installed, it was the longest run of prose on
+   * it. "Node.js is not on this machine" reads as a problem statement to
+   * anybody who does not already know what Node.js is, which is exactly the
+   * person this screen is being rebuilt for (2026-09-19).
+   *
+   * The content below is unchanged and still Ian's case. Only the moment
+   * moved: from before the press to from the press onward.
+   */
+  const carried = panel({ connected: 0, npmMissing: false, npmIsBundled: true, installing: 'opencode' })
 
   it('does not disable a single Install button', () => {
     // The whole point. `npmMissing` is what disables them, and a build that
@@ -141,5 +156,55 @@ describe('when this app carries its own npm', () => {
     const ordinary = panel({ connected: 1, npmMissing: false })
     expect(ordinary).not.toContain('the copy of npm it carries')
     expect(ordinary).not.toContain('Node.js is not on this machine')
+  })
+})
+
+/**
+ * And WHEN each of those sentences appears, which is its own decision.
+ *
+ * The first screen on a machine with nothing installed was measured for the
+ * first time on 2026-09-19 (`_tools/bare-machine-frame.mjs` — every frame
+ * before it had been taken on a machine with all six agents present, reading
+ * "6 ready"). Two things on it spoke too early for the person it is for.
+ */
+describe('what the cold first screen does not say yet', () => {
+  it('keeps the Node.js explanation until the person has pressed something', () => {
+    const cold = panel({ connected: 0, npmMissing: false, npmIsBundled: true })
+    expect(cold).not.toContain('the copy of npm it carries')
+    // And the thing it DOES say is the step: one lit row with one button.
+    expect(cold).toContain('Install')
+  })
+
+  it('still says it once anything is connected, which is when a terminal comes up', () => {
+    // Ian's case is not "while installing", it is "afterwards, in my own
+    // terminal, nothing is there". So the sentence has to outlive the spinner.
+    const after = panel({ connected: 1, npmMissing: false, npmIsBundled: true })
+    expect(after).toContain('your own terminal')
+  })
+
+  it('offers the other agents behind a press while none of them can help', () => {
+    /*
+     * Colin, 2026-09-19: "i really want a new user without tech savvyness to
+     * be able to just use the software off rip, maybe even ask them how to get
+     * the other agents working" -- the other agents come after, in his own
+     * sentence. Five rows each naming an account or a subscription the person
+     * does not have are five reasons not to press the one button that works.
+     *
+     * Deferred, not hidden: the count is in the control's own words.
+     */
+    const cold = panel({ connected: 0, npmMissing: false, npmIsBundled: true })
+    expect(cold).toContain('Locust can drive')
+    expect(cold).not.toContain('needs a Cursor account')
+    // The on-ramp itself is never deferred: it is the step.
+    expect(cold).toContain('OpenCode')
+    expect(cold).toContain('no account needed')
+  })
+
+  it('shows every agent again the moment one of them works', () => {
+    // The control. Once anything is connected, "what else can this drive" is
+    // a real question and the catalogue is the right answer to it.
+    const warm = panel({ connected: 1, npmMissing: false })
+    expect(warm).toContain('needs a Cursor account')
+    expect(warm).not.toContain('Locust can drive')
   })
 })

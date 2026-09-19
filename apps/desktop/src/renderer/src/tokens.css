@@ -359,8 +359,33 @@
    * rather than scans, and at 13.5px Colin read it as "way too small"
    * (2026-09-10) beside Claude Code, whose prose measures about 14.2px.
    * Paired with the prose family, which is already the reply's alone.
+   *
+   * 18px AND NOT 15px, from a count rather than an argument
+   * (docs/PROSE-MEASURE-2026-09-19.md, 2026-09-19). Two things decided it,
+   * and the second is the one that settles it:
+   *
+   * The design agent's release check said a serif needs MORE size than a
+   * sans, not less -- the strokes that make it a serif are the thin ones, and
+   * a dark ground eats thin strokes first, so 15px serif on `#121415` is the
+   * worst cell in that table. True, and an argument.
+   *
+   * Then it was counted, off the rendered line boxes, character by character,
+   * on two different replies. **At 15px the reply rendered 83 characters a
+   * line and 111 at the longest** -- against the ceiling `shell.css` states in
+   * its own comment, "the return sweep is what breaks past ~85 characters".
+   * At 18px it renders 62 and 83. The app was outside a rule it had written
+   * down, and this is the smallest size that puts it back inside.
+   *
+   * Not 20px, which the quoted guidance asks for: it lands in band too, and
+   * costs more vertical room in a reply that already scrolls. 18 is the size
+   * that buys the whole correction and no more.
+   *
+   * THE CEILING MOVES WITH THIS. `ch` scales with the font, so the paragraph
+   * cap in `shell.css` was re-counted at 18px and set from that count. Change
+   * one and you must re-count the other; `node _tools/prose-size-measure.mjs
+   * --at <size>` is the count.
    */
-  --lc-text-prose: 15px;
+  --lc-text-prose: 18px;
   --lc-text-control: 13px;
   --lc-text-description: 12px;
 

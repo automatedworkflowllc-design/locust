@@ -41,6 +41,15 @@ const PORT = 9505
 const KEEP = process.argv.includes('--keep')
 const WAIT_MS = 5 * 60 * 1000
 const SIZES = ['15px', '16px', '17px', '18px', '20px']
+/*
+ * Which size the CEILING sweep runs at.
+ *
+ * It ran at `SIZES[0]` and that was wrong the moment the size question got an
+ * answer: `ch` scales with the font, so a ceiling counted at 15px says
+ * nothing about the same ceiling at 18px. `--at 18px` counts it where it will
+ * actually live.
+ */
+const AT = process.argv.includes('--at') ? process.argv[process.argv.indexOf('--at') + 1] : SIZES[0]
 const ASK =
   'Write three paragraphs of ordinary prose about why very long lines of text are tiring to read. No lists, no code, no headings, no file edits. Plain sentences.'
 
@@ -263,12 +272,12 @@ try {
    * 68 and at 48; measuring it is the only way that has ever worked.
    */
   say('')
-  say('4. and the ceiling, at the size that ships today')
+  say(`4. and the ceiling, counted at ${AT}`)
   say('')
   say('   ceiling  paragraph  shortest  mean  longest   verdict')
   const ceilings = []
-  for (const ceiling of ['90ch', '84ch', '78ch', '72ch', '66ch']) {
-    const got = JSON.parse(await cdp.eval(`(${MEASURE})(${JSON.stringify(SIZES[0])}, ${JSON.stringify(ceiling)})`))
+  for (const ceiling of ['90ch', '84ch', '78ch', '72ch', '66ch', '60ch', '54ch']) {
+    const got = JSON.parse(await cdp.eval(`(${MEASURE})(${JSON.stringify(AT)}, ${JSON.stringify(ceiling)})`))
     const verdict = got.mean > 85 ? 'too wide' : got.mean > 75 ? 'over' : got.mean >= 45 ? 'in band' : 'too narrow'
     ceilings.push({ ceiling, ...got, verdict })
     say(
