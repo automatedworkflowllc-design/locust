@@ -274,6 +274,33 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
         items.push({ text: (numbered?.[2] ?? bullet![2]!).trim(), depth: indents.length - 1 })
         continue
       }
+      /*
+       * A WRAPPED LINE BELONGS TO THE ITEM IT IS WRAPPING.
+       *
+       * An item whose text ran past one line ENDED the list here, and
+       * everything after the first line became a paragraph under it: the
+       * bullet kept one line and the rest of the sentence sat outside the
+       * list, at the left margin, in its own block. Colin saw it in the
+       * "What changed" banner, which is written with two-space continuations
+       * like the rest of `CHANGELOG.md` (2026-09-19, screenshot): "this
+       * format is slightly off".
+       *
+       * Indented lines only. An UNINDENTED line after a list is ambiguous --
+       * Markdown calls it a lazy continuation, and models mean it as new
+       * prose about as often -- so that case keeps the old behaviour and
+       * only text indented past its own marker is taken as a continuation.
+       * A nested bullet never reaches here; the bullet branch above has it.
+       */
+      if (items.length > 0 && line.trim().length > 0) {
+        const width = indentWidth(/^[ \t]*/.exec(line)?.[0] ?? '')
+        if (width > (indents[indents.length - 1] ?? 0)) {
+          const last = items[items.length - 1]
+          if (last !== undefined) {
+            items[items.length - 1] = { ...last, text: `${last.text} ${line.trim()}` }
+            continue
+          }
+        }
+      }
       // A blank line inside a list ends it; prose after it is prose.
       if (items.length > 0 && line.trim().length === 0) {
         flushList()

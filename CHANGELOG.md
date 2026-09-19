@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.194.0 - 2026-09-19
+
+- **A bullet that wraps stays one bullet.** When a list item's sentence ran
+  past one line, everything after the first line was drawn as a separate
+  paragraph below the bullet, at the left margin. It showed up wherever a
+  list is read: in what a teammate writes back, and in this changelog, which
+  is how it was spotted.
+
 ## 0.193.0 - 2026-09-19
 
 - **The decision card says one thing once.** When a teammate stops and asks
