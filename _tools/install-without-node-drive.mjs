@@ -140,7 +140,7 @@ try {
       // no red card, no "coming soon", no changelog banner.
       redCard: !!document.querySelector('.lc-composer .lc-notice'),
       comingSoon: /coming soon/i.test(clean(document.body.innerText)),
-      banner: /is running\. Here is what changed/.test(clean(document.body.innerText))
+      banner: /is running[.] Here is what changed/.test(clean(document.body.innerText))
     })
   })()`)
   say(`   ${first}`)
@@ -195,7 +195,7 @@ try {
   // And once something is connected, the banner it was held for.
   const afterConnect = await cdp.eval(`(() => {
     const clean = (s) => (s || '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim()
-    return JSON.stringify({ banner: /is running\. Here is what changed/.test(clean(document.body.innerText)) })
+    return JSON.stringify({ banner: /is running[.] Here is what changed/.test(clean(document.body.innerText)) })
   })()`)
   check('the changelog banner appears once a runtime is connected', JSON.parse(afterConnect).banner === true, afterConnect)
 
