@@ -179,7 +179,9 @@ function parsedPost(value: unknown): RoomPost | undefined {
     text: record.text,
     at: record.at,
     missions,
-    ...(queued.length === 0 ? {} : { queued: queued.filter((id) => missions[id] === undefined) }),
+    // Anyone who already has a mission is not waiting, whatever the file says
+    // -- and a queue with nobody left in it is no queue, not an empty one.
+    ...(queued.filter((id) => missions[id] === undefined).length === 0 ? {} : { queued: queued.filter((id) => missions[id] === undefined) }),
     ...(Object.keys(refused).length === 0 ? {} : { refused })
   }
 }
@@ -442,15 +444,28 @@ export function createRoomStore(options: {
         const posts = room.posts.map((post) => {
           if (post.postId !== postId) return post
           const queued = (post.queued ?? []).filter((id) => id !== teammateId)
-          return {
+          const next = {
             ...post,
             missions: { ...post.missions, [teammateId]: missionId },
             ...(queued.length === 0 ? {} : { queued })
           }
+          /*
+           * Dropped rather than kept empty, so a room file never carries an
+           * empty queue that reads as "someone is waiting".
+           *
+           * Deleted from `next` by the LOCAL count, not by re-reading it off
+           * the object: `...post` above copies the old `queued` in, and when
+           * the new queue is empty nothing overrides it -- so the LAST member
+           * to leave the queue was written back into it. The read path
+           * filters anyone who has a mission out of the queue, so the app
+           * showed the post clean while the file said someone was still
+           * waiting. Grok, passes 12 and 14; reproduced by
+           * `_tools/room-queue-drive.mjs` on 2026-09-19: three of three
+           * answered, `"queued": ["tm_quill"]` on disk.
+           */
+          if (queued.length === 0) delete (next as { queued?: readonly string[] }).queued
+          return next
         })
-        // Dropped rather than kept empty, so a room file never carries an
-        // empty queue that reads as "someone is waiting".
-        for (const post of posts) if (post.postId === postId && (post.queued?.length ?? 0) === 0) delete (post as { queued?: readonly string[] }).queued
         await write({
           ...file,
           rooms: file.rooms.map((entry) => (entry.roomId === roomId ? { ...entry, posts } : entry))

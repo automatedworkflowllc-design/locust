@@ -1087,6 +1087,13 @@ if (!ownsSingleInstanceLock) {
           note('memory-file', `could not write ${MEMORY_FILE} under ${peer.cwd ?? workspacePath}: ${error instanceof Error ? error.message : String(error)}`)
           return undefined
         })
+        // `writeMemoryFile` answers undefined for a failed write rather than
+        // throwing, so the catch above never ran and 0.184.0's promised log
+        // line could not be written (Fable, pass 1, from reading). Logged on
+        // the answer, which is the one signal the write gives.
+        if (file === undefined) {
+          note('memory-file', `could not write ${MEMORY_FILE} under ${peer.cwd ?? workspacePath}: the write did not complete (see memory-file.ts)`)
+        }
         return memorySection({
           ...(file === undefined ? {} : { file }),
           selfName: peer.self.name,

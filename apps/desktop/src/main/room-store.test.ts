@@ -212,4 +212,30 @@ describe('the board', () => {
     const old = { roomId: 'room_old', name: 'Old', teammateIds: ['tm_wren'], createdAt: NOW, posts: [] }
     expect(parsedFile(JSON.stringify({ schemaVersion: 1, rooms: [old] })).rooms[0]?.tasks).toEqual([])
   })
+
+  /*
+   * Grok, passes 12 and 14: three of three answered, and the file still said
+   * `"queued": ["tm_quill"]`. The LAST member to leave the queue was written
+   * back into it -- the write spread the old post and, with nothing left to
+   * queue, nothing overrode the old key. The read path hid it (anyone with a
+   * mission is filtered out), so only the file was wrong. Checked on the
+   * bytes, not through the reader.
+   */
+  it('leaves no queue in the file once the last waiting member has started', async () => {
+    const rooms = await store()
+    const room = await rooms.create({ name: 'Standup', teammateIds: ['tm_wren', 'tm_booty', 'tm_quill'] })
+    const post = await rooms.addPost(room.roomId, { text: 'Reply with only the word CEDAR.', missions: {}, queued: ['tm_wren', 'tm_booty', 'tm_quill'] })
+    await rooms.startQueued(room.roomId, post.postId, 'tm_wren', 'mission_w')
+    await rooms.startQueued(room.roomId, post.postId, 'tm_booty', 'mission_b')
+    const midway = JSON.parse(await readFile(join(root, 'rooms.json'), 'utf8')) as { rooms: { posts: { queued?: string[] }[] }[] }
+    expect(midway.rooms[0]?.posts[0]?.queued).toEqual(['tm_quill'])
+    await rooms.startQueued(room.roomId, post.postId, 'tm_quill', 'mission_q')
+    const done = JSON.parse(await readFile(join(root, 'rooms.json'), 'utf8')) as { rooms: { posts: { queued?: string[]; missions: Record<string, string> }[] }[] }
+    expect(done.rooms[0]?.posts[0]?.missions).toEqual({ tm_wren: 'mission_w', tm_booty: 'mission_b', tm_quill: 'mission_q' })
+    expect(done.rooms[0]?.posts[0]).not.toHaveProperty('queued')
+    // And a file that already carries the stale entry reads back without it,
+    // as no queue rather than an empty one.
+    expect((await rooms.get(room.roomId))?.posts[0]).not.toHaveProperty('queued')
+    expect(parsedFile(JSON.stringify({ schemaVersion: 1, rooms: [{ ...room, posts: [{ ...post, missions: { tm_quill: 'mission_q' }, queued: ['tm_quill'] }] }] })).rooms[0]?.posts[0]).not.toHaveProperty('queued')
+  })
 })

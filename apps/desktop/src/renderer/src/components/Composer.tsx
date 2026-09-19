@@ -144,6 +144,8 @@ export interface ComposerProps {
    */
   readonly hasConnectors?: boolean
   readonly runtimes: readonly PublicRuntimeStatus[]
+  /** Discovery asked its four times and nobody answered; the rows say NOT ANSWERING. */
+  readonly runtimesGaveUp?: boolean
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
   /** The latest still-allowed rate-limit reading per runtime, for the route chip's tooltip. */
@@ -256,6 +258,7 @@ export function Composer({
   workspaceMade = false,
   onChooseFolder,
   runtimes,
+  runtimesGaveUp = false,
   limitedRuntimes,
   usageWindows,
   context,
@@ -510,7 +513,15 @@ export function Composer({
                 // sign-in earns the words.
                 runtimes.some((runtime) => runtime.status === 'auth-required' || runtime.auth === 'unauthenticated')
                 ? 'Install a coding agent and sign in to start a mission…'
-                : 'Install a coding agent to start a mission…'
+                : // And "install" is wrong under five rows that say installed
+                  // and not answering (Fable, pass 1, finding 9): the box
+                  // names what the screen above it offers, Check again.
+                  runtimes.some((runtime) => runtime.installed)
+                  ? runtimesGaveUp
+                    ? 'A coding agent is installed but not answering — Check again above…'
+                    : // Installed and still being asked: say that, not "install".
+                      'Checking the coding agents on this machine…'
+                  : 'Install a coding agent to start a mission…'
 
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()

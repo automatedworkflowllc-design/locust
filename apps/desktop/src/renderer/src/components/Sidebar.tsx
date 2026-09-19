@@ -966,7 +966,7 @@ export function Sidebar({
                   className={`lc-row lc-row--button lc-roomrow${currentRoomId === room.roomId ? ' is-selected' : ''}`}
                   aria-current={currentRoomId === room.roomId ? 'true' : undefined}
                   title={`Open ${room.name}`}
-                  onClick={() => onOpenRoom(room.roomId)}
+                  onClick={() => { railClose(); onOpenRoom(room.roomId) }}
                 >
                   <Icon name="users" size={14} />
                   <span className="lc-row__text">
@@ -1627,15 +1627,21 @@ export function Sidebar({
           * nothing.
           */}
         <div className="lc-sidebar__nav">
-          <button type="button" onClick={onOpenMissions} title="All missions (Ctrl 1)">
+          {/*
+            * Each of these closes the rail's pinned flyout first. A face
+            * pinned, then Rooms opened, left the flyout floating over the
+            * room's answers (Grok, pass 13, at 1120x720). Leaving the rail's
+            * own list is leaving the flyout.
+            */}
+          <button type="button" onClick={() => { railClose(); onOpenMissions() }} title="All missions (Ctrl 1)">
             <Icon name="inbox" size={14} />
             <span>Missions</span>
           </button>
-          <button type="button" onClick={onOpenRooms} title="Rooms — ask several teammates at once (Ctrl 4)">
+          <button type="button" onClick={() => { railClose(); onOpenRooms() }} title="Rooms — ask several teammates at once (Ctrl 4)">
             <Icon name="users" size={14} />
             <span>Rooms</span>
           </button>
-          <button type="button" onClick={onOpenAutomations} title="Routines — work that repeats">
+          <button type="button" onClick={() => { railClose(); onOpenAutomations() }} title="Routines — work that repeats">
             <Icon name="clock" size={14} />
             <span>Routines</span>
           </button>
@@ -1662,7 +1668,7 @@ export function Sidebar({
           * 371px-into-266px scar cannot reopen.
           */}
         <div className="lc-sidebar__nav">
-          <button type="button" onClick={onOpenSettings} title="Settings (Ctrl 3)">
+          <button type="button" onClick={() => { railClose(); onOpenSettings() }} title="Settings (Ctrl 3)">
             <Icon name="settings" size={14} />
             <span>Settings</span>
           </button>

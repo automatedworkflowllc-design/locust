@@ -59,9 +59,12 @@ export function ThreadItems({
   owner,
   activity,
   workspacePath,
-  decision
+  decision,
+  planMode = false
 }: {
   readonly items: readonly ThreadItem[]
+  /** The turn was sent in Plan mode; see `Thread`'s prop of the same name. */
+  readonly planMode?: boolean
   readonly owner: PublicTeammate | undefined
   /** What the live run is doing; only the working line draws it. */
   readonly activity: FaceActivity
@@ -145,7 +148,7 @@ export function ThreadItems({
                   * which is a product decision to answer before anything is
                   * drawn.
                   */}
-                {item.steps.length > 0 && item.touchedNothing === true && (
+                {planMode && item.steps.length > 0 && item.touchedNothing === true && (
                   <p className="lc-planmode">
                     Plan mode — nothing was changed. Switch the mode below and send again to have{' '}
                     {owner?.name ?? 'your teammate'} do it.
@@ -399,6 +402,14 @@ export interface ThreadProps {
    * loose. Caught on screen 2026-09-05, not by a test.
    */
   readonly sandbox?: 'read-only' | 'workspace-write' | 'full-access'
+  /**
+   * The run was sent in Plan mode. The "Plan mode — nothing was changed"
+   * sentence hangs on this, not on the shape of the reply: a run in Accept
+   * edits that answered a question has steps and touched nothing too, and
+   * was being told to switch modes two inches above a composer reading
+   * Accept edits (Fable, pass 1, finding 4, with the ledger).
+   */
+  readonly planMode?: boolean
   readonly earlierTurns: readonly {
     readonly missionId: string
     readonly prompt: string
@@ -481,6 +492,7 @@ export function Thread({
   startedBy,
   onOpenPeerRun,
   earlierTurns,
+  planMode = false,
   groupBoundary,
   pastBoundaries = [],
   groupLeavings = [],
@@ -794,6 +806,7 @@ export function Thread({
           owner={peers.self}
           activity={liveActivityOf(events, running)}
           workspacePath={workspacePath}
+          planMode={planMode}
           decision={
             onAnswer === undefined
               ? undefined

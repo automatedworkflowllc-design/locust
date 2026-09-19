@@ -6,6 +6,38 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.189.0 - 2026-09-19
+
+Three tester reports landed at once (Grok's passes 13 and 14, Fable's
+first). This build is the small half of what they found; the rest is in
+`docs/PLAN-2026-09-19-TESTERS.md`.
+
+- **A room's file agrees with its screen.** After everyone in a room had
+  answered, the room file still listed the last teammate as waiting. The
+  screen was right, the file was wrong, and anything reading the file would
+  have started them again. Fixed at the write, with a test on the bytes.
+- **No red card after hung CLIs give up.** Five rows already said NOT
+  ANSWERING with Check again beside each; a card above the message box said
+  to install one. The card now appears only when a runtime wants a sign-in,
+  and the message box under not-answering rows says *installed but not
+  answering — Check again above* instead of *install*.
+- **Save as routine on a follow-up.** A conversation started with nobody
+  picked and assigned afterwards could not be saved as a routine from a
+  later turn: the menu said nothing had been typed. The owner is found along
+  the conversation now.
+- **"Plan mode — nothing was changed" only in Plan mode.** It was drawn under
+  any reply that answered a question without touching a file, including in
+  Accept edits.
+- **The rail's flyout closes when you leave it.** Pinning a teammate on the
+  narrow sidebar and then opening a room left their card floating over the
+  room's answers.
+- **The first words no longer blink out.** On a cold start the bold
+  *OpenCode needs no account* could be blank for a moment while its weight
+  loaded; the fallback face shows instead.
+- **Two sentences made true.** The install line under the list now shows the
+  command that actually runs with the app's own npm, and a memory file that
+  fails to write is now logged, as 0.184.0 said it would be.
+
 ## 0.188.0 - 2026-09-19
 
 - **The inspector stays with its conversation.** It used to stay open across

@@ -518,7 +518,19 @@ export function FirstLaunch({
               * to know what it was doing or to run it themselves instead.
               */}
             {installing !== undefined && installCommand(installing) !== undefined && (
-              <code className="lc-installnote__running lc-mono">{installCommand(installing)}</code>
+              <code className="lc-installnote__running lc-mono">
+                {/*
+                  * The command that RUNS, not the one a person would type.
+                  * With no Node on the machine the app runs its own npm with
+                  * its own binary, allows the package's install script, and
+                  * installs into its own folder; the screen said plain
+                  * `npm install -g …`, which fails in that person's terminal
+                  * for the reason the note above gives (Fable, pass 1).
+                  */}
+                {npmIsBundled
+                  ? `${installCommand(installing) ?? ''} --allow-scripts=${(() => { const facts = runtimeInstallFacts(installing); return facts?.install.kind === 'npm' ? facts.install.packageName : '' })()} --prefix <Locust's own folder>  (with the npm Locust carries)`
+                  : installCommand(installing)}
+              </code>
             )}
             <div className="lc-installnote__live">
               <span className="lc-mono lc-installnote__lastline">{installLine}</span>

@@ -136,6 +136,7 @@ try {
   check('the head note says checking, once, with a count', /checking \d+ on this machine/.test(early.head ?? ''), early.head)
   check('and offers no Install yet', early.checkAgain === false)
   check('the composer does not ask for a sign-in nothing has asked for', !/sign in/.test(early.placeholder ?? ''), early.placeholder)
+  check('and while the rows are still being asked it says checking, not install or not-answering', /Checking the coding agents/.test(early.placeholder ?? ''), early.placeholder)
   check('no red card while the rows are still checking', early.redCard === false)
   check('no no-Node sentence while there is no Install to be about', early.npmNote === false)
 
@@ -152,8 +153,13 @@ try {
   check('and Check again is on the screen -- not Install, which it already is', late.checkAgain === true)
   check('the composer still does not ask for a sign-in', !/sign in/.test(late.placeholder ?? ''), late.placeholder)
   // Now something IS standing -- a runtime that is here and never answered
-  // -- and the card is the register for that.
-  check('the red card appears once something is standing', late.redCard === true)
+  // -- and the rows ARE the register for that. 0.185.0 drew the red card
+  // here too; Grok's pass 14 and Fable's pass 1 both read it from the
+  // stranger's seat: five rows saying not answering with Check again beside
+  // each, a box that already cannot send, and a card telling them to
+  // install what is installed. The card stays for a sign-in only (0.189.0).
+  check('no red card: the rows and Check again are the repair', late.redCard === false)
+  check('the composer says installed but not answering, and points at Check again', /installed but not answering/.test(late.placeholder ?? ''), late.placeholder)
 
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
   const out = new URL('../docs/chain-measure/hung-cli-2026-09-18.png', import.meta.url)

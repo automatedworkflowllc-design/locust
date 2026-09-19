@@ -208,6 +208,9 @@ try {
       // The wide sidebar draws a faces row: some faces and a "+N" for the rest.
       faces: document.querySelectorAll('.lc-faces__one').length + (parseInt(((document.querySelector('.lc-faces__more') || {}).innerText || '0').replace(/[^0-9]/g, ''), 10) || 0),
       railSlots: document.querySelectorAll('.lc-railslot').length,
+      // On the 720-tall rail, every face has to be on screen (Grok, pass 13,
+      // saw seven of eight).
+      railVisible: [...document.querySelectorAll('.lc-railslot')].filter(s => { const r = s.getBoundingClientRect(); return r.top >= 38 && r.bottom <= window.innerHeight }).length,
       unreadable: (document.querySelector('.lc-sidebar__unreadable-happened') || {}).innerText || null,
       room: /Release/.test(text) || [...side.querySelectorAll('[aria-label], [title]')].some(el => /Release/.test((el.getAttribute('aria-label') || '') + (el.getAttribute('title') || ''))),
       convrows: document.querySelectorAll('.lc-convrow').length
@@ -217,6 +220,7 @@ try {
   check(`the shell is ${LAYOUT} at 1120`, sidebar.compact === (LAYOUT === 'compact'), JSON.stringify(sidebar))
   if (LAYOUT === 'compact') {
     check('the rail carries eight teammate slots', sidebar.railSlots === 8, JSON.stringify(sidebar))
+    check('and all eight faces are on the 720-tall rail', sidebar.railVisible === 8, JSON.stringify(sidebar))
   } else {
     check('the faces row accounts for all eight teammates', sidebar.faces === 8, JSON.stringify(sidebar))
     check('the eight-turn chain is one conversation row', sidebar.convrows === 1, JSON.stringify(sidebar))

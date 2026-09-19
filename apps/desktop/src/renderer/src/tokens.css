@@ -32,8 +32,15 @@
  * looks worse than what it replaces. The unsubsetted build, because replies
  * carry em dashes, curly quotes, arrows and accented names, and one accented
  * filename falling back mid-paragraph is a worse defect than the one this
- * fixes. `font-display: block`, as for Geist: the file is on disk, there is
- * nothing to swap from, and `swap` can flash the wrong face for a frame.
+ * fixes. `font-display: fallback`, since 0.189.0. It was `block` on the
+ * reasoning that the file is on disk and there is nothing to swap from --
+ * but a weight loads when it is first used, `block` hides text in it for up
+ * to three seconds while it does, and Fable measured the first screen's
+ * bold words ("OpenCode needs no account") blank 0.6s after the intro
+ * rendered (pass 1, finding 10). `fallback` caps the blank at 100ms and
+ * then shows the fallback face until the file arrives; not `swap`, which
+ * the guard test forbids for the flash it can draw on a face that IS on
+ * disk.
  *
  * SIL Open Font License 1.1, the same as Geist -- IBM-Plex-LICENSE.txt sits
  * beside the files. Fetched 2026-09-10 from github.com/IBM/plex, master,
@@ -71,7 +78,7 @@
   src: url('./assets/fonts/AnthropicSerif-Variable.woff2') format('woff2');
   font-weight: 300 800;
   font-style: normal;
-  font-display: block;
+  font-display: fallback;
 }
 
 @font-face {
@@ -79,7 +86,7 @@
   src: url('./assets/fonts/AnthropicSans-Variable.woff2') format('woff2');
   font-weight: 300 800;
   font-style: normal;
-  font-display: block;
+  font-display: fallback;
 }
 
 @font-face {
@@ -87,7 +94,7 @@
   src: url('./assets/fonts/IBMPlexSans-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
-  font-display: block;
+  font-display: fallback;
 }
 
 @font-face {
@@ -95,7 +102,7 @@
   src: url('./assets/fonts/IBMPlexSans-Italic.woff2') format('woff2');
   font-weight: 400;
   font-style: italic;
-  font-display: block;
+  font-display: fallback;
 }
 
 @font-face {
@@ -103,7 +110,7 @@
   src: url('./assets/fonts/IBMPlexSans-Medium.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
-  font-display: block;
+  font-display: fallback;
 }
 
 @font-face {
@@ -111,7 +118,7 @@
   src: url('./assets/fonts/Geist-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
-  font-display: block;
+  font-display: fallback;
 }
 
 @font-face {
@@ -119,7 +126,7 @@
   src: url('./assets/fonts/Geist-Medium.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
-  font-display: block;
+  font-display: fallback;
 }
 
 @font-face {
@@ -127,7 +134,7 @@
   src: url('./assets/fonts/GeistMono-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
-  font-display: block;
+  font-display: fallback;
 }
 
 @font-face {
@@ -135,7 +142,7 @@
   src: url('./assets/fonts/GeistMono-Medium.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
-  font-display: block;
+  font-display: fallback;
 }
 
 :root {

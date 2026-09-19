@@ -525,8 +525,25 @@ export default function App(): ReactElement {
    */
   const routineDraftFor = (missionId: string): RoutineDraft | undefined => {
     const mission = historyByIdRef.current.get(missionId)
-    if (mission === undefined || missionOwnersRef.current[missionId] === undefined) return undefined
+    if (mission === undefined || conversationOwnerOf(missionId) === undefined) return undefined
     return routineDraft(mission, historyByIdRef.current)
+  }
+  /**
+   * Who owns a conversation: the owner recorded on this turn, or on the
+   * nearest earlier turn that has one. A conversation started with nobody
+   * picked and assigned afterwards carries its owner on the turn that was
+   * assigned; a follow-up typed after that is still theirs. Grok's pass 14:
+   * the menu on such a follow-up said "Nothing here was typed by you" to the
+   * person who had just typed it.
+   */
+  const conversationOwnerOf = (missionId: string): string | undefined => {
+    let current: string | undefined = missionId
+    for (let hop = 0; current !== undefined && hop < 64; hop += 1) {
+      const owner: string | undefined = missionOwnersRef.current[current]
+      if (owner !== undefined) return owner
+      current = historyByIdRef.current.get(current)?.continuesFrom?.missionId
+    }
+    return undefined
   }
 
   /**
@@ -4680,6 +4697,7 @@ export default function App(): ReactElement {
               <Thread
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
+                planMode={liveRun.plan === true}
                 onOpenPeerRun={(messageId) => {
                   // Only where the record shows the message actually reached
                   // a run. Nothing received it yet is a real state -- it
@@ -4889,6 +4907,7 @@ export default function App(): ReactElement {
             workspaceMade={workspaceMade}
             onChooseFolder={chooseWorkspace}
             runtimes={runtimes}
+            runtimesGaveUp={runtimeState.phase === 'ready' && runtimeState.gaveUp === true}
             limitedRuntimes={limitedRuntimes}
               usageWindows={usageWindows}
             discoveryPhase={runtimeState.phase}
@@ -4983,10 +5002,18 @@ export default function App(): ReactElement {
                */
               noRuntimeReady &&
               runtimeState.phase === 'ready' &&
+              /*
+               * Not after discovery gives up, either. 0.185.0 counted "asked
+               * four times, no answer" as something standing, and Grok's
+               * pass 14 drew what that meant: five rows already reading
+               * NOT ANSWERING with Check again beside each, a composer that
+               * already cannot send and already says why, and THEN this
+               * card above it. The rows are the repair; the card was a
+               * third telling. It stays for a sign-in, which no row can
+               * perform for you.
+               */
               runtimeState.runtimes.some(
-                (runtime) =>
-                  runtime.installed &&
-                  (runtime.status === 'auth-required' || runtime.auth === 'unauthenticated' || runtimeState.gaveUp === true)
+                (runtime) => runtime.installed && (runtime.status === 'auth-required' || runtime.auth === 'unauthenticated')
               )
                 ? 'No runtime can run a mission yet. Locust runs the coding-agent CLIs on this machine — Settings shows what to install, and OpenCode needs no account.'
                 : undefined
