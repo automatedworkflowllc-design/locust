@@ -94,6 +94,7 @@ const readScreen = (cdp) => cdp.eval(`(() => {
   const box = document.querySelector('.lc-composer textarea, textarea')
   return JSON.stringify({
     opencode: cells.find(c => /OpenCode/i.test(c)) || null,
+    head: (document.querySelector('.lc-agenthead__note') || { innerText: '' }).innerText.trim(),
     placeholder: box ? box.getAttribute('placeholder') : null,
     checkAgain: !!([...document.querySelectorAll('button')].find(b => /Check again/.test(b.innerText))),
     // The red card and the no-Node sentence: neither belongs on a screen
@@ -132,7 +133,7 @@ try {
     early = JSON.parse(await readScreen(cdp))
   }
   say(`   ${JSON.stringify(early)}`)
-  check('the row reads CHECKING', /CHECKING/.test(early.opencode ?? ''), early.opencode)
+  check('the head note says checking, once, with a count', /checking \d+ on this machine/.test(early.head ?? ''), early.head)
   check('and offers no Install yet', early.checkAgain === false)
   check('the composer does not ask for a sign-in nothing has asked for', !/sign in/.test(early.placeholder ?? ''), early.placeholder)
   check('no red card while the rows are still checking', early.redCard === false)
@@ -147,7 +148,7 @@ try {
     if (late.checkAgain) break
   }
   say(`   ${Math.round((Date.now() - startedAt) / 1000)}s: ${JSON.stringify(late)}`)
-  check('the row says NOT ANSWERING', /NOT ANSWERING/.test(late.opencode ?? ''), late.opencode)
+  check('the row says what was tried', /did not answer its version check/.test(late.opencode ?? ''), late.opencode)
   check('and Check again is on the screen -- not Install, which it already is', late.checkAgain === true)
   check('the composer still does not ask for a sign-in', !/sign in/.test(late.placeholder ?? ''), late.placeholder)
   // Now something IS standing -- a runtime that is here and never answered

@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.186.0 - 2026-09-19
+
+- **The first screen, redrawn.** Everything on it now shares one left edge
+  with the message box, so it reads as a sequence: which one do I pick, pick
+  it, what happens when I click, and then what. The runtime list is one
+  column instead of a grid with a hole in its corner, and each row says what
+  it costs: *no account needed*, *needs a ChatGPT account*, *needs a Cursor
+  account*. While Locust is still checking, the dots pulse and one line says
+  *checking 6 on this machine* instead of six rows saying CHECKING. The
+  recommendation is the one filled button.
+
 ## 0.185.0 - 2026-09-19
 
 - **The first screen says less, and in order.** With nothing installed it

@@ -155,7 +155,6 @@ export function FirstLaunch({
           left.runtime.id === FREE_START_RUNTIME ? -1 : right.runtime.id === FREE_START_RUNTIME ? 1 : 0
         )
       : shownAll
-  const anyReady = discoveryPhase === 'ready' && connected > 0
   void teammateCount
   // A build stamp with a commit hash is a fact for a changelog, not a
   // status panel: "2026.09.02-c22c1a3" reads as its date.
@@ -176,32 +175,37 @@ export function FirstLaunch({
           * that reads as machine output rather than marketing -- which is
           * what a local-first tool should sound like.
           */}
-        <p className="lc-claim">
-          {discoveryPhase === 'loading'
-            ? 'checking the runtimes on this machine'
-            : discoveryPhase === 'error'
-              ? 'runtime discovery could not run — no credentials were read'
-              : `${String(connected)} runtime${connected === 1 ? '' : 's'} connected`}
-          <br />
-          nothing pooled, proxied, or sent anywhere you have not connected
-        </p>
+        {/*
+          * While discovery has not answered, or could not: one mono line of
+          * state under the lockup. Once it has answered, the count moves
+          * into the list's own head note and the privacy line stays on the
+          * boot screen, where it already is (design agent, 2026-09-19).
+          */}
+        {discoveryPhase !== 'ready' && (
+          <p className="lc-claim">
+            {discoveryPhase === 'loading'
+              ? 'checking the runtimes on this machine'
+              : 'runtime discovery could not run — no credentials were read'}
+          </p>
+        )}
         {/*
           * A fresh machine: six tags and no next step read as a wall (first-run
           * drive, 2026-09-06). One sentence says what Locust runs and what to do.
           */}
-        {discoveryPhase === 'ready' && connected === 0 && (
-          <p className="lc-claim lc-claim--hint">
-            {/*
-              * The names came off: the panel below lists them WITH their
-              * state, which a sentence cannot. And the second line stopped
-              * being generic advice -- "install one, sign in" is wrong about
-              * the one path that needs no sign-in, which is the only path a
-              * person with nothing installed can complete today
-              * (FIRST-RUN-INSTALL-DESIGN, 2026-09-06).
-              */}
-            Locust runs the coding agents you install.
-            <br />
-            OpenCode needs no account — one install and you have a working teammate.
+        {/*
+          * The first screen, redrawn (design agent, 2026-09-19). Measured off
+          * the shipped frame: six centred blocks of six widths began at 194,
+          * 112, 132, 211, 32 and 32px from the pane's left edge -- six left
+          * edges, so every line arrived as its own announcement, which is
+          * what four beta passes called "the first five minutes argue". One
+          * left-aligned column, shared with the composer, makes them a
+          * sequence: which do I pick, pick it, what happens when I click,
+          * and then what. Prose, not mono: this is a list with words around
+          * it, not a lockup.
+          */}
+        {discoveryPhase === 'ready' && (
+          <p className="lc-intro">
+            Locust runs coding agents installed on this machine. <strong>OpenCode needs no account</strong> — one install and you have a working teammate.
           </p>
         )}
 
@@ -226,138 +230,134 @@ export function FirstLaunch({
           </div>
         )}
 
-        {discoveryPhase === 'ready' && (
-          <div className="lc-runtimepanel">
-            {shown.map(({ runtime, status, connected: usable }) => {
-              const settled = usable
-              // The one runtime that is a complete answer on its own -- no
-              // account, no sign-in, a free model -- leads and spans both
-              // columns, but only while nothing is connected. The moment
-              // anything works this is a status panel again and the emphasis
-              // would be selling to someone who has already bought.
-              const onRamp = !settled && connected === 0 && runtime.id === FREE_START_RUNTIME
-              return (
-                <div
-                  className={`lc-runtimecell${settled ? ' is-ready' : ''}${onRamp ? ' is-onramp' : ''}`}
-                  key={runtime.id}
-                >
-                  <span className={`lc-runtimecell__dot${settled ? ' is-green' : status.tag === 'SIGN IN' ? ' is-red' : ' is-muted'}`} />
-                  <span className="lc-runtimecell__name" title={status.detail}>
-                    {runtime.displayName}
-                  </span>
-                  {!settled && connected === 0 && runtime.id === FREE_START_RUNTIME && (
-                    <span className="lc-runtimecell__free">no account needed</span>
-                  )}
-                  {/* READY needs no tag once the dot is green; every other
-                    * state does, connected or not -- EXPERIMENTAL is the
-                    * caveat on a runtime that IS connected. */}
-                  {settled ? (
-                    // CONNECTED. Whatever caveat the tag carries -- and
-                    // EXPERIMENTAL is exactly that, "the caveat on a runtime
-                    // that IS connected" -- the runtime is already here, so
-                    // this slot says which build, never how to get one.
-                    // Antigravity fell past the READY/ACTIVE test to the
-                    // vendor branch and offered "Get it ↗" beside its own
-                    // green dot (Colin, 2026-09-07: "antigravity listed as
-                    // get it, pretty sure we have it"). A row cannot say
-                    // connected and not-installed at the same time.
-                    runtime.version === undefined || runtime.version === null ? (
-                      // `version` is `string | null`, so `=== undefined` alone
-                      // never fired and a connected runtime with no version
-                      // drew an empty slot instead of its caveat -- on
-                      // Antigravity, the runtime this branch exists for.
-                      <span className="lc-runtimecell__tag">{status.tag}</span>
-                    ) : (
-                      <span className="lc-runtimecell__version">{shortVersion(runtime.version)}</span>
-                    )
-                  ) : installing === runtime.id ? (
-                    // Keeps its box rather than becoming a spinner, so the row
-                    // does not resize while npm talks.
-                    <span className="lc-runtimecell__tag">Installing…</span>
-                  ) : signInCommand(runtime.id) !== undefined && status.tag === 'SIGN IN' ? (
-                    // Installed and signed out: the last wall, and the one
-                    // thing no button can climb. Signing in is a browser
-                    // handshake or a device code; a button that opened a
-                    // terminal and walked away would be worse than the
-                    // sentence telling them what to type. Locust notices when
-                    // it is done on its own -- discovery re-runs and the dot
-                    // goes green.
-                    <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
-                  ) : runtime.installed && checkingGaveUp && status.tag === 'CHECKING' ? (
-                    /*
-                     * Found on this machine, and it never answered -- four
-                     * sweeps, five seconds each. Grok, pass 11: five CLIs
-                     * that hang on PATH (an antivirus hold, a half-finished
-                     * npm, a proxy) left every row CHECKING for good with
-                     * no Install anywhere, and the first hour ended there.
-                     * The tag says what is true and Install comes back as
-                     * "Install again": npm replaces what is there.
-                     */
-                    /*
-                     * "Check again", not "Install again". Design agent,
-                     * 2026-09-18: that CLI IS installed, so installing it
-                     * again is not the repair, and on the one screen where
-                     * every other Install does exactly what it says this one
-                     * would quietly do something else. The repair the app
-                     * can perform is to ask again; the title says what was
-                     * tried.
-                     */
-                    <span className="lc-runtimecell__stuck">
-                      <span className="lc-runtimecell__tag">NOT ANSWERING</span>
-                      <button
-                        type="button"
-                        className="lc-runtimecell__install"
-                        title={`${runtime.displayName} is on this machine but did not answer its version check in 5 seconds, four times. Check again asks once more.`}
-                        onClick={() => onCheckAgain?.()}
-                      >
-                        Check again
-                      </button>
-                    </span>
-                  ) : runtime.installed ? (
-                    // Installed, but not answering yet. CHECKING is a moment,
-                    // not a verdict -- Claude Code's first probe can outlast
-                    // the window on a cold start -- and offering to install
-                    // what is already installed is the contradiction 0.38.6
-                    // fixed for connected runtimes and missed for this one.
-                    <span className="lc-runtimecell__tag">{status.tag}</span>
-                  ) : installCommand(runtime.id) !== undefined && onInstall !== undefined ? (
-                    <button
-                      type="button"
-                      className={`lc-runtimecell__install${runtime.id === FREE_START_RUNTIME ? ' is-primary' : ''}`}
-                      disabled={installing !== undefined || npmMissing}
-                      title={
-                        npmMissing
-                          ? 'Node.js is not on this machine, and this installs through npm.'
-                          : installing !== undefined
-                            ? `Waiting for the ${installing} install to finish`
-                            : installSentence(runtime.id, runtime.displayName)
-                      }
-                      onClick={() => onInstall(runtime.id)}
-                    >
-                      Install
-                    </button>
-                  ) : vendorUrl(runtime.id) !== undefined ? (
-                    // Not a package, and not second-class either: the same
-                    // slot, the same box, one different word.
-                    <button
-                      type="button"
-                      className="lc-runtimecell__install"
-                      onClick={() => {
-                        setLinkRefusal(undefined)
-                        openLink(vendorUrl(runtime.id) ?? '', setLinkRefusal)
-                      }}
-                      title={`Open ${vendorUrl(runtime.id) ?? ''} in your browser`}
-                    >
-                      Get it ↗
-                    </button>
-                  ) : (
-                    <span className="lc-runtimecell__tag">{status.tag}</span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
+        {discoveryPhase === 'ready' && (() => {
+          /*
+           * Five rows reading CHECKING were five rows saying nothing at the
+           * moment a person is deciding what to click, and the transient
+           * state at that. The dot carries checking; the head note says it
+           * once with a count; words in the rows are for results -- and the
+           * result a person is choosing between is what each one costs.
+           */
+          const isChecking = (row: (typeof shown)[number]): boolean =>
+            row.runtime.installed && row.status.tag === 'CHECKING' && !checkingGaveUp && !row.connected
+          const checkingAny = shown.some(isChecking)
+          const stuckAny = shown.some((row) => row.runtime.installed && row.status.tag === 'CHECKING' && checkingGaveUp && !row.connected)
+          // One thing happening, said once at the head: while an install
+          // runs, the other rows' actions step out rather than sit dimmed
+          // with no reason (Colin, 2026-09-19, with the frame: "some of the
+          // installs were bugged").
+          const installingName = installing === undefined ? undefined : shown.find((row) => row.runtime.id === installing)?.runtime.displayName ?? installing
+          const headNote = installingName !== undefined
+            ? `installing ${installingName}…`
+            : checkingAny
+            ? `checking ${String(shown.length)} on this machine`
+            : connected > 0
+              ? `${String(connected)} ready`
+              : stuckAny
+                ? `${String(shown.length)} on this machine · none answering`
+                : `${String(shown.length)} known · none installed yet`
+          return (
+            <>
+              <div className="lc-agenthead">
+                <span className="lc-agenthead__label">Coding agents</span>
+                <span className={`lc-agenthead__note${connected > 0 && !checkingAny ? ' is-green' : ''}`}>{headNote}</span>
+              </div>
+              <div className="lc-runtimepanel">
+                {shown.map((row) => {
+                  const { runtime, status, connected: usable } = row
+                  const facts = runtimeInstallFacts(runtime.id)
+                  const checking = isChecking(row)
+                  const stuck = runtime.installed && status.tag === 'CHECKING' && checkingGaveUp && !usable
+                  const signIn = !usable && status.tag === 'SIGN IN'
+                  // The recommendation, carried by the row's own emphasis while
+                  // nothing is connected: a lit dot, the name at full weight,
+                  // the fact in green, the one filled button.
+                  const onRamp = !usable && !checking && !stuck && connected === 0 && runtime.id === FREE_START_RUNTIME
+                  const need =
+                    usable || checking
+                      ? undefined
+                      : stuck
+                        ? 'did not answer its version check'
+                        : facts?.account !== undefined
+                          ? `needs ${facts.account}`
+                          : facts?.install.kind === 'vendor'
+                            ? `installs from ${new URL(facts.install.url).host}`
+                            : 'no account needed'
+                  const dot = usable ? ' is-green' : checking ? ' is-checking' : signIn ? ' is-red' : onRamp ? ' is-lime' : ' is-muted'
+                  const waiting = installing !== undefined
+                  return (
+                    <div className={`lc-runtimecell${usable ? ' is-ready' : ''}${onRamp ? ' is-onramp' : ''}`} key={runtime.id}>
+                      <span className={`lc-runtimecell__dot${dot}`} />
+                      <span className="lc-runtimecell__name" title={status.detail}>
+                        {runtime.displayName}
+                      </span>
+                      {need !== undefined && (
+                        <span className={`lc-runtimecell__need${need === 'no account needed' ? ' is-green' : ''}`}>{need}</span>
+                      )}
+                      {usable ? (
+                        <span className="lc-runtimecell__version">
+                          {runtime.version === undefined || runtime.version === null ? 'Ready' : `Ready · ${shortVersion(runtime.version)}`}
+                        </span>
+                      ) : installing === runtime.id ? (
+                        <span className="lc-runtimecell__tag">Installing…</span>
+                      ) : checking ? null : signIn && signInCommand(runtime.id) !== undefined ? (
+                        <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
+                      ) : stuck ? (
+                        /*
+                         * "Check again", not "Install again" (design agent,
+                         * 2026-09-18): that CLI is installed, so installing it
+                         * again is not the repair. Asking again is the one the
+                         * app can perform; the title says what was tried.
+                         */
+                        <button
+                          type="button"
+                          className="lc-runtimecell__quiet"
+                          title={`${runtime.displayName} is on this machine but did not answer its version check in 5 seconds, four times. Check again asks once more.`}
+                          onClick={() => onCheckAgain?.()}
+                        >
+                          Check again
+                        </button>
+                      ) : waiting ? null : !runtime.installed && installCommand(runtime.id) !== undefined && onInstall !== undefined ? (
+                        <button
+                          type="button"
+                          className={runtime.id === FREE_START_RUNTIME ? 'lc-runtimecell__install is-primary' : 'lc-runtimecell__quiet'}
+                          disabled={waiting || npmMissing}
+                          title={
+                            npmMissing
+                              ? 'Node.js is not on this machine, and this installs through npm.'
+                              : waiting
+                                ? `Waiting for the ${installing ?? ''} install to finish`
+                                : installSentence(runtime.id, runtime.displayName)
+                          }
+                          onClick={() => onInstall(runtime.id)}
+                        >
+                          Install
+                        </button>
+                      ) : !runtime.installed && vendorUrl(runtime.id) !== undefined ? (
+                        // A vendor download is quiet text: it is not the
+                        // recommendation, and it was the only boxed button on
+                        // the shipped screen.
+                        <button
+                          type="button"
+                          className="lc-runtimecell__quiet"
+                          onClick={() => {
+                            setLinkRefusal(undefined)
+                            openLink(vendorUrl(runtime.id) ?? '', setLinkRefusal)
+                          }}
+                          title={`Open ${vendorUrl(runtime.id) ?? ''} in your browser`}
+                        >
+                          Get it ↗
+                        </button>
+                      ) : (
+                        <span className="lc-runtimecell__tag">{status.tag}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )
+        })()}
 
         {/*
           * ONE line under the panel, because only one install ever runs.
@@ -529,9 +529,6 @@ export function FirstLaunch({
           * runtimes as PLANNED rows, where a person who is already working
           * and wants more is the audience.
           */}
-        {!anyReady && discoveryPhase === 'ready' && (
-          <p className="lc-footnote">Discovery runs locally · no model is shown as live until it answers</p>
-        )}
       </div>
     </div>
   )

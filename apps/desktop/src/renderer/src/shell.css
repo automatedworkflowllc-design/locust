@@ -1972,6 +1972,11 @@ textarea {
   flex: 1;
   display: grid;
   place-items: center;
+  /* Anchored to the bottom, so the list sits over the composer it shares an
+     edge with. Centred, the screen's tallest piece of empty space sat
+     between the list and the box under it (design agent, 2026-09-19:
+     "74px gap"). */
+  align-content: end;
   padding: var(--lc-space-8) var(--lc-space-6);
   /* Never push the box you type in off the screen. Without `min-height: 0` a
      flex child refuses to shrink below its content, so at 1280x860 the
@@ -3197,12 +3202,12 @@ textarea {
      cell does not fit in the old width (FIRST-RUN-INSTALL-DESIGN, 2026-09-06;
      the design said 420 and the file said 520 -- both too narrow). The mark
      card, claim lines and folder card all still centre in it. */
-  max-width: 640px;
+  max-width: var(--lc-thread-max-width);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: var(--lc-space-5);
-  text-align: center;
+  text-align: left;
 }
 
 /* The mark in its own card, at panel A's measurements: 480px wide, 40px of
@@ -3215,6 +3220,9 @@ textarea {
    and at 250px the card floated in a dead band above the composer (design
    review, 2026-09-05). */
 .lc-markcard {
+  /* The lockup stays centred; the content under it left-aligns (design
+     agent, 2026-09-19): they are not the same composition. */
+  align-self: center;
   width: 480px;
   max-width: 100%;
   padding: 22px 0;
@@ -3272,15 +3280,17 @@ textarea {
    Drawn only while nothing is connected; the moment something works this is
    a status panel again. */
 .lc-runtimecell.is-onramp {
-  grid-column: 1 / -1;
-  /* Four columns, not three: this cell carries a fourth child -- the three
-     words that are the whole argument -- and on the inherited three-column
-     grid the button wrapped onto a second line under the name. */
-  grid-template-columns: 8px minmax(0, 1fr) auto auto;
-  background: var(--lc-bg-raised);
-  border: 1px solid var(--lc-lime-border);
-  border-radius: var(--lc-radius-card);
+  /* Emphasis inside a uniform list: a lit dot, the name at full weight, the
+     account fact in green and the one filled button. No border and no
+     spanning -- the September hero row was withdrawn on 2026-09-19 for what
+     it cost the list under it. */
+  background: var(--lc-bg-raised-2);
 }
+
+.lc-runtimecell.is-onramp .lc-runtimecell__name {
+  color: var(--lc-text-name);
+}
+
 
 /* Three words in the slot the other cells use for a version or a tag. That
    phrase is the whole argument. */
@@ -3600,8 +3610,8 @@ textarea {
 
 .lc-runtimepanel {
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--lc-border-card);
   border-radius: var(--lc-radius-card);
   background: var(--lc-bg-raised);
@@ -3609,27 +3619,20 @@ textarea {
 }
 
 .lc-runtimecell {
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 14px;
   border-top: 1px solid var(--lc-border-hairline);
 }
 
 /* The first row of each column has nothing above it to divide from. */
-.lc-runtimecell:nth-child(1),
-.lc-runtimecell:nth-child(2) {
+/* One column. The 2x2 grid was a hero row plus an odd count, which left a
+   hole in the card's corner and no room in any row for the account fact
+   (design agent, 2026-09-19, withdrawing the September hero row). */
+.lc-runtimecell:first-child {
   border-top: 0;
-}
-
-.lc-runtimecell:nth-child(odd) {
-  border-right: 1px solid var(--lc-border-hairline);
-}
-
-.lc-runtimecell:nth-child(odd):last-child {
-  grid-column: 1 / -1;
-  border-right: 0;
 }
 
 .lc-runtimecell__dot {
@@ -3658,11 +3661,12 @@ textarea {
 }
 
 .lc-runtimecell__name {
-  min-width: 0;
+  flex: none;
+  width: 128px;
   /* Against the dot that describes it, not centred in the cell. */
   text-align: left;
   font-size: 13px;
-  color: var(--lc-text-muted);
+  color: var(--lc-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3686,6 +3690,125 @@ textarea {
   color: var(--lc-text-muted);
   white-space: nowrap;
 }
+
+/* The first screen, redrawn (design agent, 2026-09-19): one left edge shared
+   with the composer, and rows that say what they cost. */
+.lc-intro {
+  margin: 0;
+  max-width: 66ch;
+  font-size: var(--lc-text-body);
+  line-height: 1.7;
+  color: var(--lc-text-secondary);
+}
+
+.lc-intro strong {
+  font-weight: 500;
+  color: var(--lc-text-name);
+}
+
+.lc-agenthead {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-top: var(--lc-space-3);
+}
+
+.lc-agenthead__label {
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-agenthead__note {
+  font-family: var(--lc-font-mono);
+  font-size: 11px;
+  color: var(--lc-text-muted);
+}
+
+.lc-agenthead__note.is-green {
+  color: var(--lc-green-text);
+}
+
+/* The thing a person is actually choosing between. */
+.lc-runtimecell__need {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-runtimecell__need.is-green {
+  color: var(--lc-green-text);
+}
+
+.lc-runtimecell__dot.is-lime {
+  background: var(--lc-lime);
+}
+
+/* Words are for results; while discovery runs, the dot is the state. */
+.lc-runtimecell__dot.is-checking {
+  background: var(--lc-text-muted);
+  animation: lcPulse 1s ease-in-out infinite;
+}
+
+@keyframes lcPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.28; }
+}
+
+.lc-runtimecell.is-ready .lc-runtimecell__version {
+  color: var(--lc-green-text);
+}
+
+/* The quiet action: a button drawn as text, the way the drawing has it, so
+   the one filled Install on the recommendation stands alone. Not the link
+   style -- underlined lime read as a hyperlink, and Colin asked whether the
+   links were meant (2026-09-19). They were not. */
+.lc-runtimecell__quiet {
+  flex: none;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-control-fg);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-runtimecell__quiet:hover:not(:disabled) {
+  color: var(--lc-text-name);
+}
+
+.lc-runtimecell__quiet:disabled {
+  color: var(--lc-text-muted);
+  cursor: default;
+}
+
+.lc-runtimecell__need + .lc-runtimecell__quiet {
+  margin-left: auto;
+}
+
+/* The disclosure beside npm's last line stays on one line; it wrapped to
+   two at the column's width (frame, 2026-09-19). */
+.lc-installnote .lc-ghostbutton {
+  white-space: nowrap;
+  flex: none;
+}
+
+/* Everything after the list keeps the column's own edge. */
+.lc-runtimecell__need + .lc-runtimecell__version,
+.lc-runtimecell__need + .lc-runtimecell__tag,
+.lc-runtimecell__need + .lc-runtimecell__signin,
+.lc-runtimecell__need + .lc-linkbutton,
+.lc-runtimecell__need + .lc-runtimecell__install {
+  margin-left: auto;
+}
+
 
 .lc-runtimelist {
   width: 100%;

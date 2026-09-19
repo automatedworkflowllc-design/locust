@@ -153,10 +153,20 @@ try {
   check('no "coming soon" on the screen whose job is Install', screen.comingSoon === false)
   check('the changelog banner is held: a fresh profile has no previous version', screen.banner === false)
 
+  // The frame a person who just downloaded Locust sees, before anything is
+  // pressed: the one the design agent redrew.
+  const before = await cdp.send('Page.captureScreenshot', { format: 'png' })
+  await writeFile(new URL('../docs/chain-measure/first-screen-nothing-installed-2026-09-19.png', import.meta.url), Buffer.from(before.result.data, 'base64'))
+
   say('2. press Install and wait')
   await cdp.eval(`(() => { document.querySelector('.lc-runtimecell__install.is-primary').click(); return 'pressed' })()`)
   const startedAt = Date.now()
   let outcome
+  // The screen WHILE the install runs: Colin thought some installs looked
+  // bugged, not showing as installing (2026-09-19). Captured once, early.
+  await sleep(2500)
+  const during = await cdp.send('Page.captureScreenshot', { format: 'png' })
+  await writeFile(new URL('../docs/chain-measure/first-screen-installing-2026-09-19.png', import.meta.url), Buffer.from(during.result.data, 'base64'))
   while (Date.now() - startedAt < WAIT_FOR_INSTALL_MS) {
     await sleep(3000)
     const state = await cdp.eval(`(() => {

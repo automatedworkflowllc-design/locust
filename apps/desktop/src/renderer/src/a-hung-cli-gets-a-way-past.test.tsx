@@ -45,24 +45,27 @@ function panel(options: { gaveUp: boolean }): string {
 }
 
 describe('an installed CLI that has not answered', () => {
-  it('reads CHECKING while discovery is still asking, with no Install offered', () => {
+  it('says checking once, in the head note, while discovery is still asking', () => {
     // The control, and the 0.38.6 rule: offering to install what is there
     // is a contradiction, and one slow probe is not a verdict.
     const early = panel({ gaveUp: false })
-    expect(early).toContain('CHECKING')
+    // Words are for results: while discovery runs, the dot is the state and
+    // the head note says it once (design agent, 2026-09-19).
+    expect(early).toContain('checking 1 on this machine')
+    expect(early).toContain('is-checking')
     expect(early).not.toContain('Check again')
-    expect(early).not.toContain('NOT ANSWERING')
+    expect(early).not.toContain('did not answer its version check')
   })
 
-  it('says NOT ANSWERING once discovery has given up, and offers Check again -- not Install, which it already is', () => {
+  it('says what was tried once discovery has given up, and offers Check again -- not Install, which it already is', () => {
     const late = panel({ gaveUp: true })
-    expect(late).toContain('NOT ANSWERING')
+    expect(late).toContain('did not answer its version check')
     expect(late).toContain('Check again')
     // Design agent, 2026-09-18: that CLI is installed; installing it again is
     // not the repair, and would be the one Install on the screen that does
     // something else.
     expect(late).not.toContain('Install again')
-    expect(late).not.toContain('CHECKING')
+    expect(late).not.toContain('checking 1 on this machine')
   })
 
   it('says why, on the control itself', () => {
