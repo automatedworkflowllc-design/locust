@@ -1156,6 +1156,8 @@ export default function App(): ReactElement {
    * insisting nothing had happened (drive, 2026-09-06).
    */
   const askDiscoveryAgain = useRef<() => void>(() => undefined)
+  /** Check again starts the count of sweeps over; see the discovery effect. */
+  const resetDiscoveryBudget = useRef<() => void>(() => undefined)
   const [installElapsed, setInstallElapsed] = useState(0)
 
   useEffect(() => {
@@ -1763,10 +1765,14 @@ export default function App(): ReactElement {
       })
       .catch(() => undefined)
 
+    // When the host last actually swept. The host answers from a ten-second
+    // cache, and two asks inside it are one sweep, not two.
+    let lastCheckedAt: string | undefined
     void bridge
       .getLocalRuntimes()
       .then((response) => {
         if (!active) return
+        if (response.ok) lastCheckedAt = response.data.checkedAt
         setRuntimeState(
           response.ok
             ? {
@@ -1787,15 +1793,32 @@ export default function App(): ReactElement {
     // times, fifteen seconds apart, past the host's ten-second cache -- and
     // once more whenever the window comes back into focus, so a sign-in
     // done elsewhere shows without a relaunch.
-    let retries = 0
+    /*
+     * SWEEPS are counted, not answers. This counted answers, and two of the
+     * first four came from the host's ten-second cache -- the first focus
+     * event and the first re-check timer both asked inside it -- so the rows
+     * said NOT ANSWERING after the SECOND real sweep while the tooltip
+     * promised four, and the third sweep ran under a screen that had
+     * already given up (Fable, pass 1, finding 6, with the shims' own log).
+     * A cached answer carries the same `checkedAt` as the sweep it came
+     * from; it reschedules and counts nothing. After the fourth sweep with
+     * something still unanswered, no more are asked until Check again,
+     * which starts the count over -- a hung CLI was being probed for ten of
+     * every twenty-six seconds, for ever.
+     */
+    const SWEEPS_BEFORE_GIVING_UP = 4
+    let sweeps = 1
+    let gaveUp = false
     let lastAsked = Date.now()
     const askAgain = (): void => {
-      if (!active) return
+      if (!active || gaveUp) return
       lastAsked = Date.now()
       void bridge
         .getLocalRuntimes()
         .then((response) => {
-          if (!active || !response.ok) return
+          if (!active || !response.ok || gaveUp) return
+          const fresh = response.data.checkedAt !== lastCheckedAt
+          lastCheckedAt = response.data.checkedAt
           // A re-check must not make the screen go backwards: a probe that
           // has not answered yet keeps whatever the last sweep established.
           setRuntimeState((held) => ({
@@ -1807,16 +1830,26 @@ export default function App(): ReactElement {
           const stillChecking = response.data.runtimes.some(
             (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
           )
-          if (stillChecking && retries < 3) {
-            retries += 1
+          if (!stillChecking) return
+          if (!fresh) {
             setTimeout(askAgain, RUNTIME_RECHECK_MS)
-          } else if (stillChecking) {
+            return
+          }
+          sweeps += 1
+          if (sweeps < SWEEPS_BEFORE_GIVING_UP) {
+            setTimeout(askAgain, RUNTIME_RECHECK_MS)
+          } else {
             // Asked, asked again, and again: the screen has to stop saying
             // "shortly" and offer a way past a CLI that will never answer.
+            gaveUp = true
             setRuntimeState((held) => (held.phase === 'ready' ? { ...held, gaveUp: true } : held))
           }
         })
         .catch(() => undefined)
+    }
+    resetDiscoveryBudget.current = () => {
+      sweeps = 0
+      gaveUp = false
     }
     const firstRecheck = setTimeout(askAgain, RUNTIME_RECHECK_MS)
     const onFocus = (): void => {
@@ -3863,6 +3896,20 @@ export default function App(): ReactElement {
 
   const noRuntimeReady =
     runtimeState.phase !== 'ready' || !runtimes.some((runtime) => runtime.ready && runtime.status === 'ready')
+  /*
+   * The version is marked seen when the "what changed" banner is actually
+   * on screen -- the same condition that draws it below -- and once. It was
+   * marked when the changelog was READ, at mount, so a banner held for a
+   * runtime to connect was never shown after a relaunch either (Fable,
+   * pass 1, finding 7).
+   */
+  const changelogMarked = useRef(false)
+  useEffect(() => {
+    if (changelogMarked.current) return
+    if (screen !== 'workroom' || noRuntimeReady || changelog?.firstRun !== true || changelog.body === undefined) return
+    changelogMarked.current = true
+    void window.desktop?.markChangelogSeen().catch(() => undefined)
+  }, [screen, noRuntimeReady, changelog])
 
   // Whose mission is on screen: the owner the host recorded, never the
   // composer's current target, which may already be someone else.
@@ -4482,6 +4529,7 @@ export default function App(): ReactElement {
                 onCheckAgain={() => {
                   // The repair the app can actually perform: ask again, from
                   // the top, with CHECKING honest once more while it does.
+                  resetDiscoveryBudget.current()
                   setRuntimeState((held) => (held.phase === 'ready' ? { ...held, gaveUp: false } : held))
                   askDiscoveryAgain.current()
                 }}

@@ -12,7 +12,8 @@ import {
   createNodeRuntimeProcessRunner,
   createPathExecutableLocator,
   cursorCanEnforceReadOnly,
-  discoverInstalledRuntimes
+  discoverInstalledRuntimes,
+  killSpawnedTree
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
 import type { AppChangelog } from '../shared/ipc.js'
@@ -91,6 +92,7 @@ import {
   MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
   APP_CHANGELOG_CHANNEL,
+  APP_CHANGELOG_SEEN_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
   APP_UPDATE_STATE_CHANNEL,
@@ -443,13 +445,36 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
  * moment it can have changed under us.
  */
 let npmSeen: boolean | undefined
+const NPM_PROBE_TIMEOUT_MS = 5_000
 const npmPresent = async (): Promise<boolean> => {
   if (npmSeen !== undefined) return npmSeen
   npmSeen = await new Promise<boolean>((resolve) => {
     // `shell: true` because Windows will not spawn npm.cmd otherwise, and
     // `--version` because it is the cheapest thing npm will answer.
-    const probe = spawn('npm', ['--version'], { shell: true, windowsHide: true })
-    const settle = (found: boolean): void => resolve(found)
+    // Its own group off Windows, so the timeout below can end the shell AND
+    // what it started.
+    const probe = spawn('npm', ['--version'], { shell: true, windowsHide: true, ...(process.platform === 'win32' ? {} : { detached: true }) })
+    /*
+     * Bounded, like every CLI probe. It had no timeout, and every discovery
+     * answer waited on it: one `npm` shim that never answers -- nvm-windows
+     * with no version picked, a corporate wrapper waiting on a proxy -- held
+     * the first screen at "checking the runtimes on this machine" for ever,
+     * with no rows, no head note and no Install, on the machine that most
+     * needs the Install button (Fable, pass 1, finding 3). An npm that does
+     * not answer in five seconds is treated as absent, which selects the
+     * npm the app carries, which is the path that works without one.
+     */
+    let settled = false
+    const settle = (found: boolean): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(found)
+    }
+    const timer = setTimeout(() => {
+      if (typeof probe.pid === 'number') killSpawnedTree(probe.pid, process.platform)
+      settle(false)
+    }, NPM_PROBE_TIMEOUT_MS)
     probe.on('error', () => settle(false))
     probe.on('close', (code) => settle(code === 0))
   })
@@ -1832,6 +1857,11 @@ if (!ownsSingleInstanceLock) {
     app.once('before-quit', () => {
       clearTimeout(firstRoutineTick)
       clearInterval(routineTicks)
+      // Every discovery probe still out: a hung shim's sleep outlived the
+      // app otherwise (Fable, pass 1: ten processes after a close mid-sweep
+      // on Linux; zero after a settled one). The timer was the only caller
+      // of the kill, and there is no timer once the app has gone.
+      probeRunner.dispose()
     })
     // A run that ended waiting for the person -- a question card, an account
     // limit -- is said to the desk the way an approval is (parity row 62).
@@ -3038,14 +3068,15 @@ ${taskSection({
           // Never launched, or the file is unreadable: either way this
           // version has not been shown.
         }
-        if (seen !== version) {
-          try {
-            mkdirSync(app.getPath('userData'), { recursive: true })
-            writeFileSync(seenVersionFile, JSON.stringify({ version }), 'utf8')
-          } catch {
-            // Remembering is a convenience; failing to must not stop a launch.
-          }
-        }
+        /*
+         * NOT written here any more. Reading is not showing: the renderer
+         * reads the changelog at mount and holds the banner until a runtime
+         * connects, so a launch with nothing connected marked the version
+         * seen and the person the hold exists for -- whose runtime was
+         * signed out or hanging, who fixed it and came back -- never saw
+         * what changed (Fable, pass 1, finding 7). The renderer says when
+         * the banner is on screen, on `APP_CHANGELOG_SEEN_CHANNEL`.
+         */
         const text = await readChangelog(changelogPaths(process.resourcesPath, app.getAppPath()))
         const entry = text === undefined ? undefined : entryFor(text, version)
         return {
@@ -3057,6 +3088,16 @@ ${taskSection({
       })()
       return changelogAnswer
     }
+
+    ipcMain.handle(APP_CHANGELOG_SEEN_CHANNEL, (event) => {
+      if (!fromOwnWindow(event)) return
+      try {
+        mkdirSync(app.getPath('userData'), { recursive: true })
+        writeFileSync(seenVersionFile, JSON.stringify({ version: app.getVersion() }), 'utf8')
+      } catch {
+        // Remembering is a convenience; failing to costs one extra banner.
+      }
+    })
 
     ipcMain.handle(APP_CHANGELOG_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { version: app.getVersion(), firstRun: false } as const

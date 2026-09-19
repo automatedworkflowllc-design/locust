@@ -47,6 +47,17 @@ export interface NodeProbeRunnerOptions {
   readonly platform?: NodeJS.Platform;
 }
 
+/**
+ * A probe runner that can also be told the app is leaving. Every probe still
+ * in flight is killed with its tree: a hung shim's sleep outlived Locust
+ * otherwise -- Fable's pass 1 counted ten on Linux after a close mid-sweep,
+ * five shims and their five sleeps, each in its own session where nothing
+ * that signals the app's own group can reach it.
+ */
+export interface ProbeRunner extends CommandRunner {
+  dispose(): void;
+}
+
 const defaultKillTree = (pid: number, platform: NodeJS.Platform): void => {
   if (platform !== "win32") {
     // The probe is spawned as its own process group below, so the negative
@@ -71,6 +82,14 @@ const defaultKillTree = (pid: number, platform: NodeJS.Platform): void => {
     // The process itself still gets the signals below.
   }
 };
+
+/**
+ * Ends a spawned child and everything it started: its process group off
+ * Windows (spawn it `detached` so it has one), `taskkill /T` on Windows. For
+ * the host's own bounded probes (`npm --version`, `npm config get prefix`),
+ * which are spawned through a shell and hang with it.
+ */
+export const killSpawnedTree = (pid: number, platform: NodeJS.Platform): void => defaultKillTree(pid, platform);
 
 interface BoundedOutput {
   readonly chunks: Uint8Array[];
@@ -105,15 +124,30 @@ const defaultSpawn: ProbeSpawn = (executablePath, args, options) =>
  * Executes bounded discovery probes only. It never invokes a shell, accepts an
  * environment override, or executes a mission prompt.
  */
-export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): CommandRunner {
+export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): ProbeRunner {
   const maxOutputBytes = positiveInteger(options.maxOutputBytes, 64 * 1024, "maxOutputBytes");
   const maximumTimeoutMs = positiveInteger(options.maximumTimeoutMs, 10_000, "maximumTimeoutMs");
   const killGraceMs = positiveInteger(options.killGraceMs, 500, "killGraceMs");
   const spawnProcess = options.spawnProcess ?? defaultSpawn;
   const platform = options.platform ?? process.platform;
   const killTree = options.killTree ?? ((pid: number) => defaultKillTree(pid, platform));
+  // Every probe between spawn and close, so `dispose` can reach them. The
+  // timer is otherwise the only caller of the kill, and there is no timer
+  // once the app has gone.
+  const live = new Set<SpawnedProbeProcess>();
 
   return {
+    dispose(): void {
+      for (const child of live) {
+        if (typeof child.pid === "number") killTree(child.pid);
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // Already gone.
+        }
+      }
+      live.clear();
+    },
     run(command: ProbeCommand): Promise<CommandResult> {
       if (!isAbsolute(command.executablePath)) {
         return Promise.reject(new Error("Probe executable path must be absolute"));
@@ -144,9 +178,11 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Com
           ...(platform === "win32" ? {} : { detached: true }),
         });
 
+        live.add(child);
         const finish = (exitCode: number | null): void => {
           if (settled) return;
           settled = true;
+          live.delete(child);
           clearTimeout(timeoutTimer);
           if (forceTimer !== undefined) clearTimeout(forceTimer);
           const result: CommandResult = {
@@ -173,6 +209,7 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Com
         child.once("error", (error) => {
           if (settled) return;
           settled = true;
+          live.delete(child);
           clearTimeout(timeoutTimer);
           if (forceTimer !== undefined) clearTimeout(forceTimer);
           reject(error);

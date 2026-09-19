@@ -1229,6 +1229,69 @@ describe("bounded Node probe runner", () => {
     expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
   });
 
+  it("kills every probe still in flight when the app is leaving, tree first", async () => {
+    /*
+     * Fable, pass 1: close Locust while a discovery sweep is out and ten
+     * processes stay behind on Linux -- five shims and their five sleeps,
+     * each in its own session. The timer was the only caller of the kill,
+     * and there is no timer once the app has gone. `dispose` is what
+     * `before-quit` calls.
+     */
+    const treeKills: number[] = [];
+    const signals: Array<NodeJS.Signals | undefined> = [];
+    let nextPid = 100;
+    const runner = createNodeProbeRunner({
+      maximumTimeoutMs: 10_000,
+      killTree: (pid) => treeKills.push(pid),
+      spawnProcess: () => {
+        const process = new EventEmitter() as EventEmitter & SpawnedProbeProcess;
+        Object.assign(process, {
+          stdout: new EventEmitter(),
+          stderr: new EventEmitter(),
+          pid: nextPid++,
+          kill: (signal?: NodeJS.Signals) => {
+            signals.push(signal);
+            return true;
+          },
+        });
+        return process;
+      },
+    });
+    const command = { purpose: "readiness", executablePath: "C:\\tools\\hung.cmd", args: ["--version"], timeoutMs: 10_000 } as const;
+    // Two out, never answering; a third that closed on its own first.
+    void runner.run(command);
+    void runner.run(command);
+    const closed = runner.run(command);
+    const third = [...signals];
+    expect(third).toEqual([]);
+    runner.dispose();
+    expect(treeKills).toEqual([100, 101, 102]);
+    expect(signals).toEqual(["SIGKILL", "SIGKILL", "SIGKILL"]);
+    // Disposing again finds nothing: the set was cleared.
+    runner.dispose();
+    expect(treeKills).toHaveLength(3);
+    void closed;
+  });
+
+  it("does not reach a probe that already closed", async () => {
+    const treeKills: number[] = [];
+    let spawned: (EventEmitter & SpawnedProbeProcess) | undefined;
+    const runner = createNodeProbeRunner({
+      killTree: (pid) => treeKills.push(pid),
+      spawnProcess: () => {
+        const process = new EventEmitter() as EventEmitter & SpawnedProbeProcess;
+        Object.assign(process, { stdout: new EventEmitter(), stderr: new EventEmitter(), pid: 7, kill: () => true });
+        spawned = process;
+        return process;
+      },
+    });
+    const done = runner.run({ purpose: "readiness", executablePath: "C:\\tools\\quick.cmd", args: ["--version"], timeoutMs: 1_000 });
+    spawned?.emit("close", 0);
+    await done;
+    runner.dispose();
+    expect(treeKills).toEqual([]);
+  });
+
   it("takes a timed-out probe's whole tree down, not only the shim it spawned", async () => {
     /*
      * MEASURED 2026-09-18 with five `.cmd` shims that ping for an hour: the

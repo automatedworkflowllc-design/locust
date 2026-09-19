@@ -6,6 +6,32 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.190.0 - 2026-09-19
+
+The other half of the three tester reports, from Fable's reading of the code.
+
+- **Nothing left running when you quit mid-check.** Closing Locust while it
+  was still asking a hung CLI for its version left that CLI and its child
+  behind (ten processes on Linux). Every check still out is ended when the
+  app leaves.
+- **A hung npm no longer holds the first screen.** One `npm` on PATH that
+  never answers kept the screen at *checking the runtimes on this machine*
+  for ever, with no rows and no Install. npm gets five seconds; if it does
+  not answer, Locust uses the copy it carries.
+- **Check again means four checks.** The rows said NOT ANSWERING after two
+  real sweeps while the tooltip promised four, and kept checking every
+  fifteen seconds after giving up. Sweeps are counted now, Check again
+  starts the count over, and nothing is asked again after the fourth until
+  you press it.
+- **The "what changed" banner keeps its promise.** It is held until a
+  runtime connects. It used to mark the version as seen the moment the
+  changelog was read, so if nothing was connected at launch you never saw
+  it, on that launch or the next. It is marked seen when it is on screen.
+- **Installing with a non-ASCII Windows user name.** The small `node` stand-in
+  the app writes for an install is read by Windows in the console's own
+  code page; a name like José or 张伟 in the path broke it. It switches the
+  console to UTF-8 first.
+
 ## 0.189.0 - 2026-09-19
 
 Three tester reports landed at once (Grok's passes 13 and 14, Fable's

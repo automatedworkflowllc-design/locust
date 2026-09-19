@@ -25,7 +25,7 @@ import { join } from 'node:path'
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = 9491
-const GIVE_UP_AFTER_MS = 80_000
+const GIVE_UP_AFTER_MS = 120_000
 
 let failures = 0
 const check = (label, ok, detail) => {
@@ -148,6 +148,16 @@ try {
     late = JSON.parse(await readScreen(cdp))
     if (late.checkAgain) break
   }
+  const gaveUpAfterMs = Date.now() - startedAt
+  say(`   gave up after ${String(Math.round(gaveUpAfterMs / 1000))}s`)
+  /*
+   * FOUR SWEEPS, not two. Fable's pass 1 timed the shims: the rows gave up
+   * after the second real sweep, because the counter counted answers and two
+   * of them came from the host's ten-second cache. Sweeps are fifteen
+   * seconds apart, so four of them cannot complete inside forty seconds of
+   * the first; the tooltip's "four times" is measured here, not assumed.
+   */
+  check('the rows gave up after four sweeps, not two (at least 40s in)', gaveUpAfterMs >= 40_000, `${String(Math.round(gaveUpAfterMs / 1000))}s`)
   say(`   ${Math.round((Date.now() - startedAt) / 1000)}s: ${JSON.stringify(late)}`)
   check('the row says what was tried', /did not answer its version check/.test(late.opencode ?? ''), late.opencode)
   check('and Check again is on the screen -- not Install, which it already is', late.checkAgain === true)

@@ -163,6 +163,8 @@ export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 export const MISSION_DELETE_CHANNEL = 'mission:delete'
 export const APP_INFO_CHANNEL = 'app:info'
 export const APP_CHANGELOG_CHANNEL = 'app:changelog'
+/** The banner was drawn: this version is seen. Not when the changelog was read. */
+export const APP_CHANGELOG_SEEN_CHANNEL = 'app:changelog-seen'
 
 /** What changed in the build that is running. */
 export interface AppChangelog {
@@ -1757,6 +1759,13 @@ export interface DesktopApi {
   getAppInfo(): Promise<AppInfo>
   /** What changed in the running build, and whether this is its first launch. */
   getChangelog(): Promise<AppChangelog>
+  /**
+   * Called when the "what changed" banner is actually on screen. Reading the
+   * changelog used to mark the version seen, so a banner held at launch
+   * (nothing connected yet) was never shown on the next launch either
+   * (Fable, pass 1, finding 7).
+   */
+  markChangelogSeen(): Promise<void>
   readStorageReport(): Promise<StorageReportResponse>
   checkForUpdate(): Promise<AppUpdateResponse>
   installUpdate(): Promise<AppUpdateResponse>

@@ -40,7 +40,8 @@ export {
   resetsAtIso,
   summarizeInit,
 } from "./claude-events.js";
-export { createNodeProbeRunner } from "./node-runner.js";
+export { createNodeProbeRunner, killSpawnedTree } from "./node-runner.js";
+export type { ProbeRunner } from "./node-runner.js";
 export { createPathExecutableLocator } from "./path-locator.js";
 export {
   createNodeRuntimeProcessRunner,

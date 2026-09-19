@@ -223,7 +223,16 @@ async function runBundledNpm(
   const shimDirectory = join(bundled.prefix, 'node-shim')
   await mkdir(shimDirectory, { recursive: true })
   if (process.platform === 'win32') {
-    await writeFile(join(shimDirectory, 'node.cmd'), `@"${bundled.nodePath}" %*\r\n`, 'utf8')
+    /*
+     * `cmd.exe` reads a batch file in the console's OEM code page, not in
+     * UTF-8, so a user name outside ASCII in the binary's path -- José,
+     * Müller, 张伟 -- arrived as two or three wrong characters per letter and
+     * the shim could not find Locust (Fable, pass 1, finding 11, from
+     * reading). `chcp 65001` on the first line switches the console to UTF-8
+     * before the line with the path is read. A `%` in the path is live
+     * inside a .cmd and is doubled.
+     */
+    await writeFile(join(shimDirectory, 'node.cmd'), `@chcp 65001 >nul\r\n@"${bundled.nodePath.replace(/%/g, '%%')}" %*\r\n`, 'utf8')
   } else {
     await writeFile(join(shimDirectory, 'node'), `#!/bin/sh\nexec "${bundled.nodePath}" "$@"\n`, { encoding: 'utf8', mode: 0o755 })
   }

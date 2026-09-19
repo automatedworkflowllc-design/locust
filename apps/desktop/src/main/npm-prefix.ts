@@ -1,4 +1,6 @@
-import { execFile } from 'node:child_process'
+import { spawn } from 'node:child_process'
+
+import { killSpawnedTree } from '@teammate/runtime-adapters'
 import { posix } from 'node:path'
 
 /**
@@ -68,9 +70,40 @@ export async function readNpmBinDirectory(options: {
         // will not spawn `npm.cmd` without it. No user input reaches this
         // command line -- it is a constant -- so there is nothing here for a
         // shell to reinterpret.
-        execFile('npm', ['config', 'get', 'prefix'], { shell: true, timeout: NPM_PREFIX_TIMEOUT_MS }, (error, stdout) => {
-          if (error) reject(error)
-          else resolve(stdout)
+        //
+        // Its own timer and a TREE kill, not `execFile`'s `timeout`: that
+        // kills the outer shell and leaves what it started, which is how a
+        // hung `npm` shim survived Locust as `npm config get prefix` plus
+        // its sleep (Fable, pass 1, finding 3).
+        const child = spawn('npm', ['config', 'get', 'prefix'], {
+          shell: true,
+          windowsHide: true,
+          stdio: ['ignore', 'pipe', 'ignore'],
+          ...(platform === 'win32' ? {} : { detached: true })
+        })
+        let out = ''
+        let settled = false
+        const timer = setTimeout(() => {
+          if (settled) return
+          settled = true
+          if (typeof child.pid === 'number') killSpawnedTree(child.pid, platform)
+          reject(new Error('npm did not answer'))
+        }, NPM_PREFIX_TIMEOUT_MS)
+        child.stdout.on('data', (chunk: Buffer | string) => {
+          out += String(chunk)
+        })
+        child.on('error', (error) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          reject(error)
+        })
+        child.on('close', (code) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          if (code === 0) resolve(out)
+          else reject(new Error(`npm exited ${String(code)}`))
         })
       }))
   try {
