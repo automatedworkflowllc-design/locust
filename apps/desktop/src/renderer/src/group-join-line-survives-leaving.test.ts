@@ -35,7 +35,10 @@ describe('where an ended membership began briefing', () => {
     // The shape Grok measured: six turns, joined after turn 2, left before
     // turn 5. Both lines, so turns 3 and 4 read as briefed.
     const starts = [T(1), T(2), T(3), T(4), T(5), T(6)]
-    const [join] = groupJoins(starts, [{ name: 'Trading', instructions: 'Analysis only.', at: T(3), until: T(5) }])
+    // The record as the store keeps it, `until` included: the function reads
+    // only what it needs from it.
+    const record = { name: 'Trading', instructions: 'Analysis only.', at: T(3), until: T(5) }
+    const [join] = groupJoins(starts, [record])
     expect(join?.beforeTurn).toBe(2)
   })
 
