@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.183.0 - 2026-09-18
+
+- **A conversation that left its group keeps its join line.** The thread
+  used to mark only where the group's instructions stopped, so the turns
+  written under them no longer said so. Both lines are drawn now, and they
+  bracket the turns the instructions governed.
+
 ## 0.182.0 - 2026-09-18
 
 - **A coding CLI that hangs no longer leaves processes behind.** When one
