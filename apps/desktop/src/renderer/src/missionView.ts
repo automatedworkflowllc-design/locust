@@ -12,6 +12,8 @@ import { stripShareBlocks } from '../../shared/peer-share.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { parseDecision, stripDecisionBlocks } from '../../shared/decision.js'
+import { parseFileBlocks, stripFileBlocks } from '../../shared/handover.js'
+import type { HandedFile } from '../../shared/handover.js'
 import type { DecisionRequest } from '../../shared/decision.js'
 
 /**
@@ -744,6 +746,20 @@ export type ThreadItem =
       readonly touchedNothing?: boolean
       readonly steps: readonly PlanStep[]
       readonly doneCount: number
+    }
+  | {
+      /**
+       * Files the teammate handed to the person, as a row of buttons under
+       * the reply that handed them over.
+       *
+       * The mirror of the person's own attachments, which have drawn this way
+       * since the composer took files: same row, same control, same question
+       * answered -- "where is it". Pressing one reveals the file in the file
+       * manager and never opens it; see `shared/handover.ts`.
+       */
+      readonly key: string
+      readonly type: 'files'
+      readonly files: readonly HandedFile[]
     }
   | {
       readonly key: string
@@ -2009,16 +2025,36 @@ export function buildThread(
   for (const message of assistantMessages(events)) {
     // A share block is shown in the peer card, attributed and labelled; left
     // in the bubble it would present the same claim twice, once unlabelled.
-    const text = stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(message.text))))
-    if (text.length === 0) continue
-    items.push({
-      key: `msg_${message.itemId}`,
-      type: 'agent-message',
-      text,
-      // A caret only where text is genuinely still arriving: the run is live
-      // AND the provider has not marked this message final.
-      streaming: options.running && !message.final
-    })
+    const text = stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(message.text)))))
+    /*
+     * The files the teammate handed over, drawn UNDER the message it came
+     * with rather than folded into the work.
+     *
+     * Parsed from the raw message, not from `text`, because `text` has just
+     * had the block cut out of it. Nothing is recorded and nothing runs: the
+     * file is already on disk and the card is a pointer to it.
+     *
+     * A reply may be nothing but a block -- "here you go" is often said in
+     * the note -- so the files item is pushed even when the text is empty,
+     * which is why this sits ahead of the `continue` below rather than after
+     * the message item.
+     */
+    const handed = parseFileBlocks(message.text)
+    if (text.length > 0) {
+      items.push({
+        key: `msg_${message.itemId}`,
+        type: 'agent-message',
+        text,
+        // A caret only where text is genuinely still arriving: the run is live
+        // AND the provider has not marked this message final.
+        streaming: options.running && !message.final
+      })
+    }
+    // Not while the message is still arriving: half a block is not a file,
+    // and a button appearing and vanishing mid-stream is worse than a late one.
+    if (handed.length > 0 && (message.final || !options.running)) {
+      items.push({ key: `files_${message.itemId}`, type: 'files', files: handed })
+    }
   }
 
   if (options.running) {

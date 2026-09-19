@@ -2,10 +2,11 @@
  * Every tag this app parses out of a reply, and the one rule for text that
  * did not come from the person.
  *
- * Locust reads four protocol blocks out of what a teammate says, and each one
+ * Locust reads five protocol blocks out of what a teammate says, and each one
  * makes the host DO something: `locust-share` sends a message as that
  * teammate, `locust-memory` writes to the team's memory, `locust-ask` puts a
- * decision in front of Colin, `locust-task` moves a room's board.
+ * decision in front of Colin, `locust-task` moves a room's board, and
+ * `locust-file` hands the person a file the teammate wrote.
  *
  * Model-authored text gets re-injected into other prompts all over this app --
  * a peer message quoted into the recipient's briefing, a reviewed turn quoted
@@ -28,7 +29,7 @@
  * that IS the point of quoting it -- so the angle bracket becomes a visibly
  * different character and the words survive intact.
  */
-export const PROTOCOL_TAGS = ['locust-share', 'locust-memory', 'locust-ask', 'locust-task'] as const
+export const PROTOCOL_TAGS = ['locust-share', 'locust-memory', 'locust-ask', 'locust-task', 'locust-file'] as const
 
 /** The mark a defanged bracket leaves. Single-width, visibly not a bracket. */
 export const DEFANGED_BRACKET = '‹'

@@ -82,13 +82,26 @@ describe('the runtime prompt a teammate is sent', () => {
   it('leaves out messages that do not fit, from the newest end, and counts them as still waiting', () => {
     const big = 'x'.repeat(3_000)
     const inbound = [message(big, 1), message(big, 2), message(big, 3)]
-    // 6,000 rather than 7,000: the standing prefix grew by about 700
-    // characters on 2026-09-17, to 2,215 with two peers (the share form says what a good message is
-    // instead of a length; the last message is told to stand alone), and
-    // that is the budget this test sits at the edge of. The claim is the
-    // same: one fits, the rest wait and are counted.
+    /*
+     * THE NUMBER HERE IS A MEASUREMENT, AND IT HAS TO BE RE-MEASURED
+     * WHENEVER THE STANDING PREFIX GROWS -- which is the point of the test.
+     *
+     * The claim never changes: one message fits, the rest wait and are
+     * counted. What changes is where the edge is. With two peers the prefix
+     * measured 2,215 on 2026-09-17 and 3,144 on 2026-09-19, after the share
+     * rule was tightened and the file-handover block was added to every
+     * brief. So the person's text is sized to leave room for exactly one
+     * 3,000-character message and no more: at 5,400 the prompt measures
+     * 11,844 and one message rides; at 5,600 it would be 12,044 and the loop
+     * sheds all three.
+     *
+     * A failure here is not a broken test. It is the briefing having grown
+     * enough to cost a real teammate a real waiting message, which is the
+     * thing every comment in workroom-briefing.ts about budget is about.
+     * Re-measure, move the number, and record what grew.
+     */
     const { prompt, delivered } = composeRuntimePrompt({
-      prompt: 'y'.repeat(6_000),
+      prompt: 'y'.repeat(5_400),
       peer: PEER,
       inbound,
       remaining: 1

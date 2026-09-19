@@ -64,6 +64,7 @@ import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
+import { stripFileBlocks } from '../../shared/handover.js'
 import { Composer } from './components/Composer.js'
 import { ExchangeStrip } from './components/ExchangeStrip.js'
 import { RoomScreen } from './components/RoomScreen.js'
@@ -2252,7 +2253,7 @@ export default function App(): ReactElement {
       // Trimmed: a stripped share block leaves the blank lines that held it,
       // and the room drew a turn whose name and first sentence were an inch
       // apart for no reason a reader could see (MEASURED 2026-09-11).
-      const said = stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw)))).trim()
+      const said = stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw))))).trim()
       return said.length === 0 ? undefined : said
     }
     return sequenceOfPost({
@@ -2301,7 +2302,7 @@ export default function App(): ReactElement {
       // The words, not the blocks: what a reply shared, asked or moved on the
       // board is shown by those surfaces. The room smoke's first live run
       // drew a raw task block inside the card (2026-09-05).
-      const last = raw === undefined ? undefined : stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw))))
+      const last = raw === undefined ? undefined : stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(raw)))))
       const phase = live !== undefined ? live.phase : recorded?.phase ?? 'unknown'
       const runtime = live?.data?.runtime ?? recorded?.runtime ?? 'codex'
       const model = live?.data?.model ?? recorded?.model ?? 'account-default'

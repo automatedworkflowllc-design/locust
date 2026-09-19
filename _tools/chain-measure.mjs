@@ -30,7 +30,10 @@ const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
 // --runtime claude --model haiku                 (one paid Claude run, on his go)
 const RUNTIME = process.argv.includes('--runtime') ? process.argv[process.argv.indexOf('--runtime') + 1] : 'opencode'
 const MODEL = process.argv.includes('--model') ? process.argv[process.argv.indexOf('--model') + 1] : 'opencode/muse-spark-1.3-contributor-free'
-const LABEL = process.argv[process.argv.indexOf('--label') + 1] || 'run'
+// -1 + 1 is 0, and argv[0] is the path to node -- so without --label this
+// named every output file after C:\Program Files\nodejs\node.exe and the write
+// failed on the colon (2026-09-19, measuring the tightened share rule).
+const LABEL = process.argv.includes('--label') ? process.argv[process.argv.indexOf('--label') + 1] : 'run'
 const TASK = process.argv.includes('--task') ? process.argv[process.argv.indexOf('--task') + 1] : 'fact'
 // `fact`: one answer, one evidence line. `judge`: a verdict that needs a why,
 // evidence, and something for the person to decide -- the shape Colin's real

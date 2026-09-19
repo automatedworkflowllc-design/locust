@@ -742,6 +742,69 @@ textarea {
   max-width: 320px;
 }
 
+/*
+ * A FILE THE TEAMMATE HANDED OVER, and why it looks so nearly like the row
+ * above rather than like a card.
+ *
+ * It is the same object travelling the other way. The person attaches a file
+ * and gets `.lc-sentfile`, right-aligned because their own turn is; a
+ * teammate hands one back and gets this, left-aligned under their reply and
+ * indented past the face so it reads as part of what they said. Anything more
+ * -- a box, a heading, a label -- would make receiving a file louder than
+ * sending one, and it is the same act.
+ *
+ * The note sits beside the path in the app's own voice rather than the
+ * teammate's: it is a caption on a control, not prose.
+ */
+.lc-agentline__gutter {
+  flex: none;
+  width: 24px;
+}
+
+.lc-handedfiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
+  margin-top: var(--lc-space-2);
+}
+
+.lc-handedfile {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  padding: 3px 8px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-handedfile:hover {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-border-strong);
+}
+
+.lc-handedfile__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
+.lc-handedfile__note {
+  /* Muted, not faint: faint fails AA on copy and this is copy. */
+  color: var(--lc-text-muted);
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
 .lc-agentline {
   display: flex;
   gap: var(--lc-space-5);

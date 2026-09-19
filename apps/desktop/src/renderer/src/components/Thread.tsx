@@ -170,6 +170,50 @@ export function ThreadItems({
             </div>
           )
         }
+        if (item.type === 'files') {
+          /*
+           * A file the teammate handed over, drawn as the mirror of a file
+           * the PERSON attached: the same row of buttons, the same control,
+           * the same answer to "where is it". Colin, 2026-09-19: "the user
+           * should have the ability to receive files ... just like Claude",
+           * sent with a screenshot where he asked for a file and got a path
+           * as a sentence.
+           *
+           * REVEAL, NEVER OPEN. `window.desktop.revealFile` shows the file in
+           * the file manager; the host refuses `shell.openPath` on purpose,
+           * because opening would RUN a `.bat` or a `.ps1` the model had just
+           * written. Do not add an Open button here.
+           *
+           * Indented to the body, not to the page: these belong to the reply
+           * above them, which is why they are inside `lc-agentline`.
+           */
+          return (
+            <div className="lc-agentline" key={item.key}>
+              <span className="lc-agentline__gutter" />
+              <div className="lc-agentline__body">
+                <div className="lc-handedfiles">
+                  {item.files.map((file) => (
+                    <button
+                      key={file.path}
+                      type="button"
+                      className="lc-handedfile"
+                      title={`Show ${file.path} in the file manager`}
+                      onClick={() => {
+                        const bridge = window.desktop
+                        if (bridge === undefined || workspacePath === undefined) return
+                        void bridge.revealFile(`${workspacePath}/${file.path}`).catch(() => undefined)
+                      }}
+                    >
+                      <Icon name="file" size={12} />
+                      <span className="lc-handedfile__path">{file.path}</span>
+                      {file.note !== undefined && <span className="lc-handedfile__note">{file.note}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        }
         if (item.type === 'activity') {
           return (
             <ActivityCard

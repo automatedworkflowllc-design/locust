@@ -6,6 +6,7 @@ import { sanitizeInbound, SHARE_TAG } from '../shared/peer-share.js'
 import { ASK_TAG } from '../shared/decision.js'
 import type { TeammateRole } from '../shared/ipc.js'
 import { BLOCK_PLACEMENT } from '../shared/trailer.js'
+import { FILE_TAG } from '../shared/handover.js'
 
 /**
  * What a teammate's runtime is told about its colleagues.
@@ -136,7 +137,21 @@ function rosterSection(peer: MissionPeerContext): string {
     // as discouragement precisely when the PERSON has just asked for the
     // hand-off. Both halves are now said plainly.
     'Writing a teammate\'s name in your reply does NOT reach them. The only thing that reaches a teammate is a block in the form below. Anything your own runtime calls a subagent, worker or task is not a teammate either: it cannot reach one, and whatever it returns is your own work, not theirs.',
-    'End your reply with one block per teammate when either is true: the person asked you to tell, ask, or hand something to that teammate; or you learned something they need for their own work. Use exactly this form, and nowhere else:',
+    // AND TIGHTENED AGAIN 2026-09-19, from Colin's own ledger: Jimothy sent
+    // Wembley a block carrying version notes nobody had asked for, and
+    // diagnosed it himself by reading this sentence. The second clause said
+    // "or you learned something they need for their own work", which a model
+    // reads as FYI -- and an FYI here is not a note, it is a whole mission
+    // started on the other teammate's route, costing whatever that route
+    // costs.
+    //
+    // The clause is now about WORK rather than about knowledge, because work
+    // is the thing a run can do something about. Do not narrow it back to the
+    // pre-2026-09-03 "if and only if you learned something one of them needs":
+    // that wording produced the opposite failure, agents writing a name in
+    // prose and never hopping even when the person asked them to, and the
+    // person-asked half above must survive any future edit to this sentence.
+    'End your reply with one block per teammate when either is true: the person asked you to tell, ask, or hand something to that teammate; or this turn created work that is theirs to do -- a brief to write, a file to read, a re-score, a change to make. Something they might merely want to know is not work. Use exactly this form, and nowhere else:',
     `<${SHARE_TAG} to="${example}">`,
     // Written for a colleague, not to a length.
     //
@@ -181,6 +196,34 @@ function askSection(): string {
     '- The second option :: what it costs or implies',
     `</${ASK_TAG}>`,
     'Two to four options, each one you would actually be willing to do. The person sees them as buttons and their answer starts your next turn.'
+  ].join('\n')
+}
+
+/**
+ * How to hand the person a file.
+ *
+ * Colin, 2026-09-19, with a screenshot: he asked Yurt to "send me an md of
+ * your report" and got a file path back as a sentence. The teammate had done
+ * the work and written the file; the app simply had no way for it to say
+ * "here it is", so the person was told to go and find it.
+ *
+ * TWO SENTENCES, hard, for the reason the roster comment gives twice over:
+ * this file's tests already sit where forty more characters push a waiting
+ * peer message out of a prompt entirely, and this section is paid for on
+ * EVERY mission, including the ones that never write a file.
+ *
+ * It says "already wrote" deliberately. The block is a pointer to something
+ * on disk, not a request for the host to produce a file, and a model told
+ * only "to give the person a file, use this block" would reasonably write
+ * one that names a file it never created.
+ */
+function filesSection(): string {
+  return [
+    `To give the person a file, write it in the workspace, then hand it over with this block, and ${BLOCK_PLACEMENT}:`,
+    `<${FILE_TAG}>`,
+    'path/relative/to/the/folder.md :: what it is, in a few words',
+    `</${FILE_TAG}>`,
+    'One line per file, up to four, each one you already wrote; the person gets a button that shows it in their file manager. Naming a path in your reply does not hand it over.'
   ].join('\n')
 }
 
@@ -363,6 +406,7 @@ export function composeSoloPrompt(input: {
   if (input.connectors !== undefined) sections.push(input.connectors)
   if (input.keepATodoList) sections.push(todoSection())
   sections.push(askSection())
+  sections.push(filesSection())
   sections.push(answerSection())
   sections.push(input.prompt)
   const composed = sections.join(SECTION_GAP)
@@ -417,6 +461,7 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
     if (input.connectors !== undefined) sections.push(input.connectors)
     if (input.keepATodoList === true) sections.push(todoSection())
     sections.push(askSection())
+    sections.push(filesSection())
     sections.push(answerSection())
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))
     sections.push(input.prompt)

@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.195.0 - 2026-09-19
+
+- **A teammate can hand you a file.** Ask for one -- "send me an md of your
+  report" -- and the file arrives in the conversation as a button under the
+  reply, with its name and a line saying what it is. Pressing it shows the
+  file in your file manager. Until now you could send files to a teammate
+  but they could only tell you where they had put theirs.
+
+- **A teammate stops messaging the others just to keep them posted.** Telling
+  a teammate something starts a whole run on their side, and the rule they
+  were given -- pass it on if they need to know it -- read as an invitation to
+  share anything interesting. They now message a teammate when you asked them
+  to, or when the turn made work that is genuinely theirs to do.
+
 ## 0.194.0 - 2026-09-19
 
 - **A bullet that wraps stays one bullet.** When a list item's sentence ran

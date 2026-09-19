@@ -27,6 +27,31 @@ describe('what a teammate is told about reaching another', () => {
     expect(text).not.toContain('If, and only if,')
   })
 
+  it('asks for a hop when the turn made work for them, and not for a bare fact', () => {
+    /*
+     * Both halves of one sentence, held at once, because each was a shipped
+     * defect in its own right and fixing either one broke the other.
+     *
+     * The first half is the 2026-09-03 failure: a model told "if and only if
+     * you learned something one of them needs" wrote the teammate's name in
+     * prose and never hopped, even when the person had just asked it to.
+     *
+     * The second is the 2026-09-19 failure, from Colin's own ledger: with the
+     * widened wording "or you learned something they need for their own work",
+     * Jimothy hopped to Wembley with version notes nobody asked for. A hop is
+     * a whole mission on the other teammate's route, so an FYI is not free --
+     * it is a paid run started by a model deciding something was interesting.
+     *
+     * So the test pins the WORK clause and pins the absence of the knowledge
+     * clause. A future edit that narrows this back to knowledge fails here,
+     * and so does one that drops the person-asked half above.
+     */
+    const text = brief('Review the tests.')
+    expect(text).toContain('this turn created work that is theirs to do')
+    expect(text).toContain('might merely want to know is not work')
+    expect(text).not.toContain('you learned something they need for their own work')
+  })
+
   it('shows the block form addressed to a real teammate', () => {
     const text = brief('Review the tests.')
     expect(text).toContain(`<${SHARE_TAG} to="Bramble">`)
