@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.191.0 - 2026-09-19
+
+- **A message sent without picking a teammate knows the project.** The home
+  screen invites one: write below and assign it to someone later. That run
+  used to be told nothing at all, because everything Locust briefs a run
+  with hung on there being a teammate. It did not know which folder it was
+  standing in, it never read the folder's `LOCUST.md`, and it could not
+  answer a question about something you had typed on the Memory screen that
+  morning: *"I don't have a secret word for this project in my
+  instructions."* It now gets the folder and the project's memory, which
+  belong to the project rather than to any teammate. What it still does not
+  get is what needs a teammate to exist: a role, the roster, and the ability
+  to hand work to someone else.
+
 ## 0.190.0 - 2026-09-19
 
 The other half of the three tester reports, from Fable's reading of the code.

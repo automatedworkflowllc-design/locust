@@ -1043,7 +1043,10 @@ if (!ownsSingleInstanceLock) {
         const brief = await readWorkspaceBrief(workspacePath).catch(() => undefined)
         // A teammate with a worktree is not standing in the folder that
         // name belongs to, and saying otherwise sends it looking.
-        if (brief !== undefined) sections.push(briefSection(brief, peer.cwd === undefined ? memoryWorkspaceName : undefined))
+        // `peer` is absent for a run that belongs to nobody. It stands in the
+        // project folder, like any run with no worktree, so every branch
+        // below reads an absent peer as "no worktree of its own".
+        if (brief !== undefined) sections.push(briefSection(brief, peer?.cwd === undefined ? memoryWorkspaceName : undefined))
         // And it is told so even when there is no LOCUST.md.
         //
         // 0.36.4 fixed worktree runs dying on a directory refusal partly with
@@ -1055,7 +1058,7 @@ if (!ownsSingleInstanceLock) {
         // does not have one, so the fix did not reach the person it was for
         // (QA, 2026-09-06). It is its own line now, because it is a fact
         // about where the run is, not about the project's instructions.
-        if (peer.cwd !== undefined && brief === undefined) {
+        if (peer?.cwd !== undefined && brief === undefined) {
           sections.push(worktreeSection())
         }
         /*
@@ -1070,7 +1073,7 @@ if (!ownsSingleInstanceLock) {
          * inside: it had been editing the wrong folder and only knew the
          * right one from memory.
          */
-        if (peer.cwd === undefined && brief === undefined) {
+        if (peer?.cwd === undefined && brief === undefined) {
           sections.push(whereSection(memoryWorkspaceName))
         }
         /*
@@ -1092,7 +1095,7 @@ if (!ownsSingleInstanceLock) {
         return sections.length === 0 ? undefined : sections.join('\n\n')
       }
     }
-    async function memoryPart(peer: MissionPeerContext): Promise<string> {
+    async function memoryPart(peer: MissionPeerContext | undefined): Promise<string> {
         const settings = await teammates.readSettings()
         const listed = await memories.briefed(memoryWorkspaceId)
         const lines = listed.map((memory) => ({
@@ -1108,8 +1111,8 @@ if (!ownsSingleInstanceLock) {
         // a line typed on the Memory screen, no .locust/memory.md, and no
         // record anywhere of why. The brief still pastes the lines; the
         // failure goes to the error log so the next report can name it.
-        const file = await writeMemoryFile(peer.cwd ?? workspacePath, lines, new Date()).catch((error: unknown) => {
-          note('memory-file', `could not write ${MEMORY_FILE} under ${peer.cwd ?? workspacePath}: ${error instanceof Error ? error.message : String(error)}`)
+        const file = await writeMemoryFile(peer?.cwd ?? workspacePath, lines, new Date()).catch((error: unknown) => {
+          note('memory-file', `could not write ${MEMORY_FILE} under ${peer?.cwd ?? workspacePath}: ${error instanceof Error ? error.message : String(error)}`)
           return undefined
         })
         // `writeMemoryFile` answers undefined for a failed write rather than
@@ -1117,18 +1120,18 @@ if (!ownsSingleInstanceLock) {
         // line could not be written (Fable, pass 1, from reading). Logged on
         // the answer, which is the one signal the write gives.
         if (file === undefined) {
-          note('memory-file', `could not write ${MEMORY_FILE} under ${peer.cwd ?? workspacePath}: the write did not complete (see memory-file.ts)`)
+          note('memory-file', `could not write ${MEMORY_FILE} under ${peer?.cwd ?? workspacePath}: the write did not complete (see memory-file.ts)`)
         }
         return memorySection({
           ...(file === undefined ? {} : { file }),
-          selfName: peer.self.name,
+          ...(peer === undefined ? {} : { selfName: peer.self.name }),
           // Undefined for a worktree teammate, for the same reason the brief
           // above stopped naming it: memory's own line said "what is
           // remembered for the folder <parent>", which names the folder the
           // run is NOT standing in -- the exact invitation 0.36.4 removed
           // from the other section and left here (QA, 2026-09-06). Memory is
           // the project's either way; only the pointer at a folder goes.
-          workspaceName: peer.cwd === undefined ? memoryWorkspaceName : undefined,
+          workspaceName: peer?.cwd === undefined ? memoryWorkspaceName : undefined,
           memories: listed.map((memory) => ({
             text: memory.text,
             scope: memory.scope,

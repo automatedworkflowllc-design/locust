@@ -1260,6 +1260,19 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered
           peerDeliveryFailed = prepared.failed
+        } else if (peerExchange !== undefined) {
+          /*
+           * A run that belongs to nobody still stands in the project folder
+           * and still has the project's memory. It used to be briefed with
+           * neither, because the whole briefing hung on a teammate (Grok,
+           * pass 14, ranked second: the secret word answered NONE and no
+           * memory file anywhere). Nothing here needs a roster.
+           */
+          runtimePrompt = await peerExchange.briefSolo(prompt, runtime, {
+            ...(continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
+              ? {}
+              : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }
+          })
         }
         // Plan first, for a teammate's mission or a plain one. Appended last
         // so it is the instruction closest to the model's answer.

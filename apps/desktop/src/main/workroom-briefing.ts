@@ -335,6 +335,43 @@ export function todoSection(): string {
 /** Two newlines, written once rather than escaped into every caller. */
 const SECTION_GAP = String.fromCharCode(10, 10)
 
+/**
+ * The briefing for a run that belongs to NOBODY.
+ *
+ * Home invites one: "Pick a teammate, or write below and assign it to one
+ * later." Until 0.191.0 that run was briefed with nothing at all -- the
+ * whole briefing hung on a peer context, and there is no peer -- so it did
+ * not know the project folder, did not read LOCUST.md, and could not quote
+ * a memory the person had typed that morning. Grok watched exactly that and
+ * ranked it second (pass 14): eleven lines on the Memory screen, the
+ * secret-word question answered NONE, and no `.locust/memory.md` anywhere.
+ *
+ * What it gets is what is TRUE of it: the folder, the project's memory (the
+ * project's, not a teammate's), and the two formats every run answers in.
+ * What it does not get is what needs a teammate -- the role, the roster, the
+ * share block, waiting messages. There is nobody to be and nobody to write
+ * to, and inventing either would be a lie in the prompt.
+ */
+export function composeSoloPrompt(input: {
+  readonly prompt: string
+  readonly memory?: string
+  readonly connectors?: string
+  readonly keepATodoList: boolean
+}): string {
+  const sections: string[] = []
+  if (input.memory !== undefined) sections.push(input.memory)
+  if (input.connectors !== undefined) sections.push(input.connectors)
+  if (input.keepATodoList) sections.push(todoSection())
+  sections.push(askSection())
+  sections.push(answerSection())
+  sections.push(input.prompt)
+  const composed = sections.join(SECTION_GAP)
+  // Nothing here can be shed -- there are no inbound messages to drop, and
+  // the memory section is bounded where it is built -- so an over-long
+  // briefing loses the briefing rather than the person's words.
+  return composed.length > MAX_RUNTIME_PROMPT_LENGTH ? input.prompt : composed
+}
+
 export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
   const trailer = input.peer.others.length > 0 ? rosterSection(input.peer) : undefined
   const roster = [input.peer.self, ...input.peer.others]

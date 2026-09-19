@@ -1723,7 +1723,22 @@ describe('the workroom around a mission', () => {
     await drain(scheduled)
 
     expect(posted).toEqual([])
-    expect(start.mock.calls[0]?.[1]).toBe('Task.')
+    /*
+     * It is briefed, and it is not briefed as anybody.
+     *
+     * This asserted the prompt was the person's words and NOTHING else,
+     * which is what the app did and what Grok's pass 14 ranked second: a run
+     * started from Home with nobody picked did not know the folder and could
+     * not quote a memory the person had just typed. It gets the standing
+     * formats and (where one exists) the folder and the project's memory;
+     * what it must never get is a roster, a role or a share block, because
+     * there is nobody to be and nobody to write to.
+     */
+    const briefed = start.mock.calls[0]?.[1] as string
+    expect(briefed.endsWith('Task.')).toBe(true)
+    expect(briefed).toContain('<locust-ask>')
+    expect(briefed).not.toContain('locust-share')
+    expect(briefed).not.toContain('Teammates in this workspace besides you')
   })
 })
 

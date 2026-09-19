@@ -224,7 +224,8 @@ export function memoryAge(at: string | undefined, now: Date): string | undefined
  * worth keeping ends with no block at all.
  */
 export function memorySection(input: {
-  readonly selfName: string
+  /** Absent for a run that belongs to nobody: there is no teammate to name. */
+  readonly selfName?: string
   /**
    * The folder the memories belong to, named for the person reading.
    *
@@ -311,6 +312,8 @@ export function memorySection(input: {
     'Never remember file contents, secrets, credentials, or anything you can re-read from the workspace. Do not remember what CLAUDE.md, AGENTS.md or a rules file already says.',
     input.askFirst
       ? 'The person is asked before a memory is kept; write it as they will read it.'
-      : `A memory is kept at once and shown to the person as written by ${input.selfName}; write it as they will read it.`
+      : input.selfName === undefined
+        ? 'A memory is kept at once and shown to the person as you wrote it; write it as they will read it.'
+        : `A memory is kept at once and shown to the person as written by ${input.selfName}; write it as they will read it.`
   ].join('\n')
 }

@@ -3,7 +3,7 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { CodexMissionUpdate, PublicPeerMessage } from '../shared/ipc.js'
 import { boundedShareText, MAX_SHARES_PER_MISSION, parseShareBlocks } from '../shared/peer-share.js'
-import { composeRuntimePrompt, MAX_INBOUND_MESSAGES, runtimeKeepsATodoList } from './workroom-briefing.js'
+import { composeRuntimePrompt, composeSoloPrompt, MAX_INBOUND_MESSAGES, runtimeKeepsATodoList } from './workroom-briefing.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
 /**
@@ -48,6 +48,12 @@ export interface PeerExchange {
    * `RUNTIMES_THAT_KEEP_A_TODO_LIST`.
    */
   prepare(prompt: string, peer: MissionPeerContext, runtime?: string, conversation?: ConversationHint): Promise<PreparedPeerPrompt>
+  /**
+   * The briefing for a run with no teammate: the folder and the project's
+   * memory, and none of what needs a roster. Never throws -- a memory that
+   * cannot be read is left out, the same as everywhere else.
+   */
+  briefSolo(prompt: string, runtime?: string, conversation?: ConversationHint): Promise<string>
   /** Throws when the ledger refuses: a mission must not run on messages it cannot record. */
   recordReceived(missionId: string, delivered: readonly WorkroomMessage[], occurredAt: string): Promise<void>
   /** Never throws: a delivery that cannot be marked is shown again next time, which is the safe direction. */
@@ -125,7 +131,8 @@ export interface ConversationHint {
 
 /** What the team remembers, worded for a runtime; undefined when memory is off. */
 export interface MemoryBriefing {
-  section(peer: MissionPeerContext, conversation?: ConversationHint): Promise<string | undefined>
+  /** `peer` is absent for a run that belongs to nobody; the folder and the memory are still the project's. */
+  section(peer: MissionPeerContext | undefined, conversation?: ConversationHint): Promise<string | undefined>
 }
 
 /**
@@ -223,6 +230,22 @@ export function createPeerExchange(options: {
         })
         return { runtimePrompt: composed.prompt, delivered: [], failed: true }
       }
+    },
+
+    async briefSolo(prompt, runtime, conversation) {
+      const memory = options.memory === undefined ? undefined : await options.memory.section(undefined, conversation).catch(() => undefined)
+      const todos =
+        runtime !== undefined &&
+        runtimeKeepsATodoList(runtime) &&
+        (await options.keepATodoList?.().catch(() => false)) === true
+      const connectors =
+        runtime === 'cursor' ? await options.readyConnectors?.().catch(() => undefined) : undefined
+      return composeSoloPrompt({
+        prompt,
+        ...(memory === undefined ? {} : { memory }),
+        ...(connectors === undefined ? {} : { connectors }),
+        keepATodoList: todos
+      })
     },
 
     async recordReceived(missionId, delivered, occurredAt) {
