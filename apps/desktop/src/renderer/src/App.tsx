@@ -4052,7 +4052,7 @@ export default function App(): ReactElement {
         })
 
   return (
-    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}`}>
+    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${inspectorOpen && liveRun !== undefined ? ' has-inspector' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
         // build instead (Colin, 2026-09-05).

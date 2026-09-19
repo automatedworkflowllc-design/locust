@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.187.0 - 2026-09-19
+
+- **The smallest window, with everything open.** At 1120×720 with a long
+  conversation, eight teammates and the inspector open, three things were
+  cut off and are not now. With the sidebar folded to its rail, the inspector
+  slid over the conversation and hid the end of every line, the receipt, the
+  banner's Dismiss button and the header's own Activity button; the
+  conversation now keeps left of it. The row under the message box (mode,
+  folder, route, effort) was cut at its right end whenever the box was
+  narrower than about 720px; it takes a second line there instead. And on the
+  first screen, when six coding agents and the banner made it taller than the
+  window, the Locust lockup was cut off at the top with no way to scroll to
+  it; the screen now opens at its end, where Install is, and scrolls up to
+  the lockup.
+
 ## 0.186.0 - 2026-09-19
 
 - **The first screen, redrawn.** Everything on it now shares one left edge

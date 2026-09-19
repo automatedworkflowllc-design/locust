@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
@@ -160,8 +160,38 @@ export function FirstLaunch({
   // status panel: "2026.09.02-c22c1a3" reads as its date.
   const shortVersion = (version: string | null | undefined): string => (version === undefined || version === null ? '' : version.replace(/-[0-9a-f]{6,}$/i, ''))
 
+  /*
+   * When the screen is taller than the pane (1120x720 with six runtimes and
+   * the changelog banner), keep it at its END, where the Install button and
+   * the composer are, and let the lockup be what scrolls away above. The
+   * list grows as discovery reports, so this follows the content's height
+   * rather than running once; a person who has scrolled up is left where
+   * they are.
+   */
+  const pane = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = pane.current
+    if (el === null || typeof ResizeObserver === 'undefined') return
+    let atEnd = true
+    const onScroll = (): void => {
+      atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 4
+    }
+    const follow = (): void => {
+      if (atEnd) el.scrollTop = el.scrollHeight
+    }
+    el.addEventListener('scroll', onScroll)
+    const observer = new ResizeObserver(follow)
+    observer.observe(el)
+    if (el.firstElementChild !== null) observer.observe(el.firstElementChild)
+    follow()
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      observer.disconnect()
+    }
+  }, [])
+
   return (
-    <div className="lc-empty">
+    <div className="lc-empty" ref={pane}>
       <div className="lc-empty__inner">
         {/* The mark in its own card, at the reference's sizes. */}
         <div className="lc-markcard">

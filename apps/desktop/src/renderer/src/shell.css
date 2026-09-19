@@ -1970,13 +1970,22 @@ textarea {
 
 .lc-empty {
   flex: 1;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   /* Anchored to the bottom, so the list sits over the composer it shares an
      edge with. Centred, the screen's tallest piece of empty space sat
      between the list and the box under it (design agent, 2026-09-19:
-     "74px gap"). */
-  align-content: end;
+     "74px gap").
+
+     NOT `align-content: end` on a grid: when the content is taller than the
+     pane, end-alignment overflows at the TOP, and the top of a scroll box is
+     the one place a scrollbar cannot reach. At 1120x720 with six runtimes
+     and the changelog banner, the lockup's card was cut off under the title
+     bar with no way to see it (crowded-window drive, 2026-09-19, frame). An
+     auto top margin on the child anchors the same way when there is room
+     and resolves to zero when there is not, so the overflow goes to the
+     bottom, where it scrolls. */
   padding: var(--lc-space-8) var(--lc-space-6);
   /* Never push the box you type in off the screen. Without `min-height: 0` a
      flex child refuses to shrink below its content, so at 1280x860 the
@@ -3203,6 +3212,9 @@ textarea {
      the design said 420 and the file said 520 -- both too narrow). The mark
      card, claim lines and folder card all still centre in it. */
   max-width: var(--lc-thread-max-width);
+  /* The bottom anchor, and a refusal to be squashed: see `.lc-empty`. */
+  margin-top: auto;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -4133,8 +4145,28 @@ textarea {
    * window width, which reads as the bar breaking (QA, 2026-09-06, measured:
    * about 808px of controls into 760). Truncating the two names that can be
    * arbitrarily long is what makes the row fit, so nothing needs to move.
+   *
+   * ...down to about 720px of composer. Below that the truncated names are
+   * already at their floor and the row is cut instead: at 1120 with the
+   * inspector open the composer is 712px wide beside the rail (the row
+   * wanted 705 of its 680) and 508px beside the full sidebar, where the
+   * effort chip and the swarm face were past its edge (crowded-window drive,
+   * 2026-09-19, frames). Only there does the row take a second line -- a
+   * container query on the composer, not a window width, because it is the
+   * composer's width that decides it.
    */
   flex-wrap: nowrap;
+}
+
+.lc-composer {
+  container-type: inline-size;
+}
+
+@container (max-width: 720px) {
+  .lc-composer__controls {
+    flex-wrap: wrap;
+    row-gap: var(--lc-space-2);
+  }
 }
 
 .lc-composer__group {
@@ -4667,6 +4699,19 @@ textarea {
     bottom: 0;
     z-index: 40;
     box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
+  }
+
+/*
+ * A drawer must not cover what it inspects. The thread column stayed centred
+ * in the full width under the drawer, so at 1120x720 the drawer's 344px hid
+ * every reply's line end, the receipt, the banner's Dismiss, the header's
+ * own Activity button and the composer's route chip (crowded-window drive,
+ * 2026-09-19, frame). While the drawer is open the workroom keeps its
+ * content left of it; the drawer still floats, so nothing reflows when it
+ * closes except the room it gave back.
+ */
+.lc-shell.is-compact.has-inspector .lc-workroom {
+    padding-right: var(--lc-inspector-width);
   }
 
 .lc-shell.is-compact .lc-thread__column,
