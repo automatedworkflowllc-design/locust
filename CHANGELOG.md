@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.188.0 - 2026-09-19
+
+- **The inspector stays with its conversation.** It used to stay open across
+  All missions, Settings and Team, where it inspected nothing on screen and
+  squeezed those screens until, at 1120 wide, the mission rows and the
+  Settings pane grew sideways scrollbars. It now shows only beside the
+  conversation, and comes back when you return to it.
+- **Mission rows in a narrow list.** Below about 820px of list the row takes
+  two lines instead of cutting off its last three columns.
+
 ## 0.187.0 - 2026-09-19
 
 - **The smallest window, with everything open.** At 1120×720 with a long

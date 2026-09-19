@@ -4052,7 +4052,7 @@ export default function App(): ReactElement {
         })
 
   return (
-    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${inspectorOpen && liveRun !== undefined ? ' has-inspector' : ''}`}>
+    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
         // build instead (Colin, 2026-09-05).
@@ -5035,7 +5035,15 @@ export default function App(): ReactElement {
           />
           )}
         </main>
-        {inspectorOpen && liveRun !== undefined && (
+        {/*
+          * Only beside the conversation it inspects. It used to stay open
+          * across All missions, Settings and Team, where it inspected
+          * nothing on screen and took 344px from screens that had not been
+          * drawn for the squeeze: at 1120 the Settings pane and the mission
+          * rows grew sideways scrollbars (crowded-window drive, 2026-09-19).
+          * It comes back with the workroom; the toggle keeps its state.
+          */}
+        {inspectorOpen && liveRun !== undefined && screen === 'workroom' && (
           <Inspector
             events={liveRun.events}
             workspacePath={workspacePath}

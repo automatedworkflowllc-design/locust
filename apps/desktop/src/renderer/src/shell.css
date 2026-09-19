@@ -5519,6 +5519,33 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-3);
+  /* The rows' width decides their shape; see the container query below. */
+  container-type: inline-size;
+}
+
+/*
+ * The row's six fixed columns take about 780px before the title gets a
+ * pixel: the title is the one flexible column, so it is the first thing
+ * squeezed, and at 1120 with the full sidebar (794px of list) it measured
+ * 1px wide -- eight rows reading "Wren · COMPLETED" and nothing else
+ * (crowded-window drive, 2026-09-19, measured). Below 960px of list the row
+ * takes two lines: who and what on the first, the route, the counts and
+ * the cost on the second, under the same columns. Selector carries the
+ * list's class because the base rule below is later in the file and would
+ * otherwise win on order alone (it did, first try).
+ */
+@container (max-width: 960px) {
+  .lc-missionrows .lc-missionrow {
+    grid-template-columns: 14px minmax(0, 1fr) 130px 104px;
+    row-gap: 4px;
+  }
+  .lc-missionrows .lc-missionrow > .lc-rail__dot { grid-row: 1; grid-column: 1; }
+  .lc-missionrows .lc-missionrow__name { grid-row: 1; grid-column: 2; }
+  .lc-missionrows .lc-missionrow__owner { grid-row: 1; grid-column: 3; }
+  .lc-missionrows .lc-missionrow__tag { grid-row: 1; grid-column: 4; }
+  .lc-missionrows .lc-missionrow__route { grid-row: 2; grid-column: 2; }
+  .lc-missionrows .lc-missionrow__stats { grid-row: 2; grid-column: 3; }
+  .lc-missionrows .lc-missionrow__cost { grid-row: 2; grid-column: 4; text-align: right; }
 }
 
 .lc-missionrow {

@@ -353,6 +353,93 @@ try {
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
   await writeFile(FRAME, Buffer.from(shot.result.data, 'base64'))
   say(`   frame ${FRAME.pathname.slice(1)}`)
+
+  /*
+   * 5. THE OTHER SCREENS AT THIS SIZE. Nobody had looked at All missions,
+   * the room, Routines, Settings or the Team screen at 1120x720 either. Each
+   * is opened the way a person opens it (the sidebar's own control, by its
+   * title), audited the same way (nothing sideways, nothing spilling), and
+   * captured, so the frames can be looked at.
+   */
+  say('5. the other screens at 1120x720')
+  const audit = `(() => {
+    const ws = new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g')
+    const clean = (s) => (s || '').replace(ws, ' ').trim()
+    const spills = []
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.children.length > 0 && !/^(BUTTON|A|SPAN|LABEL|TD|TH)$/.test(el.tagName)) continue
+      const text = clean(el.innerText)
+      if (!text) continue
+      const r = el.getBoundingClientRect()
+      if (r.width === 0 || r.height === 0 || r.bottom < 0 || r.top > window.innerHeight) continue
+      const s = getComputedStyle(el)
+      if (el.scrollWidth > el.clientWidth + 1 && s.overflowX === 'visible' && s.whiteSpace !== 'normal' && s.whiteSpace !== 'pre-wrap' && s.whiteSpace !== 'pre-line' && s.whiteSpace !== 'break-spaces') {
+        spills.push({ cls: (el.className || el.tagName).toString().slice(0, 50), text: text.slice(0, 40), over: el.scrollWidth - el.clientWidth })
+      }
+      if (r.right > window.innerWidth + 1) spills.push({ cls: (el.className || el.tagName).toString().slice(0, 50), text: text.slice(0, 40), pastWindow: Math.round(r.right - window.innerWidth) })
+    }
+    // A scroll container that scrolls sideways is content cut at the edge.
+    const sideways = []
+    for (const el of document.querySelectorAll('main *')) {
+      const s = getComputedStyle(el)
+      if ((s.overflowX === 'auto' || s.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1 && !/lc-diff|lc-code|pre|lc-mono/.test(el.className || '')) {
+        // Name what pokes out, so the fix has an address.
+        const edge = el.getBoundingClientRect().right
+        const culprits = [...el.querySelectorAll('*')].filter(d => d.getBoundingClientRect().right > edge + 1 && d.getBoundingClientRect().width > 0).slice(0, 4).map(d => (d.className || d.tagName).toString().split(' ')[0] + '+' + Math.round(d.getBoundingClientRect().right - edge))
+        sideways.push({ cls: (el.className || el.tagName).toString().slice(0, 50), over: el.scrollWidth - el.clientWidth, culprits })
+      }
+    }
+    return JSON.stringify({ docScrollW: document.documentElement.scrollWidth, spills, sideways, heading: clean((document.querySelector('main h1, main h2, .lc-screen__title') || {}).innerText).slice(0, 40) })
+  })()`
+  const screens = [
+    ['missions', 'All missions'],
+    ['rooms', 'Rooms'],
+    ['room', null],
+    ['routines', 'Routines'],
+    ['settings', 'Settings'],
+    ['team', 'Team']
+  ]
+  for (const [name, titleStart] of screens) {
+    const went = await cdp.eval(`(async () => {
+      let control = null
+      if (${JSON.stringify(titleStart)} === null) {
+        // The room itself: the row named Release on the Rooms screen.
+        control = [...document.querySelectorAll('main button, main [role=button]')].find(b => /^Release/.test((b.innerText || '').trim()))
+      } else {
+        control = [...document.querySelectorAll('.lc-sidebar button')].find(b => (b.getAttribute('title') || '').indexOf(${JSON.stringify(titleStart)}) === 0)
+      }
+      if (!control) return 'no control'
+      control.click()
+      await new Promise(r => setTimeout(r, 900))
+      return 'opened'
+    })()`)
+    if (went !== 'opened') {
+      say(`   ${name}: ${went}`)
+      if (name !== 'team') check(`the ${name} screen can be opened from the sidebar`, false, went)
+      continue
+    }
+    const seen = JSON.parse(await cdp.eval(audit))
+    say(`   ${name}: ${JSON.stringify(seen)}`)
+    if (name === 'missions') {
+      // The row's shape at this width: its computed columns and whether the
+      // title is drawn with any width at all.
+      const row = JSON.parse(await cdp.eval(`(() => {
+        const rows = document.querySelector('.lc-missionrows')
+        const row = document.querySelector('.lc-missionrow')
+        const title = document.querySelector('.lc-missionrow__title')
+        if (!rows || !row || !title) return JSON.stringify({ rows: !!rows, row: !!row, title: !!title })
+        const w = (el) => Math.round(el.getBoundingClientRect().width)
+        return JSON.stringify({ listW: w(rows), rowW: w(row), columns: getComputedStyle(row).gridTemplateColumns, titleW: w(title), title: (title.innerText || '').slice(0, 30) })
+      })()`))
+      say(`   missions row: ${JSON.stringify(row)}`)
+      check('the mission title has room to be read (at least 120px)', row.titleW >= 120, JSON.stringify(row))
+    }
+    check(`${name}: nothing scrolls sideways`, seen.docScrollW <= 1120 && seen.sideways.length === 0, JSON.stringify(seen.sideways))
+    check(`${name}: no text spills past its box or the window`, seen.spills.length === 0, JSON.stringify(seen.spills))
+    const frame = new URL(`../docs/chain-measure/crowded-window-${LAYOUT}-${name}-2026-09-19.png`, import.meta.url)
+    const png = await cdp.send('Page.captureScreenshot', { format: 'png' })
+    await writeFile(frame, Buffer.from(png.result.data, 'base64'))
+  }
 } finally {
   child.kill()
   await sleep(800)
