@@ -22,6 +22,8 @@ export type ProbeSpawn = (
     readonly shell: false;
     readonly windowsHide: true;
     readonly stdio: ["ignore", "pipe", "pipe"];
+    /** Its own process group off Windows, so a timed-out tree can be signalled as one. */
+    readonly detached?: boolean;
   },
 ) => SpawnedProbeProcess;
 
@@ -41,10 +43,22 @@ export interface NodeProbeRunnerOptions {
    * Windows and does nothing extra elsewhere; a test hands in a spy.
    */
   readonly killTree?: (pid: number) => void;
+  /** Test seam: which platform's rules to follow. Production leaves it to the process. */
+  readonly platform?: NodeJS.Platform;
 }
 
-const defaultKillTree = (pid: number): void => {
-  if (process.platform !== "win32") return;
+const defaultKillTree = (pid: number, platform: NodeJS.Platform): void => {
+  if (platform !== "win32") {
+    // The probe is spawned as its own process group below, so the negative
+    // pid reaches the shim AND what it started. Grok's pass 12, Linux: 41
+    // sleeping shims after Locust exited, because this returned early.
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      // Already gone, or not a group leader: the signals below still apply.
+    }
+    return;
+  }
   try {
     // Synchronous on purpose. The first version started taskkill and sent
     // SIGTERM in the same tick; cmd.exe died before taskkill had walked its
@@ -96,7 +110,8 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Com
   const maximumTimeoutMs = positiveInteger(options.maximumTimeoutMs, 10_000, "maximumTimeoutMs");
   const killGraceMs = positiveInteger(options.killGraceMs, 500, "killGraceMs");
   const spawnProcess = options.spawnProcess ?? defaultSpawn;
-  const killTree = options.killTree ?? defaultKillTree;
+  const platform = options.platform ?? process.platform;
+  const killTree = options.killTree ?? ((pid: number) => defaultKillTree(pid, platform));
 
   return {
     run(command: ProbeCommand): Promise<CommandResult> {
@@ -123,6 +138,10 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Com
           shell: false,
           windowsHide: true,
           stdio: ["ignore", "pipe", "pipe"],
+          // A group of its own off Windows: kill(-pid) then ends the shim
+          // and whatever it started. On Windows a detached child gets its
+          // own console, which is not wanted; taskkill /T walks the tree.
+          ...(platform === "win32" ? {} : { detached: true }),
         });
 
         const finish = (exitCode: number | null): void => {

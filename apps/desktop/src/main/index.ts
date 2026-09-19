@@ -59,7 +59,7 @@ import type { AttentionReader } from './attention-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import { memorySection } from '../shared/memory.js'
-import { writeMemoryFile } from './memory-file.js'
+import { MEMORY_FILE, writeMemoryFile } from './memory-file.js'
 
 /** Scheduled routines are checked once a minute; the first check waits for runtime discovery. */
 const ROUTINE_TICK_MS = 60_000
@@ -1079,7 +1079,14 @@ if (!ownsSingleInstanceLock) {
         }))
         // The whole list as a file where the run stands, so the brief can
         // paste the newest few and the teammate can read the rest itself.
-        const file = await writeMemoryFile(peer.cwd ?? workspacePath, lines, new Date()).catch(() => undefined)
+        // A write that fails used to vanish here -- Grok's pass 12, on Linux:
+        // a line typed on the Memory screen, no .locust/memory.md, and no
+        // record anywhere of why. The brief still pastes the lines; the
+        // failure goes to the error log so the next report can name it.
+        const file = await writeMemoryFile(peer.cwd ?? workspacePath, lines, new Date()).catch((error: unknown) => {
+          note('memory-file', `could not write ${MEMORY_FILE} under ${peer.cwd ?? workspacePath}: ${error instanceof Error ? error.message : String(error)}`)
+          return undefined
+        })
         return memorySection({
           ...(file === undefined ? {} : { file }),
           selfName: peer.self.name,

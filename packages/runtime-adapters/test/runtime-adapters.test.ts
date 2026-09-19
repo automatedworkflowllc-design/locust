@@ -1269,6 +1269,59 @@ describe("bounded Node probe runner", () => {
     // The tree first, then the signals: the order in which they end things.
     expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
   });
+
+  it("off Windows, spawns the probe as its own process group and signals the group on timeout", async () => {
+    /*
+     * Grok's pass 12, Linux: 41 sleeping shims after Locust exited. The tree
+     * kill shipped in 0.182.0 was taskkill, a Windows program, and returned
+     * early everywhere else. A probe spawned detached is its own group, and
+     * kill(-pid) reaches the shim and whatever it started.
+     */
+    let spawnOptions: { detached?: boolean } | undefined;
+    const killed: Array<[number, NodeJS.Signals | undefined]> = [];
+    const realKill = process.kill;
+    process.kill = ((pid: number, signal?: NodeJS.Signals) => {
+      killed.push([pid, signal]);
+      return true;
+    }) as typeof process.kill;
+    try {
+      const runner = createNodeProbeRunner({
+        maximumTimeoutMs: 5,
+        killGraceMs: 5,
+        platform: "linux",
+        spawnProcess: (_executable, _args, options) => {
+          spawnOptions = options;
+          const child = new EventEmitter() as EventEmitter & SpawnedProbeProcess;
+          Object.assign(child, { stdout: new EventEmitter(), stderr: new EventEmitter(), pid: 777, kill: () => true });
+          return child;
+        },
+      });
+      const result = await runner.run({ purpose: "readiness", executablePath: "/usr/local/bin/opencode", args: ["--version"], timeoutMs: 5 });
+      expect(result.timedOut).toBe(true);
+    } finally {
+      process.kill = realKill;
+    }
+    expect(spawnOptions?.detached).toBe(true);
+    expect(killed).toEqual([[-777, "SIGKILL"]]);
+  });
+
+  it("on Windows, does not detach: a detached child there gets its own console", async () => {
+    let spawnOptions: { detached?: boolean } | undefined;
+    const runner = createNodeProbeRunner({
+      maximumTimeoutMs: 5,
+      killGraceMs: 5,
+      platform: "win32",
+      killTree: () => undefined,
+      spawnProcess: (_executable, _args, options) => {
+        spawnOptions = options;
+        const child = new EventEmitter() as EventEmitter & SpawnedProbeProcess;
+        Object.assign(child, { stdout: new EventEmitter(), stderr: new EventEmitter(), pid: 1, kill: () => true });
+        return child;
+      },
+    });
+    await runner.run({ purpose: "readiness", executablePath: "C:\\tools\\opencode.cmd", args: ["--version"], timeoutMs: 5 });
+    expect(spawnOptions?.detached).toBeUndefined();
+  });
 });
 
 describe("model and effort on the command line", () => {

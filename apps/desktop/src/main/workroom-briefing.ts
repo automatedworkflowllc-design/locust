@@ -135,7 +135,7 @@ function rosterSection(peer: MissionPeerContext): string {
     // -- "if, and only if, you learned something one of them needs" -- reads
     // as discouragement precisely when the PERSON has just asked for the
     // hand-off. Both halves are now said plainly.
-    'Writing a teammate\'s name in your reply does NOT reach them. The only thing that reaches a teammate is a block in the form below.',
+    'Writing a teammate\'s name in your reply does NOT reach them. The only thing that reaches a teammate is a block in the form below. Anything your own runtime calls a subagent, worker or task is not a teammate either: it cannot reach one, and whatever it returns is your own work, not theirs.',
     'End your reply with one block per teammate when either is true: the person asked you to tell, ask, or hand something to that teammate; or you learned something they need for their own work. Use exactly this form, and nowhere else:',
     `<${SHARE_TAG} to="${example}">`,
     // Written for a colleague, not to a length.
@@ -223,7 +223,7 @@ export function roleBrief(kind: TeammateRole, label?: string): string | undefine
       // A Custom teammate with no title yet gets the shared part alone.
       return label === undefined || label.trim().length === 0 || label === 'Custom'
         ? 'Your role is the one the person set you up for: do what is asked the way a capable colleague would, and say plainly when an ask falls outside what you can do here rather than stretching to cover it.'
-        : `Your role is ${label.trim()}, in the person's own words: do the work that title describes the way a capable colleague with it would, bring what someone in that role would know, and say plainly when an ask falls outside it rather than stretching to cover it.`
+        : `Your role is ${label.trim()}, in the person's own words: do the work that title describes the way a capable colleague with it would, bring what someone in that role would know, and say plainly when an ask falls outside it rather than stretching to cover it. When asked who you are or what your role is, answer with that title, not with the name of the program you run in.`
   }
 }
 

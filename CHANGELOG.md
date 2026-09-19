@@ -6,6 +6,25 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.184.0 - 2026-09-19
+
+- **A hanging CLI leaves nothing behind on Linux and macOS too.** 0.182.0
+  said this and it was true only on Windows; a tester counted forty-one
+  leftover processes on Linux. Off Windows a version check now runs in its
+  own process group and the whole group is ended when it times out.
+- **A conversation that could not be read is now said in the sidebar,** not
+  only on All missions. Deleting the one visible turn of a chain whose other
+  turn was unreadable used to look like the whole conversation was gone.
+- **A teammate's own subagents are not teammates.** The brief now says so.
+  A Chief of Staff asked to hand work to Booty was spawning its runtime's
+  own worker and calling the result Booty's.
+- **A Custom role answers with its title** when asked who it is, rather than
+  with the name of the program it runs in.
+- If the team memory file cannot be written before a run, the failure is now
+  recorded in the error log instead of vanishing.
+- The first screen's hint no longer says "and sign in to" beside a row that
+  needs no account.
+
 ## 0.183.0 - 2026-09-18
 
 - **A conversation that left its group keeps its join line.** The thread

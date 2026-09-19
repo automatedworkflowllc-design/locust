@@ -162,6 +162,7 @@ export function Sidebar({
   groups = [],
   groupMembers = {},
   unreadable = [],
+  unreadableConversations = 0,
   onGroupMenu,
   renamingGroupId,
   onRenameGroup,
@@ -232,6 +233,8 @@ export function Sidebar({
    * and then not applied at the top.
    */
   readonly unreadable?: readonly string[]
+  /** Ledger files that exist and would not read; they have no row to draw. */
+  readonly unreadableConversations?: number
   /** The header menu for a group: rename it, or remove it. */
   readonly onGroupMenu?: (groupId: string, at: { readonly x: number; readonly y: number }) => void
   /** The group being renamed in place, if any. */
@@ -1360,6 +1363,26 @@ export function Sidebar({
                 </div>
               )
             })()}
+            {/*
+              * And the conversations that exist and would not read, which
+              * are a different thing from the stores above: All missions
+              * already says "1 file could not be read" and this column said
+              * nothing, so a person who deleted the one row they could see
+              * of a chain whose other turn was unreadable thought the
+              * conversation was gone (Grok, passes 11 and 12, with the
+              * exact file). The row cannot be drawn -- there is nothing to
+              * name it by -- so the count is, with the place that lists it.
+              */}
+            {unreadableConversations > 0 && (
+              <div className="lc-sidebar__unreadable" role="status">
+                <span className="lc-sidebar__unreadable-happened">
+                  {unreadableConversations === 1
+                    ? '1 conversation could not be read and is not listed here.'
+                    : `${String(unreadableConversations)} conversations could not be read and are not listed here.`}
+                </span>
+                <span className="lc-sidebar__unreadable-safe lc-mono">Nothing is written over them. All missions names the files.</span>
+              </div>
+            )}
             {groups.map((group) => {
               const theirs = shownConversations.filter(
                 (mission) => heldFor(mission, groupMembers)?.groupId === group.groupId

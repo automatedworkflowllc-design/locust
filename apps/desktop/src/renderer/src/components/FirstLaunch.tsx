@@ -197,7 +197,7 @@ export function FirstLaunch({
               * person with nothing installed can complete today
               * (FIRST-RUN-INSTALL-DESIGN, 2026-09-06).
               */}
-            Locust runs the coding agents you install and sign in to.
+            Locust runs the coding agents you install.
             <br />
             OpenCode needs no account — one install and you have a working teammate.
           </p>

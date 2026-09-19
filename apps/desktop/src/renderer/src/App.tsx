@@ -4090,6 +4090,7 @@ export default function App(): ReactElement {
           onMissionMenu={openMissionMenu}
           groups={groups}
           groupMembers={groupMembers}
+          unreadableConversations={unreadableLedgers}
           unreadable={unreadableStores}
           onGroupMenu={openGroupMenu}
           renamingGroupId={renamingGroupId}
