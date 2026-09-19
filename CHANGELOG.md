@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.193.0 - 2026-09-19
+
+- **The decision card says one thing once.** When a teammate stops and asks
+  you to choose, the card told you twice that you could answer in your own
+  words instead — once between the question and the buttons, and again under
+  them. It says it once now, under the options, where it reads: here are the
+  choices, and you are not bound by them.
+
 ## 0.192.0 - 2026-09-19
 
 - **A to-do list looks like a to-do list again.** When a teammate kept a list

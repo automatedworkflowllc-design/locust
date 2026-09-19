@@ -1004,12 +1004,13 @@ textarea {
 
 /* Quieter than the question and quieter than the options: it is a way out,
    not a third choice, and it must not read as one. */
-.lc-decision__freeform {
-  margin: 0;
-  color: var(--lc-text-muted);
-  font-size: var(--lc-text-description);
-}
-
+/*
+ * `.lc-decision__freeform` was here. Its sentence said what the foot under
+ * the options already says, so the markup went in 0.193.0 and the rule goes
+ * with it: dead CSS in this file has broken a live surface before (the
+ * `.lc-menu` collision that flipped the permission menu downward), and a
+ * rule nobody renders is the state that allows it.
+ */
 .lc-decision__options {
   display: flex;
   flex-direction: column;

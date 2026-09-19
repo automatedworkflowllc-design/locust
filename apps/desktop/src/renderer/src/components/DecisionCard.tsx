@@ -48,12 +48,17 @@ export function DecisionCard({
       </div>
       <p className="lc-decision__question">{request.question}</p>
       {/*
-        * The card offers buttons and looks like it takes nothing else. It
-        * does -- the next thing typed goes to the same conversation. Said
-        * because a person who wants a third answer would otherwise pick the
-        * closest wrong one (design pass, the question scenario).
+        * SAID ONCE, UNDER THE OPTIONS.
+        *
+        * It was said twice: "Or answer in the composer -- free-form replies
+        * are fine" between the question and the buttons, and "Or reply below
+        * -- you are not limited to these" under them. Two answers to one
+        * worry, added months apart for the same reason, and the first one
+        * sat between the question and the options it belongs after -- seen
+        * on the first frame anybody ever took of this card (2026-09-19,
+        * `decision-card-drive.mjs`). The one under the buttons is the one
+        * that reads: options first, then that you are not bound by them.
         */}
-      <p className="lc-decision__freeform lc-mono">Or answer in the composer — free-form replies are fine</p>
       <div className="lc-decision__options">
         {request.options.map((option) => (
           <button
