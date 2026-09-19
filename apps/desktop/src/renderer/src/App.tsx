@@ -526,7 +526,7 @@ export default function App(): ReactElement {
    */
   const routineDraftFor = (missionId: string): RoutineDraft | undefined => {
     const mission = historyByIdRef.current.get(missionId)
-    if (mission === undefined || conversationOwnerOf(missionId) === undefined) return undefined
+    if (mission === undefined) return undefined
     return routineDraft(mission, historyByIdRef.current)
   }
   /**
@@ -1080,7 +1080,8 @@ export default function App(): ReactElement {
   const [queued, setQueued] = useState<readonly QueuedRow[]>([])
   /** The save/edit dialog, open on a draft taken from a conversation or on a routine already saved. */
   const [routineDialog, setRoutineDialog] = useState<{
-    readonly teammateId: string
+    /** Undefined for a conversation nobody owns: the dialog asks who will run it. */
+    readonly teammateId: string | undefined
     readonly routineId?: string
     readonly name: string
     readonly steps: readonly string[]
@@ -3071,8 +3072,29 @@ export default function App(): ReactElement {
     const mission = historyByIdRef.current.get(missionId)
     if (mission === undefined) return
     const draft = routineDraftFor(missionId)
-    const teammateId = missionOwnersRef.current[missionId]
-    if (draft === undefined || teammateId === undefined) return
+    if (draft === undefined) return
+    /*
+     * A CONVERSATION NOBODY OWNS CAN STILL BE SAVED, and the dialog asks who
+     * will run it.
+     *
+     * This returned early when the conversation had no owner, so the last
+     * hole in the solo path was this one: memory and the folder brief reached
+     * an ownerless run in 0.191.0 and Save as routine still did not. The
+     * steps are the PERSON's words either way -- that is the whole of what a
+     * routine is -- and the only thing genuinely missing is whose route
+     * replays them, which is a question with an answer on screen.
+     */
+    /*
+     * The conversation's owner, walked back -- not this turn's.
+     *
+     * A follow-up typed after a conversation was assigned records no owner of
+     * its own, and reading the turn alone is exactly the defect Grok found on
+     * pass 14: the menu told the person who had just typed the words that
+     * nothing here was typed by them. Asking "who runs it" about a
+     * conversation that plainly has an owner would be the same mistake in a
+     * new place.
+     */
+    const teammateId = conversationOwnerOf(missionId)
     const teammate = teammates.find((entry) => entry.teammateId === teammateId)
     setRoutineDialog({
       teammateId,
@@ -3116,16 +3138,25 @@ export default function App(): ReactElement {
     readonly name: string
     readonly steps: readonly string[]
     readonly schedule: RoutineSchedule | undefined
+    /** Who runs it, when the conversation had no owner to inherit. */
+    readonly teammateId?: string
   }): void => {
     const bridge = window.desktop
     const dialog = routineDialog
     if (!bridge || dialog === undefined) return
+    // The dialog asks for one when the conversation had none; this is the
+     // second half of that rule, so a routine can never be stored ownerless.
+    const owner = input.teammateId ?? dialog.teammateId
+    if (dialog.routineId === undefined && owner === undefined) {
+      setRoutineDialog({ ...dialog, busy: false, error: 'Choose which teammate runs this routine.' })
+      return
+    }
     setRoutineDialog({ ...dialog, busy: true, error: undefined })
     const request =
       dialog.routineId === undefined
         ? bridge.createRoutine({
             name: input.name,
-            teammateId: dialog.teammateId,
+            teammateId: owner ?? '',
             route: dialog.route ?? { runtime: 'codex', model: 'account-default', mode: 'ask' },
             steps: input.steps,
             learnedFrom: dialog.learnedFrom,
@@ -5266,6 +5297,9 @@ export default function App(): ReactElement {
         <RoutineDialog
           key={routineDialog.routineId ?? 'new'}
           teammate={teammates.find((entry) => entry.teammateId === routineDialog.teammateId)}
+          {...(routineDialog.teammateId === undefined && routineDialog.routineId === undefined
+            ? { chooseFrom: teammates }
+            : {})}
           initialName={routineDialog.name}
           initialSteps={routineDialog.steps}
           initialSchedule={routineDialog.schedule}

@@ -18,6 +18,7 @@ import { PixelFace } from './PixelFace.js'
  */
 export function RoutineDialog({
   teammate,
+  chooseFrom,
   initialName,
   initialSteps,
   initialSchedule,
@@ -29,6 +30,16 @@ export function RoutineDialog({
   onCancel
 }: {
   readonly teammate: PublicTeammate | undefined
+  /**
+   * Who could run it, when the conversation had no owner to inherit.
+   *
+   * A conversation can be started with nobody picked -- that is half the
+   * product -- and until now that was the one thing you could not save as a
+   * routine. The steps were never the problem: they are the words the person
+   * typed, which exist either way. What was missing is whose route replays
+   * them, so the dialog asks, once, here.
+   */
+  readonly chooseFrom?: readonly PublicTeammate[]
   readonly initialName: string
   readonly initialSteps: readonly string[]
   /** When it runs on its own, if it does. Undefined: only when a person presses Run. */
@@ -43,6 +54,7 @@ export function RoutineDialog({
     readonly name: string
     readonly steps: readonly string[]
     readonly schedule: RoutineSchedule | undefined
+    readonly teammateId?: string
   }) => void
   readonly onCancel: () => void
 }): ReactElement {
@@ -50,10 +62,15 @@ export function RoutineDialog({
   const [name, setName] = useState(initialName)
   const [steps, setSteps] = useState<readonly string[]>(initialSteps)
   const [schedule, setSchedule] = useState<RoutineSchedule | undefined>(initialSchedule)
+  // Nobody is picked to begin with: a default here would put a teammate's
+  // name on work they were never part of, which is the one thing the whole
+  // ownerless path exists to avoid.
+  const [runner, setRunner] = useState<string>('')
+  const mustPick = chooseFrom !== undefined && chooseFrom.length > 0 && teammate === undefined
   const scheduleKind = schedule?.kind ?? 'off'
 
   const kept = steps.filter((step) => step.trim().length > 0)
-  const canSave = name.trim().length > 0 && kept.length > 0 && !busy
+  const canSave = name.trim().length > 0 && kept.length > 0 && !busy && (!mustPick || runner.length > 0)
 
   return (
     <div className="lc-scrim">
@@ -85,6 +102,48 @@ export function RoutineDialog({
             <p className="lc-dialog__note lc-mono">
               <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={16} /> {teammate.name} runs it
               {routeLabel === undefined ? '' : ` on ${routeLabel}`}. A routine saved read-only stays read-only.
+            </p>
+          )}
+
+          {/*
+            * ASKED, NOT GUESSED. A conversation with nobody picked has no
+            * owner to inherit, and a routine runs on somebody's route -- so
+            * the one missing fact is asked for here rather than defaulted to
+            * whoever happens to be first in the roster.
+            */}
+          {mustPick && (
+            <div className="lc-dialog__fields">
+              <label className="lc-fieldlabel lc-mono" htmlFor="routine-runner">
+                Who runs it
+              </label>
+              <select
+                id="routine-runner"
+                className="lc-input"
+                value={runner}
+                onChange={(event) => setRunner(event.target.value)}
+              >
+                <option value="">Pick a teammate</option>
+                {chooseFrom?.map((entry) => (
+                  <option key={entry.teammateId} value={entry.teammateId}>
+                    {entry.name}
+                  </option>
+                ))}
+              </select>
+              <p className="lc-dialog__note lc-mono">
+                This conversation was not assigned to anyone. It replays on the teammate you pick, on their route.
+              </p>
+            </div>
+          )}
+
+          {/*
+            * And the case where there is nobody to pick. Said rather than
+            * silently unsavable: the app cannot invent a teammate, and a
+            * disabled button with no sentence is the failure this whole file
+            * keeps being about.
+            */}
+          {chooseFrom !== undefined && chooseFrom.length === 0 && teammate === undefined && (
+            <p className="lc-dialog__note lc-mono">
+              A routine runs on a teammate&apos;s route, and there are no teammates yet. Add one, then save this again.
             </p>
           )}
 
@@ -250,7 +309,14 @@ export function RoutineDialog({
             type="button"
             className="lc-primarybutton"
             disabled={!canSave}
-            onClick={() => onSave({ name: name.trim(), steps: kept.map((step) => step.trim()), schedule })}
+            onClick={() =>
+              onSave({
+                name: name.trim(),
+                steps: kept.map((step) => step.trim()),
+                schedule,
+                ...(runner.length === 0 ? {} : { teammateId: runner })
+              })
+            }
           >
             {editing ? 'Save changes' : 'Save routine'}
           </button>

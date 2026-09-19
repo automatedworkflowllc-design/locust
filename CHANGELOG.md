@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.196.0 - 2026-09-19
+
+- **A conversation you started without picking anyone can be saved as a
+  routine.** The menu item was there and greyed out, and the reason it gave --
+  "nothing here was typed by you" -- was not true: you had typed every word of
+  it. What was actually missing is whose turn it replays on, so the dialog now
+  asks that once and saves it like any other.
+
+- **The model picker reads as names.** A model whose program reports no name
+  for it was listed by its identifier, so one row read
+  `muse-spark-1.3-contributor-free` in a list where everything else read as a
+  proper name -- and the chip under the message box, an inch away, spelled the
+  same model out properly. They match now. A name a program does give is
+  printed exactly as it wrote it.
+
 ## 0.195.0 - 2026-09-19
 
 - **A teammate can hand you a file.** Ask for one -- "send me an md of your

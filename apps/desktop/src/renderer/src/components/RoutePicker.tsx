@@ -5,6 +5,7 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
+import { modelDisplayName } from '../routeName.js'
 
 export interface RouteChoice {
   readonly runtime: MissionRuntimeId
@@ -69,7 +70,23 @@ function buildRows(
             const described = model.description
             return {
               model: model.id,
-              label: model.displayName,
+              /*
+               * A ROW THAT IS STILL AN IDENTIFIER GETS SPELLED OUT.
+               *
+               * The catalogue falls back to the model's id when a runtime
+               * reports no display name for it, so the picker printed
+               * muse-spark-1.3-contributor-free in a list where every
+               * other row read as a proper name -- and the composer chip
+               * directly beside it read "Muse Spark 1.3 Contributor Free",
+               * because the chip has gone through modelDisplayName since
+               * Grok found the same inconsistency in mission rows (pass 1,
+               * finding 1). The picker was the one untreated spot.
+               *
+               * Only when the label IS the id. A name the runtime actually
+               * gave is left exactly as the runtime wrote it: this spells
+               * identifiers, it does not restyle anybody's product name.
+               */
+              label: model.displayName === model.id ? modelDisplayName(runtime.id, model.id) : model.displayName,
               detail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`,
               // Carried so the chosen row can offer them; the detail line
               // above still NAMES them for every row.
