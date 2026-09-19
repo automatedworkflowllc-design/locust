@@ -69,7 +69,8 @@ export function FirstLaunch({
   installFailure,
   npmMissing = false,
   npmIsBundled = false,
-  checkingGaveUp = false
+  checkingGaveUp = false,
+  onCheckAgain
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -112,6 +113,8 @@ export function FirstLaunch({
    * what is true and offer the one thing that can change it.
    */
   readonly checkingGaveUp?: boolean
+  /** Ask discovery again, from the top: the one repair the app can perform for a CLI that never answered. */
+  readonly onCheckAgain?: () => void
 }): ReactElement {
   // Stays open across subsequent installs once a person opens it, which is
   // what the design asks for: someone who wanted the trace once wants it
@@ -152,7 +155,6 @@ export function FirstLaunch({
           left.runtime.id === FREE_START_RUNTIME ? -1 : right.runtime.id === FREE_START_RUNTIME ? 1 : 0
         )
       : shownAll
-  const planned = rows.filter((row) => integrationOf(row.runtime.id) === 'planned').map((row) => row.runtime.displayName)
   const anyReady = discoveryPhase === 'ready' && connected > 0
   void teammateCount
   // A build stamp with a commit hash is a fact for a changelog, not a
@@ -281,7 +283,7 @@ export function FirstLaunch({
                     // it is done on its own -- discovery re-runs and the dot
                     // goes green.
                     <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
-                  ) : runtime.installed && checkingGaveUp && status.tag === 'CHECKING' && installCommand(runtime.id) !== undefined && onInstall !== undefined ? (
+                  ) : runtime.installed && checkingGaveUp && status.tag === 'CHECKING' ? (
                     /*
                      * Found on this machine, and it never answered -- four
                      * sweeps, five seconds each. Grok, pass 11: five CLIs
@@ -291,16 +293,24 @@ export function FirstLaunch({
                      * The tag says what is true and Install comes back as
                      * "Install again": npm replaces what is there.
                      */
+                    /*
+                     * "Check again", not "Install again". Design agent,
+                     * 2026-09-18: that CLI IS installed, so installing it
+                     * again is not the repair, and on the one screen where
+                     * every other Install does exactly what it says this one
+                     * would quietly do something else. The repair the app
+                     * can perform is to ask again; the title says what was
+                     * tried.
+                     */
                     <span className="lc-runtimecell__stuck">
                       <span className="lc-runtimecell__tag">NOT ANSWERING</span>
                       <button
                         type="button"
                         className="lc-runtimecell__install"
-                        disabled={installing !== undefined || npmMissing}
-                        title={`${runtime.displayName} is on this machine but did not answer its version probe in four tries. Installing again replaces it.`}
-                        onClick={() => onInstall(runtime.id)}
+                        title={`${runtime.displayName} is on this machine but did not answer its version check in 5 seconds, four times. Check again asks once more.`}
+                        onClick={() => onCheckAgain?.()}
                       >
-                        Install again
+                        Check again
                       </button>
                     </span>
                   ) : runtime.installed ? (
@@ -400,7 +410,13 @@ export function FirstLaunch({
           * node by name, so outside Locust the CLI still needs one. Saying so
           * here costs one sentence; being discovered costs an evening.
           */}
-        {discoveryPhase === 'ready' && npmIsBundled && (
+        {/*
+          * And only while there is an Install button for it to be about.
+          * With every row still CHECKING there is none, and a sentence about
+          * how an install will go, under a list that offers no install, was
+          * one of the three things Colin's frame had arguing at once.
+          */}
+        {discoveryPhase === 'ready' && npmIsBundled && rows.some((row) => !row.runtime.installed && installCommand(row.runtime.id) !== undefined) && (
           <p className="lc-installnote">
             Node.js is not on this machine, so Locust installs with the copy of npm it carries.
             The CLI will work here. To use it in your own terminal too, install{' '}
@@ -505,9 +521,14 @@ export function FirstLaunch({
           * instruction to pick a teammate is the sidebar's (its missions
           * empty state says it) -- the review found both said twice.
           */}
-        {discoveryPhase === 'ready' && planned.length > 0 && (
-          <p className="lc-footnote">coming soon: {planned.join(', ')}</p>
-        )}
+        {/*
+          * "coming soon" is not drawn here any more. Design agent,
+          * 2026-09-18: it names two things a person cannot install on a
+          * screen whose one job is installing something -- the only line on
+          * the page that cannot be acted on. Settings lists the same
+          * runtimes as PLANNED rows, where a person who is already working
+          * and wants more is the audience.
+          */}
         {!anyReady && discoveryPhase === 'ready' && (
           <p className="lc-footnote">Discovery runs locally · no model is shown as live until it answers</p>
         )}

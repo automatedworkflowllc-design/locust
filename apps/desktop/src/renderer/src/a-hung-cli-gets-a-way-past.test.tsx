@@ -16,7 +16,7 @@ import { FirstLaunch } from './components/FirstLaunch.js'
  * CHECKING is the right word for the first minute: a cold Claude Code probe
  * can outlast the window and it would be wrong to offer an install for what
  * is there. After discovery has asked three more times it is a verdict, and
- * the row says so and brings Install back as "Install again".
+ * the row says so and offers the one repair the app can perform: Check again.
  */
 
 const hung: PublicRuntimeStatus = {
@@ -50,18 +50,22 @@ describe('an installed CLI that has not answered', () => {
     // is a contradiction, and one slow probe is not a verdict.
     const early = panel({ gaveUp: false })
     expect(early).toContain('CHECKING')
-    expect(early).not.toContain('Install again')
+    expect(early).not.toContain('Check again')
     expect(early).not.toContain('NOT ANSWERING')
   })
 
-  it('says NOT ANSWERING once discovery has given up, and offers Install again', () => {
+  it('says NOT ANSWERING once discovery has given up, and offers Check again -- not Install, which it already is', () => {
     const late = panel({ gaveUp: true })
     expect(late).toContain('NOT ANSWERING')
-    expect(late).toContain('Install again')
+    expect(late).toContain('Check again')
+    // Design agent, 2026-09-18: that CLI is installed; installing it again is
+    // not the repair, and would be the one Install on the screen that does
+    // something else.
+    expect(late).not.toContain('Install again')
     expect(late).not.toContain('CHECKING')
   })
 
   it('says why, on the control itself', () => {
-    expect(panel({ gaveUp: true })).toContain('did not answer its version probe in four tries')
+    expect(panel({ gaveUp: true })).toContain('did not answer its version check in 5 seconds, four times')
   })
 })

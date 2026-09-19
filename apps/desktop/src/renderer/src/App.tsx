@@ -4462,6 +4462,12 @@ export default function App(): ReactElement {
                 npmMissing={runtimeState.phase === 'ready' && runtimeState.npmPresent === false}
                 npmIsBundled={runtimeState.phase === 'ready' && runtimeState.npmIsBundled === true}
                 checkingGaveUp={runtimeState.phase === 'ready' && runtimeState.gaveUp === true}
+                onCheckAgain={() => {
+                  // The repair the app can actually perform: ask again, from
+                  // the top, with CHECKING honest once more while it does.
+                  setRuntimeState((held) => (held.phase === 'ready' ? { ...held, gaveUp: false } : held))
+                  askDiscoveryAgain.current()
+                }}
               />
             )
           ) : (
@@ -4859,7 +4865,16 @@ export default function App(): ReactElement {
               )}
             </div>
           )}
-          {screen === 'workroom' && <WhatChangedBanner changelog={changelog} />}
+          {/*
+            * Held until a runtime is connected. On a fresh profile "here is
+            * what changed" has no referent -- it is addressed to somebody
+            * who used a previous version -- and on a first launch it sat in
+            * the middle of the one job that screen has (design agent,
+            * 2026-09-18, after four beta passes said so). The banner marks
+            * the version as seen only when it is shown, so held here means
+            * shown on the next launch after something connects.
+            */}
+          {screen === 'workroom' && !noRuntimeReady && <WhatChangedBanner changelog={changelog} />}
           {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer
@@ -4947,7 +4962,32 @@ export default function App(): ReactElement {
                 .catch(() => setSwarm(!next))
             }}
             error={
-              noRuntimeReady && runtimeState.phase === 'ready'
+              /*
+               * Only when something is standing: a runtime that is here and
+               * not usable (signed out, not answering). On a launch with
+               * NOTHING installed the card is cut -- design agent,
+               * 2026-09-18: "Red in this app means a run stopped. Nothing
+               * stopped here -- nothing has started, and never could have."
+               * The disabled composer under it demonstrates the same fact
+               * and its placeholder says what would change it; an assertion
+               * four lines above a demonstration is the assertion losing.
+               */
+              /*
+               * And not while the rows still say CHECKING. Colin, 2026-09-19,
+               * with a frame of five rows checking, the no-Node sentence and
+               * this card all at once: "this cant be ideal." A probe that
+               * has not answered is not a thing standing either; it is a
+               * wait. Standing means a runtime that is here and has SAID it
+               * cannot run -- signed out, or never answering after the
+               * re-checks ran out.
+               */
+              noRuntimeReady &&
+              runtimeState.phase === 'ready' &&
+              runtimeState.runtimes.some(
+                (runtime) =>
+                  runtime.installed &&
+                  (runtime.status === 'auth-required' || runtime.auth === 'unauthenticated' || runtimeState.gaveUp === true)
+              )
                 ? 'No runtime can run a mission yet. Locust runs the coding-agent CLIs on this machine — Settings shows what to install, and OpenCode needs no account.'
                 : undefined
             }

@@ -95,7 +95,11 @@ const readScreen = (cdp) => cdp.eval(`(() => {
   return JSON.stringify({
     opencode: cells.find(c => /OpenCode/i.test(c)) || null,
     placeholder: box ? box.getAttribute('placeholder') : null,
-    installAgain: !!([...document.querySelectorAll('button')].find(b => /Install again/.test(b.innerText)))
+    checkAgain: !!([...document.querySelectorAll('button')].find(b => /Check again/.test(b.innerText))),
+    // The red card and the no-Node sentence: neither belongs on a screen
+    // whose rows are still CHECKING (Colin, 2026-09-19, with the frame).
+    redCard: !!document.querySelector('.lc-composer .lc-notice'),
+    npmNote: [...document.querySelectorAll('.lc-installnote')].some(n => /copy of npm it carries/.test(n.innerText))
   })
 })()`)
 
@@ -129,8 +133,10 @@ try {
   }
   say(`   ${JSON.stringify(early)}`)
   check('the row reads CHECKING', /CHECKING/.test(early.opencode ?? ''), early.opencode)
-  check('and offers no Install yet', early.installAgain === false)
+  check('and offers no Install yet', early.checkAgain === false)
   check('the composer does not ask for a sign-in nothing has asked for', !/sign in/.test(early.placeholder ?? ''), early.placeholder)
+  check('no red card while the rows are still checking', early.redCard === false)
+  check('no no-Node sentence while there is no Install to be about', early.npmNote === false)
 
   say('2. after discovery has asked three more times')
   const startedAt = Date.now()
@@ -138,12 +144,15 @@ try {
   while (Date.now() - startedAt < GIVE_UP_AFTER_MS) {
     await sleep(5_000)
     late = JSON.parse(await readScreen(cdp))
-    if (late.installAgain) break
+    if (late.checkAgain) break
   }
   say(`   ${Math.round((Date.now() - startedAt) / 1000)}s: ${JSON.stringify(late)}`)
   check('the row says NOT ANSWERING', /NOT ANSWERING/.test(late.opencode ?? ''), late.opencode)
-  check('and Install again is on the screen', late.installAgain === true)
+  check('and Check again is on the screen -- not Install, which it already is', late.checkAgain === true)
   check('the composer still does not ask for a sign-in', !/sign in/.test(late.placeholder ?? ''), late.placeholder)
+  // Now something IS standing -- a runtime that is here and never answered
+  // -- and the card is the register for that.
+  check('the red card appears once something is standing', late.redCard === true)
 
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
   const out = new URL('../docs/chain-measure/hung-cli-2026-09-18.png', import.meta.url)

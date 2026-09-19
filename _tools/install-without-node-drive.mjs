@@ -130,11 +130,17 @@ try {
     }
     const button = document.querySelector('.lc-runtimecell__install.is-primary')
     const notes = [...document.querySelectorAll('.lc-installnote')].map(n => n.innerText.replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim())
+    const clean = (s) => (s || '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim()
     return JSON.stringify({
       button: !!button,
       disabled: button ? button.disabled : null,
       title: button ? button.title : null,
-      notes
+      notes,
+      // The design ruling of 2026-09-18, on a launch with nothing installed:
+      // no red card, no "coming soon", no changelog banner.
+      redCard: !!document.querySelector('.lc-composer .lc-notice'),
+      comingSoon: /coming soon/i.test(clean(document.body.innerText)),
+      banner: /is running\. Here is what changed/.test(clean(document.body.innerText))
     })
   })()`)
   say(`   ${first}`)
@@ -143,6 +149,9 @@ try {
   check('and it is enabled with no Node on the machine', screen.disabled === false, first)
   check('the screen says the install will use the npm the app carries', screen.notes.some((n) => /copy of npm it carries/.test(n)), first)
   check('no sentence still says the buttons are below anything', !screen.notes.some((n) => /below/.test(n)) && !/below/.test(screen.title ?? ''), first)
+  check('no red card with nothing installed: nothing has stopped', screen.redCard === false)
+  check('no "coming soon" on the screen whose job is Install', screen.comingSoon === false)
+  check('the changelog banner is held: a fresh profile has no previous version', screen.banner === false)
 
   say('2. press Install and wait')
   await cdp.eval(`(() => { document.querySelector('.lc-runtimecell__install.is-primary').click(); return 'pressed' })()`)
@@ -182,6 +191,13 @@ try {
   say(`   host: ${believed}`)
   check('the install finished without a failure card', outcome?.kind !== 'failed', JSON.stringify(outcome?.seen?.failed))
   check('the runtime row reports a version, so Locust found the CLI and ran it', outcome?.kind === 'connected', JSON.stringify(outcome?.seen?.opencode))
+
+  // And once something is connected, the banner it was held for.
+  const afterConnect = await cdp.eval(`(() => {
+    const clean = (s) => (s || '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim()
+    return JSON.stringify({ banner: /is running\. Here is what changed/.test(clean(document.body.innerText)) })
+  })()`)
+  check('the changelog banner appears once a runtime is connected', JSON.parse(afterConnect).banner === true, afterConnect)
 
   say('3. where it went')
   const shim = join(profile, 'npm', 'opencode.cmd')

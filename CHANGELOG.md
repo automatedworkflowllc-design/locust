@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.185.0 - 2026-09-19
+
+- **The first screen says less, and in order.** With nothing installed it
+  no longer shows a red card saying no runtime can run; the disabled message
+  box already shows that. The "coming soon" line is gone from it too, since
+  it named things you cannot install on a screen for installing; Settings
+  still lists them. And "here is what changed" waits until a runtime is
+  connected, because on a fresh profile there is no previous version to
+  compare with.
+- **While Locust is still checking a CLI, it says only that.** The red card
+  and the note about installing without Node.js no longer appear over rows
+  that are still checking.
+- **A CLI that never answers offers "Check again", not "Install again".** It
+  is already installed; asking again is the repair Locust can perform.
+
 ## 0.184.0 - 2026-09-19
 
 - **A hanging CLI leaves nothing behind on Linux and macOS too.** 0.182.0
