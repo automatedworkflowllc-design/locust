@@ -573,6 +573,29 @@ export function groupBoundary(
   return { beforeTurn, groupName: group.name, instructions, joinedAt: membership.at }
 }
 
+/**
+ * Where each ENDED membership's words began briefing, oldest first.
+ *
+ * Grok, passes 9, 10 and 11, the same sentence three times: after leaving, the
+ * join line is gone, "turns 3 and 4 were briefed and the thread no longer
+ * says so. Only the stop is marked." The current membership drew the join
+ * line and a conversation that had left had none, so the thread told half the
+ * story. An ended membership records when it joined, when that was recorded,
+ * and this draws its join line from that -- the same rules as the current
+ * one: no moment, no line; no words, no line.
+ */
+export function groupJoins(
+  turnStarts: readonly (string | undefined)[],
+  left: readonly { readonly name: string; readonly instructions: string; readonly at?: string }[]
+): readonly GroupBoundary[] {
+  const out: GroupBoundary[] = []
+  for (const entry of left) {
+    const boundary = groupBoundary(turnStarts, entry.at === undefined ? undefined : { at: entry.at }, entry)
+    if (boundary !== undefined) out.push(boundary)
+  }
+  return out
+}
+
 /** The mirror of the join line: where a group's words STOPPED briefing. */
 export interface GroupLeaving {
   /** Index of the first turn not briefed; equal to the turn count when that is the next one. */

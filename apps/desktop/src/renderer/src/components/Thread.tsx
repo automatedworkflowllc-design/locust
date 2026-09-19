@@ -414,6 +414,13 @@ export interface ThreadProps {
    * thread -- after the last turn that ran without them -- never at the top.
    */
   readonly groupBoundary?: GroupBoundary
+  /**
+   * Join lines for memberships that have ENDED, so the turns they briefed
+   * still say so. Grok, three passes running: after leaving, only the stop
+   * was marked. Drawn with the same note as the current join, above its own
+   * leaving line.
+   */
+  readonly pastBoundaries?: readonly GroupBoundary[]
   /** Where earlier groups' words stopped briefing this conversation; drawn as the join line's mirror. */
   readonly groupLeavings?: readonly GroupLeaving[]
   readonly events: readonly NormalizedRuntimeEvent[]
@@ -475,6 +482,7 @@ export function Thread({
   onOpenPeerRun,
   earlierTurns,
   groupBoundary,
+  pastBoundaries = [],
   groupLeavings = [],
   coldStart = false,
   onRunWithEdits,
@@ -546,25 +554,45 @@ export function Thread({
    * GROUP'S: read-only here, with the way to edit going to the group's own
    * header, so nobody edits shared text believing it is their own.
    */
-  const [viewingGroup, setViewingGroup] = useState(false)
-  const groupNote =
-    groupBoundary === undefined ? null : (
-      <div className="lc-thread__note lc-thread__groupnote">
+  // Which join notes are opened to their words, by the moment they joined:
+  // one per line, because two groups' words are two different things.
+  const [viewingJoins, setViewingJoins] = useState<ReadonlySet<string>>(new Set())
+  const joinNote = (boundary: GroupBoundary, index: number): ReactElement => {
+    const open = viewingJoins.has(boundary.joinedAt)
+    return (
+      <div key={`join-${boundary.joinedAt}-${String(index)}`} className="lc-thread__note lc-thread__groupnote">
         <span>
-          {groupBoundary.groupName}&apos;s instructions brief every turn from here
+          {boundary.groupName}&apos;s instructions brief every turn from here
           {' · '}
-          <button type="button" className="lc-linkbutton" onClick={() => setViewingGroup((held) => !held)}>
-            {viewingGroup ? 'hide' : 'view'}
+          <button
+            type="button"
+            className="lc-linkbutton"
+            onClick={() =>
+              setViewingJoins((held) => {
+                const next = new Set(held)
+                if (next.has(boundary.joinedAt)) next.delete(boundary.joinedAt)
+                else next.add(boundary.joinedAt)
+                return next
+              })
+            }
+          >
+            {open ? 'hide' : 'view'}
           </button>
         </span>
-        {viewingGroup && (
+        {open && (
           <blockquote className="lc-thread__groupwords">
-            {groupBoundary.instructions}
+            {boundary.instructions}
             <span className="lc-thread__groupedit lc-mono">edit in Group settings</span>
           </blockquote>
         )}
       </div>
     )
+  }
+  // Every join line, oldest first, the current membership's last: it is the
+  // one still in force, so it sits nearest the turns it governs.
+  const joins: readonly GroupBoundary[] = [...pastBoundaries, ...(groupBoundary === undefined ? [] : [groupBoundary])]
+  const joinNotes = (test: (beforeTurn: number) => boolean) =>
+    joins.filter((boundary) => test(boundary.beforeTurn)).map((boundary, index) => joinNote(boundary, index))
   // The mirror line. A leave and a join at the same index are drawn in that
   // order, which is the order they happened in.
   const leavingNotes = (test: (beforeTurn: number) => boolean) =>
@@ -702,7 +730,7 @@ export function Thread({
                 <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
               )}
               {leavingNotes((beforeTurn) => beforeTurn === index)}
-              {groupBoundary?.beforeTurn === index && groupNote}
+              {joinNotes((beforeTurn) => beforeTurn === index)}
               {userTurn(turnPromptLine(turn), turnAttachments(turn))}
               {cardsFor(index, 'before-work').map(peerCard)}
               <ThreadItems items={buildThread(turn.events, { running: false, mayEdit, ...(workspacePath === undefined ? {} : { workspacePath }) })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
@@ -717,7 +745,7 @@ export function Thread({
           <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
         )}
         {leavingNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
-        {groupBoundary?.beforeTurn === earlierTurns.length && groupNote}
+        {joinNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
         {coldStart && (
           /*
            * WHERE THIS TURN BEGAN, said where the turn begins.
@@ -787,7 +815,7 @@ export function Thread({
         <MemoryCard lines={memoriesOfTurn(peers.memories ?? [], shownMissionId)} />
         {/* Joined after the last turn started: the NEXT turn is the first briefed, so the line sits below this one. */}
         {leavingNotes((beforeTurn) => beforeTurn > earlierTurns.length)}
-        {groupBoundary !== undefined && groupBoundary.beforeTurn > earlierTurns.length && groupNote}
+        {joinNotes((beforeTurn) => beforeTurn > earlierTurns.length)}
 
         {/*
           Approvals sit at the END of the thread, after everything that has

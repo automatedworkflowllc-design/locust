@@ -24,6 +24,10 @@ const WORKSPACE = 'C:/Users/<home>/Documents/locust-acceptance2-20260914-scratch
 const MISSION_ID = 'mission_4ac0d5fd-b688-4f04-8222-624a155225dd'
 
 const say = (line) => console.error(line)
+const check = (label, ok, detail) => {
+  console.error(`   ${ok ? 'ok  ' : 'FAIL'} ${label}${detail === undefined ? '' : ' -- ' + detail}`)
+  if (!ok) process.exitCode = 1
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 class Cdp {
@@ -187,6 +191,29 @@ try {
     }, null, 1)
   })()`)
   say('   AIR ' + airText)
+  /*
+   * AND THE JOIN LINE IS STILL THERE, ABOVE IT.
+   *
+   * Grok, three passes running: after leaving, only the stop was marked;
+   * turns 3 and 4 were briefed and the thread no longer said so. The seeded
+   * membership joined at 02:00 and left at 03:05, so the thread must carry
+   * both lines, the join above the leave, bracketing the briefed turns.
+   */
+  const bracketText = await cdp.eval(`(() => {
+    const notes = [...document.querySelectorAll('.lc-thread__groupnote')]
+    const joins = notes.filter(n => !n.classList.contains('lc-thread__groupnote--left'))
+    const leaves = notes.filter(n => n.classList.contains('lc-thread__groupnote--left'))
+    const top = (el) => Math.round(el.getBoundingClientRect().top)
+    return JSON.stringify({
+      joins: joins.map(n => (n.innerText || '').slice(0, 60)),
+      leaves: leaves.map(n => (n.innerText || '').slice(0, 60)),
+      joinAbove: joins.length > 0 && leaves.length > 0 ? top(joins[0]) < top(leaves[0]) : null
+    })
+  })()`)
+  say('   BRACKET ' + bracketText)
+  const bracket = JSON.parse(bracketText)
+  check('the join line is still drawn after leaving', bracket.joins.length === 1 && /brief every turn from here/.test(bracket.joins[0] ?? ''), bracketText)
+  check('and it sits above the leaving line', bracket.joinAbove === true, bracketText)
   /*
    * AND THE CASE GROK ACTUALLY MEASURED: a bubble under the note.
    *

@@ -102,7 +102,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, shellCommandText, turnText, groupBoundary, groupLeavings } from './missionView.js'
+  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -4705,6 +4705,9 @@ export default function App(): ReactElement {
                   const left = row === undefined ? undefined : heldFor(row, groupLeft)
                   return {
                     ...(boundary === undefined ? {} : { groupBoundary: boundary }),
+                    // And where they STARTED, for memberships that have ended:
+                    // the turns those words briefed still say so.
+                    pastBoundaries: groupJoins(starts, left ?? []),
                     groupLeavings: groupLeavings(starts, left ?? [])
                   }
                 })()}
