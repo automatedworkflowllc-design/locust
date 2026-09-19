@@ -273,7 +273,15 @@ try {
   // The reply is its own mission -- one run, one receipt -- but a person did
   // not start a second thing, and the sidebar used to say they had.
   const listed = await cdp.eval(`(async () => {
-    const rows = [...document.querySelectorAll('.lc-teammate__mission, .lc-row__name')]
+    // .lc-teammate__mission and .lc-row__name are the RAIL's classes. The
+    // wide sidebar was flattened to a list of conversations on 2026-09-15
+    // ("conversations, newest first, teammate on the row"), so on the layout
+    // this smoke runs in, both selectors match nothing and the count came
+    // back zero -- a red that said "the sidebar lists it twice" when the
+    // sidebar was never read. Yurt found it on 0.193.0 and called it right:
+    // "a selector/UI-shape miss, not a broken follow-up in the ledger or
+    // thread." Both shapes are queried now, so it reads in either layout.
+    const rows = [...document.querySelectorAll('.lc-convrow .lc-conv__title, .lc-teammate__mission, .lc-row__name')]
       .map(node => node.innerText.trim())
       .filter(text => text.length > 0)
     return JSON.stringify(rows)
