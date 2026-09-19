@@ -107,8 +107,28 @@ try {
     return false
   })()`)
   check('discovery finished', ready === true)
-  const sidebar = await evaluate(`document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ')`)
-  check('the sidebar reads "on locust/wren" and "on locust/booty"', /on locust\/wren/.test(String(sidebar)) && /on locust\/booty/.test(String(sidebar)), String(sidebar).slice(0, 200))
+  /*
+   * WHERE "OWN BRANCH" IS VISIBLE NOW.
+   *
+   * This read the sidebar for "on locust/wren". The wide sidebar was
+   * flattened to a list of conversations on 2026-09-15 and no longer carries
+   * teammate-level facts; the setting lives on the teammate's own card, and
+   * the TREE it produces is listed in Settings -- which step 5 checks, after
+   * the runs, because a worktree is cut at a teammate's first run and does
+   * not exist before one. So what is true at launch is the SETTING, and that
+   * is what is asked for here.
+   *
+   * Recorded while doing it: on the wide sidebar a person cannot see which
+   * teammates work on their own branch without opening a card or Settings.
+   * That is a gap the flatten left, and it belongs to the design agent, not
+   * to this smoke.
+   */
+  const marked = await evaluate(`window.desktop.listTeammates().then(r => JSON.stringify(r.ok ? r.data.teammates.map(t => [t.name, t.worktree === true]) : r))`)
+  check(
+    'both teammates are marked to work on their own branch',
+    /\["Wren",true\]/.test(String(marked)) && /\["Booty",true\]/.test(String(marked)),
+    String(marked).slice(0, 200)
+  )
 
   const ask = async (name) => evaluate(`(async () => {
     let who; for (let i = 0; i < 40 && !who; i += 1) { who = [...document.querySelectorAll('button')].find(b => (b.querySelector('.lc-row__name') || { innerText: '' }).innerText.trim().startsWith("${name}")) || [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') || b.getAttribute('aria-label') || '').startsWith("${name}" + ' ')); if (!who) await new Promise(r => setTimeout(r, 250)) }

@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.192.0 - 2026-09-19
+
+- **A to-do list looks like a to-do list again.** When a teammate kept a list
+  while working and then answered without changing any files, the list was
+  drawn as though the plan itself were the answer: a bare numbered line, in
+  reading size, with no heading, sitting in the middle of the conversation
+  where it read as a glitch. That treatment belongs to Plan mode, where the
+  plan *is* what you asked for. Everywhere else the list is headed *PLAN ·
+  n of m done* with a mark against each step, which is what it was before.
+
 ## 0.191.0 - 2026-09-19
 
 - **A message sent without picking a teammate knows the project.** The home

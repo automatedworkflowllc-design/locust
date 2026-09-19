@@ -127,15 +127,27 @@ export function ThreadItems({
                   * quietly said "3 of 3 steps". "plans are still bugged and
                   * not showing in the UI" is the fair reading of that.
                   *
-                  * `touchedNothing` is the distinction the code already
-                  * makes and already carries: set only when the turn had no
-                  * activity at all. So it decides this too, rather than a
-                  * second flag meaning the same thing.
+                  * `touchedNothing` was the distinction the code already
+                  * made and already carried, so it decided this too. It is
+                  * the wrong one on its own, and in the same way the
+                  * "Plan mode -- nothing was changed" sentence beside it was
+                  * wrong (Fable, pass 1, finding 4): a turn in ACCEPT EDITS
+                  * that answers a question without editing anything also
+                  * touched nothing, and its working to-do list was then
+                  * drawn as though the plan were the deliverable -- ordinals,
+                  * reading size, no PLAN header -- which lands in the middle
+                  * of a conversation as a stray numbered line. Colin, seeing
+                  * it in his own app, 2026-09-19: "the task/plan looked like
+                  * it was showing up glitchy and not our usual ui".
+                  *
+                  * The plan is the ANSWER only when the person asked for a
+                  * plan: Plan mode, and nothing done. Everything else is a
+                  * list of work with states to report.
                   */}
                 <PlanSteps
                   steps={item.steps}
                   doneCount={item.doneCount}
-                  outcomes={item.touchedNothing !== true}
+                  outcomes={!(planMode && item.touchedNothing === true)}
                 />
                 {/*
                   * Derived, and true: this run changed nothing, and the mode is

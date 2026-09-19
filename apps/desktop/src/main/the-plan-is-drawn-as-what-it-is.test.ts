@@ -28,10 +28,20 @@ describe('drawing a plan', () => {
     expect(THREAD).not.toContain('outcomes={false}')
   })
 
-  it('decides it from the flag that already carries the distinction', () => {
-    // `touchedNothing` is set only when a turn had no activity at all, so a
-    // second flag meaning the same thing would be a second thing to keep
-    // true.
-    expect(THREAD).toContain('outcomes={item.touchedNothing !== true}')
+  it('draws the plan as the answer only when the person asked for a plan', () => {
+    /*
+     * `touchedNothing` alone was the rule here, on the reasoning that it is
+     * set only when a turn had no activity at all. It is also true of a turn
+     * in ACCEPT EDITS that answers a question without editing anything --
+     * and that turn's working to-do list was then drawn as a deliverable:
+     * ordinals, reading size, no PLAN header, landing mid-conversation as a
+     * stray numbered line. Colin, in his own app, 2026-09-19: "the task/plan
+     * looked like it was showing up glitchy and not our usual ui".
+     *
+     * The mode is the other half, and it is the same half the sentence under
+     * the steps needs (Fable, pass 1, finding 4).
+     */
+    expect(THREAD).toContain('outcomes={!(planMode && item.touchedNothing === true)}')
+    expect(THREAD).toContain('planMode && item.steps.length > 0 && item.touchedNothing === true')
   })
 })

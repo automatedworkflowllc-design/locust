@@ -181,19 +181,29 @@ try {
       name: card.querySelector('.lc-roomanswer__name')?.textContent.trim() ?? '',
       phase: card.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? '',
       route: card.querySelector('.lc-roomanswer__route')?.textContent.trim() ?? '',
-      text: card.querySelector('.lc-roomanswer__text')?.textContent.trim() ?? ''
+      // A one-line answer renders as an agent line, the way the thread draws
+      // it; only a longer one gets its own __text block. Reading just the
+      // latter reported every card as wordless (2026-09-19).
+      text: (card.querySelector('.lc-roomanswer__text') ?? card.querySelector('.lc-agentline'))?.textContent.trim() ?? ''
     }))
     const board = [...document.querySelectorAll('.lc-task')].map(row => ({
-      state: row.querySelector('.lc-task__state')?.textContent.trim() ?? '',
+      // The state is the line screen readers get, or the row's own modifier;
+      // .lc-task__state has not existed since the board became a plan list.
+      state: (row.querySelector('.lc-sr')?.textContent.trim() ?? '') || (/is-([a-z-]+)/.exec(row.className)?.[1] ?? ''),
       text: row.querySelector('.lc-task__text')?.textContent.trim() ?? '',
       owner: row.querySelector('.lc-task__owner')?.textContent.trim() ?? ''
     }))
     return JSON.stringify({
-      title: document.querySelector('.lc-screen__title')?.textContent.trim() ?? '',
+      title: (document.querySelector('.lc-room__name') ?? document.querySelector('.lc-screen__title'))?.textContent.trim() ?? '',
       posts: document.querySelectorAll('.lc-roompost').length,
       board,
       cards,
-      sidebarRooms: [...document.querySelectorAll('.lc-roomrow .lc-row__name')].map(el => el.textContent.trim())
+      // Every room the app lists, wherever it lists them: the Rooms screen's
+      // cards (wide) or the sidebar's own rows (the rail).
+      sidebarRooms: [
+        ...[...document.querySelectorAll('.lc-roomcard__name')].map(el => el.textContent.trim()),
+        ...[...document.querySelectorAll('.lc-roomrow .lc-row__name')].map(el => el.textContent.trim())
+      ]
     })
   })()`
 
@@ -206,12 +216,26 @@ try {
   if (rendererErrors.length > 0) say(`       renderer errors: ${rendererErrors.slice(0, 3).join(' || ').slice(0, 600)}`)
   let opened
   try {
+    /*
+     * THROUGH THE ROOMS SCREEN, which is where a room lives now.
+     *
+     * This looked for a `.lc-roomrow` in the sidebar and clicked it. The
+     * wide sidebar was flattened to a list of conversations on 2026-09-15
+     * ("Flatten the sidebar: conversations, newest first, teammate on the
+     * row") -- the day after this smoke was last touched -- so rooms moved
+     * to the Rooms screen, reached by the footer button or Ctrl 4. The
+     * smoke then failed for a year-old shape rather than for anything
+     * wrong, which is how a suite stops being read (measured 2026-09-19).
+     */
     opened = JSON.parse(await evaluate(`(async () => {
-    const row = [...document.querySelectorAll('.lc-roomrow')].find(r => /Release/.test(r.innerText))
-    if (!row) return JSON.stringify({ found: false, sidebar: document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200) })
-    row.click()
+    const wayIn = [...document.querySelectorAll('.lc-sidebar button')].find(b => (b.getAttribute('title') || '').indexOf('Rooms') === 0)
+      || [...document.querySelectorAll('.lc-roomrow')].find(r => /Release/.test(r.innerText))
+    if (!wayIn) return JSON.stringify({ found: false, sidebar: document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200) })
+    wayIn.click()
     await new Promise(r => setTimeout(r, 700))
-    return JSON.stringify({ found: true, ...JSON.parse(${ROOM_STATE}) })
+    const card = [...document.querySelectorAll('.lc-roomcard')].find(c => /Release/.test(c.innerText))
+    if (card) { card.click(); await new Promise(r => setTimeout(r, 700)) }
+    return JSON.stringify({ found: card !== undefined, ...JSON.parse(${ROOM_STATE}) })
   })()`))
   } catch (error) {
     say(`       opening threw: ${error instanceof Error ? error.message : String(error)}`)
@@ -219,15 +243,18 @@ try {
     throw error
   }
   say(`       ${JSON.stringify(opened).slice(0, 400)}`)
-  check('the room is listed in the sidebar and opens', opened.found === true, JSON.stringify(opened).slice(0, 200))
+  check('the room is listed on the Rooms screen and opens', opened.found === true, JSON.stringify(opened).slice(0, 200))
   check('the screen is the room', opened.title === 'Release', opened.title)
   check('one post, two answer cards', opened.posts === 1 && opened.cards?.length === 2, JSON.stringify(opened.cards))
   check('each card is attributed and completed', (opened.cards ?? []).every((c) => /Wren|Booty/.test(c.name) && c.phase === 'completed'), JSON.stringify(opened.cards))
   check('each card carries the teammate\'s last words', (opened.cards ?? []).some((c) => /README\.md and CHANGELOG\.md/.test(c.text)) && (opened.cards ?? []).some((c) => /first line/.test(c.text)), JSON.stringify(opened.cards))
   check('each card names its route', (opened.cards ?? []).every((c) => /OpenCode/.test(c.route)), JSON.stringify(opened.cards))
   check('the board reads back: one in hand with Wren, one open with nobody', JSON.stringify(opened.board) === JSON.stringify([
-    { state: 'IN HAND', text: 'Write the release notes', owner: 'Wren' },
-    { state: 'OPEN', text: 'Check the version string', owner: 'nobody' }
+    // The board reads its state to screen readers in words and names an
+    // unclaimed row "unassigned"; it used to shout IN HAND / OPEN and say
+    // "nobody". The words changed with the board, not the behaviour.
+    { state: 'in hand', text: 'Write the release notes', owner: 'Wren' },
+    { state: 'open', text: 'Check the version string', owner: 'unassigned' }
   ]), JSON.stringify(opened.board))
 
   say('2. Open on a card goes to that mission')
@@ -239,13 +266,18 @@ try {
   })()`)
   // A mission reopened from the ledger says so in its header rather than
   // repeating "completed"; either wording is the workroom on that mission.
-  check('the mission opened in the workroom', /Mission/.test(openedMission) && /wren1|booty1/.test(openedMission) && /restored|completed/.test(openedMission), openedMission)
+  // The header names the teammate, the mission and where it came from; it
+  // stopped carrying the word "Mission" when the workroom header was redrawn.
+  check('the mission opened in the workroom', /wren1|booty1/.test(openedMission) && /restored|completed/.test(openedMission), openedMission)
 
   say('3. a live post on the free model starts a run per teammate')
   const posted = JSON.parse(await evaluate(`(async () => {
-    const row = [...document.querySelectorAll('.lc-roomrow')].find(r => /Release/.test(r.innerText))
-    row.click()
-    await new Promise(r => setTimeout(r, 500))
+    // Back to the room the way a person goes back to it: the Rooms screen.
+    const wayIn = [...document.querySelectorAll('.lc-sidebar button')].find(b => (b.getAttribute('title') || '').indexOf('Rooms') === 0)
+    if (wayIn) { wayIn.click(); await new Promise(r => setTimeout(r, 700)) }
+    const back = [...document.querySelectorAll('.lc-roomcard')].find(c => /Release/.test(c.innerText))
+    if (back) { back.click() }
+    await new Promise(r => setTimeout(r, 700))
     const box = document.querySelector('.lc-roomcompose__box')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
     setter.call(box, 'Reply with the single word: ready. Then, using the task block you were shown, mark the task "Check the version string" done.')
@@ -302,8 +334,12 @@ try {
     const steps = []
     const rows = () => [...document.querySelectorAll('.lc-task')]
     const find = (text) => rows().find(r => (r.querySelector('.lc-task__text')?.textContent ?? '').includes(text))
-    const state = () => JSON.stringify([...document.querySelectorAll('.lc-task')].map(r => [r.querySelector('.lc-task__text')?.textContent.trim(), r.querySelector('.lc-task__state')?.textContent.trim(), r.querySelector('.lc-task__owner')?.textContent.trim()]))
-    // add
+    const state = () => JSON.stringify([...document.querySelectorAll('.lc-task')].map(r => [r.querySelector('.lc-task__text')?.textContent.trim(), r.querySelector('.lc-sr')?.textContent.trim(), r.querySelector('.lc-task__owner')?.textContent.trim()]))
+    // add -- the form is behind "+ Add a task" now, so the row is only one
+    // control wide until somebody asks for it. Selecting the input straight
+    // off found null and threw an Illegal invocation (2026-09-19).
+    const openAdd = document.querySelector('.lc-board__addlink')
+    if (openAdd) { openAdd.click(); await new Promise(r => setTimeout(r, 300)) }
     const input = document.querySelector('.lc-board__add input')
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
     setter.call(input, 'Sign the installer')
@@ -353,18 +389,22 @@ try {
   for (const [step, state] of moved) say(`       ${step}: ${state}`)
   const at = (step) => JSON.parse(moved.find((entry) => entry[0] === step)[1])
   const signRow = (step) => at(step).find((row) => row[0] === 'Sign the installer')
-  check('add puts an open task with nobody on the board', JSON.stringify(signRow('added')) === JSON.stringify(['Sign the installer', 'OPEN', 'nobody']), JSON.stringify(signRow('added')))
-  check('assign hands it to Booty, in hand', JSON.stringify(signRow('assigned')) === JSON.stringify(['Sign the installer', 'IN HAND', 'Booty']), JSON.stringify(signRow('assigned')))
-  check('done finishes it', signRow('done')?.[1] === 'DONE', JSON.stringify(signRow('done')))
-  check('reopen puts it back in Booty\'s hands', JSON.stringify(signRow('reopened')) === JSON.stringify(['Sign the installer', 'IN HAND', 'Booty']), JSON.stringify(signRow('reopened')))
+  check('add puts an open task with nobody on the board', JSON.stringify(signRow('added')) === JSON.stringify(['Sign the installer', 'open', 'unassigned']), JSON.stringify(signRow('added')))
+  check('assign hands it to Booty, in hand', JSON.stringify(signRow('assigned')) === JSON.stringify(['Sign the installer', 'in hand', 'Booty']), JSON.stringify(signRow('assigned')))
+  check('done finishes it', signRow('done')?.[1] === 'done', JSON.stringify(signRow('done')))
+  check('reopen puts it back in Booty\'s hands', JSON.stringify(signRow('reopened')) === JSON.stringify(['Sign the installer', 'in hand', 'Booty']), JSON.stringify(signRow('reopened')))
   check('remove takes it off the board', signRow('removed') === undefined, JSON.stringify(at('removed')))
   const storedBoard = JSON.parse(await readFile(ROOMS, 'utf8')).rooms.find((r) => r.roomId === 'room_release').tasks
   check('the file agrees with the screen', !storedBoard.some((t) => t.text === 'Sign the installer') && storedBoard.length >= 2, JSON.stringify(storedBoard.map((t) => [t.text, t.state, t.ownerId])))
 
   say('5. a new room from the form')
   const made = JSON.parse(await evaluate(`(async () => {
-    [...document.querySelectorAll('.lc-roomrow--new')][0].click()
-    await new Promise(r => setTimeout(r, 500))
+    // The "New room" form lives on the Rooms screen; the sidebar's own
+    // new-room row went with the flatten of 2026-09-15.
+    const wayIn = [...document.querySelectorAll('.lc-sidebar button')].find(b => (b.getAttribute('title') || '').indexOf('Rooms') === 0)
+      || document.querySelector('.lc-roomrow--new')
+    if (wayIn) { wayIn.click() }
+    await new Promise(r => setTimeout(r, 800))
     const name = document.querySelector('.lc-roomform__name')
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
     setter.call(name, 'Pair')
@@ -378,7 +418,14 @@ try {
   })()`))
   say(`       ${JSON.stringify(made).slice(0, 300)}`)
   check('the new room opens', made.title === 'Pair', made.title)
-  check('and the sidebar lists both rooms', made.sidebarRooms.includes('Pair') && made.sidebarRooms.includes('Release'), JSON.stringify(made.sidebarRooms))
+  // Read from the Rooms screen, which is where rooms are listed now. The
+  // room being OPEN is what hides them, so it looks at the list itself.
+  const listed = JSON.parse(await evaluate(`(async () => {
+    const wayIn = [...document.querySelectorAll('.lc-sidebar button')].find(b => (b.getAttribute('title') || '').indexOf('Rooms') === 0)
+    if (wayIn) { wayIn.click(); await new Promise(r => setTimeout(r, 800)) }
+    return JSON.stringify([...document.querySelectorAll('.lc-roomcard__name')].map(el => el.textContent.trim()))
+  })()`))
+  check('and both rooms are listed', listed.includes('Pair') && listed.includes('Release'), JSON.stringify(listed))
   const stored2 = JSON.parse(await readFile(ROOMS, 'utf8'))
   check('and it is on disk with Wren alone', stored2.rooms.some((r) => r.name === 'Pair' && r.teammateIds.length === 1 && r.teammateIds[0] === 'tm_wren'))
 
