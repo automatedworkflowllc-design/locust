@@ -519,11 +519,11 @@ export default function App(): ReactElement {
   /*
    * The send button's metal, and how it behaves. Every option the design
    * agent offered is a setting rather than a constant, because Colin asked to
-   * see them all before a default is picked. `chromatic` at `subtle` is where
-   * this started, which is his own first choice rather than the brief's.
+   * see them all before a default is picked. He picked after seeing them:
+   * `silver` at `standard`, which is also what the brief asked for.
    */
-  const [metal, setMetal] = useState<MetalPreset>('chromatic')
-  const [metalStrength, setMetalStrength] = useState<MetalStrength>('subtle')
+  const [metal, setMetal] = useState<MetalPreset>('silver')
+  const [metalStrength, setMetalStrength] = useState<MetalStrength>('standard')
   const [metalMotion, setMetalMotion] = useState<MetalMotion>('hover')
   const [metalBend, setMetalBend] = useState(true)
   // Declared HERE, right under its state, not a thousand lines down: a

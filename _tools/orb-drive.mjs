@@ -121,12 +121,21 @@ try {
       return JSON.stringify({
         sidebar: row ? row.width + 'x' + row.height : 'none',
         sidebarWell: rowBox ? Math.round(rowBox.width) : null,
+        // What the eye gets, not what the canvas holds. The library's
+        // smallest orb is 20px and resolvePreset throws on anything else, so
+        // the row's is scaled down in CSS -- which the canvas's own width
+        // property cannot see, because that is device pixels at full
+        // resolution. Only the painted box knows. (No backticks in here: a
+        // backtick in a page script's comment closes this template literal,
+        // and the repo has a guard for exactly that.)
+        sidebarDrawn: row ? Math.round(row.getBoundingClientRect().width) : null,
         planStep: plan ? plan.width + 'x' + plan.height : 'none'
       })
     })()`)
     const read = JSON.parse(String(seen))
     check('the running conversation row carries an orb', read.sidebar !== 'none', seen)
     check('and it does not widen the row', read.sidebarWell === 6, `well ${String(read.sidebarWell)}px`)
+    check('it is drawn smaller than the face beside it', read.sidebarDrawn !== null && read.sidebarDrawn < 16, `drawn ${String(read.sidebarDrawn)}px`)
     return seen
   })
 

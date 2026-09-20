@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.213.0 - 2026-09-20
+
+- **The cursor actually bends the send button's ring now.** The setting was
+  there and did nothing: the numbers were written where the library keeps
+  them, but the part that reads them every frame was never switched on. Move
+  the pointer across the ring and it dents toward you and springs back.
+- **The glow lets go.** Press send with the cursor still on the button and
+  the button disables under your pointer — which means it never hears the
+  pointer leave, so the metal kept moving over an empty composer. It stops
+  now, and it stops for the other ways a cursor can leave without saying so:
+  a window losing focus, a pointer leaving the window.
+- **Silver at standard is the default metal.** Every option is still in
+  Settings; this is just where it starts.
+- **The orb on a working conversation is smaller**, so the row still reads as
+  a teammate's name first.
+
 ## 0.212.0 - 2026-09-20
 
 - **Settings now has every option for the send button's metal.** Which metal

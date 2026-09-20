@@ -10,18 +10,18 @@ import { BEND_DEFAULTS } from 'metal-fx'
  * it" is asked again — which it will be, because this is the kind of setting
  * people iterate on by eye.
  *
- * **Chromatic at 0.35, and that is Colin's call over the brief's.** The
- * design document asks for `silver` at `0.55` and says chromatic is "plainly
- * foreign to this palette". Colin, 2026-09-20: *"metal on hover/chromatic/try
- * .35 strength at first and we can see if we want to boost it."* Both halves
- * of that are deliberate — a weaker effect than the brief wanted, in the
- * preset the brief argued against — so it is recorded as a disagreement to
- * look at on a real screen rather than settled here.
+ * **Silver at 0.55 — and the disagreement resolved itself by being looked
+ * at.** The design document asked for `silver` at `0.55` and called chromatic
+ * "plainly foreign to this palette". Colin started at chromatic · 0.35 sight
+ * unseen, then after seeing both on a real screen: *"i think silver standard
+ * is a good preset btw"* (2026-09-20) — which is the brief's own answer,
+ * arrived at independently. That is the strongest kind of agreement there is,
+ * so it is the default now.
  *
- * `silver` and `gold` are the other two the library ships; `PRESETS` has
- * exactly those three.
+ * `chromatic` and `gold` are the other two the library ships; `PRESETS` has
+ * exactly those three, and all of them are one click away in Settings.
  */
-export const METAL_PRESET: MetalFxPreset = 'chromatic'
+export const METAL_PRESET: MetalFxPreset = 'silver'
 
 /**
  * What each named strength is worth.
@@ -37,8 +37,8 @@ export const METAL_STRENGTHS: Readonly<Record<MetalStrength, number>> = {
   strong: 0.8
 }
 
-/** Colin's starting point. The brief wanted 0.55; 1.0 is the glow to avoid. */
-export const METAL_STRENGTH = METAL_STRENGTHS.subtle
+/** Where both Colin and the brief landed. 1.0 is the glow to avoid. */
+export const METAL_STRENGTH = METAL_STRENGTHS.standard
 
 /**
  * The "gooey" half — metal-fx's own cursor bend, not another library.

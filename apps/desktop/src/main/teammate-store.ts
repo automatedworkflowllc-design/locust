@@ -128,7 +128,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'chromatic', metalStrength: 'subtle', metalMotion: 'hover', metalBend: true }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: true }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -160,8 +160,8 @@ const METAL_MOTIONS = ['hover', 'always'] as const
 function parsedMetal(raw: unknown): Pick<WorkspaceSettings, 'metal' | 'metalStrength' | 'metalMotion' | 'metalBend'> {
   const record = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
   return {
-    metal: oneOf(record.metal, METAL_PRESETS, 'chromatic'),
-    metalStrength: oneOf(record.metalStrength, METAL_STRENGTHS, 'subtle'),
+    metal: oneOf(record.metal, METAL_PRESETS, 'silver'),
+    metalStrength: oneOf(record.metalStrength, METAL_STRENGTHS, 'standard'),
     metalMotion: oneOf(record.metalMotion, METAL_MOTIONS, 'hover'),
     metalBend: typeof record.metalBend === 'boolean' ? record.metalBend : true
   }

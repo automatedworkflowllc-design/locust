@@ -1,9 +1,38 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
-import { MetalFx, setBendConfig } from 'metal-fx'
+import { MetalFx, setBendConfig, useMetalBend } from 'metal-fx'
 
 import { METAL_STRENGTHS, metalBendConfig } from '../metal.js'
 import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
+
+/**
+ * The bend, mounted on the element the library actually deforms.
+ *
+ * **`setBendConfig` alone does nothing** — that was the defect Colin found by
+ * looking ("i dont think the cursor bend is working", 2026-09-20). It writes a
+ * mutable singleton; the singleton is only ever read by `useMetalBend`, and
+ * nothing called it. The configuration was correct and unused.
+ *
+ * Two things the hook is strict about, both read out of its source rather than
+ * guessed:
+ *
+ *   1. **The ref must be `.metal-fx-root` itself, not a wrapper.** It measures
+ *      `getBoundingClientRect()`, reads `getComputedStyle(n, '::after')` for
+ *      the ring's rim, and takes over `n.style.filter`. Our host is
+ *      `display: contents`, so it has no box at all — handing that over would
+ *      have produced a zero-size field and no visible dent even once the hook
+ *      was being called.
+ *   2. **Its effect depends on the ref OBJECT.** A ref filled in later never
+ *      re-runs it, and at our first paint the root does not exist yet. So the
+ *      ref is `useMemo`'d on the node: a new node means a new object, which
+ *      means the hook re-arms. This component mounts only once the node has
+ *      been found, so its first run already has something to measure.
+ */
+function MetalBend({ node }: { readonly node: HTMLElement | null }): null {
+  const ref = useMemo(() => ({ current: node }), [node])
+  useMetalBend(ref)
+  return null
+}
 
 /**
  * The send button, in metal, but only while a person is on it.
@@ -40,8 +69,8 @@ import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ip
  */
 export function MetalSend({
   children,
-  preset = 'chromatic',
-  strength = 'subtle',
+  preset = 'silver',
+  strength = 'standard',
   motion = 'hover',
   bend = true,
   ...button
@@ -53,16 +82,29 @@ export function MetalSend({
   readonly motion?: MetalMotion
   readonly bend?: boolean
 } & React.ButtonHTMLAttributes<HTMLButtonElement>): ReactElement {
-  const [awake, setAwake] = useState(false)
+  /*
+   * HOVER AND FOCUS ARE TRACKED APART, and they used to be one flag.
+   *
+   * They are woken by the same thing and put back to sleep by different
+   * things: a pointer can leave without an event, a focus cannot. One shared
+   * flag meant the pointer's rescue below would also have stolen the metal
+   * out from under somebody tabbing through the composer.
+   */
+  const [hover, setHover] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const awake = hover || focused
   /** False until the shader has painted once; see finding 1. */
   const [warm, setWarm] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
+  /** The library's own root, once it exists. The bend deforms this. */
+  const [painted, setPainted] = useState<HTMLElement | null>(null)
+  const host = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     /*
-     * The bend — the "gooey" part. A mutable singleton the library reads
-     * every frame, so it is set once for the app rather than per instance.
-     * `applyTo: 'ring'` keeps the arrow rigid: denting the icon would make
+     * The bend's numbers — the "gooey" part. A mutable singleton the library
+     * reads every frame, so it is set once for the app rather than per
+     * instance. It is INERT on its own: `MetalBend` above is what reads it.
+     * `applyTo: 'ring'` keeps the arrow rigid — denting the icon would make
      * the control feel unreliable at the exact moment it is being pressed.
      */
     setBendConfig(metalBendConfig(bend, METAL_STRENGTHS[strength]))
@@ -70,7 +112,7 @@ export function MetalSend({
 
   useEffect(() => {
     if (warm) return
-    const node = root.current
+    const node = host.current
     if (node === null) return
     /*
      * Watch for the library's own reveal rather than guessing a delay. A
@@ -80,10 +122,13 @@ export function MetalSend({
     let live = true
     const look = (): void => {
       if (!live) return
-      const painted = node.querySelector<HTMLElement>('.metal-fx-root')
-      if (painted !== null && painted.style.opacity === '1') {
-        setWarm(true)
-        return
+      const root = node.querySelector<HTMLElement>('.metal-fx-root')
+      if (root !== null) {
+        setPainted(root)
+        if (root.style.opacity === '1') {
+          setWarm(true)
+          return
+        }
       }
       requestAnimationFrame(look)
     }
@@ -92,6 +137,47 @@ export function MetalSend({
       live = false
     }
   }, [warm])
+
+  /*
+   * A DISABLED BUTTON NEVER SAYS GOODBYE.
+   *
+   * Colin, 2026-09-20: "the glow doesnt disappear after hover sometimes."
+   * Press send with the cursor still on it and the button disables under the
+   * pointer — `pointerleave` is a pointer event, a disabled control gets
+   * none, so the last thing this component ever heard was `pointerenter`, and
+   * the shader kept running over an empty composer. Which is the precise
+   * thing hover-only metal exists to avoid: motion claiming work that is not
+   * happening.
+   */
+  const disabled = button.disabled === true
+  useEffect(() => {
+    if (disabled) setHover(false)
+  }, [disabled])
+
+  useEffect(() => {
+    if (!hover) return
+    const node = host.current
+    /*
+     * The general case of the same failure: any way a pointer can end up off
+     * this button without the button hearing about it — a re-render under the
+     * cursor, a window that loses focus, a pointer that leaves the window
+     * entirely. Armed only while awake, so it costs nothing at rest.
+     */
+    const elsewhere = (event: PointerEvent): void => {
+      const target = event.target
+      if (node !== null && target instanceof Node && node.contains(target)) return
+      setHover(false)
+    }
+    const sleep = (): void => setHover(false)
+    document.addEventListener('pointerover', elsewhere, { passive: true })
+    document.addEventListener('pointerleave', sleep)
+    window.addEventListener('blur', sleep)
+    return () => {
+      document.removeEventListener('pointerover', elsewhere)
+      document.removeEventListener('pointerleave', sleep)
+      window.removeEventListener('blur', sleep)
+    }
+  }, [hover])
 
   /*
    * OFF MEANS NO SHADER AT ALL, not a paused one.
@@ -106,7 +192,7 @@ export function MetalSend({
 
   return (
     <div
-      ref={root}
+      ref={host}
       className="lc-metalsend"
       /*
        * A seam, the way `data-register` is one on the live step: it says what
@@ -117,7 +203,10 @@ export function MetalSend({
        */
       data-awake={awake ? 'true' : 'false'}
       data-warm={warm ? 'true' : 'false'}
+      /* The third of those: "we asked for the bend and found something to bend". */
+      data-bend={bend && painted !== null ? 'true' : 'false'}
     >
+      {bend ? <MetalBend node={painted} /> : null}
       <MetalFx
         variant="circle"
         preset={preset}
@@ -144,10 +233,10 @@ export function MetalSend({
           */}
         <button
           {...button}
-          onPointerEnter={() => setAwake(true)}
-          onPointerLeave={() => setAwake(false)}
-          onFocus={() => setAwake(true)}
-          onBlur={() => setAwake(false)}
+          onPointerEnter={() => setHover(true)}
+          onPointerLeave={() => setHover(false)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
         >
           {children}
         </button>

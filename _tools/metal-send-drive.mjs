@@ -165,6 +165,69 @@ try {
     return `hover ${String(awake)} → leave ${String(back)}`
   })
 
+  await drive.capture('the cursor bends the ring', async () => {
+    /*
+     * THE CHECK THAT DID NOT EXIST, WHICH IS WHY THIS SHIPPED BROKEN.
+     *
+     * The bend was configured and never mounted: `setBendConfig` writes a
+     * mutable singleton and `useMetalBend` is the only thing that ever reads
+     * it, and nothing called the hook. Every assertion this drive made still
+     * passed, because none of them asked whether anything deformed. Colin
+     * found it by looking at it.
+     *
+     * `data-mfx-bend` is the library's own seam: the ring path sets it on the
+     * root for as long as a deformation is live, and removes it when the
+     * field settles. Asserting on ours (`data-bend`) alone would only prove
+     * we asked -- this proves the library answered.
+     */
+    const at = JSON.parse(await drive.evaluate(`(() => { const b = document.querySelector('form.command-dock .lc-send').getBoundingClientRect(); return JSON.stringify({ x: Math.round(b.left + b.width/2), y: Math.round(b.top + b.height/2) }) })()`))
+    await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x - 30, y: at.y, buttons: 0 })
+    await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y, buttons: 0 })
+    const asked = await drive.evaluate(`document.querySelector('.lc-metalsend')?.getAttribute('data-bend')`)
+    check('we found a root to bend', String(asked) === 'true', asked)
+    const bent = await drive.waitFor(
+      `document.querySelector('form.command-dock .metal-fx-root')?.hasAttribute('data-mfx-bend') === true`,
+      { what: 'the ring to deform under the cursor', timeoutMs: 6_000 }
+    ).catch(() => false)
+    check('the ring deforms under the cursor', bent === true, bent)
+    return `asked ${String(asked)} → deformed ${String(bent)}`
+  })
+
+  await drive.capture('the glow lets go when the button dies under the cursor', async () => {
+    /*
+     * Colin, 2026-09-20: "the glow doesnt disappear after hover sometimes."
+     *
+     * This is the sometimes. A disabled control receives no pointer events,
+     * so a button that disables while the cursor is on it never hears
+     * `pointerleave` -- and the last thing the component was told was that a
+     * person is pointing at it. Emptying the composer is exactly what
+     * pressing send does, without spending a turn to prove it.
+     *
+     * The cursor is deliberately NOT moved away first. Moving it would test
+     * the path that already worked.
+     */
+    await drive.evaluate(`(() => {
+      const field = document.querySelector('form.command-dock textarea')
+      const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+      set.call(field, '')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    await drive.waitFor(`document.querySelector('form.command-dock .lc-send')?.disabled === true`, { what: 'the send button to go dead', timeoutMs: 5_000 })
+    const released = await drive.waitFor(
+      `document.querySelector('.lc-metalsend')?.getAttribute('data-awake') === 'false'`,
+      { what: 'the button to stop believing it is hovered', timeoutMs: 6_000 }
+    ).catch(() => false)
+    check('it stops believing it is hovered', released === true, released)
+    const quiet = await drive.waitFor(
+      `document.querySelector('form.command-dock .metal-fx-root')?.getAttribute('data-paused') === 'true'`,
+      { what: 'the shader to go quiet', timeoutMs: 6_000 }
+    ).catch(() => false)
+    check('and the shader goes quiet with it', quiet === true, quiet)
+    await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 10, buttons: 0 })
+    return `awake ${String(released)} → paused ${String(quiet)}`
+  })
+
   await drive.capture('it is still the send button', async () => {
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/free/i' }))
     const answer = await drive.evaluate(sendAndWaitScript('Reply with the single word METAL and nothing else.'))
