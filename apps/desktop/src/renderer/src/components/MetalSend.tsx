@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
-import { MetalFx, setBendConfig, useMetalBend } from 'metal-fx'
+import { BEND, MetalFx, setBendConfig, useMetalBend } from 'metal-fx'
 
 import { METAL_STRENGTHS, metalBendConfig } from '../metal.js'
 import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
@@ -28,9 +28,24 @@ import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ip
  *      means the hook re-arms. This component mounts only once the node has
  *      been found, so its first run already has something to measure.
  */
+/**
+ * The config getter, declared ONCE at module scope, and that is load-bearing.
+ *
+ * `useMetalBend(ref, getCfg = () => BEND)` keys its effect on `[ref, getCfg]`,
+ * and a DEFAULT PARAMETER is a fresh closure on every call — so calling the
+ * hook with one argument re-arms it on every render of this component, and
+ * every teardown runs the library's own cleanup, which removes the
+ * deformation. At one render per hover nobody noticed. Adding a second piece
+ * of state was enough for the teardown to land on top of the dent, and the
+ * drive went red on a feature that had worked ten minutes earlier.
+ *
+ * A stable reference means the effect arms once and stays armed.
+ */
+const bendConfig = (): typeof BEND => BEND
+
 function MetalBend({ node }: { readonly node: HTMLElement | null }): null {
   const ref = useMemo(() => ({ current: node }), [node])
-  useMetalBend(ref)
+  useMetalBend(ref, bendConfig)
   return null
 }
 
@@ -97,6 +112,26 @@ export function MetalSend({
   const [warm, setWarm] = useState(false)
   /** The library's own root, once it exists. The bend deforms this. */
   const [painted, setPainted] = useState<HTMLElement | null>(null)
+  /**
+   * Frozen, which is NOT the same as asleep, and conflating them is what put
+   * a halo on an idle screen.
+   *
+   * Colin, 2026-09-20: "the 'glow' halo effect is staying even after hover,
+   * its not moving but its still glowing." Exactly right, and the second half
+   * is the diagnosis. `paused` freezes the instance on its CURRENT FRAME —
+   * the library's own words — and the current frame at the moment a pointer
+   * leaves is the lit one. So the shimmer stopped and the halo it had been
+   * wearing stayed, which is the worst of both: no motion to justify it and
+   * no way for it to leave.
+   *
+   * The halo has its own knob, `glowGain`, and the fix is to turn it down
+   * BEFORE the freeze rather than freeze on top of it — hence a delay. A
+   * composite has to run once at the new gain for the glow to be redrawn
+   * without it, and while paused the only composites are incidental ones. So
+   * sleeping now means: glow to zero, keep running a moment, then freeze on a
+   * frame that has no halo in it.
+   */
+  const [frozen, setFrozen] = useState(false)
   const host = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -153,6 +188,23 @@ export function MetalSend({
   useEffect(() => {
     if (disabled) setHover(false)
   }, [disabled])
+
+  useEffect(() => {
+    if (awake) {
+      setFrozen(false)
+      return
+    }
+    /*
+     * 240ms, and the number is the shared loop's, not a taste call: it
+     * composites at 15fps, so a frame is ~66ms and two rAFs would not have
+     * been enough to guarantee even one. This buys three or four, which is
+     * certainly enough for the glow to be redrawn at zero — and it reads as
+     * the halo fading out behind the cursor rather than being switched off,
+     * which is the nicer of the two anyway.
+     */
+    const id = setTimeout(() => setFrozen(true), 240)
+    return () => clearTimeout(id)
+  }, [awake])
 
   useEffect(() => {
     if (!hover) return
@@ -214,9 +266,20 @@ export function MetalSend({
         // Pinned, not `auto`: `auto` falls back to the OS setting and Locust
         // is dark regardless, so a light desktop would get dark metal.
         theme="dark"
+        /*
+         * THE HALO IS THE HOVER, and the ring is the button.
+         *
+         * `glowGain` multiplies the halo and catch-light only, leaving the
+         * metal silhouette alone — so at rest the control still looks like
+         * metal, and the glow becomes the part that actually answers a
+         * person. That is a better division than the one we had: a halo
+         * sitting on an idle screen was making the same claim a shimmer
+         * would, which is the thing hover-only metal exists to avoid.
+         */
+        glowGain={motion === 'always' || awake ? 1 : 0}
         // `always` is the version the design agent asked to reject, kept so
         // the rejection can be agreed with after seeing it rather than before.
-        paused={motion === 'always' ? false : warm ? !awake : false}
+        paused={motion === 'always' ? false : warm ? frozen : false}
       >
         {/*
           * THE HANDLERS BELONG ON THE BUTTON, not on the wrapper above it.

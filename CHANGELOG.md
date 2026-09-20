@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.215.0 - 2026-09-20
+
+- **The send button's halo leaves with your cursor.** It used to stay lit
+  after you moved away — still, but still glowing — because stopping the
+  effect froze it on the frame it happened to be on, and that frame was the
+  bright one. At rest the button is a plain metal ring again; the glow is the
+  part that answers you.
+
 ## 0.214.0 - 2026-09-20
 
 - **A teammate's message never shows you the plumbing.** Locust reads a few

@@ -165,6 +165,58 @@ try {
     return `hover ${String(awake)} → leave ${String(back)}`
   })
 
+  await drive.capture('the halo leaves with the cursor', async () => {
+    /*
+     * Colin, 2026-09-20: "the glow halo effect is staying even after hover,
+     * its not moving but its still glowing."
+     *
+     * He named the cause in the second half. `paused` freezes the instance on
+     * its CURRENT frame, and the frame at the moment a pointer leaves is the
+     * lit one -- so the shimmer stopped and the halo it was wearing stayed.
+     * No motion to justify it, and no way for it to leave.
+     *
+     * MEASURED IN THE GLOW'S OWN PIXELS, not in a class or an attribute. The
+     * library draws the halo into its own 2D canvas, which is readable, so
+     * this asks the only question that matters: is there still light there.
+     * A seam of ours would only have said what we intended.
+     */
+    const LIGHT = `(() => {
+      const glow = document.querySelector('form.command-dock .metal-fx-glow-canvas')
+      if (!glow) return JSON.stringify({ error: 'no glow canvas' })
+      const ctx = glow.getContext('2d', { willReadFrequently: true })
+      if (!ctx || glow.width === 0) return JSON.stringify({ error: 'no glow context' })
+      const data = ctx.getImageData(0, 0, glow.width, glow.height).data
+      let peak = 0
+      let lit = 0
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > peak) peak = data[i]
+        if (data[i] > 8) lit += 1
+      }
+      return JSON.stringify({ peak, lit, of: glow.width * glow.height })
+    })()`
+    const at = JSON.parse(await drive.evaluate(`(() => { const b = document.querySelector('form.command-dock .lc-send').getBoundingClientRect(); return JSON.stringify({ x: Math.round(b.left + b.width/2), y: Math.round(b.top + b.height/2) }) })()`))
+    await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y, buttons: 0 })
+    await drive.waitFor(`document.querySelector('.lc-metalsend')?.getAttribute('data-awake') === 'true'`, { what: 'the button to wake', timeoutMs: 6_000 })
+    const hot = JSON.parse(await drive.waitFor(
+      `(() => { const s = ${LIGHT}; const v = JSON.parse(s); return v.lit > 0 ? s : false })()`,
+      { what: 'the halo to light up under the cursor', timeoutMs: 8_000 }
+    ))
+    check('the halo lights up on hover', hot.lit > 0, JSON.stringify(hot))
+    await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 10, buttons: 0 })
+    /*
+     * Generous, because this is the failure being fixed and a tight window
+     * would turn "it takes a moment" into a red. The glow is turned down
+     * BEFORE the freeze deliberately: a composite has to run once at the new
+     * gain, and while paused the only composites are incidental.
+     */
+    const cold = JSON.parse(await drive.waitFor(
+      `(() => { const s = ${LIGHT}; const v = JSON.parse(s); return v.lit === 0 ? s : false })()`,
+      { what: 'the halo to go out again', timeoutMs: 10_000 }
+    ).catch(async () => drive.evaluate(LIGHT)))
+    check('and goes out when the cursor leaves', cold.lit === 0, JSON.stringify(cold))
+    return `lit ${String(hot.lit)} px → ${String(cold.lit)} px`
+  })
+
   await drive.capture('the cursor bends the ring', async () => {
     /*
      * THE CHECK THAT DID NOT EXIST, WHICH IS WHY THIS SHIPPED BROKEN.

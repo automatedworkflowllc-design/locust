@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Mcp(robinhood-trading:*)",
+      "Mcp(robinhood-local:*)"
+    ],
+    "deny": []
+  }
+}
