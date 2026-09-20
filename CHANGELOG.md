@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.219.0 - 2026-09-20
+
+- **A connector call is recognised as one, whatever the runtime calls it.**
+  Every MCP name Locust had ever seen carried its server, so a runtime that
+  names the tool flatly `mcp` had its connector calls filed as ordinary local
+  tools: no connector row, and nothing saying the work had left your machine.
+  They are connector calls now. When the name carries no server, the line says
+  "using a connector" without naming one, because it does not know.
+- **MCP and connectors have their own animation.** The scrambling sphere is
+  theirs; ordinary tools and shell commands take the one it used to share with
+  them. The rarer event gets the louder mark -- a tool call already has its
+  name on the row beside it, and a call leaving your machine is the one worth
+  spotting without reading.
+
 ## 0.218.0 - 2026-09-20
 
 - **The sweep on the live line is wide enough to see.** It shipped in 0.217
