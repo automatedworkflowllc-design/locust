@@ -85,20 +85,58 @@ async function build() {
 
   say('1. creating the machine')
   vbox(['createvm', '--name', VM, '--ostype', 'Windows11_64', '--register', '--basefolder', VM_DIR])
-  vbox([
-    'modifyvm', VM,
-    '--memory', '6144',
-    '--cpus', '4',
-    '--firmware', 'efi',
-    '--tpm-type', '2.0',
-    '--secure-boot', 'on',
-    '--graphicscontroller', 'vboxsvga',
-    '--vram', '128',
-    '--nic1', 'nat',
+  /*
+   * ONE SETTING PER CALL, and every failure named.
+   *
+   * VBoxManage applies modifyvm options in order and ABORTS AT THE FIRST BAD
+   * ONE, keeping whatever it already applied. So a single unknown option --
+   * and `--secure-boot` is unknown in 7.2, though half the guides online use
+   * it -- silently leaves the VM on the OS type's defaults: 1GB of RAM, one
+   * core, and no port forward, which is the one thing this whole file exists
+   * for. The first build here did exactly that and started installing Windows
+   * on it before the check below existed (2026-09-20).
+   *
+   * Separate calls cost nothing and make the failure legible.
+   */
+  const settings = [
+    ['--memory', '6144'],
+    ['--cpus', '4'],
+    ['--firmware', 'efi'],
+    ['--graphicscontroller', 'vboxsvga'],
+    ['--vram', '128'],
+    ['--nic1', 'nat'],
+    ['--clipboard-mode', 'bidirectional'],
     // The whole point: the guest's debugging port, reachable from here.
-    '--nat-pf1', `cdp,tcp,127.0.0.1,${String(CDP_PORT)},,${String(CDP_PORT)}`,
-    '--clipboard-mode', 'bidirectional'
-  ])
+    ['--nat-pf1', `cdp,tcp,127.0.0.1,${String(CDP_PORT)},,${String(CDP_PORT)}`]
+  ]
+  for (const setting of settings) {
+    const applied = vbox(['modifyvm', VM, ...setting], { quiet: true })
+    if (!applied.ok) say(`   FAILED: ${setting.join(' ')} -- ${(applied.out.split('\n')[0] ?? '').trim()}`)
+  }
+  /*
+   * TPM separately, and NOT asserted. 7.2 accepts `--tpm-type 2.0` in silence
+   * and writes nothing to the settings file. If Windows 11 setup refuses with
+   * "This PC can't run Windows 11", that is why, and the repair is the
+   * LabConfig registry bypass rather than this line.
+   */
+  vbox(['modifyvm', VM, '--tpm-type', '2.0'], { quiet: true })
+
+  /*
+   * VERIFIED, not assumed. One bad option makes VBoxManage reject the entire
+   * modifyvm call, and the only symptom is a VM that installs with the OS
+   * type's defaults -- which for Windows11_64 is 1GB and one core, and no
+   * port forward at all.
+   */
+  const applied = vbox(['showvminfo', VM, '--machinereadable'], { quiet: true }).out
+  const memoryOk = /memory=(\d+)/.exec(applied)?.[1] === '6144'
+  const forwardOk = /Forwarding\(0\)="cdp/.test(applied)
+  if (!memoryOk || !forwardOk) {
+    say(`   settings did NOT apply (memory ok: ${String(memoryOk)}, port forward ok: ${String(forwardOk)})`)
+    say('   the modifyvm call above failed; fix it before the install runs')
+    process.exitCode = 1
+    return
+  }
+  say('   settings applied: 6GB, 4 cores, TPM 2.0, cdp forwarded')
 
   say('2. disk and drives')
   const disk = join(VM_DIR, VM, `${VM}.vdi`)
@@ -123,7 +161,8 @@ async function build() {
     '--install-additions',
     '--locale=en_US',
     '--time-zone=EST',
-    '--start-vm=gui'
+    // Headless: this runs on Colin's own desktop and should not take it over.
+    '--start-vm=headless'
   ])
 
   say('')
