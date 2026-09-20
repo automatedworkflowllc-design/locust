@@ -1001,6 +1001,18 @@ export type RuntimeDiscoveryResponse =
          * rather than leaving to be discovered.
          */
         readonly npmIsBundled?: boolean
+        /**
+         * npm IS on this machine and did not answer its version check in five
+         * seconds -- nvm-windows with no version picked, a corporate wrapper
+         * waiting on a proxy.
+         *
+         * Carried apart from `npmIsBundled` because they are the same VALUE
+         * and different SENTENCES: both select the app's own npm, correctly,
+         * but only one of them means "Node.js is not on this machine". Fable
+         * measured the wrong sentence on a box with Node on PATH and only npm
+         * hanging (pass 2, finding 3). The host knew; it stopped saying.
+         */
+        readonly npmDidNotAnswer?: boolean
       }
     }
   | {

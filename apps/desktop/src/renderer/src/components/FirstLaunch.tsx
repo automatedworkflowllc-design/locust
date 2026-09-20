@@ -69,6 +69,7 @@ export function FirstLaunch({
   installFailure,
   npmMissing = false,
   npmIsBundled = false,
+  npmDidNotAnswer = false,
   checkingGaveUp = false,
   onCheckAgain,
   workspaceMade = false
@@ -108,6 +109,11 @@ export function FirstLaunch({
    * reachable from, which the note below says out loud.
    */
   readonly npmIsBundled?: boolean
+  /**
+   * npm IS on this machine and did not answer in five seconds. Changes the
+   * sentence, never the behaviour: the bundled path is right either way.
+   */
+  readonly npmDidNotAnswer?: boolean
   /**
    * Discovery has asked three more times and an installed CLI still has not
    * answered. Until then CHECKING is honest; after it, the row has to say
@@ -363,8 +369,38 @@ export function FirstLaunch({
            * drive" is a real question, which is the one the catalogue
            * answers well.
            */
+          /*
+           * A ROW THAT IS ON THIS MACHINE IS NEVER DEFERRED, whatever state
+           * it is in.
+           *
+           * The rule above is about products a person does not have and
+           * cannot use yet. An installed CLI is the opposite of that case: it
+           * is theirs, it has a state, and the state may be the one thing on
+           * the screen they need.
+           *
+           * Fable found this on 0.198.0, the day the deferral shipped, on a
+           * Linux box with four CLIs installed and hung. The screen drew ONE
+           * row while the head note read *6 on this machine · none
+           * answering*, the composer said *A coding agent is installed but
+           * not answering — Check again above*, and the four that were
+           * installed and hanging sat behind the sentence *5 others Locust
+           * can drive — they each need their own account*. Every word of that
+           * was wrong about them: they need no account, they are here, and
+           * their Check again was a press away behind a control that gave no
+           * reason to press it.
+           *
+           * My own measurement could not have caught it: the frame I designed
+           * this against was taken on a machine with nothing installed, where
+           * "not connected" and "not installed" are the same rows. They are
+           * not the same rows.
+           *
+           * `installed` and not `connected`: a signed-out Codex is installed,
+           * and the command that signs it in is on its row.
+           */
           const deferOthers = connected === 0 && !checkingAny && installing === undefined && !othersOpen
-          const drawn = deferOthers ? shown.filter((row) => row.runtime.id === FREE_START_RUNTIME) : shown
+          const drawn = deferOthers
+            ? shown.filter((row) => row.runtime.id === FREE_START_RUNTIME || row.runtime.installed)
+            : shown
           const deferred = shown.length - drawn.length
           return (
             <>
@@ -559,7 +595,18 @@ export function FirstLaunch({
           */}
         {discoveryPhase === 'ready' && (installing !== undefined || connected > 0) && npmIsBundled && rows.some((row) => !row.runtime.installed && installCommand(row.runtime.id) !== undefined) && (
           <p className="lc-installnote">
-            Node.js is not on this machine, so Locust installs with the copy of npm it carries.
+            {/*
+              * WHICH of the two it was. The probe answers "not usable" for a
+              * machine with no Node AND for an npm that is right there and
+              * never answers -- nvm-windows with no version picked, a
+              * corporate wrapper waiting on a proxy. One sentence covered
+              * both, and Fable measured it on a box with Node on PATH and
+              * only npm hanging: the screen told them Node was not installed
+              * (pass 2, finding 3). The host always knew; it stopped saying.
+              */}
+            {npmDidNotAnswer
+              ? 'npm is on this machine but did not answer, so Locust installs with the copy of npm it carries.'
+              : 'Node.js is not on this machine, so Locust installs with the copy of npm it carries.'}{' '}
             The CLI will work here. To use it in your own terminal too, install{' '}
             <button type="button" className="lc-linkbutton" onClick={() => {
                 setLinkRefusal(undefined)

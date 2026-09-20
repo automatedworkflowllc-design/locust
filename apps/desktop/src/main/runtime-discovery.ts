@@ -39,6 +39,8 @@ interface RuntimeDiscoveryServiceOptions {
    * which is what every build before 0.178.0 and every existing test expect.
    */
   readonly npmIsBundled?: () => Promise<boolean>
+  /** npm is on this machine and did not answer in five seconds. */
+  readonly npmDidNotAnswer?: () => Promise<boolean>
 }
 
 function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
@@ -114,7 +116,8 @@ export function createRuntimeDiscoveryService(
             checkedAt: now().toISOString(),
             runtimes: runtimes.map(publicStatus),
             npmPresent: options.npmPresent === undefined ? true : await options.npmPresent(),
-            npmIsBundled: options.npmIsBundled === undefined ? false : await options.npmIsBundled()
+            npmIsBundled: options.npmIsBundled === undefined ? false : await options.npmIsBundled(),
+            npmDidNotAnswer: options.npmDidNotAnswer === undefined ? false : await options.npmDidNotAnswer()
           }
         }))
         .catch(() => discoveryFailed())

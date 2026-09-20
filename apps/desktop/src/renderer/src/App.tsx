@@ -229,6 +229,7 @@ type RuntimeDiscoveryState =
       readonly npmPresent?: boolean
       /** The npm that will run is this app's own, because the machine has none. */
       readonly npmIsBundled?: boolean
+      readonly npmDidNotAnswer?: boolean
       /**
        * Discovery asked three more times and something installed still never
        * answered. Grok, pass 11: five CLIs on PATH that hang forever left
@@ -1808,7 +1809,8 @@ export default function App(): ReactElement {
                 phase: 'ready',
                 runtimes: response.data.runtimes,
                 npmPresent: response.data.npmPresent,
-                npmIsBundled: response.data.npmIsBundled
+                npmIsBundled: response.data.npmIsBundled,
+                npmDidNotAnswer: response.data.npmDidNotAnswer
               }
             : { phase: 'error' }
         )
@@ -1854,7 +1856,8 @@ export default function App(): ReactElement {
             phase: 'ready',
             runtimes: keepWhatWasKnown(held.phase === 'ready' ? held.runtimes : [], response.data.runtimes),
             npmPresent: response.data.npmPresent,
-            npmIsBundled: response.data.npmIsBundled
+            npmIsBundled: response.data.npmIsBundled,
+            npmDidNotAnswer: response.data.npmDidNotAnswer
           }))
           const stillChecking = response.data.runtimes.some(
             (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
@@ -4583,11 +4586,26 @@ export default function App(): ReactElement {
                 installLine={
                   installing === undefined
                     ? undefined
-                    : `${String(installElapsed)}s · ${installLine ?? 'starting npm…'}`
+                    /*
+                      * "checking for npm", not "starting npm".
+                      *
+                      * Before an install runs, the installer re-asks which npm
+                      * to use. That is right -- the one thing that changes the
+                      * answer is the person having installed Node since the
+                      * first screen decided. But on a machine whose npm hangs
+                      * that probe takes five seconds, and the line claimed npm
+                      * was starting while nothing of the sort was happening
+                      * (Fable, pass 2, finding 4: "2s · starting npm… 6s ·
+                      * starting npm…", then the bundled path). Once npm really
+                      * does speak, `installLine` carries its own output and
+                      * this is gone.
+                      */
+                    : `${String(installElapsed)}s · ${installLine ?? 'checking for npm…'}`
                 }
                 installFailure={installFailure}
                 npmMissing={runtimeState.phase === 'ready' && runtimeState.npmPresent === false}
                 npmIsBundled={runtimeState.phase === 'ready' && runtimeState.npmIsBundled === true}
+                npmDidNotAnswer={runtimeState.phase === 'ready' && runtimeState.npmDidNotAnswer === true}
                 checkingGaveUp={runtimeState.phase === 'ready' && runtimeState.gaveUp === true}
                 onCheckAgain={() => {
                   // The repair the app can actually perform: ask again, from

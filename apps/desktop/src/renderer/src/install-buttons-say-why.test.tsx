@@ -208,3 +208,57 @@ describe('what the cold first screen does not say yet', () => {
     expect(warm).not.toContain('Locust can drive')
   })
 })
+
+/**
+ * And a row that is ON THIS MACHINE is never deferred.
+ *
+ * Fable, pass 2, on 0.198.0 — the day the deferral shipped — on a Linux box
+ * with four CLIs installed and hung: the screen drew ONE row while the head
+ * note read *6 on this machine · none answering*, the composer said *A coding
+ * agent is installed but not answering — Check again above*, and the four
+ * hanging CLIs sat behind *5 others Locust can drive — they each need their
+ * own account*. They need no account, they are here, and the Check again that
+ * would repair them was hidden behind a control giving no reason to press it.
+ *
+ * The frame the deferral was designed against had nothing installed, where
+ * "not connected" and "not installed" are the same rows. They are not.
+ */
+describe('the deferral, on a machine that HAS some of them', () => {
+  const withInstalled = (): string => {
+    const runtimes = [
+      runtime('opencode', 'OpenCode', false),
+      // Installed and usable is `connected`; this is installed and NOT usable,
+      // which is the hung and the signed-out row both.
+      { ...runtime('codex', 'Codex', false), installed: true },
+      runtime('cursor', 'Cursor', false)
+    ]
+    return renderToStaticMarkup(
+      <FirstLaunch
+        runtimes={runtimes}
+        limitedRuntimes={new Map()}
+        discoveryPhase="ready"
+        workspacePath="C:\work"
+        teammateCount={1}
+        onChooseFolder={() => undefined}
+        onInstall={() => undefined}
+        checkingGaveUp
+      />
+    )
+  }
+
+  it('draws the installed one even while nothing is connected', () => {
+    expect(withInstalled()).toContain('Codex')
+  })
+
+  it('still defers the ones that are only products you could buy', () => {
+    const html = withInstalled()
+    expect(html).toContain('Locust can drive')
+    expect(html).not.toContain('Cursor')
+  })
+
+  it('counts only what it actually deferred', () => {
+    // The head note's arithmetic and the control's must describe the same
+    // screen. Three rows, two drawn, so the control says one.
+    expect(withInstalled()).toMatch(/1 other Locust can drive/)
+  })
+})

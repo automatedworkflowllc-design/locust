@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.200.0 - 2026-09-20
+
+- **A coding agent that is on your machine is always shown.** Yesterday's
+  first screen tidied the list down to one step, and it tidied away installed
+  agents too -- so a Codex that was installed and not answering hid behind
+  "they each need their own account", which was untrue of it, along with the
+  Check again that would have fixed it.
+
+- **"npm did not answer" no longer reads as "Node.js is not installed".** On a
+  machine where Node is present and npm hangs, the screen said Node was
+  missing. It now says what actually happened. The install works either way.
+
+- **Nothing is left running when you quit during a check.** A coding agent
+  probe started in the last moment before Locust closed could outlive it.
+
+- **The install line says what it is doing** while it works out which npm to
+  use, instead of claiming npm is starting.
+
 ## 0.199.0 - 2026-09-19
 
 - **The reply is back to its old size, and the size is now yours.** 0.198.0

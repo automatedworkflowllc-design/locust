@@ -1273,6 +1273,36 @@ describe("bounded Node probe runner", () => {
     void closed;
   });
 
+  it("spawns nothing once it has been disposed", async () => {
+    /*
+     * Fable, pass 2, by reading: dispose() killed what was live and cleared
+     * the set, and run() would spawn again afterwards -- so a probe started
+     * AFTER the kill was reachable by nothing, because dispose is called once
+     * from before-quit.
+     *
+     * The window is the bounded shutdown: the ledger flushes for up to six
+     * seconds with the renderer alive and its re-check chains still firing.
+     * With five hung CLIs a sweep landing in there is ten processes outliving
+     * an ORDINARY quit, by the same route as the SIGKILL case that cannot be
+     * fixed.
+     */
+    let spawns = 0;
+    const runner = createNodeProbeRunner({
+      spawnProcess: () => {
+        spawns += 1;
+        const process = new EventEmitter() as EventEmitter & SpawnedProbeProcess;
+        Object.assign(process, { stdout: new EventEmitter(), stderr: new EventEmitter(), pid: 1, kill: () => true });
+        return process;
+      },
+    });
+    const command = { purpose: "readiness", executablePath: "C:\tools\hung.cmd", args: ["--version"], timeoutMs: 1_000 } as const;
+    runner.dispose();
+    // Refused rather than ignored: a caller gets an error it can see, not a
+    // promise that never settles.
+    await expect(runner.run(command)).rejects.toThrow(/disposed/i);
+    expect(spawns).toBe(0);
+  });
+
   it("does not reach a probe that already closed", async () => {
     const treeKills: number[] = [];
     let spawned: (EventEmitter & SpawnedProbeProcess) | undefined;

@@ -135,9 +135,26 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Pro
   // timer is otherwise the only caller of the kill, and there is no timer
   // once the app has gone.
   const live = new Set<SpawnedProbeProcess>();
+  /*
+   * ONE-WAY. Once disposed, this runner spawns nothing again.
+   *
+   * dispose() killed what was live and cleared the set, and run() would
+   * happily spawn afterwards -- so a probe started AFTER the kill was never
+   * reachable by anything, because dispose is called once, from before-quit.
+   *
+   * The window is real and is the bounded shutdown: the ledger flushes for up
+   * to SHUTDOWN_DEADLINE_MS with the renderer still alive and its re-check
+   * chains still firing, and the host still willing to sweep. Fable found it
+   * by reading, pass 2: "one disposed = true flag and a reject in run() away
+   * from impossible". With five hung CLIs a sweep landing in that window is
+   * ten processes outliving the app from an ORDINARY quit, by the same route
+   * as the SIGKILL case that cannot be fixed.
+   */
+  let disposed = false;
 
   return {
     dispose(): void {
+      disposed = true;
       for (const child of live) {
         if (typeof child.pid === "number") killTree(child.pid);
         try {
@@ -149,6 +166,11 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Pro
       live.clear();
     },
     run(command: ProbeCommand): Promise<CommandResult> {
+      // Refused rather than ignored: a caller that asked after the app began
+      // quitting gets an error it can see, not a promise that never settles.
+      if (disposed) {
+        return Promise.reject(new Error("Probe runner was disposed"));
+      }
       if (!isAbsolute(command.executablePath)) {
         return Promise.reject(new Error("Probe executable path must be absolute"));
       }

@@ -445,6 +445,18 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
  * moment it can have changed under us.
  */
 let npmSeen: boolean | undefined
+/*
+ * WHY npm was not found, which is not the same question as whether it was.
+ *
+ * The probe answers false for three different machines: no Node at all, an
+ * npm that errors, and an npm that never answers -- nvm-windows with no
+ * version picked, a corporate wrapper waiting on a proxy. All three select
+ * the bundled npm, correctly. But the SENTENCE the screen shows for that
+ * value says "Node.js is not on this machine", and Fable measured it on a
+ * box where Node sat on PATH and only npm hung (pass 2, finding 3). The host
+ * knew which of the three had happened and threw it away one line later.
+ */
+let npmAnswered = true
 const NPM_PROBE_TIMEOUT_MS = 5_000
 const npmPresent = async (): Promise<boolean> => {
   if (npmSeen !== undefined) return npmSeen
@@ -473,6 +485,8 @@ const npmPresent = async (): Promise<boolean> => {
     }
     const timer = setTimeout(() => {
       if (typeof probe.pid === 'number') killSpawnedTree(probe.pid, process.platform)
+      // The one branch that means 'it is there and it did not speak'.
+      npmAnswered = false
       settle(false)
     }, NPM_PROBE_TIMEOUT_MS)
     probe.on('error', () => settle(false))
@@ -522,7 +536,13 @@ const runtimeDiscovery = createRuntimeDiscoveryService({
   // Only when it is the one that WILL run: the installer prefers a machine's
   // own npm and falls back to this, so with Node installed the note would be
   // saying something untrue about the install that is about to happen.
-  npmIsBundled: async () => bundledNpm !== undefined && !(await npmPresent())
+  npmIsBundled: async () => bundledNpm !== undefined && !(await npmPresent()),
+  // Said apart, because the sentence differs: an npm that hung is not a
+  // machine without Node, and a person who installed Node is told otherwise.
+  npmDidNotAnswer: async () => {
+    await npmPresent()
+    return !npmAnswered
+  }
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
