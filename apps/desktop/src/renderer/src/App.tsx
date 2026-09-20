@@ -4205,7 +4205,13 @@ export default function App(): ReactElement {
         })
 
   return (
-    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
+    {/*
+      * `has-inspector` is what insets the workroom so the drawer does not
+      * cover the composer -- which cost a release to get right at 1120x720
+      * (0.187.0). The file viewer shares that region, so it shares the class:
+      * one inset rule, whichever of the two is occupying the space.
+      */}
+    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || (inspectorOpen && liveRun !== undefined)) && screen === 'workroom' ? ' has-inspector' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
         // build instead (Colin, 2026-09-05).
