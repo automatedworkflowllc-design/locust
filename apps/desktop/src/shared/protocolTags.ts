@@ -47,3 +47,70 @@ const ANY_TAG = new RegExp(`<(/?)(${PROTOCOL_TAGS.join('|')})\\b`, 'gi')
 export function defangProtocolBlocks(text: string): string {
   return text.replace(ANY_TAG, `${DEFANGED_BRACKET}$1$2`)
 }
+
+/**
+ * A protocol tag in its loosest possible form: the name, anything that is not
+ * another tag, a close bracket. Deliberately looser than any of the five
+ * parsers.
+ */
+// `\\b`, not `\b`: inside a template literal `\b` is the BACKSPACE character,
+// not a word boundary, and the pattern then matches nothing at all — silently,
+// because it is still a perfectly valid regex.
+const LOOSE_TAG = new RegExp(`</?(?:${PROTOCOL_TAGS.join('|')})\\b[^<>]{0,400}>`, 'gi')
+
+/** Fenced blocks and inline spans, which are quoted source and stay intact. */
+const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g
+
+/**
+ * The last thing done to a reply before a person reads it: take the tags off
+ * anything still wearing them.
+ *
+ * WHY THIS EXISTS. Each of the five parsers is strict, and each has a matching
+ * stripper built from the SAME strict pattern -- so a block the parser will
+ * not act on is also a block the stripper will not hide. Those two facts
+ * multiply into the worst possible pair: the message goes nowhere AND the
+ * person is shown the plumbing.
+ *
+ * Colin, 2026-09-20, with a photograph of a bubble reading
+ * `<locust-share>Booty :: Reply with exactly the word PEBBLE-6725...`: "bug i
+ * think". A bare open tag -- no `to=` -- which `parseShareBlocks` drops and
+ * the share stripper's `\s+` never matched. The same hole is in the other
+ * four from the opposite side: they accept no attributes at all, so
+ * `<locust-memory scope="team">` leaks exactly as loudly.
+ *
+ * UNWRAP, DO NOT DELETE. The strippers delete because their block was ACTED
+ * ON -- it is already a peer card, a memory entry, a decision. Nothing acted
+ * on this one, so its body is the only copy of what the teammate said, and
+ * deleting it would trade a visible defect for a silent one. The tags come
+ * off; the words stay, as ordinary prose the person can read and forward.
+ *
+ * Unpaired tags are handled by not caring about pairs. A turn cut off
+ * mid-block leaves an open tag with no close, which is the case a
+ * block-shaped pattern gets wrong and this gets right for free.
+ *
+ * CODE IS LEFT ALONE. A teammate reading this repo from inside Locust and
+ * explaining the protocol writes these tags ON PURPOSE, in a fence, and that
+ * is not plumbing -- it is the answer. It happens here often enough to be in
+ * these comments twice already.
+ */
+export function unwrapProtocolTags(text: string): string {
+  let out = ''
+  let at = 0
+  for (const span of text.matchAll(CODE)) {
+    const index = span.index ?? 0
+    out += text.slice(at, index).replace(LOOSE_TAG, '')
+    out += span[0]
+    at = index + span[0].length
+  }
+  out += text.slice(at).replace(LOOSE_TAG, '')
+  /*
+   * Leading blank LINES, not leading whitespace. A tag on its own first line
+   * leaves the bubble starting on an empty one, which reads as a gap the
+   * teammate left. `trim()` would also eat the indentation of a message that
+   * opens with an indented code block, and that indentation is content.
+   */
+  return out
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\n+/, '')
+    .trimEnd()
+}

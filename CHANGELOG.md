@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.214.0 - 2026-09-20
+
+- **A teammate's message never shows you the plumbing.** Locust reads a few
+  tagged blocks out of what a teammate writes — send this to Wren, remember
+  this, ask Colin. When one was written slightly wrong, it was both ignored
+  AND printed: the reply arrived with `<locust-share>` around it. Now the
+  tags come off whatever is still wearing them and the words stay, so a
+  message that went nowhere is at least something you can read and pass on
+  yourself.
+
 ## 0.213.0 - 2026-09-20
 
 - **The cursor actually bends the send button's ring now.** The setting was

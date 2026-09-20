@@ -9,6 +9,7 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc.js'
 import { splitAttachments } from '../../shared/attachments.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
+import { unwrapProtocolTags } from '../../shared/protocolTags.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { parseDecision, stripDecisionBlocks } from '../../shared/decision.js'
@@ -2232,7 +2233,16 @@ export function buildThread(
   for (const message of assistantMessages(events)) {
     // A share block is shown in the peer card, attributed and labelled; left
     // in the bubble it would present the same claim twice, once unlabelled.
-    const text = stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(message.text)))))
+    //
+    // `unwrapProtocolTags` LAST, and it is the backstop rather than a sixth
+    // stripper: each of the five above deletes the blocks its own parser
+    // acted on, and this takes the tags off whatever is still wearing them —
+    // a block too malformed to have been acted on, or a turn cut off
+    // mid-block. It keeps the body, because for those the body never reached
+    // anywhere else.
+    const text = unwrapProtocolTags(
+      stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(message.text)))))
+    )
     /*
      * The files the teammate handed over, drawn UNDER the message it came
      * with rather than folded into the work.
