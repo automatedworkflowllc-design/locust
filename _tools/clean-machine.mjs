@@ -76,6 +76,19 @@ async function build() {
     process.exitCode = 1
     return
   }
+  /*
+   * A BUILD STARTS FROM AN EMPTY DISK, ALWAYS.
+   *
+   * Re-running the unattended install over a partially installed disk boots
+   * the ISO beside an existing Windows and setup stops on a dialog the answer
+   * file says nothing about -- "It looks like you started an upgrade and
+   * booted from installation media... Yes to continue, No for a clean
+   * installation" -- and waits there for a human forever. That is how the
+   * first attempt here stalled (2026-09-20), after the VM was resized
+   * mid-install and the install restarted.
+   *
+   * So there is no resume: delete and build.
+   */
   if (exists()) {
     say(`${VM} already exists. Use reset, or delete it first with:`)
     say(`   "${VBOX}" unregistervm ${VM} --delete`)
