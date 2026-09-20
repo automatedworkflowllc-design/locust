@@ -87,6 +87,17 @@ async function build() {
    * first attempt here stalled (2026-09-20), after the VM was resized
    * mid-install and the install restarted.
    *
+   * AND THE SAME IS TRUE OF A POWER CYCLE MID-INSTALL. Stopping the VM
+   * while Windows setup is copying files leaves a disk with no bootable
+   * Windows on it -- detaching the ISO and booting the disk gives "No
+   * bootable option or device was found", and booting the ISO again gives
+   * the upgrade dialog above. Both happened here on 2026-09-20, the second
+   * time because the VM was stopped to give a working machine its RAM back.
+   *
+   * **The install needs an uninterrupted run of about twenty to thirty
+   * minutes at 4GB.** On a machine that is being used, run it when the
+   * machine is idle. There is no resuming it, only starting it again.
+   *
    * So there is no resume: delete and build.
    */
   if (exists()) {
