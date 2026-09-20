@@ -40,6 +40,7 @@ import { decideReveal } from './reveal-file.js'
 import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
+import { isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
 import { createTeammateStore } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
@@ -140,6 +141,7 @@ import {
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
   WORKSPACE_SAVE_COPY_CHANNEL,
+  WORKSPACE_TEXT_CHANNEL,
   DIAGNOSTICS_REVEAL_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
@@ -2370,6 +2372,65 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, dataUrl: `data:${mediaType};base64,${bytes.toString('base64')}` } as const
       } catch {
         return { ok: false, message: 'Could not be read.' } as const
+      }
+    })
+
+    /*
+     * THE FILE VIEWER'S READ.
+     *
+     * Colin, 2026-09-20: "is there a way like what claude code has where when
+     * you click a file/md it opens it over here near where our activity would
+     * be if opened?" A teammate writes you a report and the most this app
+     * could do was put a file manager in front of it.
+     *
+     * Deliberately the image handler's shape, line for line, because the
+     * question it answers is the same question: may the renderer have the
+     * bytes at this path. The roots are the HOST's -- the workspace, every
+     * teammate folder, the ledger -- so a path is a request and never an
+     * instruction, exactly as `reveal-file.ts` sets out.
+     *
+     * Size is checked BEFORE reading, for the reason the handler above gives:
+     * reading a file to find out how big it is has already done the thing the
+     * cap exists to prevent. And it REFUSES rather than truncating -- half a
+     * file drawn as though it were whole is the quiet kind of lie this
+     * project keeps finding in itself.
+     *
+     * What this does NOT do is run anything. It hands text to a renderer that
+     * escapes every value, which is the same treatment a reply gets, and for
+     * the same reason: a file in the workspace was written by a model.
+     */
+    ipcMain.handle(WORKSPACE_TEXT_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      if (typeof requested !== 'string' || requested.length === 0) {
+        return { ok: false, message: 'There is no file to open.' } as const
+      }
+      if (!isViewableText(requested)) {
+        return { ok: false, message: 'Locust does not open that kind of file here.' } as const
+      }
+      const decision = decideReveal(requested, [
+        ...(workspaceChosen ? [workspacePath] : []),
+        ...(await teammateFolders()),
+        ledgerDirectory
+      ])
+      if (!decision.ok) {
+        return {
+          ok: false,
+          message: 'That file is outside the folder your teammates work in, so Locust will not open it.'
+        } as const
+      }
+      try {
+        const measured = await stat(decision.path)
+        if (!measured.isFile()) return { ok: false, message: 'That is a folder, not a file.' } as const
+        if (measured.size > MAX_TEXT_BYTES) {
+          return {
+            ok: false,
+            message: `That file is ${String(Math.round(measured.size / 1024))}KB, too big to show here. Save a copy and open it in an editor.`
+          } as const
+        }
+        const text = await readFile(decision.path, 'utf8')
+        return { ok: true, path: requested, text, mode: viewerMode(requested) } as const
+      } catch {
+        return { ok: false, message: 'That file is not there. The teammate named it but did not write it.' } as const
       }
     })
 

@@ -489,6 +489,20 @@ export type AttachFilesResponse =
   | { readonly ok: false; readonly message: string }
 
 export const WORKSPACE_IMAGE_CHANNEL = 'workspace:image'
+/**
+ * Read a text file a teammate wrote, to show beside the conversation.
+ *
+ * The same containment as the reveal and the image reader: the path is a
+ * REQUEST, honoured only inside a folder the host already knows a mission ran
+ * in. Bounded, and a refusal rather than a truncation -- see
+ * `shared/text-files.ts` for what is readable and why the list is an
+ * allowlist.
+ */
+export type WorkspaceTextResponse =
+  | { readonly ok: true; readonly path: string; readonly text: string; readonly mode: 'markdown' | 'code' }
+  | { readonly ok: false; readonly message: string }
+
+export const WORKSPACE_TEXT_CHANNEL = 'workspace:text'
 
 /**
  * An attached image, as a `data:` URL the renderer can put in an `<img>`.
@@ -1877,6 +1891,8 @@ export interface DesktopApi {
   revealFile(path: string): Promise<RevealFileResponse>
   /** Save a copy of a file a teammate wrote, to a place the person picks. */
   saveCopy(path: string): Promise<RevealFileResponse>
+  /** Read a workspace text file for the viewer. */
+  readTextFile(path: string): Promise<WorkspaceTextResponse>
   /** Show the diagnostics log in the file manager. Names no path. */
   revealDiagnostics(): Promise<void>
   /** Where the log is, for the sentence that tells a person what to send. */
