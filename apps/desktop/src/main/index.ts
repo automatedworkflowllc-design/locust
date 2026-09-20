@@ -1953,7 +1953,34 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
-    ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event) => {
+    ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event, fresh: unknown) => {
+      /*
+       * `fresh` DROPS EVERY CACHED ANSWER, INCLUDING THE ONE ABOUT npm.
+       *
+       * npm is probed once and remembered for the session, and `npmSeen` was
+       * cleared only by the install channel. So a person whose npm hangs got
+       * the wrong sentence on the first screen and no way to correct it --
+       * Check again asked the CLIs again and never re-asked npm, and the
+       * screen's account of the machine stayed stale until they pressed
+       * Install (Fable, pass 2, finding 3b: "clearing npmSeen in
+       * onCheckAgain's path would let the one repair the app offers repair
+       * this too").
+       *
+       * They were right and my hesitation was wrong in a specific way. I
+       * wanted a measurement before adding a five-second probe to a button
+       * whose purpose is to be fast -- but the five seconds only ever land on
+       * the machine whose npm hangs, which is precisely the machine that
+       * needs re-asking, and on every other machine npm answers in
+       * milliseconds. The cost falls exactly where the repair is wanted.
+       *
+       * Only on an explicit ask. The automatic sweeps pass nothing and keep
+       * the cache, so the ordinary re-check is as cheap as it ever was.
+       */
+      if (fresh === true) {
+        npmSeen = undefined
+        npmAnswered = true
+        discoveryCache = undefined
+      }
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
         return {

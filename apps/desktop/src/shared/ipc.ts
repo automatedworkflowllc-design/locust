@@ -1821,7 +1821,13 @@ export interface DesktopApi {
   installUpdate(): Promise<AppUpdateResponse>
   onUpdateState(listener: (state: AppUpdateState) => void): () => void
   pruneMissions(request: MissionPruneRequest): Promise<MissionPruneResponse>
-  getLocalRuntimes(): Promise<RuntimeDiscoveryResponse>
+  /**
+   * Ask the machine what it has. `fresh` drops every cached answer first --
+   * including whether npm is there, which is otherwise decided once per
+   * session. That is the Check again path: the one repair the app offers
+   * should be able to repair the npm reading too (Fable, pass 2, finding 3b).
+   */
+  getLocalRuntimes(fresh?: boolean): Promise<RuntimeDiscoveryResponse>
   getMissionHistory(): Promise<MissionHistoryResponse>
   /** Remove a finished mission's record for good. Refused while it is live. */
   deleteMission(missionId: string): Promise<MissionDeleteResponse>

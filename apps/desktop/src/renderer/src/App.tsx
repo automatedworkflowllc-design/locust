@@ -1185,7 +1185,7 @@ export default function App(): ReactElement {
    * the first time is what showed it: `opencode.cmd` on disk, and the app
    * insisting nothing had happened (drive, 2026-09-06).
    */
-  const askDiscoveryAgain = useRef<() => void>(() => undefined)
+  const askDiscoveryAgain = useRef<(everything?: boolean) => void>(() => undefined)
   /** Check again starts the count of sweeps over; see the discovery effect. */
   const resetDiscoveryBudget = useRef<() => void>(() => undefined)
   const [installElapsed, setInstallElapsed] = useState(0)
@@ -1841,11 +1841,13 @@ export default function App(): ReactElement {
     let sweeps = 1
     let gaveUp = false
     let lastAsked = Date.now()
-    const askAgain = (): void => {
+    // `everything` drops the host's caches too, npm included. Only Check
+    // again passes it: the automatic sweeps stay as cheap as they were.
+    const askAgain = (everything = false): void => {
       if (!active || gaveUp) return
       lastAsked = Date.now()
       void bridge
-        .getLocalRuntimes()
+        .getLocalRuntimes(everything)
         .then((response) => {
           if (!active || !response.ok || gaveUp) return
           const fresh = response.data.checkedAt !== lastCheckedAt
@@ -4612,7 +4614,9 @@ export default function App(): ReactElement {
                   // the top, with CHECKING honest once more while it does.
                   resetDiscoveryBudget.current()
                   setRuntimeState((held) => (held.phase === 'ready' ? { ...held, gaveUp: false } : held))
-                  askDiscoveryAgain.current()
+                  // Everything, including whether npm is there: this is the
+                  // repair, so nothing it could fix should be remembered.
+                  askDiscoveryAgain.current(true)
                 }}
               />
             )

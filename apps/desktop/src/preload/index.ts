@@ -195,7 +195,7 @@ const desktopApi: DesktopApi = {
   },
   pruneMissions: (request: MissionPruneRequest) =>
     ipcRenderer.invoke(MISSION_PRUNE_CHANNEL, request) as Promise<MissionPruneResponse>,
-  getLocalRuntimes: () => ipcRenderer.invoke(RUNTIME_DISCOVERY_CHANNEL) as Promise<RuntimeDiscoveryResponse>,
+  getLocalRuntimes: (fresh?: boolean) => ipcRenderer.invoke(RUNTIME_DISCOVERY_CHANNEL, fresh === true) as Promise<RuntimeDiscoveryResponse>,
   getMissionHistory: () => ipcRenderer.invoke(MISSION_HISTORY_CHANNEL) as Promise<MissionHistoryResponse>,
   deleteMission: (missionId: string) =>
     ipcRenderer.invoke(MISSION_DELETE_CHANNEL, missionId) as Promise<MissionDeleteResponse>,
