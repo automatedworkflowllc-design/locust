@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.218.0 - 2026-09-20
+
+- **The sweep on the live line is wide enough to see.** It shipped in 0.217
+  and read as nothing: the bright band covered a fifth of its travel, so on a
+  seven-letter word it was a couple of characters passing in a blink. It is
+  twice as wide now and peaks a step brighter — still only lightness moving,
+  never a colour of its own. What it is for: the word beside the orb is live,
+  not text that got stuck there.
+- **The thinking orb is drawn a size up.** It is a wave through latitude
+  rings rather than a solid ball, so it used less of its box than the denser
+  shapes on the other rows and read smaller at the same size. The line does
+  not move when it changes.
+
 ## 0.217.0 - 2026-09-20
 
 - **A finished run no longer says things are still running.** A turn that had

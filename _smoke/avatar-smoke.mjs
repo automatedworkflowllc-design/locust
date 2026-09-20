@@ -112,8 +112,9 @@ const faces = `JSON.stringify([...document.querySelectorAll('.lc-face')].map(fac
   const dot = face.querySelector('.lc-presence')
   const shadow = layers.map(l => getComputedStyle(l).boxShadow).join('|')
   return {
-    where: face.closest('.lc-teammate') ? 'sidebar' : face.closest('.lc-workroom__header') ? 'header' : face.closest('.lc-livestep') ? 'step' : face.closest('.lc-agentline') ? 'thread' : face.closest('.lc-empty') ? 'empty' : 'other',
-    name: (face.closest('.lc-teammate') || face.closest('.lc-workroom__header') || { querySelector: () => null }).querySelector?.('.lc-row__name, .lc-workroom__name')?.innerText?.trim() ?? '',
+    where: (face.closest('.lc-faces__one') || face.closest('.lc-teammate')) ? 'sidebar' : face.closest('.lc-workroom__header') ? 'header' : face.closest('.lc-livestep') ? 'step' : face.closest('.lc-agentline') ? 'thread' : face.closest('.lc-empty') ? 'empty' : 'other',
+    name: (face.closest('.lc-faces__one')?.getAttribute('aria-label')?.split(' — ')[0])
+      ?? (face.closest('.lc-teammate') || face.closest('.lc-workroom__header') || { querySelector: () => null }).querySelector?.('.lc-row__name, .lc-workroom__name')?.innerText?.trim() ?? '',
     size: face.getBoundingClientRect().width,
     animating: names,
     activity: face.dataset.activity ?? '',
@@ -175,7 +176,7 @@ try {
 
   say('3b. editing a teammate changes the name and keeps the face')
   const edited = await cdp.eval(`(async () => {
-    const before = [...document.querySelectorAll('.lc-teammate .lc-face__layer')].map(l => getComputedStyle(l).boxShadow).join('|')
+    const before = [...document.querySelectorAll('.lc-faces__one .lc-face__layer')].map(l => getComputedStyle(l).boxShadow).join('|')
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true, bubbles: true }))
     await new Promise(r => setTimeout(r, 300))
     const editButton = document.querySelector('.lc-rostercard__edit')
@@ -199,16 +200,16 @@ try {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true, bubbles: true }))
     await new Promise(r => setTimeout(r, 200))
     // Back to the workroom so the sidebar and composer are the ones under test.
-    // The first TEAMMATE, not the first row-button: Rooms draws a 'New
-    // room' row above the roster, so index 0 stopped being a teammate.
-    // Clicking it opened the Rooms screen, where there is no composer, and
-    // the next line called a setter on null -- the smoke died with
-    // 'Illegal invocation' and reported nothing about faces at all.
-    const row = [...document.querySelectorAll('.lc-teammate .lc-row--button')][0]
+    // The face rail IS the roster in the wide sidebar (0.207). A face is a
+    // button that both picks the teammate and filters the list to them, so
+    // this is the same gesture the old .lc-teammate row-button made.
+    // Index 0 is a teammate here by construction -- the rail holds nothing
+    // else, which is what made the old New-room-row hazard go away.
+    const row = [...document.querySelectorAll('.lc-faces__one')][0]
     row.click()
     await new Promise(r => setTimeout(r, 300))
-    const after = [...document.querySelectorAll('.lc-teammate .lc-face__layer')].map(l => getComputedStyle(l).boxShadow).join('|')
-    const names = [...document.querySelectorAll('.lc-teammate .lc-row__name')].map(n => n.innerText.trim())
+    const after = [...document.querySelectorAll('.lc-faces__one .lc-face__layer')].map(l => getComputedStyle(l).boxShadow).join('|')
+    const names = [...document.querySelectorAll('.lc-faces__one')].map(n => (n.getAttribute('aria-label') || '').split(' — ')[0])
     return JSON.stringify({ opened: true, title, saved: true, names, faceUnchanged: before === after })
   })()`)
   const editState = JSON.parse(edited)
@@ -218,12 +219,12 @@ try {
 
   say('4. while the first Wren works, only their face moves')
   await cdp.eval(`(async () => {
-    // The first TEAMMATE, not the first row-button: Rooms draws a 'New
-    // room' row above the roster, so index 0 stopped being a teammate.
-    // Clicking it opened the Rooms screen, where there is no composer, and
-    // the next line called a setter on null -- the smoke died with
-    // 'Illegal invocation' and reported nothing about faces at all.
-    const row = [...document.querySelectorAll('.lc-teammate .lc-row--button')][0]
+    // The face rail IS the roster in the wide sidebar (0.207). A face is a
+    // button that both picks the teammate and filters the list to them, so
+    // this is the same gesture the old .lc-teammate row-button made.
+    // Index 0 is a teammate here by construction -- the rail holds nothing
+    // else, which is what made the old New-room-row hazard go away.
+    const row = [...document.querySelectorAll('.lc-faces__one')][0]
     row.click()
     await new Promise(r => setTimeout(r, 300))
     const field = document.querySelector('form.command-dock textarea')
@@ -300,8 +301,29 @@ try {
   check('no face animates under reduced motion', reduced.every((face) => face.animating.length === 0), JSON.stringify(reduced.map((f) => f.animating)))
   const reducedFirst = reduced.filter((face) => face.where === 'sidebar')[0]
   check('the working teammate still wears the presence dot', reducedFirst?.presence === 'lc-presence--lime', reducedFirst?.presence)
-  const label = await cdp.eval(`[...document.querySelectorAll('.lc-teammate .lc-row__meta')].map(n => n.innerText).join(' | ')`)
-  check('and the text still says what they are doing', /thinking|working|replying/.test(label), label)
+  /*
+   * The state is still READABLE with the motion off -- which is the whole
+   * point of this check, and is why it did not simply move to a colour.
+   *
+   * It used to read `.lc-teammate .lc-row__meta`, a line of text under every
+   * roster row. Since 0.207 the wide sidebar's roster is a one-row face rail
+   * with no text in it at all, so that selector matched nothing and this
+   * reported the app broken. The words did not go away: they went to the
+   * flyout the rail opens on hover AND on focus, which is where the rail
+   * says name, state and model as real text.
+   */
+  const label = await cdp.eval(`(async () => {
+    const face = document.querySelector('.lc-faces__one')
+    if (!face) return 'no face rail'
+    face.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }))
+    for (let i = 0; i < 40; i += 1) {
+      await new Promise(r => setTimeout(r, 100))
+      const said = document.querySelector('.lc-railflyout__status')
+      if (said) return said.innerText.trim()
+    }
+    return 'no flyout'
+  })()`)
+  check('and the text still says what they are doing', /thinking|working|replying/i.test(label), label)
   await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: '' }] })
 
   say('6. when the mission ends, every face is still')

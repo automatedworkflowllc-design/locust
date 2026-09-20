@@ -5266,12 +5266,26 @@ textarea {
  * nowhere, so painting with it would have left the word transparent.)
  */
 .lc-sweep {
+  /*
+   * A WIDER BAND, because the first one was too subtle to do its job.
+   *
+   * Colin shipped with it in 0.217 and then asked for it again -- "the slight
+   * subtle text glow moving gradient i mentioned that claude code does we
+   * should add that to the text next to the orb" -- which is the clearest
+   * possible report that a feature that IS there reads as absent. The band
+   * was 20% of a 300% background, so on a seven-letter word the bright part
+   * was a couple of characters wide and passed in a fraction of a second.
+   *
+   * It is 40% now and peaks one step brighter. Still no colour of its own:
+   * the word's own muted ink at rest, the name ink at the crest, so the only
+   * thing that moves is lightness.
+   */
   background: linear-gradient(
     100deg,
     var(--lc-text-muted) 0%,
-    var(--lc-text-muted) 40%,
+    var(--lc-text-muted) 30%,
     var(--lc-text-name) 50%,
-    var(--lc-text-muted) 60%,
+    var(--lc-text-muted) 70%,
     var(--lc-text-muted) 100%
   );
   background-size: 300% 100%;
@@ -11486,6 +11500,27 @@ textarea {
 .lc-livestep__register .lc-livestep__orb {
   margin-right: 6px;
   vertical-align: middle;
+}
+
+/*
+ * The THINKING orb, and only it, drawn a size up.
+ *
+ * Colin, 2026-09-20, with a frame of it beside the word: "can you make just
+ * the thinking animation in locust slightly larger? i think cause its not a
+ * massive ball we can get away with it". He is right about why: `listening`
+ * is a wave through latitude rings, so most of its 20px box is empty and it
+ * reads smaller than the dense shapes on the other registers even though
+ * every orb is handed the same size.
+ *
+ * SCALED, NOT RESIZED. The library takes 64 or 20 and `resolvePreset` throws
+ * on anything else, so the size cannot simply be raised. The BOX stays 20px
+ * and the drawing overflows it, which is the same trick the sidebar row uses
+ * in the other direction -- the line's layout does not move when the register
+ * changes, and nothing has to be re-measured.
+ */
+.lc-livestep__orb[data-orb='listening'] > * {
+  transform: scale(1.3);
+  transform-origin: center;
 }
 
 /*
