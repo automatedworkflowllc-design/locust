@@ -175,7 +175,7 @@ try {
         const viewer = document.querySelector('.lc-viewer')
         /*
          * THE WIDEST thread, not the first. A conversation of two turns draws
-         * one `.lc-thread` per turn, and `querySelector` took whichever came
+         * one thread element per turn, and querySelector took whichever came
          * first -- which reported 426px on a run whose conversation was
          * plainly 630px wide in its own frame. A measurement that picks one
          * of N without saying so is a measurement of nothing.
