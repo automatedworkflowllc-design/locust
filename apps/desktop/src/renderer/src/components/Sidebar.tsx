@@ -612,7 +612,7 @@ export function Sidebar({
                       * the tone still carries whether it ended well.
                       */}
                     {mission.phase === 'running' ? (
-                      <span className="lc-row__orb" aria-hidden="true">
+                      <span className="lc-row__orb" aria-hidden="true" data-orb="working">
                         <ThinkingOrb state="working" size={20} theme="dark" />
                       </span>
                     ) : (

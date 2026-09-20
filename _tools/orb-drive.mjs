@@ -53,10 +53,11 @@ const WATCH = `(async () => {
   const tick = () => {
     const step = document.querySelector('.lc-livestep')
     if (step) {
-      const orb = step.querySelector('.lc-livestep__orb canvas')
+      const well = step.querySelector('.lc-livestep__orb')
+      const orb = well ? well.querySelector('canvas') : null
       const words = (step.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 90)
       const register = step.getAttribute('data-register')
-      const seen = orb === null ? 'none' : (orb.getAttribute('aria-label') || 'orb')
+      const seen = orb === null ? 'none' : (well.getAttribute('data-orb') || 'orb')
       const key = seen + '|' + register + '|' + words
       if (!window.__orbSeen.some(r => r.key === key)) {
         window.__orbSeen.push({ key, orb: seen, register, words, painted: orb === null ? null : orb.width + 'x' + orb.height })
@@ -99,7 +100,7 @@ try {
 
   await drive.capture('the orb, while the turn is still running', async () => {
     const seen = await drive.waitFor(
-      `(() => { const c = document.querySelector('.lc-livestep__orb canvas'); return c ? (c.getAttribute('aria-label') || 'orb') + ' ' + c.width + 'x' + c.height : false })()`,
+      `(() => { const w = document.querySelector('.lc-livestep__orb'); const c = w ? w.querySelector('canvas') : null; return c ? (w.getAttribute('data-orb') || 'orb') + ' ' + c.width + 'x' + c.height : false })()`,
       { what: 'an orb on the live step', timeoutMs: 30_000 }
     )
     check('an orb is on screen mid-run', /\d+x\d+/.test(String(seen)), seen)
@@ -167,10 +168,24 @@ try {
      * THE CONTRADICTION CHECK, which is the point of the whole feature.
      * A shell register must never carry the reading orb, and vice versa.
      */
+    /*
+     * READ OFF `data-orb`, WHICH IS OURS, not the library's `aria-label`.
+     *
+     * `ThinkingOrb` labels its canvas from its own state name, and since
+     * 2026-09-20 those names are an ALLOCATION of shapes to rows rather than
+     * a description of them -- so the label stopped agreeing with the row by
+     * construction, and this check was about to start comparing a string that
+     * no longer meant anything here. Nobody hears it either way: the canvas is
+     * aria-hidden and the row's own words are the accessible name.
+     *
+     * The RULE is unchanged and is the point of the whole feature: the
+     * reading orb never sits on a command, and the tool orb never sits on a
+     * read. Those are the two things the mapping actually promises.
+     */
     const wrong = withOrb.filter((row) => {
-      const label = String(row.orb).toLowerCase()
-      if (/searching/.test(label) && /shell|command/i.test(String(row.words))) return true
-      if (/working/.test(label) && /\bread\b|grep|view_file/i.test(String(row.words))) return true
+      const state = String(row.orb).toLowerCase()
+      if (state === 'searching' && /shell|command/i.test(String(row.words))) return true
+      if (state === 'listening' && /\bread\b|grep|view_file/i.test(String(row.words))) return true
       return false
     })
     if (withOrb.length > 0) {

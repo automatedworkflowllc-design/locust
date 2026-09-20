@@ -258,7 +258,7 @@ export function ThreadItems({
                   steps={item.steps}
                   doneCount={item.doneCount}
                   outcomes={!(planMode && item.touchedNothing === true)}
-                  {...(runningOrb === undefined ? {} : { orb: runningOrb })}
+                  underway={runningOrb !== undefined}
                 />
                 {/*
                   * Derived, and true: this run changed nothing, and the mode is
@@ -320,7 +320,7 @@ export function ThreadItems({
               workspacePath={workspacePath}
               openByDefault={item.openByDefault === true}
               {...(onOpenFile === undefined ? {} : { onOpenFile })}
-              {...(runningOrb === undefined ? {} : { planOrb: runningOrb })}
+              planUnderway={runningOrb !== undefined}
               {...(item.plan === undefined ? {} : { plan: item.plan })}
               {...(item.notices === undefined ? {} : { notices: item.notices })}
             />

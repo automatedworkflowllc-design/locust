@@ -1646,18 +1646,40 @@ export function orbStateFor(
      * five transitions a run walks showed no change at all.
      *
      * CHOSEN BY RENDERING THE SEQUENCE, not by reasoning about names: the
-     * four candidate mappings were drawn at 20px side by side in the order a
-     * run actually walks them. `weaving` for thinking is nearly invisible at
-     * that size and `shaping` for writing is a hard triangle that reads as an
-     * icon rather than a state; both were rejected on sight.
+     * candidate mappings were drawn at 20px side by side in the order a run
+     * actually walks them. `weaving` for thinking is nearly invisible at that
+     * size and `shaping` for writing is a hard square that reads as an icon
+     * rather than a state; both were rejected on sight, twice, because the
+     * names keep suggesting them and the pictures keep refusing.
      *
-     * What survives is honest on its own terms rather than merely distinct:
-     * waiting on a model to speak IS listening, and a model streaming its
-     * answer IS composing one.
+     * THEN COLIN NAMED THE RULE THE PICTURES WERE ALREADY MAKING.
+     * 2026-09-20, after swapping two of these by eye: *"im sure you're
+     * noticing a theme, the spherical ones are preffered for sure."*
+     *
+     * All nine were re-rendered at 20px from the library's own engine to
+     * settle it with something other than an adjective, and at the size that
+     * ships the set splits cleanly. THREE read as spheres — `searching` (a
+     * dotted globe), `solving` (the scrambling one he picked for the plan)
+     * and `listening` (a wave through latitude rings) — with `composing`, a
+     * barrel of strokes, a near fourth. The rest are sparse clouds or flat
+     * outlines: `working` is about four dots, `connecting` four, `breathing`
+     * a hollow ring, `shaping` a square.
+     *
+     * So the mapping is now an ALLOCATION rather than a set of puns: the
+     * three spheres go on the rows a person actually stares at. `listening`
+     * takes the working register — the busiest line in the app, and the one
+     * whose four sparse dots Colin flagged twice — and `working` inherits
+     * `writing`, which is the briefest word a run says and therefore the
+     * cheapest place to spend the weakest asset.
+     *
+     * The honest-on-its-own-terms reading survives the move, for whatever it
+     * is worth: a model grinding through a tool IS listening for the result,
+     * and a model streaming its answer IS composing one. But the pictures
+     * decided, not that sentence.
      */
-    if (register === 'writing') return 'composing'
-    if (register === 'working') return 'working'
-    if (register === 'thinking') return 'listening'
+    if (register === 'writing') return 'working'
+    if (register === 'working') return 'listening'
+    if (register === 'thinking') return 'composing'
     /*
      * A STEP THAT SAYS `tool` WITHOUT AN OPEN TOOL still means a tool is
      * running. Codex reports both a step and its tools, and the step can be
@@ -1669,7 +1691,7 @@ export function orbStateFor(
      * It is the contradiction the whole mapping exists to prevent, and it was
      * invisible on every free route because no free runtime streams steps.
      */
-    if (register === 'tool') return 'working'
+    if (register === 'tool') return 'listening'
     return WAITING_ORB
   }
   /*
@@ -1679,7 +1701,7 @@ export function orbStateFor(
    * work is happening somewhere this row cannot show you.
    */
   if (detail.kind === 'helper') return 'connecting'
-  if (detail.kind === 'shell') return 'working'
+  if (detail.kind === 'shell') return 'listening'
   const words = detail.name
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .split(/[^A-Za-z]+/)
@@ -1687,11 +1709,11 @@ export function orbStateFor(
   if (words.some((word) => READ_TOOL_WORDS.has(word))) return 'searching'
   /*
    * Any other open tool -- writing a file, or one this app does not
-   * classify -- is `working`. A tool is running, which is all `working`
-   * claims; the row says which tool. The specific three claim MORE than
-   * that, so they are never the fallback.
+   * classify -- is `listening`. A tool is running, which is all this claims;
+   * the row says which tool. The specific ones claim MORE than that, so they
+   * are never the fallback.
    */
-  return 'working'
+  return 'listening'
 }
 
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {

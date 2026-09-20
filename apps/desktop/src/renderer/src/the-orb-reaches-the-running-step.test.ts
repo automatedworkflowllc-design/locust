@@ -62,7 +62,7 @@ describe('the orb reaches the running step', () => {
   it('a shell command that is still open draws the working orb', () => {
     const step = liveStep([started('t1', 'shell', 'command_execution', 'pnpm test billing')])
     expect(step?.register).toBe('tool')
-    expect(step?.orb).toBe('working')
+    expect(step?.orb).toBe('listening')
   })
 
   it('a read that is still open draws the searching orb', () => {
@@ -85,7 +85,7 @@ describe('the orb reaches the running step', () => {
     const specific = liveStep([started('t1', 'read_file'), completed('t1')])
     expect(specific?.orb).not.toBe('searching')
     const step = liveStep([started('t1', 'shell', 'command_execution', 'ls'), completed('t1')])
-    expect(step?.orb).toBe('working')
+    expect(step?.orb).toBe('listening')
   })
 
   it('a Plan-mode turn with no tool open draws the solving orb', () => {
@@ -108,6 +108,6 @@ describe('the orb reaches the running step', () => {
     // costs nothing to test with. It draws the generic orb now -- the run is
     // working, and the app does not pretend to know more than that.
     const step = liveStep([started('t1', 'shell', 'command_execution', 'echo orb'), completed('t1')])
-    expect(step?.orb).toBe('working')
+    expect(step?.orb).toBe('listening')
   })
 })

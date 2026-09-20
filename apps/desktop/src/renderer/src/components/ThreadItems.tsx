@@ -386,29 +386,52 @@ function alignClass(align: 'left' | 'right' | 'center' | undefined): string | un
   return align === undefined ? undefined : `is-${align}`
 }
 
+/**
+ * The plan's step orb, and it is FIXED rather than borrowed.
+ *
+ * Colin, 2026-09-20, with a photograph of the sparse `working` dots: *"could
+ * you swap this one out for another one of the orbs we dont see that much? i
+ * see it plan consistently and i think it would look alot better as one of
+ * the more spherical assets"* — then, pointing at `solving`: *"maybe this
+ * one? the one thats like a spherical rubix cube"*.
+ *
+ * He is right on the look and right on the logic underneath it, which I had
+ * wrong. The running step used to mirror the live line's orb, on the reasoning
+ * that both say "this is happening now". They do not say the same thing. The
+ * live line names the REGISTER — searching, writing, running a command — and
+ * sits beside a word it must not contradict. The plan's step names a STEP,
+ * and the only claim being made about it is that it is the one being worked
+ * through. `solving` is exactly that claim, it is true of every step underway
+ * whatever tool is open, and it has no word beside it to disagree with.
+ *
+ * It also fixes a noise problem I had shipped without seeing: two canvases
+ * running the SAME animation in lockstep on one screen, which reads as a
+ * glitch rather than as two facts.
+ */
+const PLAN_ORB: OrbState = 'solving'
+
 export function PlanSteps({
   steps,
   doneCount,
   outcomes,
-  orb
+  underway = false
 }: {
   readonly steps: readonly PlanStep[]
   readonly doneCount: number
   /** Whether a run happened and these steps have states to report. */
   readonly outcomes: boolean
   /**
-   * The orb for the step underway, when the turn is still running.
+   * Whether the turn is still running, so the step underway gets its orb.
    *
    * Colin, 2026-09-20: *"lets use the orbs for the working portion of the
-   * plan as well."* The running step and the live line are making the SAME
-   * claim — this is what is happening now — so they get the same mark and it
-   * is the live line's own orb rather than a second opinion about the same
-   * turn.
+   * plan as well."* This was an `OrbState` until he looked at it — see
+   * `PLAN_ORB` for why a boolean is the honest shape. The plan does not need
+   * to be told WHICH orb; it needs to be told whether anything is underway.
    *
-   * Absent on a finished plan, where a pulsing anything would say a step is
-   * underway after the run has ended.
+   * False on a finished plan, where a pulsing anything would say a step is
+   * running after the run has ended.
    */
-  readonly orb?: OrbState
+  readonly underway?: boolean
 }): ReactElement | null {
   // A Plan-mode turn that produced no steps is not a plan -- it is the
   // silent-turn case, which already has its own diagnostic. An empty list with
@@ -464,11 +487,11 @@ export function PlanSteps({
                 */}
               {step.state === 'done' ? (
                 <Icon name="check" size={11} />
-              ) : step.state === 'running' && orb !== undefined ? (
+              ) : step.state === 'running' && underway ? (
                 // The orb REPLACES the pulsing pip rather than joining it:
                 // two things pulsing on one row is the row saying "now" twice.
-                <span className="lc-plan__orb">
-                  <ThinkingOrb state={orb} size={20} theme="dark" aria-hidden="true" />
+                <span className="lc-plan__orb" data-orb={PLAN_ORB}>
+                  <ThinkingOrb state={PLAN_ORB} size={20} theme="dark" aria-hidden="true" />
                 </span>
               ) : (
                 <span className={`lc-dot${step.state === 'running' ? ' is-pulsing' : ''}`} />
@@ -575,8 +598,21 @@ export function LiveRegisterLine({
       <span className="lc-livestep__label">
         {name !== undefined && <span className="lc-livestep__who">{name}</span>}
         <span className="lc-livestep__register lc-mono">
+          {/*
+            * `data-orb` IS THE SEAM, and the library's `aria-label` is not.
+            *
+            * `ThinkingOrb` labels its canvas from its own state name —
+            * "Listening…", "Composing…" — and since 2026-09-20 those names are
+            * an ALLOCATION of shapes to rows rather than a description of
+            * them, so the label and the row's word no longer agree by
+            * construction. Nobody hears it: the canvas is `aria-hidden` and
+            * the row's own text is the accessible name. But the orb drive was
+            * reading that label as the orb's IDENTITY, which quietly emptied
+            * its contradiction check — so the state is published here, by us,
+            * where it is true.
+            */}
           {orb !== undefined && (
-            <span className="lc-livestep__orb">
+            <span className="lc-livestep__orb" data-orb={orb}>
               {/*
                 * `theme="dark"` pinned, not `auto`: `auto` falls back to the
                 * OS setting and Locust is dark regardless, so a light desktop

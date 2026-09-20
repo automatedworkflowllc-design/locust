@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.216.0 - 2026-09-20
+
+- **Older conversations stop dropping out of their groups.** A conversation
+  that began far enough back could appear under a different name and outside
+  the group you filed it in — because the sidebar only ever saw the twenty
+  most recent turns, and a conversation whose first turn fell outside that
+  window was identified by a later turn instead. Its name, and which group it
+  is in, both hang off that first turn. Nothing was ever moved, renamed or
+  lost; the app was looking under the wrong name.
+- **The orbs are spherical where you look most.** The plan's step underway
+  has its own orb rather than borrowing the live line's, and the busiest rows
+  carry the fuller shapes.
+
 ## 0.215.0 - 2026-09-20
 
 - **The send button's halo leaves with your cursor.** It used to stay lit

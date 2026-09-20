@@ -230,6 +230,80 @@ export function withinByteBudget(
   return kept
 }
 
+/** Bound on the extra ledger reads one history call may do to find roots. */
+const MAX_ANCESTOR_READS = 200
+
+/**
+ * The earlier turns of every conversation on the page, as IDENTITY ONLY.
+ *
+ * THE BUG THIS EXISTS FOR, and it is the worst kind this app has shipped:
+ * a paging boundary was changing what a conversation IS.
+ *
+ * Colin, 2026-09-20, with a screenshot of an empty group: *"both my stonks
+ * and research chats are gone out of the stonks group, probably autorenamed
+ * and moved, def need this fixed"*. Nothing was moved and nothing was
+ * renamed. His ledger had 58 missions; this call returns the 20 most recently
+ * touched; and his stonks conversations began on 14 and 15 September, so
+ * their EARLIEST turns fell off the page. The renderer builds a row by
+ * walking `continuesFrom` back through the missions it was given, so with
+ * those turns absent the walk stopped early and the row's `rootId` became a
+ * later turn. Everything hangs off that id:
+ *
+ *   - the title is the ROOT's first sentence, so the row renamed itself to a
+ *     mid-conversation prompt — "looks autorenamed";
+ *   - a name he typed is stored against the root, so it stopped matching;
+ *   - group membership is stored against the root, so `stonks` matched
+ *     nothing and read "Nothing in here yet" — "looks moved".
+ *
+ * Three symptoms, one cause, and no data involved in any of them: the
+ * ledgers and `groups.json` were intact the whole time. Measured against his
+ * real files before a line was changed.
+ *
+ * WHY IDENTITY ONLY. The page is bounded by bytes because a mission carries
+ * up to 500 events and some of those are megabytes; raising the count would
+ * just move the cliff. But a row needs its ancestors' IDS AND PROMPTS, not
+ * their transcripts — a few hundred bytes each — so these are projected with
+ * `events` emptied and appended after the budget. They cost nothing and they
+ * make the row's identity independent of where the page happened to cut.
+ *
+ * This is a floor, not the whole answer. The real fix is a compact
+ * conversation list that is not the same payload as the thread, so the
+ * sidebar stops being a side effect of how much transcript fits in one IPC
+ * message. Until then a very old conversation can still be short of turns
+ * when opened — but it is in the right group, under its own name.
+ */
+async function ancestorsOf(
+  shown: readonly PublicRecoveredMission[],
+  ledger: MissionLedger,
+  workroomMessages: ReadonlyMap<string, WorkroomMessage>
+): Promise<readonly PublicRecoveredMission[]> {
+  const have = new Set(shown.map((mission) => mission.missionId))
+  const wanted = shown.flatMap((mission) =>
+    mission.continuesFrom === undefined ? [] : [mission.continuesFrom.missionId])
+  const found: PublicRecoveredMission[] = []
+  let reads = 0
+  while (wanted.length > 0 && reads < MAX_ANCESTOR_READS) {
+    const missionId = wanted.shift()
+    if (missionId === undefined || have.has(missionId)) continue
+    have.add(missionId)
+    reads += 1
+    let older
+    try {
+      older = await ledger.getMission(missionId)
+    } catch {
+      // A torn or missing ancestor ends this branch of the walk where it
+      // stands. The row keeps whatever root it can reach, which is exactly
+      // the old behaviour rather than a new failure.
+      continue
+    }
+    if (older === undefined) continue
+    found.push({ ...publicRecoveredMission(older, workroomMessages), events: [] })
+    const next = older.metadata.continuesFrom?.missionId
+    if (next !== undefined) wanted.push(next)
+  }
+  return found
+}
+
 export async function readMissionHistory(
   ledger: MissionLedger,
   workroom?: Workroom,
@@ -251,14 +325,15 @@ export async function readMissionHistory(
         // Every link then reads as `text: null`, which is what happened.
       }
     }
+    const shown = withinByteBudget(
+      snapshot.missions
+        .slice(0, MAX_HISTORY_MISSIONS)
+        .map((mission) => publicRecoveredMission(mission, workroomMessages))
+    )
     return {
       ok: true,
       data: {
-        missions: withinByteBudget(
-          snapshot.missions
-            .slice(0, MAX_HISTORY_MISSIONS)
-            .map((mission) => publicRecoveredMission(mission, workroomMessages))
-        ),
+        missions: [...shown, ...(await ancestorsOf(shown, ledger, workroomMessages))],
         currentWorkspaceId: workspaceIdFor(workspacePath),
         issueCount: snapshot.issues.length,
         // Straight from the reader. It used to be derived here by comparing
