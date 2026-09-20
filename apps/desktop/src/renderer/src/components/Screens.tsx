@@ -3,6 +3,7 @@ import { durationText, usagePercent, usageWindowSentence } from '../missionView.
 import { AgentText } from './ThreadItems.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import type { SettingsPageId } from '../settingsPages.js'
+import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
 
@@ -1094,6 +1095,11 @@ export function SettingsScreen({
   swarm,
   tube,
   replySize,
+  metal,
+  metalStrength,
+  metalMotion,
+  metalBend,
+  onMetalChange,
   onReplySizeChange,
   onTubeChange,
   onSwarmChange,
@@ -1160,6 +1166,17 @@ export function SettingsScreen({
   readonly onTubeChange: (tube: TubePreference) => void
   /** How big a reply is set. The person's, not the app's -- see ReplyTextSize. */
   readonly replySize: ReplyTextSize
+  /** The send button's metal; every option the design pass offered. */
+  readonly metal: MetalPreset
+  readonly metalStrength: MetalStrength
+  readonly metalMotion: MetalMotion
+  readonly metalBend: boolean
+  readonly onMetalChange: (next: {
+    readonly metal?: MetalPreset
+    readonly metalStrength?: MetalStrength
+    readonly metalMotion?: MetalMotion
+    readonly metalBend?: boolean
+  }) => void
   readonly onReplySizeChange: (size: ReplyTextSize) => void
   readonly onAutoModeChange: (autoMode: boolean) => void
   readonly askConnectors: boolean
@@ -1901,6 +1918,130 @@ export function SettingsScreen({
               ))}
             </div>
           </div>
+          </div>
+        </section>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">The send button</h2>
+          <p className="lc-settings__lede">
+            {metal === 'off'
+              ? 'Off. A plain button, and no shader running in the composer.'
+              : metalMotion === 'always'
+                ? `Always on. ${metal === 'chromatic' ? 'Chromatic' : metal === 'silver' ? 'Silver' : 'Gold'}, moving whether or not you are there.`
+                : `On hover. ${metal === 'chromatic' ? 'Chromatic' : metal === 'silver' ? 'Silver' : 'Gold'}, still until you point at it.`}
+          </p>
+          <More>
+            <p>
+              Every option here is one the design pass put forward, on screen rather than buried in the
+              source, because a look is settled by seeing it rather than by describing it.
+            </p>
+            <p>
+              Its recommendation was silver at Standard, on hover only -- the argument being that in this
+              app a thing that moves means work is happening, so a button that shimmers all the time says
+              "running" on a screen where nothing is. Always on is here so you can disagree with that
+              after looking at it.
+            </p>
+            <p>
+              Off is not only a matter of taste: the effect is WebGL, and a plain button costs nothing and
+              cannot fail to appear.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">Which metal.</span>
+              <div className="lc-segmented" role="radiogroup" aria-label="Which metal">
+                {(
+                  [
+                    ['off', 'Off'],
+                    ['chromatic', 'Chromatic'],
+                    ['silver', 'Silver'],
+                    ['gold', 'Gold']
+                  ] as const
+                ).map(([option, label]) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={metal === option}
+                    className={`lc-button${metal === option ? ' is-active' : ''}`}
+                    onClick={() => onMetalChange({ metal: option })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">How strong.</span>
+              <div className="lc-segmented" role="radiogroup" aria-label="How strong the metal is">
+                {(
+                  [
+                    ['subtle', 'Subtle'],
+                    ['standard', 'Standard'],
+                    ['strong', 'Strong']
+                  ] as const
+                ).map(([option, label]) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={metalStrength === option}
+                    disabled={metal === 'off'}
+                    className={`lc-button${metalStrength === option ? ' is-active' : ''}`}
+                    onClick={() => onMetalChange({ metalStrength: option })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">When it moves.</span>
+              <div className="lc-segmented" role="radiogroup" aria-label="When the metal moves">
+                {(
+                  [
+                    ['hover', 'On hover'],
+                    ['always', 'Always on']
+                  ] as const
+                ).map(([option, label]) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={metalMotion === option}
+                    disabled={metal === 'off'}
+                    className={`lc-button${metalMotion === option ? ' is-active' : ''}`}
+                    onClick={() => onMetalChange({ metalMotion: option })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">
+                The cursor bend -- a liquid dent that rides the ring as you move across it.
+              </span>
+              <div className="lc-segmented" role="radiogroup" aria-label="The cursor bend">
+                {(
+                  [
+                    [true, 'On'],
+                    [false, 'Off']
+                  ] as const
+                ).map(([option, label]) => (
+                  <button
+                    key={String(option)}
+                    type="button"
+                    role="radio"
+                    aria-checked={metalBend === option}
+                    disabled={metal === 'off'}
+                    className={`lc-button${metalBend === option ? ' is-active' : ''}`}
+                    onClick={() => onMetalChange({ metalBend: option })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
         <section className="lc-settings__section">

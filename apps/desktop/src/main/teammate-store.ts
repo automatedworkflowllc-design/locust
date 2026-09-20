@@ -128,7 +128,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard' }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'chromatic', metalStrength: 'subtle', metalMotion: 'hover', metalBend: true }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -142,6 +142,31 @@ function parsedTodoList(value: unknown): boolean {
 
 /** How much of the boot screen to draw, or the default. Never trusts the file. */
 /** How big the reply is set, or the default. Never trusts the file. */
+/**
+ * One of a known set, or the default. The same shape every other parser here
+ * uses, and for the same reason: a settings file is a file on a disk, and a
+ * value that is not one of the options has to read as "not set" rather than
+ * reach the renderer and be rendered.
+ */
+function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? (value as T) : fallback
+}
+
+const METAL_PRESETS = ['off', 'chromatic', 'silver', 'gold'] as const
+const METAL_STRENGTHS = ['subtle', 'standard', 'strong'] as const
+const METAL_MOTIONS = ['hover', 'always'] as const
+
+/** The send button's metal, read off whatever the file happens to hold. */
+function parsedMetal(raw: unknown): Pick<WorkspaceSettings, 'metal' | 'metalStrength' | 'metalMotion' | 'metalBend'> {
+  const record = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
+  return {
+    metal: oneOf(record.metal, METAL_PRESETS, 'chromatic'),
+    metalStrength: oneOf(record.metalStrength, METAL_STRENGTHS, 'subtle'),
+    metalMotion: oneOf(record.metalMotion, METAL_MOTIONS, 'hover'),
+    metalBend: typeof record.metalBend === 'boolean' ? record.metalBend : true
+  }
+}
+
 function parsedReplySize(value: unknown): ReplyTextSize {
   return value === 'standard' || value === 'large' || value === 'largest' ? value : 'standard'
 }
@@ -414,6 +439,7 @@ function parsedFile(text: string): StoredFile {
     tube: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedTube((rawSettings as Record<string, unknown>).tube)
       : 'full',
+    ...parsedMetal(rawSettings),
     replySize: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedReplySize((rawSettings as Record<string, unknown>).replySize)
       : 'standard'
@@ -735,6 +761,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           layout: typeof settings === 'object' && settings !== null
             ? parsedLayout((settings as Record<string, unknown>).layout)
             : 'auto',
+          ...parsedMetal(settings),
           replySize: typeof settings === 'object' && settings !== null
             ? parsedReplySize((settings as Record<string, unknown>).replySize)
             : 'standard'

@@ -12,6 +12,7 @@ import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../m
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
+import type { OrbState } from '../missionView.js'
 import { PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
@@ -143,8 +144,11 @@ export function ActivityCard({
   plan,
   notices = [],
   onOpenFile,
+  planOrb,
   openByDefault = false
 }: {
+  /** The orb for the plan's running step; see `PlanSteps`. */
+  readonly planOrb?: OrbState
   readonly summary: string
   /**
    * Open a file this turn touched in the panel beside the conversation.
@@ -289,7 +293,7 @@ export function ActivityCard({
                   with the one prop that separates the two jobs. Inside a fold
                   a run happened, so the steps have outcomes and the counter is
                   a fact about them. */}
-              <PlanSteps steps={plan.steps} doneCount={plan.doneCount} outcomes />
+              <PlanSteps steps={plan.steps} doneCount={plan.doneCount} outcomes {...(planOrb === undefined ? {} : { orb: planOrb })} />
             </div>
           )}
           {entries.map((entry) => (

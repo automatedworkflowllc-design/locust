@@ -1,3 +1,4 @@
+import type { MetalStrength } from '../../shared/ipc.js'
 import type { BendConfig, MetalFxPreset } from 'metal-fx'
 import { BEND_DEFAULTS } from 'metal-fx'
 
@@ -22,8 +23,22 @@ import { BEND_DEFAULTS } from 'metal-fx'
  */
 export const METAL_PRESET: MetalFxPreset = 'chromatic'
 
+/**
+ * What each named strength is worth.
+ *
+ * The three numbers anybody actually named: 0.35 was Colin's starting point,
+ * 0.55 the design agent's recommendation, and 1.0 the "aggressive glow to
+ * avoid" — so `strong` stops short of it rather than offering the one value
+ * the brief ruled out.
+ */
+export const METAL_STRENGTHS: Readonly<Record<MetalStrength, number>> = {
+  subtle: 0.35,
+  standard: 0.55,
+  strong: 0.8
+}
+
 /** Colin's starting point. The brief wanted 0.55; 1.0 is the glow to avoid. */
-export const METAL_STRENGTH = 0.35
+export const METAL_STRENGTH = METAL_STRENGTHS.subtle
 
 /**
  * The "gooey" half — metal-fx's own cursor bend, not another library.
@@ -38,9 +53,6 @@ export const METAL_STRENGTH = 0.35
  * the cursor feels unreliable at the exact moment a person is committing to
  * press it. The metal ring can bend; the thing you are aiming at should not.
  */
-export const METAL_BEND: Partial<BendConfig> = {
-  ...BEND_DEFAULTS,
-  enabled: true,
-  applyTo: 'ring',
-  strength: METAL_STRENGTH
+export function metalBendConfig(enabled: boolean, strength: number): Partial<BendConfig> {
+  return { ...BEND_DEFAULTS, enabled, applyTo: 'ring', strength }
 }

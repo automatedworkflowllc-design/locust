@@ -4361,7 +4361,29 @@ textarea {
     border-color var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease);
 }
 
+/*
+ * THE METAL REPLACES THE LIME, on this button only.
+ *
+ * Colin, 2026-09-20, looking at it: *"lets remove the lime on hover, not
+ * feeling it"*. The design agent had flagged exactly this as the call to make
+ * deliberately rather than as a side effect — **"metal replaces lime on the
+ * primary action"** — and the reason is worth keeping: lime currently means
+ * both *happening now* and *press this*, and the hover was the one place
+ * those two collided. The metal says "press this" now, so lime goes back to
+ * meaning only the first.
+ *
+ * The STOP variant below keeps its red hover, because red there is a warning
+ * rather than an invitation and nothing has replaced it.
+ */
 .lc-send:not(:disabled):hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--lc-text-control-fg);
+}
+
+/* The queue variant is a deferral, not an invitation, and carries no metal —
+   so it keeps a hover of its own rather than losing one for nothing. */
+.lc-send.is-queue:not(:disabled):hover {
   background: var(--lc-lime-tint-strong);
   border-color: var(--lc-lime-border-strong);
   color: var(--lc-lime-text);
@@ -11379,4 +11401,57 @@ textarea {
  */
 .lc-metalsend {
   display: contents;
+}
+
+/*
+ * The orb on the plan's running step.
+ *
+ * The marker well is 16px and the orb's only inline preset is 20, so the
+ * marker gives up its ring and lets the orb be the mark. Scaling the canvas
+ * down would blur a thing whose whole job is to be legible at its own size --
+ * the library ships two SEPARATELY TUNED sizes rather than one design at two
+ * scales, and 20 is the one meant for a line of text.
+ */
+.lc-plan__step.is-running .lc-plan__marker {
+  width: 20px;
+  height: 20px;
+  border-color: transparent;
+  margin-top: 0;
+}
+
+.lc-plan__orb {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+/* Beside the word it is about, not before the name -- so it needs the gap a
+   sibling of the word needs, and none of the space a leading mark would. */
+.lc-livestep__register .lc-livestep__orb {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/*
+ * The orb on a running conversation row.
+ *
+ * The dot it replaces is 6px and the orb's only inline preset is 20, which
+ * would shove the row's text sideways every time a run started and stopped.
+ * So the orb is drawn at its own size and the BOX is the dot's, with the
+ * overflow allowed to spill: the row's layout never moves, and the mark grows
+ * out of where the dot was rather than pushing the name along.
+ */
+.lc-row__orb {
+  flex: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 6px;
+  height: 6px;
+  overflow: visible;
+}
+
+.lc-row__orb > * {
+  position: absolute;
 }

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { MetalFx, setBendConfig } from 'metal-fx'
 
-import { METAL_BEND, METAL_PRESET, METAL_STRENGTH } from '../metal.js'
+import { METAL_STRENGTHS, metalBendConfig } from '../metal.js'
+import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 
 /**
  * The send button, in metal, but only while a person is on it.
@@ -39,9 +40,18 @@ import { METAL_BEND, METAL_PRESET, METAL_STRENGTH } from '../metal.js'
  */
 export function MetalSend({
   children,
+  preset = 'chromatic',
+  strength = 'subtle',
+  motion = 'hover',
+  bend = true,
   ...button
 }: {
   readonly children: ReactNode
+  /** `off` renders the plain button and mounts no shader at all. */
+  readonly preset?: MetalPreset
+  readonly strength?: MetalStrength
+  readonly motion?: MetalMotion
+  readonly bend?: boolean
 } & React.ButtonHTMLAttributes<HTMLButtonElement>): ReactElement {
   const [awake, setAwake] = useState(false)
   /** False until the shader has painted once; see finding 1. */
@@ -55,8 +65,8 @@ export function MetalSend({
      * `applyTo: 'ring'` keeps the arrow rigid: denting the icon would make
      * the control feel unreliable at the exact moment it is being pressed.
      */
-    setBendConfig(METAL_BEND)
-  }, [])
+    setBendConfig(metalBendConfig(bend, METAL_STRENGTHS[strength]))
+  }, [bend, strength])
 
   useEffect(() => {
     if (warm) return
@@ -83,6 +93,17 @@ export function MetalSend({
     }
   }, [warm])
 
+  /*
+   * OFF MEANS NO SHADER AT ALL, not a paused one.
+   *
+   * A paused instance still mounts a canvas, compiles a program and holds a
+   * WebGL context — which is exactly what somebody choosing `off` on a tired
+   * machine is asking to avoid. It is also the safest possible fallback for
+   * the failure the design agent warned about: a plain button cannot be
+   * invisible.
+   */
+  if (preset === 'off') return <button {...button}>{children}</button>
+
   return (
     <div
       ref={root}
@@ -99,12 +120,14 @@ export function MetalSend({
     >
       <MetalFx
         variant="circle"
-        preset={METAL_PRESET}
-        strength={METAL_STRENGTH}
+        preset={preset}
+        strength={METAL_STRENGTHS[strength]}
         // Pinned, not `auto`: `auto` falls back to the OS setting and Locust
         // is dark regardless, so a light desktop would get dark metal.
         theme="dark"
-        paused={warm ? !awake : false}
+        // `always` is the version the design agent asked to reject, kept so
+        // the rejection can be agreed with after seeing it rather than before.
+        paused={motion === 'always' ? false : warm ? !awake : false}
       >
         {/*
           * THE HANDLERS BELONG ON THE BUTTON, not on the wrapper above it.

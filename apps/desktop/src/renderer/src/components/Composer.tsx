@@ -27,6 +27,7 @@ import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
 import { MetalSend } from './MetalSend.js'
+import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import { isImagePath } from '../../../shared/image-files.js'
 import { ContextRing } from './ContextRing.js'
 import type { ContextReading } from '../cost.js'
@@ -186,6 +187,11 @@ export interface ComposerProps {
   readonly recentRoutes: readonly string[]
   /** Where this build is running; some containment is platform specific. */
   readonly platform: string | undefined
+  /** The send button's metal; see `MetalSend` and Settings. */
+  readonly metal?: MetalPreset
+  readonly metalStrength?: MetalStrength
+  readonly metalMotion?: MetalMotion
+  readonly metalBend?: boolean
   readonly effort: string | undefined
   readonly onEffortChange: (effort: string | undefined) => void
   readonly swarm: boolean
@@ -279,6 +285,10 @@ export function Composer({
   resolvedModels,
   recentRoutes,
   platform,
+  metal,
+  metalStrength,
+  metalMotion,
+  metalBend,
   effort,
   onEffortChange,
   swarm,
@@ -1070,6 +1080,10 @@ export function Composer({
                * reason: one is a state, the other is a deferral.
                */
               <MetalSend
+                {...(metal === undefined ? {} : { preset: metal })}
+                {...(metalStrength === undefined ? {} : { strength: metalStrength })}
+                {...(metalMotion === undefined ? {} : { motion: metalMotion })}
+                {...(metalBend === undefined ? {} : { bend: metalBend })}
                 type="submit"
                 className="send-button lc-send"
                 disabled={!canStart}

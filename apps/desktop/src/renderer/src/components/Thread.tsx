@@ -176,6 +176,16 @@ export function ThreadItems({
     | { readonly onChoose: (option: DecisionOption) => void; readonly busy: boolean; readonly standing: string }
     | undefined
 }): ReactElement {
+  /*
+   * The orb the live line is showing, if this turn is still going.
+   *
+   * The plan's running step and the live line make the SAME claim — this is
+   * what is happening now — so they show the same mark rather than two
+   * opinions about one turn. Read off the items, which is the only place both
+   * of them can agree by construction.
+   */
+  const live = items.find((entry) => entry.type === 'live-step')
+  const runningOrb = live !== undefined && live.type === 'live-step' ? live.orb : undefined
   return (
     <>
       {items.map((item) => {
@@ -248,6 +258,7 @@ export function ThreadItems({
                   steps={item.steps}
                   doneCount={item.doneCount}
                   outcomes={!(planMode && item.touchedNothing === true)}
+                  {...(runningOrb === undefined ? {} : { orb: runningOrb })}
                 />
                 {/*
                   * Derived, and true: this run changed nothing, and the mode is
@@ -309,6 +320,7 @@ export function ThreadItems({
               workspacePath={workspacePath}
               openByDefault={item.openByDefault === true}
               {...(onOpenFile === undefined ? {} : { onOpenFile })}
+              {...(runningOrb === undefined ? {} : { planOrb: runningOrb })}
               {...(item.plan === undefined ? {} : { plan: item.plan })}
               {...(item.notices === undefined ? {} : { notices: item.notices })}
             />

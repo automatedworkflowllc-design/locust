@@ -1166,8 +1166,49 @@ export type TubePreference = 'full' | 'subtle' | 'off'
  */
 export type ReplyTextSize = 'standard' | 'large' | 'largest'
 
+/**
+ * The metal on the send button.
+ *
+ * Every option the design agent put forward, on screen rather than in a
+ * constant, because Colin asked to see them all before a default is chosen
+ * (2026-09-20: *"we can have use all the options the design agent threw at
+ * us, we can pick a default soon once we see them all"*). The library ships
+ * exactly `chromatic`, `silver` and `gold`; `off` is this app's own.
+ *
+ * `off` is not only taste. The effect is WebGL, and a person on a tired
+ * machine — or one who simply does not want a shader in their composer —
+ * should be able to say so without editing anything.
+ */
+export type MetalPreset = 'off' | 'chromatic' | 'silver' | 'gold'
+
+/**
+ * How strong, as words rather than a float.
+ *
+ * The three the brief and Colin actually named: 0.35 was his starting point,
+ * 0.55 the design agent's recommendation, and 1.0 the "aggressive glow to
+ * avoid" — so the top of this scale stops short of it.
+ */
+export type MetalStrength = 'subtle' | 'standard' | 'strong'
+
+/**
+ * When it moves.
+ *
+ * `hover` is the design agent's proposal and the reason is the app's own
+ * rule: motion means work is happening, so a permanently shimmering button
+ * says "running" on a screen where nothing is. `always` is the version it
+ * asked to reject — kept here because a rejection is easier to agree with
+ * after seeing it.
+ */
+export type MetalMotion = 'hover' | 'always'
+
 export interface WorkspaceSettings {
   readonly swarm: boolean
+  /** The metal on the send button; `off` removes it entirely. */
+  readonly metal?: MetalPreset
+  readonly metalStrength?: MetalStrength
+  readonly metalMotion?: MetalMotion
+  /** The cursor bend — the "gooey" dent that rides the ring. */
+  readonly metalBend?: boolean
   /**
    * Teammates reply to each other on their own: a share to a teammate starts
    * a run for them, and their answer starts the sender's next turn. On by

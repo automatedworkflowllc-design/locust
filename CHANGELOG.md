@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.212.0 - 2026-09-20
+
+- **Settings now has every option for the send button's metal.** Which metal
+  (off, chromatic, silver, gold), how strong, whether it moves only on hover
+  or all the time, and whether the cursor bends the ring as it crosses. Off
+  means no shader at all rather than a paused one.
+- **The orb sits beside the word it is about.** It was before the teammate's
+  name, which read as a property of the teammate — it is a property of what
+  they are doing.
+- **A running conversation in the sidebar shows an orb instead of a dot**,
+  and goes back to a quiet dot when it finishes.
+- **The plan's step underway carries the same orb** the line below it does,
+  instead of its own pulsing pip.
+- **Teammates' faces move again while they work.** They were stilled when the
+  orb arrived, on the grounds that two moving things say one thing twice —
+  but the face says *this teammate is alive* and the orb says *what kind of
+  work*, which are different claims.
+
 ## 0.211.0 - 2026-09-20
 
 - **A picture a teammate made opens as a picture.** Charts, diagrams and

@@ -21,6 +21,7 @@ import {
 } from '../status.js'
 import { PixelFace } from './PixelFace.js'
 import type { TeammateStatusView } from '../status.js'
+import { ThinkingOrb } from 'thinking-orbs'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
@@ -590,11 +591,37 @@ export function Sidebar({
                       * is left is true: a mark here means this one wants
                       * something.
                       */}
-                    <span
-                      className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}${
-                        missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone === 'blue' ? ' is-quiet' : ''
-                      }`}
-                    />
+                    {/*
+                      * AN ORB WHILE IT RUNS, A QUIET DOT WHEN IT IS DONE.
+                      *
+                      * Colin, 2026-09-20: *"instead of this dot next to the
+                      * face we can just use a smaller orb to show that they
+                      * are working that turns into a white/gray dot like
+                      * claude code when done."*
+                      *
+                      * `working` rather than the live line's own state, on
+                      * purpose. This row is a list entry for a whole
+                      * conversation, not a report on the current tool: it
+                      * claims only "this one is going", which is exactly what
+                      * the generic orb says. Reaching for the specific state
+                      * would make a sidebar row assert something it then has
+                      * to keep up with.
+                      *
+                      * Every other phase keeps the dot, because a finished
+                      * conversation is a state rather than an activity — and
+                      * the tone still carries whether it ended well.
+                      */}
+                    {mission.phase === 'running' ? (
+                      <span className="lc-row__orb" aria-hidden="true">
+                        <ThinkingOrb state="working" size={20} theme="dark" />
+                      </span>
+                    ) : (
+                      <span
+                        className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}${
+                          missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone === 'blue' ? ' is-quiet' : ''
+                        }`}
+                      />
+                    )}
                     {/*
                       * The face answers "which teammate" and costs no words.
                       * It is the same glyph as the roster above and the

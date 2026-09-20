@@ -90,13 +90,14 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   {
     id: 'appearance',
     label: 'Appearance',
-    headings: ['Sidebar', 'Reply text size', 'The boot screen'],
+    headings: ['Sidebar', 'The send button', 'Reply text size', 'The boot screen'],
     alsoKnownAs: {
       // 'font' moved to Reply text size, which is the only setting in this
       // app that changes one. The sidebar has never had a font control.
       Sidebar: ['theme', 'dark', 'light', 'colour', 'color', 'width'],
       // The words a person reaches for when a reply is too big or too small:
       // Colin's own were 'text size', and nobody searches for 'prose'.
+      'The send button': ['metal', 'chromatic', 'silver', 'gold', 'shine', 'shimmer', 'hover', 'send', 'button', 'effect', 'bend', 'gooey', 'animation', 'motion'],
       'Reply text size': ['text', 'text size', 'font', 'font size', 'bigger', 'smaller', 'type', 'reading'],
       'The boot screen': ['splash', 'startup', 'launch']
     }

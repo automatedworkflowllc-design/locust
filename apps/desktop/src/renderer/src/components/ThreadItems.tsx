@@ -389,12 +389,26 @@ function alignClass(align: 'left' | 'right' | 'center' | undefined): string | un
 export function PlanSteps({
   steps,
   doneCount,
-  outcomes
+  outcomes,
+  orb
 }: {
   readonly steps: readonly PlanStep[]
   readonly doneCount: number
   /** Whether a run happened and these steps have states to report. */
   readonly outcomes: boolean
+  /**
+   * The orb for the step underway, when the turn is still running.
+   *
+   * Colin, 2026-09-20: *"lets use the orbs for the working portion of the
+   * plan as well."* The running step and the live line are making the SAME
+   * claim — this is what is happening now — so they get the same mark and it
+   * is the live line's own orb rather than a second opinion about the same
+   * turn.
+   *
+   * Absent on a finished plan, where a pulsing anything would say a step is
+   * underway after the run has ended.
+   */
+  readonly orb?: OrbState
 }): ReactElement | null {
   // A Plan-mode turn that produced no steps is not a plan -- it is the
   // silent-turn case, which already has its own diagnostic. An empty list with
@@ -450,6 +464,12 @@ export function PlanSteps({
                 */}
               {step.state === 'done' ? (
                 <Icon name="check" size={11} />
+              ) : step.state === 'running' && orb !== undefined ? (
+                // The orb REPLACES the pulsing pip rather than joining it:
+                // two things pulsing on one row is the row saying "now" twice.
+                <span className="lc-plan__orb">
+                  <ThinkingOrb state={orb} size={20} theme="dark" aria-hidden="true" />
+                </span>
               ) : (
                 <span className={`lc-dot${step.state === 'running' ? ' is-pulsing' : ''}`} />
               )}
@@ -503,8 +523,20 @@ export function LiveRegisterLine({
   label,
   detail,
   startedAt,
+  orb,
   thinking
 }: {
+  /**
+   * The orb, drawn BESIDE THE WORD IT IS ABOUT.
+   *
+   * Colin, 2026-09-20, with a frame of `[face] ○ Yurt · starting · 21s`:
+   * *"dont we think it should be beside the thinking action? like the orb
+   * next to starting/thinking etc?"* He is right and it is not a nicety —
+   * sitting before the NAME the orb reads as a property of the teammate,
+   * which is the one thing it is not. It is a property of what they are
+   * doing, and the register word is what says that.
+   */
+  readonly orb?: OrbState
   /** Absent in a one-to-one thread, where the header already says whose it is. */
   readonly name?: string
   readonly register: LiveRegister
@@ -543,6 +575,20 @@ export function LiveRegisterLine({
       <span className="lc-livestep__label">
         {name !== undefined && <span className="lc-livestep__who">{name}</span>}
         <span className="lc-livestep__register lc-mono">
+          {orb !== undefined && (
+            <span className="lc-livestep__orb">
+              {/*
+                * `theme="dark"` pinned, not `auto`: `auto` falls back to the
+                * OS setting and Locust is dark regardless, so a light desktop
+                * would get dark ink on a dark panel.
+                *
+                * `aria-hidden`, because the word it sits next to already says
+                * this in text — and the library's own label would sometimes
+                * disagree with it ("Thinking…" beside "starting").
+                */}
+              <ThinkingOrb state={orb} size={20} theme="dark" aria-hidden="true" />
+            </span>
+          )}
           {word}
           {/*
             * THE DOTS ONLY WHERE THERE IS NO ORB.
@@ -661,41 +707,28 @@ export function LiveStepCard({
         avatar={face.avatar}
         size={26}
         /*
-         * STILL WHEN THE ORB IS MOVING. Two animations side by side, both
-         * meaning "still going", is the app saying it twice — and the orb is
-         * the one carrying the register. The face goes back to its own motion
-         * the moment there is no orb, which is most of a run.
+         * THE FACE KEEPS ITS OWN MOTION, beside the orb rather than instead
+         * of it.
+         *
+         * 0.208.0 stilled it here, on the reasoning that two moving things
+         * both meaning "still going" is the app saying one thing twice. That
+         * reasoning was wrong, and Colin called it (2026-09-20): they are not
+         * saying the same thing. The face says **this teammate is alive**;
+         * the orb says **what kind of work**. One is identity, the other is
+         * register, and the face is the bigger, more peripheral shape — so it
+         * is what catches the eye at a glance the 20px orb cannot.
          */
-        activity={orb === undefined ? activity : 'idle'}
+        activity={activity}
         {...(owner?.teammateId === undefined ? {} : { teammateId: owner.teammateId })}
       />
-      {orb !== undefined && (
-        /*
-         * `theme="dark"` pinned, not `auto`. `auto` looks for an ancestor
-         * `data-theme` or a `dark` class and otherwise falls back to the OS
-         * setting — Locust has neither convention and is dark regardless, so
-         * `auto` would flip the orb to dark ink for anyone whose desktop is
-         * light, on a surface that is always dark.
-         *
-         * Monochrome, which is the library's own tuned default (Colin,
-         * 2026-09-20). There is no `color` prop in 0.3.1 — the lime in the
-         * drawing was reproduced per-pixel by the mock, and reproducing it
-         * here would mean re-implementing the depth ramp the library already
-         * gets right.
-         *
-         * `size={20}` because the library ships exactly two tuned presets, 20
-         * and 64, and its own type says so. 20 is the inline one.
-         */
-        <span className="lc-livestep__orb">
-          <ThinkingOrb state={orb} size={20} theme="dark" aria-hidden="true" />
-        </span>
-      )}
+
       <LiveRegisterLine
         {...(owner?.name === undefined ? {} : { name: owner.name })}
         register={register}
         label={label}
         {...(detail === undefined ? {} : { detail })}
         startedAt={startedAt}
+        {...(orb === undefined ? {} : { orb })}
         /*
          * The dots and the orb are the same claim — "still going, nothing to
          * show" — so only one of them draws. The orb wins where it exists,

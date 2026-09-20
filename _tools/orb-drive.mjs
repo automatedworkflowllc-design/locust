@@ -106,6 +106,30 @@ try {
     return String(seen)
   })
 
+  await drive.capture('the sidebar row and the plan carry one too', async () => {
+    /*
+     * Three surfaces, one claim. The live line, the sidebar's running
+     * conversation and the plan's running step all say "this is going", so
+     * all three carry an orb -- and the sidebar's is the one that has to sit
+     * in a 6px well without moving the row, which is a thing only a real
+     * render can show.
+     */
+    const seen = await drive.evaluate(`(() => {
+      const row = document.querySelector('.lc-row__orb canvas')
+      const plan = document.querySelector('.lc-plan__orb canvas')
+      const rowBox = row ? row.closest('.lc-row__orb').getBoundingClientRect() : null
+      return JSON.stringify({
+        sidebar: row ? row.width + 'x' + row.height : 'none',
+        sidebarWell: rowBox ? Math.round(rowBox.width) : null,
+        planStep: plan ? plan.width + 'x' + plan.height : 'none'
+      })
+    })()`)
+    const read = JSON.parse(String(seen))
+    check('the running conversation row carries an orb', read.sidebar !== 'none', seen)
+    check('and it does not widen the row', read.sidebarWell === 6, `well ${String(read.sidebarWell)}px`)
+    return seen
+  })
+
   await drive.capture('the turn finishes', async () => {
     const answer = await sending
     return String(answer).slice(0, 160)

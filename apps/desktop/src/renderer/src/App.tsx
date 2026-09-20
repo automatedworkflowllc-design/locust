@@ -9,6 +9,9 @@ import type {
   LayoutPreference,
   TubePreference,
   ReplyTextSize,
+  MetalPreset,
+  MetalStrength,
+  MetalMotion,
   CodexMissionUpdate,
   MissionRouteSummary,
   GroupMembership,
@@ -513,6 +516,16 @@ export default function App(): ReactElement {
    * had and the choice is on the screen.
    */
   const [replySize, setReplySize] = useState<ReplyTextSize>('standard')
+  /*
+   * The send button's metal, and how it behaves. Every option the design
+   * agent offered is a setting rather than a constant, because Colin asked to
+   * see them all before a default is picked. `chromatic` at `subtle` is where
+   * this started, which is his own first choice rather than the brief's.
+   */
+  const [metal, setMetal] = useState<MetalPreset>('chromatic')
+  const [metalStrength, setMetalStrength] = useState<MetalStrength>('subtle')
+  const [metalMotion, setMetalMotion] = useState<MetalMotion>('hover')
+  const [metalBend, setMetalBend] = useState(true)
   // Declared HERE, right under its state, not a thousand lines down: a
   // helper above it closed over `runtimes` and was called during render,
   // which is a ReferenceError at boot -- and it fired only on a profile
@@ -1053,6 +1066,39 @@ export default function App(): ReactElement {
       ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube: next })
       .then((settings) => setTube(settings.tube))
       .catch(() => setTube(before))
+  }
+  /**
+   * One writer for all four, because they are one decision in four parts and
+   * writing them separately would mean four round trips to change a look.
+   */
+  const chooseMetal = (next: {
+    readonly metal?: MetalPreset
+    readonly metalStrength?: MetalStrength
+    readonly metalMotion?: MetalMotion
+    readonly metalBend?: boolean
+  }): void => {
+    const before = { metal, metalStrength, metalMotion, metalBend }
+    const wanted = { ...before, ...next }
+    setMetal(wanted.metal)
+    setMetalStrength(wanted.metalStrength)
+    setMetalMotion(wanted.metalMotion)
+    setMetalBend(wanted.metalBend)
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, ...wanted })
+      .then((settings) => {
+        setMetal(settings.metal ?? wanted.metal)
+        setMetalStrength(settings.metalStrength ?? wanted.metalStrength)
+        setMetalMotion(settings.metalMotion ?? wanted.metalMotion)
+        setMetalBend(settings.metalBend ?? wanted.metalBend)
+      })
+      // Put it back rather than leave the screen claiming a setting the disk
+      // never took -- the same rule every other writer here follows.
+      .catch(() => {
+        setMetal(before.metal)
+        setMetalStrength(before.metalStrength)
+        setMetalMotion(before.metalMotion)
+        setMetalBend(before.metalBend)
+      })
   }
   const chooseReplySize = (next: ReplyTextSize): void => {
     const before = replySize
@@ -2016,6 +2062,10 @@ export default function App(): ReactElement {
           setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto')
           setTube(settings.tube)
           setReplySize(settings.replySize)
+      if (settings.metal !== undefined) setMetal(settings.metal)
+      if (settings.metalStrength !== undefined) setMetalStrength(settings.metalStrength)
+      if (settings.metalMotion !== undefined) setMetalMotion(settings.metalMotion)
+      if (settings.metalBend !== undefined) setMetalBend(settings.metalBend)
         }
       })
       .catch(() => undefined)
@@ -4582,6 +4632,11 @@ export default function App(): ReactElement {
             onTubeChange={chooseTube}
               replySize={replySize}
               onReplySizeChange={chooseReplySize}
+              metal={metal}
+              metalStrength={metalStrength}
+              metalMotion={metalMotion}
+              metalBend={metalBend}
+              onMetalChange={chooseMetal}
             onSwarmChange={(next) => {
                 // The same write the composer mark performs: optimistic, then
                 // reconciled with what the store actually saved.
@@ -5167,6 +5222,10 @@ export default function App(): ReactElement {
           {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer
+            metal={metal}
+            metalStrength={metalStrength}
+            metalMotion={metalMotion}
+            metalBend={metalBend}
             // So the mode menu can say where connectors live when this route
             // is not the one they are signed in on. See `connectorsNote`.
             hasConnectors={connectorList !== undefined && connectorList.length > 0}
