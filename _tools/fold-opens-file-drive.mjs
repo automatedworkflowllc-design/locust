@@ -201,6 +201,63 @@ try {
   }
   await drive.resize(1280, 860)
 
+  /*
+   * HOW MANY CHARACTERS THE PANEL ACTUALLY RENDERS, swept across candidate
+   * widths. The design agent's ruling of 2026-09-20 threw out 38vw for a
+   * reason worth keeping: a percentage is a different MEASURE at every window
+   * size, and a measure is the thing a document wants. Its instruction was to
+   * target a rendered 62-68 characters and work backwards to the pixels --
+   * and to count the rendered column rather than trust the `ch` unit, since
+   * at 15px this serif's zero runs wide and `ch` overstates.
+   *
+   * IT COUNTS A PARAGRAPH IT PUTS THERE ITSELF, which is a claim about the
+   * BOX and not about any file: the question is how many characters this
+   * column fits, and the answer must not depend on which file happened to be
+   * open. The counting is `prose-size-measure.mjs`'s -- one character at a
+   * time through a Range, grouped by the top of its rect, because a line box
+   * is the only thing that knows where a line broke.
+   */
+  await drive.capture('how many characters the panel renders, by width', async () => {
+    await drive.resize(1600, 1000)
+    return drive.evaluate(`(() => {
+      const prose = document.querySelector('.lc-viewer__prose')
+      if (!prose) return 'no prose column'
+      const sentence = 'The teammate wrote this paragraph so the column could be measured rather than guessed, and it runs on for long enough that several lines break inside it. '
+      prose.innerHTML = ''
+      const p = document.createElement('p')
+      p.className = 'lc-para'
+      p.textContent = sentence.repeat(6)
+      prose.appendChild(p)
+      const root = document.documentElement
+      const was = root.style.getPropertyValue('--lc-viewer-width')
+      const count = () => {
+        const node = p.firstChild
+        const range = document.createRange()
+        const byLine = new Map()
+        for (let i = 0; i < node.textContent.length; i += 1) {
+          range.setStart(node, i); range.setEnd(node, i + 1)
+          const top = Math.round(range.getBoundingClientRect().top)
+          byLine.set(top, (byLine.get(top) || 0) + 1)
+        }
+        const lines = [...byLine.entries()].sort((a, b) => a[0] - b[0]).map(([, n]) => n).slice(0, -1)
+        return {
+          columnPx: Math.round(p.getBoundingClientRect().width),
+          mean: lines.length ? Math.round(lines.reduce((a, b) => a + b, 0) / lines.length) : 0,
+          longest: lines.length ? Math.max(...lines) : 0
+        }
+      }
+      const out = []
+      for (const width of [420, 460, 500, 540, 560, 600, 640, 680]) {
+        root.style.setProperty('--lc-viewer-width', width + 'px')
+        const reading = count()
+        out.push(width + 'px -> ' + reading.columnPx + 'px column, ' + reading.mean + ' chars mean, ' + reading.longest + ' longest')
+      }
+      root.style.setProperty('--lc-viewer-width', was)
+      return out.join(' | ')
+    })()`)
+  })
+  await drive.resize(1280, 860)
+
   await drive.capture('close it and the panel is gone', async () => {
     // ASSERT IT IS THERE FIRST. "The viewer is gone" is trivially true when
     // the viewer never opened, and on this drive's second run every earlier

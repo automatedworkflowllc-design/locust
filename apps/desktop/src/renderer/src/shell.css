@@ -3842,14 +3842,51 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/*
+ * TWO COLUMNS, SPLIT DOWN THE MIDDLE (Colin, 2026-09-20, with a frame of six
+ * installed runtimes):
+ *
+ *   "otherwise it adds a needless scroll bar that goes to nothing but
+ *   antigravity hiding below"
+ *
+ * Exactly that. The whole first screen scrolls -- `.lc-empty` does, not this
+ * panel -- and with six agents the overflow is ONE row. A scrollbar is the
+ * app saying "there is more here", and what was down there was one agent.
+ * Halving the list's height is the cheapest way to stop saying it, because
+ * the list is the tallest compressible thing on that screen.
+ *
+ * THIS REOPENS A DECISION, and says so. A 2x2 grid was withdrawn on
+ * 2026-09-19 for two reasons: a hero row plus an odd count left a hole in the
+ * card's corner, and no row had room for the account fact. The hero row is
+ * gone, and the rule below answers the other two:
+ *
+ *   - the hole: an odd final cell spans both columns, so a list of five ends
+ *     in one full-width row instead of a cell and a gap. There is no count
+ *     that can leave a corner empty.
+ *   - the fact: each cell is now about half of 640px, so the account line is
+ *     the thing to look at first if this ever reads badly. Measured at
+ *     Colin's own window before shipping, not assumed.
+ */
 .lc-runtimepanel {
   width: 100%;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border: 1px solid var(--lc-border-card);
   border-radius: var(--lc-radius-card);
   background: var(--lc-bg-raised);
   overflow: hidden;
+}
+
+/* The split. A hairline down the middle, on the right-hand cells only, so
+   the full-width odd row below never carries a divider into its own middle. */
+.lc-runtimepanel > .lc-runtimecell:nth-child(2n) {
+  border-left: 1px solid var(--lc-border-hairline);
+}
+
+/* An odd list ends in one row across, never a cell beside a hole. */
+.lc-runtimepanel > .lc-runtimecell:last-child:nth-child(2n + 1) {
+  grid-column: 1 / -1;
+  border-left: 0;
 }
 
 .lc-runtimecell {
@@ -3861,11 +3898,12 @@ textarea {
   border-top: 1px solid var(--lc-border-hairline);
 }
 
-/* The first row of each column has nothing above it to divide from. */
-/* One column. The 2x2 grid was a hero row plus an odd count, which left a
-   hole in the card's corner and no room in any row for the account fact
-   (design agent, 2026-09-19, withdrawing the September hero row). */
-.lc-runtimecell:first-child {
+/* The first row of each column has nothing above it to divide from -- and in
+   two columns that is the first TWO cells, not the first one. With only
+   `:first-child` the right-hand cell of the top row drew a rule against the
+   card's own top edge. */
+.lc-runtimecell:first-child,
+.lc-runtimecell:nth-child(2) {
   border-top: 0;
 }
 
@@ -11278,6 +11316,17 @@ textarea {
   padding: var(--lc-space-4) var(--lc-space-5);
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
+}
+
+/* The standing register: always true, never about the open file. Quiet, at
+   the foot, under a hairline -- it is a fact you can find, not a notice. */
+.lc-viewer__register {
+  flex: none;
+  margin: 0;
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-hairline);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
 }
 
 .lc-viewer--refused {

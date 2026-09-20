@@ -448,16 +448,45 @@
    * THE FILE VIEWER IS WIDER THAN THE INSPECTOR, because it is read rather
    * than scanned.
    *
-   * Measured off Colin's own Claude Code frame (2026-09-20): the document
-   * panel takes roughly 40% of the window and the conversation keeps the
-   * rest. The mission inspector's 344px is right for rows of facts and too
-   * narrow for prose -- at 344 a paragraph wraps every six or seven words.
+   * THE RULE, which is the part to keep when these numbers next change:
+   * **the viewer is sized by its content's MEASURE, the inspector by its
+   * content's LONGEST ROW.** Two rules, two numbers, one region. The
+   * inspector holds a record -- rows, ids, counts -- and a wider column of
+   * key-value rows is only a longer sweep between a key and its value. The
+   * viewer holds a document, and a document wants 62-68 characters a line.
    *
-   * Clamped rather than a bare percentage: below 360 it stops being readable
-   * and above 560 the thread starts losing its own measure, which is the
-   * thing 0.199.0 was spent getting right.
+   * THE FIRST VERSION WAS 38vw AND IT WAS WRONG BECAUSE IT WAS A PERCENTAGE.
+   * It came off one screenshot of Colin's Claude Code window, where the panel
+   * is about 40%. A percentage is a different MEASURE at every window size,
+   * so it cannot deliver the one thing a document wants (design agent's
+   * ruling, 2026-09-20).
+   *
+   * SWEPT, NOT REASONED. A paragraph rendered in this column, counted one
+   * character at a time off its line boxes, at 1600x1000:
+   *
+   *   420px -> 55 characters    540px -> 70
+   *   460px -> 58               560px -> 73
+   *   500px -> 64               600px -> 77
+   *   520px -> ~67              680px -> 90
+   *
+   * So 520 is a full measure and the ceiling belongs there. The ruling asked
+   * for 680, on the belief that 560 was still short of a measure -- it is
+   * not, it is 73 characters, already past. The ruling's own principle is
+   * what settles it: past a full measure the panel is not getting better, it
+   * is only taking room from the conversation. Measuring the column is what
+   * turned that from a preference into a number.
+   *
+   * The floor stays a readability floor rather than a measure: 420px renders
+   * 55 characters, which is tight but readable, and below it a markdown file
+   * is not worth half-showing.
+   *
+   * NO DRAG HANDLE, deliberately, and not because it is hard: a handle makes
+   * the measure a user setting, and this whole comment exists because the
+   * measure is not a preference. If one ever ships, the inspector ships one
+   * the same day -- a draggable viewer beside a fixed inspector teaches that
+   * panels move and then breaks the lesson on the next panel.
    */
-  --lc-viewer-width: clamp(360px, 38vw, 560px);
+  --lc-viewer-width: clamp(420px, 44vw, 520px);
   /*
    * The reading column GROWS with the window, instead of standing still.
    *

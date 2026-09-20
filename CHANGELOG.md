@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.207.0 - 2026-09-20
+
+- **All six coding agents fit on the first screen now, in two columns.** With
+  six installed, the list drew five and left a scrollbar whose whole job was
+  to reveal the sixth. A machine with nothing installed still sees the one
+  row it saw before.
+- **A file in the panel is sized to be read.** The panel's width was a
+  percentage taken off one screenshot, which meant a different line length at
+  every window size. It is now set by counting the characters the column
+  actually renders, and stops growing once a line is long enough to read
+  comfortably -- past that the panel would only be taking room from the
+  conversation.
+- **The panel says why it will not open a file.** "Locust does not open files
+  -- a teammate chose this file's name and contents. Reveal hands it to
+  Windows." A missing button reads as an oversight; this is a decision, and
+  now it says so.
+
 ## 0.206.0 - 2026-09-20
 
 - **An open file says which turns changed it, and you can look at each one.**

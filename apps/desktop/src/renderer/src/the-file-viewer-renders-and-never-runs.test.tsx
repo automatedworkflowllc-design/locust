@@ -83,6 +83,18 @@ describe('the file viewer', () => {
     expect(html).not.toContain('<a ')
   })
 
+  it('says why there is no open button, rather than leaving a hole', () => {
+    /*
+     * Design agent's ruling, 2026-09-20: the three controls are right and
+     * "what is absent is the reason". Without it a person reads the missing
+     * control as an oversight instead of a decision -- and it makes Reveal
+     * look like the safe fallback for something somebody forgot.
+     */
+    const html = viewer({ text: 'notes', mode: 'markdown' })
+    expect(html).toContain('lc-viewer__register')
+    expect(html).toContain('Locust does not open files')
+  })
+
   it('names the file by its own name and keeps the whole path reachable', () => {
     const html = viewer({ text: 'notes\n', mode: 'markdown', path: 'C:/work/docs/report.md' })
     expect(html).toContain('report.md')

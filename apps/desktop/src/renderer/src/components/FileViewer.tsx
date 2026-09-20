@@ -144,6 +144,23 @@ export function FileViewer({
         )}
       </div>
       )}
+      {/*
+        * THE REASON THE OPEN BUTTON IS MISSING, said out loud.
+        *
+        * Design agent's ruling, 2026-09-20: the three controls are the right
+        * words, and "what is absent is the reason. A person who wants to open
+        * a .md and cannot will read the missing control as an oversight, not
+        * a decision -- and the decision is a good one that the panel is
+        * currently keeping to itself."
+        *
+        * It is a standing fact about how the app works rather than a message
+        * about this file, so it sits at the foot of the panel and never
+        * changes. It also stops Reveal looking like the safe fallback for a
+        * control somebody forgot.
+        */}
+      <p className="lc-viewer__register">
+        Locust does not open files — a teammate chose this file's name and contents. Reveal hands it to Windows.
+      </p>
     </aside>
   )
 }
