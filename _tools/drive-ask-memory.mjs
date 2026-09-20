@@ -7,7 +7,7 @@
 // waiting; Settings and Memory must count it; Keep on the Memory screen
 // makes it kept; Wren then quotes it.
 
-import { FREE_ROUTE, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-askmem-ws-')
 const T0 = '2026-09-05T05:00:00.000Z'
@@ -29,6 +29,18 @@ const pick = (name) => `(async () => { [...document.querySelectorAll('button')].
 
 try {
   await drive.capture('launch, mode Ask me first', () => drive.ready())
+  /*
+   * SAY WHICH ROUTE, rather than inheriting whatever the composer defaulted
+   * to. This drive seeds its teammates with FREE_ROUTE, and a teammate's
+   * seeded route is NOT the composer's route on a new conversation -- a drive
+   * that assumed otherwise on 2026-09-20 sent its turn on Codex, which is
+   * Astra's quota, and passed every check it made. `ready()` now refuses to
+   * start a non-spending drive on a paid route; this line is the drive saying
+   * what it meant rather than relying on that refusal to notice.
+   */
+  await drive.capture('pick the free route', () =>
+    drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/free/i' }))
+  )
   await drive.capture('ask Booty to remember the deploy command', async () => {
     await drive.evaluate(pick('Booty'))
     return drive.evaluate(sendAndWaitScript('Remember, for this project only, that deploys run with pnpm deploy. Use the memory block you were shown. Then reply with the single word OK.'))

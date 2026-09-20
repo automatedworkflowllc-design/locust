@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto'
 
-import { FREE_ROUTE, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-memory-ws-')
 const workspaceId = `ws_${createHash('sha256').update(workspace, 'utf8').digest('hex').slice(0, 32)}`
@@ -39,6 +39,18 @@ const pick = (name) => `(async () => { [...document.querySelectorAll('button')].
 
 try {
   await drive.capture('launch', () => drive.ready())
+  /*
+   * SAY WHICH ROUTE, rather than inheriting whatever the composer defaulted
+   * to. This drive seeds its teammates with FREE_ROUTE, and a teammate's
+   * seeded route is NOT the composer's route on a new conversation -- a drive
+   * that assumed otherwise on 2026-09-20 sent its turn on Codex, which is
+   * Astra's quota, and passed every check it made. `ready()` now refuses to
+   * start a non-spending drive on a paid route; this line is the drive saying
+   * what it meant rather than relying on that refusal to notice.
+   */
+  await drive.capture('pick the free route', () =>
+    drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/free/i' }))
+  )
   await drive.capture('Settings counts the seeded memory', () => drive.evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
     await new Promise(r => setTimeout(r, 800))

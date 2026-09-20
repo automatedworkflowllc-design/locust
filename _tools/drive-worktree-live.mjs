@@ -8,7 +8,7 @@
 // Remove takes the tree away and the branch stays; a new message makes the
 // tree again on the same branch.
 
-import { FREE_ROUTE, git, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, git, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-wt-ws-')
 const drive = await startDrive({
@@ -37,6 +37,18 @@ const settingsRows = `(async () => {
 
 try {
   await drive.capture('launch: Wren on locust/wren', () => drive.ready())
+  /*
+   * SAY WHICH ROUTE, rather than inheriting whatever the composer defaulted
+   * to. This drive seeds its teammates with FREE_ROUTE, and a teammate's
+   * seeded route is NOT the composer's route on a new conversation -- a drive
+   * that assumed otherwise on 2026-09-20 sent its turn on Codex, which is
+   * Astra's quota, and passed every check it made. `ready()` now refuses to
+   * start a non-spending drive on a paid route; this line is the drive saying
+   * what it meant rather than relying on that refusal to notice.
+   */
+  await drive.capture('pick the free route', () =>
+    drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/free/i' }))
+  )
   await drive.capture('start a slow run in the own branch', async () => {
     await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
     return drive.evaluate(sendAndWaitScript('Read README.md, then write a numbered list of 40 distinct one-sentence ideas for improving this scratch project, thinking carefully about each. Do not edit any files.', { settle: false }))
