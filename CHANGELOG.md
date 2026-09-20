@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.205.0 - 2026-09-20
+
+- **The conversation keeps its room when a file is open on a smaller window.**
+  In a 1120-wide window the open file panel was squeezing the conversation
+  into a column half the panel's width -- replies breaking after three words,
+  "Write a message..." on two lines, the model's name cut off. The panel now
+  floats over the workroom the way the activity drawer already did, so the
+  conversation beside it keeps three times the width it had.
+
 ## 0.204.0 - 2026-09-20
 
 - **Any file a teammate touched opens beside the conversation, not just one

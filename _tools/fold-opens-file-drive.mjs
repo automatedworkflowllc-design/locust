@@ -117,6 +117,41 @@ try {
     })()`)
   )
 
+  /*
+   * THE PROPORTIONS, AT THREE WINDOWS, because that is the open question and
+   * it is the design agent's. The width is `clamp(360px, 38vw, 560px)`, taken
+   * off Colin's own Claude Code frame where the panel is about 40% of the
+   * window -- a measurement of ONE window, which is exactly the kind of
+   * number that reads as settled and is not. 1120x720 is the size at which
+   * the drawer used to cover the composer (fixed in 0.187.0); 1600x1000 is
+   * where the clamp stops growing and the panel starts shrinking as a share.
+   */
+  for (const [width, height] of [[1120, 720], [1600, 1000]]) {
+    await drive.capture(`the panel at ${String(width)} by ${String(height)}`, async () => {
+      await drive.resize(width, height)
+      return drive.evaluate(`(() => {
+        const viewer = document.querySelector('.lc-viewer')
+        const thread = document.querySelector('.lc-thread')
+        const composer = document.querySelector('form.command-dock')
+        if (!viewer) return 'no viewer'
+        const v = viewer.getBoundingClientRect()
+        const t = thread ? thread.getBoundingClientRect() : null
+        const c = composer ? composer.getBoundingClientRect() : null
+        const share = Math.round((v.width / window.innerWidth) * 100)
+        const prose = document.querySelector('.lc-viewer__prose p')
+        return JSON.stringify({
+          window: window.innerWidth + 'x' + window.innerHeight,
+          viewer: Math.round(v.width),
+          shareOfWindow: share + '%',
+          thread: t ? Math.round(t.width) : null,
+          composerCovered: c !== null && c.right > v.left && c.left < v.right,
+          proseWidth: prose ? Math.round(prose.getBoundingClientRect().width) : null
+        })
+      })()`)
+    })
+  }
+  await drive.resize(1280, 860)
+
   await drive.capture('close it and the panel is gone', async () => {
     // ASSERT IT IS THERE FIRST. "The viewer is gone" is trivially true when
     // the viewer never opened, and on this drive's second run every earlier

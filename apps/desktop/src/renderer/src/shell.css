@@ -4945,6 +4945,30 @@ textarea {
     padding-right: var(--lc-viewer-width);
   }
 
+/*
+ * AND THE VIEWER HAS TO FLOAT, like the inspector above it.
+ *
+ * The inset rule right above this one was written for a drawer that is
+ * `position: absolute` in compact -- it takes the workroom's content out
+ * from under a panel that is no longer in the flow. The viewer never got
+ * that rule, so it stayed a flex sibling: it took its 426px out of the row
+ * AND the workroom pushed its content another 426px clear of a panel that
+ * was not there. Measured at 1120x720 on 2026-09-20: viewer 426px, thread
+ * **205px** -- half the width of the panel beside it, replies breaking after
+ * three words, "Write a message..." on two lines, the route chip cut off.
+ *
+ * That is not a width worth debating; it is one rule applied to one of two
+ * drawers. Both float now, and the inset means what it says.
+ */
+.lc-shell.is-compact.has-viewer .lc-viewer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
+  }
+
 .lc-shell.is-compact .lc-thread__column,
 .lc-shell.is-compact .lc-composer__inner {
     max-width: var(--lc-thread-max-width-compact);
