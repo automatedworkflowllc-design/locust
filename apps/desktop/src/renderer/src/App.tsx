@@ -1849,7 +1849,27 @@ export default function App(): ReactElement {
       void bridge
         .getLocalRuntimes(everything)
         .then((response) => {
-          if (!active || !response.ok || gaveUp) return
+          if (!active || gaveUp) return
+          /*
+           * A REFUSED ANSWER IS NOT THE END OF ASKING.
+           *
+           * This returned on `!response.ok` without rescheduling, so a host
+           * that answered `discoveryFailed()` once ended EVERY re-check chain
+           * for the session -- the screen kept whatever it had and nothing
+           * asked again until the window happened to regain focus (Fable,
+           * pass 2, finding 5).
+           *
+           * A discovery that could not run is the case where asking again
+           * matters most, and it costs one more timer. Not counted as a
+           * sweep, because the give-up budget is about CLIs that will not
+           * answer, and this is the host not having answered at all -- a
+           * failure the person cannot repair by pressing Check again four
+           * times.
+           */
+          if (!response.ok) {
+            setTimeout(askAgain, RUNTIME_RECHECK_MS)
+            return
+          }
           const fresh = response.data.checkedAt !== lastCheckedAt
           lastCheckedAt = response.data.checkedAt
           // A re-check must not make the screen go backwards: a probe that
@@ -1879,7 +1899,11 @@ export default function App(): ReactElement {
             setRuntimeState((held) => (held.phase === 'ready' ? { ...held, gaveUp: true } : held))
           }
         })
-        .catch(() => undefined)
+        // The host never answered at all -- the same case as a refusal,
+        // and the same answer: ask again rather than stop for the session.
+        .catch(() => {
+          if (active && !gaveUp) setTimeout(askAgain, RUNTIME_RECHECK_MS)
+        })
     }
     resetDiscoveryBudget.current = () => {
       sweeps = 0
