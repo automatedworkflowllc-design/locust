@@ -262,7 +262,11 @@ try {
     return JSON.stringify({
       open: menu !== null,
       label: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => b.innerText.trim()).at(-1) : '',
-      roster: document.querySelector('.lc-sidebar').innerText
+      // The rail draws no NAMES -- the face is the whole identity since
+      // 0.207 -- so who is still on the team is read from the labels it
+      // writes for anyone who cannot see it, not from the sidebar's text.
+      roster: [...document.querySelectorAll('.lc-faces__one')].map(f => f.getAttribute('aria-label') || '').join(' | ')
+        + ' ' + document.querySelector('.lc-sidebar').innerText
     })
   })()`))
   check('the menu stays open', teammateArmed.open === true)

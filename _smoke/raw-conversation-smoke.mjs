@@ -181,6 +181,20 @@ try {
 
   say('3. the mission\'s own menu can hand it to a teammate')
   const menu = JSON.parse(await evaluate(`(async () => {
+    /*
+     * CLEAR THE FACE FILTER FIRST, which step 2 turned on.
+     *
+     * Picking a teammate in the wide sidebar is one gesture that does two
+     * things: it addresses them AND narrows the list to their conversations.
+     * The mission under test belongs to NOBODY, so it was correctly hidden --
+     * this smoke was reading its own previous step as a missing row.
+     *
+     * The clear control is the sentence the sidebar draws whenever it is
+     * narrowed, which exists precisely so a short list never reads as a lost
+     * one.
+     */
+    const clear = document.querySelector('.lc-faces__clearlink') || document.querySelector('.lc-faces__one.is-on')
+    if (clear) { clear.click(); await new Promise(r => setTimeout(r, 400)) }
     // .lc-conv is the conversation row in the wide sidebar since 0.207.
     const row = [...document.querySelectorAll('.lc-sidebar .lc-conv, .lc-sidebar .lc-row')].find(r => /release date/i.test(r.innerText))
     if (!row) return JSON.stringify({ found: false })
@@ -199,11 +213,27 @@ try {
     item.click()
     await new Promise(r => setTimeout(r, 900))
     const sidebar = document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ')
-    return JSON.stringify({ sidebar, menuOpen: document.querySelector('.lc-context') !== null })
+    /*
+     * WHOSE it is, read off the row rather than off the shape of the list.
+     *
+     * This used to assert the conversation had moved from an "Other missions"
+     * heading to a nest under Wren's name. There are no nests since 0.207:
+     * the sidebar is one conversation list, and ownership is drawn as the
+     * owner's FACE on the row. So the claim is the same and the evidence
+     * moved -- the row wears Wren's face now, and wore nobody's before.
+     */
+    const ownerRow = [...document.querySelectorAll('.lc-convrow')].find(r => /release date/i.test(r.innerText))
+    const owner = ownerRow ? ownerRow.querySelector('.lc-face') : null
+    return JSON.stringify({
+      sidebar,
+      menuOpen: document.querySelector('.lc-context') !== null,
+      ownerFace: owner ? (owner.dataset.teammate || '') : '',
+      nobodyMark: ownerRow ? ownerRow.querySelectorAll('.lc-conv__nobody').length : -1
+    })
   })()`))
   say(`       ${after.sidebar.slice(0, 220)}`)
   check('the menu closed', after.menuOpen === false)
-  check('the mission now sits under Wren, not under Other missions', /Wren.*release date/i.test(after.sidebar) && !/MISSIONS[^\n]*\n[^\n]*release date/i.test(after.sidebar), after.sidebar.slice(0, 220))
+  check('the mission now wears Wren’s face, and no longer nobody’s', after.ownerFace === 'tm_wren' && after.nobodyMark === 0, JSON.stringify({ ownerFace: after.ownerFace, nobodyMark: after.nobodyMark }))
 
   await sleep(600)
   const stored = JSON.parse(await readFile(TEAMMATES, 'utf8'))
