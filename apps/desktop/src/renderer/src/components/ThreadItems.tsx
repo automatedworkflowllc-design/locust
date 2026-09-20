@@ -7,7 +7,7 @@ import { parseAgentText, splitInlineCode } from '../agentText.js'
 import type { ListItem } from '../agentText.js'
 import { splitSettled } from '../settledText.js'
 import { linkHost } from '../../../shared/outbound-links.js'
-import type { PlanStep } from '../missionView.js'
+import type { OrbState, PlanStep } from '../missionView.js'
 import { PixelFace } from './PixelFace.js'
 import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
@@ -544,6 +544,18 @@ export function LiveRegisterLine({
         {name !== undefined && <span className="lc-livestep__who">{name}</span>}
         <span className="lc-livestep__register lc-mono">
           {word}
+          {/*
+            * THE DOTS ONLY WHERE THERE IS NO ORB.
+            *
+            * They meant "waiting on the model with nothing to show yet", and
+            * the `breathing` orb now says exactly that, beside the face. Both
+            * at once is the app saying one thing twice — the design agent's
+            * rule for this whole change: wherever an orb lands, the older
+            * signal goes, or "running" is said five ways instead of four.
+            *
+            * The branch stays because a row without an orb is still possible
+            * and the dots are the right answer there.
+            */}
           {thinking && (
             <span className="lc-dots" aria-hidden="true">
               <span />
@@ -619,7 +631,7 @@ export function LiveStepCard({
    * Absent when no orb is true of the work — writing a file, or waiting on
    * the model with nothing reported. The line keeps its dots there.
    */
-  readonly orb?: 'searching' | 'working' | 'connecting' | 'solving'
+  readonly orb?: OrbState
   readonly label: string
   readonly detail: string | undefined
   readonly startedAt: string
@@ -684,7 +696,13 @@ export function LiveStepCard({
         label={label}
         {...(detail === undefined ? {} : { detail })}
         startedAt={startedAt}
-        thinking={thinking}
+        /*
+         * The dots and the orb are the same claim — "still going, nothing to
+         * show" — so only one of them draws. The orb wins where it exists,
+         * which is the rule for this whole change: wherever an orb lands, the
+         * older signal goes, or "running" is said five ways instead of four.
+         */
+        thinking={thinking && orb === undefined}
       />
     </div>
   )

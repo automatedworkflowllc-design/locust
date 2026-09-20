@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.209.0 - 2026-09-20
+
+- **The orb is there for the whole wait now, and it changes when the work
+  does.** It used to appear only while a tool was actually open, which meant
+  it never appeared at all on runtimes that report their tools once they
+  finish — and on every runtime, the long wait before the first tool showed
+  nothing. A run that has not answered yet shows a slow ring; once it is
+  working the ring becomes moving particles; reading, running a command,
+  waiting on a subagent and planning each keep their own. The three dots
+  retire wherever an orb appears, so "still going" is said once.
+
 ## 0.208.0 - 2026-09-20
 
 - **The running step shows what kind of work is happening, as a small moving

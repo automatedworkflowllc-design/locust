@@ -75,28 +75,39 @@ describe('the orb reaches the running step', () => {
     expect(step?.orb).toBe('connecting')
   })
 
-  it('stops the moment the tool closes', () => {
+  it('stops claiming the work the moment the tool closes', () => {
     /*
-     * The orb is a statement about work happening NOW. A tool that has
-     * completed is not happening, and an orb left spinning over a finished
-     * call is the app saying something is running when nothing is.
+     * The orb is a statement about work happening NOW, so when a tool closes
+     * the SPECIFIC claim has to stop. The run is still going, so it drops to
+     * the generic `working` rather than to nothing -- what it must not do is
+     * keep saying `searching` over a read that finished.
      */
+    const specific = liveStep([started('t1', 'read_file'), completed('t1')])
+    expect(specific?.orb).not.toBe('searching')
     const step = liveStep([started('t1', 'shell', 'command_execution', 'ls'), completed('t1')])
-    expect(step?.orb).toBeUndefined()
+    expect(step?.orb).toBe('working')
   })
 
   it('a Plan-mode turn with no tool open draws the solving orb', () => {
     expect(liveStep([], true)?.orb).toBe('solving')
   })
 
-  it('an ordinary turn with no tool open draws none', () => {
-    expect(liveStep([], false)?.orb).toBeUndefined()
+  it('an ordinary turn with no tool open still draws the floor', () => {
+    /*
+     * Colin's frame, 2026-09-20: a real Cursor run at `starting ••• 16s` with
+     * nothing drawn. A live row is never bare now -- the teammate is there,
+     * and `breathing` says that and nothing more.
+     */
+    expect(liveStep([], false)?.orb).toBe('breathing')
   })
 
-  it('a runtime that reports its tools only on completion draws none, and that is correct', () => {
-    // OpenCode's shape, measured live: start and finish arrive together, so
-    // the tool is never open when the thread is built. No orb, no lie.
+  it('a runtime that reports its tools only on completion still shows it is alive', () => {
+    // OpenCode's shape, measured live twice: start and finish arrive
+    // together, so no tool is ever open. Before the floor this drew nothing
+    // at all, which is why the feature was invisible on the one route that
+    // costs nothing to test with. It draws the generic orb now -- the run is
+    // working, and the app does not pretend to know more than that.
     const step = liveStep([started('t1', 'shell', 'command_execution', 'echo orb'), completed('t1')])
-    expect(step?.orb).toBeUndefined()
+    expect(step?.orb).toBe('working')
   })
 })

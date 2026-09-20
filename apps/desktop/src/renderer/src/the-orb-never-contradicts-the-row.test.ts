@@ -46,28 +46,70 @@ describe('the orb maps to the work', () => {
   })
 })
 
-describe('the orb says nothing rather than something untrue', () => {
-  it('writing a file has no orb', () => {
+describe('where nothing is known, it says so rather than something untrue', () => {
+  /*
+   * THE FLOOR, added after Colin watched a real Cursor run sit at
+   * `starting ••• 16s` with no orb at all: "shouldnt it also show up for any
+   * thinking or activity regardless of calls?"
+   *
+   * It should. The first version drew an orb only while a tool was OPEN,
+   * which on OpenCode -- a runtime that reports its tools when they finish --
+   * meant never. `breathing` is the answer, and it was chosen by rendering
+   * all nine at 20px: every work state is a cloud of dots and breathing is a
+   * clean hollow ring, so it cannot be mistaken for any of them.
+   *
+   * The honesty claim is unchanged and is what these tests defend: the orb
+   * never claims WORK that is not happening.
+   */
+  const WORK = new Set(['searching', 'working', 'connecting', 'solving'])
+
+  it('writing a file is working -- a tool IS running, and that is all it says', () => {
+    expect(orbStateFor(tool('edit', 'write_file'), false)).toBe('working')
+  })
+
+  it('starting and thinking are breathing: alive, nothing back yet', () => {
+    expect(orbStateFor(undefined, false, 'starting')).toBe('breathing')
+    expect(orbStateFor(undefined, false, 'thinking')).toBe('breathing')
+    expect(orbStateFor(undefined, false)).toBe('breathing')
+  })
+
+  it('the orb CHANGES when starting becomes working', () => {
     /*
-     * None of the four is true of a write. The library has five more states
-     * and borrowing one -- `shaping`, say -- would be inventing a Locust
-     * activity to fill a gap, which is the failure this project keeps
-     * catching: a signal that looks like information and is not.
+     * Colin, 2026-09-20, watching this feature's own drive: "when it went
+     * from starting to working an orb change would have been nice". An
+     * indicator that holds one shape across a state change is an ornament.
      */
-    expect(orbStateFor(tool('edit', 'write_file'), false)).toBeUndefined()
+    expect(orbStateFor(undefined, false, 'starting')).not.toBe(orbStateFor(undefined, false, 'working'))
+    expect(orbStateFor(undefined, false, 'working')).toBe('working')
+    expect(orbStateFor(undefined, false, 'writing')).toBe('working')
   })
 
-  it('waiting on the model with nothing reported has no orb', () => {
-    // The line keeps its three dots there, which already mean exactly this.
-    expect(orbStateFor(undefined, false)).toBeUndefined()
+  it('an unclassified open tool is working, never one of the specific three', () => {
+    const state = orbStateFor(tool('tool', 'todowrite'), false)
+    expect(state).toBe('working')
+    expect(['searching', 'connecting', 'solving']).not.toContain(state)
   })
 
-  it('an unclassified tool has no orb', () => {
-    expect(orbStateFor(tool('tool', 'todowrite'), false)).toBeUndefined()
+  it('never claims a SPECIFIC kind of work that is not happening', () => {
+    /*
+     * `working` claims only "a tool is running", which the row then names.
+     * `searching`, `connecting` and `solving` each claim more than that, so
+     * they are never a fallback -- only ever a match.
+     */
+    const specific = new Set(['searching', 'connecting', 'solving'])
+    const cases = [
+      [tool('edit', 'apply_patch'), false],
+      [tool('tool', 'unknown_thing'), false],
+      [tool('shell', 'ls'), false],
+      [undefined, false]
+    ] as const
+    for (const [detail, plan] of cases) {
+      expect(specific.has(orbStateFor(detail, plan))).toBe(false)
+    }
+    expect(WORK.size).toBe(4)
   })
 
-  it('only ever returns one of the four that are true here', () => {
-    const four = new Set(['searching', 'working', 'connecting', 'solving'])
+  it('always returns something, so a live row is never bare', () => {
     const cases = [
       [tool('shell', 'ls'), false],
       [tool('helper', 'task'), false],
@@ -78,8 +120,7 @@ describe('the orb says nothing rather than something untrue', () => {
       [undefined, false]
     ] as const
     for (const [detail, plan] of cases) {
-      const state = orbStateFor(detail, plan)
-      if (state !== undefined) expect(four.has(state)).toBe(true)
+      expect(typeof orbStateFor(detail, plan)).toBe('string')
     }
   })
 

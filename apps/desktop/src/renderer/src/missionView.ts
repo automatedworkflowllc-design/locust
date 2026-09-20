@@ -783,7 +783,7 @@ export type ThreadItem =
        * information and is not. `undefined` is the honest answer for writing
        * a file and for waiting on the model, and the line keeps its dots.
        */
-      readonly orb?: 'searching' | 'working' | 'connecting' | 'solving'
+      readonly orb?: OrbState
       readonly label: string
       readonly detail: string | undefined
       /** When the step began, so the card can show elapsed time as it runs. */
@@ -1577,6 +1577,33 @@ export function isShellTool(name: string, toolKind: string | undefined): boolean
     || toolKind === 'run_command'
 }
 
+/** The orbs Locust draws. Four are work; the fifth is the absence of news. */
+export type OrbState = 'searching' | 'working' | 'connecting' | 'solving' | 'breathing'
+
+/**
+ * THE FLOOR: alive, and nothing has been reported.
+ *
+ * Colin, 2026-09-20, with a frame of his own Cursor run — `Yurt · starting
+ * ••• · 16s`, sixteen seconds and no orb: *"shouldnt it also show up for any
+ * thinking or activity regardless of calls? ... the minor models should still
+ * show SOMETHING no?"* He is right, and the first version's floor was wrong:
+ * it drew an orb only while a tool was OPEN, so on OpenCode — which reports
+ * its tools when they finish — the feature never appeared at all, and on any
+ * runtime the long wait before the first tool showed nothing.
+ *
+ * `breathing` and not one of the four, CHOSEN BY LOOKING. Rendered at 20px,
+ * every mapped state is a cloud of dots and `breathing` is a clean hollow
+ * ring — the one shape in the set that cannot be mistaken for the others, and
+ * the one that reads as calm rather than busy. That is exactly the claim it
+ * has to make: the teammate is there, and nothing has come back yet.
+ *
+ * This EXTENDS the design agent's ruling from four states to five. Its rule
+ * was "never invent a Locust activity for a state" and this does not: waiting
+ * on the model is a real state the app already drew, with three dots. The
+ * orb now says it, so the dots retire where it appears.
+ */
+const WAITING_ORB = 'breathing' as const
+
 /**
  * Which orb a running step is, from the SAME facts its row's text is from.
  *
@@ -1591,20 +1618,41 @@ export function isShellTool(name: string, toolKind: string | undefined): boolean
  */
 export function orbStateFor(
   detail: { readonly kind: string; readonly name: string } | undefined,
-  planMode: boolean
-): 'searching' | 'working' | 'connecting' | 'solving' | undefined {
+  planMode: boolean,
+  register?: 'starting' | 'working' | 'thinking' | 'writing' | 'tool' | 'connector'
+): OrbState {
   // Planning is the turn's mode, not a tool, so it answers when nothing else
   // does -- a Plan-mode run with no tool open is a run that is planning.
-  if (detail === undefined) return planMode ? 'solving' : undefined
+  if (detail === undefined) {
+    if (planMode) return 'solving'
+    /*
+     * THE ORB HAS TO MOVE WHEN THE STATE MOVES (Colin, 2026-09-20, watching
+     * this drive's own output): "when it went from starting to working an orb
+     * change would have been nice".
+     *
+     * He is right, and the fix is not a flourish -- it is the difference
+     * between an indicator and an ornament. `starting` and `thinking` are
+     * both "alive, nothing has come back", which is what the ring says.
+     * `working` and `writing` are the runtime saying it IS doing something,
+     * and the particle orb says exactly that much without claiming to know
+     * what. The row beside it carries the detail either way.
+     */
+    return register === 'working' || register === 'writing' ? 'working' : WAITING_ORB
+  }
   if (detail.kind === 'helper') return 'connecting'
   if (detail.kind === 'shell') return 'working'
-  if (detail.kind === 'edit') return undefined // writing a file has no true orb
   const words = detail.name
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .split(/[^A-Za-z]+/)
     .map((word) => word.toLowerCase())
   if (words.some((word) => READ_TOOL_WORDS.has(word))) return 'searching'
-  return planMode ? 'solving' : undefined
+  /*
+   * Any other open tool -- writing a file, or one this app does not
+   * classify -- is `working`. A tool is running, which is all `working`
+   * claims; the row says which tool. The specific three claim MORE than
+   * that, so they are never the fallback.
+   */
+  return 'working'
 }
 
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {
@@ -2223,10 +2271,7 @@ export function buildThread(
         detail: openToolMeta.connector,
         startedAt: turnStartedAt ?? openToolMeta.at,
         kind: 'item',
-        ...(() => {
-          const orb = orbStateFor(openTool, options.planMode === true)
-          return orb === undefined ? {} : { orb }
-        })(),
+        orb: orbStateFor(openTool, options.planMode === true),
         register: openToolMeta.connector === undefined ? 'tool' : 'connector'
       })
     } else if (runningStep !== undefined) {
@@ -2241,10 +2286,7 @@ export function buildThread(
         // No tool is open, so only the turn's own mode can answer. A Plan-mode
         // run is planning; anything else keeps its dots rather than borrow an
         // orb that would be describing work nobody reported.
-        ...(() => {
-          const orb = orbStateFor(undefined, options.planMode === true)
-          return orb === undefined ? {} : { orb }
-        })(),
+        orb: orbStateFor(undefined, options.planMode === true, runningStep.register),
         ...(runningStep.kind === 'reasoning' ? { waiting: true } : {})
       })
     } else if (!streaming && options.awaitingDecision !== true) {
@@ -2301,10 +2343,7 @@ export function buildThread(
           // is open, so only the turn's own mode can say what is happening,
           // and in Plan mode what is happening is planning. Every other turn
           // keeps its dots, which already mean "waiting with nothing to show".
-          ...(() => {
-            const orb = orbStateFor(undefined, options.planMode === true)
-            return orb === undefined ? {} : { orb }
-          })(),
+          orb: orbStateFor(undefined, options.planMode === true, spoken ? 'working' : 'starting'),
           // Past twenty seconds with nothing from the runtime the line says so
           // as well; see `quiet.ts` for the measured run above.
           spoken

@@ -21,6 +21,7 @@ const workspace = await scratchRepository('locust-drive-orb-ws-')
 const T0 = '2026-09-20T05:00:00.000Z'
 
 let failures = 0
+let sending
 const check = (label, ok, detail) => {
   if (!ok) failures += 1
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${label}${detail === undefined ? '' : ` -- ${String(detail).slice(0, 220)}`}`)
@@ -83,9 +84,31 @@ try {
      * appears while a tool is OPEN has to be measured against a tool that
      * stays open, or the measurement is of the sampling rate.
      */
-    return drive.evaluate(
+    /*
+     * NOT AWAITED YET. `capture` photographs after its action returns, and
+     * the orb exists only WHILE the turn runs -- so awaiting the send here
+     * would guarantee every frame was taken after the one thing being
+     * measured had stopped. The first version of this drive did exactly that
+     * and produced three screenshots of a finished conversation.
+     */
+    sending = drive.evaluate(
       sendAndWaitScript('Run exactly this one command and nothing else: powershell -Command "Start-Sleep -Seconds 8". Then reply with the single word DONE.')
     )
+    return 'sent'
+  })
+
+  await drive.capture('the orb, while the turn is still running', async () => {
+    const seen = await drive.waitFor(
+      `(() => { const c = document.querySelector('.lc-livestep__orb canvas'); return c ? (c.getAttribute('aria-label') || 'orb') + ' ' + c.width + 'x' + c.height : false })()`,
+      { what: 'an orb on the live step', timeoutMs: 30_000 }
+    )
+    check('an orb is on screen mid-run', /\d+x\d+/.test(String(seen)), seen)
+    return String(seen)
+  })
+
+  await drive.capture('the turn finishes', async () => {
+    const answer = await sending
+    return String(answer).slice(0, 160)
   })
 
   await drive.capture('what the orb said, and what the row said with it', async () => {
