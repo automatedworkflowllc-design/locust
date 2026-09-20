@@ -67,21 +67,51 @@ describe('where nothing is known, it says so rather than something untrue', () =
     expect(orbStateFor(tool('edit', 'write_file'), false)).toBe('working')
   })
 
-  it('starting and thinking are breathing: alive, nothing back yet', () => {
+  it('starting is breathing: alive, nothing back yet', () => {
     expect(orbStateFor(undefined, false, 'starting')).toBe('breathing')
-    expect(orbStateFor(undefined, false, 'thinking')).toBe('breathing')
     expect(orbStateFor(undefined, false)).toBe('breathing')
   })
 
-  it('the orb CHANGES when starting becomes working', () => {
+  it('EVERY word change changes the orb', () => {
     /*
-     * Colin, 2026-09-20, watching this feature's own drive: "when it went
-     * from starting to working an orb change would have been nice". An
-     * indicator that holds one shape across a state change is an ornament.
+     * Colin, 2026-09-20: "when it transitions to another word, an orb switch
+     * would be nice". An indicator that holds one shape across a state change
+     * is an ornament, and the first version repeated itself on three of the
+     * five transitions a run walks.
+     *
+     * Asserted as a set: the five words a run moves between must produce five
+     * DIFFERENT orbs, so no future edit can quietly collapse two of them.
      */
-    expect(orbStateFor(undefined, false, 'starting')).not.toBe(orbStateFor(undefined, false, 'working'))
-    expect(orbStateFor(undefined, false, 'working')).toBe('working')
-    expect(orbStateFor(undefined, false, 'writing')).toBe('working')
+    const words = ['starting', 'thinking', 'working', 'writing', 'connector'] as const
+    const orbs = words.map((word) => orbStateFor(undefined, false, word))
+    expect(new Set(orbs).size).toBe(words.length)
+    expect(orbs).toEqual(['breathing', 'listening', 'working', 'composing', 'connecting'])
+  })
+
+  it('waiting on a model to speak is listening, and a model writing is composing', () => {
+    // Honest on their own terms rather than merely distinct, which is the
+    // difference between a mapping and a palette.
+    expect(orbStateFor(undefined, false, 'thinking')).toBe('listening')
+    expect(orbStateFor(undefined, false, 'writing')).toBe('composing')
+  })
+
+  it('a step that says `tool` never shows the waiting ring', () => {
+    /*
+     * FOUND BY SPENDING. Codex reports a step AND its tools, so the live line
+     * can be a step whose register is `tool` while no tool detail is open.
+     * That fell through to `breathing`, whose label is "Thinking…", beside a
+     * row reading "using a tool" -- sixteen consecutive samples of it on the
+     * first paid drive, 2026-09-20.
+     *
+     * No free runtime streams steps, so no free drive could ever have seen
+     * this. It is the one defect that needed the quota Colin released.
+     */
+    expect(orbStateFor(undefined, false, 'tool')).toBe('working')
+    expect(orbStateFor(undefined, false, 'tool')).not.toBe('breathing')
+  })
+
+  it('a connector call is connecting, because it left the machine', () => {
+    expect(orbStateFor(tool('tool', 'gmail__send'), false, 'connector')).toBe('connecting')
   })
 
   it('an unclassified open tool is working, never one of the specific three', () => {

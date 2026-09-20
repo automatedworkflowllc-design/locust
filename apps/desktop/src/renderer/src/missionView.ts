@@ -1577,8 +1577,15 @@ export function isShellTool(name: string, toolKind: string | undefined): boolean
     || toolKind === 'run_command'
 }
 
-/** The orbs Locust draws. Four are work; the fifth is the absence of news. */
-export type OrbState = 'searching' | 'working' | 'connecting' | 'solving' | 'breathing'
+/**
+ * The orbs Locust draws — one per thing the live line can SAY.
+ *
+ * Seven of the library's nine. `weaving` and `shaping` are unused because
+ * nothing here is honestly theirs, and both were also rejected by looking:
+ * at 20px weaving is nearly invisible and shaping is a hard triangle that
+ * reads as an icon rather than a state.
+ */
+export type OrbState = 'searching' | 'working' | 'connecting' | 'solving' | 'breathing' | 'listening' | 'composing'
 
 /**
  * THE FLOOR: alive, and nothing has been reported.
@@ -1621,24 +1628,55 @@ export function orbStateFor(
   planMode: boolean,
   register?: 'starting' | 'working' | 'thinking' | 'writing' | 'tool' | 'connector'
 ): OrbState {
+  // A connector call is named by its register rather than by its kind: the
+  // detail carries the MCP tool, and what matters is that it left the machine.
+  if (register === 'connector') return 'connecting'
   // Planning is the turn's mode, not a tool, so it answers when nothing else
   // does -- a Plan-mode run with no tool open is a run that is planning.
   if (detail === undefined) {
     if (planMode) return 'solving'
     /*
-     * THE ORB HAS TO MOVE WHEN THE STATE MOVES (Colin, 2026-09-20, watching
-     * this drive's own output): "when it went from starting to working an orb
-     * change would have been nice".
+     * ONE ORB PER WORD THE LINE CAN SAY (Colin, 2026-09-20): "when it
+     * transitions to another word, an orb switch would be nice".
      *
-     * He is right, and the fix is not a flourish -- it is the difference
-     * between an indicator and an ornament. `starting` and `thinking` are
-     * both "alive, nothing has come back", which is what the ring says.
-     * `working` and `writing` are the runtime saying it IS doing something,
-     * and the particle orb says exactly that much without claiming to know
-     * what. The row beside it carries the detail either way.
+     * Not a flourish — it is the difference between an indicator and an
+     * ornament. The first version gave `starting` and `thinking` the same
+     * ring and `working` and `writing` the same particles, so three of the
+     * five transitions a run walks showed no change at all.
+     *
+     * CHOSEN BY RENDERING THE SEQUENCE, not by reasoning about names: the
+     * four candidate mappings were drawn at 20px side by side in the order a
+     * run actually walks them. `weaving` for thinking is nearly invisible at
+     * that size and `shaping` for writing is a hard triangle that reads as an
+     * icon rather than a state; both were rejected on sight.
+     *
+     * What survives is honest on its own terms rather than merely distinct:
+     * waiting on a model to speak IS listening, and a model streaming its
+     * answer IS composing one.
      */
-    return register === 'working' || register === 'writing' ? 'working' : WAITING_ORB
+    if (register === 'writing') return 'composing'
+    if (register === 'working') return 'working'
+    if (register === 'thinking') return 'listening'
+    /*
+     * A STEP THAT SAYS `tool` WITHOUT AN OPEN TOOL still means a tool is
+     * running. Codex reports both a step and its tools, and the step can be
+     * the live line while no tool detail is open — so this fell through to
+     * the waiting ring and the row read **"using a tool"** beside an orb
+     * whose label is "Thinking…". Measured on the first paid drive,
+     * 2026-09-20: sixteen consecutive samples of exactly that.
+     *
+     * It is the contradiction the whole mapping exists to prevent, and it was
+     * invisible on every free route because no free runtime streams steps.
+     */
+    if (register === 'tool') return 'working'
+    return WAITING_ORB
   }
+  /*
+   * A connector reaches OFF this machine, which is the one fact the
+   * permission chip exists to say — so `connecting` is the literal truth
+   * about it, not an approximation. A subagent is the same shape of claim:
+   * work is happening somewhere this row cannot show you.
+   */
   if (detail.kind === 'helper') return 'connecting'
   if (detail.kind === 'shell') return 'working'
   const words = detail.name
@@ -2271,7 +2309,7 @@ export function buildThread(
         detail: openToolMeta.connector,
         startedAt: turnStartedAt ?? openToolMeta.at,
         kind: 'item',
-        orb: orbStateFor(openTool, options.planMode === true),
+        orb: orbStateFor(openTool, options.planMode === true, openToolMeta.connector === undefined ? 'tool' : 'connector'),
         register: openToolMeta.connector === undefined ? 'tool' : 'connector'
       })
     } else if (runningStep !== undefined) {

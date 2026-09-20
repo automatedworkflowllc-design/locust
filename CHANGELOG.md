@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.210.0 - 2026-09-20
+
+- **The orb changes at every word the line changes to.** Starting, thinking,
+  working, writing and a connector call each have their own now, instead of
+  four of them sharing two. A run you watch actually moves through them.
+- **Fixed: the orb said "thinking" while the line said "using a tool".** On
+  Codex and Claude Code, which report a step as well as its tools, a step that
+  named a tool showed the waiting orb beside it. Seen only by running a real
+  turn on each.
+
 ## 0.209.0 - 2026-09-20
 
 - **The orb is there for the whole wait now, and it changes when the work
