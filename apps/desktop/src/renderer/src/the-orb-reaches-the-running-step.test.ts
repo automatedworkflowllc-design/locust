@@ -62,7 +62,7 @@ describe('the orb reaches the running step', () => {
   it('a shell command that is still open draws the working orb', () => {
     const step = liveStep([started('t1', 'shell', 'command_execution', 'pnpm test billing')])
     expect(step?.register).toBe('tool')
-    expect(step?.orb).toBe('solving')
+    expect(step?.orb).toBe('connecting')
   })
 
   it('a read that is still open draws the searching orb', () => {

@@ -112,7 +112,7 @@ const faces = `JSON.stringify([...document.querySelectorAll('.lc-face')].map(fac
   const dot = face.querySelector('.lc-presence')
   const shadow = layers.map(l => getComputedStyle(l).boxShadow).join('|')
   return {
-    where: (face.closest('.lc-faces__one') || face.closest('.lc-teammate')) ? 'sidebar' : face.closest('.lc-workroom__header') ? 'header' : face.closest('.lc-livestep') ? 'step' : face.closest('.lc-agentline') ? 'thread' : face.closest('.lc-empty') ? 'empty' : 'other',
+    where: (face.closest('.lc-faces__one') || face.closest('.lc-teammate')) ? 'sidebar' : face.closest('.lc-convrow') ? 'conv' : face.closest('.lc-workroom__header') ? 'header' : face.closest('.lc-livestep') ? 'step' : face.closest('.lc-agentline') ? 'thread' : face.closest('.lc-empty') ? 'empty' : 'other',
     name: (face.closest('.lc-faces__one')?.getAttribute('aria-label')?.split(' — ')[0])
       ?? (face.closest('.lc-teammate') || face.closest('.lc-workroom__header') || { querySelector: () => null }).querySelector?.('.lc-row__name, .lc-workroom__name')?.innerText?.trim() ?? '',
     size: face.getBoundingClientRect().width,
@@ -265,10 +265,19 @@ try {
     first !== undefined && ['thinking', 'working', 'responding'].includes(first.activity)
       && MOTION[first.activity].every((name) => first.animating.includes(name)), JSON.stringify(first))
   check('no animation from the retired generic set is on any face', working.every((face) => !face.animating.includes('lcEyes')), JSON.stringify(working.map((f) => f.animating)))
-  // One teammate, one state, everywhere: every chip that carries this
-  // teammate's id -- sidebar, header, the working line -- resolves to the
-  // same state and the same computed animations at this instant.
-  const mine = working.filter((face) => first !== undefined && face.teammate === first.teammate && face.teammate !== '')
+  /*
+   * One teammate, one state, everywhere a face REPORTS state: the rail, the
+   * workroom header and the working line resolve to the same state and the
+   * same computed animations at this instant.
+   *
+   * The conversation rows are left out ON PURPOSE, not because they failed.
+   * Their 16px face is handed a hue and an id and nothing else -- it answers
+   * "whose conversation is this", which is identity, and a list entry that
+   * animated would be claiming something about a row rather than about the
+   * teammate. Including them made this read a disagreement where there is
+   * only a division of labour.
+   */
+  const mine = working.filter((face) => first !== undefined && face.teammate === first.teammate && face.teammate !== '' && face.where !== 'conv')
   const states = new Set(mine.map((face) => face.activity))
   const motions = new Set(mine.map((face) => [...face.animating].sort().join('+')))
   check('every chip of the working teammate agrees on the state', mine.length >= 2 && states.size === 1, JSON.stringify(mine.map((f) => [f.where, f.activity])))
@@ -283,12 +292,24 @@ try {
     const line = document.querySelector('.lc-livestep')
     if (!line) return null
     const face = line.querySelector('.lc-face')
-    return { kind: line.dataset.stepKind, activity: face ? face.dataset.activity : '', hasFace: face !== null, hasBar: line.querySelector('progress, [role="progressbar"], .lc-progress') !== null, dots: line.querySelectorAll('.lc-dots').length, text: line.innerText.replace(/\\s+/g, ' ').trim() }
+    return { kind: line.dataset.stepKind, activity: face ? face.dataset.activity : '', hasFace: face !== null, hasBar: line.querySelector('progress, [role="progressbar"], .lc-progress') !== null, dots: line.querySelectorAll('.lc-dots').length, orbs: line.querySelectorAll('.lc-livestep__orb').length, text: line.innerText.replace(/\\s+/g, ' ').trim() }
   })())`)
   const stepState = JSON.parse(step)
   if (stepState !== null) {
     check('the running step is an avatar-led line without a bar', stepState.hasFace === true && stepState.hasBar === false, JSON.stringify(stepState))
-    check('a thinking face shows dots; a working or replying one does not', stepState.activity === 'thinking' ? stepState.dots === 1 : stepState.dots === 0, JSON.stringify(stepState))
+    /*
+     * THE DOTS MOVED TO THE ORB in 0.217, and this asserted the old rule.
+     *
+     * The three dots meant "waiting on the model with nothing to show yet",
+     * and an orb now says exactly that beside the face -- so the dots are
+     * drawn only where there is no orb. Both at once is the app saying one
+     * thing twice, which is the rule the whole orb change was built on.
+     *
+     * The claim worth keeping is the one this always meant: a thinking line
+     * carries EXACTLY ONE waiting mark, never none and never both.
+     */
+    const marks = stepState.dots + stepState.orbs
+    check('a thinking line carries exactly one waiting mark', stepState.activity === 'thinking' ? marks === 1 : marks <= 1, JSON.stringify(stepState))
     say(`       step: ${stepState.kind} · ${stepState.text.slice(0, 80)}`)
   } else {
     say('       (no live step on screen at the sample moment)')
@@ -315,7 +336,10 @@ try {
   const label = await cdp.eval(`(async () => {
     const face = document.querySelector('.lc-faces__one')
     if (!face) return 'no face rail'
-    face.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }))
+    // React delegates onMouseEnter from a BUBBLING mouseover. A real
+    // mouseenter does not bubble, so dispatching one reaches no handler
+    // and the flyout never opens -- which is how this read 'no flyout'.
+    face.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     for (let i = 0; i < 40; i += 1) {
       await new Promise(r => setTimeout(r, 100))
       const said = document.querySelector('.lc-railflyout__status')

@@ -167,8 +167,8 @@ try {
   const opened = await cdp.eval(`(async () => {
     for (let i = 0; i < 120; i += 1) {
       await new Promise(r => setTimeout(r, 250))
-      // `.lc-conv` is the conversation row in the wide sidebar since 0.207;
-      // `.lc-row` is the compact rail's shape and the roster's.
+      // .lc-conv is the conversation row in the wide sidebar since 0.207;
+      // .lc-row is the compact rail's shape and the roster's.
       const rows = [...document.querySelectorAll('.lc-conv, .lc-row')].filter(r => /Rewrite the README/.test(r.innerText))
       if (rows.length === 0) continue
       const row = rows[0]

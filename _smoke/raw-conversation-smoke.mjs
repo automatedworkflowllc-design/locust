@@ -181,7 +181,8 @@ try {
 
   say('3. the mission\'s own menu can hand it to a teammate')
   const menu = JSON.parse(await evaluate(`(async () => {
-    const row = [...document.querySelectorAll('.lc-sidebar .lc-row')].find(r => /release date/i.test(r.innerText))
+    // .lc-conv is the conversation row in the wide sidebar since 0.207.
+    const row = [...document.querySelectorAll('.lc-sidebar .lc-conv, .lc-sidebar .lc-row')].find(r => /release date/i.test(r.innerText))
     if (!row) return JSON.stringify({ found: false })
     const box = row.getBoundingClientRect()
     row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: Math.round(box.left + 20), clientY: Math.round(box.top + 10) }))

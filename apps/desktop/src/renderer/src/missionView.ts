@@ -1504,6 +1504,32 @@ export function mcpToolParts(name: string): { readonly server: string; readonly 
   return undefined
 }
 
+/**
+ * A connector call whose NAME carries nothing to split.
+ *
+ * `mcpToolParts` reads `mcp__server__tool` and its cousins, which is every
+ * shape Locust had been shown until Colin ran Antigravity against MCP on
+ * 2026-09-20. That runtime names the tool `mcp` -- flatly, three rows of it
+ * in his screenshot, `3 tool calls - mcp, mcp, mcp done` -- and puts the
+ * server and the real tool somewhere the event does not carry. So there is
+ * nothing to split, the split returned undefined, and the call was filed as
+ * an ordinary local tool: no connector register, no connector orb, and no
+ * permission chip saying the work left the machine.
+ *
+ * This says the ONE thing that is still knowable from the name: it went
+ * through a connector. The server stays undefined, and the row says "using a
+ * connector" without naming one rather than inventing a name for it.
+ *
+ * Deliberately a short closed list. `mcp` as a whole word is not a name any
+ * ordinary tool has, but `mcp_server_config.json` is a file and `Read` of it
+ * must not become a connector call.
+ */
+const BARE_CONNECTOR_TOOLS = new Set(['mcp', 'mcp_tool', 'mcptool', 'use_mcp_tool', 'call_mcp_tool', 'run_mcp_tool'])
+
+export function isBareConnectorTool(name: string): boolean {
+  return BARE_CONNECTOR_TOOLS.has(name.trim().toLowerCase())
+}
+
 /** The name a person connected, not the transport that carries it. */
 function prettyServer(raw: string): string {
   return raw.replace(/^claude_ai_/, '').replace(/[_-]+/g, ' ').trim()
@@ -1640,7 +1666,31 @@ export function orbStateFor(
 ): OrbState {
   // A connector call is named by its register rather than by its kind: the
   // detail carries the MCP tool, and what matters is that it left the machine.
-  if (register === 'connector') return 'connecting'
+  /*
+   * A CONNECTOR GETS THE RUBIK, because Colin picked it out of a frame for
+   * exactly this and because MCP had no shape of its own at all.
+   *
+   * 2026-09-20, with a screenshot of `solving` beside one of an Antigravity
+   * turn calling MCP three times: *"working is showing the same animation as
+   * grabbing an mcp tool call, i dont think we have mcp properly setup to its
+   * own unique animation... this should be the one used for mcp or
+   * connectors"*. He was right twice over -- see `isBareConnectorTool`, which
+   * is why his MCP calls were not even being RECOGNISED as connector calls --
+   * and this is the half of it that is about the picture.
+   *
+   * It costs the ordinary tool row its sphere: `connecting` takes that, which
+   * is the shape this line used to have. The trade is deliberate. A tool call
+   * is the commonest thing a run does and it already has a NAME on the row
+   * beside it; a connector call is rare, reaches off the machine, and is the
+   * one a person wants to spot without reading. The rarer event gets the
+   * louder mark.
+   *
+   * It also retires the residual repeat this mapping used to admit to: a
+   * Plan-mode run that opened a shell went `solving` to `solving`, and the
+   * shell is `connecting` now. The new residual is Plan mode calling a
+   * CONNECTOR, which is rarer still.
+   */
+  if (register === 'connector') return 'solving'
   // Planning is the turn's mode, not a tool, so it answers when nothing else
   // does -- a Plan-mode run with no tool open is a run that is planning.
   if (detail === undefined) {
@@ -1726,7 +1776,7 @@ export function orbStateFor(
      * It is the contradiction the whole mapping exists to prevent, and it was
      * invisible on every free route because no free runtime streams steps.
      */
-    if (register === 'tool') return 'solving'
+    if (register === 'tool') return 'connecting'
     return WAITING_ORB
   }
   /*
@@ -1736,7 +1786,7 @@ export function orbStateFor(
    * work is happening somewhere this row cannot show you.
    */
   if (detail.kind === 'helper') return 'weaving'
-  if (detail.kind === 'shell') return 'solving'
+  if (detail.kind === 'shell') return 'connecting'
   const words = detail.name
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .split(/[^A-Za-z]+/)
@@ -1744,11 +1794,11 @@ export function orbStateFor(
   if (words.some((word) => READ_TOOL_WORDS.has(word))) return 'searching'
   /*
    * Any other open tool -- writing a file, or one this app does not
-   * classify -- is `listening`. A tool is running, which is all this claims;
+   * classify -- is `connecting`. A tool is running, which is all this claims;
    * the row says which tool. The specific ones claim MORE than that, so they
    * are never the fallback.
    */
-  return 'solving'
+  return 'connecting'
 }
 
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {
@@ -1939,7 +1989,10 @@ export function buildThread(
    * way (MEASURED 2026-09-11, `probe-live-line-says-which`: `sawATool:
    * false`). The register was honest and useless, which is the worst of both.
    */
-  const openToolAt = new Map<string, { readonly at: string; readonly connector: string | undefined }>()
+  // `connector` is the SERVER when the name carries one; `viaConnector` is
+  // whether it left the machine at all. They came apart when a runtime turned
+  // up that says the second without the first -- see `isBareConnectorTool`.
+  const openToolAt = new Map<string, { readonly at: string; readonly connector: string | undefined; readonly viaConnector: boolean }>()
   /**
    * Disk observations that landed on a row the runtime drew, by item id, with
    * the file's name. When the observation's patch arrives it is the NET
@@ -1990,7 +2043,7 @@ export function buildThread(
           const own = activity.find((detail) => detail.kind === 'edit' && nameTail(detail.name) === tail)
           if (own !== undefined) {
             openTools.set(event.payload.itemId, own)
-            openToolAt.set(event.payload.itemId, { at: event.occurredAt, connector: undefined })
+            openToolAt.set(event.payload.itemId, { at: event.occurredAt, connector: undefined, viaConnector: false })
             observedNet.set(event.payload.itemId, tail)
             break
           }
@@ -2016,7 +2069,11 @@ export function buildThread(
         // Whether it reaches OFF this machine, decided by the same split the
         // row uses. `tool !== name` cannot answer it: an ordinary call names
         // the tool and its target too (`Read` / `README.md`).
-        openToolAt.set(event.payload.itemId, { at: event.occurredAt, connector: mcp?.server })
+        openToolAt.set(event.payload.itemId, {
+          at: event.occurredAt,
+          connector: mcp?.server,
+          viaConnector: mcp !== undefined || isBareConnectorTool(event.payload.name)
+        })
         activity.push(detail)
         break
       }
@@ -2386,8 +2443,8 @@ export function buildThread(
         detail: openToolMeta.connector,
         startedAt: turnStartedAt ?? openToolMeta.at,
         kind: 'item',
-        orb: orbStateFor(openTool, options.planMode === true, openToolMeta.connector === undefined ? 'tool' : 'connector'),
-        register: openToolMeta.connector === undefined ? 'tool' : 'connector'
+        orb: orbStateFor(openTool, options.planMode === true, openToolMeta.viaConnector ? 'connector' : 'tool'),
+        register: openToolMeta.viaConnector ? 'connector' : 'tool'
       })
     } else if (runningStep !== undefined) {
       items.push({
