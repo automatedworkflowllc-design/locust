@@ -135,7 +135,7 @@ try {
   const home = JSON.parse(await evaluate(`JSON.stringify({
     placeholder: document.querySelector('form.command-dock textarea').placeholder,
     sidebar: document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' '),
-    highlighted: document.querySelectorAll('.lc-teammate.is-selected').length,
+    highlighted: document.querySelectorAll('.lc-faces__one.is-on, .lc-teammate.is-selected').length,
     home: !!document.querySelector('.lc-runtimepanel')
   })`))
   say(`       ${JSON.stringify(home)}`)
@@ -147,18 +147,32 @@ try {
   // User session, 2026-09-05: with nobody picked the first teammate was drawn
   // as chosen while the composer addressed nobody.
   check('no teammate is drawn as chosen when nobody is', home.highlighted === 0, String(home.highlighted))
-  // The section is titled just "Missions" since 2026-09-06 (Colin: "just have
-  // it say missions lol, why other missions?"), so this asserts the section
-  // EXISTS and holds the conversation rather than pinning its old wording.
-  check('the mission of nobody\'s is listed outside the roster', /MISSIONS[\s\S]*release date/i.test(home.sidebar), home.sidebar.slice(0, 200))
+  /*
+   * The CLAIM is that a conversation nobody owns is still listed -- it was
+   * once drawn only nested under its teammate, so an unowned one had nowhere
+   * to be and vanished.
+   *
+   * It used to look for a MISSIONS heading, which is how the sidebar was
+   * built until 0.207. There are no per-teammate nests to be outside of any
+   * more: the wide sidebar is one conversation list, and the roster above it
+   * is a row of faces with no conversations under them at all. So the honest
+   * check is that the list holds it and the rail does not.
+   */
+  const listed = JSON.parse(await evaluate(`JSON.stringify({
+    inList: [...document.querySelectorAll('.lc-convlist .lc-conv__title')].some(t => /release date/i.test(t.innerText)),
+    underAFace: document.querySelectorAll('.lc-faces .lc-conv__title, .lc-faces__one .lc-row').length
+  })`))
+  check("the mission of nobody's is listed outside the roster", listed.inList === true && listed.underAFace === 0, JSON.stringify(listed))
 
   say('2. picking a teammate addresses them')
   const picked = await evaluate(`(async () => {
-    document.querySelector('.lc-teammate .lc-row').click()
+    // The face rail is the roster in the wide sidebar (0.207): a face both
+    // picks the teammate and filters the list to them.
+    document.querySelector('.lc-faces__one, .lc-teammate .lc-row').click()
     await new Promise(r => setTimeout(r, 400))
     return JSON.stringify({
       placeholder: document.querySelector('form.command-dock textarea').placeholder,
-      highlighted: document.querySelectorAll('.lc-teammate.is-selected').length
+      highlighted: document.querySelectorAll('.lc-faces__one.is-on, .lc-teammate.is-selected').length
     })
   })()`)
   const pickedState = JSON.parse(picked)

@@ -167,7 +167,9 @@ try {
   const opened = await cdp.eval(`(async () => {
     for (let i = 0; i < 120; i += 1) {
       await new Promise(r => setTimeout(r, 250))
-      const rows = [...document.querySelectorAll('.lc-row')].filter(r => /Rewrite the README/.test(r.innerText))
+      // `.lc-conv` is the conversation row in the wide sidebar since 0.207;
+      // `.lc-row` is the compact rail's shape and the roster's.
+      const rows = [...document.querySelectorAll('.lc-conv, .lc-row')].filter(r => /Rewrite the README/.test(r.innerText))
       if (rows.length === 0) continue
       const row = rows[0]
       const box = row.getBoundingClientRect()
@@ -228,7 +230,9 @@ try {
   // that works on a mission silently did nothing one row above it.
   say('5. right-clicking a TEAMMATE offers the same menu')
   const onTeammate = JSON.parse(await cdp.eval(`(async () => {
-    const row = document.querySelector('.lc-teammate .lc-row')
+    // The roster is the face rail in the wide sidebar; a face carries the
+    // same context menu the old teammate row did.
+    const row = document.querySelector('.lc-faces__one') || document.querySelector('.lc-teammate .lc-row')
     if (!row) return JSON.stringify({ found: false })
     const box = row.getBoundingClientRect()
     row.dispatchEvent(new MouseEvent('contextmenu', {
