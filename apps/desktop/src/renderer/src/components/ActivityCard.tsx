@@ -142,9 +142,19 @@ export function ActivityCard({
   workspacePath,
   plan,
   notices = [],
+  onOpenFile,
   openByDefault = false
 }: {
   readonly summary: string
+  /**
+   * Open a file this turn touched in the panel beside the conversation.
+   *
+   * The fold is the COMMON way a person meets a file -- a handed file is a
+   * teammate choosing to give you one, and most files are not handed. Until
+   * this, the fold's only offer was the file manager, so reading what was
+   * written meant leaving the app. Absent: the row reveals, as before.
+   */
+  readonly onOpenFile?: (path: string) => void
   /** The trace line; when absent the summary string is drawn (older callers). */
   readonly trace?: readonly TraceSegment[]
   /** True once the turn is over: an unsettled subagent then reads "did not report". */
@@ -309,6 +319,30 @@ export function ActivityCard({
                       first thing asked about a file and a fold two levels deep
                       is not where the answer belongs.
                     */}
+                    {/*
+                      Read it here, rather than going to find it. The diff
+                      above answers "what changed"; this answers "what does
+                      the file SAY", which for a report or a brief is the
+                      whole question and which a patch of three hunks cannot
+                      answer. It opens the same panel a handed file opens --
+                      one viewer, not two -- and like every other file control
+                      in this app it never hands the file to the operating
+                      system to run.
+                    */}
+                    {onOpenFile !== undefined && (
+                      <button
+                        type="button"
+                        className="lc-filerow__view"
+                        title={`Open ${relativePath(entry.file.path, workspacePath)}`}
+                        aria-label={`Open ${relativePath(entry.file.path, workspacePath)}`}
+                        onClick={() => onOpenFile(entry.file.path)}
+                      >
+                        {/* `maximize`, not `file`: the row's left edge already
+                            carries a file glyph, and two of the same mark on
+                            one row says the two controls do the same thing. */}
+                        <Icon name="maximize" size={13} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="lc-filerow__reveal"

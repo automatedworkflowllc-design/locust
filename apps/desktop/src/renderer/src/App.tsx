@@ -1146,11 +1146,29 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     setViewerRefusal(undefined)
     if (bridge === undefined || workspacePath === undefined) return
+    /*
+     * Two callers, two shapes of path.
+     *
+     * A handed file is relative by construction -- `handover.ts` drops any
+     * absolute path a model writes. An activity row's file is absolute,
+     * because that is what the runtime reported acting on, and it is not
+     * always inside the workspace. Joining the workspace onto an already
+     * absolute path produces `C:/ws/C:/elsewhere/notes.md`, which the host
+     * then refuses for the wrong reason: the panel would say the file is
+     * outside the folder about a file that is simply named twice.
+     */
+    const absolute = /^([a-z]:)?[\\/]/i.test(path)
+    // Resolve ONCE and keep the resolved path. The head's reveal and save
+    // buttons used to join the workspace on again, so whichever caller had
+    // already passed a whole path got it joined twice at the moment it was
+    // pressed -- a panel showing the right file with two controls pointing at
+    // a path that does not exist.
+    const full = absolute ? path : `${workspacePath}/${path}`
     void bridge
-      .readTextFile(`${workspacePath}/${path}`)
+      .readTextFile(full)
       .then((answer) => {
         if (answer.ok) {
-          setViewingFile({ path, text: answer.text, mode: answer.mode })
+          setViewingFile({ path: full, text: answer.text, mode: answer.mode })
           return
         }
         setViewingFile(undefined)
@@ -5295,12 +5313,12 @@ export default function App(): ReactElement {
             onReveal={() => {
               const bridge = window.desktop
               if (bridge === undefined || workspacePath === undefined) return
-              void bridge.revealFile(`${workspacePath}/${viewingFile.path}`).catch(() => undefined)
+              void bridge.revealFile(viewingFile.path).catch(() => undefined)
             }}
             onSave={() => {
               const bridge = window.desktop
               if (bridge === undefined || workspacePath === undefined) return
-              void bridge.saveCopy(`${workspacePath}/${viewingFile.path}`).catch(() => undefined)
+              void bridge.saveCopy(viewingFile.path).catch(() => undefined)
             }}
           />
         ) : (

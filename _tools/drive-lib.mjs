@@ -316,6 +316,56 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
         process.exit(1)
       }
     }
+
+    /*
+     * A DRIVE THAT DECLARED IT DOES NOT SPEND MUST NOT START ON A PAID ROUTE.
+     *
+     * `assertMaySpend` guards the drives that say `spends: true`. Nothing
+     * guarded the other direction, and the gap is not theoretical: the
+     * fold-opens-file drive on 2026-09-20 declared `spends: false`, seeded its
+     * teammate with the free OpenCode route, and sent its one turn on **Codex
+     * CLI / Account Default** -- Astra's quota -- because a teammate's seeded
+     * route is not the COMPOSER's route on a new conversation, and nothing
+     * ever compared the two. It passed every check it made. The route it ran
+     * on was visible only in a screenshot.
+     *
+     * Seven of the twenty-six sending drives never picked a route at all, so
+     * this was every one of their turns, not one accident.
+     *
+     * The repair belongs here rather than in each drive, because here is the
+     * one function all of them call before anything can be sent. Not a
+     * warning: a warning is a line in a log nobody reads while the quota is
+     * already gone.
+     */
+    if (spends !== true) {
+      const routeText = () => evaluate(`(() => {
+        const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+        // A disabled control is a screen that cannot send at all -- the bare
+        // machine, the first launch with nothing connected. Nothing to guard.
+        if (!control || control.disabled) return ''
+        return control.innerText.replace(/\\s+/g, ' ').trim()
+      })()`)
+      /*
+       * The word, not the model id. The picker reads as NAMES since 0.196.0,
+       * so the chip that used to say `opencode/muse-spark-1.3-contributor-free`
+       * now says `Jev 1.13 Free` -- and a check written against the id read
+       * the free route the app had just selected as a paid one, then exited.
+       * Measured the first time this guard ran.
+       */
+      const isFree = (text) => /opencode/i.test(String(text)) && /\bfree\b/i.test(String(text))
+      let route = await routeText()
+      if (route !== '' && !isFree(route)) {
+        say(`this drive does not spend, and the composer is on "${String(route)}". Moving it to the free route.`)
+        await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
+        route = await routeText()
+        if (!isFree(route)) {
+          say(`could not put a non-spending drive on a free route; it is on "${String(route)}".`)
+          say('pass spends: true if this drive is meant to spend, or pick a free route before sending.')
+          process.exit(1)
+        }
+      }
+      say(`route: ${String(route === '' ? 'no route control on this screen' : route)}`)
+    }
     return settled
   }
 
@@ -366,6 +416,48 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     return { width, height }
   }
 
+  /**
+   * Wait until the screen says something is true, instead of guessing how
+   * long it takes.
+   *
+   * Every drive in this repository used to wait with a fixed `sleep`. That is
+   * wrong in both directions at once: too short and the step measures a
+   * screen that had not arrived yet, too long and it pads the wall clock of
+   * every run that was already fine. Both were happening -- the flakes that
+   * cost 2026-09-09 and 2026-09-15 were a selector arriving late, and the
+   * sleeps together are most of the time a full pass takes.
+   *
+   * `expression` is evaluated IN THE PAGE and is polled from here rather than
+   * looped in the page on purpose: a one-shot evaluate can be retried when
+   * the execution context is destroyed mid-navigation, and a loop running
+   * inside that context cannot.
+   *
+   * Returns the first truthy value. On timeout it THROWS, naming what was
+   * awaited and what the expression last returned -- a wait that quietly
+   * gives up is the fixed sleep again, wearing a better name.
+   */
+  const waitFor = async (expression, { timeoutMs = 20_000, everyMs = 150, what } = {}) => {
+    const deadline = Date.now() + timeoutMs
+    let last
+    for (;;) {
+      last = await evaluate(`(() => { try { return (${expression}) } catch (error) { return 'threw: ' + String(error && error.message) } })()`)
+      if (last !== undefined && last !== null && last !== false && last !== '' && last !== 0) return last
+      if (Date.now() >= deadline) {
+        throw new Error(`waited ${String(timeoutMs)}ms for ${what ?? expression} -- last value ${JSON.stringify(last) ?? 'undefined'}`)
+      }
+      await sleep(everyMs)
+    }
+  }
+
+  /**
+   * The common case: wait until a selector matches, and hand back its text.
+   * Text rather than `true` so the step's note says what actually arrived.
+   */
+  const waitForSelector = async (selector, options = {}) => waitFor(
+    `(() => { const el = document.querySelector(${JSON.stringify(selector)}); return el ? (el.innerText || el.textContent || 'present') : false })()`,
+    { what: selector, ...options }
+  )
+
   /*
    * The OS process id, for the one thing CDP cannot do: move and photograph
    * the real window. `resize` above changes the PAGE and leaves the window
@@ -373,7 +465,7 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
    * NOT a native-window sizing pass. A design review counting pixels needs
    * the window a person actually has.
    */
-  return { evaluate, send, capture, ready, finish, profile, out, record, resize, pid: child.pid }
+  return { evaluate, send, capture, ready, finish, profile, out, record, resize, waitFor, waitForSelector, pid: child.pid }
 }
 
 /**

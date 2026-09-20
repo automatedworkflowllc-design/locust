@@ -308,6 +308,7 @@ export function ThreadItems({
               runtimeName={item.reportedBy === undefined ? undefined : runtimeDisplayName(item.reportedBy)}
               workspacePath={workspacePath}
               openByDefault={item.openByDefault === true}
+              {...(onOpenFile === undefined ? {} : { onOpenFile })}
               {...(item.plan === undefined ? {} : { plan: item.plan })}
               {...(item.notices === undefined ? {} : { notices: item.notices })}
             />

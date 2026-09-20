@@ -1467,7 +1467,8 @@ textarea {
 /* Always drawn, never hover-only: a control that appears on hover cannot be
    found by anyone who does not already know it is there, and this one exists
    BECAUSE it could not be found. */
-.lc-filerow__reveal {
+.lc-filerow__reveal,
+.lc-filerow__view {
   flex: none;
   display: flex;
   align-items: center;
@@ -1482,14 +1483,22 @@ textarea {
   cursor: pointer;
 }
 
-.lc-filerow__reveal:hover {
+.lc-filerow__reveal:hover,
+.lc-filerow__view:hover {
   background: var(--lc-hover-surface);
   color: var(--lc-text-secondary);
 }
 
-.lc-filerow__reveal:focus-visible {
+.lc-filerow__reveal:focus-visible,
+.lc-filerow__view:focus-visible {
   outline: 2px solid var(--lc-focus-ring);
   outline-offset: -2px;
+}
+
+/* Sits immediately left of reveal, so the pair reads as one group at the
+   row's end rather than two controls with a gap between them. */
+.lc-filerow__view {
+  margin-right: 0;
 }
 
 .lc-filerow__notice {
