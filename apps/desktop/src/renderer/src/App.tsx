@@ -8,6 +8,7 @@ import type { AvatarSpec } from '../../shared/avatar.js'
 import type {
   LayoutPreference,
   TubePreference,
+  ReplyTextSize,
   CodexMissionUpdate,
   MissionRouteSummary,
   GroupMembership,
@@ -500,6 +501,15 @@ const INSTALL_LOG_LINES = 500
 export default function App(): ReactElement {
   const [runtimeState, setRuntimeState] = useState<RuntimeDiscoveryState>({ phase: 'loading' })
   const [tube, setTube] = useState<TubePreference>('full')
+  /*
+   * How big a reply is set. Colin's, not mine.
+   *
+   * 0.198.0 moved it to 18px off a character count and he saw it on his own
+   * monitor: "go back to the old text size, this shit looks insane, or you
+   * can have it be changeable in settings". Both, so the default is what he
+   * had and the choice is on the screen.
+   */
+  const [replySize, setReplySize] = useState<ReplyTextSize>('standard')
   // Declared HERE, right under its state, not a thousand lines down: a
   // helper above it closed over `runtimes` and was called during render,
   // which is a ReferenceError at boot -- and it fired only on a profile
@@ -1037,15 +1047,32 @@ export default function App(): ReactElement {
     const before = tube
     setTube(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube: next })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube: next })
       .then((settings) => setTube(settings.tube))
       .catch(() => setTube(before))
   }
+  const chooseReplySize = (next: ReplyTextSize): void => {
+    const before = replySize
+    setReplySize(next)
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize: next, layout, tube })
+      .then((settings) => setReplySize(settings.replySize))
+      .catch(() => setReplySize(before))
+  }
+  /*
+   * APPLIED ON THE ROOT, because the size it changes is a token and tokens
+   * live on :root. One attribute, read by two rules in tokens.css -- the
+   * same shape the shell class for the inspector uses, and nothing here
+   * computes a pixel value: the stylesheet owns what each choice means.
+   */
+  useEffect(() => {
+    document.documentElement.dataset.replysize = replySize
+  }, [replySize])
   const chooseLayout = (next: LayoutPreference): void => {
     const before = layout
     setLayout(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout: next, tube })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout: next, tube })
       .then((settings) => setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto'))
       .catch(() => setLayout(before))
   }
@@ -1876,6 +1903,7 @@ export default function App(): ReactElement {
           setMemoryMode(settings.memoryMode)
           setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto')
           setTube(settings.tube)
+          setReplySize(settings.replySize)
         }
       })
       .catch(() => undefined)
@@ -2405,7 +2433,7 @@ export default function App(): ReactElement {
     const before = memoryMode
     setMemoryMode(next)
     void window.desktop
-      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode: next, autoMode, askConnectors, keepATodoList, layout, tube })
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode: next, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
       .then((settings) => setMemoryMode(settings.memoryMode))
       .catch(() => setMemoryMode(before))
   }
@@ -4410,12 +4438,14 @@ export default function App(): ReactElement {
               swarm={swarm}
               tube={tube}
             onTubeChange={chooseTube}
+              replySize={replySize}
+              onReplySizeChange={chooseReplySize}
             onSwarmChange={(next) => {
                 // The same write the composer mark performs: optimistic, then
                 // reconciled with what the store actually saved.
                 setSwarm(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
+                  ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                   .then((settings) => setSwarm(settings.swarm === true))
                   .catch(() => setSwarm(!next))
               }}
@@ -4423,7 +4453,7 @@ export default function App(): ReactElement {
               onAutoModeChange={(next) => {
                 setAutoMode(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: next, askConnectors, keepATodoList, layout, tube })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: next, askConnectors, keepATodoList, replySize, layout, tube })
                   .then((settings) => setAutoMode(settings.autoMode === true))
                   .catch(() => setAutoMode(!next))
               }}
@@ -4431,7 +4461,7 @@ export default function App(): ReactElement {
               onAskConnectorsChange={(next) => {
                 setAskConnectors(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors: next, keepATodoList, layout, tube })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors: next, keepATodoList, replySize, layout, tube })
                   .then((settings) => setAskConnectors(settings.askConnectors === true))
                   .catch(() => setAskConnectors(!next))
               }}
@@ -4439,7 +4469,7 @@ export default function App(): ReactElement {
               onKeepATodoListChange={(next) => {
                 setKeepATodoList(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList: next, layout, tube })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList: next, replySize, layout, tube })
                   .then((settings) => setKeepATodoList(settings.keepATodoList === true))
                   .catch(() => setKeepATodoList(!next))
               }}
@@ -4455,14 +4485,14 @@ export default function App(): ReactElement {
               onRelayHopCapChange={(next) => {
                 setRelayHopCap(next)
                 void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap: next, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                   .then((settings) => setRelayHopCap(settings.relayHopCap))
                   .catch(() => undefined)
               }}
             onRelayChange={(next) => {
               setRelay(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
+                ?.writeWorkspaceSettings({ swarm, relay: next, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                 .then((settings) => setRelay(settings.relay === true))
                 .catch(() => setRelay(!next))
             }}
@@ -4470,7 +4500,7 @@ export default function App(): ReactElement {
             onInterruptChange={(next) => {
               setInterrupt(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt: next, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt: next, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                 .then((settings) => setInterrupt(settings.interrupt === true))
                 .catch(() => setInterrupt(!next))
             }}
@@ -5015,7 +5045,7 @@ export default function App(): ReactElement {
               // same answer the composer just showed.
               setAutoMode(true)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: true, askConnectors, keepATodoList, layout: 'auto', tube: 'full' })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: true, askConnectors, keepATodoList, replySize, layout: 'auto', tube: 'full' })
                 .then((settings) => setAutoMode(settings.autoMode === true))
                 .catch(() => setAutoMode(false))
             }}
@@ -5057,7 +5087,7 @@ export default function App(): ReactElement {
               // setting that is not on disk.
               setSwarm(next)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
+                ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                 .then((settings) => setSwarm(settings.swarm === true))
                 .catch(() => setSwarm(!next))
             }}
@@ -5190,7 +5220,7 @@ export default function App(): ReactElement {
                   const next = !swarm
                   setSwarm(next)
                   void window.desktop
-                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, layout, tube })
+                    ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                     .then((settings) => setSwarm(settings.swarm === true))
                     .catch(() => setSwarm(!next))
                 }

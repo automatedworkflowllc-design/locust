@@ -4,7 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import { isAvatarSpec, seedAvatar } from '../shared/avatar.js'
-import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode, LayoutPreference, TubePreference } from '../shared/ipc.js'
+import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode, LayoutPreference, TubePreference, ReplyTextSize } from '../shared/ipc.js'
 import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
 
@@ -128,7 +128,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full' }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard' }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -141,6 +141,11 @@ function parsedTodoList(value: unknown): boolean {
 }
 
 /** How much of the boot screen to draw, or the default. Never trusts the file. */
+/** How big the reply is set, or the default. Never trusts the file. */
+function parsedReplySize(value: unknown): ReplyTextSize {
+  return value === 'standard' || value === 'large' || value === 'largest' ? value : 'standard'
+}
+
 function parsedTube(value: unknown): TubePreference {
   return value === 'full' || value === 'subtle' || value === 'off' ? value : 'full'
 }
@@ -408,7 +413,10 @@ function parsedFile(text: string): StoredFile {
       : 'auto',
     tube: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedTube((rawSettings as Record<string, unknown>).tube)
-      : 'full'
+      : 'full',
+    replySize: typeof rawSettings === 'object' && rawSettings !== null
+      ? parsedReplySize((rawSettings as Record<string, unknown>).replySize)
+      : 'standard'
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, missionTitles: titles, settings }
@@ -726,7 +734,10 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             : 'full',
           layout: typeof settings === 'object' && settings !== null
             ? parsedLayout((settings as Record<string, unknown>).layout)
-            : 'auto'
+            : 'auto',
+          replySize: typeof settings === 'object' && settings !== null
+            ? parsedReplySize((settings as Record<string, unknown>).replySize)
+            : 'standard'
         }
         const file = await read()
         await write({ ...file, settings: next })

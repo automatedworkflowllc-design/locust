@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.199.0 - 2026-09-19
+
+- **The reply is back to its old size, and the size is now yours.** 0.198.0
+  set it larger on my reading of a measurement, and on a real screen it was
+  far too big. It is back to what it was, and **Settings → Appearance → Reply
+  text size** offers Standard, Large and Largest if you want it bigger.
+
+- **The line length keeps the fix.** The thing actually worth correcting in
+  0.198.0 was that a reply could run 111 characters to a line, well past the
+  point where your eye loses its place coming back. Lines are about 74
+  characters now, at whichever size you pick.
+
 ## 0.198.0 - 2026-09-19
 
 - **A teammate's reply is set bigger, and its lines are shorter.** The reply

@@ -1108,6 +1108,21 @@ export type LayoutPreference = 'auto' | 'compact' | 'wide'
 /** How much theatre the boot screen is allowed. */
 export type TubePreference = 'full' | 'subtle' | 'off'
 
+/**
+ * How big a teammate's reply is set.
+ *
+ * A real preference, and it exists because I got this wrong on Colin's own
+ * screen. 0.198.0 moved the reply from 15px to 18px off a character count --
+ * the count was right that 15px rendered 111-character lines, and it could not
+ * answer the question it was used to settle, which is how big the type should
+ * be. Colin, seeing it on his monitor: "go back to the old text size, this
+ * shit looks insane, or you can have it be changeable in settings".
+ *
+ * So the default is what he had, and the size is his rather than mine.
+ * Absent or malformed reads as `standard`, which is 15px.
+ */
+export type ReplyTextSize = 'standard' | 'large' | 'largest'
+
 export interface WorkspaceSettings {
   readonly swarm: boolean
   /**
@@ -1188,6 +1203,12 @@ export interface WorkspaceSettings {
    * goes straight to the pane. Absent or malformed reads as `full`.
    */
   readonly tube: TubePreference
+  /**
+   * How big to set a teammate's reply. Absent or malformed reads as
+   * `standard` -- see `ReplyTextSize`, which carries the reason this is a
+   * setting at all.
+   */
+  readonly replySize: ReplyTextSize
 }
 
 /*

@@ -25,7 +25,7 @@ import type {
   LayoutPreference,
   PublicRuntimeSetup,
   PublicWorkspaceBrief,
-  PublicWorktree, TubePreference } from '../../../shared/ipc.js'
+  PublicWorktree, TubePreference, ReplyTextSize } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { TeammateStatusView } from '../status.js'
 import {
@@ -1093,6 +1093,8 @@ export function SettingsScreen({
   onAskConnectorsChange,
   swarm,
   tube,
+  replySize,
+  onReplySizeChange,
   onTubeChange,
   onSwarmChange,
   onAutoModeChange,
@@ -1156,6 +1158,9 @@ export function SettingsScreen({
   readonly onSwarmChange: (swarm: boolean) => void
   readonly tube: TubePreference
   readonly onTubeChange: (tube: TubePreference) => void
+  /** How big a reply is set. The person's, not the app's -- see ReplyTextSize. */
+  readonly replySize: ReplyTextSize
+  readonly onReplySizeChange: (size: ReplyTextSize) => void
   readonly onAutoModeChange: (autoMode: boolean) => void
   readonly askConnectors: boolean
   readonly onAskConnectorsChange: (askConnectors: boolean) => void
@@ -1896,6 +1901,53 @@ export function SettingsScreen({
               ))}
             </div>
           </div>
+          </div>
+        </section>
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Reply text size</h2>
+          <p className="lc-settings__lede">
+            {replySize === 'largest'
+              ? 'Largest. For reading at a distance, or a long reply you want to sit with.'
+              : replySize === 'large'
+                ? 'Large. A step up without turning the thread into a slide.'
+                : 'Standard. The size a reply has always been set at.'}
+          </p>
+          <More>
+            <p>
+              A teammate's reply is the one thing on this screen you read rather than scan, so it is set
+              in a serif and sized on its own -- the app's own chrome stays where it is whatever you pick
+              here.
+            </p>
+            <p>
+              The line length follows the size rather than staying put, so a bigger reply gets a wider
+              paragraph and about the same number of words to a line. Measured, not assumed: roughly 74
+              characters at Standard and 72 at Large.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">How big to set it.</span>
+              <div className="lc-segmented" role="radiogroup" aria-label="How big to set a reply">
+                {(
+                  [
+                    ['standard', 'Standard'],
+                    ['large', 'Large'],
+                    ['largest', 'Largest']
+                  ] as const
+                ).map(([option, label]) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={replySize === option}
+                    className={`lc-button${replySize === option ? ' is-active' : ''}`}
+                    onClick={() => onReplySizeChange(option)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
         <section className="lc-settings__section">

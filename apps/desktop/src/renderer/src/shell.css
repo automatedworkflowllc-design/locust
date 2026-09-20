@@ -915,11 +915,16 @@ textarea {
    * changing the face -- but the VALUE has to come from counting rendered
    * characters, every time, and this one never had been.
    *
-   * Counted at 18px, the size this now ships at: 60ch is 666px of paragraph
-   * and renders 62 characters a line, 83 at the longest. 66ch renders 72 and
-   * 92, and 92 is past the sweep. 54ch renders 60 and 74, which is inside the
-   * band but narrower than the column, and Colin has already objected once to
-   * a reply that did not fill its box.
+   * Counted at 15px, the size that ships: 66ch is 610px of paragraph and
+   * renders 74 characters a line, 93 at the longest -- against 83 and 111 at
+   * the old 90ch. 60ch renders 63 and 82, which is further inside the band
+   * and leaves 170px of the column empty at this size; Colin has objected
+   * once already to a reply that did not fill its box, so the wider of the
+   * two in-band options wins.
+   *
+   * IT HOLDS AT EVERY SIZE, which is the point of the unit and the first time
+   * it has actually been true here: 66ch counted 74 characters at 15px and 72
+   * at 18px. So the reply-size setting needs no second rule.
    *
    * It binds at every window width now, which is the point: the thread column
    * clamps at 980px and 60ch is 666px, so the measure is the same on a
@@ -928,7 +933,7 @@ textarea {
    * `node _tools/prose-size-measure.mjs --at <size>` is the count. Re-run it
    * whenever the size or the face changes; the two are one decision.
    */
-  max-width: 60ch;
+  max-width: 66ch;
   line-height: 1.7;
   text-wrap: pretty;
 }

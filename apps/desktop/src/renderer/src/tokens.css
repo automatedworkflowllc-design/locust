@@ -360,32 +360,31 @@
    * (2026-09-10) beside Claude Code, whose prose measures about 14.2px.
    * Paired with the prose family, which is already the reply's alone.
    *
-   * 18px AND NOT 15px, from a count rather than an argument
-   * (docs/PROSE-MEASURE-2026-09-19.md, 2026-09-19). Two things decided it,
-   * and the second is the one that settles it:
+   * 15px IS THE DEFAULT, AND A COUNT DOES NOT GET TO DECIDE THIS.
    *
-   * The design agent's release check said a serif needs MORE size than a
-   * sans, not less -- the strokes that make it a serif are the thin ones, and
-   * a dark ground eats thin strokes first, so 15px serif on `#121415` is the
-   * worst cell in that table. True, and an argument.
+   * 0.198.0 moved this to 18px, and the reasoning was half right in a way
+   * worth leaving on the record. Counted off the rendered line boxes, the
+   * reply at 15px ran 83 characters a line and 111 at the longest, against
+   * the "past ~85 the return sweep breaks" that `shell.css` states in its own
+   * comment. That measurement is real and the fix for it was real -- but the
+   * fix belonged to the MEASURE, which is the `ch` ceiling next door, and I
+   * used it to change the SIZE, which is a different question the count
+   * cannot answer.
    *
-   * Then it was counted, off the rendered line boxes, character by character,
-   * on two different replies. **At 15px the reply rendered 83 characters a
-   * line and 111 at the longest** -- against the ceiling `shell.css` states in
-   * its own comment, "the return sweep is what breaks past ~85 characters".
-   * At 18px it renders 62 and 83. The app was outside a rule it had written
-   * down, and this is the smallest size that puts it back inside.
+   * Colin, seeing 18px on his own monitor within the hour: *"go back to the
+   * old text size, this shit looks insane, or you can have it be changeable
+   * in settings"*. He had already said the size was his call; I had the
+   * number and let it decide a taste question anyway.
    *
-   * Not 20px, which the quoted guidance asks for: it lands in band too, and
-   * costs more vertical room in a reply that already scrolls. 18 is the size
-   * that buys the whole correction and no more.
+   * So: both. 15px is what he had and what ships, and `ReplyTextSize` in
+   * Settings offers larger for anyone who wants it -- the two rules below.
+   * The 111-character lines are fixed where they belonged, on the ceiling.
    *
-   * THE CEILING MOVES WITH THIS. `ch` scales with the font, so the paragraph
-   * cap in `shell.css` was re-counted at 18px and set from that count. Change
-   * one and you must re-count the other; `node _tools/prose-size-measure.mjs
-   * --at <size>` is the count.
+   * The design agent's argument for a larger serif on a dark ground still
+   * stands on its own terms and is not refuted by this; it is simply not
+   * mine to impose. `docs/PROSE-MEASURE-2026-09-19.md` has every number.
    */
-  --lc-text-prose: 18px;
+  --lc-text-prose: 15px;
   --lc-text-control: 13px;
   --lc-text-description: 12px;
 
@@ -494,6 +493,29 @@
    */
   --lc-focus-glow: rgba(255, 255, 255, 0.05);
   --lc-focus-edge: rgba(255, 255, 255, 0.22);
+}
+
+/*
+ * THE REPLY'S SIZE, WHEN THE PERSON HAS CHOSEN ONE.
+ *
+ * `App.tsx` writes `data-replysize` on the root from the stored setting and
+ * does nothing else: the stylesheet owns what each choice MEANS, so no pixel
+ * value is ever computed in TypeScript. Absent -- which is every build before
+ * this one, and any window whose setting has not loaded yet -- is the
+ * `standard` above, so nothing here can leave the reply unsized.
+ *
+ * The measure does not need a rule of its own. The ceiling next door is in
+ * `ch`, which is the face's own zero, so the paragraph box grows with the
+ * type and the characters-per-line stays put: counted at 66ch it is 74 a line
+ * at 15px and 72 at 18px. That is the whole reason the cap is in `ch` rather
+ * than pixels, and it is the first time it has actually been true.
+ */
+:root[data-replysize='large'] {
+  --lc-text-prose: 17px;
+}
+
+:root[data-replysize='largest'] {
+  --lc-text-prose: 19px;
 }
 
 /*

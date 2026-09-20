@@ -90,9 +90,14 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   {
     id: 'appearance',
     label: 'Appearance',
-    headings: ['Sidebar', 'The boot screen'],
+    headings: ['Sidebar', 'Reply text size', 'The boot screen'],
     alsoKnownAs: {
-      Sidebar: ['theme', 'dark', 'light', 'colour', 'color', 'font', 'width'],
+      // 'font' moved to Reply text size, which is the only setting in this
+      // app that changes one. The sidebar has never had a font control.
+      Sidebar: ['theme', 'dark', 'light', 'colour', 'color', 'width'],
+      // The words a person reaches for when a reply is too big or too small:
+      // Colin's own were 'text size', and nobody searches for 'prose'.
+      'Reply text size': ['text', 'text size', 'font', 'font size', 'bigger', 'smaller', 'type', 'reading'],
       'The boot screen': ['splash', 'startup', 'launch']
     }
   },
