@@ -5245,6 +5245,61 @@ textarea {
 
 /* The separator between the name and the register, drawn only when there is
    a name -- a run of nobody's is still a register, just an unowned one. */
+/*
+ * THE SWEEP: a band of lighter ink travelling along live text.
+ *
+ * Colin asked for the thing Claude Code does to its active line (2026-09-20).
+ * It is one moving highlight, not a pulse -- the text never dims as a whole,
+ * so a glance away and back does not catch it mid-fade looking broken.
+ *
+ * `background-clip: text` means the INK IS TRANSPARENT and the colour comes
+ * from the gradient behind it. That is the whole risk in this rule: anything
+ * that stops the paint leaves a blank where a word was. So the reduced-motion
+ * branch restores `color` rather than only stopping the animation, and the
+ * gradient's rest colour is the same muted ink the row would have had.
+ *
+ * 2.6s and a 20%-wide highlight: slow and narrow enough to read as light
+ * moving over text rather than as text flashing. The band is `--lc-text` at
+ * its brightest, which on this palette is a step up from muted, not white --
+ * "very subtle" was the ask. (`--lc-text-name` and not `--lc-text`, which a
+ * guard caught: the second one is used all over this file and defined
+ * nowhere, so painting with it would have left the word transparent.)
+ */
+.lc-sweep {
+  background: linear-gradient(
+    100deg,
+    var(--lc-text-muted) 0%,
+    var(--lc-text-muted) 40%,
+    var(--lc-text-name) 50%,
+    var(--lc-text-muted) 60%,
+    var(--lc-text-muted) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: lc-sweep 2.6s linear infinite;
+}
+
+@keyframes lc-sweep {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-sweep {
+    animation: none;
+    /* The colour BACK, not just the animation off: a transparent ink over a
+       stopped gradient is an invisible word. */
+    background: none;
+    color: var(--lc-text-muted);
+  }
+}
+
 .lc-livestep__who + .lc-livestep__register::before {
   content: '·';
   margin-right: var(--lc-space-3);

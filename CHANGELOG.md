@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.217.0 - 2026-09-20
+
+- **A finished run no longer says things are still running.** A turn that had
+  ended could still show rows reading "running" and "still running" — while
+  the summary line above them already counted them correctly as "did not
+  report". The rows say that now too, in amber: a tool that never reported
+  back is not a tool that failed.
+- **The live line has a sweep.** A band of lighter ink travels along the word
+  for whatever is happening, and along the name of a tool while it is open —
+  the thing Claude Code does to its active line.
+- **All nine orbs are in use, and the ones you see most are the fullest.**
+  Working, thinking and open tools carry the three roundest; reading and web
+  search share the globe; a connector and a sub-agent are now told apart;
+  writing and the plan's step take the rest.
+
 ## 0.216.0 - 2026-09-20
 
 - **Older conversations stop dropping out of their groups.** A conversation

@@ -408,7 +408,7 @@ function alignClass(align: 'left' | 'right' | 'center' | undefined): string | un
  * running the SAME animation in lockstep on one screen, which reads as a
  * glitch rather than as two facts.
  */
-const PLAN_ORB: OrbState = 'solving'
+const PLAN_ORB: OrbState = 'working'
 
 export function PlanSteps({
   steps,
@@ -625,7 +625,27 @@ export function LiveRegisterLine({
               <ThinkingOrb state={orb} size={20} theme="dark" aria-hidden="true" />
             </span>
           )}
-          {word}
+          {/*
+            * THE SWEEP, the thing Claude Code does to its active line.
+            *
+            * Colin, 2026-09-20: "you know how claude code has a very subtle
+            * visual gradient that goes across the text of whatever active
+            * task is happening? we should add that to whatever task is
+            * running". A band of lighter ink travels along the word, left to
+            * right, on a loop.
+            *
+            * ON THE WORD, NOT THE ROW. The sweep says "this is the live one",
+            * and a row carries a teammate's name and a clock beside it that
+            * are not live in that sense -- sweeping those would make the
+            * whole line look like it is being generated.
+            *
+            * It is painted with `background-clip: text`, which means the ink
+            * is a TRANSPARENT colour over a moving gradient. That is a real
+            * hazard: anything that stops the paint leaves invisible text, so
+            * the reduced-motion rule puts the colour back rather than only
+            * stopping the animation.
+            */}
+          <span className="lc-sweep">{word}</span>
           {/*
             * THE DOTS ONLY WHERE THERE IS NO ORB.
             *

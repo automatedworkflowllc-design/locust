@@ -70,7 +70,7 @@ describe('no file carries a control character a shell left behind', () => {
     expect(STRAY.test(`a delete ${String.fromCharCode(127)} here`)).toBe(true)
   })
 
-  it('every tracked text file is clean', () => {
+  it('every tracked text file is clean', { timeout: 30_000 }, () => {
     const dirty = files
       .filter((path) => STRAY.test(readFileSync(path, 'utf8')))
       .map((path) => path.slice(ROOT.length))

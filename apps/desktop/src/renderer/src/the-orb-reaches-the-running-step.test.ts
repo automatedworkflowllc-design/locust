@@ -62,7 +62,7 @@ describe('the orb reaches the running step', () => {
   it('a shell command that is still open draws the working orb', () => {
     const step = liveStep([started('t1', 'shell', 'command_execution', 'pnpm test billing')])
     expect(step?.register).toBe('tool')
-    expect(step?.orb).toBe('listening')
+    expect(step?.orb).toBe('solving')
   })
 
   it('a read that is still open draws the searching orb', () => {
@@ -70,9 +70,9 @@ describe('the orb reaches the running step', () => {
     expect(step?.orb).toBe('searching')
   })
 
-  it('a subagent that is still out draws the connecting orb', () => {
+  it('a subagent that is still out draws the weaving orb', () => {
     const step = liveStep([started('t1', 'Task')])
-    expect(step?.orb).toBe('connecting')
+    expect(step?.orb).toBe('weaving')
   })
 
   it('stops claiming the work the moment the tool closes', () => {
@@ -84,8 +84,12 @@ describe('the orb reaches the running step', () => {
      */
     const specific = liveStep([started('t1', 'read_file'), completed('t1')])
     expect(specific?.orb).not.toBe('searching')
+    // A CLOSED tool leaves the working register, whose orb is `composing`.
+    // `solving` is the OPEN-tool orb, so seeing it here would mean the claim
+    // outlived the tool -- which is the thing this test exists to catch.
     const step = liveStep([started('t1', 'shell', 'command_execution', 'ls'), completed('t1')])
-    expect(step?.orb).toBe('listening')
+    expect(step?.orb).toBe('composing')
+    expect(step?.orb).not.toBe('solving')
   })
 
   it('a Plan-mode turn with no tool open draws the solving orb', () => {
@@ -108,6 +112,6 @@ describe('the orb reaches the running step', () => {
     // costs nothing to test with. It draws the generic orb now -- the run is
     // working, and the app does not pretend to know more than that.
     const step = liveStep([started('t1', 'shell', 'command_execution', 'echo orb'), completed('t1')])
-    expect(step?.orb).toBe('listening')
+    expect(step?.orb).toBe('composing')
   })
 })

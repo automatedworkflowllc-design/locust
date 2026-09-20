@@ -410,10 +410,12 @@ export function ActivityCard({
                 entry.output === undefined || entry.output.trim() === '' ? (
                   <div className="lc-filerow is-shell is-static">
                     <Icon name="terminal" size={14} />
-                    <span className={`lc-shellbadge ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
+                    <span className={`lc-shellbadge ${shellResultClass(entry, finished)}`}>{shellResult(entry, finished)}</span>
                     {/* Nothing printed, so nothing to open onto -- the command
                       * stays on the row itself, under the sentence. */}
-                    <span className="lc-filerow__path">{entry.title ?? entry.command}</span>
+                    <span className={`lc-filerow__path${entry.settled || finished ? '' : ' lc-sweep'}`}>
+                      {entry.title ?? entry.command}
+                    </span>
                     {entry.output !== undefined && entry.settled && (
                       <span className="lc-filerow__result is-muted">no output</span>
                     )}
@@ -499,11 +501,43 @@ export function ActivityCard({
                 // to see", which is the opposite of what happened.
                 <div className="lc-filerow is-static">
                   <Icon name={entry.kind === 'tool' ? 'activity' : 'file'} size={14} />
-                  <span className="lc-filerow__path">{relativePath(entry.name, workspacePath)}</span>
+                  {/*
+                    * The sweep on the row that is actually going, and only on
+                    * that one. Colin asked for it on "using a tool" as well as
+                    * the live line (2026-09-20).
+                    *
+                    * `finished` is in the condition deliberately: on a turn
+                    * that has ended, this row reads "did not report", and a
+                    * travelling highlight over it would be the same lie the
+                    * word beside it just stopped telling.
+                    */}
+                  <span className={`lc-filerow__path${entry.settled || finished ? '' : ' lc-sweep'}`}>
+                    {relativePath(entry.name, workspacePath)}
+                  </span>
                   {entry.tool !== undefined && <span className="lc-filerow__status">{entry.tool}</span>}
-                  <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : 'is-running'}`}>
+                  {/*
+                    * A FINISHED RUN HAS NOTHING STILL RUNNING IN IT.
+                    *
+                    * Colin, 2026-09-20, on a completed Antigravity turn whose
+                    * rows read `running` and `still running`: "kind of
+                    * confused whats happening here". The header said
+                    * completed, the model said it was waiting for `pnpm test`,
+                    * and two rows claimed to be going — on a turn that had
+                    * ended minutes earlier.
+                    *
+                    * The fold's own trace line had it right the whole time:
+                    * `ran 7 commands · 1 did not report`. So the app knew, and
+                    * only the rows lied. The helper row has said this
+                    * correctly since SURFACES-0.22 §2; shell and tool rows
+                    * were never given `finished` to say it with.
+                    *
+                    * Amber, not red: a tool that never reported is not a tool
+                    * that failed, and the difference matters — the command may
+                    * well have run.
+                    */}
+                  <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : finished ? 'is-stalled' : 'is-running'}`}>
                     {!entry.settled
-                      ? 'still running'
+                      ? finished ? 'did not report' : 'still running'
                       : entry.failed
                         ? 'failed'
                         : entry.kind === 'tool'
@@ -556,13 +590,15 @@ export function ActivityCard({
   )
 }
 
-function shellResult(entry: Extract<ActivityEntry, { kind: 'shell' }>): string {
-  if (!entry.settled) return 'running'
+function shellResult(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished = false): string {
+  // See the tool row above: a command the run ended without settling did not
+  // report, and saying `running` about it contradicts the header beside it.
+  if (!entry.settled) return finished ? 'did not report' : 'running'
   if (entry.failed) return entry.exitCode === undefined ? 'failed' : `failed · exit ${String(entry.exitCode)}`
   return entry.exitCode === undefined ? 'done' : `exit ${String(entry.exitCode)}`
 }
 
-function shellResultClass(entry: Extract<ActivityEntry, { kind: 'shell' }>): string {
-  if (!entry.settled) return 'is-running'
+function shellResultClass(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished = false): string {
+  if (!entry.settled) return finished ? 'is-stalled' : 'is-running'
   return entry.failed ? 'is-failed' : 'is-ok'
 }

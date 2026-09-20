@@ -1586,7 +1586,16 @@ export function isShellTool(name: string, toolKind: string | undefined): boolean
  * at 20px weaving is nearly invisible and shaping is a hard triangle that
  * reads as an icon rather than a state.
  */
-export type OrbState = 'searching' | 'working' | 'connecting' | 'solving' | 'breathing' | 'listening' | 'composing'
+export type OrbState =
+  | 'searching'
+  | 'working'
+  | 'connecting'
+  | 'solving'
+  | 'breathing'
+  | 'listening'
+  | 'composing'
+  | 'weaving'
+  | 'shaping'
 
 /**
  * THE FLOOR: alive, and nothing has been reported.
@@ -1665,8 +1674,34 @@ export function orbStateFor(
      * outlines: `working` is about four dots, `connecting` four, `breathing`
      * a hollow ring, `shaping` a square.
      *
-     * So the mapping is now an ALLOCATION rather than a set of puns: the
-     * three spheres go on the rows a person actually stares at. `listening`
+     * NOTHING MAY REPEAT ACROSS A TRANSITION. Colin, 2026-09-20: "use
+     * something different for working and using a tool, we shouldnt have the
+     * same orb playing right after one another ever" -- both were
+     * `listening`, so the busiest transition a run makes showed no change at
+     * all, which is the same defect as the first version of this mapping
+     * giving `starting` and `thinking` one ring between them.
+     *
+     * There are FOUR dense shapes and exactly four live registers that must
+     * differ, so they go one each: `listening` to thinking, `composing` to
+     * working, `solving` to every tool, `searching` to reading. `composing`
+     * is on working because Colin picked that shape out of a frame and asked
+     * where it would be seen most -- one drive of a free-route turn spent 7
+     * samples on starting and 24 on working, since a runtime that reports
+     * tools only on completion is "working" for nearly the whole turn.
+     *
+     * `solving` on tools cost the PLAN its rubik, which was Colin's own
+     * earlier pick: the plan's step and the live line are on screen TOGETHER
+     * during a run, and two identical spheres animating a few pixels apart is
+     * worse than a sequential repeat. He chose the trade; the plan's marker
+     * is the calm ring now and all four spheres live on the line people
+     * actually watch.
+     *
+     * ONE RESIDUAL REPEAT, said out loud rather than hidden: a Plan-mode run
+     * that opens a SHELL goes `solving` to `solving`. Plan mode is read-only,
+     * so a shell there is rare; if it stops being rare, this is the thing to
+     * fix.
+     *
+     * The older note this replaces: the allocation idea. `listening`
      * takes the working register — the busiest line in the app, and the one
      * whose four sparse dots Colin flagged twice — and `working` inherits
      * `writing`, which is the briefest word a run says and therefore the
@@ -1677,9 +1712,9 @@ export function orbStateFor(
      * and a model streaming its answer IS composing one. But the pictures
      * decided, not that sentence.
      */
-    if (register === 'writing') return 'working'
-    if (register === 'working') return 'listening'
-    if (register === 'thinking') return 'composing'
+    if (register === 'writing') return 'shaping'
+    if (register === 'working') return 'composing'
+    if (register === 'thinking') return 'listening'
     /*
      * A STEP THAT SAYS `tool` WITHOUT AN OPEN TOOL still means a tool is
      * running. Codex reports both a step and its tools, and the step can be
@@ -1691,7 +1726,7 @@ export function orbStateFor(
      * It is the contradiction the whole mapping exists to prevent, and it was
      * invisible on every free route because no free runtime streams steps.
      */
-    if (register === 'tool') return 'listening'
+    if (register === 'tool') return 'solving'
     return WAITING_ORB
   }
   /*
@@ -1700,8 +1735,8 @@ export function orbStateFor(
    * about it, not an approximation. A subagent is the same shape of claim:
    * work is happening somewhere this row cannot show you.
    */
-  if (detail.kind === 'helper') return 'connecting'
-  if (detail.kind === 'shell') return 'listening'
+  if (detail.kind === 'helper') return 'weaving'
+  if (detail.kind === 'shell') return 'solving'
   const words = detail.name
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .split(/[^A-Za-z]+/)
@@ -1713,7 +1748,7 @@ export function orbStateFor(
    * the row says which tool. The specific ones claim MORE than that, so they
    * are never the fallback.
    */
-  return 'listening'
+  return 'solving'
 }
 
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {
@@ -1768,7 +1803,17 @@ const NOT_EDIT_TOOLS = /^(todowrite|todoread|todo_write|todo_read|write_agent|wr
  * handed to a reviewer under WHAT CHANGED, which makes it a false claim about
  * the work rather than a miscount.
  */
-const READ_TOOL_WORDS = new Set(['view', 'read', 'open', 'show', 'list', 'cat', 'search', 'find', 'grep'])
+/*
+ * `websearch`, `fetch` and `browse` joined the set so LOOKING THINGS UP ON
+ * THE WEB lands on the globe -- Colin, 2026-09-20: "searching for websearch
+ * and any type of looking/search". `WebSearch` already matched through the
+ * camelCase split; the one-word spellings did not, which is the shape of tool
+ * name half the runtimes use.
+ */
+const READ_TOOL_WORDS = new Set([
+  'view', 'read', 'open', 'show', 'list', 'cat', 'search', 'find', 'grep',
+  'websearch', 'fetch', 'browse', 'lookup'
+])
 
 export function editToolName(name: string): boolean {
   const trimmed = name.trim()
