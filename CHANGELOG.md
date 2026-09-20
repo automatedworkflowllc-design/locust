@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.204.0 - 2026-09-20
+
+- **Any file a teammate touched opens beside the conversation, not just one
+  they handed you.** The activity fold lists every file a turn wrote or
+  changed, and each row now has a button that opens it in the same panel. The
+  diff above it tells you what changed; this tells you what the file says,
+  which for a report or a brief is the whole question. As everywhere else in
+  Locust, it renders the file itself and never asks Windows to open it.
+
 ## 0.203.0 - 2026-09-20
 
 - **Click a file a teammate handed you and it opens beside the conversation.**
