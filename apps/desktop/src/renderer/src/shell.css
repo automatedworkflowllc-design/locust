@@ -11335,6 +11335,18 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* Fits the pane rather than filling it: a chart a teammate made is usually
+   wider than tall, and scaling it up past its own pixels makes it worse. */
+.lc-viewer__image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: var(--lc-space-5) auto;
+  border-radius: var(--lc-radius-card);
+  /* A pale chart on a dark panel needs an edge, or it bleeds into the ground. */
+  border: 1px solid var(--lc-border-hairline);
+}
+
 /* The standing register: always true, never about the open file. Quiet, at
    the foot, under a hairline -- it is a fact you can find, not a notice. */
 .lc-viewer__register {
@@ -11355,4 +11367,16 @@ textarea {
   padding: var(--lc-space-5);
   color: var(--lc-amber-text);
   font-size: var(--lc-text-description);
+}
+
+/*
+ * The metal send button's host.
+ *
+ * `display: contents` deliberately: metal-fx wraps the button in its own root
+ * and this element exists only to catch hover and focus. Given a box of its
+ * own it would become a second layout participant in the composer's tight
+ * button row -- which is how the attachment chip once overflowed it.
+ */
+.lc-metalsend {
+  display: contents;
 }

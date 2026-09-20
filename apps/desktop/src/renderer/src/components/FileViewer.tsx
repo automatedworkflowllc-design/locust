@@ -37,8 +37,9 @@ export function FileViewer({
   onSave
 }: {
   readonly path: string
+  /** The file's text, or a `data:` URL when the mode is `image`. */
   readonly text: string
-  readonly mode: 'markdown' | 'code'
+  readonly mode: 'markdown' | 'code' | 'image'
   /**
    * The turns in this conversation that changed this file, oldest first.
    *
@@ -130,7 +131,23 @@ export function FileViewer({
         </div>
       ) : (
       <div className="lc-viewer__scroll">
-        {mode === 'markdown' ? (
+        {mode === 'image' ? (
+          /*
+           * A raster image, drawn as itself. `alt` is the file's own name and
+           * nothing more: the model chose the name, so any description here
+           * would be the model describing its own picture to a person who
+           * cannot see it, with nothing checking the claim.
+           *
+           * SVG never reaches this branch -- `image-files.ts` leaves it out
+           * on purpose, because an SVG is a document that can carry script.
+           * It opens as code instead, which is the honest way to show one.
+           */
+          <img
+            className="lc-viewer__image"
+            src={text}
+            alt={path.replace(/\\/g, '/').split('/').pop() ?? 'image'}
+          />
+        ) : mode === 'markdown' ? (
           <div className="lc-viewer__prose">
             <AgentText text={text} streaming={false} />
           </div>

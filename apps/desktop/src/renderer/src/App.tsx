@@ -59,6 +59,7 @@ import { createFrameBatcher } from './streamFrames.js'
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
+import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
@@ -1137,8 +1138,9 @@ export default function App(): ReactElement {
    */
   const [viewingFile, setViewingFile] = useState<{
     readonly path: string
+    /** The file's text, or a `data:` URL when the mode is `image`. */
     readonly text: string
-    readonly mode: 'markdown' | 'code'
+    readonly mode: 'markdown' | 'code' | 'image'
   }>()
   /** What the host said when a file could not be opened. Shown where the press was. */
   const [viewerRefusal, setViewerRefusal] = useState<string>()
@@ -1164,6 +1166,36 @@ export default function App(): ReactElement {
     // pressed -- a panel showing the right file with two controls pointing at
     // a path that does not exist.
     const full = absolute ? path : `${workspacePath}/${path}`
+    /*
+     * A PICTURE IS SHOWN AS A PICTURE.
+     *
+     * A teammate that makes a chart, a diagram or a screenshot produces a
+     * PNG, and until now pressing it got "Locust does not open that kind of
+     * file here" -- a refusal, about a file the teammate had just made for
+     * you. `isViewableText` is an allowlist of text, correctly, and an image
+     * is simply not text.
+     *
+     * This is the half of "artifact support" that costs nothing to give
+     * (`docs/DECISION-2026-09-20-LOCUST-NEVER-RUNS-MODEL-CODE.md`): drawing a
+     * raster image executes nothing. The plumbing is the attachments'
+     * already, including the part that matters -- **SVG is deliberately not
+     * painted**, because an SVG is a document that can carry script. It stays
+     * text, and opens as code, which is the honest way to show one.
+     */
+    if (imageMediaType(full) !== undefined) {
+      void bridge
+        .readWorkspaceImage(relativePath(full, workspacePath))
+        .then((answer) => {
+          if (answer.ok) {
+            setViewingFile({ path: full, text: answer.dataUrl, mode: 'image' })
+            return
+          }
+          setViewingFile(undefined)
+          setViewerRefusal(answer.message)
+        })
+        .catch(() => setViewerRefusal('Locust could not read that image. Nothing was changed.'))
+      return
+    }
     void bridge
       .readTextFile(full)
       .then((answer) => {

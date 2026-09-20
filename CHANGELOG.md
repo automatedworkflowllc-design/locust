@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.211.0 - 2026-09-20
+
+- **A picture a teammate made opens as a picture.** Charts, diagrams and
+  screenshots used to be refused by the file panel with "Locust does not open
+  that kind of file here" — about a file your teammate had just made for you.
+  PNG, JPEG, GIF, WebP, BMP, AVIF and ICO now draw in the panel. SVG
+  deliberately still opens as code: an SVG is a document that can carry
+  script, and Locust does not run what a teammate wrote.
+- **The send button turns to metal while you are on it.** Only that button,
+  only on hover or keyboard focus, and it goes quiet the moment you leave —
+  in this app a thing that moves means work is happening, and an invitation
+  is not work.
+
 ## 0.210.0 - 2026-09-20
 
 - **The orb changes at every word the line changes to.** Starting, thinking,

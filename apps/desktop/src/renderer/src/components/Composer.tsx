@@ -26,6 +26,7 @@ import { defaultEffort } from '../status.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
+import { MetalSend } from './MetalSend.js'
 import { isImagePath } from '../../../shared/image-files.js'
 import { ContextRing } from './ContextRing.js'
 import type { ContextReading } from '../cost.js'
@@ -1050,7 +1051,25 @@ export function Composer({
                *
                * The drawing gives the multi-teammate case a button reading
                */
-              <button
+              /*
+               * METAL, AND ONLY ON THIS ONE.
+               *
+               * The design agent's answer to "use it more widely" is no, and
+               * the reason is worth keeping next to the one place it is used:
+               * three metal buttons in a view and metal stops meaning
+               * anything — it becomes the button style, which is decoration.
+               * This button earns it by being the only control in the app
+               * that is purely an invitation rather than a state.
+               *
+               * And two of the candidates are worse than redundant: `Deny` is
+               * destructive and `Approve once` is consequential. Making
+               * either delightful to hover is the wrong nudge on a card whose
+               * whole job is to slow a person down.
+               *
+               * The stop and queue variants above stay plain for the same
+               * reason: one is a state, the other is a deferral.
+               */
+              <MetalSend
                 type="submit"
                 className="send-button lc-send"
                 disabled={!canStart}
@@ -1058,7 +1077,7 @@ export function Composer({
                 title="Start mission — Shift+Enter for a new line"
               >
                 <Icon name="arrow-up" size={15} />
-              </button>
+              </MetalSend>
             )}
           </div>
           <div className="lc-composer__controls">

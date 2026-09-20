@@ -29,6 +29,9 @@ importers:
       electron-updater:
         specifier: ^6.8.9
         version: 6.8.9(supports-color@7.2.0)
+      metal-fx:
+        specifier: ^2.0.10
+        version: 2.0.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react:
         specifier: ^19.2.0
         version: 19.2.8
@@ -1740,6 +1743,12 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
+
+  metal-fx@2.0.10:
+    resolution: {integrity: sha512-XOeKBZl4xFw+l+7oe/zBt0AK2w87QWpa7QoSgd0c0MzkglQr49vejCVvkl+E3acKHW1K+SEJ8Pyis8v8BCjDpQ==}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
 
   mime-db@1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
@@ -3979,6 +3988,11 @@ snapshots:
     optional: true
 
   math-intrinsics@1.1.0: {}
+
+  metal-fx@2.0.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    dependencies:
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
 
   mime-db@1.52.0: {}
 
