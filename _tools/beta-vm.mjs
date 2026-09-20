@@ -48,7 +48,11 @@ function vbox(args) {
  */
 const KEYS = {
   enter: ['1c', '9c'],
+  space: ['39', 'b9'],
   tab: ['0f', '8f'],
+  // Shift held across the tab, then released. A modifier left down arrives
+  // on everything typed afterwards, which reads as the guest ignoring you.
+  'shift-tab': ['2a', '0f', '8f', 'aa'],
   esc: ['01', '81'],
   down: ['e0', '50', 'e0', 'd0'],
   up: ['e0', '48', 'e0', 'c8'],
