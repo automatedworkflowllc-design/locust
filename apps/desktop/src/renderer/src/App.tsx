@@ -105,7 +105,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings } from './missionView.js'
+  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -2260,6 +2260,30 @@ export default function App(): ReactElement {
    * linked by the workroom messages they posted and received. Nothing is
    * bookkept twice -- the strip says what the records say.
    */
+  /**
+   * The turns of this conversation that changed the file now open, oldest
+   * first, for the viewer's history strip.
+   *
+   * Memoised because it walks every turn's events through `buildThread` --
+   * cheap for a conversation, wasteful on every frame of a streaming reply,
+   * and the viewer is open across exactly those frames.
+   */
+  const viewingFileTurns = useMemo(() => {
+    if (viewingFile === undefined || liveRun === undefined) return []
+    const turns = [
+      ...(liveRun.earlierTurns ?? []).map((turn) => ({
+        missionId: turn.missionId,
+        prompt: turn.prompt,
+        events: turn.events
+      })),
+      {
+        missionId: liveRun.data?.missionId ?? liveRun.restoredMission?.missionId ?? 'live',
+        prompt: liveRun.prompt,
+        events: liveRun.events
+      }
+    ]
+    return fileTurns(turns, viewingFile.path, workspacePath)
+  }, [viewingFile, liveRun, workspacePath])
   /**
    * Every mission the window knows, live or recorded, in one shape.
    *
@@ -5309,6 +5333,7 @@ export default function App(): ReactElement {
             path={viewingFile.path}
             text={viewingFile.text}
             mode={viewingFile.mode}
+            turns={viewingFileTurns}
             onClose={() => setViewingFile(undefined)}
             onReveal={() => {
               const bridge = window.desktop

@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import type { ReactElement } from 'react'
 
+import type { FileTurn } from '../missionView.js'
 import { AgentText } from './ThreadItems.js'
+import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 
 /**
@@ -28,6 +31,7 @@ export function FileViewer({
   path,
   text,
   mode,
+  turns = [],
   onClose,
   onReveal,
   onSave
@@ -35,11 +39,21 @@ export function FileViewer({
   readonly path: string
   readonly text: string
   readonly mode: 'markdown' | 'code'
+  /**
+   * The turns in this conversation that changed this file, oldest first.
+   *
+   * Empty for a file nobody here touched -- a project file a teammate only
+   * read, say -- and the strip is then absent rather than present and empty.
+   */
+  readonly turns?: readonly FileTurn[]
   readonly onClose: () => void
   /** Show it in the file manager -- the thing the pill did before this existed. */
   readonly onReveal: () => void
   readonly onSave: () => void
 }): ReactElement {
+  /** Which turn's change is being read, or undefined for the file as it is. */
+  const [showing, setShowing] = useState<number>()
+  const version = showing === undefined ? undefined : turns[showing]
   return (
     <aside className="lc-viewer" aria-label={`Viewing ${path}`}>
       <div className="lc-viewer__head">
@@ -63,6 +77,58 @@ export function FileViewer({
           <Icon name="close" size={13} />
         </button>
       </div>
+      {/*
+        * WHAT THIS FILE HAS BEEN THROUGH, when this conversation put it there.
+        *
+        * Colin asked for artifacts; this is the half of the word that is a
+        * READING feature over what the ledger already keeps. Each chip is a
+        * turn that changed this file, oldest on the left, and pressing one
+        * shows the change that turn made.
+        *
+        * It says "changed in" and never "as it looked", because it is not
+        * that: reverse-applying the recorded patches would build a
+        * convincing document out of an incomplete record -- patches arrive
+        * truncated, and some runtimes report an edit with no diff at all.
+        * The label is the feature's honesty, not decoration on it.
+        */}
+      {turns.length > 0 && (
+        <div className="lc-viewer__versions">
+          <span className="lc-viewer__versionlabel lc-mono">
+            CHANGED IN {turns.length} {turns.length === 1 ? 'TURN' : 'TURNS'}
+          </span>
+          <span className="lc-viewer__spacer" />
+          {turns.map((turn, index) => (
+            <button
+              key={`${turn.missionId}_${String(index)}`}
+              type="button"
+              className={`lc-viewer__version${showing === index ? ' is-showing' : ''}`}
+              /* The ask, so a version has a reason on it and not just a number. */
+              title={turn.prompt}
+              aria-pressed={showing === index}
+              onClick={() => setShowing(showing === index ? undefined : index)}
+            >
+              {index + 1}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`lc-viewer__version is-now${showing === undefined ? ' is-showing' : ''}`}
+            title="The file as it is on disk now"
+            aria-pressed={showing === undefined}
+            onClick={() => setShowing(undefined)}
+          >
+            Now
+          </button>
+        </div>
+      )}
+      {version !== undefined ? (
+        <div className="lc-viewer__scroll">
+          <p className="lc-viewer__versionnote">
+            What turn {String((showing ?? 0) + 1)} changed. The file itself is under <strong>Now</strong>.
+          </p>
+          <DiffView file={version.file} truncated={version.truncated} reported={version.reported} />
+        </div>
+      ) : (
       <div className="lc-viewer__scroll">
         {mode === 'markdown' ? (
           <div className="lc-viewer__prose">
@@ -77,6 +143,7 @@ export function FileViewer({
           <pre className="lc-viewer__code">{text}</pre>
         )}
       </div>
+      )}
     </aside>
   )
 }

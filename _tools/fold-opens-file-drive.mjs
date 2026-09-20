@@ -118,6 +118,48 @@ try {
   )
 
   /*
+   * A SECOND TURN ON THE SAME FILE, so the version strip has something real
+   * in it. This is artifact support's (c) -- the turns of a conversation that
+   * changed one file -- and it is a reading feature over what the ledger
+   * already keeps, so the only way to see it is to make a conversation that
+   * actually has two turns touching one file.
+   */
+  await drive.capture('ask for a second change to the same file', async () => {
+    await drive.evaluate(`document.querySelector('.lc-viewer__close')?.click()`)
+    return drive.evaluate(
+      sendAndWaitScript('Add one more line to notes.md: "The door is shut." Then reply with the single word DONE.')
+    )
+  })
+
+  await drive.capture('open it again: the strip says two turns', async () => {
+    await drive.evaluate(`(() => {
+      const fold = document.querySelector('.lc-activity')
+      if (fold && fold.getAttribute('aria-expanded') !== 'true') fold.click()
+      return true
+    })()`)
+    await drive.waitForSelector('.lc-filerow__view', { what: 'a file row to open', timeoutMs: 15_000 })
+    await drive.evaluate(`document.querySelector('.lc-filerow__view').click()`)
+    const label = await drive.waitForSelector('.lc-viewer__versionlabel', { what: 'the version strip', timeoutMs: 10_000 })
+    check('the strip counts the turns that changed this file', /CHANGED IN \d+ TURNS?/.test(String(label)), label)
+    const chips = await drive.evaluate(`[...document.querySelectorAll('.lc-viewer__version')].map(b => b.innerText).join(',')`)
+    check('there is a numbered chip per turn, and a way back to the file', /Now/.test(String(chips)), chips)
+    return `${String(label)} -- chips: ${String(chips)}`
+  })
+
+  await drive.capture('press a turn: it shows what that turn changed', async () => {
+    await drive.evaluate(`document.querySelector('.lc-viewer__version').click()`)
+    const note = await drive.waitForSelector('.lc-viewer__versionnote', { what: 'the version note', timeoutMs: 5_000 })
+    check('the panel says the diff is a CHANGE, not the file', /changed/i.test(String(note)), note)
+    const diff = await drive.evaluate(`document.querySelector('.lc-viewer__scroll')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? ''`)
+    check('and it draws the hunks that turn made', /kettle|door|[+]/.test(String(diff)), diff)
+    // Back to the document, which is where the panel opens.
+    await drive.evaluate(`[...document.querySelectorAll('.lc-viewer__version')].find(b => b.innerText.trim() === 'Now')?.click()`)
+    const back = await drive.waitFor(`document.querySelector('.lc-viewer__prose') !== null`, { what: 'the file itself to come back', timeoutMs: 5_000 })
+    check('Now brings the file back', back === true)
+    return String(note)
+  })
+
+  /*
    * THE PROPORTIONS, AT THREE WINDOWS, because that is the open question and
    * it is the design agent's. The width is `clamp(360px, 38vw, 560px)`, taken
    * off Colin's own Claude Code frame where the panel is about 40% of the
@@ -131,11 +173,18 @@ try {
       await drive.resize(width, height)
       return drive.evaluate(`(() => {
         const viewer = document.querySelector('.lc-viewer')
-        const thread = document.querySelector('.lc-thread')
+        /*
+         * THE WIDEST thread, not the first. A conversation of two turns draws
+         * one `.lc-thread` per turn, and `querySelector` took whichever came
+         * first -- which reported 426px on a run whose conversation was
+         * plainly 630px wide in its own frame. A measurement that picks one
+         * of N without saying so is a measurement of nothing.
+         */
+        const threads = [...document.querySelectorAll('.lc-thread')]
         const composer = document.querySelector('form.command-dock')
         if (!viewer) return 'no viewer'
         const v = viewer.getBoundingClientRect()
-        const t = thread ? thread.getBoundingClientRect() : null
+        const t = threads.length === 0 ? null : threads.map(el => el.getBoundingClientRect()).sort((a, b) => b.width - a.width)[0]
         const c = composer ? composer.getBoundingClientRect() : null
         const share = Math.round((v.width / window.innerWidth) * 100)
         const prose = document.querySelector('.lc-viewer__prose p')

@@ -386,6 +386,70 @@ export function activityEntries(
   return foldPlainToolRuns(entries)
 }
 
+/** One turn that changed one file, for the viewer's history strip. */
+export interface FileTurn {
+  readonly missionId: string
+  /** What was asked on that turn, so a version carries the reason for it. */
+  readonly prompt: string
+  readonly file: DiffFile
+  readonly counts: DiffCounts
+  readonly truncated: boolean
+  readonly reported: DiffCounts | undefined
+}
+
+/**
+ * Every turn in a conversation that changed one file, oldest first.
+ *
+ * Colin asked for artifact support and the honest answer was that the word
+ * means at least four features (`docs/PLAN-2026-09-20-VIEWER-AND-ARTIFACTS.md`).
+ * This is (c): *"show me what this looked like three turns ago"*, over data
+ * the ledger already keeps -- every turn's diff is recorded, and the activity
+ * fold draws those hunks today. Nothing new is stored.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT DO: reconstruct the file as it stood.
+ * Reverse-applying the recorded patches would produce a plausible document
+ * from an incomplete record -- a patch can arrive `truncated`, and several
+ * runtimes report an edit with no diff at all -- and a wrong file that looks
+ * right is the worst failure available here. So a version shows **what that
+ * turn changed**, and the panel says so in those words.
+ *
+ * It goes through `buildThread` rather than reading events itself because
+ * that function already knows every runtime's quirks -- which row is the net
+ * change to a file and which rows are steps inside it, chief among them. A
+ * second reader of the same events would drift from the fold it sits beside.
+ */
+export function fileTurns(
+  turns: readonly {
+    readonly missionId: string
+    readonly prompt: string
+    readonly events: readonly NormalizedRuntimeEvent[]
+  }[],
+  path: string,
+  workspacePath: string | undefined
+): readonly FileTurn[] {
+  const key = (value: string): string => relativePath(value, workspacePath).replace(/[\\/]+/g, '/').toLowerCase()
+  const wanted = key(path)
+  const out: FileTurn[] = []
+  for (const turn of turns) {
+    const thread = buildThread(turn.events, { running: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
+    for (const item of thread) {
+      if (item.type !== 'activity') continue
+      for (const entry of activityEntries(item.details, workspacePath)) {
+        if (entry.kind !== 'file' || key(entry.file.path) !== wanted) continue
+        out.push({
+          missionId: turn.missionId,
+          prompt: turn.prompt,
+          file: entry.file,
+          counts: entry.counts,
+          truncated: entry.truncated,
+          reported: entry.reported
+        })
+      }
+    }
+  }
+  return out
+}
+
 /**
  * The card's `+N -M`. Summed from the rendered rows, never from a runtime's
  * header: if a patch was cut short, the header would promise lines the diff

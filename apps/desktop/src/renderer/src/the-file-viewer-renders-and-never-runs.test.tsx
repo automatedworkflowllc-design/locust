@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ActivityCard } from './components/ActivityCard.js'
 import { FileViewer } from './components/FileViewer.js'
-import type { ActivityDetail } from './missionView.js'
+import type { ActivityDetail, FileTurn } from './missionView.js'
 
 /**
  * The file viewer, and the fold that now opens it.
@@ -140,5 +140,90 @@ describe('the activity fold, which is how a file is usually met', () => {
     const html = fold()
     expect(html).not.toContain('lc-filerow__view')
     expect(html).toContain('lc-filerow__reveal')
+  })
+})
+
+/**
+ * The version strip: artifact support's (c), "show me what this looked like
+ * three turns ago", over data the ledger already keeps.
+ *
+ * The claim under test is not that the strip renders. It is that the strip
+ * NEVER CLAIMS TO BE THE FILE. Reverse-applying the recorded patches would
+ * build a convincing document out of an incomplete record -- patches arrive
+ * truncated, several runtimes report an edit with no diff at all -- so a
+ * version shows what that turn CHANGED, and the words on screen have to say
+ * so. If someone later adds reconstruction, this test is where the reason it
+ * needs a complete record lives.
+ */
+
+const turn = (added: string): FileTurn => ({
+  missionId: 'ms_1',
+  prompt: 'add a line to the notes',
+  counts: { added: 1, removed: 0 },
+  truncated: false,
+  reported: undefined,
+  file: {
+    path: 'C:/work/docs/report.md',
+    status: 'modified',
+    hunks: [
+      {
+        header: '@@ -1 +1,2 @@',
+        heading: '',
+        oldStart: 1,
+        newStart: 1,
+        rows: [{ kind: 'add', text: added, oldLine: undefined, newLine: 2 }]
+      }
+    ]
+  }
+}) as unknown as FileTurn
+
+const withTurns = (turns: readonly FileTurn[]): string =>
+  renderToStaticMarkup(
+    <FileViewer
+      path="C:/work/docs/report.md"
+      text="# The rollup\n"
+      mode="markdown"
+      turns={turns}
+      onClose={noop}
+      onReveal={noop}
+      onSave={noop}
+    />
+  )
+
+describe('the versions of a file across turns', () => {
+  it('counts the turns that changed it and offers each one', () => {
+    const html = withTurns([turn('first'), turn('second')])
+    expect(html).toContain('CHANGED IN 2 TURNS')
+    expect(html).toContain('lc-viewer__version')
+    // And a way back to the file itself, which is where it opens.
+    expect(html).toContain('Now')
+  })
+
+  it('says one turn in the singular', () => {
+    expect(withTurns([turn('only')])).toContain('CHANGED IN 1 TURN')
+  })
+
+  it('shows nothing at all for a file this conversation never changed', () => {
+    const html = withTurns([])
+    expect(html).not.toContain('lc-viewer__versions')
+    expect(html).not.toContain('CHANGED IN')
+  })
+
+  it('opens on the file, not on a turn', () => {
+    // The document is the thing that was asked for. A panel that opened on a
+    // patch would answer a question nobody pressed.
+    const html = withTurns([turn('first')])
+    expect(html).toContain('lc-viewer__prose')
+    expect(html).not.toContain('lc-viewer__versionnote')
+  })
+
+  it('never offers to show the file as it stood', () => {
+    /*
+     * The words are the feature's honesty. "Changed in" is a claim the
+     * record supports; "as it looked" is one it does not.
+     */
+    const html = withTurns([turn('first'), turn('second')])
+    expect(html).not.toMatch(/as it (looked|stood|was)/i)
+    expect(html).not.toMatch(/\b(restore|revert|roll ?back)\b/i)
   })
 })

@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.206.0 - 2026-09-20
+
+- **An open file says which turns changed it, and you can look at each one.**
+  A strip under the file's name counts the turns of this conversation that
+  touched it -- "changed in 2 turns" -- with a numbered button for each and
+  "Now" for the file as it stands. Pressing a number shows what that turn
+  changed, with the ask that caused it on the button's tooltip. It says
+  *changed in*, never *as it looked*: the record is a list of changes, some of
+  them cut short by the runtime that reported them, so Locust will show you
+  the changes rather than rebuild a document it cannot vouch for.
+
 ## 0.205.0 - 2026-09-20
 
 - **The conversation keeps its room when a file is open on a smaller window.**

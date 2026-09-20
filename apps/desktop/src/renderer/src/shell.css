@@ -11222,6 +11222,64 @@ textarea {
   white-space: pre;
 }
 
+/* The turns that changed this file. One row under the head, never a sidebar:
+   a conversation has a handful of turns that touch any one file, and a column
+   for three chips would be a second panel inside the panel. */
+.lc-viewer__versions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--lc-space-3) var(--lc-space-5);
+  border-bottom: 1px solid var(--lc-border-hairline);
+}
+
+.lc-viewer__versionlabel {
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.06em;
+  color: var(--lc-text-muted);
+}
+
+.lc-viewer__version {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+  font-family: var(--lc-font-mono);
+  cursor: pointer;
+}
+
+.lc-viewer__version:hover {
+  background: var(--lc-hover-surface);
+  color: var(--lc-text-secondary);
+}
+
+/* The same "this one is selected" the inspector's tabs already use, rather
+   than a third way of saying it. */
+.lc-viewer__version.is-showing {
+  border-color: var(--lc-border-card);
+  background: var(--lc-bg-bubble-user);
+  color: var(--lc-text-primary);
+}
+
+.lc-viewer__version:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: -2px;
+}
+
+/* Says what the diff below IS. Without it a person reads a patch as the
+   document, which is the one misreading this feature must not invite. */
+.lc-viewer__versionnote {
+  margin: 0;
+  padding: var(--lc-space-4) var(--lc-space-5);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
 .lc-viewer--refused {
   flex: none;
 }
