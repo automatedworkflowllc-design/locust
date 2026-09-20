@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.208.0 - 2026-09-20
+
+- **The running step shows what kind of work is happening, as a small moving
+  orb.** Reading a file, running a command and waiting on a subagent each get
+  their own; a Plan-mode turn gets the planning one. It is tied to the work
+  rather than cycling through shapes, so it can never say "reading" while the
+  line beside it says a command is running. Where none of them is true — while
+  a file is being written, or while the teammate is just waiting on the model —
+  there is no orb and the line keeps its three dots. The teammate's face sits
+  still while an orb is moving, so the row says "still going" once instead of
+  twice.
+
 ## 0.207.0 - 2026-09-20
 
 - **All six coding agents fit on the first screen now, in two columns.** With

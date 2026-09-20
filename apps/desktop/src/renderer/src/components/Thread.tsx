@@ -324,6 +324,7 @@ export function ThreadItems({
               kind={item.kind}
               register={item.register}
               waiting={item.waiting ?? false}
+              {...(item.orb === undefined ? {} : { orb: item.orb })}
               owner={owner}
               activity={activity}
             />
@@ -676,6 +677,9 @@ export function Thread({
     awaitingDecision: approvals.length > 0,
     spokeToPeers: peers.messages.length > 0,
     mayEdit,
+    // Only the orb reads this: `solving` is the one of the four mapped states
+    // no open tool can answer for, because planning is the turn's mode.
+    planMode,
     ...(workspacePath === undefined ? {} : { workspacePath }),
     ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso })
   })

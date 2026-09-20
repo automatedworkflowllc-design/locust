@@ -1,0 +1,134 @@
+// The thinking orb on the running step, watched happening.
+//
+//   node _tools/orb-drive.mjs [--keep]
+//
+// The orb is MAPPED to the work rather than cycled (design agent's ruling,
+// 2026-09-20), and the whole claim is that it cannot contradict the row it
+// sits on. `the-orb-never-contradicts-the-row.test.ts` pins the mapping
+// function; this pins that the mapping reaches the screen at all, which a
+// unit test cannot see.
+//
+// It catches the orb MID-RUN, which is the only time it exists -- so it polls
+// the live step while a real turn is going and keeps every distinct state it
+// sees, with the row's own words beside it. If the orb ever said `searching`
+// next to a shell command, this is where it would show.
+//
+// Live and free: one turn on the free OpenCode model.
+
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+
+const workspace = await scratchRepository('locust-drive-orb-ws-')
+const T0 = '2026-09-20T05:00:00.000Z'
+
+let failures = 0
+const check = (label, ok, detail) => {
+  if (!ok) failures += 1
+  say(`  [${ok ? 'PASS' : 'FAIL'}] ${label}${detail === undefined ? '' : ` -- ${String(detail).slice(0, 220)}`}`)
+}
+
+const drive = await startDrive({
+  name: 'orb',
+  port: 9519,
+  workspace,
+  spends: false,
+  seed: {
+    schemaVersion: 1,
+    teammates: [
+      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: T0, route: { ...FREE_ROUTE } }
+    ],
+    missionOwners: {},
+    settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off' }
+  }
+})
+
+/*
+ * Watch the live step while the turn runs, in the PAGE, because the orb only
+ * exists between two events and a screenshot taken afterwards would find
+ * nothing. Keeps one record per distinct (orb state, register, words) it
+ * sees -- which is also exactly the evidence for "it never contradicts".
+ */
+const WATCH = `(async () => {
+  window.__orbSeen = []
+  const tick = () => {
+    const step = document.querySelector('.lc-livestep')
+    if (step) {
+      const orb = step.querySelector('.lc-livestep__orb canvas')
+      const words = (step.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 90)
+      const register = step.getAttribute('data-register')
+      const seen = orb === null ? 'none' : (orb.getAttribute('aria-label') || 'orb')
+      const key = seen + '|' + register + '|' + words
+      if (!window.__orbSeen.some(r => r.key === key)) {
+        window.__orbSeen.push({ key, orb: seen, register, words, painted: orb === null ? null : orb.width + 'x' + orb.height })
+      }
+    }
+    window.__orbTimer = setTimeout(tick, 120)
+  }
+  tick()
+  return 'watching'
+})()`
+
+try {
+  await drive.capture('launch', () => drive.ready())
+
+  await drive.capture('start a turn that reads and then runs a command', async () => {
+    await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()`)
+    const route = await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/free/i' }))
+    check('the turn runs on a free route', /opencode/i.test(String(route)) && /\bfree\b/i.test(String(route)), route)
+    await drive.evaluate(WATCH)
+    /*
+     * A SLOW command on purpose. The first version of this drive asked for a
+     * read and an `echo`, and the run did both -- the fold shows them -- while
+     * the live step never left `working`. Each tool was open for milliseconds,
+     * so there was no frame in which an orb could exist. A feature that only
+     * appears while a tool is OPEN has to be measured against a tool that
+     * stays open, or the measurement is of the sampling rate.
+     */
+    return drive.evaluate(
+      sendAndWaitScript('Run exactly this one command and nothing else: powershell -Command "Start-Sleep -Seconds 8". Then reply with the single word DONE.')
+    )
+  })
+
+  await drive.capture('what the orb said, and what the row said with it', async () => {
+    await drive.evaluate(`clearTimeout(window.__orbTimer)`)
+    const seen = JSON.parse(await drive.evaluate(`JSON.stringify(window.__orbSeen ?? [])`))
+    for (const row of seen) say(`     ${String(row.orb).padEnd(12)} register=${String(row.register).padEnd(10)} ${String(row.words).slice(0, 70)}`)
+
+    const withOrb = seen.filter((row) => row.orb !== 'none')
+    check('the orb reached the screen during a real run', withOrb.length > 0, `${String(seen.length)} live-step states seen`)
+    /*
+     * ONLY IF THERE WAS ONE. "Every orb painted" and "no orb contradicted"
+     * are both trivially true of an empty set, and on this drive's first run
+     * both reported PASS while the orb had never appeared at all. A check
+     * that passes because the feature is absent is worse than no check.
+     */
+    if (withOrb.length === 0) {
+      say('     (no orb was drawn, so the two checks about orbs are not being made)')
+    } else {
+      check('every orb drawn actually painted a canvas', withOrb.every((row) => row.painted !== null && row.painted !== '0x0'), withOrb.map((r) => r.painted).join(','))
+    }
+
+    /*
+     * THE CONTRADICTION CHECK, which is the point of the whole feature.
+     * A shell register must never carry the reading orb, and vice versa.
+     */
+    const wrong = withOrb.filter((row) => {
+      const label = String(row.orb).toLowerCase()
+      if (/searching/.test(label) && /shell|command/i.test(String(row.words))) return true
+      if (/working/.test(label) && /\bread\b|grep|view_file/i.test(String(row.words))) return true
+      return false
+    })
+    if (withOrb.length > 0) {
+      check('no orb contradicted the words beside it', wrong.length === 0, wrong.map((r) => r.key).join(' || '))
+    }
+    return seen.map((r) => `${String(r.orb)}:${String(r.register)}`).join(' → ')
+  })
+} catch (error) {
+  failures += 1
+  say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
+} finally {
+  const threw = drive.record.filter((row) => /^threw: /.test(String(row.note)))
+  threw.forEach((row) => check(`step ${String(row.step)} (${row.title}) completed`, false, row.note))
+  say(failures === 0 ? '\nall checks passed' : `\n${String(failures)} check(s) failed`)
+  await drive.finish({ intro: 'Wren on the free OpenCode model. The thinking orb on the running step, polled while the turn ran.' })
+  process.exitCode = failures === 0 ? 0 : 1
+}

@@ -5165,6 +5165,23 @@ textarea {
   padding: var(--lc-space-3) 0;
 }
 
+/*
+ * The orb sits where the eye already goes for "is this still going" — beside
+ * the face, before the words. It is 20px against a 26px face on purpose: the
+ * face is the larger thing because it is the teammate, and the orb is the
+ * smaller because it is a state of them.
+ *
+ * `flex: none` so it never stretches, and a fixed box so a line does not jump
+ * height when the orb appears and disappears between steps.
+ */
+.lc-livestep__orb {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
 .lc-livestep__label {
   display: inline-flex;
   align-items: center;

@@ -763,6 +763,27 @@ export type ThreadItem =
        * step's own kind and never from its wording.
        */
       readonly register: 'starting' | 'working' | 'thinking' | 'writing' | 'tool' | 'connector'
+      /**
+       * Which thinking orb this step is, or none.
+       *
+       * Mapped to the work, never cycled. The design agent's ruling of
+       * 2026-09-20 settles why: mapped, the orb is not the sole carrier of
+       * meaning -- the row already reads `shell · pnpm test billing` -- so it
+       * does not need to be legible at 20px on its own. It needs to not
+       * CONTRADICT. Rotation and mapping cannot coexist: a person who learns
+       * `searching` means reading and then sees it during a shell command
+       * distrusts every indicator in the app.
+       *
+       * So it is derived from the same classification the row's own text is
+       * derived from, and the two cannot disagree.
+       *
+       * Four of the library's nine are true here, and the rest render never.
+       * Inventing a Locust activity for `weaving` would be exactly the
+       * failure this project keeps catching: a signal that looks like
+       * information and is not. `undefined` is the honest answer for writing
+       * a file and for waiting on the model, and the line keeps its dots.
+       */
+      readonly orb?: 'searching' | 'working' | 'connecting' | 'solving'
       readonly label: string
       readonly detail: string | undefined
       /** When the step began, so the card can show elapsed time as it runs. */
@@ -1556,6 +1577,36 @@ export function isShellTool(name: string, toolKind: string | undefined): boolean
     || toolKind === 'run_command'
 }
 
+/**
+ * Which orb a running step is, from the SAME facts its row's text is from.
+ *
+ * `detail.kind` is what `activityEntries` reads to decide whether a row is a
+ * command, a subagent or a file, so an orb derived from it cannot contradict
+ * the words beside it. That is the whole requirement: the orb reinforces a
+ * fact the text states.
+ *
+ * Reading is spotted the way the fold spots it -- `READ_TOOL_WORDS` on the
+ * tool's own name, which is the same set that stopped 38 Antigravity
+ * `view_file` calls being counted as edits.
+ */
+export function orbStateFor(
+  detail: { readonly kind: string; readonly name: string } | undefined,
+  planMode: boolean
+): 'searching' | 'working' | 'connecting' | 'solving' | undefined {
+  // Planning is the turn's mode, not a tool, so it answers when nothing else
+  // does -- a Plan-mode run with no tool open is a run that is planning.
+  if (detail === undefined) return planMode ? 'solving' : undefined
+  if (detail.kind === 'helper') return 'connecting'
+  if (detail.kind === 'shell') return 'working'
+  if (detail.kind === 'edit') return undefined // writing a file has no true orb
+  const words = detail.name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z]+/)
+    .map((word) => word.toLowerCase())
+  if (words.some((word) => READ_TOOL_WORDS.has(word))) return 'searching'
+  return planMode ? 'solving' : undefined
+}
+
 function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started' }>): string {
   const name = event.payload.name
   const command = event.payload.command
@@ -1690,6 +1741,12 @@ export interface MissionThreadOptions {
   readonly awaitingDecision?: boolean
   /** Whether the run was allowed to change files; see activityTrace. */
   readonly mayEdit?: boolean
+  /**
+   * The turn was sent in Plan mode. Only the orb reads this: planning is the
+   * turn's MODE rather than a tool, so it is the one of the four mapped orbs
+   * that no open tool can answer for.
+   */
+  readonly planMode?: boolean
   /**
    * The folder the conversation is open in. The file COUNT needs it for the
    * same reason each file ROW does -- see activityTrace.
@@ -2166,6 +2223,10 @@ export function buildThread(
         detail: openToolMeta.connector,
         startedAt: turnStartedAt ?? openToolMeta.at,
         kind: 'item',
+        ...(() => {
+          const orb = orbStateFor(openTool, options.planMode === true)
+          return orb === undefined ? {} : { orb }
+        })(),
         register: openToolMeta.connector === undefined ? 'tool' : 'connector'
       })
     } else if (runningStep !== undefined) {
@@ -2177,6 +2238,13 @@ export function buildThread(
         startedAt: turnStartedAt ?? runningStep.startedAt,
         kind: runningStep.kind,
         register: runningStep.register,
+        // No tool is open, so only the turn's own mode can answer. A Plan-mode
+        // run is planning; anything else keeps its dots rather than borrow an
+        // orb that would be describing work nobody reported.
+        ...(() => {
+          const orb = orbStateFor(undefined, options.planMode === true)
+          return orb === undefined ? {} : { orb }
+        })(),
         ...(runningStep.kind === 'reasoning' ? { waiting: true } : {})
       })
     } else if (!streaming && options.awaitingDecision !== true) {
@@ -2229,6 +2297,14 @@ export function buildThread(
           startedAt: since,
           kind: 'turn',
           waiting: true,
+          // The same answer as the branch above, for the same reason: no tool
+          // is open, so only the turn's own mode can say what is happening,
+          // and in Plan mode what is happening is planning. Every other turn
+          // keeps its dots, which already mean "waiting with nothing to show".
+          ...(() => {
+            const orb = orbStateFor(undefined, options.planMode === true)
+            return orb === undefined ? {} : { orb }
+          })(),
           // Past twenty seconds with nothing from the runtime the line says so
           // as well; see `quiet.ts` for the measured run above.
           spoken

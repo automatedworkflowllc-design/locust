@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
+import { ThinkingOrb } from 'thinking-orbs'
 
 import { seedAvatar } from '../../../shared/avatar.js'
 import { parseAgentText, splitInlineCode } from '../agentText.js'
@@ -602,9 +603,23 @@ export function LiveStepCard({
   kind,
   register,
   waiting = false,
+  orb,
   owner,
   activity
 }: {
+  /**
+   * The thinking orb for this step, when one is truthful.
+   *
+   * THE SPLIT (design agent, 2026-09-20): **the face is *who*, the orb is
+   * *waiting*.** The pixel face keeps its motion in the sidebar, the header
+   * and the roster — the surfaces where teammates are compared with each
+   * other. Inside the thread there is only one teammate and the question is
+   * not who, so the orb carries the motion and the face sits still.
+   *
+   * Absent when no orb is true of the work — writing a file, or waiting on
+   * the model with nothing reported. The line keeps its dots there.
+   */
+  readonly orb?: 'searching' | 'working' | 'connecting' | 'solving'
   readonly label: string
   readonly detail: string | undefined
   readonly startedAt: string
@@ -633,9 +648,36 @@ export function LiveStepCard({
         hue={face.hue}
         avatar={face.avatar}
         size={26}
-        activity={activity}
+        /*
+         * STILL WHEN THE ORB IS MOVING. Two animations side by side, both
+         * meaning "still going", is the app saying it twice — and the orb is
+         * the one carrying the register. The face goes back to its own motion
+         * the moment there is no orb, which is most of a run.
+         */
+        activity={orb === undefined ? activity : 'idle'}
         {...(owner?.teammateId === undefined ? {} : { teammateId: owner.teammateId })}
       />
+      {orb !== undefined && (
+        /*
+         * `theme="dark"` pinned, not `auto`. `auto` looks for an ancestor
+         * `data-theme` or a `dark` class and otherwise falls back to the OS
+         * setting — Locust has neither convention and is dark regardless, so
+         * `auto` would flip the orb to dark ink for anyone whose desktop is
+         * light, on a surface that is always dark.
+         *
+         * Monochrome, which is the library's own tuned default (Colin,
+         * 2026-09-20). There is no `color` prop in 0.3.1 — the lime in the
+         * drawing was reproduced per-pixel by the mock, and reproducing it
+         * here would mean re-implementing the depth ramp the library already
+         * gets right.
+         *
+         * `size={20}` because the library ships exactly two tuned presets, 20
+         * and 64, and its own type says so. 20 is the inline one.
+         */
+        <span className="lc-livestep__orb">
+          <ThinkingOrb state={orb} size={20} theme="dark" aria-hidden="true" />
+        </span>
+      )}
       <LiveRegisterLine
         {...(owner?.name === undefined ? {} : { name: owner.name })}
         register={register}
