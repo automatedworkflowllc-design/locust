@@ -172,9 +172,27 @@ try {
     return JSON.stringify({ picked: true, text: control.innerText })
   })()`)
   say(`   ${picked}`)
+  /*
+   * THE FREE ROUTE UNLESS SOMEBODY DELIBERATELY SAID OTHERWISE.
+   *
+   * `--spend` plus `LOCUST_SPEND=1` runs this on whatever route the composer
+   * is already on, which is how the protocol blocks get measured on a CAPABLE
+   * model rather than only on the free one. That distinction matters here
+   * more than anywhere else: this drive measures whether a model reaches for
+   * `<locust-file>` from the words "send me the file", and "a weak model does"
+   * is weaker evidence than it sounds -- a stronger model has more room to
+   * decide it knows better and write a path in prose instead.
+   *
+   * Both are required. One flag is a typo; two is a decision.
+   */
+  const paid = process.argv.includes('--spend') && process.env.LOCUST_SPEND === '1'
   const onFree = /muse[- ]spark[- ]1[.]3/i.test(JSON.parse(picked).text ?? '')
-  check('the free OpenCode model is the route', onFree, picked)
-  if (!onFree) throw new Error('the free OpenCode route was not picked; nothing was sent')
+  if (paid) {
+    say(`   SPENDING DELIBERATELY: ${JSON.parse(picked).text ?? '(unknown route)'}`)
+  } else {
+    check('the free OpenCode model is the route', onFree, picked)
+    if (!onFree) throw new Error('the free OpenCode route was not picked; nothing was sent')
+  }
 
   say('2. ask for a file, in the words a person would use')
   const sent = await cdp.eval(`(async () => {
@@ -259,6 +277,29 @@ try {
 } finally {
   child.kill()
   await sleep(1000)
+  /*
+   * CLOSE THE FILE MANAGER THIS DRIVE OPENED.
+   *
+   * Step 5 presses the reveal, which is the point -- and a reveal opens a real
+   * Explorer window on the person's own desktop, pointed into this drive's
+   * temp workspace. Then the teardown below deletes that workspace, and
+   * Explorer is left staring at a folder that no longer exists, with a
+   * "Location is not available" dialog on top of it.
+   *
+   * Colin found four of them on his machine (2026-09-20: "this you?"). It was
+   * mine, four runs of it, and it is exactly the kind of mess a test fixture
+   * has no business leaving on a working machine.
+   *
+   * Targeted by path rather than "close Explorer": the only windows shut are
+   * the ones showing this run's own temp folder.
+   */
+  const scratch = workspace.replace(/\\/g, '\\\\')
+  spawn('powershell', [
+    '-NoProfile',
+    '-Command',
+    `$shell = New-Object -ComObject Shell.Application; @($shell.Windows()) | Where-Object { $_.LocationURL -and $_.LocationURL -match [regex]::Escape('${scratch.split('\\\\').pop() ?? ''}') } | ForEach-Object { $_.Quit() }`
+  ], { stdio: 'ignore', windowsHide: true }).unref()
+  await sleep(1200)
   if (KEEP) say(`profile kept at ${profile}, workspace at ${workspace}`)
   else {
     await rm(profile, { recursive: true, force: true }).catch(() => undefined)

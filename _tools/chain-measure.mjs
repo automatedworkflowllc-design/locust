@@ -30,6 +30,26 @@ const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
 // --runtime claude --model haiku                 (one paid Claude run, on his go)
 const RUNTIME = process.argv.includes('--runtime') ? process.argv[process.argv.indexOf('--runtime') + 1] : 'opencode'
 const MODEL = process.argv.includes('--model') ? process.argv[process.argv.indexOf('--model') + 1] : 'opencode/muse-spark-1.3-contributor-free'
+
+/*
+ * THE TOOL THAT CAN SPEND WAS THE ONE WITHOUT THE GATE.
+ *
+ * Every drive that presses Send asserts its route first and throws unless it
+ * is the free model -- a rule added on 2026-09-19 after one of them fell
+ * through to the composer's default and spent a turn of quota that is not
+ * mine. This file takes `--runtime` and `--model` as arguments, which is the
+ * whole point of it, and had no such check: `--runtime codex` just ran.
+ *
+ * So the gate is here now, and it is the SAME one `drive-lib.mjs` uses. A
+ * paid route is allowed and deliberate: `LOCUST_SPEND=1` says the person
+ * meant it. The free OpenCode model needs nothing, because it costs nothing.
+ */
+const FREE_MODEL = /muse[- ]spark[- ]1[.]3/i
+if (!(RUNTIME === 'opencode' && FREE_MODEL.test(MODEL)) && process.env.LOCUST_SPEND !== '1') {
+  console.error(`refusing to run on ${RUNTIME} / ${MODEL}: that is a paid account.`)
+  console.error('Re-run with LOCUST_SPEND=1 if you mean to spend it. The free route is the default.')
+  process.exit(1)
+}
 // -1 + 1 is 0, and argv[0] is the path to node -- so without --label this
 // named every output file after C:\Program Files\nodejs\node.exe and the write
 // failed on the colon (2026-09-19, measuring the tightened share rule).
