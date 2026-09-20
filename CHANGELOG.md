@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.202.0 - 2026-09-20
+
+- **Check again re-asks everything, including npm.** Whether npm is on your
+  machine was decided once per session, so if yours was slow or hung the
+  first screen said so and nothing could change its mind until you pressed
+  Install. The button that exists to ask again now asks again properly.
+
+- **A failed check no longer stops Locust checking.** If the app could not
+  read the machine once, it gave up asking for the rest of the session and
+  the screen quietly kept whatever it had.
+
 ## 0.201.0 - 2026-09-20
 
 - **A file a teammate hands you has a save button.** The little download icon
