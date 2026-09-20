@@ -61,6 +61,58 @@ const KEYS = {
   'win-r': ['e0', '5b', '13', '93', 'e0', 'db']
 }
 
+/*
+ * TYPING, BY SCANCODE, because `keyboardputstring` does not work on this
+ * guest.
+ *
+ * It returns success and types NOTHING. Measured 2026-09-20 against an open
+ * Run box with the caret in it: `controlvm keyboardputstring "notepad"`
+ * reported seven characters and the box stayed empty, while
+ * `keyboardputscancode` had already driven Win+R, Tab, Space and Enter
+ * through the whole of Windows setup. So the halves of this tool are not
+ * equally real, and the string half is the one that is not.
+ *
+ * A scancode is the key, not the character: the guest's own layout decides
+ * what a key produces. This map is US set 1, which is the layout this VM was
+ * installed with -- chosen on the keyboard page, by this tool. If that ever
+ * changes, this map is wrong and nothing else is.
+ */
+const MAKE = {
+  a: 0x1e, b: 0x30, c: 0x2e, d: 0x20, e: 0x12, f: 0x21, g: 0x22, h: 0x23,
+  i: 0x17, j: 0x24, k: 0x25, l: 0x26, m: 0x32, n: 0x31, o: 0x18, p: 0x19,
+  q: 0x10, r: 0x13, s: 0x1f, t: 0x14, u: 0x16, v: 0x2f, w: 0x11, x: 0x2d,
+  y: 0x15, z: 0x2c,
+  '1': 0x02, '2': 0x03, '3': 0x04, '4': 0x05, '5': 0x06,
+  '6': 0x07, '7': 0x08, '8': 0x09, '9': 0x0a, '0': 0x0b,
+  '-': 0x0c, '=': 0x0d, '[': 0x1a, ']': 0x1b, ';': 0x27, "'": 0x28,
+  '`': 0x29, '\\': 0x2b, ',': 0x33, '.': 0x34, '/': 0x35, ' ': 0x39
+}
+
+/** What shift turns each key into, so the caller types the character it means. */
+const SHIFTED = {
+  ':': ';', '?': '/', '_': '-', '+': '=', '{': '[', '}': ']', '"': "'",
+  '~': '`', '|': '\\', '<': ',', '>': '.',
+  '!': '1', '@': '2', '#': '3', $: '4', '%': '5',
+  '^': '6', '&': '7', '*': '8', '(': '9', ')': '0'
+}
+
+const SHIFT_DOWN = 0x2a
+const SHIFT_UP = 0xaa
+
+/** The codes for one character, or undefined if this map cannot type it. */
+function codesFor(character) {
+  const lower = character.toLowerCase()
+  const shifted = SHIFTED[character] !== undefined
+  const key = shifted ? SHIFTED[character] : lower
+  const make = MAKE[key]
+  if (make === undefined) return undefined
+  const stroke = [make, make + 0x80]
+  // Uppercase letters are shift too -- and the shift must come back UP, or
+  // everything after it arrives shifted.
+  const needsShift = shifted || (character !== lower && MAKE[lower] !== undefined)
+  return needsShift ? [SHIFT_DOWN, ...stroke, SHIFT_UP] : stroke
+}
+
 const command = process.argv[2]
 const argument = process.argv[3]
 
@@ -77,9 +129,27 @@ if (command === 'state') {
   if (!shot.ok) process.exitCode = 1
 } else if (command === 'type') {
   if (argument === undefined) { say('nothing to type'); process.exit(1) }
-  const typed = vbox(['controlvm', VM, 'keyboardputstring', argument])
-  say(typed.ok ? `typed ${String(argument.length)} characters` : typed.out)
-  if (!typed.ok) process.exitCode = 1
+  const unknown = [...argument].filter((character) => codesFor(character) === undefined)
+  if (unknown.length > 0) {
+    // Refuse rather than type most of it. A half-typed command line is a
+    // DIFFERENT command line, and this tool cannot see what it produced.
+    say(`cannot type ${JSON.stringify(unknown.join(''))} with the US map`)
+    process.exit(1)
+  }
+  /*
+   * In chunks, not one call per character and not one call for everything.
+   * One call each is a process launch per keystroke; everything at once
+   * overruns the guest's keyboard buffer and drops the tail silently --
+   * which is the same failure as `keyboardputstring`, just slower.
+   */
+  const codes = [...argument].flatMap((character) => codesFor(character))
+  for (let at = 0; at < codes.length; at += 24) {
+    const chunk = codes.slice(at, at + 24).map((code) => code.toString(16).padStart(2, '0'))
+    const typed = vbox(['controlvm', VM, 'keyboardputscancode', ...chunk])
+    if (!typed.ok) { say(typed.out); process.exitCode = 1; break }
+    await new Promise((r) => setTimeout(r, 60))
+  }
+  say(`typed ${String(argument.length)} characters`)
 } else if (command === 'press') {
   const codes = KEYS[String(argument).toLowerCase()]
   if (codes === undefined) { say(`no such key; known: ${Object.keys(KEYS).join(', ')}`); process.exit(1) }
@@ -95,9 +165,17 @@ if (command === 'state') {
    * silently.
    */
   vbox(['controlvm', VM, 'keyboardputscancode', ...KEYS['win-r']])
-  await new Promise((r) => setTimeout(r, 1200))
-  const typed = vbox(['controlvm', VM, 'keyboardputstring', argument])
-  if (!typed.ok) { say(typed.out); process.exit(1) }
+  await new Promise((r) => setTimeout(r, 1500))
+  const codes = [...argument].flatMap((character) => {
+    const found = codesFor(character)
+    if (found === undefined) { say(`cannot type ${JSON.stringify(character)}`); process.exit(1) }
+    return found
+  })
+  for (let at = 0; at < codes.length; at += 24) {
+    const chunk = codes.slice(at, at + 24).map((code) => code.toString(16).padStart(2, '0'))
+    vbox(['controlvm', VM, 'keyboardputscancode', ...chunk])
+    await new Promise((r) => setTimeout(r, 60))
+  }
   await new Promise((r) => setTimeout(r, 400))
   vbox(['controlvm', VM, 'keyboardputscancode', ...KEYS.enter])
   say(`ran: ${argument.slice(0, 120)}`)
