@@ -37,9 +37,15 @@ import type {
  * - `system`/`init` carries the session id (which `--resume` takes back), the
  *   model Cursor resolved (`"Auto"`, `"Composer 2.5"`), the permission mode,
  *   the cwd and the auth source. It is allow-listed like Claude's.
- * - `thinking` deltas are the model's reasoning. Their text is REDACTED from
- *   the evidence, as Codex's reasoning items are, and they become a
- *   `reasoning` step so the step line can show that thinking is happening.
+ * - `thinking` deltas are the model's reasoning. Their text is KEPT -- Colin
+ *   overturned the redaction on 2026-09-15, and the long comment at the
+ *   `thinking` branch says why -- with secrets scrubbed from it as from
+ *   anything else. They become a `reasoning` step so the step line can show
+ *   that thinking is happening. (This paragraph said REDACTED for five days
+ *   after the code stopped doing it, and a smoke test written from the
+ *   paragraph rather than the code reported the app broken every sweep since.
+ *   A comment that outlives its code is not a stale comment, it is a false
+ *   claim with a test behind it.)
  * - `assistant` records come in two forms that look alike. With
  *   `--stream-partial-output` each fragment arrives as its own record carrying
  *   `timestamp_ms` and no `model_call_id`; then the COMPLETE message arrives

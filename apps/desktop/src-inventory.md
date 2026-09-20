@@ -1,0 +1,419 @@
+# Source inventory: `apps/desktop/src`
+
+This inventory contains every file under `src`, including ignored/generated files. The file count was verified as 400 on 2026-09-20. Each entry names the source path first and then gives a short purpose sentence. For test files, the sentence describes the behavior under test; for implementation and asset files, it reflects the source header, exported surface, or file type. These are source descriptions, not additional product conclusions.
+
+## Main process
+
+- `src/main/a-beta-can-report-itself.test.ts` — Tests the a beta can report itself behavior and its boundary cases.
+- `src/main/a-conversation-can-be-named.test.ts` — Tests the a conversation can be named behavior and its boundary cases.
+- `src/main/a-keyboard-user-can-see-where-they-are.test.ts` — Tests the a keyboard user can see where they are behavior and its boundary cases.
+- `src/main/an-fyi-need-not-page-a-model.test.ts` — Tests the an fyi need not page a model behavior and its boundary cases.
+- `src/main/antigravity-host.ts` — Discovers and probes the experimental Antigravity IDE host, including executable, data, transcript, token, and version locations.
+- `src/main/antigravity-mission.test.ts` — Tests the antigravity mission behavior and its boundary cases.
+- `src/main/antigravity-mission.ts` — Runs and normalizes experimental Antigravity missions while recording their lifecycle in the local ledger.
+- `src/main/approval-channel.test.ts` — Tests the approval channel behavior and its boundary cases.
+- `src/main/approval-channel.ts` — Translates runtime approval and question requests into mission cards and converts the person’s answers back to protocol responses.
+- `src/main/approval-patch.test.ts` — Tests the approval patch behavior and its boundary cases.
+- `src/main/approval-patch.ts` — Extracts Codex file-change approval items and turns them into a unified patch for the approval UI.
+- `src/main/approve-each-reaches-every-start.test.ts` — Tests the approve each reaches every start behavior and its boundary cases.
+- `src/main/a-refused-link-says-so.test.ts` — Tests the a refused link says so behavior and its boundary cases.
+- `src/main/a-run-that-is-nobodys-still-knows-the-project.test.ts` — Tests the a run that is nobodys still knows the project behavior and its boundary cases.
+- `src/main/attach-outside.test.ts` — Tests the attach outside behavior and its boundary cases.
+- `src/main/attach-outside.ts` — Places files selected outside the workspace into a collision-safe ignored attachment directory.
+- `src/main/attention.test.ts` — Tests the attention behavior and its boundary cases.
+- `src/main/attention.ts` — Builds notifications and room toasts for approvals, decisions, limits, and other work that needs the person’s attention.
+- `src/main/attention-reader.test.ts` — Tests the attention reader behavior and its boundary cases.
+- `src/main/attention-reader.ts` — Reads completed mission events to identify decision questions and account-limit endings that need attention.
+- `src/main/block-placement.test.ts` — Tests the block placement behavior and its boundary cases.
+- `src/main/bounded-shutdown.test.ts` — Tests the bounded shutdown behavior and its boundary cases.
+- `src/main/bounded-shutdown.ts` — Ensures application shutdown completes within a bounded deadline even when live work does not settle.
+- `src/main/bundled-npm.test.ts` — Tests the bundled npm behavior and its boundary cases.
+- `src/main/bundled-npm.ts` — Locates the npm distribution bundled with the app and computes its owned install and binary paths.
+- `src/main/changelog.test.ts` — Tests the changelog behavior and its boundary cases.
+- `src/main/changelog.ts` — Reads and parses the build changelog so the app can explain what changed in the running version.
+- `src/main/classes-are-styled.test.ts` — Tests the classes are styled behavior and its boundary cases.
+- `src/main/codex-mission.test.ts` — Tests the codex mission behavior and its boundary cases.
+- `src/main/codex-mission.ts` — Runs Codex and Cursor-style app-server missions, normalizes their events, persists receipts, and manages lifecycle recovery.
+- `src/main/cold-start-is-not-an-alert.test.ts` — Tests the cold start is not an alert behavior and its boundary cases.
+- `src/main/command-length.test.ts` — Tests the command length behavior and its boundary cases.
+- `src/main/command-length.ts` — Checks whether a runtime command fits Windows command-line and process-length limits.
+- `src/main/command-record.test.ts` — Tests the command record behavior and its boundary cases.
+- `src/main/command-record.ts` — Creates a safe recorded representation of the command actually run without retaining the prompt text.
+- `src/main/composer-keys.test.ts` — Tests the composer keys behavior and its boundary cases.
+- `src/main/connector-reader.test.ts` — Tests the connector reader behavior and its boundary cases.
+- `src/main/connector-reader.ts` — Reads locally available connector names in the background for use by teammate briefings.
+- `src/main/conversation-chain.test.ts` — Tests the conversation chain behavior and its boundary cases.
+- `src/main/conversation-chain.ts` — Walks conversation ancestry and group membership so a mission receives the correct inherited briefing.
+- `src/main/css-tokens-exist.test.ts` — Tests the css tokens exist behavior and its boundary cases.
+- `src/main/cursor-connector-allow.test.ts` — Tests the cursor connector allow behavior and its boundary cases.
+- `src/main/cursor-connector-allow.ts` — Merges configured connector allow rules into Cursor’s project CLI configuration.
+- `src/main/cursor-connector-notice.ts` — Detects Cursor connectors that need login or are ready and produces honest notices about them.
+- `src/main/cursor-visibility.test.ts` — Tests the cursor visibility behavior and its boundary cases.
+- `src/main/cursor-visibility.ts` — Detects when `.cursorignore` prevents Cursor from seeing the workspace and explains the refusal.
+- `src/main/diagnostics.ts` — Formats bounded, useful diagnostic log records and startup/crash explanations for beta reports.
+- `src/main/discovery-log.ts` — Stores runtime-discovery events so the boot screen can show the complete sequence to late subscribers.
+- `src/main/disk-observation.test.ts` — Tests the disk observation behavior and its boundary cases.
+- `src/main/disk-observation.ts` — Snapshots workspace files and compares them to observe on-disk changes that runtime event streams did not report.
+- `src/main/embedded-scripts-parse.test.ts` — Tests the embedded scripts parse behavior and its boundary cases.
+- `src/main/escapes-survived-the-shell.test.ts` — Tests the escapes survived the shell behavior and its boundary cases.
+- `src/main/forget-hits-one-memory.test.ts` — Tests the forget hits one memory behavior and its boundary cases.
+- `src/main/grid-columns-match-children.test.ts` — Tests the grid columns match children behavior and its boundary cases.
+- `src/main/groups-hold-conversations.test.ts` — Tests the groups hold conversations behavior and its boundary cases.
+- `src/main/groups-remember-leaving.test.ts` — Tests the groups remember leaving behavior and its boundary cases.
+- `src/main/group-store.ts` — Persists named groups of conversations per workspace, including membership and leave state.
+- `src/main/handoff.test.ts` — Tests the handoff behavior and its boundary cases.
+- `src/main/handoff.ts` — Builds the briefing and handoff boundary for a new runtime continuing the same problem.
+- `src/main/harness-backticks.test.ts` — Tests the harness backticks behavior and its boundary cases.
+- `src/main/harness-selectors.test.ts` — Tests the harness selectors behavior and its boundary cases.
+- `src/main/harness-syntax.test.ts` — Tests the harness syntax behavior and its boundary cases.
+- `src/main/index.ts` — Bootstraps the Electron main process, IPC handlers, windows, discovery, routines, and application services.
+- `src/main/memory-file.test.ts` — Tests the memory file behavior and its boundary cases.
+- `src/main/memory-file.ts` — Builds the bounded memory-file briefing that is placed beside the lines handed to a teammate.
+- `src/main/memory-reader.test.ts` — Tests the memory reader behavior and its boundary cases.
+- `src/main/memory-reader.ts` — Reads a mission reply for memory operations and applies remembers or forgets to the team memory store.
+- `src/main/memory-says-how-old.test.ts` — Tests the memory says how old behavior and its boundary cases.
+- `src/main/memory-store.test.ts` — Tests the memory store behavior and its boundary cases.
+- `src/main/memory-store.ts` — Persists workspace and global teammate memory in the app-owned local data directory.
+- `src/main/menus-dismiss.test.ts` — Tests the menus dismiss behavior and its boundary cases.
+- `src/main/mission-history.test.ts` — Tests the mission history behavior and its boundary cases.
+- `src/main/mission-history.ts` — Bounds and reads mission history for IPC without allowing large tool outputs to create oversized responses.
+- `src/main/missions-can-be-deleted-together.test.ts` — Tests the missions can be deleted together behavior and its boundary cases.
+- `src/main/model-catalog.test.ts` — Tests the model catalog behavior and its boundary cases.
+- `src/main/model-catalog.ts` — Queries and caches the model catalog exposed by a runtime app server.
+- `src/main/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json` — Contains generated Vite test-result data for the main-process test environment.
+- `src/main/no-dead-links.test.ts` — Tests the no dead links behavior and its boundary cases.
+- `src/main/no-stray-control-characters.test.ts` — Tests the no stray control characters behavior and its boundary cases.
+- `src/main/npm-precondition.test.ts` — Tests the npm precondition behavior and its boundary cases.
+- `src/main/npm-prefix.test.ts` — Tests the npm prefix behavior and its boundary cases.
+- `src/main/npm-prefix.ts` — Finds the global npm install prefix and executable locations used on the current machine.
+- `src/main/one-table-of-modes.test.ts` — Tests the one table of modes behavior and its boundary cases.
+- `src/main/pasted-attachment.test.ts` — Tests the pasted attachment behavior and its boundary cases.
+- `src/main/peer-exchange.ts` — Coordinates the two workroom exchange moments around a mission while keeping them transport-independent.
+- `src/main/peer-exchange-conversation.test.ts` — Tests the peer exchange conversation behavior and its boundary cases.
+- `src/main/permission-host.test.ts` — Tests the permission host behavior and its boundary cases.
+- `src/main/permission-host.ts` — Acts as Locust’s Claude Code permission host and records permission decisions around connector use.
+- `src/main/plan-is-not-a-card.test.ts` — Tests the plan is not a card behavior and its boundary cases.
+- `src/main/prose-face-is-bundled.test.ts` — Tests the prose face is bundled behavior and its boundary cases.
+- `src/main/qa-0365-concurrency.test.ts` — Tests the qa 0365 concurrency behavior and its boundary cases.
+- `src/main/qa-0365-fresh.test.ts` — Tests the qa 0365 fresh behavior and its boundary cases.
+- `src/main/qa-0365-rooms.test.ts` — Tests the qa 0365 rooms behavior and its boundary cases.
+- `src/main/question-answers.test.ts` — Tests the question answers behavior and its boundary cases.
+- `src/main/relay.test.ts` — Tests the relay behavior and its boundary cases.
+- `src/main/relay.ts` — Routes teammate-to-teammate replies without starting a new person-facing mission.
+- `src/main/relay-note-is-writable.test.ts` — Tests the relay note is writable behavior and its boundary cases.
+- `src/main/retention.test.ts` — Tests the retention behavior and its boundary cases.
+- `src/main/retention.ts` — Deletes old mission records in bulk according to the local retention policy.
+- `src/main/reveal-file.test.ts` — Tests the reveal file behavior and its boundary cases.
+- `src/main/reveal-file.ts` — Reveals a teammate-written file through host-controlled paths without allowing the renderer to name arbitrary disk locations.
+- `src/main/role-brief.test.ts` — Tests the role brief behavior and its boundary cases.
+- `src/main/room-and-mission-caps-agree.test.ts` — Tests the room and mission caps agree behavior and its boundary cases.
+- `src/main/room-answer-is-whole.test.ts` — Tests the room answer is whole behavior and its boundary cases.
+- `src/main/room-queue-drains.test.ts` — Tests the room queue drains behavior and its boundary cases.
+- `src/main/rooms-are-reachable.test.ts` — Tests the rooms are reachable behavior and its boundary cases.
+- `src/main/room-store.test.ts` — Tests the room store behavior and its boundary cases.
+- `src/main/room-store.ts` — Persists rooms, their members, and the person’s posts broadcast to those members.
+- `src/main/room-tasks.test.ts` — Tests the room tasks behavior and its boundary cases.
+- `src/main/room-tasks.ts` — Applies task-block operations from room mission replies to the room’s shared task board.
+- `src/main/route-at-start.test.ts` — Tests the route at start behavior and its boundary cases.
+- `src/main/route-remembers-effort.test.ts` — Tests the route remembers effort behavior and its boundary cases.
+- `src/main/routine-recovery.test.ts` — Tests the routine recovery behavior and its boundary cases.
+- `src/main/routine-recovery-ipc.ts` — Validates and handles durable routine-recovery requests in the main process.
+- `src/main/routine-runner.test.ts` — Tests the routine runner behavior and its boundary cases.
+- `src/main/routine-runner.ts` — Replays saved routine steps as missions and follow-ups on the same teammate conversation.
+- `src/main/routine-store.test.ts` — Tests the routine store behavior and its boundary cases.
+- `src/main/routine-store.ts` — Persists saved routines made from teammate conversations and their ordered steps.
+- `src/main/runtime-artifacts.test.ts` — Tests the runtime artifacts behavior and its boundary cases.
+- `src/main/runtime-artifacts.ts` — Reads artifacts configured inside each runtime’s own CLI without creating or changing them.
+- `src/main/runtime-discovery.test.ts` — Tests the runtime discovery behavior and its boundary cases.
+- `src/main/runtime-discovery.ts` — Discovers installed runtimes, their capabilities, and their available models.
+- `src/main/runtime-installer.test.ts` — Tests the runtime installer behavior and its boundary cases.
+- `src/main/runtime-installer.ts` — Runs the runtime installation command and streams npm output for a first-launch setup flow.
+- `src/main/runtime-setup.test.ts` — Tests the runtime setup behavior and its boundary cases.
+- `src/main/runtime-setup.ts` — Reads runtime-owned MCP servers and hooks and exposes their setup status without modifying them.
+- `src/main/says-what-is-still-true.test.ts` — Tests the says what is still true behavior and its boundary cases.
+- `src/main/settings-pages-are-real.test.ts` — Tests the settings pages are real behavior and its boundary cases.
+- `src/main/share-addressed-home.test.ts` — Tests the share addressed home behavior and its boundary cases.
+- `src/main/slash-is-composer-only.test.ts` — Tests the slash is composer only behavior and its boundary cases.
+- `src/main/sources-are-lf.test.ts` — Tests the sources are lf behavior and its boundary cases.
+- `src/main/stale-shortcut.test.ts` — Tests the stale shortcut behavior and its boundary cases.
+- `src/main/stale-shortcut.ts` — Detects and repairs the Windows Start-menu shortcut condition that can give the running app the wrong taskbar icon.
+- `src/main/stores-fail-closed.test.ts` — Tests the stores fail closed behavior and its boundary cases.
+- `src/main/teammate-knows-its-connectors.test.ts` — Tests the teammate knows its connectors behavior and its boundary cases.
+- `src/main/teammate-store.test.ts` — Tests the teammate store behavior and its boundary cases.
+- `src/main/teammate-store.ts` — Persists local teammate identity, avatar, role, route defaults, and approval mode.
+- `src/main/tests-assert-something.test.ts` — Tests the tests assert something behavior and its boundary cases.
+- `src/main/text-may-not-bleed.test.ts` — Tests the text may not bleed behavior and its boundary cases.
+- `src/main/the-boot-screen-css.test.ts` — Tests the the boot screen css behavior and its boundary cases.
+- `src/main/the-flat-sidebar-is-written-down.test.ts` — Tests the the flat sidebar is written down behavior and its boundary cases.
+- `src/main/the-plan-is-drawn-as-what-it-is.test.ts` — Tests the the plan is drawn as what it is behavior and its boundary cases.
+- `src/main/the-rail-can-be-used.test.ts` — Tests the the rail can be used behavior and its boundary cases.
+- `src/main/thread-registers.test.ts` — Tests the thread registers behavior and its boundary cases.
+- `src/main/three-placements.test.ts` — Tests the three placements behavior and its boundary cases.
+- `src/main/todo-list-is-opt-in.test.ts` — Tests the todo list is opt in behavior and its boundary cases.
+- `src/main/tone-classes-win.test.ts` — Tests the tone classes win behavior and its boundary cases.
+- `src/main/tool-rows-say-what-they-did.test.ts` — Tests the tool rows say what they did behavior and its boundary cases.
+- `src/main/torn-ledger.test.ts` — Tests the torn ledger behavior and its boundary cases.
+- `src/main/unreadable-is-not-empty.test.ts` — Tests the unreadable is not empty behavior and its boundary cases.
+- `src/main/updates.test.ts` — Tests the updates behavior and its boundary cases.
+- `src/main/updates.ts` — Checks and describes available application updates under the app’s update policy.
+- `src/main/what-running-it-again-does.test.ts` — Tests the what running it again does behavior and its boundary cases.
+- `src/main/window-bounds.test.ts` — Tests the window bounds behavior and its boundary cases.
+- `src/main/window-bounds.ts` — Stores and restores window position and bounds while keeping them on a usable display.
+- `src/main/windows-can-start-it.test.ts` — Tests the windows can start it behavior and its boundary cases.
+- `src/main/window-size.test.ts` — Tests the window size behavior and its boundary cases.
+- `src/main/window-size.ts` — Defines the minimum viable layout size and the opening window size.
+- `src/main/workroom-briefing.test.ts` — Tests the workroom briefing behavior and its boundary cases.
+- `src/main/workroom-briefing.ts` — Builds the teammate-facing briefing about colleagues, peers, connectors, and workroom context.
+- `src/main/workspace.test.ts` — Tests the workspace behavior and its boundary cases.
+- `src/main/workspace.ts` — Derives the stable workspace identifier recorded on missions from a folder path.
+- `src/main/workspace-brief.test.ts` — Tests the workspace brief behavior and its boundary cases.
+- `src/main/workspace-brief.ts` — Reads the workspace’s `LOCUST.md` brief and includes it in every teammate mission.
+- `src/main/worktrees.test.ts` — Tests the worktrees behavior and its boundary cases.
+- `src/main/worktrees.ts` — Creates and manages per-teammate git worktrees and their local ownership conventions.
+
+## Preload
+
+- `src/preload/index.ts` — Exposes the constrained desktop IPC bridge used by the renderer, including runtime installation and application controls.
+- `src/preload/routine-recovery.test.ts` — Tests the routine recovery behavior and its boundary cases.
+
+## Renderer document
+
+- `src/renderer/index.html` — Provides the HTML document shell into which the renderer bundle mounts.
+
+## Renderer application
+
+- `src/renderer/src/a-cancelled-run-spent-nothing.test.ts` — Tests the a cancelled run spent nothing behavior and its boundary cases.
+- `src/renderer/src/a-command-reads-as-a-command.test.ts` — Tests the a command reads as a command behavior and its boundary cases.
+- `src/renderer/src/a-conversation-keeps-its-name-and-group.test.ts` — Tests the a conversation keeps its name and group behavior and its boundary cases.
+- `src/renderer/src/agentText.test.ts` — Tests the agentText behavior and its boundary cases.
+- `src/renderer/src/agentText.ts` — Parses model-authored text into the semantic pieces the conversation thread can render.
+- `src/renderer/src/a-handed-file-is-a-control.test.tsx` — Tests the a handed file is a control behavior and its boundary cases.
+- `src/renderer/src/a-hung-cli-gets-a-way-past.test.tsx` — Tests the a hung cli gets a way past behavior and its boundary cases.
+- `src/renderer/src/answer-state.test.ts` — Tests the answer state behavior and its boundary cases.
+- `src/renderer/src/a-plan-shows-what-happened-to-it.test.ts` — Tests the a plan shows what happened to it behavior and its boundary cases.
+- `src/renderer/src/App.tsx` — Renders the main Locust shell, navigation, mission surfaces, and application-level state.
+- `src/renderer/src/approval-patch.test.ts` — Tests the approval patch behavior and its boundary cases.
+- `src/renderer/src/a-signed-out-teammate-is-not-idle.test.ts` — Tests the a signed out teammate is not idle behavior and its boundary cases.
+- `src/renderer/src/assets/fonts/ANTHROPIC-FONTS-LICENSE.txt` — Contains the license text for the bundled ANTHROPIC FONTS LICENSE font family.
+- `src/renderer/src/assets/fonts/AnthropicSans-Variable.woff2` — Stores the AnthropicSans Variable font asset used by the renderer.
+- `src/renderer/src/assets/fonts/AnthropicSerif-Variable.woff2` — Stores the AnthropicSerif Variable font asset used by the renderer.
+- `src/renderer/src/assets/fonts/GEIST-LICENSE.txt` — Contains the license text for the bundled GEIST LICENSE font family.
+- `src/renderer/src/assets/fonts/Geist-Medium.woff2` — Stores the Geist Medium font asset used by the renderer.
+- `src/renderer/src/assets/fonts/GeistMono-Medium.woff2` — Stores the GeistMono Medium font asset used by the renderer.
+- `src/renderer/src/assets/fonts/GeistMono-Regular.woff2` — Stores the GeistMono Regular font asset used by the renderer.
+- `src/renderer/src/assets/fonts/Geist-Regular.woff2` — Stores the Geist Regular font asset used by the renderer.
+- `src/renderer/src/assets/fonts/IBM-Plex-LICENSE.txt` — Contains the license text for the bundled IBM Plex LICENSE font family.
+- `src/renderer/src/assets/fonts/IBMPlexSans-Italic.woff2` — Stores the IBMPlexSans Italic font asset used by the renderer.
+- `src/renderer/src/assets/fonts/IBMPlexSans-Medium.woff2` — Stores the IBMPlexSans Medium font asset used by the renderer.
+- `src/renderer/src/assets/fonts/IBMPlexSans-Regular.woff2` — Stores the IBMPlexSans Regular font asset used by the renderer.
+- `src/renderer/src/assets/locust-app-icon.svg` — Stores the locust app icon brand artwork used by the renderer.
+- `src/renderer/src/assets/locust-logo.svg` — Stores the locust logo brand artwork used by the renderer.
+- `src/renderer/src/assets/locust-mark.svg` — Stores the locust mark brand artwork used by the renderer.
+- `src/renderer/src/assets/locust-wordmark.svg` — Stores the locust wordmark brand artwork used by the renderer.
+- `src/renderer/src/a-teammate-can-hand-you-a-file.test.ts` — Tests the a teammate can hand you a file behavior and its boundary cases.
+- `src/renderer/src/a-wrapped-bullet-stays-one-bullet.test.ts` — Tests the a wrapped bullet stays one bullet behavior and its boundary cases.
+- `src/renderer/src/bootView.ts` — Models the boot-screen state as data independent of the React component.
+- `src/renderer/src/combine-queued.test.ts` — Tests the combine queued behavior and its boundary cases.
+- `src/renderer/src/command-output.test.tsx` — Tests the command output behavior and its boundary cases.
+- `src/renderer/src/command-rows.test.ts` — Tests the command rows behavior and its boundary cases.
+- `src/renderer/src/components/ActivityCard.tsx` — Renders the ActivityCard React UI surface.
+- `src/renderer/src/components/ApprovalCard.tsx` — Renders the ApprovalCard React UI surface.
+- `src/renderer/src/components/AttachedImage.tsx` — Renders the AttachedImage React UI surface.
+- `src/renderer/src/components/AutomationsScreen.tsx` — Renders the AutomationsScreen React UI surface.
+- `src/renderer/src/components/BootScreen.tsx` — Renders the BootScreen React UI surface.
+- `src/renderer/src/components/CancellationCard.tsx` — Renders the CancellationCard React UI surface.
+- `src/renderer/src/components/CliArtifacts.tsx` — Renders the CliArtifacts React UI surface.
+- `src/renderer/src/components/CommandPalette.tsx` — Renders the CommandPalette React UI surface.
+- `src/renderer/src/components/Composer.tsx` — Renders the Composer React UI surface.
+- `src/renderer/src/components/ContextMenu.tsx` — Renders the ContextMenu React UI surface.
+- `src/renderer/src/components/ContextRing.tsx` — Renders the ContextRing React UI surface.
+- `src/renderer/src/components/DecisionCard.tsx` — Renders the DecisionCard React UI surface.
+- `src/renderer/src/components/DiffView.tsx` — Renders the DiffView React UI surface.
+- `src/renderer/src/components/ExchangeStrip.tsx` — Renders the ExchangeStrip React UI surface.
+- `src/renderer/src/components/FileViewer.tsx` — Renders the FileViewer React UI surface.
+- `src/renderer/src/components/FirstLaunch.tsx` — Renders the FirstLaunch React UI surface.
+- `src/renderer/src/components/GroupSettingsDialog.tsx` — Renders the GroupSettingsDialog React UI surface.
+- `src/renderer/src/components/HandoffDivider.tsx` — Renders the HandoffDivider React UI surface.
+- `src/renderer/src/components/Icon.tsx` — Renders the Icon React UI surface.
+- `src/renderer/src/components/IdleTeammate.tsx` — Renders the IdleTeammate React UI surface.
+- `src/renderer/src/components/Inspector.tsx` — Renders the Inspector React UI surface.
+- `src/renderer/src/components/JumpToBottom.tsx` — Renders the JumpToBottom React UI surface.
+- `src/renderer/src/components/MemoryCard.tsx` — Renders the MemoryCard React UI surface.
+- `src/renderer/src/components/MemoryScreen.tsx` — Renders the MemoryScreen React UI surface.
+- `src/renderer/src/components/MetalSend.tsx` — Renders the MetalSend React UI surface.
+- `src/renderer/src/components/NewTeammateDialog.tsx` — Renders the NewTeammateDialog React UI surface.
+- `src/renderer/src/components/PeerThread.tsx` — Renders the PeerThread React UI surface.
+- `src/renderer/src/components/PixelFace.tsx` — Renders the PixelFace React UI surface.
+- `src/renderer/src/components/RailFlyout.tsx` — Renders the RailFlyout React UI surface.
+- `src/renderer/src/components/ResumeCard.tsx` — Renders the ResumeCard React UI surface.
+- `src/renderer/src/components/RoomScreen.tsx` — Renders the RoomScreen React UI surface.
+- `src/renderer/src/components/RoutePicker.tsx` — Renders the RoutePicker React UI surface.
+- `src/renderer/src/components/RoutineDialog.tsx` — Renders the RoutineDialog React UI surface.
+- `src/renderer/src/components/RoutineRecovery.tsx` — Renders the RoutineRecovery React UI surface.
+- `src/renderer/src/components/Screens.tsx` — Renders the Screens React UI surface.
+- `src/renderer/src/components/Sidebar.tsx` — Renders the Sidebar React UI surface.
+- `src/renderer/src/components/Thread.tsx` — Renders the Thread React UI surface.
+- `src/renderer/src/components/ThreadItems.tsx` — Renders the ThreadItems React UI surface.
+- `src/renderer/src/components/TimeMarker.tsx` — Renders the TimeMarker React UI surface.
+- `src/renderer/src/components/TitleBar.tsx` — Renders the TitleBar React UI surface.
+- `src/renderer/src/connectors-are-not-the-mode.test.tsx` — Tests the connectors are not the mode behavior and its boundary cases.
+- `src/renderer/src/conversationList.ts` — Builds the flat, newest-first sidebar conversation list.
+- `src/renderer/src/conversationMemories.ts` — Derives conversation-level memory summaries from the durable mission record.
+- `src/renderer/src/cost.test.ts` — Tests the cost behavior and its boundary cases.
+- `src/renderer/src/cost.ts` — Reads reported run cost from mission receipts without estimating it.
+- `src/renderer/src/diff.test.ts` — Tests the diff behavior and its boundary cases.
+- `src/renderer/src/diff.ts` — Parses unified diffs into rows suitable for the thread’s file-change viewer.
+- `src/renderer/src/effortLevels.test.ts` — Tests the effortLevels behavior and its boundary cases.
+- `src/renderer/src/effortLevels.ts` — Defines the user-facing meaning of known reasoning-effort levels.
+- `src/renderer/src/effortScale.test.ts` — Tests the effortScale behavior and its boundary cases.
+- `src/renderer/src/effortScale.ts` — Maps runtime reasoning effort onto a single continuous scale.
+- `src/renderer/src/env.d.ts` — Declares TypeScript types for renderer environment globals and assets.
+- `src/renderer/src/exchange.test.ts` — Tests the exchange behavior and its boundary cases.
+- `src/renderer/src/exchange.ts` — Represents the participants, budget, and cost of an automatic teammate exchange.
+- `src/renderer/src/faceState.test.ts` — Tests the faceState behavior and its boundary cases.
+- `src/renderer/src/faceState.ts` — Maps teammate mission state to the animated face state shown in the UI.
+- `src/renderer/src/fold-tool-runs.test.ts` — Tests the fold tool runs behavior and its boundary cases.
+- `src/renderer/src/follow-bottom.test.ts` — Tests the follow bottom behavior and its boundary cases.
+- `src/renderer/src/followBottom.ts` — Implements smooth follow-bottom behavior for streaming conversation surfaces.
+- `src/renderer/src/group-boundary.test.ts` — Tests the group boundary behavior and its boundary cases.
+- `src/renderer/src/group-join-line-survives-leaving.test.ts` — Tests the group join line survives leaving behavior and its boundary cases.
+- `src/renderer/src/group-leaving-line.test.ts` — Tests the group leaving line behavior and its boundary cases.
+- `src/renderer/src/group-settings-dialog.test.tsx` — Tests the group settings dialog behavior and its boundary cases.
+- `src/renderer/src/groups-unreadable-is-a-line.test.tsx` — Tests the groups unreadable is a line behavior and its boundary cases.
+- `src/renderer/src/install-buttons-say-why.test.tsx` — Tests the install buttons say why behavior and its boundary cases.
+- `src/renderer/src/its-own-settings-file.test.ts` — Tests the its own settings file behavior and its boundary cases.
+- `src/renderer/src/last-activity.test.ts` — Tests the last activity behavior and its boundary cases.
+- `src/renderer/src/layout.test.ts` — Tests the layout behavior and its boundary cases.
+- `src/renderer/src/layout.ts` — Chooses between the full sidebar layout and compact avatar-rail layout.
+- `src/renderer/src/ledgerFailure.test.ts` — Tests the ledgerFailure behavior and its boundary cases.
+- `src/renderer/src/ledgerFailure.ts` — Produces user-facing wording when Locust cannot write its durable local receipts.
+- `src/renderer/src/links-go-somewhere.test.ts` — Tests the links go somewhere behavior and its boundary cases.
+- `src/renderer/src/main.tsx` — Mounts the renderer application and coordinates the loading window and main window bundle.
+- `src/renderer/src/mcp-tool-rows.test.ts` — Tests the mcp tool rows behavior and its boundary cases.
+- `src/renderer/src/memory-card-survives-a-reply.test.ts` — Tests the memory card survives a reply behavior and its boundary cases.
+- `src/renderer/src/metal.ts` — Centralizes the send-button metal/bend visual configuration.
+- `src/renderer/src/missionView.test.ts` — Tests the missionView behavior and its boundary cases.
+- `src/renderer/src/missionView.ts` — Turns normalized mission events into the semantic thread view.
+- `src/renderer/src/mode-says-one-thing.test.ts` — Tests the mode says one thing behavior and its boundary cases.
+- `src/renderer/src/nested-lists.test.ts` — Tests the nested lists behavior and its boundary cases.
+- `src/renderer/src/nobodys-conversation-can-be-a-routine.test.tsx` — Tests the nobodys conversation can be a routine behavior and its boundary cases.
+- `src/renderer/src/one-fact-one-surface.test.ts` — Tests the one fact one surface behavior and its boundary cases.
+- `src/renderer/src/permissions-panel-is-true.test.tsx` — Tests the permissions panel is true behavior and its boundary cases.
+- `src/renderer/src/picker-empty-states.test.tsx` — Tests the picker empty states behavior and its boundary cases.
+- `src/renderer/src/plan-answer.test.tsx` — Tests the plan answer behavior and its boundary cases.
+- `src/renderer/src/post-headline.test.ts` — Tests the post headline behavior and its boundary cases.
+- `src/renderer/src/qa-0365-composer.test.tsx` — Tests the qa 0365 composer behavior and its boundary cases.
+- `src/renderer/src/quiet.test.ts` — Tests the quiet behavior and its boundary cases.
+- `src/renderer/src/quiet.ts` — Determines when a silent run should receive a progress or waiting explanation.
+- `src/renderer/src/railFlyout.test.ts` — Tests the railFlyout behavior and its boundary cases.
+- `src/renderer/src/railFlyout.ts` — Builds the compact rail flyout listing a teammate’s conversations.
+- `src/renderer/src/ran-on.test.ts` — Tests the ran on behavior and its boundary cases.
+- `src/renderer/src/ranOn.ts` — Formats the positive conditions under which a mission ran.
+- `src/renderer/src/reasoning-is-kept.test.ts` — Tests the reasoning is kept behavior and its boundary cases.
+- `src/renderer/src/resume.test.ts` — Tests the resume behavior and its boundary cases.
+- `src/renderer/src/resume.ts` — Determines whether an interrupted mission can resume and supplies its explanatory copy.
+- `src/renderer/src/review-brief.test.ts` — Tests the review brief behavior and its boundary cases.
+- `src/renderer/src/reviewBrief.ts` — Builds the brief used when a finished mission is handed to a reviewer teammate.
+- `src/renderer/src/review-sees-the-conversation.test.ts` — Tests the review sees the conversation behavior and its boundary cases.
+- `src/renderer/src/room-absent-is-a-line.test.tsx` — Tests the room absent is a line behavior and its boundary cases.
+- `src/renderer/src/room-exchange.test.ts` — Tests the room exchange behavior and its boundary cases.
+- `src/renderer/src/roomExchange.ts` — Summarizes current mission activity in the vocabulary used by a room screen.
+- `src/renderer/src/room-too-big-to-make.test.tsx` — Tests the room too big to make behavior and its boundary cases.
+- `src/renderer/src/routeName.test.ts` — Tests the routeName behavior and its boundary cases.
+- `src/renderer/src/routeName.ts` — Formats runtime routes as the same readable names used in the composer and mission header.
+- `src/renderer/src/routine-recovery.test.tsx` — Tests the routine recovery behavior and its boundary cases.
+- `src/renderer/src/routines.test.ts` — Tests the routines behavior and its boundary cases.
+- `src/renderer/src/routines.ts` — Converts finished conversations into replayable routine definitions.
+- `src/renderer/src/routines-shelf.test.tsx` — Tests the routines shelf behavior and its boundary cases.
+- `src/renderer/src/run-it-again-repeats-nothing.test.ts` — Tests the run it again repeats nothing behavior and its boundary cases.
+- `src/renderer/src/savable-conversations.test.ts` — Tests the savable conversations behavior and its boundary cases.
+- `src/renderer/src/savableConversations.ts` — Selects finished conversations that the empty Routines screen can offer for saving.
+- `src/renderer/src/settingsPages.ts` — Defines the paged settings navigation and its searchable labels.
+- `src/renderer/src/settings-search-knows-the-words.test.ts` — Tests the settings search knows the words behavior and its boundary cases.
+- `src/renderer/src/settled-text.test.ts` — Tests the settled text behavior and its boundary cases.
+- `src/renderer/src/settledText.ts` — Separates settled streaming reply text from text that is still arriving.
+- `src/renderer/src/shell.css` — Styles the Locust shell using the shared design tokens.
+- `src/renderer/src/slashCommands.test.ts` — Tests the slashCommands behavior and its boundary cases.
+- `src/renderer/src/slashCommands.ts` — Maps composer slash commands to existing application controls and actions.
+- `src/renderer/src/spawning-is-not-working.test.ts` — Tests the spawning is not working behavior and its boundary cases.
+- `src/renderer/src/SplashApp.tsx` — Renders the loading window shown before runtime discovery and application readiness.
+- `src/renderer/src/status.test.ts` — Tests the status behavior and its boundary cases.
+- `src/renderer/src/status.ts` — Derives every status word shown by the shell from discovery and mission state.
+- `src/renderer/src/steering.test.ts` — Tests the steering behavior and its boundary cases.
+- `src/renderer/src/steering.ts` — Handles sending a next instruction while a teammate is still working.
+- `src/renderer/src/stickToBottom.test.ts` — Tests the stickToBottom behavior and its boundary cases.
+- `src/renderer/src/stickToBottom.ts` — Keeps a chat surface pinned to its newest content unless the person is reading older content.
+- `src/renderer/src/stop-press.test.ts` — Tests the stop press behavior and its boundary cases.
+- `src/renderer/src/stopPress.ts` — Determines the meaning and wording of pressing Stop for the current mission state.
+- `src/renderer/src/stream-frames.test.ts` — Tests the stream frames behavior and its boundary cases.
+- `src/renderer/src/streamFrames.ts` — Batches streaming deltas per animation frame instead of rendering once per token.
+- `src/renderer/src/swarm.test.ts` — Tests the swarm behavior and its boundary cases.
+- `src/renderer/src/teammate-folder-row.test.tsx` — Tests the teammate folder row behavior and its boundary cases.
+- `src/renderer/src/teammateTooltip.test.ts` — Tests the teammateTooltip behavior and its boundary cases.
+- `src/renderer/src/teammateTooltip.ts` — Builds the information shown when a person hovers a teammate.
+- `src/renderer/src/teammateWork.test.ts` — Tests the teammateWork behavior and its boundary cases.
+- `src/renderer/src/teammateWork.ts` — Summarizes what a teammate has actually done for its roster card.
+- `src/renderer/src/the-bare-machine.test.ts` — Tests the the bare machine behavior and its boundary cases.
+- `src/renderer/src/the-boot-screen.test.ts` — Tests the the boot screen behavior and its boundary cases.
+- `src/renderer/src/the-composer-counts-what-it-is-about.test.tsx` — Tests the the composer counts what it is about behavior and its boundary cases.
+- `src/renderer/src/the-file-viewer-renders-and-never-runs.test.tsx` — Tests the the file viewer renders and never runs behavior and its boundary cases.
+- `src/renderer/src/the-flat-sidebar.test.ts` — Tests the the flat sidebar behavior and its boundary cases.
+- `src/renderer/src/the-frame-pass.test.ts` — Tests the the frame pass behavior and its boundary cases.
+- `src/renderer/src/the-orb-never-contradicts-the-row.test.ts` — Tests the the orb never contradicts the row behavior and its boundary cases.
+- `src/renderer/src/the-orb-reaches-the-running-step.test.ts` — Tests the the orb reaches the running step behavior and its boundary cases.
+- `src/renderer/src/the-picker-reads-as-names.test.tsx` — Tests the the picker reads as names behavior and its boundary cases.
+- `src/renderer/src/the-plan-marks-the-step-underway.test.tsx` — Tests the the plan marks the step underway behavior and its boundary cases.
+- `src/renderer/src/thought-folds-to-one-line.test.ts` — Tests the thought folds to one line behavior and its boundary cases.
+- `src/renderer/src/tokens.css` — Defines the Locust design tokens consumed by the renderer styles.
+- `src/renderer/src/tool-vocabulary.test.ts` — Tests the tool vocabulary behavior and its boundary cases.
+- `src/renderer/src/unreadable-ledger-is-said.test.tsx` — Tests the unreadable ledger is said behavior and its boundary cases.
+- `src/renderer/src/useDismissOnOutsidePress.ts` — Closes an open panel when the person clicks outside it or presses Escape.
+- `src/renderer/src/useFollowBottom.ts` — Provides the shared React hook for following the bottom of a chat surface.
+
+## Shared modules
+
+- `src/shared/a-half-written-tag-is-never-shown-to-a-person.test.ts` — Tests the a half written tag is never shown to a person behavior and its boundary cases.
+- `src/shared/approval-data.test.ts` — Tests the approval data behavior and its boundary cases.
+- `src/shared/approval-data.ts` — Explains what an approval would send off-machine when the command makes that knowable.
+- `src/shared/approval-patch.ts` — Composes per-file changes into the unified diff used by approval and activity views.
+- `src/shared/attachments.test.ts` — Tests the attachments behavior and its boundary cases.
+- `src/shared/attachments.ts` — Encodes person-attached files into prompts and parses them back for display.
+- `src/shared/avatar.ts` — Defines deterministic, editable pixel-avatar features seeded from a teammate identity.
+- `src/shared/board-is-not-behind.test.ts` — Tests the board is not behind behavior and its boundary cases.
+- `src/shared/claim-what-you-start.test.ts` — Tests the claim what you start behavior and its boundary cases.
+- `src/shared/cursorIgnore.test.ts` — Tests the cursorIgnore behavior and its boundary cases.
+- `src/shared/cursorIgnore.ts` — Identifies the `.cursorignore` rule hiding a path and formats the explanation.
+- `src/shared/decision.test.ts` — Tests the decision behavior and its boundary cases.
+- `src/shared/decision.ts` — Parses bounded `locust-ask` decision blocks into questions and options.
+- `src/shared/handover.test.ts` — Tests the handover behavior and its boundary cases.
+- `src/shared/handover.ts` — Parses and sanitizes `locust-file` blocks that hand files to the person.
+- `src/shared/image-files.test.ts` — Tests the image files behavior and its boundary cases.
+- `src/shared/image-files.ts` — Identifies image attachments, their browser media types, and preview-size limits.
+- `src/shared/ipc.ts` — Defines the shared IPC request, response, mission, teammate, memory, and UI protocol types.
+- `src/shared/live-missions.ts` — Defines the shared caps for concurrent live missions and room teammates.
+- `src/shared/memory.test.ts` — Tests the memory behavior and its boundary cases.
+- `src/shared/memory.ts` — Parses and bounds `locust-memory` operations for workspace and global team memory.
+- `src/shared/messageFragments.test.ts` — Tests the messageFragments behavior and its boundary cases.
+- `src/shared/messageFragments.ts` — Joins streamed message fragments into one coherent reply without duplication.
+- `src/shared/outbound-links.ts` — Defines and validates the set of URLs the host is allowed to open.
+- `src/shared/peer-share.test.ts` — Tests the peer share behavior and its boundary cases.
+- `src/shared/peer-share.ts` — Parses, bounds, sanitizes, and strips `locust-share` blocks between teammates.
+- `src/shared/protocol-tags.test.ts` — Tests the protocol tags behavior and its boundary cases.
+- `src/shared/protocolTags.ts` — Centralizes parsed protocol tags and defangs model-originated blocks before they become instructions.
+- `src/shared/room-task.test.ts` — Tests the room task behavior and its boundary cases.
+- `src/shared/room-task.ts` — Parses and applies `locust-task` operations for claiming, finishing, handing off, and adding room tasks.
+- `src/shared/route-at-start.ts` — Resolves the saved runtime/model route at mission start and supplies picker defaults.
+- `src/shared/routine-recovery.ts` — Defines validated dispatch receipts and IPC messages for recovering interrupted routines.
+- `src/shared/routine-schedule.test.ts` — Tests the routine schedule behavior and its boundary cases.
+- `src/shared/routine-schedule.ts` — Validates local routine schedules and computes labels, due times, and next runs.
+- `src/shared/runtime-install.test.ts` — Tests the runtime install behavior and its boundary cases.
+- `src/shared/runtime-install.ts` — Defines installation and sign-in guidance for each supported runtime.
+- `src/shared/runtimes.ts` — Centralizes runtime identity, display names, event support, and mission-run capability.
+- `src/shared/step-budget.test.ts` — Tests the step budget behavior and its boundary cases.
+- `src/shared/step-budget.ts` — Bounds routine-step length and provides the corresponding warning.
+- `src/shared/text-files.test.ts` — Tests the text files behavior and its boundary cases.
+- `src/shared/text-files.ts` — Determines which teammate-written files are viewable and whether to render them as Markdown or code.
+- `src/shared/the-named-teammate-claims.test.ts` — Tests the the named teammate claims behavior and its boundary cases.
+- `src/shared/trailer.ts` — Defines the briefing text that tells a runtime where to place a protocol block.
+- `src/shared/worktree-name.ts` — Converts a teammate name into a valid `locust/<name>` git branch name.
+

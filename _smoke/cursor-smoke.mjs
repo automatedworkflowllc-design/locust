@@ -259,13 +259,29 @@ try {
   check('a run.completed receipt with the session id', events.some((e) => e?.type === 'run.completed' && typeof e.runtimeThreadId === 'string' && e.runtimeThreadId.length > 0))
   const started = events.find((e) => e?.type === 'run.started')
   say(`       resolved model: ${started?.payload?.evidence?.raw?.model ?? '(none)'}`)
-  // Reasoning records reach the ledger with their text replaced, never kept.
+  /*
+   * THE REASONING IS KEPT, AND THIS ASSERTED THE OPPOSITE.
+   *
+   * It required `raw.text === '[redacted]'` -- the policy until 2026-09-15,
+   * when Colin overturned it: "i feel like it gives way more insight into the
+   * thinking and structure of what its doing... i wanted to sacrifice
+   * nothing." The adapter changed that day; this did not, so every sweep since
+   * has reported the app broken FOR DOING WHAT HE ASKED FOR. Yurt's
+   * 2026-09-20 sweep called it "the clearest product red", which is what a
+   * stale assertion buys: an hour of attention pointed at working code.
+   *
+   * WHAT IS STILL TRUE AND STILL WORTH CHECKING is the narrower promise the
+   * adapter actually makes: secrets are scrubbed from reasoning exactly as
+   * they are from anything else. That was measured wrong once already -- on
+   * 2026-09-17 the evidence read `[redacted]` while the message text carried
+   * the key verbatim -- so it is the half that has a defect history.
+   *
+   * No thinking at all is a PASS. A prompt this small may not produce any,
+   * and requiring reasoning to exist grades the model for being brief.
+   */
   const thinking = events.filter((e) => e?.payload?.evidence?.raw?.type === 'thinking')
-  // The promise is that reasoning NEVER reaches the ledger, and a prompt this
-  // small may produce no thinking at all -- in which case there is nothing to
-  // redact and this is vacuously true, which is correct. Requiring reasoning
-  // to exist graded the model for being brief.
-  check('reasoning text never reached the ledger', thinking.every((e) => e.payload.evidence.raw.text === '[redacted]' && e.payload.evidence.redacted === true), `thinking records: ${thinking.length}`)
+  const leaked = thinking.filter((e) => /\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b|\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/.test(String(e?.payload?.evidence?.raw?.text ?? '')))
+  check('reasoning reached the ledger readable, with no secret in it', leaked.length === 0, `thinking records: ${thinking.length}, with a secret: ${leaked.length}`)
 } finally {
   child.kill()
   await sleep(500)
