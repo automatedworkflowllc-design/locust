@@ -56,3 +56,46 @@ describe('a file a teammate handed over', () => {
     expect(html).not.toContain('lc-handedfile__note')
   })
 })
+
+/**
+ * And the second thing a person wants from a file: it somewhere else.
+ *
+ * Colin, 2026-09-20, looking at a real handover: "give it the little download
+ * icon that claude code also has for files, in case the user wants to easily
+ * move it to another folder."
+ *
+ * On a desktop app the file is already on disk, so this is a copy to a place
+ * the person picks in a native save dialog rather than a download. It does
+ * NOT weaken the rule above: bytes are copied, nothing is executed, and the
+ * destination is never a path the renderer named.
+ */
+describe('saving a copy of a handed file', () => {
+  it('offers it, beside the reveal rather than instead of it', () => {
+    const html = drawn([item])
+    expect(html).toContain('lc-handedfile__save')
+    expect(html).toContain('Save a copy of docs/report.md')
+    // Both actions, on one file.
+    expect(html).toContain('lc-handedfile__open')
+  })
+
+  it('still never offers to open it', () => {
+    // The rule this whole file exists for, re-checked now there are two
+    // buttons: a save dialog is the person choosing a destination, which is
+    // a different act from launching what a model wrote.
+    const html = drawn([item])
+    expect(html).not.toMatch(/>\s*Open\b/)
+  })
+
+  it('keeps the whole note reachable when the pill truncates it', () => {
+    /*
+     * The note is the teammate's own words and it ellipsises in a pill, so
+     * the cut-off half has to live somewhere. It did not: the title said only
+     * "Show <path> in the file manager", and Colin hit exactly that on a real
+     * handover -- "evening continuation: workroom/relay/q…" with no way to
+     * read the rest.
+     */
+    const html = drawn([item])
+    expect(html).toContain('the rollup you asked for')
+    expect(html).toMatch(/title="the rollup you asked for[^"]*Show docs\/report\.md/)
+  })
+})

@@ -518,7 +518,28 @@ export function Composer({
                   // names what the screen above it offers, Check again.
                   runtimes.some((runtime) => runtime.installed)
                   ? runtimesGaveUp
-                    ? 'A coding agent is installed but not answering — Check again above…'
+                    ? /*
+                       * COUNTED, because the rest of the screen is plural.
+                       *
+                       * This said "A coding agent is installed but not
+                       * answering" over FIVE rows that each said so and each
+                       * carried their own Check again (Grok, pass 16, the
+                       * extra finding). The list was plural, the buttons were
+                       * plural, and the box you type into was not.
+                       *
+                       * Only the ones this sentence is ABOUT: installed, and
+                       * still not usable after discovery gave up. A machine
+                       * with one working CLI and one hung one is not
+                       * "2 coding agents are not answering".
+                       */
+                      (() => {
+                        const silent = runtimes.filter(
+                          (runtime) => runtime.installed && !runtimeIsUsable(runtime)
+                        ).length
+                        return silent === 1
+                          ? 'A coding agent is installed but not answering — Check again above…'
+                          : `${String(silent)} coding agents are installed but not answering — Check again above…`
+                      })()
                     : // Installed and still being asked: say that, not "install".
                       'Checking the coding agents on this machine…'
                   : 'Install a coding agent to start a mission…'

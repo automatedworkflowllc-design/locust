@@ -768,24 +768,63 @@ textarea {
   margin-top: var(--lc-space-2);
 }
 
+/*
+ * TWO CONTROLS IN ONE PILL: where is it, and I want it elsewhere.
+ *
+ * The pill is now the container and the two buttons live inside it, so the
+ * border is drawn once and the hover lights the whole thing -- a second
+ * bordered chip beside the first would read as a second FILE.
+ */
 .lc-handedfile {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--lc-border-control);
+  border-radius: 999px;
+  overflow: hidden;
+  transition: border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-handedfile:hover {
+  border-color: var(--lc-border-strong);
+}
+
+.lc-handedfile__open {
   display: flex;
   align-items: center;
   gap: var(--lc-space-2);
   padding: 3px 8px;
-  border: 1px solid var(--lc-border-control);
-  border-radius: 999px;
+  border: 0;
   background: transparent;
   color: var(--lc-text-muted);
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-caption);
   cursor: pointer;
-  transition: color var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+  transition: color var(--lc-motion-hover) var(--lc-ease);
 }
 
-.lc-handedfile:hover {
+.lc-handedfile__open:hover {
   color: var(--lc-text-primary);
-  border-color: var(--lc-border-strong);
+}
+
+/*
+ * The save, divided from the name by a hairline rather than a gap: they are
+ * two actions on ONE file, and a gap would start to read as two files.
+ */
+.lc-handedfile__save {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 0;
+  border-left: 1px solid var(--lc-border-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease), background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-handedfile__save:hover {
+  color: var(--lc-text-primary);
+  background: var(--lc-bg-control);
 }
 
 .lc-handedfile__path {
@@ -793,6 +832,18 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 320px;
+}
+
+/*
+ * What the host said when a press could not be honoured -- a file outside
+ * the folder, or one the teammate named and never wrote. Beside the pills
+ * rather than under each one: there is one message at a time, because there
+ * was one press.
+ */
+.lc-handedfile__refusal {
+  flex-basis: 100%;
+  color: var(--lc-amber-text);
+  font-size: var(--lc-text-description);
 }
 
 .lc-handedfile__note {

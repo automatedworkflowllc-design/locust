@@ -333,14 +333,29 @@ export function FirstLaunch({
           // with no reason (Colin, 2026-09-19, with the frame: "some of the
           // installs were bugged").
           const installingName = installing === undefined ? undefined : shown.find((row) => row.runtime.id === installing)?.runtime.displayName ?? installing
+          /*
+           * "ON THIS MACHINE" HAS TO MEAN ON THIS MACHINE.
+           *
+           * Both of these counted `shown.length`, which is the CATALOGUE --
+           * every agent Locust can drive, installed or not. So a box with
+           * five hung CLIs and no Antigravity read *6 on this machine · none
+           * answering*, and Antigravity is not on this machine (Grok, pass
+           * 16). The arithmetic of rows-plus-deferred came to six and the
+           * words did not.
+           *
+           * `known` is right for the other branch and stays: a machine with
+           * nothing installed genuinely has six KNOWN and none installed.
+           * The word is what changes with the claim.
+           */
+          const onThisMachine = shown.filter((row) => row.runtime.installed).length
           const headNote = installingName !== undefined
             ? `installing ${installingName}…`
             : checkingAny
-            ? `checking ${String(shown.length)} on this machine`
+            ? `checking ${String(onThisMachine)} on this machine`
             : connected > 0
               ? `${String(connected)} ready`
               : stuckAny
-                ? `${String(shown.length)} on this machine · none answering`
+                ? `${String(onThisMachine)} on this machine · none answering`
                 : `${String(shown.length)} known · none installed yet`
           /*
            * ONE STEP FIRST, AND THE CATALOGUE WHEN IT IS ASKED FOR.

@@ -42,6 +42,101 @@ import type { ThreadItem, ThreadPeerCard } from '../missionView.js'
 import type { DecisionOption } from '../../../shared/decision.js'
 
 /**
+ * The files a teammate handed over, and what the host said when a press
+ * could not be honoured.
+ *
+ * Its own component because it holds state, and it holds state for the
+ * reason every other control in this app that talks to the host does: the
+ * answer has to be shown. `revealFile` returns `{ok, message}` for a path
+ * outside the workspace or a file that is not there, and the first version of
+ * this dropped it on the floor -- `void bridge.revealFile(...).catch(...)`.
+ *
+ * That is the shape this project keeps paying for. Grok found it on outbound
+ * links (pass 2, finding 3): a refused press and a press that worked looked
+ * identical, and nothing whatsoever appeared on screen. The handover drive
+ * found the same thing here on 2026-09-20 -- a reply that said it had written
+ * `notes/summary.md`, a card that drew a button for it, and no such file on
+ * disk. A model can name a file it never wrote, so this card must be able to
+ * say so.
+ *
+ * The refusal clears on the next press: a stale message beside a button that
+ * now works is the same lie pointing the other way.
+ */
+function HandedFiles({
+  files,
+  workspacePath
+}: {
+  readonly files: readonly { readonly path: string; readonly note?: string }[]
+  readonly workspacePath: string | undefined
+}): ReactElement {
+  const [refused, setRefused] = useState<string>()
+  const ask = (action: 'revealFile' | 'saveCopy', path: string): void => {
+    const bridge = window.desktop
+    setRefused(undefined)
+    if (bridge === undefined || workspacePath === undefined) return
+    void bridge[action](`${workspacePath}/${path}`)
+      .then((answer) => setRefused(answer.ok ? undefined : answer.message))
+      // The host never answered. Say what is still true: nothing moved.
+      .catch(() => setRefused('Locust could not reach that file. Nothing was changed.'))
+  }
+  return (
+    <div className="lc-handedfiles">
+      {files.map((file) => (
+        <span key={file.path} className="lc-handedfile">
+          <button
+            type="button"
+            className="lc-handedfile__open"
+            /*
+              * THE NOTE IS IN THE TOOLTIP, because the note is what truncates.
+              *
+              * The row is a pill and the note is the teammate's own words
+              * about the file, so it ellipsises -- and the title said only
+              * "Show <path> in the file manager", which left the cut-off half
+              * unrecoverable. Colin saw exactly that on a real handover
+              * (2026-09-20: "evening continuation: workroom/relay/q…").
+              */
+            title={
+              file.note === undefined
+                ? `Show ${file.path} in the file manager`
+                : `${file.note}\n\nShow ${file.path} in the file manager`
+            }
+            onClick={() => ask('revealFile', file.path)}
+          >
+            <Icon name="file" size={12} />
+            <span className="lc-handedfile__path">{file.path}</span>
+            {file.note !== undefined && <span className="lc-handedfile__note">{file.note}</span>}
+          </button>
+          {/*
+            * SAVE A COPY, the way every other client offers a download
+            * (Colin, 2026-09-20: "give it the little download icon ... in
+            * case the user wants to easily move it to another folder").
+            *
+            * On a desktop app the file is already on disk, so this is a copy
+            * to a place the person picks in a native save dialog rather than
+            * a download. Reveal answers "where is it"; this answers "I want
+            * it somewhere else". Neither one ever opens it.
+            */}
+          <button
+            type="button"
+            className="lc-handedfile__save"
+            aria-label={`Save a copy of ${file.path}`}
+            title="Save a copy…"
+            onClick={() => ask('saveCopy', file.path)}
+          >
+            <Icon name="download" size={12} />
+          </button>
+        </span>
+      ))}
+      {refused !== undefined && (
+        <span className="lc-handedfile__refusal" role="status">
+          {refused}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
  * One transcript's worth of items. Extracted so a handed-off mission can render
  * TWO of them -- what the first runtime did, the divider, then what the second
  * one did -- without either half being re-derived differently from the other.
@@ -171,6 +266,7 @@ export function ThreadItems({
           )
         }
         if (item.type === 'files') {
+          // Drawn below, from the host's own answer: see `HandedFiles`.
           /*
            * A file the teammate handed over, drawn as the mirror of a file
            * the PERSON attached: the same row of buttons, the same control,
@@ -191,25 +287,7 @@ export function ThreadItems({
             <div className="lc-agentline" key={item.key}>
               <span className="lc-agentline__gutter" />
               <div className="lc-agentline__body">
-                <div className="lc-handedfiles">
-                  {item.files.map((file) => (
-                    <button
-                      key={file.path}
-                      type="button"
-                      className="lc-handedfile"
-                      title={`Show ${file.path} in the file manager`}
-                      onClick={() => {
-                        const bridge = window.desktop
-                        if (bridge === undefined || workspacePath === undefined) return
-                        void bridge.revealFile(`${workspacePath}/${file.path}`).catch(() => undefined)
-                      }}
-                    >
-                      <Icon name="file" size={12} />
-                      <span className="lc-handedfile__path">{file.path}</span>
-                      {file.note !== undefined && <span className="lc-handedfile__note">{file.note}</span>}
-                    </button>
-                  ))}
-                </div>
+                <HandedFiles files={item.files} workspacePath={workspacePath} />
               </div>
             </div>
           )

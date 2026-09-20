@@ -410,6 +410,23 @@ export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
  * for why that check is the whole point of the channel.
  */
 export const WORKSPACE_REVEAL_CHANNEL = 'workspace:reveal'
+/**
+ * Save a COPY of a file a teammate wrote, wherever the person says.
+ *
+ * Colin, 2026-09-20, looking at a handover card: give it the little download
+ * icon Claude Code has, in case the user wants to easily move it to another
+ * folder.
+ *
+ * It is the same containment as a reveal on the way IN -- the source must
+ * resolve inside a folder the host already knows a mission ran in, so a model
+ * cannot hand over C:/Windows/something and have the app copy it out. The way
+ * OUT is a native save dialog, so the destination is the person's own choice
+ * and never a path the renderer named.
+ *
+ * And it is still not opening. Bytes are copied; nothing is executed, and the
+ * rule in reveal-file.ts is untouched.
+ */
+export const WORKSPACE_SAVE_COPY_CHANNEL = 'workspace:save-copy'
 
 /**
  * Show the diagnostics log, so a person can send it.
@@ -1852,6 +1869,8 @@ export interface DesktopApi {
    * card can say something rather than appear to do nothing.
    */
   revealFile(path: string): Promise<RevealFileResponse>
+  /** Save a copy of a file a teammate wrote, to a place the person picks. */
+  saveCopy(path: string): Promise<RevealFileResponse>
   /** Show the diagnostics log in the file manager. Names no path. */
   revealDiagnostics(): Promise<void>
   /** Where the log is, for the sentence that tells a person what to send. */

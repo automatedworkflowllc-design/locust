@@ -18,6 +18,7 @@ export type IconName =
   | 'command'
   | 'copy'
   | 'diff'
+  | 'download'
   | 'dots'
   | 'file'
   | 'folder'
@@ -65,6 +66,10 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }): Re
     // Two columns and a divider: a change with a before and an after.
     diff: <><rect x="3" y="5" width="6" height="14" /><rect x="15" y="5" width="6" height="14" /><path d="M12 2v20" /></>,
     file: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v5h5" /></>,
+    // The arrow into a tray: what every other client draws for "save this
+    // somewhere". A desktop app copies rather than downloads, and the glyph
+    // is still the one people know (Colin, 2026-09-20).
+    download: <><path d="M12 4v10" /><path d="M8 11l4 4 4-4" /><path d="M5 19h14" /></>,
     folder: <path d="M3 6h6l2 3h10v10H3z" />,
     grid: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>,
     inbox: <><path d="M4 5h16v13H4z" /><path d="M4 13h4l2 3h4l2-3h4" /></>,

@@ -139,6 +139,7 @@ import {
   WORKSPACE_PASTE_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
+  WORKSPACE_SAVE_COPY_CHANNEL,
   DIAGNOSTICS_REVEAL_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
@@ -2225,11 +2226,84 @@ if (!ownsSingleInstanceLock) {
               : 'That file is outside the folder your teammates work in, so Locust will not open it.'
         } as const
       }
+      /*
+       * IS IT ACTUALLY THERE?
+       *
+       * `showItemInFolder` on a path that does not exist does nothing at all,
+       * silently, and the card had no way to say so -- so a model that names
+       * a file it never wrote produced a button that looked identical to one
+       * that works. Caught by the handover drive on 2026-09-20: the reply
+       * said it had written notes/summary.md, the card drew it, and the file
+       * was not on disk.
+       *
+       * This is the same shape as the dead outbound links Grok found: a
+       * refusal and a success that look the same is the defect this project
+       * keeps paying for.
+       */
+      const there = await stat(decision.path).then(() => true).catch(() => false)
+      if (!there) {
+        return { ok: false, message: 'That file is not there. The teammate named it but did not write it.' } as const
+      }
       // Reveals, never opens: `showItemInFolder` puts a file manager in front
       // of the person. `openPath` would run a `.bat` or a `.ps1` that a model
       // wrote, which is not a click anyone should be one step away from.
       shell.showItemInFolder(decision.path)
       return { ok: true } as const
+    })
+
+    /*
+     * SAVE A COPY, which is the other half of "a teammate wrote you a file".
+     *
+     * Reveal answers "where is it". This answers "I want it somewhere else" --
+     * Colin, 2026-09-20: the little download icon Claude Code has, for moving
+     * it to another folder.
+     *
+     * The containment is the reveal's, exactly, and for the reason that file
+     * gives: the SOURCE is a request from the renderer and is honoured only
+     * inside a folder the host already knows a mission ran in. Without that a
+     * model could hand over any path on the disk and have the app copy it out
+     * to somewhere the person can read.
+     *
+     * The DESTINATION is never the renderer's. It comes back from a native
+     * save dialog, so the only place this can write is one the person just
+     * chose by hand.
+     *
+     * And nothing is executed. `copyFile` moves bytes; the no-open rule in
+     * `reveal-file.ts` is untouched by this.
+     */
+    ipcMain.handle(WORKSPACE_SAVE_COPY_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const decision = decideReveal(requested, [
+        ...(workspaceChosen ? [workspacePath] : []),
+        ...(await teammateFolders()),
+        ledgerDirectory
+      ])
+      if (!decision.ok) {
+        return {
+          ok: false,
+          message:
+            decision.reason === 'no-path'
+              ? 'There is no file to save.'
+              : 'That file is outside the folder your teammates work in, so Locust will not copy it.'
+        } as const
+      }
+      const window = BrowserWindow.fromWebContents(event.sender)
+      if (window === null) return { ok: false, message: 'That request was rejected.' } as const
+      const chosen = await dialog.showSaveDialog(window, {
+        title: 'Save a copy',
+        defaultPath: basename(decision.path),
+        properties: ['createDirectory', 'showOverwriteConfirmation']
+      })
+      // Cancelled is not a failure; the card says nothing and nothing moved.
+      if (chosen.canceled || chosen.filePath === undefined || chosen.filePath.length === 0) {
+        return { ok: true } as const
+      }
+      try {
+        await copyFile(decision.path, chosen.filePath)
+        return { ok: true } as const
+      } catch {
+        return { ok: false, message: 'That file could not be copied. Nothing was changed.' } as const
+      }
     })
 
     /*

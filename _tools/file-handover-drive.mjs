@@ -198,9 +198,12 @@ try {
     await sleep(2000)
     seen = JSON.parse(await cdp.eval(`(() => {
       const clean = (s) => (s || '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim()
-      const buttons = [...document.querySelectorAll('.lc-handedfile')]
+      // The PILL is the container now and the two controls live inside it:
+      // the name reveals, the icon saves a copy. Read the one that reveals.
+      const buttons = [...document.querySelectorAll('.lc-handedfile__open')]
       return JSON.stringify({
         card: buttons.length > 0,
+        saves: document.querySelectorAll('.lc-handedfile__save').length,
         running: !!document.querySelector('button[aria-label^="Stop the running"]'),
         files: buttons.map(b => clean(b.innerText).slice(0, 90)),
         titles: buttons.map(b => b.getAttribute('title') || ''),
@@ -222,11 +225,16 @@ try {
   if (seen.card === true) {
     check('the control names the file', seen.files.some((text) => /summary\.md/.test(text)), JSON.stringify(seen.files))
     // Reveal, never open. `shell.openPath` would RUN a `.bat` a model wrote.
+    // The title carries the teammate's note first, then the reveal sentence,
+    // because the note is what the pill truncates and it has to be readable
+    // somewhere (Colin, 2026-09-20).
     check(
       'it offers to show the file, not to open it',
-      seen.titles.every((title) => /^Show /.test(title)) && !/\bopen\b/i.test(seen.titles.join(' ')),
+      seen.titles.every((title) => /Show .*in the file manager/.test(title)) && !/\bopen\b/i.test(seen.titles.join(' ')),
       JSON.stringify(seen.titles)
     )
+    // And the other thing a person wants from a file: it somewhere else.
+    check('the pill also offers to save a copy', seen.saves === seen.files.length, String(seen.saves))
   }
   check('the raw block is not in what the person reads', !/locust-file/.test(seen.said ?? ''), (seen.said ?? '').slice(0, 200))
 
@@ -235,10 +243,10 @@ try {
     // The host answers `{ok}`; a refusal here would mean the card is
     // decoration, which is the failure mode this whole drive exists for.
     const revealed = await cdp.eval(`(async () => {
-      const before = document.querySelectorAll('.lc-handedfile').length
-      document.querySelector('.lc-handedfile').click()
+      const before = document.querySelectorAll('.lc-handedfile__open').length
+      document.querySelector('.lc-handedfile__open').click()
       await new Promise(r => setTimeout(r, 1500))
-      return JSON.stringify({ before, after: document.querySelectorAll('.lc-handedfile').length, error: !!document.querySelector('.lc-card.is-red') })
+      return JSON.stringify({ before, after: document.querySelectorAll('.lc-handedfile__open').length, error: !!document.querySelector('.lc-card.is-red') })
     })()`)
     say(`   ${revealed}`)
     check('pressing it changes nothing on screen and raises no error', JSON.parse(revealed).error === false, revealed)

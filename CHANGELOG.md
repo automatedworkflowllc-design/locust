@@ -6,6 +6,27 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.201.0 - 2026-09-20
+
+- **A file a teammate hands you has a save button.** The little download icon
+  other clients have, for when you want the file somewhere else. It opens the
+  ordinary Save dialog and copies it wherever you pick.
+
+- **The note on a handed file is readable when it does not fit.** It shortens
+  to fit the row, and the whole of it is in the tooltip now rather than lost.
+
+- **And the card says so when the file is not there.** A teammate can name a
+  file it never actually wrote. Pressing it used to do nothing at all, which
+  looked exactly like it having worked.
+
+- **The message box counts.** With five coding agents installed and none of
+  them answering, it said "A coding agent is installed but not answering" --
+  singular, over five rows that each said so.
+
+- **"On this machine" means on this machine.** The count above the agent list
+  was counting every agent Locust can drive, including ones you have not
+  installed.
+
 ## 0.200.0 - 2026-09-20
 
 - **A coding agent that is on your machine is always shown.** Yesterday's
