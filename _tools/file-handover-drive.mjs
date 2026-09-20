@@ -246,9 +246,16 @@ try {
     // The title carries the teammate's note first, then the reveal sentence,
     // because the note is what the pill truncates and it has to be readable
     // somewhere (Colin, 2026-09-20).
+    /*
+     * The NAME now opens the file in the panel beside the conversation;
+     * reveal and save are that panel's own controls. "Open" here means
+     * Locust draws it, never that the operating system is handed the file --
+     * `reveal-file.ts` still refuses `shell.openPath`, and the viewer has no
+     * control that would.
+     */
     check(
-      'it offers to show the file, not to open it',
-      seen.titles.every((title) => /Show .*in the file manager/.test(title)) && !/\bopen\b/i.test(seen.titles.join(' ')),
+      'the name offers to open it in the panel',
+      seen.titles.every((title) => /Open /.test(title)),
       JSON.stringify(seen.titles)
     )
     // And the other thing a person wants from a file: it somewhere else.
@@ -257,17 +264,27 @@ try {
   check('the raw block is not in what the person reads', !/locust-file/.test(seen.said ?? ''), (seen.said ?? '').slice(0, 200))
 
   if (seen.card === true) {
-    say('5. press it')
+    say('5. press it -- the panel should open with the file in it')
     // The host answers `{ok}`; a refusal here would mean the card is
     // decoration, which is the failure mode this whole drive exists for.
     const revealed = await cdp.eval(`(async () => {
       const before = document.querySelectorAll('.lc-handedfile__open').length
       document.querySelector('.lc-handedfile__open').click()
-      await new Promise(r => setTimeout(r, 1500))
-      return JSON.stringify({ before, after: document.querySelectorAll('.lc-handedfile__open').length, error: !!document.querySelector('.lc-card.is-red') })
+      await new Promise(r => setTimeout(r, 2000))
+      const viewer = document.querySelector('.lc-viewer')
+      const shown = viewer ? (viewer.innerText || '') : ''
+      return JSON.stringify({ before, after: document.querySelectorAll('.lc-handedfile__open').length, error: !!document.querySelector('.lc-card.is-red'), viewer: !!viewer, viewerText: shown.slice(0, 180), inset: document.querySelector('.lc-shell.has-viewer') !== null })
     })()`)
     say(`   ${revealed}`)
-    check('pressing it changes nothing on screen and raises no error', JSON.parse(revealed).error === false, revealed)
+    const pressed = JSON.parse(revealed)
+    check('the panel opened', pressed.viewer === true, revealed)
+    // The file's own words, not a spinner and not an empty pane.
+    check('and it is showing the file', /Pelican|scratch project|summary/i.test(pressed.viewerText ?? ''), (pressed.viewerText ?? '').slice(0, 120))
+    // The workroom insets under it. Its OWN class, not the inspector's: the
+    // viewer is wider, and a mismatched inset puts the composer under the
+    // panel -- the exact defect 0.187.0 was spent fixing.
+    check('the workroom insets under it', pressed.inset === true, String(pressed.inset))
+    check('and nothing raised an error', pressed.error === false, revealed)
   }
 
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })

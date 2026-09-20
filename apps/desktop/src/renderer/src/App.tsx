@@ -78,6 +78,7 @@ import { CommandPalette } from './components/CommandPalette.js'
 import type { PaletteAction } from './components/CommandPalette.js'
 import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
+import { FileViewer } from './components/FileViewer.js'
 import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner, WhatChangedBanner } from './components/Screens.js'
 import type { RouteChoice } from './components/RoutePicker.js'
 import { composerRouteFor } from '../../shared/route-at-start.js'
@@ -1125,6 +1126,38 @@ export default function App(): ReactElement {
   /** Why a folder request for one teammate did nothing. */
   const [folderNotice, setFolderNotice] = useState<string>()
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  /*
+   * The file open beside the conversation, if any.
+   *
+   * It shares the inspector's REGION and not its state: somebody reading a
+   * report does not want the mission inspector's tabs underneath it, and the
+   * inspector's own toggle should not close their file. The slot below draws
+   * whichever is open, with the file winning -- it was opened by a press on a
+   * specific thing, which is a more specific intent than a toggle.
+   */
+  const [viewingFile, setViewingFile] = useState<{
+    readonly path: string
+    readonly text: string
+    readonly mode: 'markdown' | 'code'
+  }>()
+  /** What the host said when a file could not be opened. Shown where the press was. */
+  const [viewerRefusal, setViewerRefusal] = useState<string>()
+  const openFileInViewer = (path: string): void => {
+    const bridge = window.desktop
+    setViewerRefusal(undefined)
+    if (bridge === undefined || workspacePath === undefined) return
+    void bridge
+      .readTextFile(`${workspacePath}/${path}`)
+      .then((answer) => {
+        if (answer.ok) {
+          setViewingFile({ path, text: answer.text, mode: answer.mode })
+          return
+        }
+        setViewingFile(undefined)
+        setViewerRefusal(answer.message)
+      })
+      .catch(() => setViewerRefusal('Locust could not read that file. Nothing was changed.'))
+  }
   const [screen, setScreen] = useState<Screen>('workroom')
   const [paletteOpen, setPaletteOpen] = useState(false)
   // Accept edits, not Ask. A person who opens a workroom and says "add a
@@ -4204,14 +4237,14 @@ export default function App(): ReactElement {
           recentlyReceived: recentlyReceived.includes(missionOwner.teammateId)
         })
 
+  /*
+   * `has-inspector` is what insets the workroom so the drawer does not cover
+   * the composer -- which cost a release to get right at 1120x720 (0.187.0).
+   * The file viewer shares that region, so it shares the class: one inset
+   * rule, whichever of the two is occupying the space.
+   */
   return (
-    {/*
-      * `has-inspector` is what insets the workroom so the drawer does not
-      * cover the composer -- which cost a release to get right at 1120x720
-      * (0.187.0). The file viewer shares that region, so it shares the class:
-      * one inset rule, whichever of the two is occupying the space.
-      */}
-    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || (inspectorOpen && liveRun !== undefined)) && screen === 'workroom' ? ' has-inspector' : ''}`}>
+    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || viewerRefusal !== undefined) && screen === 'workroom' ? ' has-viewer' : inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
         // build instead (Colin, 2026-09-05).
@@ -4858,6 +4891,7 @@ export default function App(): ReactElement {
                 />
               )}
               <Thread
+                onOpenFile={openFileInViewer}
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
                 planMode={liveRun.plan === true}
@@ -5233,15 +5267,53 @@ export default function App(): ReactElement {
           * rows grew sideways scrollbars (crowded-window drive, 2026-09-19).
           * It comes back with the workroom; the toggle keeps its state.
           */}
-        {inspectorOpen && liveRun !== undefined && screen === 'workroom' && (
-          <Inspector
-            events={liveRun.events}
-            workspacePath={workspacePath}
-            running={running}
-            route={liveRun.data}
-            restoredMission={liveRun.restoredMission}
-            onClose={() => setInspectorOpen(false)}
+        {/*
+          * ONE REGION, TWO OCCUPANTS, and the file wins.
+          *
+          * A file is opened by pressing a specific file; the inspector is a
+          * toggle. The more specific intent is the one to honour, and the
+          * inspector is one press away again the moment the file is closed.
+          */}
+        {viewerRefusal !== undefined && screen === 'workroom' && viewingFile === undefined && (
+          <aside className="lc-viewer lc-viewer--refused" role="status">
+            <div className="lc-viewer__head">
+              <span className="lc-viewer__name">Could not open that file</span>
+              <span className="lc-viewer__spacer" />
+              <button type="button" className="lc-viewer__close" aria-label="Dismiss" onClick={() => setViewerRefusal(undefined)}>
+                <Icon name="close" size={13} />
+              </button>
+            </div>
+            <p className="lc-viewer__refusal">{viewerRefusal}</p>
+          </aside>
+        )}
+        {viewingFile !== undefined && screen === 'workroom' ? (
+          <FileViewer
+            path={viewingFile.path}
+            text={viewingFile.text}
+            mode={viewingFile.mode}
+            onClose={() => setViewingFile(undefined)}
+            onReveal={() => {
+              const bridge = window.desktop
+              if (bridge === undefined || workspacePath === undefined) return
+              void bridge.revealFile(`${workspacePath}/${viewingFile.path}`).catch(() => undefined)
+            }}
+            onSave={() => {
+              const bridge = window.desktop
+              if (bridge === undefined || workspacePath === undefined) return
+              void bridge.saveCopy(`${workspacePath}/${viewingFile.path}`).catch(() => undefined)
+            }}
           />
+        ) : (
+          inspectorOpen && liveRun !== undefined && screen === 'workroom' && (
+            <Inspector
+              events={liveRun.events}
+              workspacePath={workspacePath}
+              running={running}
+              route={liveRun.data}
+              restoredMission={liveRun.restoredMission}
+              onClose={() => setInspectorOpen(false)}
+            />
+          )
         )}
       </div>
       {paletteOpen && (

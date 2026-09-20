@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.203.0 - 2026-09-20
+
+- **Click a file a teammate handed you and it opens beside the conversation.**
+  Markdown is rendered the way a reply is; anything else is shown as code. The
+  panel has its own buttons to show the file in your file manager or save a
+  copy. It never hands the file to Windows to open -- Locust draws it.
+
+- **The plan card has its border back, and its finished steps are filled in.**
+  It was drawn without either, which was never what the design called for.
+
 ## 0.202.0 - 2026-09-20
 
 - **Check again re-asks everything, including npm.** Whether npm is on your

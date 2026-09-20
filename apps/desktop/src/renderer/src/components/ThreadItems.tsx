@@ -414,9 +414,21 @@ export function PlanSteps({
     )
   }
   return (
-    <>
-      <div className="lc-rail__meta lc-mono">
-        PLAN · {doneCount} of {steps.length} done
+    /*
+     * A BORDERED CARD, which is what the design package actually drew.
+     *
+     * The 2026-09-09 ruling that took the box off was about the Plan-MODE
+     * answer -- the branch above, where the plan IS the reply and belongs in
+     * prose beside the face. It was read too broadly and the box came off
+     * this branch too, which is a different thing: a plan with STATES, a
+     * done count, and rows that change while you watch. Colin, 2026-09-20,
+     * against the design agent's own frame: "the plan in chat isnt showing
+     * up with a border like it did from the design agent".
+     */
+    <div className="lc-plancard">
+      <div className="lc-plancard__head lc-mono">
+        <span>PLAN</span>
+        <span>{doneCount} of {steps.length} done</span>
       </div>
       <ul className="lc-plan">
         {steps.map((step, index) => (
@@ -445,7 +457,7 @@ export function PlanSteps({
           </li>
         ))}
       </ul>
-    </>
+    </div>
   )
 }
 

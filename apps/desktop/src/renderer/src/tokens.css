@@ -445,6 +445,20 @@
   --lc-sidebar-rail-width: 64px;
   --lc-inspector-width: 344px;
   /*
+   * THE FILE VIEWER IS WIDER THAN THE INSPECTOR, because it is read rather
+   * than scanned.
+   *
+   * Measured off Colin's own Claude Code frame (2026-09-20): the document
+   * panel takes roughly 40% of the window and the conversation keeps the
+   * rest. The mission inspector's 344px is right for rows of facts and too
+   * narrow for prose -- at 344 a paragraph wraps every six or seven words.
+   *
+   * Clamped rather than a bare percentage: below 360 it stops being readable
+   * and above 560 the thread starts losing its own measure, which is the
+   * thing 0.199.0 was spent getting right.
+   */
+  --lc-viewer-width: clamp(360px, 38vw, 560px);
+  /*
    * The reading column GROWS with the window, instead of standing still.
    *
    * 760px was fixed, so a 1920px window read a 760px column and about 900px

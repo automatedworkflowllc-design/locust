@@ -64,10 +64,13 @@ import type { DecisionOption } from '../../../shared/decision.js'
  */
 function HandedFiles({
   files,
-  workspacePath
+  workspacePath,
+  onOpenFile
 }: {
   readonly files: readonly { readonly path: string; readonly note?: string }[]
   readonly workspacePath: string | undefined
+  /** Open it in the panel beside the conversation. Absent: the name reveals instead. */
+  readonly onOpenFile?: (path: string) => void
 }): ReactElement {
   const [refused, setRefused] = useState<string>()
   const ask = (action: 'revealFile' | 'saveCopy', path: string): void => {
@@ -95,12 +98,11 @@ function HandedFiles({
               * unrecoverable. Colin saw exactly that on a real handover
               * (2026-09-20: "evening continuation: workroom/relay/q…").
               */
-            title={
-              file.note === undefined
-                ? `Show ${file.path} in the file manager`
-                : `${file.note}\n\nShow ${file.path} in the file manager`
-            }
-            onClick={() => ask('revealFile', file.path)}
+            title={(() => {
+              const what = onOpenFile === undefined ? `Show ${file.path} in the file manager` : `Open ${file.path}`
+              return file.note === undefined ? what : `${file.note}\n\n${what}`
+            })()}
+            onClick={() => (onOpenFile === undefined ? ask('revealFile', file.path) : onOpenFile(file.path))}
           >
             <Icon name="file" size={12} />
             <span className="lc-handedfile__path">{file.path}</span>
@@ -155,9 +157,12 @@ export function ThreadItems({
   activity,
   workspacePath,
   decision,
+  onOpenFile,
   planMode = false
 }: {
   readonly items: readonly ThreadItem[]
+  /** Open a handed file in the panel beside the conversation. */
+  readonly onOpenFile?: (path: string) => void
   /** The turn was sent in Plan mode; see `Thread`'s prop of the same name. */
   readonly planMode?: boolean
   readonly owner: PublicTeammate | undefined
@@ -287,7 +292,7 @@ export function ThreadItems({
             <div className="lc-agentline" key={item.key}>
               <span className="lc-agentline__gutter" />
               <div className="lc-agentline__body">
-                <HandedFiles files={item.files} workspacePath={workspacePath} />
+                <HandedFiles files={item.files} workspacePath={workspacePath} {...(onOpenFile === undefined ? {} : { onOpenFile })} />
               </div>
             </div>
           )
@@ -499,6 +504,8 @@ export interface ThreadProps {
   /** Who started the current turn; a host-briefed one is not the person's words. */
   readonly startedBy?: LiveStarter
   /** Open the run a peer message reached; undefined for one nothing received yet. */
+  /** Open a handed file in the panel beside the conversation. */
+  readonly onOpenFile?: (path: string) => void
   readonly onOpenPeerRun: (messageId: string) => (() => void) | undefined
   /**
    * Earlier turns of the same conversation, oldest first, each with the words
@@ -624,6 +631,7 @@ export interface ThreadProps {
 export function Thread({
   prompt,
   startedBy,
+  onOpenFile,
   onOpenPeerRun,
   earlierTurns,
   planMode = false,
@@ -936,6 +944,7 @@ export function Thread({
         {cardsFor(earlierTurns.length, 'before-work').map(peerCard)}
 
         <ThreadItems
+          {...(onOpenFile === undefined ? {} : { onOpenFile })}
           items={items}
           owner={peers.self}
           activity={liveActivityOf(events, running)}

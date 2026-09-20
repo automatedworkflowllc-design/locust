@@ -4927,11 +4927,52 @@ textarea {
     padding-right: var(--lc-inspector-width);
   }
 
+/*
+ * The viewer is wider than the inspector, so the compact inset has to match
+ * it rather than the inspector. Without this the composer sits under the
+ * panel at narrow widths -- the exact defect 0.187.0 was spent fixing.
+ */
+.lc-shell.is-compact.has-viewer .lc-workroom {
+    padding-right: var(--lc-viewer-width);
+  }
+
 .lc-shell.is-compact .lc-thread__column,
 .lc-shell.is-compact .lc-composer__inner {
     max-width: var(--lc-thread-max-width-compact);
   }
 /* --- Plan card --------------------------------------------------------- */
+
+/*
+ * THE PLAN, AS THE DESIGN PACKAGE DREW IT: a card with a head.
+ *
+ * The 2026-09-09 ruling that took a box off the plan was about the
+ * Plan-MODE answer, where the plan IS the reply and belongs in prose beside
+ * the face. It was applied too widely. A plan with STATES is a different
+ * thing -- it has a done count and rows that change while you watch -- and
+ * the design frame has always shown it bordered (Colin, 2026-09-20).
+ */
+.lc-plancard {
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  overflow: hidden;
+}
+
+.lc-plancard__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-bottom: 1px solid var(--lc-border-hairline);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-caption);
+  letter-spacing: 0.08em;
+}
+
+.lc-plancard .lc-plan {
+  padding-top: var(--lc-space-5);
+}
 
 .lc-plan {
   list-style: none;
@@ -5027,8 +5068,15 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/*
+ * FILLED, not outlined. Colin, 2026-09-20: the design package's "filled in
+ * green checks are more aesthetic". A done step is the one state that is
+ * finished and will not change again, so it is the one that can afford to be
+ * solid; running and pending stay outlines because they are still moving.
+ */
 .lc-plan__step.is-done .lc-plan__marker {
   border-color: var(--lc-green-border);
+  background: var(--lc-green-tint);
   color: var(--lc-green-text);
 }
 
@@ -11041,4 +11089,113 @@ textarea {
   font-size: var(--lc-text-description);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/*
+ * THE FILE VIEWER: a file open beside the conversation.
+ *
+ * It occupies the inspector's region -- same width, same edge -- because that
+ * region already knows how to sit beside the thread without covering the
+ * composer, and a second drawer would be a second answer to "what is this
+ * panel".
+ */
+.lc-viewer {
+  /*
+   * THE INSPECTOR'S WIDTH, not a width of its own.
+   *
+   * The workroom insets by `--lc-inspector-width` when `has-inspector` is on,
+   * so a panel of any other width breaks the layout rule that already works:
+   * the first version had no width at all, flexed to fill, and crushed the
+   * thread into a column narrower than the panel (frame, 2026-09-20).
+   *
+   * Whether a document deserves MORE room than a mission inspector is a real
+   * question and a design one -- it would mean a second inset width, not a
+   * bigger number here.
+   */
+  width: var(--lc-viewer-width);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--lc-border-hairline);
+  background: var(--lc-bg-chrome);
+}
+
+.lc-viewer__head {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-bottom: 1px solid var(--lc-border-hairline);
+  color: var(--lc-text-muted);
+}
+
+.lc-viewer__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-body);
+}
+
+.lc-viewer__spacer {
+  flex: 1;
+}
+
+.lc-viewer__action,
+.lc-viewer__close {
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease), background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-viewer__action:hover,
+.lc-viewer__close:hover {
+  color: var(--lc-text-primary);
+  background: var(--lc-bg-control);
+}
+
+.lc-viewer__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--lc-space-5);
+}
+
+/* Prose in the reply's own voice: it is the same kind of reading. */
+.lc-viewer__prose {
+  font-family: var(--lc-font-prose);
+  font-size: var(--lc-text-prose);
+}
+
+/*
+ * Its own horizontal scroll, never the pane's. A long line in a log must not
+ * make the whole drawer scroll sideways -- the rule every wide thing in this
+ * app follows.
+ */
+.lc-viewer__code {
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.6;
+  color: var(--lc-text-secondary);
+  white-space: pre;
+}
+
+.lc-viewer--refused {
+  flex: none;
+}
+
+.lc-viewer__refusal {
+  margin: 0;
+  padding: var(--lc-space-5);
+  color: var(--lc-amber-text);
+  font-size: var(--lc-text-description);
 }
