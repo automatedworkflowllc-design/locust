@@ -99,8 +99,13 @@ async function build() {
    * Separate calls cost nothing and make the failure legible.
    */
   const settings = [
-    ['--memory', '6144'],
-    ['--cpus', '4'],
+    // 4GB and two cores, not 6 and 4. This runs on Colin's own working
+    // machine -- 24GB with six coding agents, Chrome and Claude Code already
+    // on it -- and at 6GB the host went to 1.8GB free and started killing
+    // background tasks mid-install (2026-09-20). Windows 11 installs fine on
+    // four; the VM is a test fixture, not a workstation.
+    ['--memory', '4096'],
+    ['--cpus', '2'],
     ['--firmware', 'efi'],
     ['--graphicscontroller', 'vboxsvga'],
     ['--vram', '128'],
@@ -128,7 +133,7 @@ async function build() {
    * port forward at all.
    */
   const applied = vbox(['showvminfo', VM, '--machinereadable'], { quiet: true }).out
-  const memoryOk = /memory=(\d+)/.exec(applied)?.[1] === '6144'
+  const memoryOk = /memory=(\d+)/.exec(applied)?.[1] === '4096'
   const forwardOk = /Forwarding\(0\)="cdp/.test(applied)
   if (!memoryOk || !forwardOk) {
     say(`   settings did NOT apply (memory ok: ${String(memoryOk)}, port forward ok: ${String(forwardOk)})`)
@@ -136,7 +141,7 @@ async function build() {
     process.exitCode = 1
     return
   }
-  say('   settings applied: 6GB, 4 cores, TPM 2.0, cdp forwarded')
+  say('   settings applied: 4GB, 2 cores, TPM 2.0, cdp forwarded')
 
   say('2. disk and drives')
   const disk = join(VM_DIR, VM, `${VM}.vdi`)
