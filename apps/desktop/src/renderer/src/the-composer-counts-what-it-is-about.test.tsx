@@ -38,7 +38,13 @@ const runtime = (
   version: state === 'ready' ? '1.18.27' : null,
   auth: state === 'ready' ? 'authenticated' : 'unknown',
   ready: state === 'ready',
-  status: state === 'ready' ? 'ready' : state === 'hung' ? 'checking' : 'not-installed'
+  /*
+   * `probe-failed` is what a hung CLI actually reports: it is on the machine,
+   * and asking it for a version did not come back. There is no `checking`
+   * status -- the first draft of this file invented one, vitest never
+   * noticed because it does not typecheck, and `pnpm check` caught it.
+   */
+  status: state === 'ready' ? 'ready' : state === 'hung' ? 'probe-failed' : 'not-installed'
 })
 
 const props = (over: Partial<ComposerProps>): ComposerProps => ({
