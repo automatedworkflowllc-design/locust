@@ -2,15 +2,20 @@
 //
 //   node _tools/drive-muse-in-app.mjs
 //
-// Not a smoke: nothing here asserts. It opens the BUILT app on a throwaway
-// profile and keeps what the screen showed -- Settings' Muse Code row, and
-// the route picker's Muse group with the modes offered beside it. Judging is
-// done afterwards by reading the record under docs/user-session/.
+// Not a smoke: nothing here asserts. It opens the PACKAGED app on a throwaway
+// profile and keeps what the screen showed -- Settings' Muse Code row, the
+// route picker's Muse group, and the modes offered once it is chosen. The
+// judging is done afterwards by reading the record under docs/user-session/.
 //
-// The thing worth looking at: until 0.247.0 the row read
-// "Muse Code 1.3.0 · PLANNED · Not built yet", and the picker offered it as
-// unselectable. It should now read PREVIEW, be selectable, and offer Ask,
-// Accept edits and Plan -- and NOT Auto.
+// This drive is why 0.247.0 is not wrong. It first read
+// "Muse Code 1.3.0 · CHECKING · did not answer its version probe in time",
+// which is how two defects were found that every unit test had passed over:
+// a readiness regex with a doubled escape, and a capability probe pointed at
+// the wrong help page.
+//
+// Every step says what it found INSTEAD when a selector misses. That rule
+// found the Settings paging and the teammate button's renamed title, both of
+// which would otherwise have been reported as the product doing nothing.
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -20,7 +25,7 @@ import { APP_DIR, FREE_ROUTE, say, scratchRepository, startDrive } from './drive
 // The PACKAGED build, because that is what anybody installs.
 const EXE = join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
 if (!existsSync(EXE)) {
-  say('no packaged build at ' + EXE + ' -- run node _tools/ship.mjs first')
+  say(`no packaged build at ${EXE} -- run node _tools/ship.mjs first`)
   process.exit(1)
 }
 
@@ -40,96 +45,99 @@ const drive = await startDrive({
   }
 })
 
-/** The Settings row for a runtime, by the name printed on it. */
-const settingsRow = (name) => `(async () => {
-  // The button's title has moved before. Find it by what it says, and say
-  // what was there when it is not found.
+const openRuntimesPage = `(async () => {
   const buttons = [...document.querySelectorAll('button')]
-  const settings = buttons.find(b => /settings/i.test((b.getAttribute('title') ?? '') + ' ' + (b.getAttribute('aria-label') ?? '') + ' ' + b.innerText))
-  if (!settings) return 'no Settings control; titles seen: ' + buttons.map(b => b.getAttribute('title') ?? b.getAttribute('aria-label') ?? b.innerText.trim()).filter(Boolean).join(' / ').slice(0, 400)
+  const settings = buttons.find(b => /settings/i.test((b.getAttribute('title') ?? '') + ' ' + b.innerText))
+  if (!settings) return 'no Settings control; titles seen: ' + buttons.map(b => b.getAttribute('title') ?? b.innerText.trim()).filter(Boolean).join(' / ').slice(0, 400)
   settings.click()
   await new Promise(r => setTimeout(r, 1200))
   // Settings is paged, and Runtimes is not the page it opens on.
   const page = [...document.querySelectorAll('button, a, [role=tab]')].find(n => n.innerText.trim() === 'Runtimes')
-  if (!page) return 'no Runtimes page in Settings; pages seen: ' + [...document.querySelectorAll('button, [role=tab]')].map(n => n.innerText.trim()).filter(Boolean).join(' / ').slice(0, 300)
+  if (!page) return 'no Runtimes page; pages seen: ' + [...document.querySelectorAll('button, [role=tab]')].map(n => n.innerText.trim()).filter(Boolean).join(' / ').slice(0, 300)
   page.click()
   await new Promise(r => setTimeout(r, 1200))
-  const rows = [...document.querySelectorAll('.lc-runtimerow')]
-    .map(node => node.innerText?.replace(/\\s+/g, ' ').trim() ?? '')
-    .filter(text => text.startsWith(${JSON.stringify(name)}))
-  if (rows.length > 0) return rows[0].slice(0, 260)
-  const all = [...document.querySelectorAll('.lc-runtimerow')].map(n => n.innerText.replace(/\s+/g, ' ').trim().slice(0, 40))
-  return 'NO ROW FOUND for ${name}; rows present: ' + (all.join(' | ').slice(0, 1200) || '(none)')
+  return 'Runtimes page open'
 })()`
 
-
-/** Read a row with the Runtimes page already open. */
-const rowNow = (name) => `(() => {
-  const rows = [...document.querySelectorAll('.lc-runtimerow')]
-    .map(node => node.innerText?.replace(/\s+/g, ' ').trim() ?? '')
-  const found = rows.find(text => text.startsWith(${JSON.stringify(name)}))
-  return found ?? ('NO ROW for ${name}; rows present: ' + (rows.map(r => r.slice(0, 40)).join(' | ').slice(0, 1200) || '(none)'))
+/** A Settings runtime row, with that page already open. */
+const runtimeRow = (name) => `(() => {
+  const rows = [...document.querySelectorAll('.lc-runtimerow')].map(node => node.innerText.replace(/[\\r\\n]+/g, ' ').trim())
+  const found = rows.find(text => text.indexOf(${JSON.stringify(name)}) === 0)
+  if (found !== undefined) return found.slice(0, 260)
+  return 'NO ROW for ${name}; rows present: ' + (rows.map(r => r.slice(0, 30)).join(' | ').slice(0, 600) || '(none)')
 })()`
 
-/** Every group and row the picker draws, so Muse can be found among them. */
-const pickerGroups = `(async () => {
-  // Back out of Settings first: the picker does not exist on that screen.
+/** Open Wren's composer and its route picker. */
+const openPicker = `(async () => {
+  // Out of Settings, and back to the team. Both of these reach it; the
+  // lockup alone did not after a Settings page had been opened.
   const home = [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') ?? '') === 'Home')
   home?.click()
-  document.querySelector('.lc-brand__lockup')?.click()
   await new Promise(r => setTimeout(r, 1200))
-  const buttons = [...document.querySelectorAll('button')]
-  const message = buttons.find(b => /Wren/.test(b.getAttribute('title') ?? b.getAttribute('aria-label') ?? ''))
-  // A miss has to SAY what was there instead, or the next step reports the
-  // screen it happens to be on as if it were the screen it asked for.
-  if (!message) return 'no teammate button; titles seen: ' + buttons.map(b => b.getAttribute('title') ?? b.getAttribute('aria-label') ?? '').filter(Boolean).join(' / ').slice(0, 400)
-  message.click()
-  await new Promise(r => setTimeout(r, 600))
-  const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+  document.querySelector('.lc-brand__lockup')?.click()
+  await new Promise(r => setTimeout(r, 1500))
+  const routeControl = () => [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+  // Home may land straight in Wren's conversation, which already HAS the
+  // composer -- so only go looking for a teammate to open when it does not.
+  if (routeControl() === undefined) {
+    const message = [...document.querySelectorAll('button')].find(b => /Wren/.test(b.getAttribute('title') ?? ''))
+    if (!message) return 'no composer and no teammate button; titles seen: ' + [...document.querySelectorAll('button')].map(b => b.getAttribute('title') ?? '').filter(Boolean).join(' / ').slice(0, 800)
+    message.click()
+    await new Promise(r => setTimeout(r, 900))
+  }
+  const control = routeControl()
   if (!control) return 'no route control'
   control.click()
   await new Promise(r => setTimeout(r, 900))
-  const text = document.querySelector('[role=listbox]')?.innerText.replace(/\\s+/g, ' ') ?? '(no listbox)'
-  const muse = text.match(/Muse[^|]{0,200}/)?.[0] ?? '(no Muse group)'
-  return 'MUSE: ' + muse + ' || ALL: ' + text.slice(0, 700)
+  // The picker is a dialog, not a listbox: role="dialog" on .lc-picker.
+  const picker = document.querySelector('.lc-picker')
+  if (!picker) return 'the picker did not open'
+  const muse = picker.innerText.replace(/\\s+/g, ' ').match(/MUSE CODE.{0,200}/)
+  return muse === null
+    ? 'no Muse group; groups seen: ' + [...picker.querySelectorAll('.lc-picker__group')].map(g => g.innerText.trim()).join(' / ').slice(0, 300)
+    : 'MUSE GROUP: ' + muse[0]
 })()`
 
-/** The modes offered, with the picker still open on a Muse row. */
-const museModes = `(async () => {
-  const rows = [...document.querySelectorAll('[role=listbox] [role=option], [role=listbox] button')]
-  const row = rows.find(r => /muse/i.test(r.innerText))
-  if (!row) return 'no Muse row in the picker'
-  const disabled = row.getAttribute('aria-disabled') === 'true' || row.disabled === true
-  row.click()
-  await new Promise(r => setTimeout(r, 800))
+/** Choose the Muse row, then read the modes the composer offers. */
+const chooseMuseAndReadModes = `(async () => {
+  const list = document.querySelector('.lc-picker__list')
+  if (!list) return 'the picker is not open'
+  // Rows carry the model; the group heading above carries the runtime. Walk
+  // the list keeping the heading in hand, so the right row is chosen.
+  let heading = ''
+  let target
+  for (const node of list.querySelectorAll('.lc-picker__group, .lc-picker__row')) {
+    if (node.classList.contains('lc-picker__group')) heading = node.innerText.trim()
+    else if (/muse/i.test(heading)) { target = node; break }
+  }
+  if (!target) return 'no row under a Muse heading'
+  const disabled = target.getAttribute('aria-disabled') === 'true' || target.disabled === true
+  target.click()
+  await new Promise(r => setTimeout(r, 1000))
   const mode = document.querySelector('button[aria-label="Permission mode"], button[title="Permission mode"]')
   if (!mode) return 'row was ' + (disabled ? 'DISABLED' : 'selectable') + ', but there is no mode control'
   mode.click()
-  await new Promise(r => setTimeout(r, 500))
-  const offered = [...document.querySelectorAll('[role=menuitemradio]')].map(b => ({
-    label: b.innerText.replace(/\\s+/g, ' ').trim().split(' ')[0],
-    off: b.getAttribute('aria-disabled') === 'true' || b.disabled === true
-  }))
+  await new Promise(r => setTimeout(r, 600))
+  const offered = [...document.querySelectorAll('[role=menuitemradio]')].map(b => {
+    const label = b.innerText.replace(/\\s+/g, ' ').trim()
+    const off = b.getAttribute('aria-disabled') === 'true' || b.disabled === true
+    return label.split(' · ')[0] + (off ? ' (OFF)' : '')
+  })
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  const route = document.querySelector('.lc-control')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''
   return 'row was ' + (disabled ? 'DISABLED' : 'selectable')
-    + ' || offered: ' + offered.map(o => o.label + (o.off ? ' (off)' : '')).join(', ')
+    + ' || composer now on: ' + route
+    + ' || modes: ' + (offered.join(', ') || '(none)')
 })()`
 
 try {
   await drive.capture('launch', () => drive.ready())
-  await drive.capture('Settings, Runtimes: the Muse Code row', () => drive.evaluate(settingsRow('Muse Code')))
-  // The version probe reaches muse through a PowerShell launcher and is slow
-  // to answer on a cold profile, so the first look can catch it CHECKING.
-  // Looking once more is what a person does; reporting the first look as the
-  // final state would be reporting a stopwatch as a verdict.
-  await drive.capture('the same row, after discovery has had longer', async () => {
-    await new Promise((resolve) => setTimeout(resolve, 12_000))
-    return drive.evaluate(rowNow('Muse Code'))
-  })
-  await drive.capture('the OpenCode row beside it, as a control', () => drive.evaluate(rowNow('OpenCode')))
-  await drive.capture('the route picker: where Muse sits', () => drive.evaluate(pickerGroups))
-  await drive.capture('Muse Code: selectable, and which modes', () => drive.evaluate(museModes))
+  await drive.capture('Settings: open the Runtimes page', () => drive.evaluate(openRuntimesPage))
+  await drive.capture('the Muse Code row', () => drive.evaluate(runtimeRow('Muse Code')))
+  await drive.capture('the OpenCode row beside it, as a control', () => drive.evaluate(runtimeRow('OpenCode')))
+  await drive.capture('the route picker: where Muse sits', () => drive.evaluate(openPicker))
+  await drive.capture('choose Muse Code, and see which modes it offers', () => drive.evaluate(chooseMuseAndReadModes))
 } finally {
-  await drive.finish({ intro: 'Muse Code in the packaged 0.247.0 build: what Settings says about it, and what the route picker offers.' })
+  await drive.finish({ intro: 'Muse Code in the packaged 0.247.0 build: what Settings says about it, and what the route picker and the mode menu offer.' })
   say(`kept: ${drive.out}`)
 }

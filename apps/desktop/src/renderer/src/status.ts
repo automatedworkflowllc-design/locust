@@ -1,5 +1,5 @@
 import { FREE_START_RUNTIME, installSentence } from '../../shared/runtime-install.js'
-import { hostCanRunMission, isMissionRuntime } from '../../shared/runtimes.js'
+import { hostCanRunMission, isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import { faceLabel, teammateActivity } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
 import type { MissionMode, PublicModel, PublicRecoveredMission, PublicRuntimeStatus } from '../../shared/ipc.js'
@@ -1001,14 +1001,22 @@ export function modeUnavailableReason(
   return 'Cursor Agent cannot be held read-only on Windows: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files.'
 }
 
+/**
+ * A runtime's name, from the one table that has to list them all.
+ *
+ * This was an `if` chain ending in `return 'Codex CLI'`, which is the same
+ * fall-through that let `modeRunsOn` grant Muse four untested modes: a
+ * runtime nobody added here was not missing, it was renamed. MEASURED on
+ * 2026-09-21 by driving the packaged build -- with Muse Code chosen, the
+ * mode menu said **"Codex CLI only. Codex CLI cannot stop and ask yet"** and
+ * **"Codex CLI runs its own agent under its own permissions"**, about a
+ * runtime the person had just picked and a runtime that was not in play.
+ *
+ * `runtimeDisplayName` is an exhaustive record, so the compiler asks for the
+ * next runtime instead of quietly calling it Codex.
+ */
 function runtimeLabel(runtime: MissionRuntimeId): string {
-  if (runtime === 'claude') return 'Claude Code'
-  if (runtime === 'cursor') return 'Cursor Agent'
-  if (runtime === 'opencode') return 'OpenCode'
-  if (runtime === 'copilot') return 'Copilot CLI'
-  if (runtime === 'antigravity') return 'Antigravity'
-  if (runtime === 'gemini') return 'Gemini CLI'
-  return 'Codex CLI'
+  return runtimeDisplayName(runtime)
 }
 
 /**

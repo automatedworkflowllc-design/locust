@@ -20,6 +20,10 @@ Dates are when the build was cut. Versions are the number Settings shows.
   may edit anything on this machine, and Locust keeps Muse’s own sandbox on
   whichever mode you choose. Offering Auto would have promised more than the
   run actually gets.
+- **The mode menu names the runtime you actually picked.** With Muse Code
+  chosen, the two modes it cannot offer explained themselves as "Codex CLI
+  only" and "Codex CLI runs its own agent" — about a runtime that was not in
+  play.
 - **The Install link on Muse Code works.** It was the only runtime whose sole
   way in is a vendor page, and pressing the link did nothing at all.
 

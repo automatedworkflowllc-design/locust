@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { MissionMode } from '../../shared/ipc.js'
-import { RUNTIME_CAPABILITIES, modeRunsOn } from './status.js'
+import { RUNTIME_CAPABILITIES, modeRunsOn, modeUnavailableReason } from './status.js'
 
 /**
  * A runtime cannot claim a mode by saying nothing.
@@ -104,6 +104,29 @@ describe('a runtime declares what it can do', () => {
     // the control above stays honest about what this change touched — but
     // the claim is now visible instead of implied by silence.
     expect(RUNTIME_CAPABILITIES.gemini.evidence).toBe('unproven')
+  })
+
+  it('names the runtime the person chose when it refuses a mode', () => {
+    /*
+     * MEASURED on 2026-09-21 by driving the packaged build: with Muse Code
+     * chosen, the mode menu read "Codex CLI only. Codex CLI cannot stop and
+     * ask yet" and "Codex CLI runs its own agent under its own
+     * permissions" -- about a runtime that was not in play. `runtimeLabel`
+     * was an if-chain ending in `return 'Codex CLI'`, so a runtime nobody
+     * added to it was not missing, it was renamed. The same fall-through
+     * that let this table exist in the first place.
+     */
+    for (const runtime of Object.keys(RUNTIME_CAPABILITIES)) {
+      for (const mode of MODES) {
+        const reason = modeUnavailableReason(mode, runtime as never, 'win32')
+        if (reason === undefined || runtime === 'codex') continue
+        // Approve-each names Codex on purpose -- it says which runtime DOES
+        // have it -- so only the second half of that sentence is checked.
+        const aboutThisRuntime = mode === 'approve-each' ? reason.replace('Codex CLI only.', '') : reason
+        expect(aboutThisRuntime, `${runtime} / ${mode}: ${reason}`).not.toContain('Codex CLI')
+      }
+    }
+    expect(modeUnavailableReason('auto', 'muse', 'win32')).toContain('Muse Code')
   })
 
   it('platform bars only the platform named', () => {
