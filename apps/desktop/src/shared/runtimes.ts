@@ -13,7 +13,8 @@ const DISPLAY_NAMES: Readonly<Record<MissionRuntimeId, string>> = {
   gemini: 'Gemini CLI',
   opencode: 'OpenCode',
   copilot: 'Copilot CLI',
-  antigravity: 'Antigravity'
+  antigravity: 'Antigravity',
+  muse: 'Muse Code'
 }
 
 export function isMissionRuntime(value: unknown): value is MissionRuntimeId {

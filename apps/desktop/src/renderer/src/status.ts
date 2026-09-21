@@ -675,36 +675,113 @@ export function prunePreviewSummary(preview: {
  * it started -- which is exactly what happened to the first person to try it.
  * A control that cannot do its job says so instead.
  */
+/**
+ * WHAT EACH RUNTIME CAN HONESTLY BE ASKED TO DO.
+ *
+ * This was a chain of `if` statements ending in `return true`, each clause a
+ * war story worth keeping -- and the fall-through was the defect. A runtime
+ * added to `MissionRuntimeId` inherited FOUR modes it had never been tested
+ * in, silently, because saying nothing meant saying yes.
+ *
+ * MEASURED 2026-09-21, by adding `muse` to the union: typecheck clean, 3,689
+ * tests green, and the app immediately offered Ask, Accept edits, Auto and
+ * Plan on a runtime with no adapter, no command builder and no event
+ * normalizer. Nothing asked. That is the whole argument for this table, made
+ * by accident while building something else.
+ *
+ * The type is an EXHAUSTIVE `Record`, which is the point: the next runtime
+ * added to the union will not compile until somebody says what it can do.
+ * A declaration is cheap; discovering the answer from a screenshot six weeks
+ * later is what this project actually did for six runtimes
+ * (`FINDING-2026-09-20-THE-ORBS-DEPEND-ON-WHAT-A-RUNTIME-STREAMS.md`).
+ *
+ * `evidence` is not decoration. Builder.io's conformance suite proves two
+ * things of an adapter -- that it does not advertise what it cannot do, and
+ * that an un-advertised capability THROWS rather than silently no-ops. This
+ * is the first half. `unproven` means the row is a placeholder and the
+ * runtime offers nothing, which is the only honest default.
+ */
+export interface RuntimeCapabilities {
+  /**
+   * The modes this runtime can actually run. `plan` is deliberately absent:
+   * it is available exactly where read-only containment is real, so it is
+   * DERIVED from `ask` below rather than declared twice and allowed to drift.
+   */
+  readonly modes: readonly Exclude<MissionMode, 'plan'>[]
+  /** Modes that are not real on a given platform, whatever the list says. */
+  readonly notOn?: Readonly<Record<string, readonly Exclude<MissionMode, 'plan'>[]>>
+  readonly evidence: 'measured' | 'unproven'
+}
+
+const EVERY_ORDINARY_MODE = ['ask', 'accept-edits', 'auto'] as const
+
+export const RUNTIME_CAPABILITIES: Readonly<Record<MissionRuntimeId, RuntimeCapabilities>> = {
+  // The only runtime with a real per-call approval: `approve-each` exists
+  // because Codex asks before each tool and waits for an answer.
+  codex: { modes: [...EVERY_ORDINARY_MODE, 'approve-each'], evidence: 'measured' },
+  /*
+   * Claude was briefly Ask-only here, on the reading that it could not edit.
+   * It can: `--permission-mode acceptEdits` with the editing tools named. The
+   * contradiction that prompted it -- "Accept edits" in the composer beside
+   * "read-only" in the header -- was fixed properly by making the mode decide
+   * the argv, in `createClaudePrintCommand`. Removing the capability had been
+   * the wrong repair for the right complaint.
+   */
+  claude: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
+  /*
+   * Cursor's read-only mode is only real where its sandbox can run. On
+   * Windows the host refuses such a mission rather than record a containment
+   * it cannot keep -- so offering the mode there would be offering a refusal,
+   * and every message sent under it came back as an error.
+   */
+  cursor: { modes: [...EVERY_ORDINARY_MODE], notOn: { win32: ['ask'] }, evidence: 'measured' },
+  /*
+   * KEPT EXACTLY AS IT WAS, AND IT IS PROBABLY WRONG.
+   *
+   * Gemini is listed PLANNED / "Not built yet" and no mission can run under
+   * it -- its event stream has never been captured -- yet it has always
+   * claimed these three modes through the old fall-through. Correcting it is
+   * a behaviour change, and this commit is a refactor with a control test
+   * proving every runtime answers exactly as it did before. Changing it here
+   * would make that control lie about what it checked.
+   *
+   * Flagged rather than fixed, which is the entire value of writing the
+   * table down: the claim is now visible instead of implied by silence.
+   */
+  gemini: { modes: [...EVERY_ORDINARY_MODE], evidence: 'unproven' },
+  opencode: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
+  copilot: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
+  /*
+   * Antigravity runs its agent under its own policy and Locust holds nothing
+   * there: no handle keeps it read-only, and none bounds it for Auto. The one
+   * mode it can honestly offer is the one it offers.
+   */
+  antigravity: { modes: ['accept-edits'], evidence: 'measured' },
+  /*
+   * NOTHING YET, ON PURPOSE.
+   *
+   * Colin, 2026-09-21: *"we have no control over whether opencode continues
+   * to support muse so its better that we integrate it ourself"*. Agreed and
+   * being built -- but until `muse --version`, `muse schema` and one
+   * `muse exec` have actually been run, every mode here would be a guess.
+   * The docs promise an OS sandbox and approval modes; the docs are not a
+   * measurement, and a mode offered on a guess is a refusal with extra steps.
+   */
+  muse: { modes: [], evidence: 'unproven' }
+}
+
 export function modeRunsOn(
   mode: MissionMode,
   runtime: MissionRuntimeId,
   platform?: string
 ): boolean {
-  if (mode === 'approve-each') return runtime === 'codex'
-  // Auto needs a handle on the runtime's own permissions. Antigravity runs
-  // its agent under its own policy and Locust holds nothing there, so the
-  // one mode it can honestly offer stays the one it already offers.
-  if (mode === 'auto') return runtime !== 'antigravity'
-  // Plan is available exactly where read-only containment is real. A plan
-  // that could edit the workspace is a promise the app cannot keep, and the
-  // Cursor/Windows reason below already says so in its last clause.
+  // Plan is available exactly where read-only containment is real. A plan that
+  // could edit the workspace is a promise the app cannot keep.
   if (mode === 'plan') return modeRunsOn('ask', runtime, platform)
-  // Antigravity's agent runs its own tools under its own policy; the host
-  // has no handle that holds it read-only, so only the mode that says so is
-  // offered.
-  if (mode === 'ask' && runtime === 'antigravity') return false
-  // Claude Code was briefly Ask-only here, on the reading that it could not
-  // edit. It can: `--permission-mode acceptEdits` with the editing tools
-  // named. The contradiction that prompted it -- "Accept edits" in the
-  // composer beside "read-only" in the header -- was fixed properly by making
-  // the mode decide the argv, in `createClaudePrintCommand`. Removing the
-  // capability had been the wrong repair for the right complaint.
-  // Cursor's read-only mode is only real where its sandbox can run. On
-  // Windows the host refuses such a mission rather than record a containment
-  // it cannot keep -- so offering the mode here would be offering a refusal,
-  // and every message sent under it came back as an error.
-  if (mode === 'ask' && runtime === 'cursor' && platform === 'win32') return false
-  return true
+  const facts = RUNTIME_CAPABILITIES[runtime]
+  if (!facts.modes.includes(mode)) return false
+  const barred = platform === undefined ? undefined : facts.notOn?.[platform]
+  return barred === undefined || !barred.includes(mode)
 }
 
 /** The modes a route can actually run, in the order they are offered. */

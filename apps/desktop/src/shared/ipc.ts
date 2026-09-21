@@ -573,7 +573,7 @@ export const WORKTREE_REMOVE_CHANNEL = 'worktrees:remove'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
-export type LocalRuntimeId = 'codex' | 'claude' | 'cursor' | 'gemini' | 'opencode' | 'copilot' | 'antigravity' | 'omniroute'
+export type LocalRuntimeId = 'codex' | 'claude' | 'cursor' | 'gemini' | 'opencode' | 'copilot' | 'antigravity' | 'muse' | 'omniroute'
 
 export type TeammateHue = 'lime' | 'blue' | 'violet' | 'clay'
 
