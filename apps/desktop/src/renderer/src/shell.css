@@ -11641,18 +11641,26 @@ textarea {
 .lc-row__orb > * {
   position: absolute;
   /*
-   * AT ITS OWN SIZE, and the shrink that used to live here is gone.
+   * A LITTLE SMALLER, and this is the one orb where that is safe.
    *
-   * It was `scale(0.7)`, added when the row wore the ORBITING PARTICLES and
-   * Colin said "lets make the working orb a bit smaller too" -- a cloud of
-   * points really was the loudest thing in a row whose job is to name a
-   * teammate. Shrinking it was treating the symptom: the problem was that a
-   * point cloud has no silhouette to lose, so it reads as noise at any size
-   * a sidebar can spare.
+   * The shrink here was removed with the orbiting particles, because the
+   * reason it existed was wrong: a cloud of points has no silhouette to
+   * lose, so shrinking it only made a smaller smudge. The row wears the
+   * dotted OUTLINE now, and Colin, looking at it at full size beside a
+   * teammate's face: *"animation needs to be a little smaller size, should
+   * be one of those that shouldnt be too bad to make smaller, just try not
+   * to cook it"*.
    *
-   * The row wears the dotted OUTLINE now, which keeps its shape all the way
-   * down, so it is quiet at full size in a way the cloud never was. The box
-   * stays 6px with the drawing spilling out of it: nothing in the row moves
-   * when a conversation starts or stops running.
+   * He is right about which shape can take it, and it is the same property
+   * that put this one here. An outline is a few strokes with space between
+   * them: scaling it DOWN is a downscale of a 20px raster, which stays
+   * sharp, and there is no point density to lose. That is the opposite of
+   * what scaling UP did to the live line's orb -- the thing he called
+   * cooking the resolution -- and it is why this is 0.75 rather than a
+   * smaller canvas, which the library will not draw anyway.
+   *
+   * 15px, from 20. The box stays 6px with the drawing spilling out of it,
+   * so nothing in the row moves when a conversation starts or stops.
    */
+  transform: scale(0.75);
 }

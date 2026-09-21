@@ -14,6 +14,8 @@ Dates are when the build was cut. Versions are the number Settings shows.
   with nothing to close it, sitting at the end of the reply as though the
   teammate had typed it. It comes off now. A stray angle bracket in ordinary
   prose is left exactly where it is.
+- **The mark on a running conversation is a quarter smaller**, which is safe
+  on an outline in a way it would not be on any of the others.
 
 ## 0.225.0 - 2026-09-20
 

@@ -44,6 +44,18 @@ describe('the orb uses the asset that reads', () => {
     expect(orb).toContain('size={dense ? 64 : 20}')
   })
 
+  it('shrinks only the sidebar row, and only an outline', () => {
+    /*
+     * The one place a transform is right. Scaling an outline DOWN is a
+     * downscale of a 20px raster -- sharp, with no point density to lose --
+     * where scaling any of them UP enlarges the raster itself. The sidebar
+     * row wears the dotted outline precisely because it holds its shape at
+     * any size a row can spare.
+     */
+    const row = css.slice(css.indexOf('.lc-row__orb > * {'))
+    expect(row.slice(0, 1400)).toContain('transform: scale(0.75)')
+  })
+
   it('never scales a raster to get a bigger orb', () => {
     // The first attempt, and Colin's verdict on it: "you just cooked the
     // resolution". A bigger orb is a bigger ASSET painted down, never a
