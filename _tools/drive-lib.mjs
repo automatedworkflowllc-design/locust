@@ -338,12 +338,27 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
      * already gone.
      */
     if (spends !== true) {
+      /*
+       * A SCREEN THAT CANNOT SEND AT ALL IS NOTHING TO GUARD -- the bare
+       * machine, a first launch with nothing connected. There is no route,
+       * so there is nothing that could spend.
+       *
+       * `control.disabled` was the whole test for that, and it is the wrong
+       * signal. The chip stays ENABLED with nothing installed, deliberately
+       * -- Composer.tsx: "the picker still opens, because that is where a
+       * person goes to see what could be installed" -- and it reads "No
+       * runtime" instead of naming one.
+       *
+       * So the first drive ever to reach a genuinely bare machine
+       * (2026-09-21, once the LOCUST_HIDE_RUNTIMES seam was made to cover
+       * Antigravity) was stopped by the guard written to exempt it, saying
+       * the composer was "on" a route called No runtime.
+       */
       const routeText = () => evaluate(`(() => {
         const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
-        // A disabled control is a screen that cannot send at all -- the bare
-        // machine, the first launch with nothing connected. Nothing to guard.
         if (!control || control.disabled) return ''
-        return control.innerText.replace(/\\s+/g, ' ').trim()
+        const text = control.innerText.replace(/\\s+/g, ' ').trim()
+        return /^no runtime$/i.test(text) ? '' : text
       })()`)
       /*
        * The word, not the model id. The picker reads as NAMES since 0.196.0,

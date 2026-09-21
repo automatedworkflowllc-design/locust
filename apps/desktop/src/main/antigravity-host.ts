@@ -190,7 +190,33 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
   const now = options.now ?? Date.now
   let cached: { readonly at: number; readonly value: AntigravityHost | undefined; readonly pids: readonly number[] | undefined } | undefined
 
+  /*
+   * `LOCUST_HIDE_RUNTIMES=1` HAS TO REACH THIS PROBE TOO.
+   *
+   * The seam exists so `_tools/drive-first-run.mjs` can see what a person
+   * with an empty laptop sees, on a machine that has all six agents. It works
+   * by handing discovery an executable locator that finds nothing -- and this
+   * probe does not use that locator. It looks for Antigravity's own install
+   * directly with `existsSync`, so it stayed READY through every "bare
+   * machine" drive.
+   *
+   * MEASURED 2026-09-21, driving 0.244.0: `drive-first-run.mjs` exited on
+   * *"the composer is on Antigravity / Account Default"*, which is neither a
+   * bare machine nor a free route. So the one tool whose whole job is the
+   * first-run screen has not been driving the first-run screen since
+   * Antigravity shipped -- and that screen is where eight of the nine
+   * findings in Sol's beta review were, found on a separate Linux box
+   * because this seam could not show them here.
+   *
+   * Read from `options` first so the unit tests keep their own seam, and the
+   * environment only decides when nothing else has.
+   */
+  // Read at ASK time, not at construction: a probe built during module load
+  // would latch whatever the environment said before the drive set it.
+  const hidden = (): boolean => options.localAppData === undefined && process.env.LOCUST_HIDE_RUNTIMES === '1'
+
   const probe = async (): Promise<AntigravityHost | undefined> => {
+    if (hidden()) return undefined
     if (cached !== undefined && now() - cached.at < PROBE_TTL_MS) return cached.value
     if (platform !== 'win32') return undefined
     const executablePath = antigravityExecutableCandidates(localAppData).find((candidate) => existsSync(candidate))
@@ -254,7 +280,7 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
   return {
     probe,
     async discoveryRecord(): Promise<RuntimeDiscovery> {
-      const installed = platform === 'win32' && antigravityExecutableCandidates(localAppData).some((candidate) => existsSync(candidate))
+      const installed = !hidden() && platform === 'win32' && antigravityExecutableCandidates(localAppData).some((candidate) => existsSync(candidate))
       const host = installed ? await probe() : undefined
       const base = {
         id: 'antigravity' as const,
