@@ -59,6 +59,7 @@ export function FirstLaunch({
   runtimes,
   limitedRuntimes,
   discoveryPhase,
+  freeStart = 'unknown',
   workspacePath,
   teammateCount,
   onChooseFolder,
@@ -77,6 +78,12 @@ export function FirstLaunch({
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
+  /**
+   * Whether the no-account runtime still lists something free. Absent reads
+   * as `unknown`, which keeps the promise: this is a correction on disproof,
+   * not a hedge on silence.
+   */
+  readonly freeStart?: 'yes' | 'no' | 'unknown'
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
   /** The folder the teammates work in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
@@ -255,7 +262,22 @@ export function FirstLaunch({
           */}
         {discoveryPhase === 'ready' && (
           <p className="lc-intro">
-            Locust runs coding agents installed on this machine. <strong>OpenCode needs no account</strong> — one install and you have a working teammate.
+            {/*
+              * The second half of this sentence is a promise about SOMEBODY
+              * ELSE'S price list, so it is checked before it is made. It
+              * softens only on positive evidence that OpenCode has nothing
+              * free left -- never on "we have not looked", which is the
+              * ordinary state at first launch. See `freeStartStillFree`.
+              */}
+            {freeStart === 'no' ? (
+              <>
+                Locust runs coding agents installed on this machine. <strong>OpenCode needs no account</strong> — though it is not currently listing a free model, so this one needs a paid route too.
+              </>
+            ) : (
+              <>
+                Locust runs coding agents installed on this machine. <strong>OpenCode needs no account</strong> — one install and you have a working teammate.
+              </>
+            )}
           </p>
         )}
 

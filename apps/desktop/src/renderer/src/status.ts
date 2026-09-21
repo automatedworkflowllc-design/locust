@@ -1245,6 +1245,47 @@ export function collapseConversations<
  * thing that decides it -- a family that folds variants does, and the next
  * runtime to fold them should not need this file edited.
  */
+/**
+ * Whether the runtime we tell a new person needs no account STILL has
+ * something free to run.
+ *
+ * `FirstLaunch` promises, unconditionally: *"OpenCode needs no account — one
+ * install and you have a working teammate."* Both halves are true today, but
+ * they are different KINDS of claim. "Needs no account" is about auth and is
+ * a property of the runtime's design. "You have a working teammate" depends
+ * on OpenCode continuing to publish a free model -- a decision somebody else
+ * makes, about which Colin asked directly (2026-09-21): *"i know its
+ * available on opencode but idk how long that will continue for."*
+ *
+ * Nothing checked it. The app would have gone on promising a free teammate
+ * to someone who installs OpenCode and finds nothing they can run -- the
+ * worst moment to be wrong, because it is the first one.
+ *
+ * THREE ANSWERS, and the third is the point:
+ *
+ * - `yes`   - OpenCode is ready and lists at least one `-free` model.
+ * - `no`    - OpenCode is ready, its list was read, and none of it is free.
+ * - `unknown` - it is not installed yet, or its list has not been read.
+ *
+ * **`unknown` must never weaken the promise.** At first launch OpenCode is
+ * usually not installed, so `unknown` IS the ordinary path; treating absence
+ * of evidence as disproof would quietly retire the onboarding sentence for
+ * everybody. The copy changes only on `no`, which is positive evidence.
+ */
+export function freeStartStillFree(
+  runtimes: readonly PublicRuntimeStatus[],
+  models: readonly PublicModel[]
+): 'yes' | 'no' | 'unknown' {
+  const runtime = runtimes.find((entry) => entry.id === FREE_START_RUNTIME)
+  if (runtime?.status !== 'ready') return 'unknown'
+  const listed = models.filter((model) => model.runtime === FREE_START_RUNTIME)
+  // A ready runtime whose list we never read tells us nothing about its
+  // prices. That is the same distinction the rest of this file keeps: no
+  // answer is not a bad answer.
+  if (listed.length === 0) return 'unknown'
+  return listed.some((model) => model.id.endsWith('-free')) ? 'yes' : 'no'
+}
+
 export function effortIsInModelId(
   models: readonly PublicModel[],
   runtime: MissionRuntimeId,

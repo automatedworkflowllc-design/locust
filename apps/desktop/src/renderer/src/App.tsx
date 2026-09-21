@@ -125,7 +125,7 @@ import { splitAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute } from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute, freeStartStillFree} from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
@@ -4868,6 +4868,7 @@ export default function App(): ReactElement {
 
               <FirstLaunch
                 runtimes={runtimes}
+                freeStart={freeStartStillFree(runtimes, models)}
                 limitedRuntimes={limitedRuntimes}
                 discoveryPhase={runtimeState.phase}
                 workspacePath={workspacePath}

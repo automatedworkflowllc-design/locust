@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.241.0 - 2026-09-21
+
+- **The welcome screen stops promising a free teammate if there is not one.**
+  It told every new person "OpenCode needs no account — one install and you
+  have a working teammate". Whether OpenCode still publishes a free model is
+  somebody else's decision, and nothing checked it. Locust now checks: if
+  OpenCode is installed and none of its models are free, the sentence says so
+  instead. If we have not looked yet — which is normal before anything is
+  installed — the promise stands, because not having looked is not the same as
+  finding out it is false.
+
 ## 0.240.0 - 2026-09-21
 
 - **The send button's cursor bend is off unless you ask for it.** The liquid
