@@ -69,16 +69,37 @@ const reading = `(() => {
 
 const send = (text) => `(async () => {
   const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  if (!box) return 'no composer box'
   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
   setter.call(box, ${JSON.stringify(text)})
   box.dispatchEvent(new Event('input', { bubbles: true }))
   await new Promise(r => setTimeout(r, 200))
   box.focus()
-  box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-  for (let i = 0; i < 180; i += 1) {
+  let started = false
+  for (let i = 0; i < 40; i += 1) {
+    const startBtn = document.querySelector('button[aria-label="Start mission"]')
+    if (startBtn && !startBtn.disabled) {
+      startBtn.click()
+      started = true
+      break
+    }
+    await new Promise(r => setTimeout(r, 100))
+  }
+  if (!started) {
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  }
+  // Wait for run to be recognized as started
+  for (let i = 0; i < 20; i += 1) {
+    await new Promise(r => setTimeout(r, 500))
+    if (document.querySelector('button[aria-label^="Stop the running"]')) break
+  }
+  // Wait for run to complete
+  for (let i = 0; i < 240; i += 1) {
     await new Promise(r => setTimeout(r, 1000))
-    const head = document.querySelector('.lc-workroom__header, header')?.textContent ?? ''
-    if (!/running|starting/i.test(head)) return 'done'
+    if (!document.querySelector('button[aria-label^="Stop the running"]')) {
+      await new Promise(r => setTimeout(r, 2000))
+      return 'done'
+    }
   }
   return 'still running'
 })()`
@@ -88,8 +109,8 @@ const trend = []
 try {
   await drive.capture('launch, on a free model', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
-    return drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
+    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label')?.includes('Wren') || b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    return drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse.*1\\.3/i' }))
   })
 
   for (let turn = 1; turn <= TURNS; turn += 1) {
