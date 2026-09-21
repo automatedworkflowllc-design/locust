@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.246.0 - 2026-09-21
+
+- **A long conversation stops turning into several.** Past 32 turns, the
+  sidebar started drawing one conversation as two rows, then three, then four
+  — a new one every turn after that. Colin saw it as Antigravity "spawning a
+  new conversation after a workflow finishes"; nothing was spawning, and his
+  36-turn chain was intact in the record the whole time. The list now follows
+  a conversation back however long it is.
+
+  If you tidied one of those phantom rows into a group, that conversation may
+  still be filed in two groups. Moving it once more puts it right.
+
 ## 0.245.0 - 2026-09-21
 
 Settings, rebuilt to look like the rest of the app.

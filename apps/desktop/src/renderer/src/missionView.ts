@@ -2957,15 +2957,43 @@ export function rootMission(
   mission: PublicRecoveredMission,
   byId: ReadonlyMap<string, PublicRecoveredMission>
 ): PublicRecoveredMission {
+  /*
+   * WALKED TO THE END, GUARDED BY WHAT IT HAS SEEN.
+   *
+   * This stopped after 32 hops and returned whatever turn it had reached AS
+   * THE ROOT. On a conversation longer than 32 turns that answer is wrong,
+   * and wrong DIFFERENTLY for each turn -- the newest stops 32 back, an
+   * older one reaches the real root -- so `collapseConversations`, which
+   * keys on exactly this id, split one conversation into several rows.
+   *
+   * MEASURED IN COLIN'S OWN LEDGER, 2026-09-21, which is what settled it.
+   * He reported Antigravity "spawning a new conversation after a workflow
+   * finishes", then "it just did it again". Nothing spawned: his Antigravity
+   * chain is ONE unbroken run of 36 turns (`mission_3bd1ccbf` back to
+   * `mission_4c65cf41`), and the whole ledger holds only two true Antigravity
+   * roots. The sidebar was drawing one conversation three times, and
+   * `groups.json` had filed three ids of that same chain -- 4c65cf41 under
+   * Locust, 0f4888ce and 9de113fa under Chief -- because he had tidied the
+   * phantom rows into groups, which made the split permanent.
+   *
+   * Each new turn past 32 slides the window and mints another pseudo-root,
+   * which is exactly the "it happened again" he saw.
+   *
+   * The cap was never about depth. It is cycle protection for a hand-edited
+   * `continuesFrom`, and a `seen` set is that -- exactly, with no number to
+   * be wrong. Four walks in this codebase carried four different numbers
+   * (32, 64, 32, 64) for the same question; fewer clocks, not fewer numbers.
+   */
   let current = mission
-  for (let hops = 0; hops < 32; hops += 1) {
+  const seen = new Set<string>([mission.missionId])
+  for (;;) {
     const priorId = current.continuesFrom?.missionId
-    if (priorId === undefined) return current
+    if (priorId === undefined || seen.has(priorId)) return current
     const prior = byId.get(priorId)
     if (prior === undefined) return current
+    seen.add(priorId)
     current = prior
   }
-  return current
 }
 
 export interface StitchedHandoff {
@@ -3082,9 +3110,13 @@ export function conversationTurns(
   mission: PublicRecoveredMission,
   byId: ReadonlyMap<string, PublicRecoveredMission>
 ): readonly ConversationTurn[] {
+  // Bounded by what it has already seen rather than by a count: the count
+  // was cycle protection, and a 65-turn conversation would have lost its
+  // earliest turns the way `rootMission`'s 32 lost Colin's. The `chain.some`
+  // check below was already doing the real work.
   const chain: PublicRecoveredMission[] = [mission]
   let current = mission
-  for (let hops = 0; hops < 64; hops += 1) {
+  for (;;) {
     const link = current.continuesFrom
     if (link === undefined || link.reason !== 'follow-up') break
     const prior = byId.get(link.missionId)
@@ -3312,7 +3344,9 @@ export function typedPrompt(
   byId: ReadonlyMap<string, PublicRecoveredMission>
 ): string {
   let current = mission
-  for (let hops = 0; hops < 32; hops += 1) {
+  // Same walk, same guard. See `rootMission`.
+  const seen = new Set<string>([mission.missionId])
+  for (;;) {
     const relayed = relayedTitle(current)
     if (relayed !== undefined) return relayed
     // Only where the host wrote the prompt. A mission a PERSON typed is their
@@ -3320,8 +3354,14 @@ export function typedPrompt(
     if (current.continuesFrom?.reason !== 'route-switch') return current.prompt
     const asked = handoffInstruction(current.prompt)
     if (asked !== undefined) return asked
-    const prior = byId.get(current.continuesFrom.missionId)
+    const priorId = current.continuesFrom.missionId
+    // The guard the removed counter was standing in for. Without it a
+    // hand-edited cycle spins this loop for ever instead of ending 32 hops
+    // in — which is the one thing the count was genuinely buying.
+    if (seen.has(priorId)) return current.prompt
+    const prior = byId.get(priorId)
     if (prior === undefined) return current.prompt
+    seen.add(priorId)
     current = prior
   }
   return current.prompt
