@@ -94,11 +94,20 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
         ...(typeof percent === 'number' ? { percent: Math.max(0, Math.min(100, Math.round(percent))) } : {})
       })
     })
-    options.updater.on('update-downloaded', () => {
+    options.updater.on('update-downloaded', (payload) => {
+      /*
+       * WHICH version is on disk, remembered -- see `check` for why.
+       *
+       * The event carries the `UpdateInfo` it downloaded. `state.availableVersion`
+       * is the fallback for an updater that sends nothing, which is what the
+       * tests' fake did before this.
+       */
+      const version = (payload as { readonly version?: unknown } | undefined)?.version
+      downloadedVersion = typeof version === 'string' ? version : state.availableVersion
       publish({
         phase: 'ready',
         currentVersion: options.currentVersion,
-        ...(state.availableVersion === undefined ? {} : { availableVersion: state.availableVersion })
+        ...(downloadedVersion === undefined ? {} : { availableVersion: downloadedVersion })
       })
     })
     options.updater.on('error', () => {
@@ -111,6 +120,9 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       })
     })
   }
+
+  /** The version actually sitting in the pending folder, if any. */
+  let downloadedVersion: string | undefined
 
   return {
     state: () => state,
@@ -130,10 +142,46 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
           // Only said after a check that actually finished.
           return { ok: true, data: publish({ phase: 'current', currentVersion: options.currentVersion }) }
         }
+        /*
+         * READY MEANS *THIS* VERSION IS ON DISK, and it used to mean only
+         * that SOMETHING was.
+         *
+         * Colin, 2026-09-21, stuck on 0.225 with three releases published
+         * above him in quick succession: *"restart and install isnt working,
+         * keeps giving me the same option on restart, like its showing it as
+         * downloaded but its not"*.
+         *
+         * Exactly what the old line did. It kept `phase: 'ready'` and wrote
+         * the NEWLY FOUND version into `availableVersion`, so after
+         * downloading one version and then checking again against a newer
+         * one, the window said the newer version was downloaded and offered
+         * Restart. The installer then had nothing matching to run -- the
+         * pending file was the older build -- so the restart came back on the
+         * same version, and the same button was there again.
+         *
+         * It needed three releases in an evening to show up, which is why it
+         * survived 200 of them. A downloaded update is now `ready` only while
+         * the version on disk is the version the check just found; anything
+         * else is `available`, which is the state that offers Download.
+         */
+        /*
+         * `downloadedVersion` ALONE, not `state.phase === 'ready'` beside it.
+         *
+         * The first version of this fix read the phase and always saw
+         * `checking`, because this function publishes that before it asks --
+         * so it reported `available` even for the version genuinely sitting
+         * on disk. Caught by the test written for the defect above, which is
+         * the argument for writing it first.
+         *
+         * The field is set only by `update-downloaded`, so it is the whole
+         * truth on its own.
+         */
+        const onDisk = downloadedVersion !== undefined && downloadedVersion === version
+        if (!onDisk) downloadedVersion = undefined
         return {
           ok: true,
           data: publish({
-            phase: state.phase === 'ready' ? 'ready' : 'available',
+            phase: onDisk ? 'ready' : 'available',
             currentVersion: options.currentVersion,
             availableVersion: version
           })

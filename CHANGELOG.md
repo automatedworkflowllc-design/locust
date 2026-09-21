@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.229.0 - 2026-09-21
+
+- **"Downloaded" names the version that is actually downloaded.** If a newer
+  release appeared after one had been fetched, the window kept saying an
+  update was ready and put the NEWER number on it -- so Restart and install
+  came back on the same version with the same button showing. It only happens
+  when releases land close together, which is why it took until tonight to
+  surface. A fetched update is now offered as ready only while it is the one
+  the check just found; anything newer goes back to offering Download.
+
 ## 0.228.0 - 2026-09-21
 
 - **A run that is writing says so, on every runtime.** Text arriving is the
