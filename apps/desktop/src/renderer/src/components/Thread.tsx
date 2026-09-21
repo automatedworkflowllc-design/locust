@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -714,6 +714,11 @@ export function Thread({
    * Asked of the parsed reply rather than the prose, so a stray backtick
    * cannot fake it.
    */
+  /*
+   * A run the MODE stopped is not a run that went wrong, and the two need
+   * different offers. See `modeRefusedATool`.
+   */
+  const refusedByMode = modeRefusedATool(error)
   const answeredWithCode = items.some(
     (item) => item.type === 'agent-message' && parseAgentText(item.text).some((block) => block.kind === 'code')
   )
@@ -1005,7 +1010,7 @@ export function Thread({
           />
         ))}
 
-        {onRunWithEdits !== undefined && (wasPlan === true || answeredWithCode) && (
+        {onRunWithEdits !== undefined && (wasPlan === true || answeredWithCode || refusedByMode) && (
           // Deliberately not an error: the run did exactly what its mode
           // allows. This is the one click that would otherwise be a mode
           // change and a retyped prompt. A plan run says so in its own
@@ -1015,7 +1020,9 @@ export function Thread({
             <span>
               {wasPlan === true
                 ? 'This is the plan, not the work: nothing in the workspace has changed.'
-                : 'Ask mode answers in the conversation, so this stayed in the reply. Nothing in the workspace has changed.'}
+                : refusedByMode
+                  ? 'Ask mode does not change files, so this run stopped rather than write one. Nothing in the workspace has changed.'
+                  : 'Ask mode answers in the conversation, so this stayed in the reply. Nothing in the workspace has changed.'}
             </span>
             <button type="button" className="lc-button" onClick={onRunWithEdits}>
               <Icon name="diff" size={13} /> {wasPlan === true ? 'Build this plan' : 'Run again with edits allowed'}
@@ -1023,7 +1030,14 @@ export function Thread({
           </div>
         )}
 
-        {onRunAgain !== undefined && (
+        {/*
+          * NOT offered when the mode is what refused it. Sol's beta finding
+          * 3: pressing this would hit the same boundary, correctly, for
+          * ever -- and the sentence beside it ("running this again cannot
+          * repeat anything") is a button admitting it does nothing. The
+          * offer that belongs there is the mode switch above.
+          */}
+        {onRunAgain !== undefined && !refusedByMode && (
           /*
            * One press, where retyping was the only way forward.
            *

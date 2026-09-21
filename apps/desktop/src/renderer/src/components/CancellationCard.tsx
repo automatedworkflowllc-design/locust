@@ -36,8 +36,23 @@ export function CancellationCard({
       </div>
 
       {nothingHappened ? (
+        /*
+         * Said as what the RUN did, not as a denial of what the person did.
+         *
+         * Sol's beta review, 2026-09-21, finding 4: the card read *"You
+         * stopped this run at 05:08 PM"* and, directly under it, *"Nothing
+         * had started yet."* Both are true of different subjects -- the stop
+         * happened, no tool call had opened -- and stacked like that the
+         * second reads as taking back the first. Sol: *"If the person
+         * pressed Stop, do not also say nothing had started."*
+         *
+         * The fact this reports is unchanged; only who the sentence is about
+         * changes. `nothingHappened` is still exactly "no tool call settled,
+         * none was interrupted, none was planned", which is what "any work"
+         * means on this card.
+         */
         <div className="lc-card__body">
-          Nothing had started yet, so nothing was left half-done.
+          Stopped before it did any work, so there is nothing half-done.
         </div>
       ) : (
         <dl className="lc-receipt">

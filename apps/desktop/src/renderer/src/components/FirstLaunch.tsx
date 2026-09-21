@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
 import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
-import { connectedRuntimeCount, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
+import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
 
 /**
@@ -545,7 +545,16 @@ export function FirstLaunch({
                 */}
               {deferred > 0 && (
                 <button type="button" className="lc-agentmore" onClick={() => setOthersOpen(true)}>
-                  {deferred} other{deferred === 1 ? '' : 's'} Locust can drive — they each need their own account
+                  {/*
+                    * Derived from the rows it is hiding. See
+                    * `deferredOthersSentence` -- this sentence has now been
+                    * wrong about them twice, both times by being fixed.
+                    */}
+                  {deferredOthersSentence(
+                    shown
+                      .filter((row) => !drawn.includes(row))
+                      .map((row) => ({ installsFromHere: installCommand(row.runtime.id) !== undefined }))
+                  )}
                 </button>
               )}
             </>
@@ -630,7 +639,41 @@ export function FirstLaunch({
           * everything, through `installFailure` below, which carries the
           * command and the repair.
           */}
-        {discoveryPhase === 'ready' && (installing !== undefined || connected > 0) && npmIsBundled && rows.some((row) => !row.runtime.installed && installCommand(row.runtime.id) !== undefined) && (
+        {/*
+          * TWO SENTENCES, TWO MOMENTS -- and they were one paragraph.
+          *
+          * Sol's beta review, 2026-09-21, finding 8: OpenCode finished, the
+          * row said Ready, and this paragraph was still under it, opening
+          * with *"Node.js is not on this machine"* on a screen that had just
+          * succeeded. Sol: clear the install note when the install finishes.
+          *
+          * The obvious fix -- hold the whole thing to `installing` -- is
+          * wrong, and `install-buttons-say-why.test.ts` caught it. Ian's case
+          * is the opposite one: he installed through us, went to his OWN
+          * terminal afterwards, and the CLI was not there. His sentence has
+          * to OUTLIVE the spinner, which is exactly when Sol's has to go.
+          *
+          * So they are split by who is being spoken to. The bundled-npm
+          * reassurance belongs to the person watching a progress line and
+          * ends with it; the terminal note belongs to the person who has
+          * finished and stays. Neither piece of evidence loses.
+          */}
+        {discoveryPhase === 'ready' && installing === undefined && connected > 0 && npmIsBundled && (
+          <p className="lc-installnote">
+            Agents installed from here work inside Locust. To use one in your own terminal too, install{' '}
+            <button
+              type="button"
+              className="lc-linkbutton"
+              onClick={() => {
+                setLinkRefusal(undefined)
+                openLink('https://nodejs.org', setLinkRefusal)
+              }}
+            >
+              Node.js ↗
+            </button>
+          </p>
+        )}
+        {discoveryPhase === 'ready' && installing !== undefined && npmIsBundled && rows.some((row) => !row.runtime.installed && installCommand(row.runtime.id) !== undefined) && (
           <p className="lc-installnote">
             {/*
               * WHICH of the two it was. The probe answers "not usable" for a

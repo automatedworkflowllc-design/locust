@@ -125,7 +125,7 @@ import { splitAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute, freeStartStillFree} from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
@@ -1443,6 +1443,27 @@ export default function App(): ReactElement {
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
   const [models, setModels] = useState<readonly PublicModel[]>([])
+  /*
+   * An unchosen route lands on a NAMED FREE model once the catalogue says
+   * there is one. Sol's beta finding 1, the only one of the nine that can
+   * spend money: after installing the runtime we recommend BECAUSE it needs
+   * no account, the composer read `OpenCode / Account Default` -- an unnamed
+   * route behind the first Enter a new person presses.
+   *
+   * Gated on `routeChosen` exactly like the runtime half above it: a route
+   * the person picked never moves on its own, and pinning Account Default
+   * deliberately has to stay possible. This only ever fires on a profile that
+   * has not picked yet, which is the profile the finding is about.
+   */
+  useEffect(() => {
+    if (runtimeState.phase !== 'ready' || routeChosen.current) return
+    if (route.model !== ACCOUNT_DEFAULT_MODEL) return
+    const free = freeStartModel(route.runtime, models)
+    if (free === undefined) return
+    setRoute((current) =>
+      current.model === ACCOUNT_DEFAULT_MODEL ? { ...current, model: free } : current
+    )
+  }, [runtimeState.phase, route.runtime, route.model, models])
   // What the CLIs already have set up. Read once discovery has settled: the
   // list is gated on which runtimes are installed, so asking earlier would
   // report an empty machine.
@@ -5323,8 +5344,17 @@ export default function App(): ReactElement {
             * 2026-09-18, after four beta passes said so). The banner marks
             * the version as seen only when it is shown, so held here means
             * shown on the next launch after something connects.
+            *
+            * ALSO held while a conversation is open. Sol's beta review found
+            * it still sitting over the live thread after four turns, on both
+            * 0.239 and 0.242: *"A first-hour user is trying to talk."* It
+            * only ever needed Home, where there is nothing to interrupt, and
+            * Home is where a person lands before their first send anyway.
+            * `shownKey` undefined IS Home -- no conversation on screen.
             */}
-          {screen === 'workroom' && !noRuntimeReady && <WhatChangedBanner changelog={changelog} />}
+          {screen === 'workroom' && !noRuntimeReady && shownKey === undefined && (
+            <WhatChangedBanner changelog={changelog} />
+          )}
           {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer

@@ -3623,3 +3623,31 @@ export function lastActivityAt(mission: {
 export function runtimeNeverStarted(events: readonly NormalizedRuntimeEvent[]): boolean {
   return !events.some((event) => event.type === 'run.started')
 }
+
+/**
+ * Whether a run failed because the MODE refused a tool, rather than anything
+ * going wrong.
+ *
+ * Sol's beta review, 2026-09-21, finding 3: in Ask mode, asked for a file,
+ * the run ended on a red *"The run could not continue"* card offering **Run
+ * it again** beside the sentence *"Nothing had started, so running this again
+ * cannot repeat anything."* Running it again would refuse identically, for
+ * the same correct reason, for ever. The boundary held exactly as designed
+ * and the screen read as a breakage with a useless button on it.
+ *
+ * The one press that IS the next thing wanted -- switch the mode and rerun --
+ * already exists as `onRunWithEdits`. It was gated on the run having produced
+ * a reply carrying code, which a refused run never does, so the case that
+ * most needs it was the one case that never got it.
+ *
+ * MATCHED ON THE SENTENCE, because the sentence is all the renderer is given:
+ * `run.failed` carries a message, not a reason code. That is a drift risk,
+ * and the control for it lives on the other side -- runtime-adapters'
+ * `a-refusal-is-not-a-crash.test.ts` pins this exact phrase against the
+ * message its normalizer builds, so the adapter cannot reword it without
+ * failing there. Both halves name the phrase; neither can move alone.
+ */
+export function modeRefusedATool(error: string | undefined): boolean {
+  if (error === undefined) return false
+  return /^The mode this run is in does not allow (?:bash|edit|write|patch)\b/.test(error.trim())
+}

@@ -39,6 +39,19 @@ describe('a refusal is not a crash', () => {
   it('names the tool the mode refused, not the missing stop step', () => {
     const message = said(failureFrom('! permission requested: bash (Test-Path forbidden-ask.txt); auto-rejecting\n'))
     expect(message).toContain('does not allow bash')
+    /*
+     * THE WHOLE PHRASE, because the renderer reads it.
+     *
+     * Sol's beta review, 2026-09-21, finding 3: a mode refusal drew a red
+     * card offering "Run it again" beside a sentence admitting the rerun
+     * could not repeat anything. The fix reads this message back --
+     * `modeRefusedATool` in `missionView.ts` -- to offer the mode switch
+     * instead, and `run.failed` carries no reason code for it to use. So the
+     * words below ARE the contract. Rewording them without updating that
+     * predicate would silently take the offer away again; this line is what
+     * stops that being silent.
+     */
+    expect(message).toContain('The mode this run is in does not allow')
     expect(message).toContain('Nothing was changed')
     expect(message).not.toContain('ended without a step')
   })

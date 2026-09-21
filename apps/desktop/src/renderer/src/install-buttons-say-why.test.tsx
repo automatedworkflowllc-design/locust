@@ -182,6 +182,26 @@ describe('what the cold first screen does not say yet', () => {
     expect(after).toContain('your own terminal')
   })
 
+  it('stops explaining the missing Node once the install has finished', () => {
+    /*
+     * Sol's beta review, 2026-09-21, finding 8: OpenCode Ready, catalogue up,
+     * and the screen still opened a paragraph with "Node.js is not on this
+     * machine" -- a dependency complaint under an install that had just
+     * worked.
+     *
+     * THE TEST ABOVE IS WHY THIS IS A SPLIT AND NOT A DELETION. Ian needs the
+     * terminal half afterwards; Sol is right that the bundled-npm half has
+     * nothing to say to him by then. The pair below is the whole rule, and
+     * either one failing means the paragraph was merged back together.
+     */
+    const during = panel({ connected: 0, npmMissing: false, npmIsBundled: true, installing: 'opencode' })
+    expect(during).toContain('the copy of npm it carries')
+
+    const after = panel({ connected: 1, npmMissing: false, npmIsBundled: true })
+    expect(after).not.toContain('the copy of npm it carries')
+    expect(after).not.toContain('Node.js is not on this machine')
+  })
+
   it('offers the other agents behind a press while none of them can help', () => {
     /*
      * Colin, 2026-09-19: "i really want a new user without tech savvyness to

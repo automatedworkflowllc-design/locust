@@ -1022,6 +1022,41 @@ export function orderRouteRows<
   const rank = new Map(recent.map((key, index) => [key, index]))
   const groups: string[] = []
   for (const row of rows) if (!groups.includes(row.group)) groups.push(row.group)
+  /*
+   * GROUPS ARE BANDED BY WHETHER THEY CAN RUN, then by discovery order.
+   *
+   * They used to keep discovery's order outright -- "only rows move" -- and
+   * discovery's order has nothing to do with what is installed. Sol's beta
+   * review, 2026-09-21, finding 2, opened the picker on a machine where
+   * exactly one runtime worked:
+   *
+   *   CODEX CLI · YOUR ACCOUNT   NOT INSTALLED
+   *   CLAUDE CODE                NOT INSTALLED
+   *   CURSOR AGENT               NOT INSTALLED
+   *   ... OpenCode, the only thing that works, below the fold
+   *   GEMINI CLI                 PLANNED -- "Not built yet."
+   *
+   * Three headings a person cannot use, and a thing that does not exist, in
+   * the one control they open to send a message. `runtimeListOrder` fixed
+   * exactly this for the Settings list on 2026-09-15 and its comment claimed
+   * "the picker already groups connected-first". It did not; nothing did.
+   *
+   * A group takes the band of its BEST row, so one usable model keeps a
+   * runtime up top, and `RUNTIME_BAND` is the same table Settings sorts by --
+   * one definition of "first", not two that drift.
+   */
+  const bandOf = (group: string): number => {
+    let best = 9
+    for (const row of rows) {
+      if (row.group !== group) continue
+      // ACTIVE only ever lands on a selectable row (`routeRowTag`), so it is
+      // a READY row wearing a different word.
+      const band = row.tag === 'ACTIVE' ? 0 : RUNTIME_BAND[row.tag ?? ''] ?? 3
+      if (band < best) best = band
+    }
+    return best
+  }
+  const groupBand = new Map(groups.map((group) => [group, bandOf(group)]))
   const score = (row: TRow): number => {
     // The route you are ON sorts first in its group. It used to sort by the
     // same rules as everything else, so "account-default" -- not recently
@@ -1038,7 +1073,9 @@ export function orderRouteRows<
     return flagship === undefined ? 2_000_000 : 1_000_000 + flagship
   }
   return [...rows].sort((left, right) => {
-    // Groups keep the order discovery gave them; only rows move.
+    // What can run, then discovery's order inside that. See `bandOf`.
+    const byBand = (groupBand.get(left.group) ?? 9) - (groupBand.get(right.group) ?? 9)
+    if (byBand !== 0) return byBand
     const byGroup = groups.indexOf(left.group) - groups.indexOf(right.group)
     if (byGroup !== 0) return byGroup
     return score(left) - score(right)
@@ -1442,4 +1479,109 @@ export function keepWhatWasKnown(
     }
     return runtime
   })
+}
+
+/**
+ * The model a never-used profile should sit on once the free runtime is ready.
+ *
+ * `defaultRoute` deliberately answers only half of this: it picks the RUNTIME
+ * and leaves the model on `account-default`, because which model to prefer is
+ * the catalogue's business and discovery has not read the catalogue yet. This
+ * is the other half, asked once the catalogue exists.
+ *
+ * Sol's beta review, 2026-09-21, finding 1 -- and the only one of the nine
+ * that can cost money:
+ *
+ *   "After Install, the composer is Account Default... The one runtime that
+ *   needs no account should come up on a named free model, so the first Send
+ *   cannot spend."
+ *
+ * `account-default` means "whatever this account gives you". On a signed-in
+ * account that is a billable model, chosen by somebody else, sitting behind
+ * the first Enter a new person presses. The app recommends OpenCode by name
+ * on the welcome screen precisely because it needs no account; landing them
+ * on an unnamed route afterwards gives that back.
+ *
+ * THE FIRST LISTED FREE MODEL, not a named one. Naming a specific OpenCode
+ * model here would be the same bet `freeStartStillFree` exists to refuse --
+ * somebody else's catalogue, changed on somebody else's clock, hardcoded into
+ * our first-run path. Catalogue order is OpenCode's own answer to "what
+ * first", and it stays right when the list changes.
+ *
+ * `undefined` means LEAVE IT ALONE: no free model listed, the catalogue is
+ * unread, or this is not the free-start runtime. Same rule as everywhere else
+ * in this file -- no answer is not a bad answer.
+ */
+export function freeStartModel(
+  runtime: MissionRuntimeId,
+  models: readonly PublicModel[]
+): string | undefined {
+  if (runtime !== FREE_START_RUNTIME) return undefined
+  return models.find((model) => model.runtime === FREE_START_RUNTIME && model.id.endsWith('-free'))?.id
+}
+
+/**
+ * Why Send is disabled, in the person's own terms — or `undefined` when it is
+ * not.
+ *
+ * Sol's beta review, 2026-09-21, finding 6: typed `hello` with no runtime
+ * installed, Send stayed grey, and the only thing the control said about
+ * itself was *"Start mission — Shift+Enter for a new line."* A disabled
+ * button describing the thing it will not do is the shape of the first-run
+ * wall this app has hit before (QA, 2026-09-06: install what you were told
+ * to, come back, type, press Enter, nothing, and no part of the screen says
+ * why).
+ *
+ * ORDER IS THE WHOLE DESIGN. Every clause below can be true at once on a
+ * fresh profile — nothing installed AND nothing typed — and only the FIRST
+ * one is worth saying, because it is the one the person cannot fix by doing
+ * the obvious thing. "Write a message first" to someone who has written a
+ * message and has no runtime is the original defect with more words.
+ *
+ * `empty` is last and deliberately quiet: a person staring at an empty box
+ * knows the box is empty, so this is the only clause that is not news.
+ */
+export function sendBlockedReason(blocked: {
+  readonly nothingInstalled: boolean
+  readonly runtimeReady: boolean
+  readonly routeCanRun: boolean
+  readonly busy: boolean
+  readonly empty: boolean
+}): string | undefined {
+  if (blocked.nothingInstalled) return 'Nothing can run yet — install a coding agent from the list above.'
+  if (!blocked.runtimeReady) return 'The route this is set to is not ready on this machine. Pick another above, or set it up in Settings.'
+  if (!blocked.routeCanRun) return 'This mode cannot run on the route this is set to. Pick another mode or route above.'
+  if (blocked.busy) return 'Something else is starting. This goes as soon as it settles.'
+  if (blocked.empty) return 'Write a message first.'
+  return undefined
+}
+
+/**
+ * What the collapsed row of "other" coding agents honestly says about them.
+ *
+ * It used to say one thing about all of them: *"{n} others Locust can drive —
+ * they each need their own account."* Sol's beta review, 2026-09-21, finding
+ * 7, expanded it and counted: Codex, Claude and Copilot install from here and
+ * then want an account; Cursor Agent and Antigravity are a **Get it** link to
+ * somebody else's installer. One sentence, two different jobs, and a person
+ * deciding whether to press it was told the wrong one about two of five.
+ *
+ * This is the second time that sentence has been wrong about the rows behind
+ * it. Fable found the first on 0.198.0 — four installed, hung CLIs sitting
+ * behind *"they each need their own account"*, when they needed no account
+ * and were already on the machine. Both failures are the same failure: a
+ * fixed sentence about a list that varies. So it is derived now.
+ *
+ * Said as INSTALL METHOD, which is what the next click actually is. The
+ * account only survives in the case where it is true of every row.
+ */
+export function deferredOthersSentence(
+  others: readonly { readonly installsFromHere: boolean }[]
+): string {
+  const count = others.length
+  const head = `${String(count)} other${count === 1 ? '' : 's'} Locust can drive`
+  const fromHere = others.filter((other) => other.installsFromHere).length
+  if (fromHere === count) return `${head} — each installs from here, then signs in.`
+  if (fromHere === 0) return `${head} — each installs from its own vendor.`
+  return `${head} — some install from here, some from their own vendor.`
 }

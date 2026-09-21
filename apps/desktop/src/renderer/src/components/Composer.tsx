@@ -22,7 +22,7 @@ import {
   modelFamily,
   runtimeIsUsable
 } from '../status.js'
-import { defaultEffort } from '../status.js'
+import { defaultEffort, sendBlockedReason } from '../status.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
@@ -1088,7 +1088,20 @@ export function Composer({
                 className="send-button lc-send"
                 disabled={!canStart}
                 aria-label="Start mission"
-                title="Start mission — Shift+Enter for a new line"
+                /*
+                  * A disabled control says why. Sol's beta finding 6: with
+                  * nothing installed, Send was grey and its only word about
+                  * itself was the thing it would not do.
+                  */
+                title={
+                  sendBlockedReason({
+                    nothingInstalled: nothingConnected,
+                    runtimeReady: selectedReady,
+                    routeCanRun,
+                    busy: busyWith !== undefined,
+                    empty: value.trim().length === 0
+                  }) ?? 'Start mission — Shift+Enter for a new line'
+                }
               >
                 <Icon name="arrow-up" size={15} />
               </MetalSend>

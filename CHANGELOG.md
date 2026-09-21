@@ -6,6 +6,34 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.244.0 - 2026-09-21
+
+The first hour, from a beta review driven on a blank machine.
+
+- **The first message cannot spend.** Install OpenCode — the one agent Locust
+  recommends because it needs no account — and the composer now names a free
+  model instead of "Account Default". Account Default was whatever the account
+  gives you, which on a signed-in account is a paid model somebody else chose,
+  sitting behind the first Enter.
+- **The model picker opens on what actually works.** It listed three agents
+  that were not installed, and one that does not exist yet, above the only one
+  that could run. Ready first now, then signed-out, then not installed.
+- **Send says why it is grey.** It used to describe the thing it would not do.
+  On a machine with nothing installed it now says so, ahead of every other
+  reason, because that is the one typing cannot fix.
+- **Stopping a run no longer argues with itself.** "You stopped this run" sat
+  directly above "Nothing had started yet". It says "Stopped before it did any
+  work" — about the run, not about you.
+- **Ask mode offers the mode that works.** Asking Ask mode to write a file
+  correctly refused, then offered "Run it again" beside a sentence admitting
+  the rerun could not change anything. It offers the switch to Accept edits.
+- **"What changed" stays on Home.** The version banner sat over live
+  conversations until dismissed.
+- **Two sentences stopped being wrong about the list under them.** The
+  collapsed "others Locust can drive" line claimed they each need an account,
+  which was untrue of two of five; and "Node.js is not on this machine" stayed
+  on screen under an install that had already finished.
+
 ## 0.243.0 - 2026-09-21
 
 - **Switches line up with their own tracks.** Every toggle in Settings pushed
