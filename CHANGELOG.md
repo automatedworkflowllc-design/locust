@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.247.0 - 2026-09-21
+
+- **Muse Code runs missions now.** Meta’s CLI has been in the runtime list
+  for a day as a roadmap row that did nothing. Locust can read its output, so
+  it is selectable, it shows up in the model picker, and a mission under it
+  is recorded like any other — same thread, same receipts, same history.
+
+  It is marked PREVIEW on purpose. Every part of the path has been run end to
+  end, but only against Muse’s own free test provider, which never calls a
+  model and never uses a tool. Nobody has watched it do real work yet.
+- **Ask, Accept edits and Plan on Muse Code, and not Auto.** Auto means a run
+  may edit anything on this machine, and Locust keeps Muse’s own sandbox on
+  whichever mode you choose. Offering Auto would have promised more than the
+  run actually gets.
+- **The Install link on Muse Code works.** It was the only runtime whose sole
+  way in is a vendor page, and pressing the link did nothing at all.
+
 ## 0.246.0 - 2026-09-21
 
 - **A long conversation stops turning into several.** Past 32 turns, the
