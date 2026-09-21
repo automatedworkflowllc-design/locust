@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.235.0 - 2026-09-21
+
+- **Locust finds your runtimes in half the time.** Each runtime's checks --
+  version, help, sign-in, model list -- ran one after another, and eight
+  runtimes' worth of that took twelve seconds on the machine this was built
+  on. They run together now, and a check that answers two questions is asked
+  once: six seconds, same answers. A single slow check is also given ten
+  seconds rather than five before it is called a failure, because a check
+  that is merely slow was being reported as broken and re-asked.
+- **A teammate's replies row wears its name from the start.** 0.234 named
+  the row on disk but the sidebar kept showing the first message's words
+  until the next launch.
+
 ## 0.234.0 - 2026-09-21
 
 - **Each teammate has one conversation their replies go to.** When a

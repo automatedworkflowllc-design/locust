@@ -1856,6 +1856,13 @@ export default function App(): ReactElement {
           setTeammates((current) =>
             current.map((teammate) => (teammate.teammateId === update.teammateId ? { ...teammate, hubMissionId: hub } : teammate))
           )
+          // And the row's NAME. The host names a hub the first time it is
+          // made, but the titles here were read at launch -- so the row wore
+          // its root prompt ("Wren asked: ...") until the next full refresh.
+          // Measured by `_smoke/hub-smoke.mjs` on 0.234.0 before this line.
+          void window.desktop?.listTeammates().then((listed) => {
+            if (listed.ok) setMissionTitles(listed.data.missionTitles)
+          }).catch(() => undefined)
         }
         // A routine that started on its own: the Team card's run count and
         // next run moved on disk, and nobody pressed anything to refresh them.

@@ -186,7 +186,19 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
   },
 ];
 
-const PROBE_TIMEOUT_MS = 5_000;
+/*
+ * Ten seconds, from five.
+ *
+ * A probe that times out reads as a FAILED probe -- the checking state, which
+ * schedules more sweeps -- and five was measured too close to the truth on
+ * Colin's machine, 2026-09-21: with one runtime's probes running together
+ * and eight runtimes staggered, `gemini`'s sign-in check took 5.5 s under
+ * contention and reported `error` where it had reported `needs-signin` in
+ * sequence; OpenCode's `models` and Antigravity sat at 5.2-5.5 s. The
+ * timeout exists to bound a HUNG command, not to race a slow one. (Fable's
+ * probing review, #6.)
+ */
+const PROBE_TIMEOUT_MS = 10_000;
 
 interface ProbeOutcome {
   readonly result?: CommandResult;
@@ -262,12 +274,33 @@ async function discoverOne(
   }
 
   const diagnostics: RuntimeDiagnostic[] = [];
-  const versionOutcome = await runProbe(
-    runner,
-    executable,
-    "version",
-    definition.versionArgs,
-  );
+  /*
+   * All of one runtime's probes at once.
+   *
+   * They ran strictly in sequence -- version, then help, then readiness,
+   * then the model list -- and none depends on another's OUTPUT. Readiness
+   * used to wait for the capability probe only to be SKIPPED when a required
+   * flag was missing, which is a discard after the fact, not a dependency.
+   * MEASURED on Colin's machine, 2026-09-21: each `cursor-agent` probe is
+   * 1.1-1.6 s warm through its `.cmd` shim, so the four in sequence were
+   * ~5.1 s -- the "past six seconds" the stagger comment records was their
+   * SUM. Together they cost the slowest one. (Fable's probing review, #3.)
+   *
+   * A list command that is the readiness command -- OpenCode's `models` is
+   * both -- is spawned once and read twice.
+   */
+  const sameCommand =
+    definition.modelsArgs !== undefined
+    && definition.modelsArgs.length === definition.readinessArgs.length
+    && definition.modelsArgs.every((arg, index) => arg === definition.readinessArgs[index]);
+  const [versionOutcome, capabilityOutcome, readinessOutcome, listedOutcome] = await Promise.all([
+    runProbe(runner, executable, "version", definition.versionArgs),
+    runProbe(runner, executable, "capabilities", definition.capabilityArgs),
+    runProbe(runner, executable, "readiness", definition.readinessArgs),
+    definition.modelsArgs === undefined || sameCommand
+      ? Promise.resolve(undefined)
+      : runProbe(runner, executable, "models", definition.modelsArgs),
+  ]);
   const combinedVersionOutput = succeeded(versionOutcome)
     ? `${versionOutcome.result.stdout}\n${versionOutcome.result.stderr}`
     : "";
@@ -290,12 +323,6 @@ async function discoverOne(
     );
   }
 
-  const capabilityOutcome = await runProbe(
-    runner,
-    executable,
-    "capabilities",
-    definition.capabilityArgs,
-  );
   const capabilityText = succeeded(capabilityOutcome)
     ? `${capabilityOutcome.result.stdout}\n${capabilityOutcome.result.stderr}`
     : "";
@@ -340,12 +367,6 @@ async function discoverOne(
 
   let readiness: RuntimeReadiness = missingFeatures.length > 0 ? "unsupported" : "unknown";
   if (missingFeatures.length === 0) {
-    const readinessOutcome = await runProbe(
-      runner,
-      executable,
-      "readiness",
-      definition.readinessArgs,
-    );
     if (succeeded(readinessOutcome) && (definition.readyWhen?.(readinessOutcome.result) ?? true)) {
       readiness = "ready";
       if (definition.readinessCaveat !== undefined) {
@@ -380,8 +401,10 @@ async function discoverOne(
   // A model list is read only from a signed-in runtime: measured, the
   // signed-out command prints an error instead of a list.
   if (definition.modelsArgs !== undefined && readiness === "ready") {
-    const modelsOutcome = await runProbe(runner, executable, "models", definition.modelsArgs);
-    if (succeeded(modelsOutcome)) {
+    // Spawned above with the rest; the readiness answer itself when the list
+    // command is the readiness command.
+    const modelsOutcome = sameCommand ? readinessOutcome : listedOutcome;
+    if (modelsOutcome !== undefined && succeeded(modelsOutcome)) {
       // Both streams, like every other probe in this file: the one model
       // listing this repo has actually captured arrived on stderr.
       modelHints = definition.parseModels?.(

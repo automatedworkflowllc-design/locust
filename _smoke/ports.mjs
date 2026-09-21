@@ -63,7 +63,8 @@ export const SMOKE_PORTS = Object.freeze({
   update: 9265,
   workroom: 9266,
   workspace: 9267,
-  worktree: 9268
+  worktree: 9268,
+  hub: 9269
 })
 
 /**
