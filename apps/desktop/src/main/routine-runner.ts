@@ -138,9 +138,19 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
   const heldOff = new Map<string, number>()
   const changed = (): void => options.notify({ kind: 'routine-recovery-changed' })
 
-  const hold = async (routine: PublicRoutine, execution: RoutineExecution, reason: string, canContinue = false): Promise<void> => {
+  const hold = async (
+    routine: PublicRoutine,
+    execution: RoutineExecution,
+    reason: string,
+    canContinue = false,
+    settledAtDispatch = false
+  ): Promise<void> => {
     if (execution.status === 'held' && execution.reason === reason && execution.canContinue === canContinue) return
-    await options.routines.saveProgress(routine.routineId, { ...execution, status: 'held', reason, canContinue }, execution.attemptId)
+    await options.routines.saveProgress(
+      routine.routineId,
+      { ...execution, status: 'held', reason, canContinue, ...(settledAtDispatch ? { settledAtDispatch: true } : {}) },
+      execution.attemptId
+    )
     active.delete(routine.routineId)
     changed()
   }
@@ -159,6 +169,16 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     for (const routine of await options.routines.list()) {
       const execution = routine.execution
       if (execution === undefined || execution.status === 'abandoned' || active.has(routine.routineId)) continue
+      /*
+       * A refusal the dispatch already explained is not re-decided.
+       *
+       * Without this, every reconcile overwrote a precise reason with the
+       * generic one below, because there is no mission to ask about -- so
+       * the card blamed a restart for a route the runtime had refused
+       * outright, and told the person to review external work that never
+       * ran. See `settledAtDispatch`.
+       */
+      if (execution.status === 'held' && execution.settledAtDispatch === true) continue
       if (execution.workspaceId !== options.workspaceId) {
         await hold(routine, execution, 'Open the original workspace to reconcile this attempt. Nothing will be replayed.')
         continue
@@ -256,7 +276,13 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         // id they remain uncertain, even though the service returned an error.
         await options.routines.clearProgress(routine.routineId, intent.attemptId)
       } else {
-        await hold(routine, intent, `Dispatch not confirmed for step ${String(step)}: ${response.error.message}. Review external work before proceeding.`)
+        await hold(
+          routine,
+          intent,
+          `Dispatch not confirmed for step ${String(step)}: ${response.error.message}. Review external work before proceeding.`,
+          false,
+          true
+        )
       }
     } catch (error) {
       active.delete(routine.routineId)

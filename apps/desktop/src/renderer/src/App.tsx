@@ -3386,10 +3386,24 @@ export default function App(): ReactElement {
       // -- every routine on Cursor failed to start, silently, from 0.43.0
       // until routine-smoke caught it.
       route: (() => {
+        /*
+         * The mode the conversation ACTUALLY RAN IN, not `ask`.
+         *
+         * Colin, 2026-09-21: a routine saved from an ownerless conversation
+         * could never run. The conversation ran on Cursor in `auto`; this
+         * stored `ask`, and Cursor cannot be held read-only on Windows, so
+         * every attempt was refused at dispatch. `ask` was a safe-looking
+         * guess that is not safe at all -- it is a mode the person did not
+         * choose, on a route that may not support it.
+         *
+         * A mission records its mode (v15), so there is nothing to guess.
+         * Older missions have none; `ask` remains the answer only when the
+         * record itself cannot say.
+         */
         const base = teammate?.route ?? {
           runtime: mission.runtime,
           model: mission.model ?? 'account-default',
-          mode: 'ask' as const
+          mode: mission.mode ?? ('ask' as const)
         }
         const carried =
           effort === undefined || effortIsInModelId(models, base.runtime, base.model)
@@ -3414,6 +3428,18 @@ export default function App(): ReactElement {
     // The dialog asks for one when the conversation had none; this is the
      // second half of that rule, so a routine can never be stored ownerless.
     const owner = input.teammateId ?? dialog.teammateId
+    /*
+     * The route follows whoever the person just NAMED.
+     *
+     * `dialog.route` is decided when the dialog opens, and for a
+     * conversation nobody owns there is no teammate to read it from -- so it
+     * fell back to the conversation's runtime with a guessed mode, and
+     * answering "who runs this?" never revisited it. The routine was then
+     * stored on a mode its own teammate had never run in. Same rule as the
+     * dialog's: the teammate's own route, else what the dialog worked out.
+     */
+    const named = teammates.find((entry) => entry.teammateId === owner)?.route
+    const route = named ?? dialog.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
     if (dialog.routineId === undefined && owner === undefined) {
       setRoutineDialog({ ...dialog, busy: false, error: 'Choose which teammate runs this routine.' })
       return
@@ -3424,7 +3450,7 @@ export default function App(): ReactElement {
         ? bridge.createRoutine({
             name: input.name,
             teammateId: owner ?? '',
-            route: dialog.route ?? { runtime: 'codex', model: 'account-default', mode: 'ask' },
+            route,
             steps: input.steps,
             learnedFrom: dialog.learnedFrom,
             ...(input.schedule === undefined ? {} : { schedule: input.schedule })

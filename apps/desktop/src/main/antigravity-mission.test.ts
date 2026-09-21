@@ -67,14 +67,16 @@ interface Harness {
   readonly created: unknown[]
   readonly appended: ReturnType<typeof fakeLedger>['appended']
   readonly updates: { kind: string }[]
+  readonly notices: { message: string }[]
 }
 
-function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; refuseAppend?: boolean } = {}): Harness {
+function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean } = {}): Harness {
   const { ledger, created, appended } = fakeLedger(options.refuseAppend === true)
   const api = { calls: [] as { kind: string; input: unknown }[] }
   const transcript = { lines: options.lines ?? [] }
   const emitted: { type: string; payload: Record<string, unknown> }[] = []
   const updates: { kind: string }[] = []
+  const notices: { message: string }[] = []
   let ids = 0
   const service = createAntigravityMissionService({
     workspacePath: WORKSPACE,
@@ -96,9 +98,11 @@ function harness(options: { host?: AntigravityHost | undefined; lines?: string[]
     createId: () => String(++ids),
     now: () => new Date(NOW),
     pollMs: 5,
-    ...(options.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: options.idleTimeoutMs })
+    notify: ({ message }) => notices.push({ message }),
+    ...(options.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: options.idleTimeoutMs }),
+    ...(options.askingNoticeMs === undefined ? {} : { askingNoticeMs: options.askingNoticeMs })
   })
-  return { service, api, transcript, emitted, created, appended, updates }
+  return { service, api, transcript, emitted, created, appended, updates, notices }
 }
 
 const settle = async (ticks = 12): Promise<void> => {
@@ -234,6 +238,46 @@ describe('a mission through Antigravity', () => {
     await settle()
     expect(emitted.map((event) => event.type).at(-1)).toBe('run.completed')
     expect(appended.length).toBeGreaterThan(0)
+  })
+
+  /**
+   * Colin, 2026-09-21, on a run that sat for forty minutes: *"this antigrav
+   * question was not appearing in locust ui, didnt know it was hung up."*
+   *
+   * Antigravity had stopped on its own "Allow reading this URL?" prompt --
+   * read from his transcript afterwards: a `search_web` call at 12:09:53
+   * with nothing after it. The sentence that explains this existed only in
+   * the ten-minute timeout, which ENDS the mission, and his app restarted
+   * for an update before it fired. So the one thing he needed to know was
+   * ten minutes away and then never came at all.
+   */
+  it('says the agent may be asking, long before the timeout and without ending the run', async () => {
+    // A tool is open (step 2 calls `write_to_file`) and nothing follows it.
+    const h = harness({ lines: WRITE_LINES.slice(0, 3), askingNoticeMs: 15, idleTimeoutMs: 100_000 })
+    const mission = await h.service.start('hi', undefined, {})
+    await settle(10)
+    const said = h.notices.map((notice) => notice.message).join(' | ')
+    expect(said).toMatch(/write_to_file/)
+    expect(said).toMatch(/its own window/i)
+    // NOT an ending: the run is still being watched.
+    expect(h.service.has(mission.runId)).toBe(true)
+    expect(h.emitted.map((event) => event.type)).not.toContain('run.failed')
+  })
+
+  it('says it once, not on every tick', async () => {
+    const h = harness({ lines: WRITE_LINES.slice(0, 3), askingNoticeMs: 15, idleTimeoutMs: 100_000 })
+    await h.service.start('hi', undefined, {})
+    await settle(20)
+    expect(h.notices).toHaveLength(1)
+  })
+
+  it('says nothing while the agent is still writing', async () => {
+    const h = harness({ lines: WRITE_LINES, askingNoticeMs: 15, idleTimeoutMs: 100_000 })
+    await h.service.start('hi', undefined, {})
+    await settle(6)
+    // The transcript reaches a final answer, so there is no open tool and
+    // no silence worth naming.
+    expect(h.notices).toHaveLength(0)
   })
 
   it('gives up when the agent writes nothing for too long, as a failure and not a completion', async () => {

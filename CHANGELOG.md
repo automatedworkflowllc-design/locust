@@ -6,6 +6,26 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.239.0 - 2026-09-21
+
+- **A routine saved from a conversation runs the way that conversation ran.**
+  Saving a routine from a conversation nobody owned stored the permission
+  mode as "Ask", whatever the conversation had actually used -- and on a
+  route that cannot be held read-only, that routine could never start at all.
+  It now takes the mode the conversation really ran in, and follows whichever
+  teammate you pick when it asks who should run it.
+- **A routine that was refused says why it was refused.** When a runtime turns
+  a routine down -- "Cursor Agent cannot be held read-only on this system",
+  say -- that sentence is what the card shows. It used to be replaced,
+  moments later, with "the app stopped before saving a mission receipt":
+  blaming a crash that never happened and sending you to review work that had
+  never started.
+- **Antigravity says when it is probably waiting for you.** Antigravity asks
+  its own questions in its own window, where Locust cannot see them, so a run
+  could sit silent for a long time looking like it was working. After a
+  minute and a half of silence with a step still open, the thread now says so
+  and names the step. The run is not ended -- it is a note, not a verdict.
+
 ## 0.238.0 - 2026-09-21
 
 - **A long answer no longer stops the run that wrote it.** A Cursor run that

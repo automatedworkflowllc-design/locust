@@ -1401,6 +1401,8 @@ if (!ownsSingleInstanceLock) {
         }
       },
       emitUpdate: (update) => sendToWindow(update),
+      // A silence that looks like a question, said in the run's own thread.
+      notify: ({ runId, missionId, message }) => sendToWindow({ kind: 'relay-notice', runId, missionId, message }),
       onShared: async (mission, posted) => {
         await relay?.onShared(mission, posted)
       },

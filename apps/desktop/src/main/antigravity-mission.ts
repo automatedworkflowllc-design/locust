@@ -52,6 +52,13 @@ import { MAX_LIVE_MISSIONS as MAX_LIVE_ANTIGRAVITY_MISSIONS } from '../shared/li
 export { MAX_LIVE_ANTIGRAVITY_MISSIONS }
 /** No new transcript line for this long means the agent is not coming back. */
 export const ANTIGRAVITY_IDLE_TIMEOUT_MS = 10 * 60_000
+/**
+ * How long a silence with a tool still open may last before the person is
+ * told it might be a question. Ninety seconds: long enough that an ordinary
+ * slow step does not raise it, short enough that nobody watches a still
+ * screen wondering.
+ */
+export const ANTIGRAVITY_ASKING_NOTICE_MS = 90_000
 const NOBODY = ''
 
 export interface AntigravityMissionOptions {
@@ -75,6 +82,10 @@ export interface AntigravityMissionOptions {
   readonly now?: () => Date
   readonly pollMs?: number
   readonly idleTimeoutMs?: number
+  /** How long an open tool may be silent before the person is told. Test seam. */
+  readonly askingNoticeMs?: number
+  /** A note into the mission's own thread; absent means the notice is not drawn. */
+  readonly notify?: (input: { runId: string; missionId: string; message: string }) => void
 }
 
 export interface AntigravityMission {
@@ -125,6 +136,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
   const readTranscript = options.readTranscript ?? readTranscriptFile
   const pollMs = options.pollMs ?? 1_000
   const idleTimeoutMs = options.idleTimeoutMs ?? ANTIGRAVITY_IDLE_TIMEOUT_MS
+  const askingNoticeMs = options.askingNoticeMs ?? ANTIGRAVITY_ASKING_NOTICE_MS
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined ? undefined : createPeerExchange({
           workroom: options.workroom,
@@ -147,6 +159,8 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     /** Lines already handed to the normalizer; a follow-up starts past the prior turns. */
     fed: number
     lastProgressAt: number
+    /** Whether the person has already been told this silence looks like a question. */
+    saidItMightBeAsking: boolean
     timer: NodeJS.Timeout | undefined
     polling: boolean
     ended: boolean
@@ -289,10 +303,39 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       if (lines.length > run.fed) {
         run.fed = lines.length
         run.lastProgressAt = Date.now()
+        // It spoke, so the next silence is a new one worth naming.
+        run.saidItMightBeAsking = false
       }
       if (run.normalizer.latestFinal) {
         await end(run, {})
         return
+      }
+      /*
+       * SAY IT EARLY, and do not end the run to say it.
+       *
+       * Colin, 2026-09-21, on a run that sat for forty minutes: *"this
+       * antigrav question was not appearing in locust ui, didnt know it was
+       * hung up."* Antigravity had stopped on its own "Allow reading this
+       * URL?" prompt, in its own window, and Locust showed a working run
+       * with nothing to read. The sentence that explains it already existed
+       * -- but only in the ten-minute timeout, which ENDS the mission, and
+       * his app was restarted for an update before it fired. So the one
+       * thing he needed to know was ten minutes away and then never came.
+       *
+       * A silence with a tool still open is worth saying at ninety seconds,
+       * as a note in the thread rather than an ending. Said ONCE: it is a
+       * standing condition, not news each tick. If it clears, progress
+       * resets the flag with `lastProgressAt`.
+       */
+      const silentFor = Date.now() - run.lastProgressAt
+      const pendingNow = run.normalizer.pendingToolName
+      if (silentFor > askingNoticeMs && silentFor <= idleTimeoutMs && pendingNow !== undefined && !run.saidItMightBeAsking) {
+        run.saidItMightBeAsking = true
+        options.notify?.({
+          runId: run.runId,
+          missionId: run.missionId,
+          message: `Antigravity has been on its own "${pendingNow}" step for ${String(Math.round(silentFor / 60_000) || 1)} minute${Math.round(silentFor / 60_000) === 1 ? '' : 's'} without reporting anything. It asks questions in its own window, not here -- if it is waiting on you, answer it there.`
+        })
       }
       if (Date.now() - run.lastProgressAt > idleTimeoutMs) {
         // Say WHY, and do not blame the model for a silence this app caused.
@@ -479,6 +522,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           fed,
           lastProgressAt: Date.now(),
           timer: undefined,
+          saidItMightBeAsking: false,
           polling: false,
           ended: false
         }

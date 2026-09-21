@@ -138,7 +138,8 @@ function parsedExecution(value: unknown, steps: readonly string[], route: Teamma
     && [item.missionId, item.runId, item.followUpOf].every((id) => id === undefined || safeId(id))
     && (item.reason === undefined || (typeof item.reason === 'string' && item.reason.length <= 4000))
     && (item.canContinue === undefined || typeof item.canContinue === 'boolean')
-    && (item.recovered === undefined || typeof item.recovered === 'boolean')) {
+    && (item.recovered === undefined || typeof item.recovered === 'boolean')
+    && (item.settledAtDispatch === undefined || typeof item.settledAtDispatch === 'boolean')) {
     return item as unknown as RoutineExecution
   }
   // Losing an invalid receipt must never turn uncertain side effects into a

@@ -17,6 +17,22 @@ export interface RoutineExecution {
   readonly followUpOf?: string
   readonly reason?: string
   readonly canContinue?: boolean
+  /**
+   * The dispatch itself answered, and the answer will not change.
+   *
+   * A hold written when the runtime REFUSED the start names the refusal --
+   * "Cursor Agent cannot be held read-only on this system", say -- and that
+   * is the most useful sentence this attempt will ever have. Reconciliation
+   * re-decides every held attempt, and with no mission to ask about it
+   * rewrote that sentence as "the app stopped before saving a mission
+   * receipt": a crash that had not happened, in place of the one fact that
+   * told the person what to change. Colin, 2026-09-21: *"bug?"*
+   *
+   * So a hold decided AT DISPATCH says so, and reconciliation leaves it
+   * alone. Nothing later can teach it anything: there is no mission whose
+   * phase could move.
+   */
+  readonly settledAtDispatch?: boolean
 }
 
 export const ROUTINE_RECOVERY_CHANNEL = 'routine:recovery'

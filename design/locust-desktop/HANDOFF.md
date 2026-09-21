@@ -124,6 +124,17 @@ The four teammates in the reference are outputs of this system: Wren = lime + ca
 
 ### Avatar activity — animation only while actually working
 
+> **SUPERSEDED by `apps/desktop/src/renderer/src/faceState.ts`.** Verified
+> 2026-09-21: the shipped code has NINE activities, a different animation
+> set (`lcTilt`, `lcBob2`, `lcEyesUp`, `lcEyesDown`, `lcEyesFwd`, `lcStare`,
+> `lcGlance`, `lcHop`, and `lcRingWait` for `waiting`), and **no `streaming`
+> state at all** -- its nearest equivalent is `responding`. Anything written
+> from the table below will name states that do not exist, and
+> `FACE_MOTION['streaming']` is `undefined`, so reading a field off it
+> throws. That bug reached a preview during the design-system extraction.
+> Read `faceState.ts`; the rule in the next line is the part still true.
+> (Found by the design-system handover, §10.)
+
 **Rule: a face animates only when that teammate is doing something.** Idle, blocked, awaiting-approval and completed teammates are perfectly still — motion is a status signal, so it must never be decorative.
 
 | Animation | Keyframe | Applies to | Timing |
