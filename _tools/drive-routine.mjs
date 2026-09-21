@@ -28,7 +28,7 @@ let handoff
 try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('one message to Wren, and its reply', () => drive.evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren') || b.getAttribute('aria-label')?.includes('Wren'))
     who.click()
     await new Promise(r => setTimeout(r, 500))
     const field = document.querySelector('form.command-dock textarea')
