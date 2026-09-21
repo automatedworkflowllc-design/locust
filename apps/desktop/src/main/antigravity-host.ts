@@ -41,10 +41,18 @@ export interface AntigravityProbeOptions {
   readonly localAppData?: string
   readonly home?: string
   readonly platform?: NodeJS.Platform
+  /**
+   * Test seam: the pids of every `language_server.exe`, as `tasklist`
+   * reports them in tens of milliseconds -- or `undefined` when it could not
+   * say, which falls through to the PowerShell path below.
+   */
+  readonly listPids?: () => Promise<readonly number[] | undefined>
   /** Test seam: the process list as `Win32_Process` reports it. */
   readonly listProcesses?: () => Promise<readonly { readonly pid: number; readonly commandLine: string }[]>
   /** Test seam: listening TCP ports of a process. */
   readonly listeningPorts?: (pid: number) => Promise<readonly number[]>
+  /** Test seam: the clock, so a test can step past the TTL. */
+  readonly now?: () => number
   /** Test seam: run the CLI once. */
   readonly run?: (executable: string, args: readonly string[], env: Readonly<Record<string, string>>) => Promise<{ stdout: string; stderr: string; code: number | null }>
 }
@@ -135,6 +143,39 @@ async function listeningPortsWindows(pid: number): Promise<readonly number[]> {
     .filter((port) => Number.isFinite(port) && port > 0)
 }
 
+/**
+ * Every `language_server.exe` pid, from `tasklist` -- tens of milliseconds
+ * where each PowerShell start is one to three seconds cold. `undefined` when
+ * tasklist itself failed, so the caller falls back rather than concluding
+ * "not open" from a tool that did not answer.
+ */
+function listLanguageServerPidsWindows(): Promise<readonly number[] | undefined> {
+  return new Promise((resolve) => {
+    execFile(
+      'tasklist.exe',
+      ['/FI', 'IMAGENAME eq language_server.exe', '/FO', 'CSV', '/NH'],
+      { timeout: 10_000, maxBuffer: 1024 * 1024, windowsHide: true },
+      (error, stdout) => {
+        if (error !== null) {
+          resolve(undefined)
+          return
+        }
+        // `"language_server.exe","12345","Console","1","123,456 K"`; with no
+        // match tasklist prints an INFO sentence instead of a CSV row.
+        const pids = String(stdout)
+          .split(/\r?\n/)
+          .map((line) => /^"language_server\.exe","(\d+)"/i.exec(line.trim())?.[1])
+          .filter((pid): pid is string => pid !== undefined)
+          .map((pid) => Number(pid))
+        resolve(pids)
+      }
+    )
+  })
+}
+
+const samePids = (left: readonly number[], right: readonly number[]): boolean =>
+  left.length === right.length && [...left].sort((a, b) => a - b).every((pid, index) => pid === [...right].sort((a, b) => a - b)[index])
+
 export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}): {
   probe(): Promise<AntigravityHost | undefined>
   discoveryRecord(): Promise<RuntimeDiscovery>
@@ -142,17 +183,43 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
   const platform = options.platform ?? process.platform
   const localAppData = options.localAppData ?? process.env.LOCALAPPDATA ?? ''
   const home = options.home ?? homedir()
+  const listPids = options.listPids ?? listLanguageServerPidsWindows
   const listProcesses = options.listProcesses ?? listProcessesWindows
   const listeningPorts = options.listeningPorts ?? listeningPortsWindows
   const run = options.run ?? runCli
-  let cached: { readonly at: number; readonly value: AntigravityHost | undefined } | undefined
+  const now = options.now ?? Date.now
+  let cached: { readonly at: number; readonly value: AntigravityHost | undefined; readonly pids: readonly number[] | undefined } | undefined
 
   const probe = async (): Promise<AntigravityHost | undefined> => {
-    if (cached !== undefined && Date.now() - cached.at < PROBE_TTL_MS) return cached.value
+    if (cached !== undefined && now() - cached.at < PROBE_TTL_MS) return cached.value
+    if (platform !== 'win32') return undefined
+    const executablePath = antigravityExecutableCandidates(localAppData).find((candidate) => existsSync(candidate))
+    if (executablePath === undefined) return undefined
+    /*
+     * The cheap question first: is a language server running at all, and is
+     * it the same one as last time?
+     *
+     * Two PowerShell round trips per sweep -- `Get-CimInstance Win32_Process`
+     * and `Get-NetTCPConnection` -- were 4.2-5.5 s of every sweep on Colin's
+     * machine (2026-09-21), for an answer that only changes when Antigravity
+     * opens or closes. `tasklist` says in tens of milliseconds whether any
+     * `language_server.exe` exists; the same pids as the last full look mean
+     * the same server, the same port and the same token, so the last answer
+     * stands. PowerShell runs only when the set of processes has changed.
+     * (Fable's probing review, #7.)
+     */
+    const pids = await listPids()
+    if (pids !== undefined) {
+      if (pids.length === 0) {
+        cached = { at: now(), value: undefined, pids }
+        return undefined
+      }
+      if (cached?.value !== undefined && cached.pids !== undefined && samePids(cached.pids, pids)) {
+        cached = { ...cached, at: now() }
+        return cached.value
+      }
+    }
     const value = await (async () => {
-      if (platform !== 'win32') return undefined
-      const executablePath = antigravityExecutableCandidates(localAppData).find((candidate) => existsSync(candidate))
-      if (executablePath === undefined) return undefined
       const servers = (await listProcesses())
         .map((entry) => ({ pid: entry.pid, parsed: parseServerCommandLine(entry.commandLine) }))
         .filter((entry): entry is { pid: number; parsed: NonNullable<ReturnType<typeof parseServerCommandLine>> } => entry.parsed !== undefined)
@@ -180,7 +247,7 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
       }
       return undefined
     })()
-    cached = { at: Date.now(), value }
+    cached = { at: now(), value, pids }
     return value
   }
 

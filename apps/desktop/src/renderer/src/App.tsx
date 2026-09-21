@@ -496,6 +496,17 @@ function missionTitle(prompt: string): string {
 /** Discovery is asked again while a runtime is still CHECKING, and on focus after this gap. */
 const RUNTIME_RECHECK_MS = 15_000
 const RUNTIME_RECHECK_MIN_GAP_MS = 10_000
+/**
+ * Whether a sweep could learn anything: an installed runtime that is not
+ * ready -- signed out, or not yet answered. A machine where everything
+ * installed is ready has nothing a sign-in in another window could change,
+ * so the sweep that ran on EVERY focus (6 s here, measured 2026-09-21) and
+ * the one that ran unconditionally 15 s after launch are skipped. Check
+ * again still sweeps everything.
+ */
+function worthAskingAgain(runtimes: readonly PublicRuntimeStatus[]): boolean {
+  return runtimes.some((entry) => entry.installed && entry.status !== 'ready')
+}
 
 /**
  * How many lines of npm output to keep. Enough that the end of a failing
@@ -1957,11 +1968,17 @@ export default function App(): ReactElement {
     // When the host last actually swept. The host answers from a ten-second
     // cache, and two asks inside it are one sweep, not two.
     let lastCheckedAt: string | undefined
+    // True until the first answer says otherwise: an answer that never comes
+    // is exactly the case to ask again about.
+    let unanswered = true
     void bridge
       .getLocalRuntimes()
       .then((response) => {
         if (!active) return
-        if (response.ok) lastCheckedAt = response.data.checkedAt
+        if (response.ok) {
+          lastCheckedAt = response.data.checkedAt
+          unanswered = worthAskingAgain(response.data.runtimes)
+        }
         setRuntimeState(
           response.ok
             ? {
@@ -2043,6 +2060,7 @@ export default function App(): ReactElement {
           const stillChecking = response.data.runtimes.some(
             (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
           )
+          unanswered = worthAskingAgain(response.data.runtimes)
           if (!stillChecking) return
           if (!fresh) {
             setTimeout(askAgain, RUNTIME_RECHECK_MS)
@@ -2068,9 +2086,14 @@ export default function App(): ReactElement {
       sweeps = 0
       gaveUp = false
     }
-    const firstRecheck = setTimeout(askAgain, RUNTIME_RECHECK_MS)
+    // Both gated on there being something to learn (Fable's probing review,
+    // #2: measured, the 15 s re-check re-swept a machine with nothing to
+    // learn, and every return to the window did the same).
+    const firstRecheck = setTimeout(() => {
+      if (unanswered) askAgain()
+    }, RUNTIME_RECHECK_MS)
     const onFocus = (): void => {
-      if (Date.now() - lastAsked >= RUNTIME_RECHECK_MIN_GAP_MS) askAgain()
+      if (unanswered && Date.now() - lastAsked >= RUNTIME_RECHECK_MIN_GAP_MS) askAgain()
     }
     // So an install can ask for a fresh answer the moment it finishes.
     askDiscoveryAgain.current = askAgain

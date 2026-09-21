@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.236.0 - 2026-09-21
+
+- **Locust stops re-checking runtimes that have nothing to report.** Every
+  return to the window, and a timer fifteen seconds after launch, re-ran the
+  whole runtime sweep -- six seconds on the machine this was built on -- even
+  when every installed runtime was already ready. Those sweeps now run only
+  when something installed is not ready (signed out, or not yet answered).
+  Check again still checks everything.
+- **The window appears sooner.** Locust asked npm where it keeps its
+  programs before it drew anything; that question is asked in the background
+  now and read only if a runtime is not found on PATH.
+- **Antigravity is found without two PowerShell round trips per sweep.**
+  A cheap process check decides whether Antigravity is open and whether it
+  is the same one as last time; PowerShell runs only when that has changed.
+
 ## 0.235.0 - 2026-09-21
 
 - **Locust finds your runtimes in half the time.** Each runtime's checks --

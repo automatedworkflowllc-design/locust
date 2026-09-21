@@ -46,7 +46,11 @@ pm`
    * this module has no business spawning one, and the answer is stable for a
    * session. The host asks once and passes it in.
    */
-  readonly npmBinDirectory?: string;
+  /**
+   * npm's real bin directory, or a promise of it. A promise is awaited only
+   * when PATH has missed, which is the only pass that reads it.
+   */
+  readonly npmBinDirectory?: string | Promise<string | undefined>;
   /**
    * Where the host's OWN npm installs to, when the host carries one.
    *
@@ -474,7 +478,10 @@ export function createPathExecutableLocator(
        * one a person would get from a terminal, and this whole search exists
        * to agree with that.
        */
-      const npmBin = options.npmBinDirectory
+      // Awaited HERE, at the one pass that needs it, so the host can hand
+      // over the answer to `npm config get prefix` before it has one -- that
+      // question used to be a top-level await in front of the first window.
+      const npmBin = await options.npmBinDirectory
       const own = options.ownInstallDirectory
       return (
         (await resolveWithin(pathOnly))

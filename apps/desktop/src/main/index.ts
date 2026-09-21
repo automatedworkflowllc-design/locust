@@ -216,7 +216,14 @@ const probeRunner = createNodeProbeRunner()
  * stays PATH first. A machine with no npm answers undefined and nothing
  * changes. See `npm-prefix.ts`.
  */
-const npmBinDirectory = await readNpmBinDirectory()
+/*
+ * NOT awaited. This was `await readNpmBinDirectory()` at the top of the
+ * module, which put `npm config get prefix` -- half a second here, up to its
+ * ten-second timeout on a machine where npm hangs -- in front of
+ * `app.whenReady` and the splash window. The locator awaits it at the one
+ * pass that needs it, after PATH has missed (Fable's probing review, #5).
+ */
+const npmBinDirectory = readNpmBinDirectory()
 /*
  * The Node this app is already made of.
  *
@@ -256,7 +263,7 @@ const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
   ? { find: async () => undefined }
   : createPathExecutableLocator({
       bundledNode,
-      ...(npmBinDirectory === undefined ? {} : { npmBinDirectory }),
+      npmBinDirectory,
       ...(bundledNpm === undefined
         ? {}
         : { ownInstallDirectory: bundledNpmBinDirectory(bundledNpmPrefixPath, process.platform) })
