@@ -229,8 +229,24 @@ export interface RuntimeCommandSpec {
    * a request/response protocol, and the prompt travels inside a request.
    * The ordinary process runner refuses that spec rather than guessing, so a
    * protocol command can only be run by something that speaks the protocol.
+   *
+   * `prompt-file` means the runner writes the prompt to a temporary file and
+   * substitutes its path for `PROMPT_FILE_PLACEHOLDER` in `args`. Muse Code
+   * is the first runtime that needs it and the reason it exists:
+   *
+   *   - MEASURED 2026-09-21, `muse exec` with the prompt piped in exits 2
+   *     with `usage: muse exec [OPTIONS] [PROMPT]`. It does not read stdin.
+   *   - It is reached through `muse.cmd`, so `cmd.exe` caps the command line
+   *     at 8,191 characters.
+   *
+   * Those two together are the failure OpenCode already had and already fixed
+   * once: a 1,200-character reply quoted inside a 2,215-character standing
+   * brief came to ~7,500 characters and was refused, and the person never got
+   * their report (2026-09-17). OpenCode escaped it through stdin. Muse cannot,
+   * so the prompt goes in a file instead of argv, and `commandTooLong` --
+   * which only limits `stdin: "none"` -- correctly stops applying.
    */
-  readonly stdin: "prompt" | "none" | "protocol";
+  readonly stdin: "prompt" | "none" | "protocol" | "prompt-file";
   readonly stdout: "jsonl";
   /**
    * What this mission was allowed. Absent reads as `read-only` everywhere it

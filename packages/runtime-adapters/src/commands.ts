@@ -289,7 +289,7 @@ export function assertSafeRuntimeCommand(
 
 interface SpecTransport {
   /** Omitted means the prompt goes on stdin, which is what most CLIs read. */
-  readonly stdin?: "prompt" | "none" | "protocol";
+  readonly stdin?: RuntimeCommandSpec["stdin"];
   /** What the mission was allowed, so the guard can judge the argv it is given. */
   readonly sandbox?: MissionSandbox;
   readonly env?: Readonly<Record<string, string>>;
@@ -1052,6 +1052,100 @@ export const OPENCODE_CONFINED_CONFIG = JSON.stringify({
  * The working directory is the workspace and there is no flag for it: OpenCode
  * takes the directory it is spawned in.
  */
+/**
+ * Where the runner substitutes the path of the file it wrote the prompt into.
+ *
+ * A literal rather than a positional index, so a builder can put it anywhere
+ * in its argument list and a reader of the spec can see what it is. Chosen to
+ * be something no real path could be.
+ */
+export const PROMPT_FILE_PLACEHOLDER = "<locust:prompt-file>";
+
+/**
+ * Meta's Muse Code, headless.
+ *
+ * MEASURED on Windows 2026-09-21 against 1.3.0-R3401.1, captures in
+ * `docs/muse-probe-2026-09-21/`. Every flag below was read from
+ * `muse exec --help` on the installed binary, not from documentation.
+ *
+ * THE PROMPT GOES IN A FILE, and that is not a preference:
+ *
+ *   - piping it in exits 2 with `usage: muse exec [OPTIONS] [PROMPT]`, so
+ *     stdin is not an option the way it is for OpenCode;
+ *   - `muse` on PATH is `muse.cmd`, a PowerShell launcher that is neither npm
+ *     shim shape `path-locator` unwraps, so it keeps its shell and cmd.exe
+ *     caps the command line at 8,191 characters.
+ *
+ * Locust routinely sends more than that -- a peer reply quoted inside a
+ * standing brief reached ~7,500 characters and was refused on OpenCode in
+ * 2026-09-17, and the person never got their report. `--prompt-file` is the
+ * escape Muse offers, and taking it also lifts `commandTooLong`, which only
+ * limits specs whose prompt is in argv.
+ *
+ * READ-ONLY IS REAL HERE, which is worth saying because it is the thing
+ * Cursor cannot give us on Windows. `--disable-write` stops non-shell
+ * workspace writes and `--disable-shell` stops shell execution; both are
+ * flags on the binary rather than a config file we have to smuggle in.
+ *
+ * Approval and the sandbox are ON by default. A headless run cannot answer an
+ * approval prompt, so the mode that would ask is set to one that does not --
+ * `--approval-mode never` for a run allowed to write, which is what
+ * `accept-edits` means, and the read-only flags above for one that is not.
+ * `--yolo` is deliberately never passed: it also disables the sandbox and
+ * trusts the workspace, which is three decisions hiding in one flag.
+ */
+export function createMuseExecCommand(
+  executable: ExecutableLaunch,
+  options: RuntimeCommandOptions,
+): RuntimeCommandSpec {
+  const sandbox = sandboxArgument(options.sandbox);
+  requireText(options.prompt ?? "", "Prompt");
+  const args = ["exec", "--json", "--prompt-file", PROMPT_FILE_PLACEHOLDER];
+  // The workspace is named as well as entered. `--workspace PATH` is what
+  // roots the policy-gated tools; the measured run printed
+  // `muse: workspace root: ... (explicit)` for it.
+  args.push("--workspace", requireText(options.workspacePath, "Workspace path"));
+  if (options.model !== undefined) {
+    args.push("--model", requireText(options.model, "Model"));
+  }
+  if (options.effort !== undefined) {
+    // Measured from `muse exec --help`: none|minimal|low|medium|high|xhigh|
+    // max|ultra. An effort outside that set is refused here rather than
+    // passed on, because the CLI would reject the whole run for it.
+    const effort = requireText(options.effort, "Effort");
+    if (!MUSE_EFFORTS.includes(effort)) {
+      throw new Error(`Muse Code takes no reasoning effort called "${effort}"`);
+    }
+    args.push("--reasoning-effort", effort);
+  }
+  if (options.resumeThreadId !== undefined) {
+    args.push("--session-id", requireText(options.resumeThreadId, "Session id"));
+  }
+  if (sandbox === "read-only") {
+    args.push("--disable-write", "--disable-shell");
+  } else {
+    // Nothing can answer a prompt in a headless run, and the default
+    // `on-request` would wait for one. The sandbox is left ON.
+    args.push("--approval-mode", "never");
+  }
+  return baseSpec("muse", executable, options.workspacePath, args, {
+    stdin: "prompt-file",
+    sandbox,
+  });
+}
+
+/** The reasoning efforts `muse exec --help` lists, measured 2026-09-21. */
+const MUSE_EFFORTS: readonly string[] = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+];
+
 export function createOpenCodeRunCommand(
   executable: ExecutableLaunch,
   options: RuntimeCommandOptions,

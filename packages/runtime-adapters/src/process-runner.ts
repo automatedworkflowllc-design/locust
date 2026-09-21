@@ -1,7 +1,32 @@
 import { execFileSync, spawn } from "node:child_process";
-import { isAbsolute } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { assertSafeRuntimeCommand } from "./commands.js";
+import { assertSafeRuntimeCommand, PROMPT_FILE_PLACEHOLDER } from "./commands.js";
+
+/**
+ * The transports this runner knows how to honour. `protocol` is absent on
+ * purpose: that spec is a server to be spoken to, and running it as an
+ * ordinary process would start something nobody is listening to.
+ */
+const ACCEPTED_TRANSPORTS: ReadonlySet<string> = new Set(["prompt", "none", "prompt-file"]);
+
+/**
+ * Remove the prompt file, whatever happened to the run.
+ *
+ * Never throws: a temp file that cannot be deleted is a housekeeping problem,
+ * and letting it take down a run that has already produced an answer would
+ * turn a small leak into a lost mission.
+ */
+function discardPromptFile(directory: string | undefined): void {
+  if (directory === undefined) return;
+  try {
+    rmSync(directory, { recursive: true, force: true });
+  } catch {
+    // Left for the OS to sweep with the rest of its temp directory.
+  }
+}
 import type { RuntimeCommandSpec } from "./types.js";
 
 interface RuntimeReadable {
@@ -383,7 +408,7 @@ export function createNodeRuntimeProcessRunner(
       if (!isAbsolute(spec.cwd)) {
         throw safeTransportError("Runtime workspace path must be absolute");
       }
-      if ((spec.stdin !== "prompt" && spec.stdin !== "none") || spec.stdout !== "jsonl") {
+      if (!ACCEPTED_TRANSPORTS.has(spec.stdin) || spec.stdout !== "jsonl") {
         throw safeTransportError("Runtime command does not satisfy the JSONL transport contract");
       }
       if (spec.args.some((argument) => argument.includes("\0"))) {
@@ -421,9 +446,42 @@ export function createNodeRuntimeProcessRunner(
         completionReject = reject;
       });
 
+      /*
+       * THE PROMPT, IN A FILE, for a runtime that reads neither stdin nor a
+       * command line long enough to hold it. See the `prompt-file` note on
+       * `RuntimeCommandSpec["stdin"]`.
+       *
+       * Written before the spawn and removed in `finally` below whatever
+       * happens, including a failed launch. It holds the person's own words,
+       * so it goes in a directory only they can read -- `mkdtemp` under the
+       * OS temp root, which on every platform we ship is per-user -- and it
+       * is deleted rather than left for the next person to find.
+       */
+      let promptDirectory: string | undefined;
+      let args = spec.args;
+      if (spec.stdin === "prompt-file") {
+        try {
+          promptDirectory = mkdtempSync(join(tmpdir(), "locust-prompt-"));
+          const promptPath = join(promptDirectory, "prompt.txt");
+          writeFileSync(promptPath, prompt, "utf8");
+          args = spec.args.map((argument) =>
+            argument === PROMPT_FILE_PLACEHOLDER ? promptPath : argument,
+          );
+          if (args.includes(PROMPT_FILE_PLACEHOLDER) || !args.includes(promptPath)) {
+            // A spec that asked for this transport and never named where the
+            // path goes would launch a run with no prompt at all, which reads
+            // as the model ignoring you.
+            throw new Error("placeholder");
+          }
+        } catch {
+          discardPromptFile(promptDirectory);
+          throw safeTransportError("Runtime prompt could not be prepared");
+        }
+      }
+
       let child: SpawnedRuntimeProcess;
       try {
-        child = spawnProcess(spec.executablePath, spec.args, {
+        child = spawnProcess(spec.executablePath, args, {
           cwd: spec.cwd,
           // The spec's own variables sit ON TOP of the allowlist, not beside
           // it: OpenCode's read-only permission config is the only thing
@@ -493,6 +551,10 @@ export function createNodeRuntimeProcessRunner(
         if (forceTimer !== undefined) clearTimeout(forceTimer);
         if (confirmationTimer !== undefined) clearTimeout(confirmationTimer);
         removeAbortListener();
+        // Both `finish` and `fail` come through here, so the prompt file is
+        // removed on a clean exit, a crash, and a cancellation alike.
+        discardPromptFile(promptDirectory);
+        promptDirectory = undefined;
       };
 
       const finish = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
@@ -661,7 +723,7 @@ export function createNodeRuntimeProcessRunner(
       // A spec whose prompt is already in argv gets an empty, closed stdin.
       // Writing the prompt a second time would put it where the CLI is not
       // reading, and some CLIs treat anything on stdin as extra input.
-      if (terminationRequested || spec.stdin === "none") {
+      if (terminationRequested || spec.stdin === "none" || spec.stdin === "prompt-file") {
         child.stdin.end();
       } else {
         try {

@@ -140,8 +140,11 @@ export {
   COPILOT_MODEL_HINTS,
   COPILOT_REQUIRED_FEATURES,
   createCopilotPromptCommand,
+  createMuseExecCommand,
+  PROMPT_FILE_PLACEHOLDER,
   createOpenCodeRunCommand,
   OPENCODE_READ_ONLY_CONFIG,
+  MUSE_REQUIRED_FEATURES,
   OPENCODE_REQUIRED_FEATURES,
   parseOpenCodeModelList,
 } from "./commands.js";
