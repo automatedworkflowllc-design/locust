@@ -371,7 +371,7 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
       let route = await routeText()
       if (route !== '' && !isFree(route)) {
         say(`this drive does not spend, and the composer is on "${String(route)}". Moving it to the free route.`)
-        await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
+        await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/muse.*1\\.3/i' }))
         route = await routeText()
         if (!isFree(route)) {
           say(`could not put a non-spending drive on a free route; it is on "${String(route)}".`)

@@ -78,6 +78,35 @@ try {
     }
     return 'still running: ' + ${roomState}
   })()`))
+  /*
+   * WHAT COLOUR EACH PART OF AN ANSWER HEADER ACTUALLY IS.
+   *
+   * The handover's §4.2 says the route line "renders across four or five
+   * colours ... it reads as syntax highlighting", the clearest violation of
+   * the system's own rule that blue/amber/red carry meaning and never
+   * hierarchy. That is a claim about pixels, and the frames it was made from
+   * were never committed, so it cannot be checked by reading anything.
+   *
+   * It is also a claim worth checking before acting on: the last confident
+   * assertion from that document -- that a duplicate `.lc-switch` block was
+   * "a dead rule worth deleting regardless" -- was wrong in a way that took
+   * two real defects to discover.
+   *
+   * So the drive reads the computed colour of every span in the header and
+   * counts the distinct ones. No opinion, just the count and the values.
+   */
+  await drive.capture('what tones the answer header is drawn in', () => drive.evaluate(`(() => {
+    const header = document.querySelector('.lc-roomanswer__who')
+    if (!header) return 'no answer header on screen'
+    const parts = [...header.querySelectorAll('span, button')]
+      .filter(el => (el.textContent ?? '').trim().length > 0 && el.children.length === 0)
+      .map(el => ({
+        text: (el.textContent ?? '').replace(/\\s+/g, ' ').trim().slice(0, 34),
+        className: el.className,
+        color: getComputedStyle(el).color
+      }))
+    return JSON.stringify({ distinct: [...new Set(parts.map(p => p.color))].length, parts })
+  })()`))
   await drive.capture('Open on a card goes to that mission', () => drive.evaluate(`(async () => {
     const button = [...document.querySelectorAll('.lc-roomanswer .lc-ghostbutton')].find(b => b.innerText.trim() === 'Open')
     if (!button) return 'no Open button'
@@ -85,12 +114,32 @@ try {
     await new Promise(r => setTimeout(r, 800))
     return document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? 'no header'
   })()`))
+  /*
+   * SAYS SO WHEN IT DID NOT GO BACK.
+   *
+   * This clicked a `.lc-roomrow` matching /Release/ and, when there was no
+   * such row, clicked NOTHING and reported the room state of whatever screen
+   * it was already on -- the mission thread step 08 opened. The design
+   * handover of 2026-09-21 (§6.3) read the resulting `{posts: 0, cards: []}`
+   * as a room that had lost its answers and nearly filed it as a functional
+   * bug. It is not one: the room selectors found nothing because the screen
+   * was not the room.
+   *
+   * An assertion that cannot fail is not an assertion. Same wrong assumption
+   * the hub smoke's first draft made -- `selectTeammate` has always opened
+   * the newest conversation, not the one you meant.
+   */
   await drive.capture('back to the room from the sidebar', () => drive.evaluate(`(async () => {
     const row = [...document.querySelectorAll('.lc-roomrow')].find(r => /Release/.test(r.innerText))
-    if (row) row.click()
+    if (!row) return 'NO ROOM ROW named Release in the sidebar -- did not navigate, so nothing below is about the room'
+    row.click()
     await new Promise(r => setTimeout(r, 700))
+    const title = document.querySelector('.lc-screen__title')?.innerText ?? ''
+    if (!/Release/.test(title)) return 'CLICKED the room row and landed on ' + JSON.stringify(title) + ' instead'
     return ${roomState}
   })()`))
+
+
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
