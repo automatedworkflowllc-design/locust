@@ -67,14 +67,28 @@ const DENSE: ReadonlySet<OrbState> = new Set([
 export function Orb({
   state,
   box,
-  label
+  label,
+  preset
 }: {
   readonly state: OrbState
   /** CSS pixels the drawing gets. 64 is painted down into this. */
   readonly box: number
   readonly label?: string
+  /**
+   * Force one of the library's two drawings, where the default is wrong for
+   * this surface.
+   *
+   * There is exactly one caller: the plan's step. `listening` is a density
+   * shape, so it takes the 64 asset on the live line -- but at marker size
+   * the inline drawing is the one that reads, and it is also usefully
+   * DIFFERENT from the same shape on the line below. Colin picked it out of
+   * a contact sheet by pointing at that exact cell: *"the original small
+   * .221 20 preset @ 20 pxl its honestly different enough from everything
+   * else"*.
+   */
+  readonly preset?: 20 | 64
 }): ReactElement {
-  const dense = DENSE.has(state)
+  const dense = preset === undefined ? DENSE.has(state) : preset === 64
   return (
     <ThinkingOrb
       state={state}

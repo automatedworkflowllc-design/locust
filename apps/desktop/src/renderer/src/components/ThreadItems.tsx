@@ -409,12 +409,28 @@ function alignClass(align: 'left' | 'right' | 'center' | undefined): string | un
  * where there is room, once per card, and says what a card-level mark should
  * say: this plan is running.
  *
- * The step keeps the mark a row marker can hold: `working`, four particles on
- * tilted orbits, sparse by design and legible at 11px. It is the one Colin
- * called the "previous smaller pulsing/bouncing sphere", which is exactly what
- * it looks like at that size.
+ * The step took `working` first -- four particles on tilted orbits -- and that
+ * lasted one look: *"the particles were using rn are a little scattered for
+ * that task"*. Right again, and for a reason worth keeping: a plan step is a
+ * DISCRETE unit of work, and a mark made of loose particles says diffuse. A
+ * step underway wants something that reads as one solid thing.
+ *
+ * So it is `listening` at the library's INLINE drawing -- the 20 preset at
+ * 20px, which Colin picked by pointing at that cell on a contact sheet:
+ * *"its honestly different enough from everything else and i think it would
+ * work with the plan structure"*. At that size it is a small dense sphere,
+ * which is exactly what a discrete unit of work should look like.
+ *
+ * NOTE THE ONE COLLISION IT ACCEPTS. `listening` is also the live line's
+ * THINKING orb, and the plan card and the live line can be on screen at once
+ * -- which is the very thing that cost the rubik this slot. It is a weaker
+ * version of that problem: these are different drawings of the same shape
+ * (inline 20 here, the 64 asset there) at different sizes and at opposite
+ * ends of the view, where the rubik's clash was the same drawing at the same
+ * size a few pixels apart. Colin made the call knowing the shape; if the two
+ * ever read as one thing on screen, this is the line to come back to.
  */
-const PLAN_ORB: OrbState = 'working'
+const PLAN_ORB: OrbState = 'listening'
 
 /** The header light: the rubik at a size its bands can actually be seen at. */
 const PLAN_HEAD_ORB = 24
@@ -422,11 +438,12 @@ const PLAN_HEAD_ORB = 24
 /**
  * The step marker, kept small on purpose.
  *
- * It sits in an 11px column beside a line of text. Anything bigger pushes the
- * step's words out of line with the ones above and below it, which is the
- * whole reason a plan reads as a list.
+ * It sits in a narrow column beside a line of text. Anything bigger pushes
+ * the step's words out of line with the ones above and below it, which is the
+ * whole reason a plan reads as a list. 20 is the inline drawing's own size,
+ * so this is neither scaled up nor down -- it is the picture as drawn.
  */
-const PLAN_STEP_ORB = 18
+const PLAN_STEP_ORB = 20
 
 export function PlanSteps({
   steps,
@@ -537,7 +554,7 @@ export function PlanSteps({
                 // The orb REPLACES the pulsing pip rather than joining it:
                 // two things pulsing on one row is the row saying "now" twice.
                 <span className="lc-plan__orb" data-orb={PLAN_ORB}>
-                  <Orb state={PLAN_ORB} box={PLAN_STEP_ORB} />
+                  <Orb state={PLAN_ORB} box={PLAN_STEP_ORB} preset={20} />
                 </span>
               ) : (
                 <span className={`lc-dot${step.state === 'running' ? ' is-pulsing' : ''}`} />

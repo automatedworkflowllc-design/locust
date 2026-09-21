@@ -6,6 +6,12 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.225.0 - 2026-09-20
+
+- **The step underway is one solid mark.** The orbiting particles read as
+  diffuse next to a single named piece of work; it is the small dense sphere
+  now, at the size that drawing was made for.
+
 ## 0.224.0 - 2026-09-20
 
 - **The plan card says it is running, where you can see it.** The scrambling

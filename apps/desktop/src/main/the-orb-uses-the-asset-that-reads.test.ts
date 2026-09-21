@@ -70,6 +70,8 @@ describe('the orb uses the asset that reads', () => {
     const head = css.slice(css.indexOf('.lc-plancard__orb {'))
     expect(head.slice(0, 200)).toContain('width: 24px')
     const step = css.slice(css.indexOf('.lc-plan__orb {'))
-    expect(step.slice(0, 260)).toContain('width: 18px')
+    // 20 is the inline drawing's own size: the step asks for that preset by
+    // name, so the box is the picture rather than a scale of it.
+    expect(step.slice(0, 260)).toContain('width: 20px')
   })
 })

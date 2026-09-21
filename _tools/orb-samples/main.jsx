@@ -79,7 +79,7 @@ function App() {
                 {state === 'done'
                   ? <span className="tick">&#10003;</span>
                   : state === 'running'
-                    ? <span className="steporb"><ThinkingOrb state="working" size={20} theme="dark" /></span>
+                    ? <span className="steporb"><ThinkingOrb state="listening" size={20} theme="dark" /></span>
                     : <span className="dot" />}
               </span>
               <span>{text}</span>

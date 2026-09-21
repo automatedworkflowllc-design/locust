@@ -11586,10 +11586,11 @@ textarea {
 .lc-plan__orb {
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  /* The inline drawing's own size, neither scaled up nor down. */
+  width: 20px;
+  height: 20px;
   /* The row's line box is set by the text, not by this. */
-  margin: -4px 0;
+  margin: -5px 0;
 }
 
 /* Beside the word it is about, not before the name -- so it needs the gap a
