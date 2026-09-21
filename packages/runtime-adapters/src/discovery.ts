@@ -1,3 +1,5 @@
+import { stat } from "node:fs/promises";
+
 import {
   CLAUDE_REQUIRED_FEATURES,
   CODEX_REQUIRED_FEATURES,
@@ -229,6 +231,76 @@ function succeeded(outcome: ProbeOutcome): outcome is { readonly result: Command
   return outcome.result?.exitCode === 0 && outcome.result.timedOut !== true;
 }
 
+/**
+ * What a CLI's own files say about it, as the probes printed it.
+ *
+ * RAW TEXT, not the version and features read out of it. A Locust release
+ * that teaches `parseRuntimeVersion` a new format, or
+ * `detectSupportedFeatures` a new flag, must reach a machine whose CLIs have
+ * not changed -- and it does, because the text is what is kept and the
+ * reading is redone every time.
+ */
+export interface RuntimeBinaryFacts {
+  readonly versionText: string;
+  readonly capabilityText: string;
+}
+
+/**
+ * What was learned about a binary that has not changed since.
+ *
+ * `--version` and `--help` are functions of the file on disk: same file,
+ * same answer, and on Colin's machine each costs 0.5-1.6 s of a sweep that
+ * runs at every launch. Readiness is NOT cached here and never will be --
+ * whether an account is signed in changes without the file changing, which
+ * is the whole reason the probe exists.
+ *
+ * Keyed by a fingerprint of every file the launch touches (the shim found on
+ * PATH, the executable actually run, and any path among its prefix
+ * arguments) with each one's size and modification time. An npm update
+ * rewrites those files, so the fingerprint moves and the probes run again.
+ * A file that cannot be stat'd yields no fingerprint at all, so it is probed
+ * -- absence of a fact is never taken as the fact being unchanged.
+ */
+export interface RuntimeFactsCache {
+  get(fingerprint: string): RuntimeBinaryFacts | undefined;
+  set(fingerprint: string, facts: RuntimeBinaryFacts): void;
+}
+
+/** Test seam: `stat`, narrowed to the two fields a fingerprint is made of. */
+export type StatFile = (path: string) => Promise<{ readonly size: number; readonly mtimeMs: number }>;
+
+/**
+ * Every file this launch depends on, in a stable order.
+ *
+ * A node-shim runs `node.exe` with the CLI's own script as a prefix
+ * argument, so the executable that is spawned is not the file that changes
+ * when the CLI is updated. Fingerprinting all of them costs three stats --
+ * microseconds against a spawn -- and is the difference between noticing an
+ * update and serving a stale version number for ever.
+ */
+function fingerprintPaths(executable: ExecutableLaunch): readonly string[] {
+  const paths = [executable.discoveredPath, executable.executablePath, ...executable.prefixArgs];
+  return [...new Set(paths.filter((path) => path.length > 0))];
+}
+
+async function fingerprintOf(executable: ExecutableLaunch, statFile: StatFile): Promise<string | undefined> {
+  const parts: string[] = [];
+  for (const path of fingerprintPaths(executable)) {
+    let stats;
+    try {
+      stats = await statFile(path);
+    } catch {
+      // A prefix argument that is a flag rather than a file lands here, and
+      // so does a file that has gone. Neither is fatal on its own; what is
+      // fatal is claiming a fingerprint that does not cover everything.
+      continue;
+    }
+    parts.push(`${path}:${String(stats.size)}:${String(stats.mtimeMs)}`);
+  }
+  // Nothing could be stat'd at all: there is no fact here to key on.
+  return parts.length === 0 ? undefined : parts.join("|");
+}
+
 function failureMessage(outcome: ProbeOutcome): string {
   if (outcome.error) return outcome.error;
   if (outcome.result?.timedOut) return "probe timed out";
@@ -248,6 +320,8 @@ async function discoverOne(
   definition: IntegrationDefinition,
   runner: CommandRunner,
   locator: ExecutableLocator,
+  recall: RuntimeFactsCache | undefined,
+  statFile: StatFile,
 ): Promise<RuntimeDiscovery> {
   const executable = await locator.find(definition.commandName);
   if (!executable) {
@@ -293,9 +367,22 @@ async function discoverOne(
     definition.modelsArgs !== undefined
     && definition.modelsArgs.length === definition.readinessArgs.length
     && definition.modelsArgs.every((arg, index) => arg === definition.readinessArgs[index]);
+  /*
+   * What this binary already told us, if it is the same binary.
+   *
+   * Only version and capability: the two probes whose answer is a function
+   * of the file. Readiness is always asked, because signing in changes
+   * nothing on disk. (Fable's probing review, #4.)
+   */
+  const fingerprint = recall === undefined ? undefined : await fingerprintOf(executable, statFile);
+  const remembered = fingerprint === undefined ? undefined : recall?.get(fingerprint);
   const [versionOutcome, capabilityOutcome, readinessOutcome, listedOutcome] = await Promise.all([
-    runProbe(runner, executable, "version", definition.versionArgs),
-    runProbe(runner, executable, "capabilities", definition.capabilityArgs),
+    remembered === undefined
+      ? runProbe(runner, executable, "version", definition.versionArgs)
+      : Promise.resolve({ result: { stdout: remembered.versionText, stderr: "", exitCode: 0 } } as ProbeOutcome),
+    remembered === undefined
+      ? runProbe(runner, executable, "capabilities", definition.capabilityArgs)
+      : Promise.resolve({ result: { stdout: remembered.capabilityText, stderr: "", exitCode: 0 } } as ProbeOutcome),
     runProbe(runner, executable, "readiness", definition.readinessArgs),
     definition.modelsArgs === undefined || sameCommand
       ? Promise.resolve(undefined)
@@ -326,6 +413,24 @@ async function discoverOne(
   const capabilityText = succeeded(capabilityOutcome)
     ? `${capabilityOutcome.result.stdout}\n${capabilityOutcome.result.stderr}`
     : "";
+  /*
+   * Kept only when BOTH probes answered, and only when this was a real
+   * probe rather than a recollection.
+   *
+   * A failure is not a fact about the binary -- a CLI that timed out once
+   * under load would otherwise be remembered as versionless for as long as
+   * nobody reinstalled it, which is the "absence of an answer is not an
+   * answer" rule this project keeps relearning, written into a cache.
+   */
+  if (
+    remembered === undefined
+    && fingerprint !== undefined
+    && succeeded(versionOutcome)
+    && succeeded(capabilityOutcome)
+  ) {
+    recall?.set(fingerprint, { versionText: combinedVersionOutput, capabilityText });
+  }
+
   const supportedFeatures = succeeded(capabilityOutcome)
     ? detectSupportedFeatures(definition.id, capabilityText)
     : [];
@@ -475,6 +580,14 @@ export interface DiscoverInstalledRuntimesOptions {
    * app wants.
    */
   readonly staggerMs?: number;
+  /**
+   * What the binaries said last time, so a file that has not changed is not
+   * asked its version and its help text again. Absent means ask everything,
+   * which is what every caller but the app wants.
+   */
+  readonly recall?: RuntimeFactsCache;
+  /** Test seam: how a file's size and modification time are read. */
+  readonly statFile?: StatFile;
 }
 
 /**
@@ -506,6 +619,10 @@ export async function discoverInstalledRuntimes(
     ? DEFINITIONS.filter((definition) => definition.id !== "omniroute")
     : DEFINITIONS;
   const stagger = options.staggerMs ?? 0;
+  const statFile = options.statFile ?? (async (path: string) => {
+    const stats = await stat(path);
+    return { size: stats.size, mtimeMs: stats.mtimeMs };
+  });
   /*
    * NEVER WAIT LONGER THAN THE RUNTIME DOES.
    *
@@ -555,7 +672,7 @@ export async function discoverInstalledRuntimes(
           displayName: definition.displayName,
           bin: definition.commandName,
         });
-        const running = discoverOne(definition, options.runner, options.locator);
+        const running = discoverOne(definition, options.runner, options.locator, options.recall, statFile);
         if (stagger > 0) {
           void Promise.race([
             running.then(

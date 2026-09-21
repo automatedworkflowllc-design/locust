@@ -82,6 +82,7 @@ import { AntigravityStartError, createAntigravityMissionService } from './antigr
 import type { Relay } from './relay.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
 import { bootOutcome, createDiscoveryLog } from './discovery-log.js'
+import { createRuntimeFactsStore } from './runtime-facts.js'
 import { createRuntimeInstaller } from './runtime-installer.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
@@ -268,15 +269,29 @@ const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
         ? {}
         : { ownInstallDirectory: bundledNpmBinDirectory(bundledNpmPrefixPath, process.platform) })
     })
+/*
+ * What the CLIs on this machine already told us about themselves.
+ *
+ * Loaded before the first sweep and consulted by discovery for any binary
+ * whose files have not changed since -- which skips that runtime's version
+ * and help probes entirely. Readiness is still asked every time. Loading it
+ * is not awaited here: a sweep that starts before the file has been read
+ * simply probes, which is what every sweep did before this existed.
+ */
+const runtimeFacts = createRuntimeFactsStore({ rootDirectory: app.getPath('userData') })
+const runtimeFactsLoaded = runtimeFacts.load().catch(() => undefined)
 // Antigravity has no CLI probe: its readiness is whether the app is open,
 // which the host checks itself and merges into the same sweep.
 const antigravityProbe = createAntigravityHostProbe()
 const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
+  // Cheap and bounded: a file read that has already been started.
+  await runtimeFactsLoaded
   const [found, antigravity] = await Promise.all([
     discoverInstalledRuntimes({
       runner: probeRunner,
       locator: executableLocator,
       includeOmniRoute: true,
+      recall: runtimeFacts,
       /*
        * A beat between starts you can actually SEE.
        *

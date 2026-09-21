@@ -10,6 +10,7 @@ export {
   OMNIROUTE_REQUIRED_FEATURES,
 } from "./commands.js";
 export { discoverInstalledRuntimes } from "./discovery.js";
+export type { RuntimeBinaryFacts, RuntimeFactsCache, StatFile } from "./discovery.js";
 export {
   allowRuleFor,
   cursorConnectorSentence,

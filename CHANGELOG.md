@@ -6,6 +6,24 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.238.0 - 2026-09-21
+
+- **A long answer no longer stops the run that wrote it.** A Cursor run that
+  had already printed a full account summary on screen ended with "the
+  mission ledger could not be written -- too many mission events in one
+  append", and the work was thrown away. The limit it hit is about how much
+  Locust writes to disk at once, not about how much a run may say; a burst
+  bigger than that is now written in several goes instead of being refused.
+  The ledger from that run was intact all along -- 547 records, nothing
+  wrong with it.
+- **Locust asks a CLI its version and its help text only when the CLI has
+  changed.** Both answers are fixed by the program on disk, so they are
+  remembered between launches and re-read when the file is updated. Whether
+  you are signed in is still checked every time, because that changes
+  without the file changing. Measured on the machine this was built on: a
+  second launch finds every runtime in 4.2 seconds where the first takes
+  6.1, with the same answers.
+
 ## 0.237.0 - 2026-09-21
 
 - **A teammate is handed the memories that bear on what you asked.** The

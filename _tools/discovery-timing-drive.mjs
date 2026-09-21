@@ -10,7 +10,7 @@
 // because a before/after is not a control unless the old thing is re-run.
 
 import { spawn } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -23,7 +23,16 @@ const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
 const label = process.argv[2] ?? ''
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-const profile = await mkdtemp(join(tmpdir(), 'locust-timing-'))
+/*
+ * `--profile <dir>` REUSES a profile, and that is the only way to see the
+ * binary-facts cache at all: it is read from the profile at launch, so a
+ * fresh profile is always a cold sweep. Run the same directory twice and
+ * the second launch is the warm one.
+ */
+const asked = process.argv.indexOf('--profile')
+const reused = asked === -1 ? undefined : process.argv[asked + 1]
+const profile = reused ?? (await mkdtemp(join(tmpdir(), 'locust-timing-')))
+if (reused !== undefined) await mkdir(reused, { recursive: true })
 const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(PORT)}`, `--user-data-dir=${profile}`], {
   cwd: APP_DIR,
   env: { ...process.env, PATH: `${CODEX_BIN_DIR};${NPM_DIR};${CURSOR_DIR};${process.env.PATH ?? ''}` },
@@ -76,5 +85,6 @@ try {
 } finally {
   child.kill()
   await sleep(500)
-  await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+  // A reused profile is the point: leave it for the next run.
+  if (reused === undefined) await rm(profile, { recursive: true, force: true }).catch(() => undefined)
 }

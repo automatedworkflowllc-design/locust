@@ -1267,6 +1267,45 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
     }
   }
 
+  /**
+   * Write these records, in as many appends as it takes.
+   *
+   * `MAX_EVENTS_PER_APPEND` and `MAX_APPEND_BYTES` bound ONE WRITE -- they
+   * are about how much this file is willing to put in a single append, not
+   * about how much a caller is allowed to record. They were enforced as a
+   * refusal, and on 2026-09-21 Colin lost a finished Cursor run to it: a
+   * long answer arrived as one burst, the normalizer turned it into more
+   * than a hundred events, and the mission was STOPPED with "Too many
+   * mission events in one append" -- the analysis already on screen, and the
+   * ledger refusing to keep it.
+   *
+   * A batch too big for one write is not a caller error; it is a write to
+   * split. Every record is still validated before any of it is written, and
+   * the sequences were assigned in one pass, so the batches land in order
+   * and read back as one run. A failure part-way leaves the earlier batches
+   * on disk, which is what an append-only ledger promises anyway -- "the
+   * ledger only ever appends, so what reached the disk is intact" is what
+   * the failure card already tells the person.
+   */
+  const appendInBatches = async (missionId: string, records: readonly LedgerRecord[]): Promise<void> => {
+    let batch: LedgerRecord[] = []
+    let bytes = 0
+    for (const record of records) {
+      // Each record is under `MAX_RECORD_BYTES` (checked by `recordLine`),
+      // which is a quarter of the append bound, so a single record always
+      // fits in a batch of its own and this loop always makes progress.
+      const size = Buffer.byteLength(recordLine(record), 'utf8')
+      if (batch.length > 0 && (batch.length >= MAX_EVENTS_PER_APPEND || bytes + size > MAX_APPEND_BYTES)) {
+        await appendRecords(missionId, batch)
+        batch = []
+        bytes = 0
+      }
+      batch.push(record)
+      bytes += size
+    }
+    if (batch.length > 0) await appendRecords(missionId, batch)
+  }
+
   const appendRecords = async (missionId: string, records: readonly LedgerRecord[]): Promise<void> => {
     const lines = records.map(recordLine).join('')
     const appendBytes = Buffer.byteLength(lines, 'utf8')
@@ -1545,9 +1584,6 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       return serialize(async () => {
         requireSafeId(missionId, 'missionId')
         if (events.length === 0) return
-        if (events.length > MAX_EVENTS_PER_APPEND) {
-          throw new Error('Too many mission events in one append')
-        }
         const hydrated = await hydrateForAppend(missionId)
         let sequence = hydrated.nextSequence
         let eventSequence = hydrated.nextEventSequence
@@ -1578,7 +1614,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
           eventSequence += 1
           return record
         })
-        await appendRecords(missionId, records)
+        await appendInBatches(missionId, records)
         nextSequences.set(missionId, sequence)
         nextEventSequences.set(missionId, eventSequence)
       })
