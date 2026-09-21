@@ -271,6 +271,17 @@ describe('a mission through Antigravity', () => {
     expect(h.notices).toHaveLength(1)
   })
 
+  it('never lets the notice sit at or past the ending, where it would be dead code', async () => {
+    // A caller that shortens the ending must still get one notice. Before
+    // this, the 90 s default against a 20 s ending meant the notice could
+    // never fire and nothing said so -- Builder.io's §6.4 in miniature.
+    const h = harness({ lines: WRITE_LINES.slice(0, 3), idleTimeoutMs: 200 })
+    await h.service.start('hi', undefined, {})
+    await settle(14)
+    expect(h.notices.length).toBeGreaterThan(0)
+    expect(h.notices[0]?.message).toMatch(/write_to_file/)
+  })
+
   it('says nothing while the agent is still writing', async () => {
     const h = harness({ lines: WRITE_LINES, askingNoticeMs: 15, idleTimeoutMs: 100_000 })
     await h.service.start('hi', undefined, {})

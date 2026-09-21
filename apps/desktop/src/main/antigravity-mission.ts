@@ -136,7 +136,31 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
   const readTranscript = options.readTranscript ?? readTranscriptFile
   const pollMs = options.pollMs ?? 1_000
   const idleTimeoutMs = options.idleTimeoutMs ?? ANTIGRAVITY_IDLE_TIMEOUT_MS
-  const askingNoticeMs = options.askingNoticeMs ?? ANTIGRAVITY_ASKING_NOTICE_MS
+  /*
+   * ASSERTED, not assumed: the notice must come before the ending.
+   *
+   * These are two clocks watching one silence, and the notice only fires in
+   * the window between them -- so if the ending is set at or below the
+   * notice, the notice is DEAD CODE and nobody finds out, because dead code
+   * looks exactly like a silence that never happened. The suite already
+   * contains a case where it is dead (an idle timeout of 20 ms against the
+   * 90 s default), which is harmless there and is precisely how this reaches
+   * production unnoticed.
+   *
+   * Builder.io's `agent-run-stop-conditions.md` §6.4 is the same finding on
+   * a much bigger machine: their ordering invariants "were prose until this
+   * branch", and one was already violated in a shipped build -- an
+   * automation took a 13-minute budget under its own 10-minute abort,
+   * "making its recoverable boundary dead code". Locust has twenty-odd
+   * timeout constants and, before this line, no asserted ordering anywhere.
+   * Read 2026-09-21; the idea is theirs, the code is ours.
+   */
+  const askingNoticeMs = Math.min(
+    options.askingNoticeMs ?? ANTIGRAVITY_ASKING_NOTICE_MS,
+    // Half, so a caller that shortens the ending still gets one notice
+    // rather than silently losing it.
+    Math.floor(idleTimeoutMs / 2)
+  )
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined ? undefined : createPeerExchange({
           workroom: options.workroom,
