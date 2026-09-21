@@ -134,7 +134,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: true }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -169,7 +169,21 @@ function parsedMetal(raw: unknown): Pick<WorkspaceSettings, 'metal' | 'metalStre
     metal: oneOf(record.metal, METAL_PRESETS, 'silver'),
     metalStrength: oneOf(record.metalStrength, METAL_STRENGTHS, 'standard'),
     metalMotion: oneOf(record.metalMotion, METAL_MOTIONS, 'hover'),
-    metalBend: typeof record.metalBend === 'boolean' ? record.metalBend : true
+    /*
+     * OFF unless it was switched on.
+     *
+     * Colin, 2026-09-21: "have cursor bend automatically off, user can turn
+     * on in settings if they like." It is a flourish on the send button, and
+     * a flourish is the kind of thing a new user should meet only if they
+     * went looking for it.
+     *
+     * A stored boolean still wins, in BOTH directions: someone who turned it
+     * on keeps it on, and someone who turned it off keeps it off. Only an
+     * ABSENT key -- never chosen -- reads as the new default. (The reverse
+     * reading is what made the todo-list default a no-op for everyone who
+     * already had a settings file; see `parsedTodoList`.)
+     */
+    metalBend: typeof record.metalBend === 'boolean' ? record.metalBend : false
   }
 }
 

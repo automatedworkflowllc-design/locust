@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.240.0 - 2026-09-21
+
+- **The send button's cursor bend is off unless you ask for it.** The liquid
+  dent that follows your pointer across the ring was on for everyone; it is a
+  flourish, so it now starts off and lives in Settings for anyone who wants
+  it. If you had already turned it on, it stays on.
+
 ## 0.239.0 - 2026-09-21
 
 - **A routine saved from a conversation runs the way that conversation ran.**
