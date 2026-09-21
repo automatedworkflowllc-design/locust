@@ -214,6 +214,23 @@ export function detectSupportedFeatures(
       add("tool-allowlist", scan(helpText, "--allow-all-tools"));
       add("tool-denylist", scan(helpText, "--deny-tool"));
     }
+  } else if (runtime === "muse") {
+    /*
+     * MUSE HAD NO BRANCH HERE AT ALL, and the `else` below is a gateway's:
+     * it claims `json-health-check` and nothing else. So Muse's two required
+     * features were never detected, discovery reported it `unsupported`, and
+     * no mission could have run under it however finished the adapter was.
+     * Found on 2026-09-21 by driving the packaged build, not by a test.
+     *
+     * Scanned for are the exact flags `createMuseExecCommand` passes, off
+     * `muse exec --help` -- which is what `capabilityArgs` now asks for. The
+     * TOP-LEVEL `muse --help` names the subcommands and none of these flags,
+     * so it could not have answered this either.
+     */
+    add("non-interactive", scan(helpText, "exec"));
+    add("jsonl-events", scan(helpText, "--json"));
+    add("workspace-selection", scan(helpText, "--workspace"));
+    add("read-only-sandbox", scan(helpText, "--disable-write") && scan(helpText, "--disable-shell"));
   } else if (runtime === "antigravity") {
     // Nothing. Antigravity's `agentapi` prints no help text this repo has ever
     // captured, and it cannot even open a conversation without a project id

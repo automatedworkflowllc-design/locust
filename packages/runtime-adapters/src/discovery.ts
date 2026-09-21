@@ -196,7 +196,15 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
     optional: true,
     // Measured: `Muse Code 1.3.0 (1.3.0-R3401.1)`, exit 0.
     versionArgs: ["--version"],
-    capabilityArgs: ["--help"],
+    /*
+     * `exec --help`, not `--help`.
+     *
+     * The top-level help lists subcommands and the TUI's options; every flag
+     * a mission passes -- `--json`, `--workspace`, `--disable-write` -- is on
+     * the exec page. Asking the wrong page meant the feature scan found none
+     * of them, so discovery called a working runtime unsupported.
+     */
+    capabilityArgs: ["exec", "--help"],
     /*
      * READINESS IS THE VERSION, AND THAT IS A JUDGEMENT CALL WORTH SPELLING
      * OUT -- the same one Copilot forced, for a sharper reason.
@@ -220,7 +228,22 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
      */
     readinessArgs: ["--version"],
     requiredFeatures: MUSE_REQUIRED_FEATURES,
-    readyWhen: (result) => /muse code\\s+\\d/i.test(`${result.stdout}\\n${result.stderr}`),
+    /*
+     * `\s` and `\n`, ONE backslash each.
+     *
+     * This shipped as `/muse code\\s+\\d/i` -- a regex for a literal
+     * backslash followed by an `s` -- so it could never match
+     * `Muse Code 1.3.0` and readiness never came back. Settings read
+     * **Muse Code 1.3.0 · CHECKING · "did not answer its version probe in
+     * time"** forever, on a machine where that probe answers in 400ms. Seen
+     * by driving the packaged build; no unit test had the runtime's real
+     * stdout in front of it. There is one below now.
+     *
+     * Written through a bash heredoc, which ate the escape. That is the
+     * eighth time this session's family of mistakes has landed one, and the
+     * only reliable answer is not to write source through a heredoc.
+     */
+    readyWhen: (result) => /muse code\s+\d/i.test(`${result.stdout}\n${result.stderr}`),
     readinessCaveat: {
       code: "readiness-unverifiable",
       severity: "info",

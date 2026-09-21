@@ -1,5 +1,11 @@
 # Muse Code captures
 
+`exec-help.txt` is `muse exec --help` verbatim. It is what the capability
+probe reads, and the reason it is kept here rather than only in the probe
+folder: the detection was pointed at the TOP-LEVEL `muse --help` at first,
+which names the subcommands and not one of the flags a mission passes, so
+discovery reported a working runtime `unsupported`.
+
 `echo-provider-run.jsonl` is one real `muse exec --provider echo --json`
 stream from Muse Code 1.3.0-R3401.1, captured 2026-09-21 on Windows. It is
 the only source the `muse-events` adapter was built from, and the full probe

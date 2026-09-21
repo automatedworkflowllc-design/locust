@@ -11,6 +11,7 @@ import {
   createGeminiPrintCommand,
   createOpenCodeRunCommand,
   CURSOR_REQUIRED_FEATURES,
+  MUSE_REQUIRED_FEATURES,
   OPENCODE_READ_ONLY_CONFIG,
   OPENCODE_REQUIRED_FEATURES,
   parseClaudeModelHints,
@@ -406,6 +407,41 @@ describe("installed runtime discovery", () => {
 
   // The first lines of the real list, as printed on 2026-09-02.
   const CURSOR_MODELS = "Available models\n\nauto - Auto (default)\ncursor-grok-4.6-high - Cursor Grok 4.6\ncomposer-2.5 - Composer 2.5\n";
+
+  /*
+   * THE EXACT BYTES `muse --version` PRINTS, and the reason this test exists.
+   *
+   * The readiness rule shipped as a regex for a literal backslash followed
+   * by an `s` -- a heredoc had eaten the escape -- so it could never match
+   * this line. Discovery therefore never called Muse ready, and Settings
+   * read "Muse Code 1.3.0 - CHECKING - did not answer its version probe in
+   * time" on a machine where that probe answers in 400ms. Every unit test we
+   * had passed, because none of them had the runtime's own stdout in front
+   * of it. This one does.
+   */
+  const MUSE_VERSION = "Muse Code 1.3.0 (1.3.0-R3401.1)\n";
+  // `muse exec --help`, the page that names the flags a mission passes. The
+  // top-level `muse --help` names none of them, which is how the capability
+  // probe came to be pointed at the wrong page.
+  const MUSE_HELP = readFileSync(new URL("./fixtures/muse/exec-help.txt", import.meta.url), "utf8");
+
+  it("calls Muse Code ready from the line its own version command prints", async () => {
+    const runner: CommandRunner = {
+      run: async (command) =>
+        command.purpose === "capabilities"
+          ? { exitCode: 0, stdout: MUSE_HELP, stderr: "" }
+          : { exitCode: 0, stdout: MUSE_VERSION, stderr: "" },
+    };
+    const [muse] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("muse") }))
+      .filter((entry) => entry.id === "muse");
+    expect(muse?.availability).toBe("available");
+    expect(muse?.readiness).toBe("ready");
+    expect(muse?.version?.version).toBe("1.3.0");
+    expect(muse?.supportedFeatures).toEqual(expect.arrayContaining([...MUSE_REQUIRED_FEATURES]));
+    // Version IS readiness here, so the caveat has to ride along saying the
+    // sign-in cannot be checked without spending money.
+    expect(JSON.stringify(muse)).toContain("readiness-unverifiable");
+  });
 
   it("reports a signed-in Cursor Agent ready and reads its models off --list-models", async () => {
     const runner: CommandRunner = {
