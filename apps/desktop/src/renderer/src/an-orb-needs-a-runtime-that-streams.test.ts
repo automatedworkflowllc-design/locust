@@ -65,6 +65,44 @@ describe('an orb needs a runtime that streams', () => {
     expect(step?.orb).toBe('searching')
   })
 
+  it('reaches the writing orb on OpenCode, because text arriving IS writing', () => {
+    /*
+     * The one honest orb a report-when-finished runtime can be given. Colin
+     * asked for "SOME orb notifiers for opencode, even if they arent entirely
+     * accurately reporting a tool" -- and a tool orb would be the app
+     * claiming something is happening that already happened. A delta is not:
+     * the model is writing, now.
+     */
+    const step = liveStep([
+      event('step.started', { stepKind: 'turn' }, 0),
+      event('message.delta', { itemId: 'm1', operation: 'append', text: 'hel', final: false }, 1)
+    ])
+    expect(step?.register).toBe('writing')
+    expect(step?.orb).toBe('shaping')
+  })
+
+  it('goes back to working when the text is complete', () => {
+    // A claim that has stopped being true must stop being made -- the same
+    // rule that makes the tool orb stop when its tool closes.
+    const step = liveStep([
+      event('step.started', { stepKind: 'turn' }, 0),
+      event('message.delta', { itemId: 'm1', operation: 'append', text: 'hel', final: false }, 1),
+      event('message.delta', { itemId: 'm1', operation: 'replace', text: 'hello', final: true }, 2)
+    ])
+    expect(step?.register).toBe('working')
+    expect(step?.orb).toBe('composing')
+  })
+
+  it('never overrides a step that said something more specific', () => {
+    // A tool is open. Text arriving alongside it does not make the tool
+    // stop running, and the row must not stop saying so.
+    const step = liveStep([
+      event('tool.started', { itemId: 't1', name: 'grep_search', toolKind: 'grep_search' }, 1),
+      event('message.delta', { itemId: 'm1', operation: 'append', text: 'hi', final: false }, 2)
+    ])
+    expect(step?.register).toBe('tool')
+  })
+
   it('cannot hold the thinking orb when a reasoning step opens and closes at once', () => {
     const step = liveStep([
       event('step.started', { stepKind: 'reasoning', itemId: 'r1' }, 1),

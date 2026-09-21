@@ -6,6 +6,13 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.228.0 - 2026-09-21
+
+- **A run that is writing says so, on every runtime.** Text arriving is the
+  model writing, and the live line now shows that -- which on runtimes that
+  report their tools only once those tools have finished was the difference
+  between one mark for a whole run and a line that actually changes.
+
 ## 0.227.0 - 2026-09-20
 
 - **A refusal reads as a refusal, not a crash.** In Ask mode, a run that tried

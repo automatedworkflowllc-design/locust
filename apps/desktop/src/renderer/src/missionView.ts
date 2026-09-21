@@ -2200,6 +2200,42 @@ export function buildThread(
         runningStep = undefined
         break
       }
+      /*
+       * TEXT ARRIVING IS THE MODEL WRITING, and saying so is the only honest
+       * orb a runtime like OpenCode can be given.
+       *
+       * Colin, 2026-09-21, after the finding that OpenCode shows one orb for
+       * a whole run: *"you think we can atleast give them SOME orb notifiers
+       * for opencode? even if they arent entirely accurately reporting a
+       * tool?"* -- and the answer has to be yes WITHOUT the second half. A
+       * tool orb on a runtime that reports tools only once they are finished
+       * would be the app claiming something is happening that already
+       * happened, which is the one thing the mapping exists to prevent.
+       *
+       * This claims nothing extra. A `message.delta` IS the model writing,
+       * now, and `writing` is a register the app already has with an orb
+       * already allocated to it. OpenCode opens exactly one step -- a `turn`,
+       * which becomes `working` -- so before this it could never reach the
+       * writing register at all, however much text it streamed.
+       *
+       * ONLY FROM `working`. A step that said something more specific
+       * (`thinking`, `tool`, `connector`) keeps what it said: those are
+       * claims about work this does not know better than.
+       *
+       * It also returns. A final delta means the text is complete, so the run
+       * goes back to working rather than staying on a claim that has stopped
+       * being true -- the same rule that makes the tool orb stop when its
+       * tool closes.
+       */
+      case 'message.delta': {
+        if (runningStep === undefined) break
+        if (runningStep.register !== 'working' && runningStep.register !== 'writing') break
+        runningStep = {
+          ...runningStep,
+          register: event.payload.final === true ? 'working' : 'writing'
+        }
+        break
+      }
       case 'plan.updated': {
         workBegan = true
         plan = readPlan(event.payload.plan)
