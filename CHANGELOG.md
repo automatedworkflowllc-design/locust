@@ -6,6 +6,12 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.220.0 - 2026-09-20
+
+- **The bigger orb is on the working line, where it was meant to go.** It
+  landed on thinking in 0.218 -- the request named the shape, and the row it
+  sits on is called something else. Thinking is back to its own size.
+
 ## 0.219.0 - 2026-09-20
 
 - **A connector call is recognised as one, whatever the runtime calls it.**

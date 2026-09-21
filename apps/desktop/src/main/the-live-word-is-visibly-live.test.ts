@@ -15,9 +15,11 @@ import { describe, expect, it } from 'vitest'
  * rather than argued about.
  *
  * And: *"can you make just the thinking animation in locust slightly larger?
- * i think cause its not a massive ball we can get away with it"*. `listening`
- * is a wave through latitude rings, so it uses less of its box than the dense
- * shapes beside it and reads a size down at the same size.
+ * i think cause its not a massive ball we can get away with it"* — which went
+ * on the wrong orb first. He named the SHAPE he could see; the register it
+ * sits on is called something else, and the two vocabularies have not agreed
+ * since the orbs became an allocation rather than a description. Pinned by
+ * ORB NAME here, which is the only one of the three that is unambiguous.
  *
  * Pinned here because both are pure CSS and nothing else in the suite can
  * see them: a stylesheet edit that dropped either would ship silently.
@@ -49,8 +51,13 @@ describe('the live word is visibly live', () => {
     expect(sweep.slice(0, 220)).toContain('animation: none')
   })
 
-  it('draws the thinking orb a size up without moving the line', () => {
-    const rule = css.slice(css.indexOf(".lc-livestep__orb[data-orb='listening']"))
+  it('draws the working orb a size up, and only it', () => {
+    // It went on `listening` first, because Colin named the SHAPE and the
+    // register it sits on is called something else. He caught it by looking:
+    // "when i said make thinking bigger it was what you have set to working
+    // rn, so now the sphere for thinking is too big".
+    expect(css).not.toContain(".lc-livestep__orb[data-orb='listening']")
+    const rule = css.slice(css.indexOf(".lc-livestep__orb[data-orb='composing']"))
     expect(rule.slice(0, 160)).toContain('transform: scale(1.3)')
     // The BOX stays 20px: the library takes 64 or 20 and throws on anything
     // else, so this is a scale, and the layout must not depend on it.
