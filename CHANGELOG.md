@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.233.0 - 2026-09-21
+
+- **A gap the runtime left is marked as one.** Antigravity notes its own
+  dropped bytes inside the text it sends, so the note arrived mid-sentence in
+  a teammate's reply, in their voice, splitting a word across it. The words
+  either side are untouched -- nothing is hidden, because something really was
+  lost -- but the note is now drawn as Locust saying it, not the teammate.
+
 ## 0.232.0 - 2026-09-21
 
 - **The mark on a running conversation is clean again.** Shrinking it a

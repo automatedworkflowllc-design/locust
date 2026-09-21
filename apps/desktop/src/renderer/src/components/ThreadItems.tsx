@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { ORB_BOX, Orb } from './Orb.js'
 
@@ -311,19 +311,51 @@ export function AgentText({
         if (block.kind === 'rule') {
           return <hr className="lc-hr" key={`b${String(index)}`} />
         }
-        if (block.kind === 'quote') {
-          // Models use these for cautions. A chevron is not a caution.
-          return (
-            <blockquote className="lc-quote" key={`b${String(index)}`}>
-              {inline(block.text)}
-            </blockquote>
-          )
-        }
         // Line breaks inside a paragraph are kept (`lc-para` is pre-line):
         // asked for "every file, one per line", Composer answered
         // "README.md\nstatus.ts" and the thread drew "README.md status.ts",
         // which reads as the teammate ignoring the request. User session 3,
         // 2026-09-05, checked against the ledger.
+        /*
+         * A GAP THE RUNTIME LEFT, said as the app rather than as the teammate.
+         *
+         * Antigravity writes `<truncated N bytes>` into its own transcript
+         * when it drops part of a record, and Locust passes it through
+         * faithfully -- 7 message deltas and 48 tool outputs in Colin's
+         * ledger, and no code in this repo writes that string. So it arrived
+         * mid-reply on its own LINE, splitting a word across it: "...internal
+         * Ollama i" / the marker / "yte-offset, tamper-evident receipts".
+         * Colin, 2026-09-21: *"minor truncation bug"*.
+         *
+         * It is not our truncation and it is not wrong to show -- content
+         * really was lost, and hiding the marker would hand someone a broken
+         * sentence as a whole one. What was wrong is that a machine string
+         * wore the teammate's voice.
+         *
+         * SPLIT INSIDE THE PARAGRAPH, not into blocks. A paragraph keeps its
+         * newlines here (`lc-para` is `pre-line`, for the "one file per line"
+         * reason below), so the marker is never a block of its own -- which
+         * is what the first attempt at this assumed, and why it drew nothing.
+         * Every character still reaches the screen; only the drawing changes.
+         */
+        const parts = block.text.split(/^<truncated (\d+) bytes>$/gm)
+        if (parts.length > 1) {
+          return (
+            <Fragment key={`b${String(index)}`}>
+              {parts.map((part, at) =>
+                at % 2 === 1 ? (
+                  <p className="lc-gap lc-mono" key={`g${String(at)}`} role="note">
+                    {part} bytes the runtime did not keep
+                  </p>
+                ) : part.trim().length === 0 ? null : (
+                  <p className="lc-para" key={`p${String(at)}`}>
+                    {inline(part)}
+                  </p>
+                )
+              )}
+            </Fragment>
+          )
+        }
         return (
           <p className="lc-para" key={`b${String(index)}`}>
             {inline(block.text)}

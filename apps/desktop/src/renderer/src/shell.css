@@ -5410,6 +5410,22 @@ textarea {
   content: '· ';
 }
 
+/*
+ * A gap the RUNTIME left, drawn as a note rather than as the reply.
+ *
+ * Antigravity marks its own dropped bytes inline, so the marker arrives
+ * mid-sentence in a teammate's answer. It is true and it stays; what changes
+ * is that it stops wearing the teammate's voice. See `ThreadItems`.
+ */
+.lc-gap {
+  margin: var(--lc-space-4) 0;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border-left: 2px solid var(--lc-border-control);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.02em;
+}
+
 /* Thought, not action: a still face and three staggered dots. */
 .lc-dots {
   display: inline-flex;
