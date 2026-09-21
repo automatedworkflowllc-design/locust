@@ -2387,9 +2387,56 @@ textarea {
 }
 
 /* A row of fixed choices; one is active. */
+/*
+ * ONE CONTROL, not six buttons.
+ *
+ * Handover §3.3: the 2 / 4 / 8 / 12 / 16 / 24 picker was six boxes at full
+ * button scale -- 30px tall, gapped, each its own pill -- for a minor
+ * setting, ragged against left-aligned labels. It read as the heaviest thing
+ * on the page while meaning the least.
+ *
+ * Joined, at control height, with mono numerals so the digits line up. The
+ * active state is untouched: `.lc-button.is-active` already draws lime-tint
+ * on lime-text, which is what the sample proposed, so there is nothing to
+ * add and nothing to keep in sync.
+ */
 .lc-segmented {
   display: inline-flex;
-  gap: var(--lc-space-1);
+  gap: 0;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  overflow: hidden;
+}
+.lc-segmented > .lc-button {
+  min-width: 34px;
+  height: 26px;
+  padding: 0 var(--lc-space-3);
+  justify-content: center;
+  border: 0;
+  border-left: 1px solid var(--lc-border-control);
+  border-radius: 0;
+}
+.lc-segmented > .lc-button:first-child { border-left: 0; }
+
+/*
+ * MONO IS FOR THE NUMBERS ONLY, and that limit is deliberate.
+ *
+ * The sample proposed "mono numerals" and the only segmented control on it
+ * was the numeric one. Applying the same font to the word pickers --
+ * Off / Chromatic / Silver / Gold, Subtle / Standard / Strong -- looked
+ * consistent in the Appearance frame and was me extending an approval past
+ * what was actually shown. Mono at caption size is also the least legible
+ * thing on the page, and the person this app is being made easy for is not a
+ * developer.
+ *
+ * So the numerals get it, where tabular alignment is the point and the
+ * content really is a number; the words keep the interface font they are
+ * read in everywhere else.
+ */
+.lc-segmented.is-numeric > .lc-button {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Memory. A list of rows: a switch, the text with who/where/when under it,
@@ -3632,13 +3679,30 @@ textarea {
 }
 
 .lc-settings__navitem:hover {
-  background: var(--lc-bg-control);
+  background: var(--lc-bg-raised-2);
   color: var(--lc-text-primary);
 }
 
-/* The page you are on, said by weight and ground rather than by a colour. */
+/*
+ * The page you are on, said by weight and ground rather than by a colour --
+ * and said in the SIDEBAR'S OWN WORDS.
+ *
+ * Handover §3.4: this drew a filled pill while the sidebar three inches to
+ * its left drew `lc-bg-selected` + `lc-border-card`. Two navigations in one
+ * window, in two languages, at the same moment.
+ *
+ * The 9px radius is not a new size: it is `.lc-row`'s own value, so "matches
+ * the sidebar" is literally true rather than approximately. My first read of
+ * the sample called that hardcoded number a nit and was wrong.
+ */
+.lc-settings__navitem {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px 10px;
+}
 .lc-settings__navitem.is-current {
-  background: var(--lc-bg-control);
+  background: var(--lc-bg-selected);
+  border-color: var(--lc-border-card);
   color: var(--lc-text-primary);
   font-weight: 500;
 }
@@ -6288,9 +6352,14 @@ textarea {
   color: var(--lc-red-text);
 }
 
+/*
+ * Tightened so two groups read as one page rather than two islands.
+ * Handover §3.6: the page ended after two sections and left roughly half the
+ * pane empty, which a space-8 gap between them made worse, not better.
+ */
 .lc-settings__section {
   max-width: 660px;
-  margin-bottom: var(--lc-space-8);
+  margin-bottom: var(--lc-space-7);
 }
 
 /*
@@ -6325,13 +6394,13 @@ textarea {
 }
 
 .lc-settings__heading {
-  margin: 0 0 var(--lc-space-4);
+  margin: 0 0 var(--lc-space-2);
   font-size: var(--lc-text-screen-title);
   font-weight: 500;
 }
 
 .lc-settings__lede {
-  margin: 0 0 var(--lc-space-5);
+  margin: 0 0 var(--lc-space-4);
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   text-wrap: pretty;
@@ -6492,20 +6561,62 @@ textarea {
   background: var(--lc-bg-control);
 }
 
+/*
+ * SETTING ROWS LIVE IN A CARD, like every other row in the app.
+ *
+ * The design handover of 2026-09-21 counted `.lc-*` rule blocks by surface:
+ * thread 121, sidebar 77, composer 51, Rooms 29, Settings 27, Routines 15.
+ * Settings is not a matter of taste away from the thread, it is a multiple.
+ *
+ * One root cause carried most of it: these rows floated naked on the window
+ * ground. `padding: var(--lc-space-3) 0` -- six pixels of vertical padding,
+ * ZERO horizontal -- with a hairline running edge to edge across the page.
+ * Meanwhile `.lc-settingcard` directly above already had the card language,
+ * and was used only for folder and runtime rows, never for the settings rows
+ * themselves.
+ *
+ * The sample (`docs/SAMPLE-settings-proposed.html`, rendered at the true
+ * 947px pane with the real stylesheet inlined) put this behind an opt-in
+ * `.is-carded`. That modifier exists so the sample can draw before and after
+ * on one page; here it would be ten hand-added class names and a second
+ * visual language the first missed one falls into. So it is the base rule.
+ *
+ * Every value is an existing token. No new token, colour or size.
+ */
 .lc-settingrows {
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  overflow: hidden;
 }
 .lc-settingrow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--lc-space-5);
-  padding: var(--lc-space-3) 0;
-  border-top: 1px solid var(--lc-border-card);
+  gap: var(--lc-space-6);
+  /* 44px is the sidebar row's own height, which is what "matches the rest of
+     the app" has to mean if it means anything. */
+  min-height: 44px;
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-hairline);
 }
 .lc-settingrow:first-child { border-top: 0; }
+.lc-settingrow:hover { background: var(--lc-hover-surface); }
 .lc-settingrow > .lc-settings__note { flex: 1 1 auto; min-width: 0; }
+
+/*
+ * A card inside a card is one card. Some groups nest a `.lc-settingcard` (or
+ * another row list) inside the rows; without this they would draw a second
+ * border a pixel inside the first.
+ */
+.lc-settingrows .lc-settingrows,
+.lc-settingrows .lc-settingcard {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
 
 .lc-runtimerow__version {
   margin-left: 8px;

@@ -1500,7 +1500,7 @@ export function SettingsScreen({
               <span className="lc-settings__note">
                 Automatic replies per exchange before they wait for you
               </span>
-              <div className="lc-segmented" role="radiogroup" aria-label="Automatic replies per exchange">
+              <div className="lc-segmented is-numeric" role="radiogroup" aria-label="Automatic replies per exchange">
                 {[2, 4, 8, 12, 16, 24].map((cap) => (
                   <button
                     key={cap}

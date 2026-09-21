@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.245.0 - 2026-09-21
+
+Settings, rebuilt to look like the rest of the app.
+
+- **Settings rows live in a card now.** They used to float on the window
+  background with six pixels of padding and a hairline running edge to edge —
+  the single thing that made the screen read as unfinished next to a
+  conversation. Same card, same border, same corners as every other row.
+- **Rows have real height and real padding**, and light up under the pointer,
+  matching the sidebar rows three inches to their left.
+- **The 2 / 4 / 8 / 12 / 16 / 24 picker is one control**, not six buttons at
+  full size. Its digits line up.
+- **The Settings menu marks the page you are on the way the sidebar does.**
+  Two navigations in one window had been using two different languages.
+- Sections sit closer together, so two groups read as one page.
+
 ## 0.244.0 - 2026-09-21
 
 The first hour, from a beta review driven on a blank machine.
