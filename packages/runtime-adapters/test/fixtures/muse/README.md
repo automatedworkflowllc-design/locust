@@ -19,12 +19,13 @@ capture a longer one, with:
 muse exec --provider echo --json --workspace <a temp folder> "<a prompt>"
 ```
 
-Two artefacts of how it was captured are deliberately left in the bytes: a
-UTF-8 byte-order mark on the front and CRLF line endings, both put there by
-PowerShell's redirect rather than by Muse. The test strips the carriage
-returns the way the process runner's line splitter does and leaves the mark
-alone, so the first record the adapter is handed in that suite is the
-awkward one.
+The capture arrived with two artefacts of PowerShell's redirect rather than
+of Muse: a UTF-8 byte-order mark on the front, and CRLF line endings. **The
+mark is deliberately left in** — it is why the adapter strips one, and it
+makes the first record this suite hands over the awkward one. The carriage
+returns are not preserved: git normalised them to LF on commit, which is
+fine and is why the loader strips a trailing `\r` anyway — a file
+re-captured on this machine will have them again.
 
 **What this capture does not contain: a tool call under a paying provider.**
 The three tasks in it are Muse's own machinery — a skill reminder, the model
