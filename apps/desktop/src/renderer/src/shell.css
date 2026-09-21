@@ -2499,8 +2499,25 @@ textarea {
   transition: transform 120ms ease, background-color 120ms ease;
 }
 
+/*
+ * TWELVE, not fourteen -- the travel a 26px track actually has.
+ *
+ * `.lc-switch` is defined TWICE in this file, and the design handover of
+ * 2026-09-21 read that as one dead rule "worth deleting regardless". It is
+ * not dead, and deleting it would have broken the Settings toggles: the two
+ * blocks answer DIFFERENT markup. Settings writes `class="lc-switch is-on"`
+ * on the control itself, which only `.lc-switch.is-on` here can reach; the
+ * composer writes a bare `.lc-switch` inside an ancestor carrying `is-on`,
+ * which only `.is-on .lc-switch` below can reach. Both are live.
+ *
+ * What the duplication DID cost is this line. The later block wins on the
+ * box (26x14 with a 10px knob, from 34x20 with a 14px knob), so the travel
+ * left in the track is 26 - 2*2 - 10 = 12px. This still moved 14px, and
+ * every switched-on toggle in Settings put its knob 2px past the padding
+ * box, flush against the border. The other block's twin already says 12.
+ */
 .lc-switch.is-on .lc-switch__knob {
-  transform: translateX(14px);
+  transform: translateX(12px);
   background: var(--lc-bg-raised);
 }
 
@@ -2536,8 +2553,17 @@ textarea {
   transition: transform 120ms ease;
 }
 
+/*
+ * FOURTEEN here, because this track is a different size.
+ *
+ * 28px wide, 2px padding, a 10px knob: 14px of room. It moved 12 and left
+ * the knob 2px short of the end, which reads as a switch that is not quite
+ * on. Found while fixing the opposite error on `.lc-switch`, where a stale
+ * duplicate moved 14 in a 12px track -- one over, one under, both from the
+ * same missing habit of deriving the travel from the box it happens in.
+ */
 .lc-memory__switch.is-on .lc-memory__knob {
-  transform: translateX(12px);
+  transform: translateX(14px);
   background: var(--lc-bg-raised);
 }
 

@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.243.0 - 2026-09-21
+
+- **Switches line up with their own tracks.** Every toggle in Settings pushed
+  its knob two pixels too far when switched on, so it sat against the edge
+  rather than inside it; the switches on the Memory screen stopped two pixels
+  short of the end, reading as not quite on. Both now travel exactly the room
+  they have.
+
 ## 0.242.0 - 2026-09-21
 
 - **A teammate can name a memory, and naming it stops it piling up.** Facts
