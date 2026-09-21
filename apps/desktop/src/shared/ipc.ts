@@ -28,6 +28,26 @@ export interface PublicMemory {
   /** `proposed` waits for the person; only `kept` is briefed. */
   readonly status: 'kept' | 'proposed'
   readonly enabled: boolean
+  /**
+   * The slug this memory is filed under, when it has one.
+   *
+   * A named memory is REPLACEABLE: remembering the same name in the same
+   * place rewrites this one instead of adding a near-copy beside it. Absent
+   * on every memory written before 0.242 and on every unnamed one since,
+   * which keeps matching by text exactly as it was.
+   */
+  readonly name?: string
+  /** When a named memory was last rewritten. Absent if it never has been. */
+  readonly updatedAt?: string
+  /**
+   * What this memory said before it was last rewritten.
+   *
+   * One step, not a chain: these are single lines of at most 300 characters,
+   * and the file has a size cliff that a full history would walk into. It is
+   * enough to see what changed and to put it back by hand, which is what a
+   * person actually does with a note.
+   */
+  readonly previousText?: string
 }
 
 export interface MemoryAddRequest {
@@ -1720,6 +1740,13 @@ export type CodexMissionUpdate =
       readonly kept: readonly string[]
       readonly proposed: readonly string[]
       readonly forgotten: readonly string[]
+      /**
+       * Memories that REPLACED an earlier one filed under the same name.
+       * Separate from `kept` on purpose: adding a fact and changing one a
+       * person may already have acted on are different events, and folding
+       * them together lets a memory move under them without a word.
+       */
+      readonly rewritten?: readonly string[]
     }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */
   | {

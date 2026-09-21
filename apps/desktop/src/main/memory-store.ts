@@ -4,7 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import type { MemoryScope, PublicMemory } from '../shared/ipc.js'
-import { boundedMemoryText, forgetMatch, memoryKey } from '../shared/memory.js'
+import { boundedMemoryText, forgetMatch, memoryKey, memoryName } from '../shared/memory.js'
 import { safeId } from './teammate-store.js'
 
 /**
@@ -36,12 +36,19 @@ export interface MemoryStore {
   add(input: {
     readonly text: unknown
     readonly scope: unknown
+    /**
+     * File it under this slug. Remembering the same name in the same place
+     * REWRITES that memory rather than adding a near-copy beside it -- which
+     * is the whole fix for a teammate that re-states the same fact after
+     * every run. Absent matches by text, exactly as before.
+     */
+    readonly name?: unknown
     readonly workspaceId: string
     readonly workspaceName: string
     readonly by: { readonly teammateId?: string; readonly name: string }
     readonly missionId?: string
     readonly status: 'kept' | 'proposed'
-  }): Promise<{ readonly memory: PublicMemory; readonly created: boolean }>
+  }): Promise<{ readonly memory: PublicMemory; readonly created: boolean; readonly rewritten?: boolean }>
   /** Edit the text, switch it on or off, or keep a proposed one. */
   update(input: { readonly memoryId: unknown; readonly text?: unknown; readonly enabled?: unknown; readonly keep?: unknown }): Promise<PublicMemory>
   remove(memoryId: unknown): Promise<void>
@@ -108,7 +115,13 @@ export function parsedMemory(value: unknown): PublicMemory | undefined {
     ...(record.missionId === undefined ? {} : { missionId: record.missionId }),
     createdAt: record.createdAt,
     status: record.status,
-    enabled: record.enabled
+    enabled: record.enabled,
+    // Untrusted like everything else here: a name that is not a slug is
+    // dropped, which turns the memory back into an ordinary unnamed one
+    // rather than filing it under something unmatchable.
+    ...(typeof record.name === 'string' && memoryName(record.name) !== undefined ? { name: memoryName(record.name) } : {}),
+    ...(typeof record.updatedAt === 'string' && !Number.isNaN(Date.parse(record.updatedAt)) ? { updatedAt: record.updatedAt } : {}),
+    ...(validMemoryText(record.previousText) ? { previousText: boundedMemoryText(record.previousText) } : {})
   }
 }
 
@@ -200,13 +213,58 @@ export function createMemoryStore(options: {
       )
     },
 
-    add(input): Promise<{ readonly memory: PublicMemory; readonly created: boolean }> {
+    add(input): Promise<{ readonly memory: PublicMemory; readonly created: boolean; readonly rewritten?: boolean }> {
       return serialize(async () => {
         if (!validMemoryText(input.text)) throw new Error('A memory is one line of text, up to 300 characters.')
         if (!validScope(input.scope)) throw new Error('A memory is for this folder or for everywhere.')
         const text = boundedMemoryText(input.text)
         const file = await read()
         const place = placeOf({ scope: input.scope, workspaceId: input.workspaceId })
+        const named = typeof input.name === 'string' ? memoryName(input.name) : undefined
+        /*
+         * A NAME REPLACES; text only ever de-duplicates.
+         *
+         * Same name, same place: this is the current value of a fact the
+         * teammate is restating, so the row is rewritten in place and keeps
+         * its id, its author and its birthday. That is what stops a store
+         * accumulating eight copies of "orb round N" (measured on Colin's
+         * store, 2026-09-21: 26 of 89 memories were in a near-duplicate
+         * pair, most of them that shape).
+         *
+         * Rewritten IN PLACE rather than superseded into a second row,
+         * because the point is that the store stops growing. One step of the
+         * old text rides along so a person can see what moved.
+         */
+        if (named !== undefined) {
+          const held = file.memories.find((memory) => placeOf(memory) === place && memory.name === named)
+          if (held !== undefined) {
+            // Nothing actually changed: do not churn the file or lose the
+            // real `updatedAt` by writing the same words again.
+            if (memoryKey(held.text) === memoryKey(text)) return { memory: held, created: false }
+            const rewritten: PublicMemory = {
+              ...held,
+              text,
+              previousText: held.text,
+              updatedAt: now().toISOString(),
+              // The turn that CHANGED it, not the turn that first wrote it.
+              // The thread draws a memory card under the turn it belongs to,
+              // and as this memory now reads, it belongs to this one.
+              ...(input.missionId === undefined ? {} : { missionId: input.missionId }),
+              // A rewrite of a kept memory stays kept; one the person has
+              // not seen yet stays proposed. The name does not smuggle a
+              // proposed memory past the person.
+              status: held.status
+            }
+            await write({
+              ...file,
+              memories: file.memories.map((memory) => (memory.memoryId === held.memoryId ? rewritten : memory))
+            })
+            // Not created, but not nothing either: a rewrite is the event the
+            // person most wants to see, and reporting it as "already knew
+            // that" is how a memory silently changes under them.
+            return { memory: rewritten, created: false, rewritten: true }
+          }
+        }
         const key = memoryKey(text)
         const existing = file.memories.find((memory) => placeOf(memory) === place && memoryKey(memory.text) === key)
         if (existing !== undefined) return { memory: existing, created: false }
@@ -223,7 +281,8 @@ export function createMemoryStore(options: {
           ...(input.missionId === undefined ? {} : { missionId: input.missionId }),
           createdAt: now().toISOString(),
           status: input.status,
-          enabled: true
+          enabled: true,
+          ...(named === undefined ? {} : { name: named })
         }
         await write({ ...file, memories: [...file.memories, memory] })
         return { memory, created: true }

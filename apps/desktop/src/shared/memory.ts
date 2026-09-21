@@ -31,13 +31,45 @@ export const MAX_MEMORY_TEXT_LENGTH = 300
 export const MAX_MEMORY_OPS_PER_REPLY = 4
 
 const BLOCK = /<locust-memory\s*>([\s\S]*?)<\/locust-memory>/g
-const LINE = /^\s*(remember(?:\s+everywhere)?|forget)\s*::\s*(.+?)\s*$/i
+/**
+ * `remember :: ...`, `remember everywhere :: ...`, `forget :: ...`, and the
+ * named forms `remember as <slug> :: ...`.
+ *
+ * The slug is what makes a memory REPLACEABLE. Measured on Colin's store
+ * 2026-09-21: 26 of 89 memories were in a near-duplicate pair, and the worst
+ * of them was one teammate re-writing "orb round N, unit tests X/X" after
+ * every test round -- eight near-copies of a fact that only ever has one
+ * current value. Naming it once makes the ninth write REPLACE the eighth.
+ *
+ * This is the shape both Grok Build and Builder.io's agent-native landed on,
+ * and neither does similarity matching on memory text: identity is asserted
+ * by the writer, never inferred. Inferring it is how a store starts deleting
+ * things nobody agreed to lose.
+ */
+const LINE = /^\s*(remember(?:\s+everywhere)?|forget)(?:\s+as\s+([A-Za-z0-9][A-Za-z0-9-]{0,63}))?\s*::\s*(.+?)\s*$/i
 
 export type MemoryScope = 'workspace' | 'global'
 
 export type MemoryOp =
-  | { readonly kind: 'remember'; readonly scope: MemoryScope; readonly text: string }
+  | {
+      readonly kind: 'remember'
+      readonly scope: MemoryScope
+      readonly text: string
+      /**
+       * The slug this memory is filed under, when the teammate named one.
+       * Re-remembering the same name in the same place REPLACES it rather
+       * than adding a second copy. Absent keeps the old behaviour exactly:
+       * an unnamed memory is matched by its text, as it always was.
+       */
+      readonly name?: string
+    }
   | { readonly kind: 'forget'; readonly text: string }
+
+/** A memory slug as the store keeps it: lower case, bounded, no stray marks. */
+export function memoryName(raw: string): string | undefined {
+  const slug = raw.trim().toLowerCase()
+  return /^[a-z0-9][a-z0-9-]{0,63}$/.test(slug) ? slug : undefined
+}
 
 /** Memory text as the store compares it: case, punctuation and spacing blind. */
 export function memoryKey(text: string): string {
@@ -131,12 +163,20 @@ export function parseMemoryBlocks(text: string): readonly MemoryOp[] {
       const line = LINE.exec(rawLine)
       if (line === null) continue
       const verb = line[1]!.toLowerCase().replace(/\s+/g, ' ')
-      const memoryText = boundedMemoryText(line[2] ?? '')
+      const memoryText = boundedMemoryText(line[3] ?? '')
       if (memoryText.length === 0) continue
       if (verb === 'forget') {
+        // `forget` names a QUOTE, not a slug. A name here is a misunderstanding
+        // of the form, and dropping it is kinder than filing the quote under it.
         ops.push({ kind: 'forget', text: memoryText })
       } else {
-        ops.push({ kind: 'remember', scope: verb === 'remember everywhere' ? 'global' : 'workspace', text: memoryText })
+        const named = line[2] === undefined ? undefined : memoryName(line[2])
+        ops.push({
+          kind: 'remember',
+          scope: verb === 'remember everywhere' ? 'global' : 'workspace',
+          text: memoryText,
+          ...(named === undefined ? {} : { name: named })
+        })
       }
       if (ops.length >= MAX_MEMORY_OPS_PER_REPLY) return ops
     }
@@ -358,10 +398,16 @@ export function memorySection(input: {
     `If this work taught you something the next conversation in this folder would need -- a convention, a correction the person gave, where something lives that the code does not say -- use exactly this block and ${BLOCK_PLACEMENT}, one line per memory, at most ${String(MAX_MEMORY_OPS_PER_REPLY)}:`,
     `<${MEMORY_TAG}>`,
     'remember :: one sentence, specific enough to act on',
+    'remember as <name> :: the same, for a fact that will change -- a status, a version, a current owner',
     'remember everywhere :: only for something true in every project, like how the person likes to work',
     'forget :: quote a remembered line that is now wrong',
     `</${MEMORY_TAG}>`,
     'Never remember file contents, secrets, credentials, or anything you can re-read from the workspace. Do not remember what CLAUDE.md, AGENTS.md or a rules file already says.',
+    // The instruction that stops the store filling with near-copies. Measured
+    // 2026-09-21: 26 of 89 memories were in a near-duplicate pair, and most
+    // of them were one teammate restating "orb round N, tests X/X" after
+    // every run -- a fact with one current value, written nine times.
+    'If you are restating something you have remembered before -- a test result, a version, a state that moves -- give it a NAME with `remember as <name> ::` and use that same name every time. A named memory REPLACES the one before it instead of piling up beside it. Names are lower case with hyphens, like `orb-suite-status`. Anything you have not named is matched by its words, as before.',
     input.askFirst
       ? 'The person is asked before a memory is kept; write it as they will read it.'
       : input.selfName === undefined

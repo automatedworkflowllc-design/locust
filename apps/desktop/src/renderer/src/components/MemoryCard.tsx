@@ -19,17 +19,24 @@ export interface MemoryCardLine {
   readonly by: string
   readonly text: string
   readonly status: 'kept' | 'proposed'
+  /** It replaced an earlier memory under the same name, rather than adding one. */
+  readonly updated?: boolean
   /** The turn it was learned on: the card is drawn under that turn. */
   readonly missionId: string
 }
 
 export function memoryCardSummary(lines: readonly MemoryCardLine[]): string {
-  const kept = lines.filter((line) => line.status === 'kept')
+  const kept = lines.filter((line) => line.status === 'kept' && line.updated !== true)
   const proposed = lines.filter((line) => line.status === 'proposed')
+  const rewritten = lines.filter((line) => line.updated === true && line.status === 'kept')
   const by = lines[0]?.by ?? 'A teammate'
   const things = (n: number): string => `${String(n)} thing${n === 1 ? '' : 's'}`
   const parts: string[] = []
   if (kept.length > 0) parts.push(`remembered ${things(kept.length)}`)
+  // "Updated", not "remembered": this one replaced something the person may
+  // already have read. Said in the person's words rather than the store's --
+  // nobody thinks of it as an upsert.
+  if (rewritten.length > 0) parts.push(`updated ${things(rewritten.length)} it already knew`)
   if (proposed.length > 0) parts.push(`wants to remember ${things(proposed.length)}`)
   // A proposal needs a person, and until 2026-09-13 the sentence that said so
   // lived on a second notice above this card -- which is the redundancy that

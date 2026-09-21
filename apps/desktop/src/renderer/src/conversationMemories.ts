@@ -22,12 +22,21 @@ export interface ConversationMemory {
   readonly by: { readonly name: string }
   readonly text: string
   readonly status: 'kept' | 'proposed'
+  /** Present when this memory has been rewritten under its name; what it said before. */
+  readonly previousText?: string
 }
 
 export interface MemoryLine {
   readonly by: string
   readonly text: string
   readonly status: 'kept' | 'proposed'
+  /**
+   * This memory REPLACED an earlier one filed under the same name, rather
+   * than being a new fact. Read off the record -- a memory that has been
+   * rewritten keeps what it used to say -- so the card can say "updated"
+   * without the live update that announced it still being in hand.
+   */
+  readonly updated?: boolean
   /**
    * The turn it was learned on, kept so the card can sit THERE.
    *
@@ -78,5 +87,11 @@ export function memoriesOfConversation(
   if (turns.size === 0) return []
   return memories
     .filter((memory) => memory.missionId !== undefined && turns.has(memory.missionId))
-    .map((memory) => ({ by: memory.by.name, text: memory.text, status: memory.status, missionId: memory.missionId! }))
+    .map((memory) => ({
+      by: memory.by.name,
+      text: memory.text,
+      status: memory.status,
+      missionId: memory.missionId!,
+      ...(memory.previousText === undefined ? {} : { updated: true })
+    }))
 }

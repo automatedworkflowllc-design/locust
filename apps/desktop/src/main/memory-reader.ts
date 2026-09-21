@@ -92,6 +92,16 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
        * and indistinguishable from a memory nobody tried to remove.
        */
       const missed: string[] = []
+      /*
+       * A memory that REPLACED an earlier one under the same name.
+       *
+       * Reported separately from a new one, because they are different
+       * events: one adds a fact, the other changes a fact the person may
+       * already have read and acted on. Folding a rewrite into "remembered"
+       * would let a memory change under them silently, which is the same
+       * failure the `missed` list above exists to prevent.
+       */
+      const rewritten: string[] = []
       for (const op of ops) {
         try {
           if (op.kind === 'forget') {
@@ -114,8 +124,13 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
             workspaceName: options.workspaceName,
             by,
             missionId: mission.missionId,
-            status: mode === 'ask' ? 'proposed' : 'kept'
+            status: mode === 'ask' ? 'proposed' : 'kept',
+            ...(op.name === undefined ? {} : { name: op.name })
           })
+          if (result.rewritten === true) {
+            rewritten.push(result.memory.text)
+            continue
+          }
           if (!result.created) continue
           ;(result.memory.status === 'proposed' ? proposed : kept).push(result.memory.text)
         } catch {
@@ -123,7 +138,7 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
           // reply itself is untouched and the person can still read it.
         }
       }
-      if (kept.length === 0 && proposed.length === 0 && forgotten.length === 0 && missed.length === 0) return
+      if (kept.length === 0 && proposed.length === 0 && forgotten.length === 0 && missed.length === 0 && rewritten.length === 0) return
 
       /*
        * Only what the memory card cannot say.
@@ -139,7 +154,7 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
        * because the card is read from the memories that exist and a memory
        * that was forgotten is exactly the one it cannot draw.
        */
-      options.notify({ kind: 'memory-changed', by: by.name, kept, proposed, forgotten })
+      options.notify({ kind: 'memory-changed', by: by.name, kept, proposed, forgotten, ...(rewritten.length === 0 ? {} : { rewritten }) })
       if (missed.length > 0) {
         // Amber: a person may need to act. The memory that was meant to go is
         // still there, and only they can settle what it should say.

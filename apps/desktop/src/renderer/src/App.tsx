@@ -1820,6 +1820,11 @@ export default function App(): ReactElement {
         if (update.kept.length > 0) said.push(`${update.by} remembered ${update.kept.map((text) => `"${text}"`).join('; ')}`)
         if (update.proposed.length > 0) said.push(`${update.by} wants to remember ${update.proposed.map((text) => `"${text}"`).join('; ')}`)
         if (update.forgotten.length > 0) said.push(`${update.by} forgot ${update.forgotten.map((text) => `"${text}"`).join('; ')}`)
+        // A memory that CHANGED, named as a change. It replaced something the
+        // person may already have read, which is worth more than a new one.
+        if ((update.rewritten ?? []).length > 0) {
+          said.push(`${update.by} updated ${(update.rewritten ?? []).map((text) => `"${text}"`).join('; ')}`)
+        }
         // All three lists empty says nothing happened worth reporting, and
         // `[].join('. ')` is '' -- which passes `!== undefined` downstream and
         // drew an empty paragraph that then also could not be dismissed.

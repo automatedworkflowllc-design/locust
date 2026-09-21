@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.242.0 - 2026-09-21
+
+- **A teammate can name a memory, and naming it stops it piling up.** Facts
+  that change — a test result, a version, whose turn it is — were written
+  fresh every time, so the same fact accumulated a dozen near-identical
+  copies and crowded out everything else. A teammate can now file one under a
+  name, and remembering that name again rewrites it instead of adding another
+  copy. What it said before is kept, and the thread says "updated" rather
+  than "remembered" so a memory never changes under you silently. Memories
+  without a name behave exactly as they did.
+
 ## 0.241.0 - 2026-09-21
 
 - **The welcome screen stops promising a free teammate if there is not one.**
