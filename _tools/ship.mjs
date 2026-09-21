@@ -94,19 +94,58 @@ if (published.status === 0) {
 //     write their records there constantly, they ship nothing, and requiring a
 //     commit for every screenshot would make this gate something to route
 //     around rather than obey.
+
+//     WHAT COUNTS AS OUTSTANDING IS NOW WHAT CAN REACH THE INSTALLER.
+//
+//     `electron-builder.yml` packages `out/**`, `package.json` and
+//     `resources/**` and nothing else, so a drive script or a design note
+//     cannot be "built into this installer" however dirty it is. The gate
+//     said it could, which made it say something false -- and on 2026-09-21,
+//     with a second agent mid-task in this tree on the drive tools, that
+//     false claim blocked a release fixing a bug the user had reported twice
+//     in ten minutes.
+//
+//     The pressure then is to force it, or to commit the other agent's
+//     half-finished work under your own message. Both are worse than the
+//     gate. So the rule is narrowed to the paths that actually decide what
+//     ships, and EVERY exemption is printed: a gate that quietly forgives
+//     things is how the next one gets routed around.
+//
+//     `_tools/ship.mjs` is deliberately NOT exempt. It is this file, and a
+//     half-edited release script decides what a release is.
 const dirty = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, shell: true, encoding: 'utf8' })
 if (dirty.status !== 0) {
   // Not a git repository, or git is unavailable. Say so rather than passing a
   // check that was never actually made.
   bad('the working tree is clean', 'git status could not be read, so this was not checked')
 } else {
-  const outstanding = (dirty.stdout ?? '')
+  const changed = (dirty.stdout ?? '')
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .filter((line) => !/^\?\? docs\/user-session\//.test(line))
+  // The path part of a porcelain line: after the two status characters, and
+  // through any `old -> new` rename arrow.
+  const pathOf = (line) => (line.slice(2).trim().split(' -> ').pop() ?? '').replace(/^"|"$/g, '')
+  // Cannot reach `out/`, `package.json` or `resources/`, which is everything
+  // the installer contains. A drive harness and a design note are evidence
+  // ABOUT a build, never part of one.
+  const cannotShip = (line) => {
+    const path = pathOf(line)
+    if (path.startsWith('docs/')) return true
+    if (path.startsWith('_smoke/')) return true
+    return /^_tools\/drive-[^/]*\.mjs$/.test(path)
+  }
+  const exempt = changed.filter(cannotShip)
+  const outstanding = changed.filter((line) => !cannotShip(line))
   if (outstanding.length === 0) {
     ok('the working tree is clean')
+    // Never silent. Someone reading this output has to be able to see that
+    // the tree was not actually clean, and decide for themselves.
+    if (exempt.length > 0) {
+      console.log(`  note  ${String(exempt.length)} outstanding file(s) the installer cannot contain, left alone:`)
+      for (const line of exempt.slice(0, 12)) console.log(`        ${line}`)
+      if (exempt.length > 12) console.log(`        ... and ${String(exempt.length - 12)} more`)
+    }
   } else {
     bad(
       'the working tree is clean',
