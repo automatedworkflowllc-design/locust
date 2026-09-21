@@ -415,6 +415,31 @@ export function createOpenCodeEventNormalizer(
         completion.stderr ?? "",
       );
       const refusedPath = refused?.[1]?.trim().replace(/[\\/]\*$/, "");
+      /*
+       * A POLICY REFUSAL IS NOT A CRASH, and it was being reported as one.
+       *
+       * Sol's beta review of 0.225.0, ranked embarrassing: in Ask mode a run
+       * asked to create a file, the write never happened -- the boundary held
+       * exactly as designed -- and the card said "OpenCode ended without a
+       * step that reported it had stopped" over the runtime's own
+       * auto-rejecting line. "A new user is likely to conclude Ask mode or
+       * OpenCode is broken."
+       *
+       * The mechanism is ours and it is deliberate. Ask mode sets bash to
+       * "ask", and `opencode run` is non-interactive, so every shell call is
+       * auto-rejected and the process ends without reaching its own stop step
+       * -- see OPENCODE_ASK_CONFIG in commands.ts for why the tool has to
+       * stay on the list at all. Knowing that, the vaguest sentence available
+       * is the wrong one to print.
+       *
+       * external_directory keeps its own case above: that one names a FOLDER,
+       * which tells the person something about their own mission. This names
+       * the TOOL, and the mode that refused it.
+       */
+      const blocked = /permission requested:\s*(bash|edit|write|patch)\b/i.exec(
+        completion.stderr ?? "",
+      );
+      const blockedTool = blocked?.[1]?.toLowerCase();
       if (finalized) return [];
       finalized = true;
       const process = processEvidence(completion);
@@ -439,7 +464,9 @@ export function createOpenCodeEventNormalizer(
             // thing we know for certain.
             message: refusedPath !== undefined && refusedPath.length > 0
               ? `OpenCode asked for ${refusedPath}, which is outside the folder this run may use, and stopped.`
-              : completion.outputLimitExceeded
+              : blockedTool !== undefined
+                ? `The mode this run is in does not allow ${blockedTool}, so OpenCode stopped when it tried to use it. Nothing was changed.`
+                : completion.outputLimitExceeded
                 ? "OpenCode sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
                 // The runtime's own account of why, when it gave one. Sits
                 // below the two cases above because those describe something

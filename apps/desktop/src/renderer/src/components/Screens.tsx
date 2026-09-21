@@ -41,7 +41,7 @@ import {
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
 import { PixelFace } from './PixelFace.js'
-import { COST_NOT_REPORTED_SHORT, costLine, costLineOrWhyNot, runCostOf, sumCosts } from '../cost.js'
+import { COST_NOT_REPORTED_SHORT, costLine, costLineOrWhyNot, costUnit, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
@@ -219,7 +219,12 @@ export function MissionsScreen({
   // rather than as free.
   const costs = shown.map((mission) => runCostOf(mission.events))
   const priced = costs.filter((cost) => cost !== undefined).length
-  const total = costLine(sumCosts(costs))
+  const summed = sumCosts(costs)
+  const total = costLine(summed)
+  // "priced" is a claim about money. When every receipt reported tokens and
+  // no price -- which is what a free route gives -- the honest word for the
+  // same count is "measured". See `costUnit`.
+  const counted = costUnit(summed) === 'money' ? 'priced' : 'measured'
 
   /*
    * A running mission cannot be deleted -- the host refuses, because
@@ -255,7 +260,7 @@ export function MissionsScreen({
             : damaged === 0
               ? 'ledger verified'
               : ledgerDamageWords(withIssues, unreadableLedgers)
-        }${total === undefined ? '' : ` · ${total} across ${priced} priced`}`}
+        }${total === undefined ? '' : ` · ${total} across ${priced} ${counted}`}`}
       />
       {/*
         * Filters over an empty archive are four controls that can only ever
@@ -556,7 +561,9 @@ export function TeammatesScreen({
                   * not said the work was free, and `not reported` must never
                   * be truncated into saying something else. */}
                 <dl className="lc-rostercard__cost">
-                  <dt>Cost</dt>
+                  {/* `Usage` when the receipts carry tokens and no price: a
+                      free route's numbers are a measurement, not a charge. */}
+                  <dt>{costUnit(work.cost) === 'money' ? 'Cost' : 'Usage'}</dt>
                   <dd className={`lc-mono${work.cost === undefined ? ' is-unreported' : ''}`}>
                     {costLineOrWhyNot(work.cost)}
                   </dd>

@@ -6,6 +6,20 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.227.0 - 2026-09-20
+
+- **A refusal reads as a refusal, not a crash.** In Ask mode, a run that tried
+  to use a tool the mode does not allow ended with "OpenCode ended without a
+  step that reported it had stopped" -- so the safety boundary working
+  correctly looked like a broken runtime. It now says which tool the mode
+  refused, and that nothing was changed.
+- **Free routes stop being described as priced.** A run whose receipt reports
+  tokens and no price is a measurement, not a charge: Missions says "measured"
+  rather than "priced", and the Team card labels those numbers Usage rather
+  than Cost.
+- **"Save conversation as routine"** says what it does. It builds a routine
+  from the whole conversation, not from the one mission you opened it on.
+
 ## 0.226.0 - 2026-09-20
 
 - **A run that is cut off mid-sentence no longer leaves plumbing on screen.**

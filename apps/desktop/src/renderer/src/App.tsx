@@ -827,7 +827,22 @@ export default function App(): ReactElement {
           }
         },
         {
-          label: 'Save as routine',
+          /*
+           * "Save CONVERSATION as routine", because that is what it does.
+           *
+           * Sol's beta review of 0.225.0: opening this from one conversation
+           * built a routine with TWO steps, the second being a stress task
+           * that had been cancelled. The dialog was honest about it -- it
+           * said "STEPS 2 OF 12", labelled the behaviour "replayed step by
+           * step", and offered Remove on each -- so nothing was saved by
+           * accident. But the ACTION had promised one mission and delivered
+           * the thread, which is a promise the dialog then has to talk the
+           * person out of.
+           *
+           * One word fixes the promise. Marking a cancelled step inside the
+           * editor is the other half and is still open.
+           */
+          label: 'Save conversation as routine',
           // Only where there is something to replay: a conversation whose
           // turns were all written by the host has no words of the person's
           // in it, and one still running has not finished the work yet.
@@ -4119,7 +4134,7 @@ export default function App(): ReactElement {
     }
   }
   if (saveAsRoutineId !== undefined) {
-    headerActions.push({ label: 'Save as routine', onSelect: () => openSaveRoutine(saveAsRoutineId) })
+    headerActions.push({ label: 'Save conversation as routine', onSelect: () => openSaveRoutine(saveAsRoutineId) })
   }
   if (!running && liveRun?.data?.missionId !== undefined) {
     const shownId = liveRun.data.missionId

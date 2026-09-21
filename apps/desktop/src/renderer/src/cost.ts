@@ -64,6 +64,33 @@ function tokens(value: number): string {
  * priced the run; premium requests are Copilot's unit and are said as such;
  * tokens are shown as in/out. `undefined` means the receipt said nothing.
  */
+/**
+ * Whether a number is MONEY or merely a measurement.
+ *
+ * `costLine` falls back to a token count when a runtime reports no price, so
+ * the same function returns "$0.04" and "12k in · 3k out" -- and everything
+ * downstream called both of them a cost. Sol's beta review of 0.225.0, after
+ * four runs on a model the picker labels "Free · no sign-in": Missions said
+ * *"across 4 priced"* and the Team card put the token counts under a COST
+ * heading. *"No currency charge was displayed, but 'priced' and 'cost'
+ * contradict the route's free promise."*
+ *
+ * Right, and it is a truth problem rather than a wording preference: a person
+ * choosing a free route is choosing it to avoid being charged, and the app
+ * telling them their free runs were priced is the app appearing to contradict
+ * its own first screen.
+ *
+ * `undefined` for a run that reported nothing stays `undefined`. Nothing here
+ * decides a route is free -- it decides only what UNIT was reported, which is
+ * the one thing the receipt actually says.
+ */
+export function costUnit(cost: RunCost | undefined): 'money' | 'usage' | undefined {
+  if (cost === undefined) return undefined
+  if (cost.usd !== undefined || cost.premiumRequests !== undefined) return 'money'
+  if (cost.inputTokens !== undefined || cost.outputTokens !== undefined) return 'usage'
+  return undefined
+}
+
 export function costLine(cost: RunCost | undefined): string | undefined {
   if (cost === undefined) return undefined
   if (cost.usd !== undefined) return cost.usd === 0 ? '$0.00' : cost.usd < 0.01 ? '< $0.01' : `$${cost.usd.toFixed(2)}`
