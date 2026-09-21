@@ -7,8 +7,8 @@ describe('how big the window opens', () => {
     // 1480x940 flat was the old default, which is most of a laptop screen and
     // reads as "very large" the moment it appears.
     const on1920 = openingSize({ width: 1920, height: 1080 })
-    expect(on1920.width).toBeLessThanOrEqual(1280)
-    expect(on1920.height).toBeLessThanOrEqual(860)
+    expect(on1920.width).toBeLessThanOrEqual(1215)
+    expect(on1920.height).toBeLessThanOrEqual(800)
   })
 
   it('never opens below what the layout needs', () => {

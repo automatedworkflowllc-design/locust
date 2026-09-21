@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.231.0 - 2026-09-21
+
+- **The window opens narrower.** It opened up to 1280 wide, which on a big
+  display left a column of empty panel beside the thread -- the app looking
+  like it had nothing to put there. It opens at the width the app is actually
+  worked at now, and still takes a fraction of smaller screens rather than a
+  fixed number.
+
 ## 0.230.0 - 2026-09-21
 
 - **Sending starts the run instead of re-checking every runtime first.**

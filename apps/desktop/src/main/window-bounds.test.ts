@@ -8,7 +8,9 @@ const WORK = { width: 1920, height: 1040 }
 describe('what the window opens with', () => {
   it('uses the opening size when nothing was saved', () => {
     const placement = openingPlacement(undefined, [LAPTOP], WORK)
-    expect(placement.width).toBe(1280)
+    // 1215 since 2026-09-21: the width Colin actually works at, so a new
+    // person does not meet a column of empty panel beside the thread.
+    expect(placement.width).toBe(1215)
     expect(placement.x).toBeUndefined()
     expect(placement.maximized).toBe(false)
   })
