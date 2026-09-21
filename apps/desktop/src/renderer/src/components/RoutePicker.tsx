@@ -6,6 +6,7 @@ import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
 import { modelDisplayName } from '../routeName.js'
+import { FREE_START_RUNTIME } from '../../../shared/runtime-install.js'
 
 export interface RouteChoice {
   readonly runtime: MissionRuntimeId
@@ -42,7 +43,21 @@ function buildRows(
     if (runtime.id === 'omniroute') continue
     const integration = integrationOf(runtime.id)
     const status = routeRowStatus(runtime, integration, false, limited.get(runtime.id))
-    const group = `${runtime.displayName} · your account`
+    /*
+     * THE ACCOUNT SUFFIX, ONLY WHERE THERE IS AN ACCOUNT.
+     *
+     * Every group header said `· your account` unconditionally, OpenCode's
+     * included -- and OpenCode is the runtime the welcome screen recommends
+     * BY NAME because it needs no account, whose free model this app's whole
+     * on-ramp rests on. Gemini's handoff pass, 2026-09-21.
+     * 
+     * It is the same sentence-that-does-not-match-its-list defect as the
+     * welcome screen's collapsed `they each need their own account`, on the
+     * next control along, and it lands on the one person least able to tell
+     * it is wrong: someone deciding whether picking this route will cost
+     * them money.
+     */
+    const group = runtime.id === FREE_START_RUNTIME ? runtime.displayName : `${runtime.displayName} · your account`
 
     // Every catalog model names its runtime -- Codex's from a live server
     // read, Claude's from what its CLI advertised -- and is offered only

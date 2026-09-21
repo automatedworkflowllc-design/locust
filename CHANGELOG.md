@@ -17,6 +17,11 @@ Dates are when the build was cut. Versions are the number Settings shows.
 
   If you tidied one of those phantom rows into a group, that conversation may
   still be filed in two groups. Moving it once more puts it right.
+- **The model picker stops telling you OpenCode needs an account.** Every
+  group in it was labelled "· your account", including the one runtime Locust
+  recommends because it needs none.
+- **Runtimes read in the same order in the picker as in Settings.** They were
+  sorted by whichever answered its version check first.
 
 ## 0.245.0 - 2026-09-21
 

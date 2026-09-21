@@ -1073,10 +1073,24 @@ export function orderRouteRows<
     return flagship === undefined ? 2_000_000 : 1_000_000 + flagship
   }
   return [...rows].sort((left, right) => {
-    // What can run, then discovery's order inside that. See `bandOf`.
+    /*
+     * What can run, then ALPHABETICAL inside that band. See `bandOf`.
+     *
+     * This fell back to `groups.indexOf` -- discovery's arrival order -- and
+     * Gemini's handoff pass caught it on a machine with all seven runtimes
+     * present: Claude Code sorted below Codex CLI in the same band, purely
+     * because Codex answered its probe first.
+     * 
+     * Worth taking for a reason beyond taste. `runtimeListOrder`, which
+     * Settings uses, has sorted `left.displayName.localeCompare(right.
+     * displayName)` inside each band since 2026-09-15. Two lists of the same
+     * six runtimes, two different answers to 'what comes first' -- and I
+     * wrote 'alphabetical inside each band' into the handoff brief myself,
+     * then implemented the other thing. Fewer clocks, not fewer numbers.
+     */
     const byBand = (groupBand.get(left.group) ?? 9) - (groupBand.get(right.group) ?? 9)
     if (byBand !== 0) return byBand
-    const byGroup = groups.indexOf(left.group) - groups.indexOf(right.group)
+    const byGroup = left.group.localeCompare(right.group)
     if (byGroup !== 0) return byGroup
     return score(left) - score(right)
   })
