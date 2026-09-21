@@ -26,7 +26,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  */
 export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 15 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 16 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -118,13 +118,25 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 15 as const
  * could touch the whole machine as one confined to a folder. The permission a
  * run had is the last thing a record may be vague about.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
 
+/**
+ * READ FROM THE LIST ABOVE, not written out again.
+ *
+ * This was sixteen `value === n` clauses, a hand-kept copy of the array it
+ * sits under, and the two drifted the moment one of them moved: bumping to
+ * v16 for Muse Code left this at 15, so the writer produced files its own
+ * reader called `unsupported-schema` -- every mission written, none listed.
+ * Caught by the suite, which is the one place this class of duplication
+ * ever is.
+ */
+const SUPPORTED_VERSIONS: ReadonlySet<unknown> = new Set(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)
+
 function isSupportedSchemaVersion(value: unknown): value is MissionLedgerSchemaVersion {
-  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7 || value === 8 || value === 9 || value === 10 || value === 11 || value === 12 || value === 13 || value === 14 || value === 15
+  return SUPPORTED_VERSIONS.has(value)
 }
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -564,13 +576,34 @@ function requireTimestamp(value: string, label: string): string {
 
 /**
  * Every runtime a mission may record. Widening this is a schema version:
- * v8 added opencode and copilot, v9 antigravity, so an older reader refusing
- * a newer file says why.
+ * v8 added opencode and copilot, v9 antigravity, v16 muse.
+ *
+ * IT IS A RECORD, NOT AN ARRAY, and that is the whole point.
+ *
+ * It was `readonly string[]`, so nothing tied it to `MissionRuntimeId` and
+ * the compiler never asked. Adding Muse Code to the union, to the display
+ * names, to the capability table and to the command builder therefore left
+ * this behind -- and every Muse mission died at
+ * **"Stopped -- the mission ledger could not be written"**, before the
+ * runtime was ever launched. Colin hit it on 0.247.0, on the first run.
+ *
+ * `satisfies Record<MissionRuntimeId, true>` makes the next runtime a
+ * compile error here rather than a refusal at the only moment it matters.
+ * Anything a person can pick must be something the ledger can write down.
  */
-const MISSION_RUNTIMES: readonly string[] = ['codex', 'claude', 'cursor', 'gemini', 'opencode', 'copilot', 'antigravity']
+const MISSION_RUNTIMES = {
+  codex: true,
+  claude: true,
+  cursor: true,
+  gemini: true,
+  opencode: true,
+  copilot: true,
+  antigravity: true,
+  muse: true
+} as const satisfies Record<MissionRuntimeId, true>
 
 function isMissionRuntime(value: unknown): value is MissionRuntimeId {
-  return typeof value === 'string' && MISSION_RUNTIMES.includes(value)
+  return typeof value === 'string' && Object.hasOwn(MISSION_RUNTIMES, value)
 }
 
 function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadata {
@@ -777,6 +810,10 @@ function parsedMetadata(
   }
   // And no writer before v7 knew Cursor Agent or Gemini CLI.
   if (schemaVersion < 7 && candidate.runtime !== 'codex' && candidate.runtime !== 'claude') {
+    return undefined
+  }
+  // And no writer before v16 knew Muse Code.
+  if (schemaVersion < 16 && candidate.runtime === 'muse') {
     return undefined
   }
   if (

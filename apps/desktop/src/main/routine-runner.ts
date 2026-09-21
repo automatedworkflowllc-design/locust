@@ -7,6 +7,7 @@ import type { MissionPeerContext } from './workroom-briefing.js'
 import { randomUUID } from 'node:crypto'
 import type { RoutineExecution, RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
 import type { RoutineStore } from './routine-store.js'
+import { hostReadsEventsOf } from '../shared/runtimes.js'
 
 /**
  * Replays a routine: step 1 starts as a new mission for the teammate, and each
@@ -114,8 +115,19 @@ function isAtCapacity(message: string): boolean {
 /** How long a scheduled routine waits after a start that failed before it is tried again. */
 export const SCHEDULE_HOLD_OFF_MS = 3_600_000
 
-/** Runtimes the routine runner can start. Antigravity is driven through another service and records no starter. */
-const ROUTINE_RUNTIMES: ReadonlySet<string> = new Set(['codex', 'claude', 'cursor', 'opencode', 'copilot'])
+/**
+ * Runtimes the routine runner can start: the ones whose events this host
+ * reads through a process it owns. Antigravity is excluded by that same
+ * rule, which is the right reason -- it is driven through another service
+ * and records no starter.
+ *
+ * ASKED, NOT LISTED. This was a hand-written set of five ids, and a set
+ * like that is how Muse Code came to be pickable in the composer and
+ * refused by the mission ledger on the same build. A routine would have
+ * been refused here with "Routines cannot run on muse yet", which is a
+ * sentence about a list nobody had updated rather than about the runtime.
+ */
+const canStartRoutine = (runtime: MissionRuntimeId): boolean => hostReadsEventsOf(runtime)
 
 function phaseWords(phase: RecoveredMissionPhase | undefined): string {
   switch (phase) {
@@ -351,7 +363,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       if (routine.execution !== undefined && routine.execution.status !== 'abandoned') {
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: 'This routine is already running or waiting for review. Open its routine card before starting more work.' } }
       }
-      if (!ROUTINE_RUNTIMES.has(routine.route.runtime)) {
+      if (!canStartRoutine(routine.route.runtime)) {
         return {
           ok: false,
           error: { code: 'ROUTINE_REJECTED', message: `Routines cannot run on ${routine.route.runtime} yet.` }

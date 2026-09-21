@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.248.0 - 2026-09-21
+
+- **A Muse Code mission actually starts.** Every one of them stopped at
+  "the mission ledger could not be written" — before Muse was launched, so
+  nothing ran and nothing was changed, but nothing worked either. The ledger
+  keeps its own list of runtimes it will record, and Muse Code had been
+  added everywhere else and not there.
+- **Routines can run on Muse Code too.** They were held back by a second
+  list with the same gap.
+
 ## 0.247.0 - 2026-09-21
 
 - **Muse Code runs missions now.** Meta’s CLI has been in the runtime list
