@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.226.0 - 2026-09-20
+
+- **A run that is cut off mid-sentence no longer leaves plumbing on screen.**
+  When a turn is interrupted inside one of the blocks Locust reads, the stream
+  stops mid-word -- so what reached you was the first few characters of a tag
+  with nothing to close it, sitting at the end of the reply as though the
+  teammate had typed it. It comes off now. A stray angle bracket in ordinary
+  prose is left exactly where it is.
+
 ## 0.225.0 - 2026-09-20
 
 - **The step underway is one solid mark.** The orbiting particles read as

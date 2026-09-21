@@ -58,6 +58,34 @@ export function defangProtocolBlocks(text: string): string {
 // because it is still a perfectly valid regex.
 const LOOSE_TAG = new RegExp(`</?(?:${PROTOCOL_TAGS.join('|')})\\b[^<>]{0,400}>`, 'gi')
 
+/**
+ * A tag the run was CUT OFF inside, at the very end of the text.
+ *
+ * Colin, 2026-09-20, with a bubble ending `</locust-` on a turn whose own card
+ * read "The run could not continue -- recovered as interrupted": *"happened
+ * before update, could be fixed but i doubt"*. It can.
+ *
+ * `LOOSE_TAG` requires a closing bracket and a whole tag name, because that is
+ * what makes it safe to delete anything at all. An interrupted turn produces
+ * neither: the stream stops mid-word, so what reaches the person is the first
+ * few characters of a tag and nothing else. Every complete tag on the message
+ * came off and this one stayed, which reads as the teammate having typed it.
+ *
+ * NARROW ON PURPOSE, three ways. It matches only at the END of the text,
+ * because that is the only place a cut-off stream can leave one; only a
+ * PREFIX of a tag this app actually knows; and only from four characters in
+ * (`<locu`, `</locu`), so a lone `<` or a truncated `</li` from some other
+ * language is left exactly where it is.
+ *
+ * `[a-z-]*` after the prefix, not `.*`: the partial cannot contain a space or
+ * a bracket, or it is not a cut-off tag name -- it is prose with a bracket in
+ * it, and prose is the thing this function exists to protect.
+ */
+const TORN_TAG = new RegExp(
+  `\n?\s*</?(?:${PROTOCOL_TAGS.map((tag) => tag.slice(0, 4)).join('|')})[a-z-]*$`,
+  'i'
+)
+
 /** Fenced blocks and inline spans, which are quoted source and stay intact. */
 const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g
 
@@ -103,6 +131,11 @@ export function unwrapProtocolTags(text: string): string {
     at = index + span[0].length
   }
   out += text.slice(at).replace(LOOSE_TAG, '')
+  /*
+   * The torn one last, and only on the tail: it is anchored to the end of the
+   * string, so it can only be judged once every complete tag is gone.
+   */
+  out = out.replace(TORN_TAG, '')
   /*
    * Leading blank LINES, not leading whitespace. A tag on its own first line
    * leaves the bubble starting on an empty one, which reads as a gap the

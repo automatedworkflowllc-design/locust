@@ -66,3 +66,40 @@ describe('a half-written tag is never shown to a person', () => {
     expect(unwrapProtocolTags('<locust-unknown>x</locust-unknown>')).toBe('<locust-unknown>x</locust-unknown>')
   })
 })
+
+describe('a run cut off inside a tag leaves nothing behind', () => {
+  /**
+   * Colin, 2026-09-20, with a bubble ending `</locust-` on a turn whose own
+   * card said "The run could not continue -- recovered as interrupted":
+   * *"happened before update, could be fixed but i doubt"*.
+   *
+   * `LOOSE_TAG` needs a whole name and a closing bracket, which is what makes
+   * deleting safe. An interrupted stream gives neither — it stops mid-word —
+   * so every complete tag came off the message and the torn one stayed,
+   * reading as something the teammate typed.
+   */
+  it('takes off a tag the stream was cut off inside', () => {
+    expect(unwrapProtocolTags('briefs/colin-founder-bio.md :: a draft\n</locust-')).toBe(
+      'briefs/colin-founder-bio.md :: a draft'
+    )
+    expect(unwrapProtocolTags('the answer\n<locust-sh')).toBe('the answer')
+  })
+
+  it('leaves a lone bracket, and anyone else\u2019s torn tag, alone', () => {
+    // The narrowness IS the feature: prose with a bracket in it is the thing
+    // this whole function exists to protect.
+    expect(unwrapProtocolTags('x < y')).toBe('x < y')
+    expect(unwrapProtocolTags('a list item </li')).toBe('a list item </li')
+    expect(unwrapProtocolTags('compare a < b and c > d')).toBe('compare a < b and c > d')
+  })
+
+  it('only at the end, because that is the only place a cut can leave one', () => {
+    const middle = 'I was going to write </locust- but then kept talking about it.'
+    expect(unwrapProtocolTags(middle)).toBe(middle)
+  })
+
+  it('still unwraps the complete tags on the same message', () => {
+    const said = unwrapProtocolTags('<locust-file path="a.md">a draft</locust-file>\nand then\n</locust-')
+    expect(said).toBe('a draft\nand then')
+  })
+})
