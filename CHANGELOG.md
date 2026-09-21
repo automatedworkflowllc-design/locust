@@ -11,7 +11,9 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - **The live line reads like a line again.** The word beside the orb was
   10.5px in the monospace face, which next to a bigger orb read as a caption
   on a picture rather than a sentence. It is 14px in the app's own UI face
-  now, capitalised, with the four dots the library's page uses.
+  now, in the app's own medium weight, capitalised, with an ellipsis after it
+  -- three dots, which is what people write, rather than the four the
+  library's own page happens to use.
 - **The travelling highlight is brighter, and safer.** It is the library's own
   technique now: the word stays solidly painted and a bright band slides over
   a copy of it, instead of the word itself being transparent ink over a moving

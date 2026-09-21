@@ -5253,7 +5253,16 @@ textarea {
   gap: var(--lc-space-3);
   font-family: var(--lc-font-ui);
   font-size: 14px;
-  font-weight: 400;
+  /*
+   * 500, not 400, and it is not a guess. The library's page sets this in
+   * INTER at 400; Geist at 400 is a lighter, narrower face, so matching the
+   * number does not match the picture. Colin, holding the two side by side:
+   * *"their font stills look a teensy weensy bit different/better than ours,
+   * you sure you got there, maybe its bolded? the font looks thicker"*. He
+   * was reading stroke weight, and he was right. Geist ships Regular and
+   * Medium; Medium is the one that lands where Inter Regular does.
+   */
+  font-weight: 500;
   letter-spacing: 0;
   color: var(--lc-text-muted);
   /* Two words that mean one thing. Wrapped, "using a / tool" reads as two

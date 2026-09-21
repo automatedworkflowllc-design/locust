@@ -699,8 +699,14 @@ export function LiveRegisterLine({
 
 /** What a live line IS, in the words a person would use for it. */
 /**
- * The word as the library's own page sets it: capitalised, with an ellipsis
- * and a full stop after it -- `Thinking….`, four dots on screen.
+ * The word as the library's own page sets it, with one correction.
+ *
+ * THREE DOTS, NOT FOUR. Their markup is `Solving….` -- an ellipsis
+ * followed by a full stop, which draws four. Colin: *"3 ...'s is standard
+ * with us humans"*, which is the right call: four dots is not a punctuation
+ * mark anyone writes, and a trailing stop after an ellipsis reads as a typo
+ * rather than as a style. The ellipsis alone is the thing every chat app
+ * uses for this.
  *
  * KEPT OUR WORDS, TOOK THEIR SHAPE. Their captions name the ORB (`Solving…`),
  * and ours name what is happening (`using a connector`). Printing theirs would
@@ -709,7 +715,7 @@ export function LiveRegisterLine({
  * of vocabularies that made three rounds of "use this one for that" ambiguous.
  */
 export function sweepText(word: string): string {
-  return `${word.charAt(0).toUpperCase()}${word.slice(1)}….`
+  return `${word.charAt(0).toUpperCase()}${word.slice(1)}…`
 }
 
 export const REGISTER_WORD: Record<LiveRegister, string> = {

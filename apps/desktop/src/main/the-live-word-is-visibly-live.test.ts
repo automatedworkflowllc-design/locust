@@ -60,8 +60,11 @@ describe('the live word is visibly live', () => {
   it('sets the live word as a label rather than a machine string', () => {
     // 10.5px mono beside a 26px orb read as a caption on a picture.
     const rule = css.slice(css.indexOf('.lc-livestep__register {'))
-    expect(rule.slice(0, 400)).toContain('font-size: 14px')
-    expect(rule.slice(0, 400)).toContain('font-family: var(--lc-font-ui)')
+    expect(rule.slice(0, 800)).toContain('font-size: 14px')
+    expect(rule.slice(0, 800)).toContain('font-family: var(--lc-font-ui)')
+    // 500 because the library's page is INTER at 400 and Geist at 400 is a
+    // lighter face -- matching the number does not match the picture.
+    expect(rule.slice(0, 800)).toContain('font-weight: 500')
   })
 
   it('scales no orb at all', () => {
