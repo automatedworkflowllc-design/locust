@@ -24,3 +24,6 @@ smoke-results.json
 
 # Staged by _tools/vendor-npm.mjs before packaging; not source.
 apps/desktop/resources/npm/
+
+# orb sample build output
+_tools/orb-samples/bundle.js
