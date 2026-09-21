@@ -439,6 +439,47 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
 }
 
 /**
+ * How long a runtime that was READY is trusted, when the only question is
+ * whether a mission may start on it.
+ *
+ * STARTING ONE MISSION SWEPT ALL EIGHT RUNTIMES. Fable's probing review,
+ * 2026-09-21, ranked first and measured: a Send 41 s after launch waited 3 s
+ * before the run could begin, because `discover()` re-probes every runtime's
+ * version, help, readiness and model list to answer one question about one of
+ * them. On Colin's machine the slowest runtime "ran past six seconds". **The
+ * Stop button appears at 51 ms**, so the screen says running while the host
+ * is busy with six runtimes the mission is not using — which is why nobody
+ * ever named this delay despite feeling it every time.
+ *
+ * Five minutes rather than the sweep's ten seconds, and only for a `ready`
+ * record. The reason it is safe is that THE RUN ITSELF IS THE REAL CHECK: a
+ * CLI that has been signed out since the last sweep fails at launch, fast and
+ * legibly, which is a better answer than making every start wait for a probe
+ * that is almost always going to say yes.
+ *
+ * Anything else — not ready, not available, no record at all — takes the full
+ * sweep exactly as before. That is the case where the answer might actually
+ * have changed in the person's favour, and it is the one worth waiting for.
+ */
+const READY_TO_START_TTL_MS = 5 * 60_000
+
+const discoverForStart = (runtimeId?: string): Promise<readonly RuntimeDiscovery[]> => {
+  const held = discoveryCache
+  if (runtimeId !== undefined && held !== undefined && Date.now() - held.at < READY_TO_START_TTL_MS) {
+    const chosen = held.value.find((entry) => entry.id === runtimeId)
+    if (
+      chosen !== undefined
+      && chosen.availability === 'available'
+      && chosen.readiness === 'ready'
+      && chosen.executable !== undefined
+    ) {
+      return Promise.resolve(held.value)
+    }
+  }
+  return discoverForWork()
+}
+
+/**
  * Can npm be run from here?
  *
  * Asked once and remembered: it is a fact about the machine, and asking on
@@ -1281,7 +1322,7 @@ if (!ownsSingleInstanceLock) {
       keepATodoList: async () => (await teammates.readSettings()).keepATodoList === true,
       readyConnectors: cursorReadyConnectors,
       allowConnectors: async (workspace) => allowCursorConnectors(workspace, await cursorConfiguredConnectorNames()),
-      discover: discoverForWork,
+      discover: discoverForStart,
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,
       workroom,
@@ -1487,7 +1528,7 @@ if (!ownsSingleInstanceLock) {
     })
 
     const modelCatalog = createModelCatalog({
-      discover: discoverForWork,
+      discover: discoverForStart,
       spawn: spawnAppServer
     })
 

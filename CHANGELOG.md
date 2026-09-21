@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.230.0 - 2026-09-21
+
+- **Sending starts the run instead of re-checking every runtime first.**
+  Starting one mission re-probed all of them -- version, help, readiness and
+  model list -- to answer one question about the one it was using, which on a
+  slow machine was several seconds between pressing Send and anything
+  happening. The Stop button appeared immediately, so the screen said running
+  for the whole wait. A runtime that was ready in the last few minutes is now
+  taken at its word; anything else is still checked properly, because that is
+  the case where the answer may have changed.
+
 ## 0.229.0 - 2026-09-21
 
 - **"Downloaded" names the version that is actually downloaded.** If a newer

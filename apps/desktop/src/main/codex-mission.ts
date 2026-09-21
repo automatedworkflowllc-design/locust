@@ -223,7 +223,14 @@ interface CodexMissionServiceOptions {
   readonly workspacePath: string
   /** Test seam. Which platform's containment rules apply. */
   readonly platform?: NodeJS.Platform
-  readonly discover: () => Promise<readonly RuntimeDiscovery[]>
+  /**
+   * The runtimes, for deciding whether this mission may start.
+   *
+   * Takes the runtime it is about to use so the host can answer from a recent
+   * `ready` record instead of re-probing every other runtime — see
+   * `discoverForStart`. Passing nothing is the old full sweep.
+   */
+  readonly discover: (runtimeId?: string) => Promise<readonly RuntimeDiscovery[]>
   readonly runner: RuntimeProcessRunner
   /**
    * How to start `codex app-server`, which is the transport every Codex mode
@@ -890,7 +897,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         claimed = true
         let runtimes: readonly RuntimeDiscovery[]
         try {
-          runtimes = await options.discover()
+          runtimes = await options.discover(runtime)
         } catch {
           return error(
             'CODEX_UNAVAILABLE',
