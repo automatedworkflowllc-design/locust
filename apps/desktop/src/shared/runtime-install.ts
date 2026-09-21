@@ -78,6 +78,24 @@ const FACTS: Readonly<Record<string, RuntimeInstallFacts | undefined>> = {
     signIn: 'cursor-agent login',
     account: 'a Cursor account'
   },
+  /*
+   * Not npm, and not a plain download either.
+   *
+   * Muse Code 1.3.0 (2026-09) ships a native Windows build -- before that it
+   * was WSL-only, which is why Locust did not carry it. The installer is a
+   * PowerShell script from Meta and it puts `muse.exe` under
+   * %LOCALAPPDATA%\Programs\muse, which is on the same kind of path
+   * discovery already walks for cursor-agent.
+   *
+   * Pointed at the vendor rather than given a command line, for the reason
+   * Cursor is: a script we do not own can change, and a command we print is
+   * a command a person will run.
+   */
+  muse: {
+    install: { kind: 'vendor', url: 'https://dev.meta.ai' },
+    signIn: 'muse login',
+    account: 'a Muse Code subscription'
+  },
   // Not a CLI: a desktop app Locust drives and reads a transcript from.
   antigravity: { install: { kind: 'vendor', url: 'https://antigravity.google' } },
   // Found and signed into like the others, but no mission can run under it --

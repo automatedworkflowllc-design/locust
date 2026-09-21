@@ -12,6 +12,31 @@ export type RuntimeIntegrationId =
   | "opencode"
   | "copilot"
   /**
+   * Meta's terminal coding agent, discovered like the CLIs above.
+   *
+   * WHY IT IS HERE AT ALL, since the same model is already reachable: the
+   * free route this whole product opens on is
+   * `opencode/muse-spark-1.3-contributor-free` -- Muse THROUGH OpenCode --
+   * and the second route to it is Cursor, who also resell it. Both are
+   * arrangements between two other companies. Colin, 2026-09-21: *"we have
+   * no control over whether opencode continues to support muse so its
+   * better that we integrate it ourself through meta/muse"*.
+   *
+   * He is right, and the earlier assessment that talked him out of it was
+   * wrong twice. It said "customers already have Muse twice" -- availability
+   * TODAY, which is the exact reasoning `freeStartStillFree` exists to
+   * reject -- and it rested on a blocker that has since lifted: native
+   * Windows landed in Muse Code 1.3.0 (2026-09), and that document's own
+   * revisit condition was "if native Windows support lands".
+   *
+   * What it does NOT hedge is the free tier. Muse's own CLI is a paid
+   * subscription, so this is a bring-your-own-account runtime like Codex,
+   * Claude, Cursor and Copilot. The free promise still rests on OpenCode
+   * publishing something with a `-free` suffix, which is checked separately
+   * and on its own evidence.
+   */
+  | "muse"
+  /**
    * EXPERIMENTAL. Antigravity is a mission runtime, but it is not DISCOVERED
    * like the others: its `agentapi` refuses to start a conversation without a
    * project id that only its own protobuf state file holds, so no probe this
