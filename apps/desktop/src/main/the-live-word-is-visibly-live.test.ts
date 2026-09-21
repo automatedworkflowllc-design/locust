@@ -64,7 +64,13 @@ describe('the live word is visibly live', () => {
      * mark this small that reads as broken rather than as big.
      */
     expect(css).not.toContain(".lc-livestep__orb[data-orb='")
-    const box = css.slice(css.indexOf('.lc-livestep__orb {'))
-    expect(box.slice(0, 160)).toContain('width: 20px')
+    /*
+     * The box is 26px now and the orb is not scaled -- those are two
+     * different things, and the difference is the whole lesson. A bigger
+     * BOX holding the library's bigger ASSET is sharp; a transform on the
+     * small asset is the thing Colin called cooking the resolution.
+     * `the-orb-uses-the-asset-that-reads.test.ts` owns the box size.
+     */
+    expect(css).not.toContain('transform: scale(1.3)')
   })
 })

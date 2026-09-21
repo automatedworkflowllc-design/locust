@@ -54,43 +54,43 @@ const DOTS = {
   morph: [0.395, 1.011]
 }
 
+// The live line's real geometry, so a size is judged as a ROW and not as a
+// picture: same gap, same mono label, same pill.
+const Line = ({ state, word, box, preset }) => (
+  <span className="row" style={{ gap: 8 }}>
+    <span style={{ flex: 'none', display: 'grid', placeItems: 'center', width: box, height: box }}>
+      {preset === 20
+        ? <ThinkingOrb state={state} size={20} theme="dark" />
+        : <Big state={state} box={box} />}
+    </span>
+    <span className="word">{word}</span>
+  </span>
+)
+
 function App() {
   return (
     <>
-      <h1>Are these the library&rsquo;s own drawings?</h1>
+      <h1>The 64 asset in the live line&rsquo;s own geometry</h1>
       <p className="sub">
-        Yes — all 23 files are byte-identical to the published npm tarball, nothing is redrawn.
-        What changed the LOOK is the library&rsquo;s own <b>20px preset</b>, which draws a small
-        fraction of the points at a much bigger dot size. Column 1 is what Locust ships today.
-        Column 2 is the same shape from the <b>64</b> asset — the drawing the website shows.
+        Left is what shipped through 0.221 — the library&rsquo;s 20px inline design in a 20px box.
+        Right is the 64 asset painted into a 26px box, which is what the website shows.
+        Judge the ROW, not the orb: does the line still read, and does the word still sit right?
       </p>
-
       <table>
         <thead><tr>
-          <th>shape</th>
-          <th>ships today<br/>20 preset @ 20px</th>
-          <th>64 asset @ 20px</th>
-          <th>64 asset @ 24px</th>
-          <th>64 asset @ 28px</th>
-          <th>points kept at 20<br/>vs the 64 asset</th>
-          <th>dot size</th>
+          <th>shape</th><th>0.221 · 20 preset @ 20px</th><th>64 asset @ 22px</th>
+          <th>64 asset @ 26px</th><th>64 asset @ 30px</th>
         </tr></thead>
         <tbody>
-          {SHAPES.map(([state, shape, word]) => {
-            const [big, small] = PRESETS[shape]
-            const [dbig, dsmall] = DOTS[shape]
-            return (
-              <tr key={state}>
-                <td className="name">{shape} · {word}</td>
-                <td><ThinkingOrb state={state} size={20} theme="dark" /></td>
-                <td><Big state={state} box={20} /></td>
-                <td><Big state={state} box={24} /></td>
-                <td><Big state={state} box={28} /></td>
-                <td className="tag">{Math.round((small / big) * 100)}% of them</td>
-                <td className="tag">{(dsmall / dbig).toFixed(1)}&times; fatter</td>
-              </tr>
-            )
-          })}
+          {SHAPES.map(([state, shape, word]) => (
+            <tr key={state}>
+              <td className="name">{shape}</td>
+              <td><Line state={state} word={word} box={20} preset={20} /></td>
+              <td><Line state={state} word={word} box={22} preset={64} /></td>
+              <td><Line state={state} word={word} box={26} preset={64} /></td>
+              <td><Line state={state} word={word} box={30} preset={64} /></td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </>

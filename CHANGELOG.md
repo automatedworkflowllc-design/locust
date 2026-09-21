@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.222.0 - 2026-09-20
+
+- **The orbs look like the orbs.** The library ships two separate drawings per
+  orb -- one tuned for 64px and one for inline text at 20px -- and Locust was
+  showing the small one everywhere. At 20 the connector orb keeps a fifth of
+  its points at one and a half times the size, which is why it looked like
+  nothing on the library's own page. The six whose shape lives in their
+  detail now use the big drawing, painted down into a slightly larger box, so
+  it stays sharp.
+- **The two outline orbs keep the small drawing**, because that is the one
+  that reads: at the big size their lines are hairline and fade into the
+  panel.
+
 ## 0.221.0 - 2026-09-20
 
 - **Conversations stop disappearing.** The sidebar only ever received the 20

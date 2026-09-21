@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
-import { ThinkingOrb } from 'thinking-orbs'
+import { ORB_BOX, Orb } from './Orb.js'
 
 import { seedAvatar } from '../../../shared/avatar.js'
 import { parseAgentText, splitInlineCode } from '../agentText.js'
@@ -505,7 +505,7 @@ export function PlanSteps({
                 // The orb REPLACES the pulsing pip rather than joining it:
                 // two things pulsing on one row is the row saying "now" twice.
                 <span className="lc-plan__orb" data-orb={PLAN_ORB}>
-                  <ThinkingOrb state={PLAN_ORB} size={20} theme="dark" aria-hidden="true" />
+                  <Orb state={PLAN_ORB} box={ORB_BOX} />
                 </span>
               ) : (
                 <span className={`lc-dot${step.state === 'running' ? ' is-pulsing' : ''}`} />
@@ -636,7 +636,7 @@ export function LiveRegisterLine({
                 * this in text — and the library's own label would sometimes
                 * disagree with it ("Thinking…" beside "starting").
                 */}
-              <ThinkingOrb state={orb} size={20} theme="dark" aria-hidden="true" />
+              <Orb state={orb} box={ORB_BOX} />
             </span>
           )}
           {/*

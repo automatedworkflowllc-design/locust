@@ -1,0 +1,61 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vitest'
+
+/**
+ * Which drawing each orb uses, pinned — because it was decided by looking and
+ * nothing else in the suite can see it.
+ *
+ * The library ships TWO drawings per orb and says so in its own types:
+ * *"Exactly two tuned presets ship: 64 (chat-avatar scale) and 20
+ * (inline-text scale). Each size carries its own dot count, dot size and
+ * speed tuning — they are separate designs, not a scale factor."*
+ *
+ * Locust shipped the 20 design everywhere, and Colin held the app up next to
+ * the library's page: *"the one we have set for 'using a tool' doesnt even
+ * look like any of the ones in that asset pack lol"*. Nothing had been
+ * redrawn — all 23 files are byte-identical to the published tarball. It was
+ * the other design: at 20 the web keeps 19% of its points at 1.5x the size.
+ *
+ * The split is by what carries the shape. Density shapes take the 64 asset
+ * painted down; OUTLINE shapes keep the 20 design, because at 64 their lines
+ * are hairline-thin and vanish into the panel.
+ */
+
+const SRC = fileURLToPath(new URL('../renderer/src/', import.meta.url))
+const orb = readFileSync(`${SRC}components/Orb.tsx`, 'utf8')
+const css = readFileSync(`${SRC}shell.css`, 'utf8')
+
+describe('the orb uses the asset that reads', () => {
+  it('gives the density shapes the 64 asset', () => {
+    const set = orb.slice(orb.indexOf('const DENSE'), orb.indexOf('export function Orb'))
+    for (const state of ['composing', 'listening', 'solving', 'searching', 'connecting', 'weaving']) {
+      expect(set).toContain(`'${state}'`)
+    }
+  })
+
+  it('leaves the outline shapes on their own 20px design', () => {
+    const set = orb.slice(orb.indexOf('const DENSE'), orb.indexOf('export function Orb'))
+    // `shaping` is a dotted square and `breathing` a dotted ring. The 20
+    // design fattens them on purpose; the 64 one is hairline.
+    expect(set).not.toContain("'shaping'")
+    expect(set).not.toContain("'breathing'")
+    expect(orb).toContain('size={dense ? 64 : 20}')
+  })
+
+  it('never scales a raster to get a bigger orb', () => {
+    // The first attempt, and Colin's verdict on it: "you just cooked the
+    // resolution". A bigger orb is a bigger ASSET painted down, never a
+    // transform on the small one.
+    expect(css).not.toContain(".lc-livestep__orb[data-orb='")
+    expect(orb).not.toContain('scale(')
+  })
+
+  it('gives the row a box big enough for the asset', () => {
+    const box = css.slice(css.indexOf('.lc-livestep__orb {'))
+    expect(box.slice(0, 200)).toContain('width: 26px')
+    const plan = css.slice(css.indexOf('.lc-plan__orb {'))
+    expect(plan.slice(0, 200)).toContain('width: 26px')
+  })
+})

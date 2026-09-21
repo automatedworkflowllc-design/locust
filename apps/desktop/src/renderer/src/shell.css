@@ -5196,12 +5196,24 @@ textarea {
  * `flex: none` so it never stretches, and a fixed box so a line does not jump
  * height when the orb appears and disappears between steps.
  */
+/*
+ * The box is 26px because the DRAWING is the 64 asset now, painted down.
+ *
+ * It was 20, which is the library's other design -- a different picture with
+ * a fifth of the points at nearly twice the dot size, which is why Colin
+ * could hold the app up next to the library's own page and say the tool orb
+ * "doesnt even look like any of the ones in that asset pack". See `Orb.tsx`.
+ *
+ * The BOX grows rather than the drawing overflowing it: a 26px mark spilling
+ * out of a 20px box would sit over the word beside it, and the row's height
+ * would still be set by the old number.
+ */
 .lc-livestep__orb {
   flex: none;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
 .lc-livestep__label {
@@ -11491,8 +11503,9 @@ textarea {
 .lc-plan__orb {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  /* Same asset and same box as the live line -- see `.lc-livestep__orb`. */
+  width: 26px;
+  height: 26px;
 }
 
 /* Beside the word it is about, not before the name -- so it needs the gap a
