@@ -11,6 +11,11 @@ Dates are when the build was cut. Versions are the number Settings shows.
 - **The step underway is one solid mark.** The orbiting particles read as
   diffuse next to a single named piece of work; it is the small dense sphere
   now, at the size that drawing was made for.
+- **A running conversation in the sidebar wears the dotted outline**, and at
+  full size rather than shrunk. The orbiting particles were shrunk because
+  they were the loudest thing in a row whose job is to name a teammate -- but
+  a cloud of points has no silhouette to keep, so it read as noise at any size
+  that row can spare. An outline stays itself all the way down.
 
 ## 0.224.0 - 2026-09-20
 

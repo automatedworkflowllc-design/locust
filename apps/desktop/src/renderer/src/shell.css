@@ -11641,17 +11641,18 @@ textarea {
 .lc-row__orb > * {
   position: absolute;
   /*
-   * SMALLER THAN THE LIBRARY WILL DRAW IT.
+   * AT ITS OWN SIZE, and the shrink that used to live here is gone.
    *
-   * `thinking-orbs` types its size as `OrbSize = 64 | 20` and `resolvePreset`
-   * THROWS on anything else, so 20 is already the smallest orb that exists.
-   * Beside a 20px teammate face it still read as the loudest thing in the
-   * row (Colin, 2026-09-20: "lets make the working orb a bit smaller too"),
-   * and the row's job is to name a teammate, not to animate.
+   * It was `scale(0.7)`, added when the row wore the ORBITING PARTICLES and
+   * Colin said "lets make the working orb a bit smaller too" -- a cloud of
+   * points really was the loudest thing in a row whose job is to name a
+   * teammate. Shrinking it was treating the symptom: the problem was that a
+   * point cloud has no silhouette to lose, so it reads as noise at any size
+   * a sidebar can spare.
    *
-   * A transform is the only lever left, and it is the right one anyway: the
-   * canvas keeps drawing at its tuned resolution and gets scaled down, which
-   * is sharper than a smaller canvas would have been.
+   * The row wears the dotted OUTLINE now, which keeps its shape all the way
+   * down, so it is quiet at full size in a way the cloud never was. The box
+   * stays 6px with the drawing spilling out of it: nothing in the row moves
+   * when a conversation starts or stops running.
    */
-  transform: scale(0.7);
 }

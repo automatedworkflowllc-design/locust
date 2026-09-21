@@ -612,8 +612,23 @@ export function Sidebar({
                       * the tone still carries whether it ended well.
                       */}
                     {mission.phase === 'running' ? (
-                      <span className="lc-row__orb" aria-hidden="true" data-orb="working">
-                        <ThinkingOrb state="working" size={20} theme="dark" />
+                      <span className="lc-row__orb" aria-hidden="true" data-orb="shaping">
+                        {/*
+                          * The dotted outline that morphs circle to triangle
+                          * to square, at the library's INLINE drawing and its
+                          * own 20px -- Colin picked it off a contact sheet:
+                          * *"replace the sidebar notifier, ALSO with the
+                          * original .221 20 preset @ 20px"*.
+                          *
+                          * It is the right species for this row. Every other
+                          * orb here is a cloud of points, and a cloud at the
+                          * size a sidebar row can spare is a smudge; an
+                          * OUTLINE keeps its silhouette all the way down,
+                          * which is the same reason this shape kept the
+                          * inline drawing on the live line instead of the
+                          * 64 asset. See `Orb.tsx`.
+                          */}
+                        <ThinkingOrb state="shaping" size={20} theme="dark" />
                       </span>
                     ) : (
                       <span
