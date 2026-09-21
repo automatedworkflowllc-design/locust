@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.224.0 - 2026-09-20
+
+- **The plan card says it is running, where you can see it.** The scrambling
+  sphere moved off the individual step and up beside PLAN at a size its bands
+  can actually be read at. It appears only while a step is underway.
+- **The step underway gets its small orbiting mark back**, which is what a
+  row marker is the right size for -- and the rows line up again.
+- **The plan reads in mono**, like the card's own header and ordinals. It was
+  the only part of that card speaking in the prose face.
+
 ## 0.223.0 - 2026-09-20
 
 - **The live line reads like a line again.** The word beside the orb was

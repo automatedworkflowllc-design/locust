@@ -387,42 +387,46 @@ function alignClass(align: 'left' | 'right' | 'center' | undefined): string | un
 }
 
 /**
- * The plan's step orb, and it is FIXED rather than borrowed.
+ * The plan card's two orbs, and why they are two.
  *
- * Colin, 2026-09-20, with a photograph of the sparse `working` dots: *"could
- * you swap this one out for another one of the orbs we dont see that much? i
- * see it plan consistently and i think it would look alot better as one of
- * the more spherical assets"* — then, pointing at `solving`: *"maybe this
- * one? the one thats like a spherical rubix cube"*.
+ * THE HISTORY, because this one moved three times and each move was a real
+ * finding. Colin asked for the rubik on the step underway -- *"i see it plan
+ * consistently and i think it would look alot better as one of the more
+ * spherical assets"*. It went there, then away when `solving` took every open
+ * tool (two identical spheres a few pixels apart on one screen reads as a
+ * glitch), then back when `solving` narrowed to connectors.
  *
- * He is right on the look and right on the logic underneath it, which I had
- * wrong. The running step used to mirror the live line's orb, on the reasoning
- * that both say "this is happening now". They do not say the same thing. The
- * live line names the REGISTER — searching, writing, running a command — and
- * sits beside a word it must not contradict. The plan's step names a STEP,
- * and the only claim being made about it is that it is the one being worked
- * through. `solving` is exactly that claim, it is true of every step underway
- * whatever tool is open, and it has no word beside it to disagree with.
+ * AND THEN IT LOST ON ITS OWN MERITS, which is the part worth keeping: *"might
+ * have to give up on rubix cube as the plan indicator... put the full sized
+ * rubix next to PLAN so the user can see the plan is active, and then use the
+ * previous smaller pulsing/bouncing sphere... for the active part of the
+ * plan."*
  *
- * It also fixes a noise problem I had shipped without seeing: two canvases
- * running the SAME animation in lockstep on one screen, which reads as a
- * glitch rather than as two facts.
+ * That is the same rule that cut the web and the braid, arriving on the orb we
+ * had just fought to keep: A SHAPE MADE OF SCRAMBLING BANDS NEEDS ROOM. An
+ * 11px row marker is not room. It is not that the rubik is wrong for a plan --
+ * it is that a row marker is the wrong SIZE for a rubik. So the rubik goes
+ * where there is room, once per card, and says what a card-level mark should
+ * say: this plan is running.
  *
- * IT WAS TAKEN AWAY AND GIVEN BACK, and the reason it can come back is the
- * whole point. `solving` was moved onto every open tool, so the plan lost it:
- * the plan's step and the live line are on screen TOGETHER during a run, and
- * two identical spheres animating a few pixels apart is worse than anything
- * this was trying to fix. Colin took the trade then and asked for the rubik
- * back the moment it was safe: *"go back to rubix sphere for plan ui as well,
- * it switched"*.
- *
- * It is safe now because `solving` belongs to MCP and connectors only. A plan
- * step and a connector call CAN be on screen at once, but a connector call is
- * rare and brief where an open tool was near-continuous, so the lockstep this
- * guards against is no longer the common case. If connectors ever become the
- * common case, this is the thing to look at.
+ * The step keeps the mark a row marker can hold: `working`, four particles on
+ * tilted orbits, sparse by design and legible at 11px. It is the one Colin
+ * called the "previous smaller pulsing/bouncing sphere", which is exactly what
+ * it looks like at that size.
  */
-const PLAN_ORB: OrbState = 'solving'
+const PLAN_ORB: OrbState = 'working'
+
+/** The header light: the rubik at a size its bands can actually be seen at. */
+const PLAN_HEAD_ORB = 24
+
+/**
+ * The step marker, kept small on purpose.
+ *
+ * It sits in an 11px column beside a line of text. Anything bigger pushes the
+ * step's words out of line with the ones above and below it, which is the
+ * whole reason a plan reads as a list.
+ */
+const PLAN_STEP_ORB = 18
 
 export function PlanSteps({
   steps,
@@ -479,6 +483,34 @@ export function PlanSteps({
      */
     <div className="lc-plancard">
       <div className="lc-plancard__head lc-mono">
+        {/*
+          * THE RUBIK MOVED UP HERE, at the size it was drawn for.
+          *
+          * Colin, 2026-09-20, with a frame of it on a step: *"might have to
+          * give up on rubix cube as the plan indicator... put the full sized
+          * rubix next to PLAN so the user can see the plan is active"*. He is
+          * right about the cause. An 11px row marker cannot hold a shape whose
+          * whole identity is scrambling bands -- that is the same finding that
+          * cut the web and the braid, arriving on the one orb we had just
+          * fought to keep.
+          *
+          * So it stops being a marker and becomes a HEADER LIGHT, which is
+          * what it is good at: one per card, big enough to read, and it says
+          * the thing the card as a whole wants to say.
+          *
+          * LEFT OF THE WORD, not beside the count. The eye starts at the left
+          * edge of a card and the claim is about the plan, not about the
+          * arithmetic -- next to "1 of 4 done" it would read as decoration on
+          * a number.
+          *
+          * Only while something is actually underway: a still rubik on a
+          * finished plan would say "active" about a plan that is not.
+          */}
+        {underway && (
+          <span className="lc-plancard__orb" aria-hidden="true">
+            <Orb state="solving" box={PLAN_HEAD_ORB} />
+          </span>
+        )}
         <span>PLAN</span>
         <span>{doneCount} of {steps.length} done</span>
       </div>
@@ -505,7 +537,7 @@ export function PlanSteps({
                 // The orb REPLACES the pulsing pip rather than joining it:
                 // two things pulsing on one row is the row saying "now" twice.
                 <span className="lc-plan__orb" data-orb={PLAN_ORB}>
-                  <Orb state={PLAN_ORB} box={ORB_BOX} />
+                  <Orb state={PLAN_ORB} box={PLAN_STEP_ORB} />
                 </span>
               ) : (
                 <span className={`lc-dot${step.state === 'running' ? ' is-pulsing' : ''}`} />

@@ -5051,6 +5051,19 @@ textarea {
   overflow: hidden;
 }
 
+/* The rubik in the card header -- see `PLAN_HEAD_ORB`. It is the only orb in
+   the app with room to be itself, and the header's height must not depend on
+   whether it is there: a plan that starts running should not jump. */
+.lc-plancard__orb {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  /* Pulled out of the line box so the header keeps its own height. */
+  margin: -6px 0;
+}
+
 .lc-plancard__head {
   display: flex;
   align-items: center;
@@ -5076,11 +5089,23 @@ textarea {
   gap: var(--lc-space-4);
 }
 
+/*
+ * The steps are set in MONO, which Colin asked for by eye: *"also maybe
+ * switch plan text to geist mono i dont like this look rn"*.
+ *
+ * It is the right instinct and it has a reason under it. The card's own
+ * header is mono, its ordinals are mono, and the steps were in the prose
+ * face -- so one small card was speaking in two voices. A plan is also not
+ * prose: it is a list of named units of work, the same species as a command
+ * or a file path, and this app sets those in mono everywhere else.
+ */
 .lc-plan__step {
   display: flex;
   align-items: flex-start;
   gap: var(--lc-space-4);
+  font-family: var(--lc-font-mono);
   font-size: var(--lc-text-description);
+  letter-spacing: -0.01em;
   color: var(--lc-text-muted);
 }
 
@@ -11550,12 +11575,21 @@ textarea {
   margin-top: 0;
 }
 
+/*
+ * The STEP marker, back to a marker's size.
+ *
+ * It was 26px carrying the rubik, which is the size that shape needs and the
+ * size this column does not have: it pushed the step's words out of line with
+ * the rows above and below, and a plan stops reading as a list the moment its
+ * rows stop lining up. The rubik moved to the header, where there is room.
+ */
 .lc-plan__orb {
   display: grid;
   place-items: center;
-  /* Same asset and same box as the live line -- see `.lc-livestep__orb`. */
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
+  /* The row's line box is set by the text, not by this. */
+  margin: -4px 0;
 }
 
 /* Beside the word it is about, not before the name -- so it needs the gap a

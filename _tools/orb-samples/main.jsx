@@ -54,37 +54,39 @@ const DOTS = {
   morph: [0.395, 1.011]
 }
 
-// The live line as 0.223 draws it: the 64 asset in a 26px box, the word at
-// 14px in the UI face with four dots, and the library's own shimmer over it.
-const Line = ({ state, word, dense }) => (
-  <span className="row" style={{ gap: 10, padding: '6px 16px 6px 8px' }}>
-    <span style={{ flex: 'none', display: 'grid', placeItems: 'center', width: 26, height: 26 }}>
-      {dense ? <Big state={state} box={26} /> : <ThinkingOrb state={state} size={20} theme="dark" />}
-    </span>
-    <span className="said" data-text={word}>{word}</span>
-  </span>
-)
-
-const DENSE = new Set(['composing', 'listening', 'solving', 'searching', 'connecting', 'weaving'])
-const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1) + '….'
+const STEPS = [
+  ['done', 'Find any all-states orb drive'],
+  ['running', 'Re-run unit + free orb-drive'],
+  ['todo', 'Cycle paid Luna then Sonnet orb-paid'],
+  ['todo', 'Write cycle report']
+]
 
 function App() {
   return (
     <>
-      <h1>0.223 — the live line with the library&rsquo;s label and shimmer</h1>
-      <p className="sub">
-        Word at 14px in the UI face with their four dots, and their two-layer highlight:
-        a solid word with a white band sliding over a copy of it, rather than transparent ink
-        over a gradient. Outline shapes keep their own 20px drawing.
-      </p>
-      <table><tbody>
-        {SHAPES.map(([state, shape, word]) => (
-          <tr key={state}>
-            <td className="name">{shape}</td>
-            <td><Line state={state} word={cap(word)} dense={DENSE.has(state)} /></td>
-          </tr>
-        ))}
-      </tbody></table>
+      <h1>The plan card &mdash; rubik in the header, marker on the step</h1>
+      <p className="sub">Steps in Geist Mono, the rubik at 24px beside PLAN, the step marker back to 18px.</p>
+      <div className="plancard">
+        <div className="planhead">
+          <span className="planorb"><Big state="solving" box={24} /></span>
+          <span>PLAN</span>
+          <span style={{ marginLeft: 'auto' }}>1 of 4 done</span>
+        </div>
+        <ul className="plan">
+          {STEPS.map(([state, text]) => (
+            <li key={text} className={'planstep is-' + state}>
+              <span className="planmarker">
+                {state === 'done'
+                  ? <span className="tick">&#10003;</span>
+                  : state === 'running'
+                    ? <span className="steporb"><ThinkingOrb state="working" size={20} theme="dark" /></span>
+                    : <span className="dot" />}
+              </span>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </>
   )
 }

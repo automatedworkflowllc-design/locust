@@ -13,6 +13,19 @@
   .name { font: 11px ui-monospace, monospace; color: #6f7176; }
   .tag { font: 11px ui-monospace, monospace; color: #c8a24a; }
   #app canvas { display: block; }
+  .plancard { max-width: 620px; border: 1px solid #26272b; border-radius: 10px; background: #141518; }
+  .planhead { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #202126;
+    color: #85878c; font: 400 11px 'Geist Mono', ui-monospace, monospace; letter-spacing: .08em; }
+  .planorb { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin: -6px 0; }
+  .plan { list-style: none; margin: 0; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .planstep { display: flex; align-items: flex-start; gap: 10px;
+    font: 400 13px 'Geist Mono', ui-monospace, monospace; letter-spacing: -.01em; color: #85878c; }
+  .planstep.is-running { color: #e8e9ea; font-weight: 500; }
+  .planstep.is-done { color: #6f7176; }
+  .planmarker { flex: none; width: 18px; display: grid; place-items: center; }
+  .steporb { display: grid; place-items: center; width: 18px; height: 18px; margin: -4px 0; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #4a4c51; }
+  .tick { color: #7bbf6a; font-size: 12px; }
   .said { position: relative; color: rgba(215,216,218,.55); font: 400 14px Geist, Helvetica, ui-sans-serif, system-ui, sans-serif; }
   .said::before {
     content: attr(data-text); position: absolute; inset: 0;

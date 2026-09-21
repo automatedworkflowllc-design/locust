@@ -52,10 +52,24 @@ describe('the orb uses the asset that reads', () => {
     expect(orb).not.toContain('scale(')
   })
 
-  it('gives the row a box big enough for the asset', () => {
+  it('gives the live line a box big enough for the asset', () => {
     const box = css.slice(css.indexOf('.lc-livestep__orb {'))
     expect(box.slice(0, 200)).toContain('width: 26px')
-    const plan = css.slice(css.indexOf('.lc-plan__orb {'))
-    expect(plan.slice(0, 200)).toContain('width: 26px')
+  })
+
+  it('gives the plan card one big orb and one small one', () => {
+    /*
+     * THE SIZE IS THE WHOLE ARGUMENT, so both ends are pinned.
+     *
+     * The rubik's identity is scrambling bands, which an 11px row marker
+     * cannot hold -- the same finding that cut the web and the braid, landing
+     * on the orb we had just fought to keep. It moved to the card header,
+     * where there is room and where "this plan is running" is a card-level
+     * claim anyway. The step went back to a marker-sized mark.
+     */
+    const head = css.slice(css.indexOf('.lc-plancard__orb {'))
+    expect(head.slice(0, 200)).toContain('width: 24px')
+    const step = css.slice(css.indexOf('.lc-plan__orb {'))
+    expect(step.slice(0, 260)).toContain('width: 18px')
   })
 })
