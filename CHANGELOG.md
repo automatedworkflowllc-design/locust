@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.232.0 - 2026-09-21
+
+- **The mark on a running conversation is clean again.** Shrinking it a
+  quarter in 0.226 put its dots under a screen pixel: it is the one drawing in
+  the set that keeps three quarters of its points at small size, where the
+  others keep a tenth to a third and draw them fatter. It is back at its own
+  size, where it reads as a circle rather than a smudge.
+
 ## 0.231.0 - 2026-09-21
 
 - **The window opens narrower.** It opened up to 1280 wide, which on a big

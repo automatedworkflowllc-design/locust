@@ -11641,26 +11641,30 @@ textarea {
 .lc-row__orb > * {
   position: absolute;
   /*
-   * A LITTLE SMALLER, and this is the one orb where that is safe.
+   * AT ITS OWN SIZE, and the shrink is gone AGAIN -- this time with the
+   * measurement that says why it cannot come back.
    *
-   * The shrink here was removed with the orbiting particles, because the
-   * reason it existed was wrong: a cloud of points has no silhouette to
-   * lose, so shrinking it only made a smaller smudge. The row wears the
-   * dotted OUTLINE now, and Colin, looking at it at full size beside a
-   * teammate's face: *"animation needs to be a little smaller size, should
-   * be one of those that shouldnt be too bad to make smaller, just try not
-   * to cook it"*.
+   * Colin, 2026-09-21: *"the notification shape changing animation... the
+   * pixels are so dense it doesnt look as clean as it used to"*. "As it used
+   * to" is exactly right and the timeline agrees with him: this row was
+   * full-size in 0.225, he asked for it smaller in 0.226, and 0.75 is what
+   * made it dense.
    *
-   * He is right about which shape can take it, and it is the same property
-   * that put this one here. An outline is a few strokes with space between
-   * them: scaling it DOWN is a downscale of a 20px raster, which stays
-   * sharp, and there is no point density to lose. That is the opposite of
-   * what scaling UP did to the live line's orb -- the thing he called
-   * cooking the resolution -- and it is why this is 0.75 rather than a
-   * smaller canvas, which the library will not draw anyway.
+   * WHY THIS SHAPE IN PARTICULAR, from the library's own preset table:
+   * `morph` keeps **75%** of its points at inline size and fattens them
+   * 1.011x. Every other shape in the set drops to 11-31% and fattens 1.4-2.4x
+   * -- `ring` keeps 11%, `rubik` 25%, `orbits` 24%. So morph is by a wide
+   * margin the densest, finest-dotted drawing the library ships, and scaling
+   * it down puts its dots under a device pixel. The other eight have room to
+   * shrink; this one never did.
    *
-   * 15px, from 20. The box stays 6px with the drawing spilling out of it,
-   * so nothing in the row moves when a conversation starts or stops.
+   * MEASURED BEFORE CHANGING IT, all three at the row's real geometry: at
+   * 0.75 and 0.85 morph turns to a grey smudge; at 1.0 it is a clean,
+   * complete dotted circle. `ring` at the same sizes is so sparse it reads as
+   * a broken arc rather than a shape.
+   *
+   * So the row cannot have both. It is clean at its own size, and the only
+   * shapes that would survive shrinking are the dense spheres -- a different
+   * look, and not the one he picked for this row.
    */
-  transform: scale(0.75);
 }

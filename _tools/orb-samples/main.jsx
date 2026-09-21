@@ -54,39 +54,39 @@ const DOTS = {
   morph: [0.395, 1.011]
 }
 
-const STEPS = [
-  ['done', 'Find any all-states orb drive'],
-  ['running', 'Re-run unit + free orb-drive'],
-  ['todo', 'Cycle paid Luna then Sonnet orb-paid'],
-  ['todo', 'Write cycle report']
-]
+const ROW = ({ state, scale, label }) => (
+  <span className="row" style={{ gap: 9, padding: '5px 14px 5px 8px' }}>
+    <span style={{ flex: 'none', position: 'relative', display: 'grid', placeItems: 'center', width: 6, height: 6, overflow: 'visible' }}>
+      <span style={{ position: 'absolute', transform: `scale(${scale})` }}>
+        <ThinkingOrb state={state} size={20} theme="dark" />
+      </span>
+    </span>
+    <span style={{ width: 16, height: 16, borderRadius: 3, background: '#3b6fd4', flex: 'none' }} />
+    <span className="word" style={{ font: '400 13px Geist, system-ui, sans-serif' }}>{label}</span>
+  </span>
+)
 
 function App() {
   return (
     <>
-      <h1>The plan card &mdash; rubik in the header, marker on the step</h1>
-      <p className="sub">Steps in Geist Mono, the rubik at 24px beside PLAN, the step marker back to 18px.</p>
-      <div className="plancard">
-        <div className="planhead">
-          <span className="planorb"><Big state="solving" box={24} /></span>
-          <span>PLAN</span>
-          <span style={{ marginLeft: 'auto' }}>1 of 4 done</span>
-        </div>
-        <ul className="plan">
-          {STEPS.map(([state, text]) => (
-            <li key={text} className={'planstep is-' + state}>
-              <span className="planmarker">
-                {state === 'done'
-                  ? <span className="tick">&#10003;</span>
-                  : state === 'running'
-                    ? <span className="steporb"><ThinkingOrb state="listening" size={20} theme="dark" /></span>
-                    : <span className="dot" />}
-              </span>
-              <span>{text}</span>
-            </li>
+      <h1>The sidebar notifier &mdash; density at the size it ships</h1>
+      <p className="sub">
+        Beside a teammate face, at the row&rsquo;s own 0.75 scale. `shaping` keeps 75% of its points
+        at inline size with almost no dot fattening; `breathing` keeps 11% at 1.6&times;.
+      </p>
+      <table>
+        <thead><tr><th>shape</th><th>0.75 (ships today)</th><th>0.85</th><th>1.0</th></tr></thead>
+        <tbody>
+          {[['shaping', 'morph — 75% of points'], ['breathing', 'ring — 11% of points'], ['working', 'orbits — 24%']].map(([state, name]) => (
+            <tr key={state}>
+              <td className="name">{name}</td>
+              <td><ROW state={state} scale={0.75} label="code" /></td>
+              <td><ROW state={state} scale={0.85} label="code" /></td>
+              <td><ROW state={state} scale={1} label="code" /></td>
+            </tr>
           ))}
-        </ul>
-      </div>
+        </tbody>
+      </table>
     </>
   )
 }

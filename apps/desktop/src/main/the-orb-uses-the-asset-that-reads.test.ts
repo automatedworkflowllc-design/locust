@@ -44,7 +44,7 @@ describe('the orb uses the asset that reads', () => {
     expect(orb).toContain('size={dense ? 64 : 20}')
   })
 
-  it('shrinks only the sidebar row, and only an outline', () => {
+  it('does not shrink the sidebar row, because this shape has no room to', () => {
     /*
      * The one place a transform is right. Scaling an outline DOWN is a
      * downscale of a 20px raster -- sharp, with no point density to lose --
@@ -52,8 +52,15 @@ describe('the orb uses the asset that reads', () => {
      * row wears the dotted outline precisely because it holds its shape at
      * any size a row can spare.
      */
+    /*
+     * IT IS NOT SCALED, and the measurement is the reason. `morph` keeps 75%
+     * of its points at inline size against 11-31% for every other shape, and
+     * fattens them 1.011x against 1.4-2.4x -- so it is the one drawing in the
+     * set with no room to shrink. Rendered at the row's real geometry: 0.75
+     * and 0.85 are a smudge, 1.0 is a clean dotted circle.
+     */
     const row = css.slice(css.indexOf('.lc-row__orb > * {'))
-    expect(row.slice(0, 1400)).toContain('transform: scale(0.75)')
+    expect(row.slice(0, 1600)).not.toContain('transform: scale(')
   })
 
   it('never scales a raster to get a bigger orb', () => {
