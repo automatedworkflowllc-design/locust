@@ -8,9 +8,15 @@ Dates are when the build was cut. Versions are the number Settings shows.
 
 ## 0.220.0 - 2026-09-20
 
-- **The bigger orb is on the working line, where it was meant to go.** It
-  landed on thinking in 0.218 -- the request named the shape, and the row it
-  sits on is called something else. Thinking is back to its own size.
+- **The orbs are back to one size.** 0.218 drew one of them larger, on the
+  wrong row -- and larger turned out to be the wrong idea anyway: these are
+  drawings made for their size, so scaling one softens every stroke, which on
+  a mark this small reads as broken rather than as big.
+- **The plan's step has its rubik sphere back.** It lost it when that shape
+  went to every open tool, because the plan and the live line share a screen
+  and two identical spheres a few pixels apart read as a glitch. The shape
+  belongs to connectors now, which are rare and brief, so the plan can have
+  it again.
 
 ## 0.219.0 - 2026-09-20
 

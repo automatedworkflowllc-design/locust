@@ -51,16 +51,19 @@ describe('the live word is visibly live', () => {
     expect(sweep.slice(0, 220)).toContain('animation: none')
   })
 
-  it('draws the working orb a size up, and only it', () => {
-    // It went on `listening` first, because Colin named the SHAPE and the
-    // register it sits on is called something else. He caught it by looking:
-    // "when i said make thinking bigger it was what you have set to working
-    // rn, so now the sphere for thinking is too big".
-    expect(css).not.toContain(".lc-livestep__orb[data-orb='listening']")
-    const rule = css.slice(css.indexOf(".lc-livestep__orb[data-orb='composing']"))
-    expect(rule.slice(0, 160)).toContain('transform: scale(1.3)')
-    // The BOX stays 20px: the library takes 64 or 20 and throws on anything
-    // else, so this is a scale, and the layout must not depend on it.
+  it('scales no orb at all', () => {
+    /*
+     * A DECISION, not an omission. Colin asked for one a size up, looked at
+     * the result and stopped the idea: "with how bad the other one looks
+     * enlarged id be wary to even touch the other one, just revert to
+     * previous size for now".
+     *
+     * These are canvas drawings authored for their size. The library takes 64
+     * or 20 and throws on anything else, so a bigger orb can only be a
+     * transform of a 20px raster -- every stroke 30% softer with it, and on a
+     * mark this small that reads as broken rather than as big.
+     */
+    expect(css).not.toContain(".lc-livestep__orb[data-orb='")
     const box = css.slice(css.indexOf('.lc-livestep__orb {'))
     expect(box.slice(0, 160)).toContain('width: 20px')
   })

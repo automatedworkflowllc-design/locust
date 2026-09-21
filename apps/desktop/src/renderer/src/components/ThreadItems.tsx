@@ -407,8 +407,22 @@ function alignClass(align: 'left' | 'right' | 'center' | undefined): string | un
  * It also fixes a noise problem I had shipped without seeing: two canvases
  * running the SAME animation in lockstep on one screen, which reads as a
  * glitch rather than as two facts.
+ *
+ * IT WAS TAKEN AWAY AND GIVEN BACK, and the reason it can come back is the
+ * whole point. `solving` was moved onto every open tool, so the plan lost it:
+ * the plan's step and the live line are on screen TOGETHER during a run, and
+ * two identical spheres animating a few pixels apart is worse than anything
+ * this was trying to fix. Colin took the trade then and asked for the rubik
+ * back the moment it was safe: *"go back to rubix sphere for plan ui as well,
+ * it switched"*.
+ *
+ * It is safe now because `solving` belongs to MCP and connectors only. A plan
+ * step and a connector call CAN be on screen at once, but a connector call is
+ * rare and brief where an open tool was near-continuous, so the lockstep this
+ * guards against is no longer the common case. If connectors ever become the
+ * common case, this is the thing to look at.
  */
-const PLAN_ORB: OrbState = 'working'
+const PLAN_ORB: OrbState = 'solving'
 
 export function PlanSteps({
   steps,
