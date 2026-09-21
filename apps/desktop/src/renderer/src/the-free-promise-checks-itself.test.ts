@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { PublicModel, PublicRuntimeStatus } from '../shared/ipc.js'
-import { freeStartStillFree } from '../renderer/src/status.js'
+import type { PublicModel, PublicRuntimeStatus } from '../../shared/ipc.js'
+import { freeStartStillFree } from './status.js'
 
 /**
  * Colin, 2026-09-21, asking about Muse: *"i know its available on opencode
