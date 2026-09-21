@@ -31,46 +31,40 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(fileURLToPath(new URL('../renderer/src/shell.css', import.meta.url)), 'utf8')
 
 describe('the live word is visibly live', () => {
-  it('sweeps a band wide enough to notice', () => {
-    const rule = css.slice(css.indexOf('.lc-sweep {'))
-    // 30→70 rather than 40→60: a fifth of the travel was a couple of
-    // characters on a seven-letter word.
-    expect(rule).toContain('var(--lc-text-muted) 30%')
-    expect(rule).toContain('var(--lc-text-name) 50%')
-    expect(rule).toContain('var(--lc-text-muted) 70%')
+  it('sweeps with the library own shape: a solid word, a highlight over it', () => {
+    const rule = css.slice(css.indexOf('.lc-sweep::before'))
+    // Ported from `.t-shimmer` on libraries.dev rather than approximated.
+    // The overlay is drawn from the element's own `data-text`.
+    expect(rule.slice(0, 700)).toContain('content: attr(data-text)')
+    expect(rule.slice(0, 700)).toContain('background-size: 400% 100%')
+    expect(rule.slice(0, 700)).toContain('-webkit-text-fill-color: transparent')
   })
 
-  it('puts the colour back when motion is off', () => {
-    // `background-clip: text` means the ink is TRANSPARENT. Stopping the
-    // paint without restoring a colour leaves a blank where a word was.
-    // The LAST `.lc-sweep {` in the file is the reduced-motion override; the
-    // stylesheet has many reduced-motion blocks, so anchoring on the first
-    // one found a different rule entirely.
-    const sweep = css.slice(css.lastIndexOf('.lc-sweep {'))
-    expect(sweep.slice(0, 220)).toContain('color: var(--lc-text-muted)')
-    expect(sweep.slice(0, 220)).toContain('animation: none')
+  it('leaves the word itself painted', () => {
+    /*
+     * The hazard their shape removes. Ours made the INK transparent over a
+     * moving gradient, so anything that stopped the paint left a blank where
+     * a word had been -- which is why reduced motion had to restore a colour.
+     * Here the base is a normal painted word and only the overlay is clipped.
+     */
+    const base = css.slice(css.indexOf('.lc-sweep {'), css.indexOf('.lc-sweep::before'))
+    expect(base).toContain('color: var(--lc-text-muted)')
+    expect(base).not.toContain('color: transparent')
+  })
+
+  it('drops only the highlight when motion is off', () => {
+    const reduced = css.slice(css.lastIndexOf('.lc-sweep::before'))
+    expect(reduced.slice(0, 200)).toContain('display: none')
+  })
+
+  it('sets the live word as a label rather than a machine string', () => {
+    // 10.5px mono beside a 26px orb read as a caption on a picture.
+    const rule = css.slice(css.indexOf('.lc-livestep__register {'))
+    expect(rule.slice(0, 400)).toContain('font-size: 14px')
+    expect(rule.slice(0, 400)).toContain('font-family: var(--lc-font-ui)')
   })
 
   it('scales no orb at all', () => {
-    /*
-     * A DECISION, not an omission. Colin asked for one a size up, looked at
-     * the result and stopped the idea: "with how bad the other one looks
-     * enlarged id be wary to even touch the other one, just revert to
-     * previous size for now".
-     *
-     * These are canvas drawings authored for their size. The library takes 64
-     * or 20 and throws on anything else, so a bigger orb can only be a
-     * transform of a 20px raster -- every stroke 30% softer with it, and on a
-     * mark this small that reads as broken rather than as big.
-     */
-    expect(css).not.toContain(".lc-livestep__orb[data-orb='")
-    /*
-     * The box is 26px now and the orb is not scaled -- those are two
-     * different things, and the difference is the whole lesson. A bigger
-     * BOX holding the library's bigger ASSET is sharp; a transform on the
-     * small asset is the thing Colin called cooking the resolution.
-     * `the-orb-uses-the-asset-that-reads.test.ts` owns the box size.
-     */
     expect(css).not.toContain('transform: scale(1.3)')
   })
 })

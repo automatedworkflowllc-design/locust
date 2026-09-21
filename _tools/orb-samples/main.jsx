@@ -54,45 +54,37 @@ const DOTS = {
   morph: [0.395, 1.011]
 }
 
-// The live line's real geometry, so a size is judged as a ROW and not as a
-// picture: same gap, same mono label, same pill.
-const Line = ({ state, word, box, preset }) => (
-  <span className="row" style={{ gap: 8 }}>
-    <span style={{ flex: 'none', display: 'grid', placeItems: 'center', width: box, height: box }}>
-      {preset === 20
-        ? <ThinkingOrb state={state} size={20} theme="dark" />
-        : <Big state={state} box={box} />}
+// The live line as 0.223 draws it: the 64 asset in a 26px box, the word at
+// 14px in the UI face with four dots, and the library's own shimmer over it.
+const Line = ({ state, word, dense }) => (
+  <span className="row" style={{ gap: 10, padding: '6px 16px 6px 8px' }}>
+    <span style={{ flex: 'none', display: 'grid', placeItems: 'center', width: 26, height: 26 }}>
+      {dense ? <Big state={state} box={26} /> : <ThinkingOrb state={state} size={20} theme="dark" />}
     </span>
-    <span className="word">{word}</span>
+    <span className="said" data-text={word}>{word}</span>
   </span>
 )
+
+const DENSE = new Set(['composing', 'listening', 'solving', 'searching', 'connecting', 'weaving'])
+const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1) + '….'
 
 function App() {
   return (
     <>
-      <h1>The 64 asset in the live line&rsquo;s own geometry</h1>
+      <h1>0.223 — the live line with the library&rsquo;s label and shimmer</h1>
       <p className="sub">
-        Left is what shipped through 0.221 — the library&rsquo;s 20px inline design in a 20px box.
-        Right is the 64 asset painted into a 26px box, which is what the website shows.
-        Judge the ROW, not the orb: does the line still read, and does the word still sit right?
+        Word at 14px in the UI face with their four dots, and their two-layer highlight:
+        a solid word with a white band sliding over a copy of it, rather than transparent ink
+        over a gradient. Outline shapes keep their own 20px drawing.
       </p>
-      <table>
-        <thead><tr>
-          <th>shape</th><th>0.221 · 20 preset @ 20px</th><th>64 asset @ 22px</th>
-          <th>64 asset @ 26px</th><th>64 asset @ 30px</th>
-        </tr></thead>
-        <tbody>
-          {SHAPES.map(([state, shape, word]) => (
-            <tr key={state}>
-              <td className="name">{shape}</td>
-              <td><Line state={state} word={word} box={20} preset={20} /></td>
-              <td><Line state={state} word={word} box={22} preset={64} /></td>
-              <td><Line state={state} word={word} box={26} preset={64} /></td>
-              <td><Line state={state} word={word} box={30} preset={64} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <table><tbody>
+        {SHAPES.map(([state, shape, word]) => (
+          <tr key={state}>
+            <td className="name">{shape}</td>
+            <td><Line state={state} word={cap(word)} dense={DENSE.has(state)} /></td>
+          </tr>
+        ))}
+      </tbody></table>
     </>
   )
 }

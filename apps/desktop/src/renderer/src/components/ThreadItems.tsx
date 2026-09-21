@@ -611,7 +611,7 @@ export function LiveRegisterLine({
     <>
       <span className="lc-livestep__label">
         {name !== undefined && <span className="lc-livestep__who">{name}</span>}
-        <span className="lc-livestep__register lc-mono">
+        <span className="lc-livestep__register">
           {/*
             * `data-orb` IS THE SEAM, and the library's `aria-label` is not.
             *
@@ -659,7 +659,13 @@ export function LiveRegisterLine({
             * the reduced-motion rule puts the colour back rather than only
             * stopping the animation.
             */}
-          <span className="lc-sweep">{word}</span>
+          {/*
+            * `data-text` repeats the word because the highlight is drawn from
+            * it -- the library's own shape, see `.lc-sweep`. The four dots are
+            * theirs too: an ellipsis and a full stop, which is what their page
+            * shows beside every orb.
+            */}
+          <span className="lc-sweep" data-text={sweepText(word)}>{sweepText(word)}</span>
           {/*
             * THE DOTS ONLY WHERE THERE IS NO ORB.
             *
@@ -692,6 +698,20 @@ export function LiveRegisterLine({
 }
 
 /** What a live line IS, in the words a person would use for it. */
+/**
+ * The word as the library's own page sets it: capitalised, with an ellipsis
+ * and a full stop after it -- `Thinking….`, four dots on screen.
+ *
+ * KEPT OUR WORDS, TOOK THEIR SHAPE. Their captions name the ORB (`Solving…`),
+ * and ours name what is happening (`using a connector`). Printing theirs would
+ * put "Solving" on a row where an MCP tool is running, which is the exact
+ * contradiction this whole mapping exists to prevent -- and the same collision
+ * of vocabularies that made three rounds of "use this one for that" ambiguous.
+ */
+export function sweepText(word: string): string {
+  return `${word.charAt(0).toUpperCase()}${word.slice(1)}….`
+}
+
 export const REGISTER_WORD: Record<LiveRegister, string> = {
   starting: 'starting',
   working: 'working',

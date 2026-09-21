@@ -413,7 +413,12 @@ export function ActivityCard({
                     <span className={`lc-shellbadge ${shellResultClass(entry, finished)}`}>{shellResult(entry, finished)}</span>
                     {/* Nothing printed, so nothing to open onto -- the command
                       * stays on the row itself, under the sentence. */}
-                    <span className={`lc-filerow__path${entry.settled || finished ? '' : ' lc-sweep'}`}>
+                    <span
+                      className={`lc-filerow__path${entry.settled || finished ? '' : ' lc-sweep'}`}
+                      // The highlight is drawn from this, not from the child
+                      // text -- see `.lc-sweep`. Harmless when not sweeping.
+                      data-text={entry.title ?? entry.command}
+                    >
                       {entry.title ?? entry.command}
                     </span>
                     {entry.output !== undefined && entry.settled && (
@@ -511,7 +516,10 @@ export function ActivityCard({
                     * travelling highlight over it would be the same lie the
                     * word beside it just stopped telling.
                     */}
-                  <span className={`lc-filerow__path${entry.settled || finished ? '' : ' lc-sweep'}`}>
+                  <span
+                    className={`lc-filerow__path${entry.settled || finished ? '' : ' lc-sweep'}`}
+                    data-text={relativePath(entry.name, workspacePath)}
+                  >
                     {relativePath(entry.name, workspacePath)}
                   </span>
                   {entry.tool !== undefined && <span className="lc-filerow__status">{entry.tool}</span>}

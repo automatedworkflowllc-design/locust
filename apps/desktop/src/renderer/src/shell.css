@@ -5234,12 +5234,27 @@ textarea {
   font-weight: 500;
 }
 
+/*
+ * THE WORD IS A LABEL, not a machine string.
+ *
+ * It was 10.5px mono, which is how every other technical mark in this app is
+ * set -- and beside a 26px orb it read as a caption on a picture. Colin:
+ * *"our text next to it is so small it makes the orb look bigger than it is.
+ * we can make it look more normal with bigger text next to it."*
+ *
+ * The library's own page sets this in Inter at 18px against a much larger
+ * orb. 18 would be louder than the thread's own 13.5px body, which is the
+ * wrong way to fix a proportion, so it takes the UI face at 14 -- a hair
+ * above body, the way a live line should sit.
+ */
 .lc-livestep__register {
   display: inline-flex;
   align-items: center;
   gap: var(--lc-space-3);
-  font-size: var(--lc-text-mono-label);
-  letter-spacing: 0.02em;
+  font-family: var(--lc-font-ui);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
   color: var(--lc-text-muted);
   /* Two words that mean one thing. Wrapped, "using a / tool" reads as two
      lines of something else (Colin, 2026-09-11, screenshot). */
@@ -5277,52 +5292,78 @@ textarea {
  * guard caught: the second one is used all over this file and defined
  * nowhere, so painting with it would have left the word transparent.)
  */
+/*
+ * THE SWEEP, ported from the library's own page rather than approximated.
+ *
+ * Colin, 2026-09-20: *"they even already have the gradient shift on it, like
+ * we do, so it shoudl be easy to port over"*. It was, and reading their CSS
+ * settled why ours had to be asked for twice: THE TECHNIQUE IS DIFFERENT, and
+ * theirs is better.
+ *
+ * Ours made the ink itself transparent over a moving gradient between two
+ * greys, so the word's own colour was the effect -- which is why it could
+ * only ever be faint, and why stopping the paint left a blank where a word
+ * had been. Theirs keeps the word SOLID underneath and slides a separate
+ * white highlight across a copy of it:
+ *
+ *   .t-shimmer::before { content: attr(data-text); position: absolute;
+ *     inset: 0; background: linear-gradient(90deg, transparent 40%,
+ *     #fff 50%, transparent 60%); background-size: 400% 100%;
+ *     background-clip: text; -webkit-text-fill-color: transparent;
+ *     animation: t-shimmer 2s linear infinite }
+ *
+ * Two things fall out of that. The highlight is ADDITIVE, so it can be bright
+ * without touching the resting colour; and the base text is a normal painted
+ * word, so reduced motion simply drops the overlay and there is no invisible
+ * -text hazard left to guard against.
+ *
+ * The one requirement it carries: the element must repeat its own text in
+ * `data-text`, because the overlay is drawn from that attribute.
+ */
 .lc-sweep {
-  /*
-   * A WIDER BAND, because the first one was too subtle to do its job.
-   *
-   * Colin shipped with it in 0.217 and then asked for it again -- "the slight
-   * subtle text glow moving gradient i mentioned that claude code does we
-   * should add that to the text next to the orb" -- which is the clearest
-   * possible report that a feature that IS there reads as absent. The band
-   * was 20% of a 300% background, so on a seven-letter word the bright part
-   * was a couple of characters wide and passed in a fraction of a second.
-   *
-   * It is 40% now and peaks one step brighter. Still no colour of its own:
-   * the word's own muted ink at rest, the name ink at the crest, so the only
-   * thing that moves is lightness.
-   */
+  position: relative;
+  color: var(--lc-text-muted);
+}
+
+.lc-sweep::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
-    100deg,
-    var(--lc-text-muted) 0%,
-    var(--lc-text-muted) 30%,
+    90deg,
+    transparent 0%,
+    transparent 40%,
     var(--lc-text-name) 50%,
-    var(--lc-text-muted) 70%,
-    var(--lc-text-muted) 100%
+    transparent 60%,
+    transparent 100%
   );
-  background-size: 300% 100%;
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  background-position: 100% 0;
   background-clip: text;
   -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: lc-sweep 2.6s linear infinite;
+  pointer-events: none;
+  /* The overlay is decoration over text that is already on screen. */
+  white-space: pre;
+  animation: lc-sweep 2s linear infinite;
 }
 
 @keyframes lc-sweep {
   from {
-    background-position: 150% 0;
+    background-position: 100% 0;
   }
   to {
-    background-position: -50% 0;
+    background-position: 0% 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lc-sweep {
-    animation: none;
-    /* The colour BACK, not just the animation off: a transparent ink over a
-       stopped gradient is an invisible word. */
-    background: none;
-    color: var(--lc-text-muted);
+  /* Just drop the highlight. The word underneath was never transparent, so
+     there is nothing to restore -- which is the other thing their shape buys. */
+  .lc-sweep::before {
+    display: none;
   }
 }
 

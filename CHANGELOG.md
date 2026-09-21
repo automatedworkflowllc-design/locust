@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.223.0 - 2026-09-20
+
+- **The live line reads like a line again.** The word beside the orb was
+  10.5px in the monospace face, which next to a bigger orb read as a caption
+  on a picture rather than a sentence. It is 14px in the app's own UI face
+  now, capitalised, with the four dots the library's page uses.
+- **The travelling highlight is brighter, and safer.** It is the library's own
+  technique now: the word stays solidly painted and a bright band slides over
+  a copy of it, instead of the word itself being transparent ink over a moving
+  gradient. It can be bright without changing the resting colour, and with
+  motion turned off the highlight simply goes away.
+
 ## 0.222.0 - 2026-09-20
 
 - **The orbs look like the orbs.** The library ships two separate drawings per
