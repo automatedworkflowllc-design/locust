@@ -69,6 +69,16 @@ export const RUNTIME_INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
   opencode: 'live',
   copilot: 'live',
   antigravity: 'experimental',
+  /*
+   * Muse Code owns a mission end to end and its runs are as durable as any
+   * other -- measured twice through the real builder, runner and normalizer
+   * on the free echo provider. What is NOT measured is a run under a paying
+   * provider: no tool call has ever been seen, so the tool rows are built on
+   * the captured lifecycle and not on a captured tool. That is the gap the
+   * PREVIEW row names, and it closes the first time someone runs a real
+   * mission on it.
+   */
+  muse: 'preview',
   gemini: 'planned',
   omniroute: 'planned'
 }
@@ -276,7 +286,7 @@ function baseRouteRowStatus(
     return {
       tag: 'PREVIEW',
       selectable: true,
-      detail: `Signed in and detected. The ${runtime.displayName} adapter is not finished, so runs are not durable yet.`
+      detail: `Signed in and detected. The ${runtime.displayName} adapter has not been proven against a full run, so parts of a run may not be drawn.`
     }
   }
   return {
@@ -758,16 +768,22 @@ export const RUNTIME_CAPABILITIES: Readonly<Record<MissionRuntimeId, RuntimeCapa
    */
   antigravity: { modes: ['accept-edits'], evidence: 'measured' },
   /*
-   * NOTHING YET, ON PURPOSE.
+   * TWO MODES, AND THE THIRD IS LEFT OFF DELIBERATELY.
    *
    * Colin, 2026-09-21: *"we have no control over whether opencode continues
-   * to support muse so its better that we integrate it ourself"*. Agreed and
-   * being built -- but until `muse --version`, `muse schema` and one
-   * `muse exec` have actually been run, every mode here would be a guess.
-   * The docs promise an OS sandbox and approval modes; the docs are not a
-   * measurement, and a mode offered on a guess is a refusal with extra steps.
+   * to support muse so its better that we integrate it ourself"*. This row
+   * was empty until a run had actually happened. One has, twice, through the
+   * real command builder, the real process runner and the real normalizer --
+   * `node _tools/drive-muse-echo.mjs`, on the free echo provider, once
+   * read-only and once workspace-write. Both reached `run.completed`, and
+   * the prompt came back in the answer, so the prompt file arrived.
+   *
+   * `auto` is NOT claimed. Auto means full-access -- "may edit anything on
+   * this machine" -- and `createMuseExecCommand` leaves Muse's own sandbox
+   * ON for every mode and never passes `--yolo`. Offering Auto would be
+   * offering Accept edits under a name that promises more.
    */
-  muse: { modes: [], evidence: 'unproven' }
+  muse: { modes: ['ask', 'accept-edits'], evidence: 'measured' }
 }
 
 export function modeRunsOn(

@@ -58,14 +58,26 @@ describe('a runtime declares what it can do', () => {
     }
   })
 
-  it('offers nothing at all for a runtime whose modes are unproven', () => {
-    // Muse. The docs promise an OS sandbox and approval modes; the docs are
-    // not a measurement, and a mode offered on a guess is a refusal with
-    // extra steps. This is the case the old fall-through got wrong.
-    expect(RUNTIME_CAPABILITIES.muse.modes).toEqual([])
-    for (const mode of MODES) {
-      expect(modeRunsOn(mode, 'muse', 'win32'), `muse must not claim ${mode}`).toBe(false)
-    }
+  it('offers a runtime only the modes someone has actually run under it', () => {
+    /*
+     * Muse. This row was `modes: []` for as long as no `muse exec` had been
+     * run, because the docs promise an OS sandbox and approval modes and the
+     * docs are not a measurement -- the case the old fall-through got wrong.
+     *
+     * Two have been run since, through the real builder, runner and
+     * normalizer: `node _tools/drive-muse-echo.mjs` on the free echo
+     * provider, read-only and workspace-write, both to `run.completed`.
+     * Those are the two modes here, and Plan comes free with Ask.
+     */
+    expect(RUNTIME_CAPABILITIES.muse.modes).toEqual(['ask', 'accept-edits'])
+    expect(RUNTIME_CAPABILITIES.muse.evidence).toBe('measured')
+    expect(modeRunsOn('plan', 'muse', 'win32')).toBe(true)
+    // Auto means full-access -- "may edit anything on this machine" -- and
+    // `createMuseExecCommand` keeps Muse's own sandbox on in every mode and
+    // never passes `--yolo`. The name would promise more than the argv does.
+    expect(modeRunsOn('auto', 'muse', 'win32')).toBe(false)
+    // Approve-each needs a per-call approval the exec transport cannot ask.
+    expect(modeRunsOn('approve-each', 'muse', 'win32')).toBe(false)
   })
 
   it('keeps plan available exactly where ask is, and never apart from it', () => {

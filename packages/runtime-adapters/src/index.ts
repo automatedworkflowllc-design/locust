@@ -160,6 +160,15 @@ export type {
   OpenCodeInvocationContext,
 } from "./opencode-events.js";
 export {
+  createMuseEventNormalizer,
+  museSessionIdOf,
+  museTaskIsInternal,
+} from "./muse-events.js";
+export type {
+  MuseEventNormalizer,
+  MuseInvocationContext,
+} from "./muse-events.js";
+export {
   copilotFailureFrom,
   copilotToolCommand,
   copilotUsage,

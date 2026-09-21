@@ -59,6 +59,28 @@ describe('links out of the app', () => {
     expect(OUTBOUND_LINKS).toContain('https://nodejs.org')
   })
 
+  it('can open every vendor address a runtime tells someone to visit', () => {
+    /*
+     * THE OMISSION THIS TEST EXISTS FOR, found on 2026-09-21 while finishing
+     * Muse Code. `RUNTIME_LINKS` is a hand-written list of ids, and Muse was
+     * added to the install facts and not to it -- so the one runtime whose
+     * only install route is a vendor page had an Install link the host
+     * refused to open. Silently, like every other dead link here.
+     *
+     * The three assertions above would not have caught it: they name three
+     * URLs that were already there. This reads the facts file itself, so a
+     * runtime added to it and forgotten here fails rather than ships.
+     */
+    const facts = readFileSync(fileURLToPath(new URL('../shared/runtime-install.ts', import.meta.url)), 'utf8')
+    // NOT through `codeOnly`: its line-comment rule blanks any line holding a
+    // double slash, which is every line holding an https URL.
+    const urls = [...facts.matchAll(/kind:\s*'vendor',\s*url:\s*'([^']+)'/g)].map((found) => found[1]!)
+    expect(urls.length, 'no vendor URLs found, so this test checked nothing').toBeGreaterThanOrEqual(3)
+    for (const url of urls) {
+      expect(isOutboundLink(url), `${url} is offered to install and cannot be opened`).toBe(true)
+    }
+  })
+
   it('opens only what the host allows', () => {
     for (const url of OUTBOUND_LINKS) expect(isOutboundLink(url)).toBe(true)
     // The whole point of the list: anything else is refused rather than

@@ -32,13 +32,27 @@ export function runtimeDisplayName(runtime: MissionRuntimeId): string {
  * refuses the CLI to consumer accounts), so a mission under it would be a
  * process whose output nobody can read -- and it is refused, by name, before
  * anything is recorded.
+ *
+ * Muse Code is here on a narrower measurement than the rest: its stream was
+ * captured off `muse exec --provider echo`, which is free and needs no
+ * account, so every envelope, the session id and the terminal record are
+ * real -- but no tool call under a paying provider has ever been seen. See
+ * the note at the top of `muse-events.ts` for what that does and does not
+ * establish.
  */
-export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' | 'cursor' | 'opencode' | 'copilot' {
-  return runtime === 'codex' || runtime === 'claude' || runtime === 'cursor' || runtime === 'opencode' || runtime === 'copilot'
+export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' | 'cursor' | 'opencode' | 'copilot' | 'muse' {
+  return (
+    runtime === 'codex'
+    || runtime === 'claude'
+    || runtime === 'cursor'
+    || runtime === 'opencode'
+    || runtime === 'copilot'
+    || runtime === 'muse'
+  )
 }
 
 /**
- * Whether the host can own a mission under this runtime at all. Five stream
+ * Whether the host can own a mission under this runtime at all. Six stream
  * their events through a process the host reads; Antigravity is driven
  * through its own running app and watched through a transcript file, which
  * is a different transport with the same receipts -- so it can run a mission

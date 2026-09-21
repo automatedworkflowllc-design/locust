@@ -197,9 +197,17 @@ describe('nothing is live unless discovery proved it', () => {
     const status = routeRowStatus(runtime({ id: 'claude', displayName: 'Claude Code' }), 'preview', true)
     expect(status.tag).toBe('PREVIEW')
     // Selectable is the point -- Claude must be visibly choosable -- but the
-    // row has to say the adapter is unfinished rather than imply durability.
+    // row has to say what has not been established about it.
     expect(status.selectable).toBe(true)
-    expect(status.detail).toMatch(/not finished/)
+    expect(status.detail).toMatch(/not been proven/)
+    /*
+     * It used to end "so runs are not durable yet", which was written for an
+     * adapter that could not record. Muse Code became the first real PREVIEW
+     * row on 2026-09-21 and its runs ARE durable -- same ledger, same
+     * receipts; what is unproven is a run under a paying provider. A row
+     * that overstates the gap is as wrong as one that hides it.
+     */
+    expect(status.detail).not.toMatch(/not durable/)
   })
 
   it('keeps a planned runtime non-interactive whatever discovery says', () => {

@@ -11,6 +11,8 @@ import {
   createCopilotPromptCommand,
   createCursorEventNormalizer,
   createCursorPrintCommand,
+  createMuseEventNormalizer,
+  createMuseExecCommand,
   createOpenCodeEventNormalizer,
   createOpenCodeRunCommand,
   cursorCanEnforceReadOnly,
@@ -1027,7 +1029,16 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const missionId = `mission_${createId()}`
         const controller = new AbortController()
         const createdAt = now().toISOString()
-        const routeId = runtime === 'claude' ? 'claude' : runtime === 'opencode' ? 'opencode' : runtime === 'copilot' ? 'copilot' : 'codex'
+        const routeId =
+          runtime === 'claude'
+            ? 'claude'
+            : runtime === 'opencode'
+              ? 'opencode'
+              : runtime === 'copilot'
+                ? 'copilot'
+                : runtime === 'muse'
+                  ? 'muse'
+                  : 'codex'
         // ONE definition of what this run may touch, computed before anything
         // records it, so the durable header and the receipt agree with what
         // the process was actually allowed to do.
@@ -1111,7 +1122,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               ? createOpenCodeEventNormalizer(normalizerContext)
               : runtime === 'copilot'
                 ? createCopilotEventNormalizer({ ...normalizerContext, sessionId: copilotSessionId! })
-                : createCodexEventNormalizer(normalizerContext)
+                : runtime === 'muse'
+                  ? createMuseEventNormalizer(normalizerContext)
+                  : createCodexEventNormalizer(normalizerContext)
 
         // The argv, decided BEFORE anything durable is written. The builders
         // refuse what they cannot honour -- an effort for a runtime that has
@@ -1164,6 +1177,18 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               // Only when this run is in a worktree, which is exactly when
               // the folder it stands in is not the repository it belongs to.
               ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
+              ...choice
+            })
+          }
+          if (runtime === 'muse') {
+            // The prompt is named here only so the builder can refuse an
+            // empty one before anything durable is written. What Muse is
+            // SENT is the file the runner writes from `runtimePrompt`, which
+            // is the same text every other runtime receives.
+            return createMuseExecCommand(executable, {
+              workspacePath: runCwd,
+              sandbox: effectiveSandbox,
+              prompt: promptText,
               ...choice
             })
           }
