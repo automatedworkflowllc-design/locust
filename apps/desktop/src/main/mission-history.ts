@@ -9,6 +9,28 @@ import type {
 } from '../shared/ipc.js'
 
 const MAX_HISTORY_MISSIONS = 20
+/**
+ * How many conversations the sidebar may LIST, as opposed to carry transcript
+ * for.
+ *
+ * THE BUG THIS EXISTS FOR. 0.216 stopped a paging boundary changing what a
+ * conversation IS, by fetching absent ancestors. It did not stop a whole
+ * conversation falling off the page: `listMissions` returns the 20
+ * most-recently-touched missions, and a conversation whose own newest turn is
+ * older than those twenty is simply not in the response. No row, no group
+ * entry, nothing -- Colin, 2026-09-20, on the same conversation for the
+ * second time: *"my research convo disappeared again"*.
+ *
+ * Twenty was never a statement about how many conversations a person may
+ * have. It is a budget on TRANSCRIPT: a mission carries up to 500 events and
+ * some of those are megabytes, which is what `MAX_HISTORY_BYTES` guards. A
+ * row in the list needs none of that -- an id, a prompt, a phase and a clock,
+ * a few hundred bytes -- so the two limits had no business being one number.
+ *
+ * They are now two. The newest `MAX_HISTORY_MISSIONS` come with their events;
+ * everything up to here comes with `events: []`. One ledger read either way.
+ */
+const MAX_LISTED_MISSIONS = 300
 const MAX_HISTORY_EVENTS = 500
 const MAX_HISTORY_CHECKPOINTS = 25
 /**
@@ -311,7 +333,7 @@ export async function readMissionHistory(
   workspacePath: string = process.cwd()
 ): Promise<MissionHistoryResponse> {
   try {
-    const snapshot = await ledger.listMissions({ limit: MAX_HISTORY_MISSIONS })
+    const snapshot = await ledger.listMissions({ limit: MAX_LISTED_MISSIONS })
     // The workroom is joined best-effort: a channel that cannot be read makes
     // every peer message show as unreadable, which is the truthful state, and
     // must not take the mission history down with it.
@@ -325,15 +347,35 @@ export async function readMissionHistory(
         // Every link then reads as `text: null`, which is what happened.
       }
     }
+    /*
+     * The newest few come whole, because those are the ones about to be
+     * opened. Order is the reader's: most recently touched first.
+     */
+    const recent = snapshot.missions.slice(0, MAX_HISTORY_MISSIONS)
     const shown = withinByteBudget(
-      snapshot.missions
-        .slice(0, MAX_HISTORY_MISSIONS)
-        .map((mission) => publicRecoveredMission(mission, workroomMessages))
+      recent.map((mission) => publicRecoveredMission(mission, workroomMessages))
     )
+    /*
+     * And every OTHER conversation as a row and nothing else.
+     *
+     * `events: []` is the whole trick -- the same projection the ancestor
+     * walk uses, for the same reason. Opening one of these fetches its
+     * transcript; until then it costs a few hundred bytes and it EXISTS,
+     * which is the difference between a conversation you have not opened in
+     * a while and a conversation that is gone.
+     *
+     * Note the slice is from `shown.length`, not from MAX_HISTORY_MISSIONS:
+     * the byte budget can cut the whole page short, and anything it dropped
+     * must come back here as a row rather than vanish.
+     */
+    const listedOnly = snapshot.missions
+      .slice(shown.length)
+      .map((mission) => ({ ...publicRecoveredMission(mission, workroomMessages), events: [] }))
+    const listed = [...shown, ...listedOnly]
     return {
       ok: true,
       data: {
-        missions: [...shown, ...(await ancestorsOf(shown, ledger, workroomMessages))],
+        missions: [...listed, ...(await ancestorsOf(listed, ledger, workroomMessages))],
         currentWorkspaceId: workspaceIdFor(workspacePath),
         issueCount: snapshot.issues.length,
         // Straight from the reader. It used to be derived here by comparing
@@ -341,8 +383,13 @@ export async function readMissionHistory(
         // that list is a page rather than the whole ledger -- see
         // `unreadableFileCount` for what that cost.
         unreadableCount: snapshot.unreadableCount,
-        limitedRuntimes: limitedRuntimesFrom(snapshot.missions),
-        usageWindows: usageWindowsFrom(snapshot.missions)
+        // These two read EVENTS, so they see the missions that came with
+        // events. Widening the list did not widen them: the answer is about
+        // recent runs either way, and scanning three hundred transcripts to
+        // decide whether a runtime is at its limit would be a new cost for no
+        // new fact.
+        limitedRuntimes: limitedRuntimesFrom(recent),
+        usageWindows: usageWindowsFrom(recent)
       }
     }
   } catch {

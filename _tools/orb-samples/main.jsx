@@ -43,58 +43,56 @@ const SHAPES = [
   ['working', 'orbits', '(sidebar row)']
 ]
 
+const PRESETS = {
+  orbits: [1, 0.238], globe: [0.42, 0.105], rubik: [0.35, 0.088], wave: [0.341, 0.105],
+  web: [1.35, 0.25], braid: [0.5, 0.1125], ribbon: [0.25, 0.051], ring: [0.25, 0.028],
+  morph: [0.702, 0.53]
+}
+const DOTS = {
+  orbits: [1, 2.4], globe: [1.15, 1.75], rubik: [1.05, 1.9], wave: [1, 1.6],
+  web: [0.95, 1.52], braid: [1, 1.36], ribbon: [0.85, 1.073], ring: [0.956, 1.622],
+  morph: [0.395, 1.011]
+}
+
 function App() {
   return (
     <>
-      <h1>Orb samples — bigger asset, not a bigger raster</h1>
+      <h1>Are these the library&rsquo;s own drawings?</h1>
       <p className="sub">
-        Left column is exactly what ships today (the 20 preset at 20px). The rest render the
-        library&rsquo;s 64 preset into a bigger box, which is a downscale and stays sharp.
+        Yes — all 23 files are byte-identical to the published npm tarball, nothing is redrawn.
+        What changed the LOOK is the library&rsquo;s own <b>20px preset</b>, which draws a small
+        fraction of the points at a much bigger dot size. Column 1 is what Locust ships today.
+        Column 2 is the same shape from the <b>64</b> asset — the drawing the website shows.
       </p>
 
-      <h2>Every shape, as it ships today</h2>
-      <table><tbody>
-        {SHAPES.map(([state, shape, word]) => (
-          <tr key={state}>
-            <td><Live word={word} orb={<ThinkingOrb state={state} size={20} theme="dark" />} /></td>
-            <td className="name">{shape}</td>
-            <td className="name">{state}</td>
-          </tr>
-        ))}
-      </tbody></table>
-
-      <h2>The working row — today vs the 64 asset at four sizes</h2>
       <table>
         <thead><tr>
-          <th>ships today · 20 @ 20px</th><th>64 @ 20px</th><th>64 @ 24px</th>
-          <th>64 @ 26px</th><th>64 @ 28px</th>
+          <th>shape</th>
+          <th>ships today<br/>20 preset @ 20px</th>
+          <th>64 asset @ 20px</th>
+          <th>64 asset @ 24px</th>
+          <th>64 asset @ 28px</th>
+          <th>points kept at 20<br/>vs the 64 asset</th>
+          <th>dot size</th>
         </tr></thead>
-        <tbody><tr>
-          <td><Live word="working" orb={<ThinkingOrb state="composing" size={20} theme="dark" />} /></td>
-          <td><Live word="working" orb={<Big state="composing" box={20} />} /></td>
-          <td><Live word="working" orb={<Big state="composing" box={24} />} /></td>
-          <td><Live word="working" orb={<Big state="composing" box={26} />} /></td>
-          <td><Live word="working" orb={<Big state="composing" box={28} />} /></td>
-        </tr></tbody>
+        <tbody>
+          {SHAPES.map(([state, shape, word]) => {
+            const [big, small] = PRESETS[shape]
+            const [dbig, dsmall] = DOTS[shape]
+            return (
+              <tr key={state}>
+                <td className="name">{shape} · {word}</td>
+                <td><ThinkingOrb state={state} size={20} theme="dark" /></td>
+                <td><Big state={state} box={20} /></td>
+                <td><Big state={state} box={24} /></td>
+                <td><Big state={state} box={28} /></td>
+                <td className="tag">{Math.round((small / big) * 100)}% of them</td>
+                <td className="tag">{(dsmall / dbig).toFixed(1)}&times; fatter</td>
+              </tr>
+            )
+          })}
+        </tbody>
       </table>
-
-      <h2>The thinking row — the other wavy sphere, same treatment</h2>
-      <table><tbody><tr>
-        <td><Live word="thinking" orb={<ThinkingOrb state="listening" size={20} theme="dark" />} /></td>
-        <td><Live word="thinking" orb={<Big state="listening" box={20} />} /></td>
-        <td><Live word="thinking" orb={<Big state="listening" box={24} />} /></td>
-        <td><Live word="thinking" orb={<Big state="listening" box={26} />} /></td>
-        <td><Live word="thinking" orb={<Big state="listening" box={28} />} /></td>
-      </tr></tbody></table>
-
-      <h2>Side by side with its neighbours, at 26px</h2>
-      <p className="sub">The question is whether it still reads as one of a set.</p>
-      <table><tbody><tr>
-        <td><Live word="working" orb={<Big state="composing" box={26} />} /></td>
-        <td><Live word="thinking" orb={<ThinkingOrb state="listening" size={20} theme="dark" />} /></td>
-        <td><Live word="using a connector" orb={<ThinkingOrb state="solving" size={20} theme="dark" />} /></td>
-        <td><Live word="using a tool" orb={<ThinkingOrb state="connecting" size={20} theme="dark" />} /></td>
-      </tr></tbody></table>
     </>
   )
 }

@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.221.0 - 2026-09-20
+
+- **Conversations stop disappearing.** The sidebar only ever received the 20
+  most recently touched conversations, so one you had not opened in a while
+  was not hidden or renamed -- it was absent, and its group read empty. It now
+  lists every conversation you have. Twenty was a budget on how much
+  TRANSCRIPT one message could carry, which a row does not need: the newest
+  still arrive with their transcripts, the rest arrive as rows and fetch
+  theirs when you open them.
+
 ## 0.220.0 - 2026-09-20
 
 - **The orbs are back to one size.** 0.218 drew one of them larger, on the

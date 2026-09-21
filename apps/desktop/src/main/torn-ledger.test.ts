@@ -293,13 +293,43 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     const response = await throughPreload(await readMissionHistory(ledger, undefined, root))
     expect(response.ok).toBe(true)
     if (!response.ok) throw new Error('Paged history unexpectedly unavailable')
-    expect(response.data.missions).toHaveLength(20)
-    expect(response.data.missions.every((mission) => mission.integrityIssueCount === 0)).toBe(true)
+    /*
+     * TWENTY-ONE, and that is the fix rather than a slip.
+     *
+     * This asserted 20 because history used to return exactly one page, so
+     * the older mission was absent -- which is the very thing that made
+     * Colin's conversations vanish twice. Since `MAX_LISTED_MISSIONS` the
+     * newest twenty come with their transcripts and everything else comes as
+     * a ROW: present, named, groupable, no events.
+     *
+     * The claim this test is actually about is untouched: an older receipt
+     * that recovered fine is not called unreadable.
+     */
+    expect(response.data.missions).toHaveLength(21)
+    const rows = response.data.missions
+    expect(rows.at(-1)?.missionId).toBe(ID)
+    expect(rows.at(-1)?.events).toEqual([])
+    // The twenty clean ones are clean. The older one is the torn file, and
+    // its one bad record is a fact about it -- saying so on its row is the
+    // opposite of the defect this test is named for, which was calling a
+    // mission that RECOVERED unreadable.
+    expect(rows.slice(0, 20).every((mission) => mission.integrityIssueCount === 0)).toBe(true)
     // Nothing failed to recover, so nothing is unreadable -- the assertion
     // Astra's report named as the one a fix should make true.
     expect(response.data.unreadableCount).toBe(0)
     const said = renderHistory(response)
+    /*
+     * "could not be read" is still WRONG and still absent -- the mission
+     * recovered, which is the whole point of this test.
+     *
+     * But "ledger verified" is no longer right, and it only ever passed
+     * because the torn mission was off the page. The file does carry one bad
+     * record; now that the mission is listed, the header says so. A header
+     * that reassures about a file it is not showing is the same class of
+     * defect this test was written for, pointed the other way.
+     */
     expect(said).not.toContain('could not be read')
-    expect(said).toContain('ledger verified')
+    expect(said).not.toContain('ledger verified')
+    expect(said).toContain('with an incomplete receipt')
   })
 })
