@@ -130,6 +130,20 @@ const WINDOWS_INSTALL_ROOTS: readonly InstallRoot[] = [
   // from the shell does not see until the next sign-in.
   { command: "cursor-agent", base: "LOCALAPPDATA", segments: ["cursor-agent"], versioned: false },
   { command: "gemini", base: "APPDATA", segments: ["npm"], versioned: false },
+  /*
+   * Muse Code installs to %LOCALAPPDATA%\Programs\muse and appends that
+   * directory to the USER PATH -- the same shape as Cursor, and the same
+   * problem: a packaged app started from the Start menu does not see a PATH
+   * entry added after it launched.
+   *
+   * MEASURED on this machine 2026-09-21, minutes after installing 1.3.0: the
+   * directory holds `muse.cmd`, `.muse-launcher.ps1`, and the real binary as
+   * `muse-bin-1.3.0-R3401.1.exe` -- version-stamped, so it self-updates in
+   * place and `fingerprintOf` will invalidate the facts cache when it moves.
+   * NOT `versioned`: the launcher name is stable, only the binary beside it
+   * carries the version.
+   */
+  { command: "muse", base: "LOCALAPPDATA", segments: ["Programs", "muse"], versioned: false },
   // OpenCode and Copilot CLI both install from npm, so the global npm bin
   // directory is where their launchers land.
   { command: "opencode", base: "APPDATA", segments: ["npm"], versioned: false },

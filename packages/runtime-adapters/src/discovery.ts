@@ -9,6 +9,7 @@ import {
   detectSupportedFeatures,
   GEMINI_REQUIRED_FEATURES,
   OMNIROUTE_REQUIRED_FEATURES,
+  MUSE_REQUIRED_FEATURES,
   OPENCODE_REQUIRED_FEATURES,
   parseClaudeModelHints,
   parseEffortChoices,
@@ -173,6 +174,61 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
         + "whether this account's plan includes the CLI cannot be checked without spending a premium request.",
       resolution:
         "If a run fails with a policy denial, confirm the plan at https://github.com/settings/copilot",
+    },
+  },
+  {
+    /*
+     * Meta's Muse Code. Every line here was MEASURED on Windows 2026-09-21
+     * against 1.3.0-R3401.1, minutes after installing it; the captures are in
+     * `docs/muse-probe-2026-09-21/`.
+     *
+     * On PATH this is `muse.cmd`, a batch shim that runs a PowerShell
+     * launcher, which then starts a version-stamped 415 MB binary beside it.
+     * It is NEITHER npm shim shape `path-locator` unwraps, so it keeps its
+     * shell -- correct, and it means the 8,191-character cmd.exe argv limit
+     * applies. `--prompt-file` exists for exactly that and is what a real run
+     * must use.
+     */
+    id: "muse",
+    kind: "agent-runtime",
+    displayName: "Muse Code",
+    commandName: "muse",
+    optional: true,
+    // Measured: `Muse Code 1.3.0 (1.3.0-R3401.1)`, exit 0.
+    versionArgs: ["--version"],
+    capabilityArgs: ["--help"],
+    /*
+     * READINESS IS THE VERSION, AND THAT IS A JUDGEMENT CALL WORTH SPELLING
+     * OUT -- the same one Copilot forced, for a sharper reason.
+     *
+     * Muse has no status command: `auth` only sets a key, `login` only starts
+     * a device flow. The one thing that reveals sign-in is a real run, and
+     * MEASURED signed-out it says on stderr:
+     *
+     *   missing meta credentials: run `muse login` or set META_API_KEY, or
+     *   save credentials at \Users\<you>\.config\muse\auth.json
+     *
+     * Fast, free and unmistakable -- but only while signed OUT. Signed IN,
+     * that same probe is a billed model step, and discovery sweeps every
+     * fifteen seconds and on every window focus. **A readiness check that
+     * spends the user's money each sweep is not a readiness check.** So the
+     * version is taken as ready and the caveat below rides along, exactly as
+     * it does for Copilot.
+     *
+     * `--provider echo` runs with no credentials at all, so it cannot
+     * distinguish either; it is how the event stream was captured for free.
+     */
+    readinessArgs: ["--version"],
+    requiredFeatures: MUSE_REQUIRED_FEATURES,
+    readyWhen: (result) => /muse code\\s+\\d/i.test(`${result.stdout}\\n${result.stderr}`),
+    readinessCaveat: {
+      code: "readiness-unverifiable",
+      severity: "info",
+      message:
+        "Muse Code is installed as far as its version command can tell; whether this machine is "
+        + "signed in cannot be checked without starting a run, and a run on Muse costs money.",
+      resolution:
+        "If a run fails with 'missing meta credentials', run `muse login` in a terminal.",
     },
   },
   {

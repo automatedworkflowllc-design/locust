@@ -60,7 +60,10 @@ function harness(options: {
  * fixture keyed on the ids, so Cursor's file could not be stat'd, and the
  * test reported a cache miss that was its own fixture's doing.
  */
-const COMMANDS = ["codex", "claude", "cursor-agent", "gemini", "opencode", "copilot", "omniroute"];
+// Muse's command is `muse` and its launcher is `muse.cmd`; the locator is
+// faked here, so the NAME is what has to match — the same trap this file's
+// comment above describes for cursor-agent.
+const COMMANDS = ["codex", "claude", "cursor-agent", "gemini", "opencode", "copilot", "muse", "omniroute"];
 const everyBinary = (mtimeMs: number): Record<string, { size: number; mtimeMs: number }> =>
   Object.fromEntries(COMMANDS.map((name) => [`C:/bin/${name}.exe`, { size: 1000, mtimeMs }]));
 

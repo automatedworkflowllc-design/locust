@@ -63,6 +63,21 @@ export const GEMINI_REQUIRED_FEATURES = [
  * would report every install unsupported; the enforcement lives in the
  * command builder instead, where it is applied rather than merely checked.
  */
+/**
+ * Meta's Muse Code in its `exec` mode.
+ *
+ * MEASURED on Windows 2026-09-21 against 1.3.0-R3401.1, on the free `echo`
+ * provider so the capture cost nothing and needed no account. Evidence in
+ * `docs/muse-probe-2026-09-21/`.
+ *
+ * `muse exec --json` puts JSONL on stdout and leaves its own chatter on
+ * stderr, so the two streams do not have to be untangled.
+ */
+export const MUSE_REQUIRED_FEATURES = [
+  "non-interactive",
+  "jsonl-events",
+] as const satisfies readonly RuntimeFeature[];
+
 export const OPENCODE_REQUIRED_FEATURES = [
   "non-interactive",
   "jsonl-events",
