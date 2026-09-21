@@ -113,6 +113,12 @@ export interface TeammateStore {
   missionTitles(): Promise<Readonly<Record<string, string>>>
   /** An empty or blank name CLEARS it, back to the words that were typed. */
   renameMission(missionId: string, title: string): Promise<void>
+  /**
+   * Record the newest turn of this teammate's hub -- the conversation their
+   * replies to other teammates continue. Unknown teammate or bad id: nothing
+   * changes, the same shape as `rememberRoute`.
+   */
+  rememberHub(teammateId: unknown, missionId: unknown): Promise<void>
   readSettings(): Promise<WorkspaceSettings>
   writeSettings(settings: unknown): Promise<WorkspaceSettings>
 }
@@ -312,7 +318,10 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     // the same face every reader would derive, so nothing changes on upgrade.
     avatar: isAvatarSpec(record.avatar) ? record.avatar : seedAvatar(record.teammateId),
     createdAt: record.createdAt,
-    ...(isTeammateRoute(record.route) ? { route: record.route } : {})
+    ...(isTeammateRoute(record.route) ? { route: record.route } : {}),
+    // A mission id or nothing: a hub pointing at a string that is not one
+    // would be a face that opens nothing.
+    ...(safeId(record.hubMissionId) ? { hubMissionId: record.hubMissionId } : {})
   }
 }
 
@@ -556,7 +565,10 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...(existing.connectors === undefined ? {} : { connectors: existing.connectors }),
           avatar: input.avatar,
           createdAt: existing.createdAt,
-          ...(existing.route === undefined ? {} : { route: existing.route })
+          ...(existing.route === undefined ? {} : { route: existing.route }),
+          // Carried like the route: renaming a teammate must not lose the
+          // conversation their replies live in.
+          ...(existing.hubMissionId === undefined ? {} : { hubMissionId: existing.hubMissionId })
         }
         await write({
           ...file,
@@ -588,6 +600,20 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...file,
           teammates: file.teammates.map((teammate) =>
             teammate.teammateId === teammateId ? { ...teammate, route: kept } : teammate
+          )
+        })
+      })
+    },
+
+    rememberHub(teammateId, missionId): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(teammateId) || !safeId(missionId)) return
+        const file = await read()
+        if (!file.teammates.some((teammate) => teammate.teammateId === teammateId)) return
+        await write({
+          ...file,
+          teammates: file.teammates.map((teammate) =>
+            teammate.teammateId === teammateId ? { ...teammate, hubMissionId: missionId } : teammate
           )
         })
       })

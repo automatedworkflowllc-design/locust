@@ -40,6 +40,8 @@ export function RailFlyout({
   onMissionMenu,
   onOpenMissions,
   onNewConversation,
+  filtered = false,
+  onFilter,
   onPointerEnter,
   onPointerLeave,
   onClose
@@ -58,6 +60,15 @@ export function RailFlyout({
   readonly onMissionMenu: (missionId: string, at: { readonly x: number; readonly y: number }) => void
   readonly onOpenMissions: () => void
   readonly onNewConversation: () => void
+  /**
+   * Whether the sidebar's list is narrowed to this teammate, and the switch
+   * for it. This is where the face's old click went (0.234): the face now
+   * OPENS their conversation, and the card that already lists their
+   * conversations is the natural home for "only theirs". Absent in the rail,
+   * which draws no list to narrow.
+   */
+  readonly filtered?: boolean
+  readonly onFilter?: () => void
   readonly onPointerEnter: () => void
   readonly onPointerLeave: () => void
   readonly onClose: () => void
@@ -158,6 +169,12 @@ export function RailFlyout({
           <Icon name="plus" size={14} />
           <span>New conversation with {teammate.name}</span>
         </button>
+        {onFilter !== undefined && (
+          <button type="button" className="lc-railflyout__action" aria-pressed={filtered} onClick={onFilter}>
+            <Icon name="search" size={14} />
+            <span>{filtered ? 'Show everyone’s conversations' : `Only ${teammate.name}’s in the list`}</span>
+          </button>
+        )}
       </div>
     </div>
   )

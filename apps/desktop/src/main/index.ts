@@ -1726,6 +1726,25 @@ if (!ownsSingleInstanceLock) {
       if (teammateId === undefined) return
       await teammates.assignMission(teammateId, missionId).catch(() => undefined)
     }
+    /*
+     * A person's own turn in a teammate's hub moves the hub along with it.
+     *
+     * The hub records its NEWEST turn, and the relay continues from there.
+     * When the person follows up in the hub -- which is what the hub is for
+     * -- the next relayed reply has to come after what they said, not
+     * beside it. Only when the follow-up IS the hub's newest turn: a
+     * follow-up on some other conversation is not the hub's business.
+     */
+    const advanceHub = async (
+      teammateId: string | undefined,
+      followUpOf: string | undefined,
+      missionId: string
+    ): Promise<void> => {
+      if (teammateId === undefined || followUpOf === undefined) return
+      const own = (await teammates.list().catch(() => [])).find((entry) => entry.teammateId === teammateId)
+      if (own?.hubMissionId !== followUpOf) return
+      await teammates.rememberHub(teammateId, missionId).catch(() => undefined)
+    }
     // A PERSON starting a teammate on a route is what makes it theirs. A run
     // the relay starts for them never re-records it, so a fallback onto the
     // sender's route cannot quietly become the recipient's own.
@@ -1774,6 +1793,32 @@ if (!ownsSingleInstanceLock) {
         )
       },
       assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
+      /*
+       * The teammate's hub: where a reply with no exchange of its own goes.
+       *
+       * Answered from the roster, and checked against the ledger before it is
+       * handed over: a hub whose newest turn was deleted is begun again
+       * rather than refused, because the start would otherwise fail with
+       * "its earlier mission is not in the ledger" -- true, and no help.
+       */
+      hubOf: async (teammateId) => {
+        const own = (await teammates.list()).find((entry) => entry.teammateId === teammateId)
+        const hub = own?.hubMissionId
+        if (hub === undefined) return undefined
+        const kept = await missionLedger.getMission(hub).catch(() => undefined)
+        return kept === undefined ? undefined : hub
+      },
+      rememberHub: async (teammateId, missionId, began) => {
+        await teammates.rememberHub(teammateId, missionId)
+        // The row's name, given once. A hub's root prompt is whatever the
+        // first peer message happened to be -- the sidebar would title the
+        // whole conversation with one teammate's aside to another. Named
+        // like anything a person names, so it can be renamed like one.
+        if (!began) return
+        const own = (await teammates.list().catch(() => [])).find((entry) => entry.teammateId === teammateId)
+        if (own === undefined) return
+        await teammates.renameMission(missionId, `${own.name}'s replies`).catch(() => undefined)
+      },
       // The one question a held reply has to ask before it starts: is there
       // still anything to show them? Whatever a teammate has not read rides
       // along on the next run whoever starts it, so a person who messaged
@@ -3652,6 +3697,7 @@ ${taskSection({
           })
           await assignOwner(peer?.self.teammateId, mission.missionId)
           await rememberRoute(peer?.self.teammateId, { runtime: 'antigravity', model: mission.model, mode })
+          await advanceHub(peer?.self.teammateId, followUpOf, mission.missionId)
           return { ok: true, data: antigravityStartData(mission) } as const
         } catch (error) {
           if (error instanceof PeerRecordError) {
@@ -3697,6 +3743,7 @@ ${taskSection({
         if (response.ok) {
           await assignOwner(peer?.self.teammateId, response.data.missionId)
           await rememberRoute(peer?.self.teammateId, { runtime, model: model ?? 'account-default', mode, ...(effort === undefined ? {} : { effort }) })
+          await advanceHub(peer?.self.teammateId, followUpOf, response.data.missionId)
         }
         return response
       } catch {

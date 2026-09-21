@@ -51,6 +51,7 @@ function sidebar(props: { readonly groups?: readonly PublicGroup[]; readonly unr
       recentlyReceived={[]}
       onSelectTeammate={noop}
       onNewConversationWith={noop}
+      onOpenHub={noop}
       onNewTeammate={noop}
       composerShown={false}
       onOpenSettings={noop}

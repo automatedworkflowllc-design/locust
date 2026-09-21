@@ -179,6 +179,7 @@ export function Sidebar({
   recentlyDone,
   recentlyReceived,
   onSelectTeammate,
+  onOpenHub,
   onNewConversationWith,
   onNewTeammate,
   composerShown,
@@ -262,6 +263,12 @@ export function Sidebar({
   readonly recentlyDone: readonly string[]
   readonly recentlyReceived: readonly string[]
   readonly onSelectTeammate: (teammateId: string) => void
+  /**
+   * Open the teammate's hub -- the conversation their replies to other
+   * teammates land in -- or, for a teammate who has none yet, address them.
+   * The face's click. Filtering the list to them lives in the hover card.
+   */
+  readonly onOpenHub: (teammateId: string) => void
   /** A blank page with that teammate on it, not their newest conversation. */
   readonly onNewConversationWith: (teammateId: string) => void
   readonly onNewTeammate: () => void
@@ -843,19 +850,33 @@ export function Sidebar({
       {!compact && teammates.length > 0 && (
         <div className="lc-faces">
           {shownFaces.map((teammate) => {
-            const on = faceFilter === teammate.teammateId
+            /*
+             * ON means "this is who you are with": the teammate the composer
+             * addresses, whose conversation is open. It used to mean "the
+             * list is filtered to them", and the click did both -- picked
+             * the teammate AND narrowed the list -- which left no click for
+             * the thing a face most obviously does: open their conversation.
+             *
+             * Colin, 2026-09-21: "We already have those avatars at the top
+             * for the teammates, we can just make those clickable, to go to
+             * their hub chat where all those teammate responses go to." So
+             * the click opens the hub, and the filter moved into the card
+             * that opens on hover, where the list of their conversations
+             * already is.
+             */
+            const on = selectedTeammateId === teammate.teammateId
             const status = viewByTeammate[teammate.teammateId]
             return (
               <button
                 key={teammate.teammateId}
                 type="button"
-                className={`lc-faces__one${on ? ' is-on' : ''}`}
+                className={`lc-faces__one${on ? ' is-on' : ''}${faceFilter === teammate.teammateId ? ' is-filtering' : ''}`}
                 aria-pressed={on}
                 // No native `title`: the card that opens on hover says all of
                 // this laid out, and a tooltip drawing the same facts as one
                 // unbroken line underneath it is the worse of two answers.
                 // The label stays for anyone who cannot see either.
-                aria-label={`${teammate.name} — show only their conversations`}
+                aria-label={`${teammate.name} — open their conversation`}
                 ref={(node) => {
                   if (node === null) railSlots.current.delete(teammate.teammateId)
                   else railSlots.current.set(teammate.teammateId, node)
@@ -866,10 +887,7 @@ export function Sidebar({
                 // question as pointing at one.
                 onFocus={() => railEnter(teammate.teammateId)}
                 onBlur={railLeave}
-                onClick={() => {
-                  setFaceFilter(on ? undefined : teammate.teammateId)
-                  onSelectTeammate(teammate.teammateId)
-                }}
+                onClick={() => onOpenHub(teammate.teammateId)}
                 onContextMenu={(event) => {
                   event.preventDefault()
                   onTeammateMenu(teammate.teammateId, { x: event.clientX, y: event.clientY })
@@ -1579,6 +1597,18 @@ export function Sidebar({
                 onNewConversationWith(open.teammateId)
                 railClose()
               }}
+              // The list filter is offered only where there is a list: the
+              // rail draws no conversation rows, so narrowing them there
+              // would narrow nothing anyone can see.
+              filtered={faceFilter === open.teammateId}
+              {...(compact
+                ? {}
+                : {
+                    onFilter: () => {
+                      setFaceFilter(faceFilter === open.teammateId ? undefined : open.teammateId)
+                      railClose()
+                    }
+                  })}
               onPointerEnter={() => window.clearTimeout(railCloseTimer.current)}
               onPointerLeave={railLeave}
               onClose={railClose}

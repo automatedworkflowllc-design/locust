@@ -10879,6 +10879,12 @@ textarea {
   background: var(--lc-bg-selected);
 }
 
+/* The list is narrowed to this face (from the hover card). Distinct from
+   ON, which is who you are with: a ring, not a fill. */
+.lc-faces__one.is-filtering {
+  box-shadow: 0 0 0 1.5px var(--lc-focus-edge);
+}
+
 .lc-faces__pip {
   position: absolute;
   right: 0;

@@ -635,6 +635,22 @@ export interface PublicTeammate {
    * and that only means anything if each side stays itself.
    */
   readonly route?: TeammateRoute
+  /**
+   * The latest turn of this teammate's HUB: the one conversation their
+   * replies to other teammates land in.
+   *
+   * Colin, 2026-09-21: "its kind of messy that each time a teammate messages
+   * another that it spawns a new chat in ungrouped ... each teammate has
+   * their own isolated chat where the replies go to on the sidebar." A
+   * reply inside an exchange continues the recipient's own mission in that
+   * exchange; a reply that has no such predecessor used to start a brand-new
+   * root, and every one of those was another Ungrouped row. Now it continues
+   * the hub, and the hub is the row a face opens.
+   *
+   * Written by the host from the relay, never by the renderer. Absent until
+   * the teammate first replies on their own.
+   */
+  readonly hubMissionId?: string
 }
 
 export interface TeammateRoute {
@@ -1664,6 +1680,12 @@ export type CodexMissionUpdate =
         | { readonly kind: 'relay'; readonly hop: number }
         | { readonly kind: 'routine'; readonly routineId: string; readonly step: number }
         | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
+      /**
+       * Present when this run is the newest turn of the teammate's hub (see
+       * `PublicTeammate.hubMissionId`), so the roster on screen learns it
+       * without a refresh -- the face has to open the hub from this moment.
+       */
+      readonly hubMissionId?: string
     }
   /**
    * A post was written to a room, before anybody has been asked.

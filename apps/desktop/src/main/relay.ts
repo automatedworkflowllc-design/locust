@@ -324,6 +324,19 @@ export interface RelayOptions {
   }) => Promise<CodexMissionStartResponse>
   readonly assignOwner: (teammateId: string, missionId: string) => Promise<void>
   /**
+   * The newest turn of this teammate's hub, or nothing.
+   *
+   * A reply with no predecessor in its own exchange continues THIS rather
+   * than starting a root of its own -- which is what put every peer message
+   * after the first in Ungrouped as a conversation nobody asked for (Colin,
+   * 2026-09-21). Absent means every such reply is a new conversation, the
+   * way it was. The caller answers `undefined` for a turn the ledger no
+   * longer has, so a deleted hub is simply begun again.
+   */
+  readonly hubOf?: (teammateId: string) => Promise<string | undefined>
+  /** Record a run as the newest turn of the teammate's hub; `began` when it is the hub's first. */
+  readonly rememberHub?: (teammateId: string, missionId: string, began: boolean) => Promise<void>
+  /**
    * Whether anything is still waiting to be shown to this teammate.
    *
    * A held reply is not the only way a message gets delivered: anything a
@@ -540,7 +553,20 @@ export function createRelay(options: RelayOptions): Relay {
     readonly notice: (message: string) => void
   }): Promise<StartOutcome> => {
     const { recipient, from } = input
-    const followUpOf = input.origin.lastMissionOf[recipient.self.teammateId]
+    // Their turn in THIS exchange first; failing that, their hub. A reply
+    // inside an exchange belongs to the conversation the exchange is, and a
+    // reply from outside one belongs to them.
+    const inExchange = input.origin.lastMissionOf[recipient.self.teammateId]
+    let hub: string | undefined
+    if (inExchange === undefined && options.hubOf !== undefined) {
+      try {
+        hub = await options.hubOf(recipient.self.teammateId)
+      } catch {
+        hub = undefined
+      }
+    }
+    const followUpOf = inExchange ?? hub
+    const ontoHub = inExchange === undefined
     // Their own route, so each teammate stays the model a person made
     // them. Only a teammate who has never run borrows the sender's.
     const own = recipient.self.route
@@ -621,6 +647,12 @@ export function createRelay(options: RelayOptions): Relay {
     // This is the one place every relayed run passes through.
     if (input.origin.rootMissionId !== undefined) recordSpend(input.origin.rootMissionId)
     await options.assignOwner(recipient.self.teammateId, response.data.missionId).catch(() => undefined)
+    // A run that continued the hub, or began one, is the hub's newest turn
+    // now. Recorded before the window is told, so a face clicked on the
+    // strength of this update opens a hub the host already knows.
+    if (ontoHub && options.rememberHub !== undefined) {
+      await options.rememberHub(recipient.self.teammateId, response.data.missionId, hub === undefined).catch(() => undefined)
+    }
     options.notify({
       kind: 'mission-started',
       runId: response.data.runId,
@@ -628,7 +660,8 @@ export function createRelay(options: RelayOptions): Relay {
       teammateId: recipient.self.teammateId,
       prompt: input.prompt,
       data: response.data,
-      startedBy: { kind: 'relay', hop: input.origin.hop }
+      startedBy: { kind: 'relay', hop: input.origin.hop },
+      ...(ontoHub ? { hubMissionId: response.data.missionId } : {})
     })
     return { kind: 'started', missionId: response.data.missionId }
   }

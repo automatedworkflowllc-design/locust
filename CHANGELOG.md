@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.234.0 - 2026-09-21
+
+- **Each teammate has one conversation their replies go to.** When a
+  teammate wrote to another, the reply started a new conversation every
+  time, and the sidebar filled with them. A reply that is not part of an
+  exchange you can see now continues that teammate's own conversation --
+  named "Wren's replies" the first time it is made, renameable like any
+  other -- and clicking their face at the top of the sidebar opens it. The
+  "only their conversations" filter the face used to be moved into the card
+  that opens when you hover a face, which is where their conversations are
+  listed anyway.
+
 ## 0.233.0 - 2026-09-21
 
 - **A gap the runtime left is marked as one.** Antigravity notes its own

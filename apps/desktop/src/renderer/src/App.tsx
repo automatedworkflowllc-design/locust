@@ -1849,6 +1849,14 @@ export default function App(): ReactElement {
         // adopts it exactly as it adopts a run it asked for, so the sidebar
         // shows them working from this moment rather than after a refresh.
         setMissionOwners((current) => ({ ...current, [update.missionId]: update.teammateId }))
+        // The hub moved, or began. Mirrored so the face opens it from this
+        // moment rather than after the roster is next re-read.
+        if (update.hubMissionId !== undefined) {
+          const hub = update.hubMissionId
+          setTeammates((current) =>
+            current.map((teammate) => (teammate.teammateId === update.teammateId ? { ...teammate, hubMissionId: hub } : teammate))
+          )
+        }
         // A routine that started on its own: the Team card's run count and
         // next run moved on disk, and nobody pressed anything to refresh them.
         if (update.startedBy?.kind === 'routine') void reloadRoutines()
@@ -3967,6 +3975,26 @@ export default function App(): ReactElement {
     setShownKey(undefined)
   }
 
+  /**
+   * A face's click: their hub, or them.
+   *
+   * The hub is the conversation their replies to other teammates land in,
+   * recorded by the host as its newest turn. It is opened through the
+   * sidebar's own row for it when one is listed -- the same path a click on
+   * the row takes -- so the thread shows the whole conversation and not
+   * just the turn the host happened to record. A teammate with no hub yet
+   * has nothing to open, so the click addresses them, as it always did.
+   */
+  const openHub = (teammateId: string): void => {
+    const hub = teammates.find((teammate) => teammate.teammateId === teammateId)?.hubMissionId
+    if (hub === undefined) {
+      selectTeammate(teammateId)
+      return
+    }
+    const row = sidebarMissionsRef.current.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(hub))
+    openMission(row?.missionId ?? hub)
+  }
+
   const sidebarMissionsRef = useRef<readonly SidebarMission[]>([])
   // The right-click menus are built outside render, so they read the roster
   // and the routines through refs the same way they read the rows.
@@ -4492,6 +4520,7 @@ export default function App(): ReactElement {
           recentlyReceived={recentlyReceived}
           onSelectTeammate={selectTeammate}
           onNewConversationWith={newConversationWith}
+          onOpenHub={openHub}
           onNewTeammate={() => {
             setTeammateError(undefined)
             setNewTeammateOpen(true)
