@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.237.0 - 2026-09-21
+
+- **A teammate is handed the memories that bear on what you asked.** The
+  brief pasted the newest eight memories and left the rest in a file the
+  teammate could open. The eight were chosen by date alone, so a note from
+  weeks ago that answered your question exactly was left out in favour of
+  whatever was written most recently. The memories that share words with your
+  message come first now, then the newest as before; the file is unchanged.
+  Measured on the free model before the change: it did open the file and
+  find the answer -- this saves it the trip.
+
 ## 0.236.0 - 2026-09-21
 
 - **Locust stops re-checking runtimes that have nothing to report.** Every

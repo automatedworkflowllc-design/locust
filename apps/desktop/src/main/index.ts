@@ -1108,7 +1108,7 @@ if (!ownsSingleInstanceLock) {
     // The folder's own LOCUST.md rides in the same slot, first: read fresh at
     // every start so an edit lands on the next mission (parity row 45).
     const memoryBriefing: MemoryBriefing = {
-      section: async (peer, conversation) => {
+      section: async (peer, conversation, query) => {
         if (!workspaceChosen) return undefined
         const sections: string[] = []
         const brief = await readWorkspaceBrief(workspacePath).catch(() => undefined)
@@ -1162,11 +1162,11 @@ if (!ownsSingleInstanceLock) {
           if (inGroup !== undefined) sections.push(groupSection(inGroup.name, inGroup.instructions))
         }
         const settings = await teammates.readSettings()
-        if (settings.memoryMode !== 'off') sections.push(await memoryPart(peer))
+        if (settings.memoryMode !== 'off') sections.push(await memoryPart(peer, query))
         return sections.length === 0 ? undefined : sections.join('\n\n')
       }
     }
-    async function memoryPart(peer: MissionPeerContext | undefined): Promise<string> {
+    async function memoryPart(peer: MissionPeerContext | undefined, query: string | undefined): Promise<string> {
         const settings = await teammates.readSettings()
         const listed = await memories.briefed(memoryWorkspaceId)
         const lines = listed.map((memory) => ({
@@ -1195,6 +1195,7 @@ if (!ownsSingleInstanceLock) {
         }
         return memorySection({
           ...(file === undefined ? {} : { file }),
+          ...(query === undefined ? {} : { query }),
           ...(peer === undefined ? {} : { selfName: peer.self.name }),
           // Undefined for a worktree teammate, for the same reason the brief
           // above stopped naming it: memory's own line said "what is

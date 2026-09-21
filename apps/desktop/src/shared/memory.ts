@@ -218,6 +218,56 @@ export function memoryAge(at: string | undefined, now: Date): string | undefined
 }
 
 /**
+ * Words that carry no topic, so "what is the secret word for this project"
+ * scores on `secret`, `word` and `project` rather than on `the`, which every
+ * memory contains. Small on purpose: this is a tie-breaker between notes,
+ * not a search engine.
+ */
+const TOPICLESS: ReadonlySet<string> = new Set([
+  'the', 'and', 'for', 'this', 'that', 'with', 'what', 'which', 'when', 'where', 'how', 'why', 'who',
+  'are', 'was', 'were', 'have', 'has', 'had', 'does', 'did', 'not', 'you', 'your', 'our', 'its',
+  'from', 'into', 'about', 'please', 'can', 'could', 'should', 'would', 'will', 'just', 'only',
+  'then', 'than', 'there', 'here', 'they', 'them', 'these', 'those', 'also', 'any', 'all', 'one'
+])
+
+/** The words of a question worth matching a memory on. */
+function topicWords(text: string): ReadonlySet<string> {
+  return new Set(memoryKey(text).split(' ').filter((word) => word.length > 2 && !TOPICLESS.has(word)))
+}
+
+/**
+ * Which memories a brief pastes, and in what order: the ones that share
+ * words with what was asked first, then the newest.
+ *
+ * MEASURED on Colin's store, 2026-09-21: 76 memories, of which a turn pasted
+ * the newest 8 -- chosen by DATE alone. A memory from 13 September that
+ * matters to every run was outranked by anything trivial from this morning,
+ * and the safety valve, the teammate opening `.locust/memory.md`, is the
+ * model's manners. Grok Build hands its model a `memory_search` tool;
+ * Locust drives six CLIs it cannot add a tool to, so the search is done on
+ * this side, at brief time: score each memory by the topic words it shares
+ * with the prompt, paste the matches first (most shared words, then newest),
+ * and fill what is left of the allowance the old way. With no prompt, or a
+ * prompt that matches nothing, this is exactly the list it always was. No
+ * index: a linear scan of a few hundred one-line notes is microseconds.
+ */
+export function memoriesForBrief(memories: readonly MemoryLine[], query: string | undefined, maxLines: number): readonly MemoryLine[] {
+  const here = memories.filter((memory) => memory.scope !== 'global')
+  const everywhere = memories.filter((memory) => memory.scope === 'global')
+  // Folder-first, newest-within-group: the end of each list is the newest.
+  const byDate = [...here.slice(-maxLines), ...everywhere.slice(-maxLines)]
+  const wanted = query === undefined ? new Set<string>() : topicWords(query)
+  if (wanted.size === 0) return byDate
+  const relevant = memories
+    .map((memory, index) => ({ memory, index, score: [...topicWords(memory.text)].filter((word) => wanted.has(word)).length }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || right.index - left.index)
+    .map((entry) => entry.memory)
+  const rest = byDate.filter((memory) => !relevant.includes(memory))
+  return [...relevant, ...rest]
+}
+
+/**
  * What a mission is told about the team's memory, appended to its brief.
  * Lists what is remembered for this folder and everywhere, each with who
  * wrote it, and teaches the block -- worded so a teammate with nothing
@@ -242,6 +292,8 @@ export function memorySection(input: {
   readonly file?: string
   /** Test seam, so an age in a brief is a fact rather than a moving target. */
   readonly now?: Date
+  /** What was asked, so the memories that bear on it are the ones pasted. */
+  readonly query?: string
 }): string {
   /*
    * BOUNDED, and it was not.
@@ -263,11 +315,11 @@ export function memorySection(input: {
    * shortened list cannot tell that it was shortened, and neither can the
    * person reading the answer.
    */
-  const here = input.memories.filter((memory) => memory.scope !== 'global')
-  const everywhere = input.memories.filter((memory) => memory.scope === 'global')
   const maxLines = input.file === undefined ? MEMORY_BRIEF_LINES : MEMORY_BRIEF_LINES_WITH_FILE
   const budget = input.file === undefined ? MEMORY_BRIEF_BUDGET : MEMORY_BRIEF_BUDGET_WITH_FILE
-  const candidates = [...here.slice(-maxLines), ...everywhere.slice(-maxLines)]
+  // Folder-first and newest-within-group, with the ones that bear on what
+  // was asked moved to the front (see `memoriesForBrief`).
+  const candidates = memoriesForBrief(input.memories, input.query, maxLines)
   const briefed: MemoryLine[] = []
   let spent = 0
   // From the FRONT: `candidates` is already folder-first, newest-within-group,
