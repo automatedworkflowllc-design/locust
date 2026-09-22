@@ -4873,7 +4873,7 @@ export default function App(): ReactElement {
                     theirs === undefined || !isMissionRuntime(theirs) ? 'Their runtime' : runtimeDisplayName(theirs)
                   return command === undefined
                     ? `${named} is not signed in, so ${who.name} cannot start yet.`
-                    : `${named} is not signed in, so ${who.name} cannot start yet. In a terminal: ${command}`
+                    : `${named} is not signed in, so ${who.name} cannot start yet. Sign in from Settings > Runtimes, or ${command} in a terminal.`
                 })()}
                 mode={mode}
                 onStarter={(prompt) => {

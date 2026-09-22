@@ -23,6 +23,7 @@ import {
   MODEL_CATALOG_CHANNEL,
   RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
+  RUNTIME_SIGN_IN_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
@@ -139,7 +140,8 @@ import type {
   TeammateFolderResponse,
   WorktreeListResponse,
   RuntimeInstallProgress,
-  RuntimeInstallResponse
+  RuntimeInstallResponse,
+  RuntimeSignInResponse
 } from '../shared/ipc.js'
 import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
 import type { RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
@@ -249,6 +251,8 @@ const desktopApi: DesktopApi = {
   /** Run `npm install -g <package>` for a runtime, watching npm's own output. */
   installRuntime: (runtime: string) =>
     ipcRenderer.invoke(RUNTIME_INSTALL_CHANNEL, runtime) as Promise<RuntimeInstallResponse>,
+  signInRuntime: (runtime: string) =>
+    ipcRenderer.invoke(RUNTIME_SIGN_IN_CHANNEL, runtime) as Promise<RuntimeSignInResponse>,
   onRuntimeInstallProgress: (listener: (progress: RuntimeInstallProgress) => void) => {
     const handler = (_event: unknown, progress: RuntimeInstallProgress): void => listener(progress)
     ipcRenderer.on(RUNTIME_INSTALL_PROGRESS_CHANNEL, handler)

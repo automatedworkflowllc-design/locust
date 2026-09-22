@@ -3908,8 +3908,10 @@ textarea {
   color: var(--lc-text-muted);
 }
 
-/* Installed and signed out: the command, not a button. Signing in is a
-   browser handshake or a device code, and Locust cannot drive either. */
+/* Installed and signed out. The row is a Sign in button now, which opens the
+   runtime's own sign-in in a window of its own; this is the line it leaves
+   behind -- the hint once the window is open, the command if it could not
+   be. Locust still drives no part of the handshake itself. */
 .lc-runtimecell__signin {
   color: var(--lc-text-muted);
   font-size: var(--lc-text-mono-label);

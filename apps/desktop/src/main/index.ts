@@ -84,6 +84,7 @@ import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runt
 import { bootOutcome, createDiscoveryLog } from './discovery-log.js'
 import { createRuntimeFactsStore } from './runtime-facts.js'
 import { createRuntimeInstaller } from './runtime-installer.js'
+import { openSignIn } from './runtime-sign-in.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
@@ -109,6 +110,7 @@ import {
   RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
+  RUNTIME_SIGN_IN_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
   GROUP_LIST_CHANNEL,
@@ -1582,6 +1584,22 @@ if (!ownsSingleInstanceLock) {
           if (target !== null && !target.isDestroyed()) {
             target.webContents.send(RUNTIME_INSTALL_PROGRESS_CHANNEL, { runtime, line })
           }
+        }
+      })
+    })
+
+    // The runtime's own sign-in, in a window of its own. Only an id crosses
+    // the bridge; the command is the one the install facts name.
+    ipcMain.handle(RUNTIME_SIGN_IN_CHANNEL, async (event, runtime: unknown) => {
+      if (!fromOwnWindow(event) || typeof runtime !== 'string') {
+        return { ok: false, what: 'That runtime cannot be signed in from here.', next: 'Run the command shown in a terminal.' } as const
+      }
+      return openSignIn(runtime, {
+        discover: discoverForWork,
+        // Signing in changes nothing Locust caches except the answer itself,
+        // so dropping that is enough for the next ask to be a real one.
+        closed: () => {
+          discoveryCache = undefined
         }
       })
     })

@@ -6,6 +6,7 @@ import mark from '../assets/locust-mark.svg'
 import wordmark from '../assets/locust-wordmark.svg'
 import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
+import { SignInButton } from './SignInButton.js'
 
 /**
  * First run, and the empty state generally.
@@ -484,7 +485,7 @@ export function FirstLaunch({
                       ) : installing === runtime.id ? (
                         <span className="lc-runtimecell__tag">Installing…</span>
                       ) : checking ? null : signIn && signInCommand(runtime.id) !== undefined ? (
-                        <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
+                        <SignInButton runtime={runtime.id} />
                       ) : stuck ? (
                         /*
                          * "Check again", not "Install again" (design agent,

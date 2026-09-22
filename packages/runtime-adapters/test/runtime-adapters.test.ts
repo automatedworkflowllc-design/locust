@@ -490,6 +490,31 @@ describe("installed runtime discovery", () => {
     expect(muse?.readiness).toBe("ready");
   });
 
+  it("looks where Muse looks when XDG_CONFIG_HOME is set", async () => {
+    /*
+     * Muse's bundled help (1.3.0): the config root is `$XDG_CONFIG_HOME/muse`,
+     * ELSE `$HOME/.config/muse`. On a machine with the variable set, a login
+     * writes under it, and a check of the home path alone would draw SIGN IN
+     * over somebody who had just signed in -- the exact complaint the check
+     * was written to answer.
+     */
+    const at = (existing: string) =>
+      discoverInstalledRuntimes({
+        runner: museRunner,
+        locator: newcomerLocator("muse"),
+        credentialLookup: { homeDirectory: "/home/dev", variables: { XDG_CONFIG_HOME: "/xdg" } },
+        statFile: async (path: string) => {
+          if (path.replace(/\\/g, "/") === existing) return { size: 64, mtimeMs: 1 };
+          throw new Error("ENOENT");
+        },
+      }).then((found) => found.filter((entry) => entry.id === "muse")[0]);
+
+    expect((await at("/xdg/muse/auth.json"))?.readiness).toBe("ready");
+    // The control: with the variable set, Muse does not read the home path,
+    // so a file left there is not a login Muse will use.
+    expect((await at("/home/dev/.config/muse/auth.json"))?.readiness).toBe("authentication-required");
+  });
+
   it("does not claim nobody signed in when it cannot look", async () => {
     // No home directory to look under is not evidence of anything. Guessing
     // SIGN IN there would be the same defect pointed the other way.

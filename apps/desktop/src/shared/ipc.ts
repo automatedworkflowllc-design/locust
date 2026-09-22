@@ -419,6 +419,16 @@ export type RuntimeInstallResponse =
        */
       readonly command?: string
     }
+/**
+ * Open a runtime's own sign-in in a window of its own. The renderer sends the
+ * runtime id only; main runs the command the install facts name, against the
+ * executable discovery found. See `main/runtime-sign-in.ts`.
+ */
+export const RUNTIME_SIGN_IN_CHANNEL = 'runtime:sign-in'
+
+export type RuntimeSignInResponse =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly what: string; readonly next: string }
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
@@ -1971,6 +1981,8 @@ export interface DesktopApi {
   installRuntime(runtime: string): Promise<RuntimeInstallResponse>
   /** npm output while an install runs. Returns the unsubscribe. */
   onRuntimeInstallProgress(listener: (progress: RuntimeInstallProgress) => void): () => void
+  /** Open the runtime's sign-in in its own window. */
+  signInRuntime(runtime: string): Promise<RuntimeSignInResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>

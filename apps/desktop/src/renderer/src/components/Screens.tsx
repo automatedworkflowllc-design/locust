@@ -46,7 +46,8 @@ import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
 import type { RecoverRoutine } from './RoutineRecovery.js'
-import { FREE_START_RUNTIME, installCommand, signInCommand } from '../../../shared/runtime-install.js'
+import { FREE_START_RUNTIME, installCommand } from '../../../shared/runtime-install.js'
+import { SignInButton } from './SignInButton.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
@@ -1638,9 +1639,7 @@ export function SettingsScreen({
                     * runtime is wrong -- drew the same red tag and stopped
                     * there (Grok's audit, 2026-09-13).
                     */}
-                  {status.tag === 'SIGN IN' && signInCommand(runtime.id) !== undefined && (
-                    <span className="lc-runtimecell__signin lc-mono">{signInCommand(runtime.id)}</span>
-                  )}
+                  {status.tag === 'SIGN IN' && <SignInButton runtime={runtime.id} />}
                 </div>
               )
             })}

@@ -89,6 +89,13 @@ interface IntegrationDefinition {
     readonly environment: readonly string[];
     /** Path segments under the user's home directory. */
     readonly homePath: readonly string[];
+    /**
+     * Path segments under `$XDG_CONFIG_HOME`, for a runtime that reads its
+     * config from there INSTEAD of the home path whenever it is set. Checking
+     * only the home path on such a machine would report SIGN IN to someone
+     * who has signed in.
+     */
+    readonly xdgConfigPath?: readonly string[];
   };
 }
 
@@ -279,10 +286,18 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
      * So Muse names the file itself. Checking whether it is there costs one
      * stat and settles the common case for free -- see `credentials` on the
      * definition type for why that matters more than it sounds.
+     *
+     * The path is confirmed by Muse's own bundled help (1.3.0, read out of
+     * the executable 2026-09-22): the config root is `$XDG_CONFIG_HOME/muse`,
+     * else `$HOME/.config/muse`, and it holds `settings.json`, `auth.json`
+     * and `trust.json`. `settings.json` alone exists after a first launch
+     * with no login, which is why the check is on `auth.json` and not on the
+     * folder.
      */
     credentials: {
       environment: ["META_API_KEY"],
       homePath: [".config", "muse", "auth.json"],
+      xdgConfigPath: ["muse", "auth.json"],
     },
     readinessCaveat: {
       code: "readiness-unverifiable",
@@ -463,8 +478,13 @@ export async function missingCredentials(
   for (const name of credentials.environment) {
     if ((lookup.variables[name] ?? "").trim().length > 0) return false;
   }
-  if (lookup.homeDirectory.length === 0) return false;
-  const path = [lookup.homeDirectory, ...credentials.homePath].join(sep);
+  const xdg = (lookup.variables.XDG_CONFIG_HOME ?? "").trim();
+  const path = credentials.xdgConfigPath !== undefined && xdg.length > 0
+    ? [xdg, ...credentials.xdgConfigPath].join(sep)
+    : lookup.homeDirectory.length === 0
+      ? undefined
+      : [lookup.homeDirectory, ...credentials.homePath].join(sep);
+  if (path === undefined) return false;
   try {
     await statFile(path);
     return false;

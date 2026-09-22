@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.258.0 - 2026-09-22
+
+- **SIGN IN is a button now.** A runtime that needs signing in used to print
+  a command and leave you to find a terminal. Press **Sign in** and Locust
+  opens the runtime's own sign-in in a window of its own; finish there, and
+  Locust checks again when you come back to it. It works for every runtime that
+  needs an account, in Settings and on the first screen.
+
+  A command-line tool cannot use the account your browser is signed in to, so
+  the sign-in itself stays, once per runtime. For Muse Code it is a code you
+  approve in the browser, which takes one click when you are already signed
+  in to Meta there.
+
+- **Muse Code is found signed in wherever it keeps its login.** On a machine
+  that sets `XDG_CONFIG_HOME`, Muse keeps its login there rather than in your
+  home folder, and Locust looked only in the home folder.
+
 ## 0.257.0 - 2026-09-22
 
 - **A command sent to the background says so.** Claude Code can be told not
