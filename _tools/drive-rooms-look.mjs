@@ -96,6 +96,21 @@ try {
   await drive.capture('open Rooms', () => drive.evaluate(openRooms))
   await drive.capture('the two titles, and the measure', () => drive.evaluate(ranks))
   await drive.capture('THE SILENT DISABLE: what the form says in each state', () => drive.evaluate(states))
+  await drive.capture('what the New room block costs, and what encloses it', () => drive.evaluate(`(() => {
+    const sections = [...document.querySelectorAll('.lc-settings__section')]
+    const block = sections[sections.length - 1]
+    if (!block) return 'no New room block'
+    const form = block.querySelector('.lc-roomform')
+    const style = form === null ? null : getComputedStyle(form)
+    return JSON.stringify({
+      blockHeightPx: Math.round(block.getBoundingClientRect().height),
+      formWidthPx: form === null ? null : Math.round(form.getBoundingClientRect().width),
+      // What, if anything, encloses the field/chips/button as one object.
+      formBackground: style === null ? null : style.backgroundColor,
+      formBorder: style === null ? null : style.borderStyle,
+      formPadding: style === null ? null : style.padding
+    })
+  })()`))
 } finally {
   await drive.finish({
     intro: 'The Rooms screen with three teammates and no rooms yet. Reads the screen title against the block heading, the paragraph measure, and what a disabled Create room says in each of the three states that disable it.'

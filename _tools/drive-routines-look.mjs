@@ -107,8 +107,18 @@ try {
     const first = document.querySelector('.lc-automations .lc-routinerow')
     if (!first) return 'no row'
     const face = first.querySelector('.lc-face')?.getBoundingClientRect()
-    const name = first.querySelector('.lc-routinerow__name')?.getBoundingClientRect()
-    if (!face || !name) return 'face or name missing'
+    // THE NAME'S FIRST LINE, not the name element.
+    //
+    // This measured against .lc-routinerow__name, which is the flex COLUMN
+    // holding the name and its meta -- so a face centred against the whole
+    // two-line block scored 0px apart while the screenshot showed it
+    // floating between the two lines. A check that agrees with itself and
+    // disagrees with the screen is worse than no check.
+    const line = first.querySelector('.lc-routinerow__name')?.firstChild
+    const range = line === undefined || line === null ? null : document.createRange()
+    if (range !== null && line !== null) range.selectNodeContents(line)
+    const name = range === null ? undefined : range.getBoundingClientRect()
+    if (!face || !name || name.height === 0) return 'face or name line missing'
     const apart = Math.round(Math.abs((face.top + face.height / 2) - (name.top + name.height / 2)))
     return apart < 14
       ? 'SAME LINE: centres ' + apart + 'px apart'

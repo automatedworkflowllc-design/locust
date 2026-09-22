@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.252.0 - 2026-09-22
+
+- **New room is a card.** The name field, the teammate chips and the Create
+  button used to sit loose on the screen with nothing holding them together,
+  so the button read as unrelated to the field above it. They are one object
+  now, in three parts: what a room is, what this one will be, and the button.
+  The teammate list has a label with the count beside it.
+- **A routine's owner sits beside its name**, not floating between the name
+  and the line under it — and the detail line no longer opens with a stray
+  "·" left over from when it ran on from the name.
+- **The Routines list keeps its distance from the window edge.** Remove was
+  flush against it, and on a narrow window it was cut off.
+
 ## 0.251.0 - 2026-09-22
 
 Routines and Rooms, read properly for the first time.

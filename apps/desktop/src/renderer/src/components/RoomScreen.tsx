@@ -558,20 +558,39 @@ export function RoomScreen({
                 at equal rank with neither subordinate. The screen is Rooms;
                 this names a block on it. */}
             <h2 className="lc-settings__heading lc-settings__heading--section lc-mono">New room</h2>
-            <p className="lc-settings__lede">
-              Name it and pick who is in it. A post goes to everyone in the room at once, each on their own
-              runtime and model; their answers land here, and each one opens the conversation it came from.
-            </p>
             {teammates.length === 0 ? (
               <p className="lc-settings__note">Make a teammate first; a room is a set of them.</p>
             ) : (
+              /*
+                * THE CARD, and the rule behind it.
+                *
+                * "A screen's content lives in a card; the pane is not a
+                * surface" -- the roster, the runtime panel, the activity
+                * fold, the receipt and the sidebar rows all obey it. This
+                * form did not: the field, the chips and the button sat
+                * straight on the pane with nothing binding them, so the
+                * button read as unrelated to the field it belongs to.
+                * MEASURED before the change: transparent background, no
+                * border, no padding.
+                *
+                * Three bands, because they answer three different
+                * questions: what a room IS, what this one will be, and the
+                * one thing to press. The action band sits on a lighter
+                * ground so the press is visibly the end of the form rather
+                * than another field.
+                */
               <form
-                className="lc-roomform"
+                className="lc-roomform lc-roomcardform"
                 onSubmit={(event) => {
                   event.preventDefault()
                   void create()
                 }}
               >
+                <p className="lc-roomcardform__about">
+                  Name it and pick who is in it. A post goes to everyone in the room at once, each on their own
+                  runtime and model; their answers land here, and each one opens the conversation it came from.
+                </p>
+                <div className="lc-roomcardform__fields">
                 <input
                   className="lc-roomform__name"
                   value={draftName}
@@ -580,13 +599,16 @@ export function RoomScreen({
                   aria-label="Room name"
                   maxLength={60}
                 />
-                {/* The count belongs where the ticking happens. Without it
-                    the only record of how many are on is the chips
-                    themselves, which is a thing to count rather than read --
-                    and the cap is eight. */}
-                <span className="lc-roomform__count lc-mono">
-                  {`${String(draftMembers.length)} of ${String(teammates.length)}`}
-                </span>
+                {/* The count belongs where the ticking happens, and beside
+                    a label rather than floating between the field and the
+                    chips -- which is where it landed first, belonging to
+                    neither. Seen in a drive, 2026-09-22. */}
+                <div className="lc-roomcardform__pick">
+                  <span>Teammates in this room</span>
+                  <span className="lc-roomform__count lc-mono">
+                    {`${String(draftMembers.length)} of ${String(teammates.length)}`}
+                  </span>
+                </div>
                 <div className="lc-roomform__members" role="group" aria-label="Teammates in the room">
                   {teammates.map((teammate) => {
                     const on = draftMembers.includes(teammate.teammateId)
@@ -620,7 +642,8 @@ export function RoomScreen({
                     {roomBlockedReason(draftName, draftMembers.length)}
                   </span>
                 )}
-                <div className="lc-roomform__actions">
+                </div>
+                <div className="lc-roomform__actions lc-roomcardform__action">
                   <button
                     type="submit"
                     className="lc-button is-active"

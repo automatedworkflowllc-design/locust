@@ -209,7 +209,12 @@ export function AutomationsScreen({
                 <span className="lc-routinerow__name" title={routine.steps.join(STEP_GAP)}>
                   {routine.name}
                   <span className="lc-routinerow__meta lc-mono">
-                    {' · '}
+                    {/* No leading separator. It was written when the meta
+                        ran on from the name on the same line; on its own
+                        line it opened with a dangling "·". Seen in a drive,
+                        2026-09-22 -- the measurements said nothing about it
+                        because a separator has a size and a colour like any
+                        other text. */}
                     {owner?.name ?? 'teammate removed'}
                     {' · '}
                     {/* The step count comes from `routineRunSummary`, which

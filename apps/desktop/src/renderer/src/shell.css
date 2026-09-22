@@ -2824,6 +2824,71 @@ textarea {
   gap: var(--lc-space-2);
 }
 
+/* ----------------------------------------------------------------------
+ * New room, as a card in three bands.
+ *
+ * The field, the chips and the button used to sit straight on the pane --
+ * measured: transparent background, no border, no padding -- so the button
+ * read as unrelated to the field above it. Every other surface in this app
+ * puts its content in a card; this screen was the exception.
+ *
+ * It costs height, and that is the honest trade: the block measured 214px
+ * before. Bands and padding buy the reading, and the screen scrolls.
+ * -------------------------------------------------------------------- */
+.lc-roomcardform {
+  gap: 0;
+  max-width: 620px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  overflow: hidden;
+}
+
+/*
+ * Band one: what a room is.
+ *
+ * NO max-width here, and that is deliberate after seeing it. A measure and
+ * a bottom border on the same element makes the border stop where the text
+ * stops, which reads as a broken divider rather than as a band. The card is
+ * 620px, which is already a reading measure; the band gets the full width
+ * and the prose fits inside it.
+ */
+.lc-roomcardform__about {
+  margin: 0;
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-bottom: 1px solid var(--lc-border-card);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/* The chips' own label, with the count beside it. */
+.lc-roomcardform__pick {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lc-space-3);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/* Band two: what this one will be. */
+.lc-roomcardform__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-5);
+}
+
+/*
+ * Band three: the one thing to press, on a lighter ground so it reads as
+ * the end of the form rather than another field.
+ */
+.lc-roomcardform__action {
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-card);
+  background: var(--lc-bg-raised-2);
+}
+
 .lc-roomform__actions {
   display: flex;
   align-items: center;
@@ -9007,6 +9072,16 @@ textarea {
 }
 
 /*
+ * No gap between rows on the SCREEN: the rows carry their own hairline, and
+ * a gap on top of a border reads as two different dividers. The roster
+ * card's list keeps its gap, because its rows have no border.
+ */
+.lc-automations > .lc-routinelist {
+  gap: 0;
+  margin-top: 0;
+}
+
+/*
  * Four things on a row: the teammate's face, the name, Run, and Edit/Remove.
  *
  * The columns said `1fr auto auto` -- three, written for a row with no face on
@@ -9097,12 +9172,35 @@ textarea {
  * tidied. A grid with fewer columns than children does not refuse; it wraps,
  * silently, and the cost shows up as height rather than as an error.
  */
+/*
+ * `align-items: start`, NOT center, and a drive taught me the difference.
+ *
+ * With `center` the owner's face sat vertically centred against the whole
+ * two-line block -- between the name and its meta, belonging to neither --
+ * and my own check called that "SAME LINE: centres 0px apart", because it
+ * compared the face's centre to the centre of the NAME ELEMENT, which is
+ * the flex column holding both lines. The measurement agreed with itself
+ * and disagreed with the screenshot. Looked at, 2026-09-22.
+ *
+ * The face belongs to the NAME, so it aligns with the first line.
+ */
 .lc-automations .lc-routinerow {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: var(--lc-space-3);
-  align-items: center;
-  padding: var(--lc-space-3) 0;
+  align-items: start;
+  padding: var(--lc-space-3) var(--lc-space-7);
   border-bottom: 1px solid var(--lc-border-hairline);
+}
+
+/* On the first line's optical centre, not the block's. */
+.lc-automations .lc-routinerow > .lc-face {
+  margin-top: 1px;
+}
+
+/* The controls sit on the name's line too, rather than drifting down. */
+.lc-automations .lc-routinerow > .lc-ghostbutton,
+.lc-automations .lc-routinerow > .lc-routinerow__meta {
+  align-self: start;
 }
 
 .lc-automations .lc-routinerow:last-child {
