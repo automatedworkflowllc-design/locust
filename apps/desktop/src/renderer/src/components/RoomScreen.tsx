@@ -82,6 +82,29 @@ export function roomFullNote(ticked: number): string | undefined {
 }
 
 /**
+ * Why Create room is not available, in the order a person hits them.
+ *
+ * SAME RULE, THREE BRANCHES, AND ONLY ONE SPOKE. The button is disabled on
+ * an empty name, on nobody ticked, and on more than eight ticked -- and the
+ * third one explained itself in amber with the number to untick while the
+ * first two were `opacity: 0.5` and silence. A person who has typed nothing
+ * yet can work out the first; a person who has typed a name and is looking
+ * at a row of teammates cannot tell whether the button is broken.
+ *
+ * `roomFullNote` keeps its own wording and its amber register: that one is
+ * about a cap the machine enforces. These two are about a step not taken
+ * yet, so they are quiet rather than amber -- see the register argument
+ * above, which resolves the other way for them.
+ */
+export function roomBlockedReason(name: string, ticked: number): string | undefined {
+  const full = roomFullNote(ticked)
+  if (full !== undefined) return full
+  if (name.trim().length === 0) return 'Name the room to create it.'
+  if (ticked === 0) return 'Pick at least one teammate.'
+  return undefined
+}
+
+/**
  * The people a post did not reach, as one line.
  *
  * A member with no mission used to get an ANSWER CARD with nothing in it --
@@ -515,7 +538,7 @@ export function RoomScreen({
         <div className="lc-screen__scroll">
           {rooms.length > 0 && (
             <section className="lc-settings__section">
-              <h2 className="lc-settings__heading">Your rooms</h2>
+              <h2 className="lc-settings__heading lc-settings__heading--section lc-mono">Your rooms</h2>
               <div className="lc-roomlist">
                 {rooms.map((entry) => (
                   <button key={entry.roomId} type="button" className="lc-roomcard" onClick={() => onSelectRoom(entry.roomId)}>
@@ -529,7 +552,12 @@ export function RoomScreen({
             </section>
           )}
           <section className="lc-settings__section">
-            <h2 className="lc-settings__heading">New room</h2>
+            {/* A section label, not a second screen title. `.lc-screen__title`
+                and `.lc-settings__heading` both set --lc-text-screen-title at
+                weight 500, so "Rooms" and "New room" sat one above the other
+                at equal rank with neither subordinate. The screen is Rooms;
+                this names a block on it. */}
+            <h2 className="lc-settings__heading lc-settings__heading--section lc-mono">New room</h2>
             <p className="lc-settings__lede">
               Name it and pick who is in it. A post goes to everyone in the room at once, each on their own
               runtime and model; their answers land here, and each one opens the conversation it came from.
@@ -552,6 +580,13 @@ export function RoomScreen({
                   aria-label="Room name"
                   maxLength={60}
                 />
+                {/* The count belongs where the ticking happens. Without it
+                    the only record of how many are on is the chips
+                    themselves, which is a thing to count rather than read --
+                    and the cap is eight. */}
+                <span className="lc-roomform__count lc-mono">
+                  {`${String(draftMembers.length)} of ${String(teammates.length)}`}
+                </span>
                 <div className="lc-roomform__members" role="group" aria-label="Teammates in the room">
                   {teammates.map((teammate) => {
                     const on = draftMembers.includes(teammate.teammateId)
@@ -576,8 +611,14 @@ export function RoomScreen({
                 </div>
                 {/* Said HERE, while the room is being built, because this
                   * is the only screen where the number can still be changed. */}
-                {roomFullNote(draftMembers.length) !== undefined && (
-                  <span className="lc-settings__note lc-tone-amber">{roomFullNote(draftMembers.length)}</span>
+                {roomBlockedReason(draftName, draftMembers.length) !== undefined && (
+                  <span
+                    className={`lc-settings__note${
+                      roomFullNote(draftMembers.length) === undefined ? '' : ' lc-tone-amber'
+                    }`}
+                  >
+                    {roomBlockedReason(draftName, draftMembers.length)}
+                  </span>
                 )}
                 <div className="lc-roomform__actions">
                   <button

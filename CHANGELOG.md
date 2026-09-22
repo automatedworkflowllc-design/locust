@@ -6,6 +6,34 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.251.0 - 2026-09-22
+
+Routines and Rooms, read properly for the first time.
+
+- **The page stops jumping when you open Routines.** Routines drew a
+  different header from every other screen — 129px against 60px — so
+  everything below the title dropped 69px on the way in and rose again on the
+  way out. Every list screen uses the same header now, and the count sits in
+  it. Measured: a 69px step, then none.
+- **A routine's name reads as the name.** The line beside it — the teammate,
+  the step count, when it last ran — was set at the same size and colour as
+  the name in a heavier typeface, so it won the line and the name lost it.
+  The name is now the larger of the two and the detail sits quietly under it.
+- **The owner's face sits beside the routine it belongs to**, instead of
+  alone on a line above it. A routine takes about a third less room as a
+  result: four now fit where three did.
+- **Remove looks destructive when you reach for it.** Run, Edit and Remove
+  were the same control in the same clothes; Remove turns red on hover.
+- **Rooms has one title, not two.** "Rooms" and "New room" were the same size
+  and weight, one above the other, so neither read as belonging to the other.
+- **Create room says why it is unavailable.** It refused on three counts and
+  explained only one of them: too many teammates named the number to untick,
+  while no name and nobody picked were a greyed-out button and silence. All
+  three say what is missing now, and the roster shows how many of them you
+  have ticked.
+- **Long paragraphs stop stretching to the window.** Settings and Rooms ledes
+  had no measure, so they got harder to read the wider you made the window.
+
 ## 0.250.0 - 2026-09-22
 
 - **A teammate on its own branch can read again.** In Ask or Plan mode, on

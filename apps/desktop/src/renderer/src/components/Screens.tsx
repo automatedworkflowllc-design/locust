@@ -50,7 +50,21 @@ import { FREE_START_RUNTIME, installCommand, signInCommand } from '../../../shar
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
-function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
+/**
+ * THE header for a list screen. Exported since 2026-09-22 because Routines
+ * had a second one.
+ *
+ * Routines rendered `.lc-screen__head` -- a flex column with a UI-font lede
+ * -- while Missions, Rooms and Memory rendered this 60px row. MEASURED on
+ * the packaged build: 60 / 60 / 129px, so everything below the title stepped
+ * down 69px on landing in Routines and back up on leaving. Colin: "why am I
+ * so triggered". A tab click is the most frequent gesture in the app, and it
+ * moved the page under him.
+ *
+ * One component, so a third form cannot appear by being written rather than
+ * imported.
+ */
+export function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
   return (
     <div className="lc-screen__header">
       <span className="lc-screen__title">{title}</span>

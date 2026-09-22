@@ -6,6 +6,7 @@ import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../
 import { NOTHING_TO_SAVE_YET, savableConversations, turnsLabel } from '../savableConversations.js'
 import type { SavableConversation } from '../savableConversations.js'
 import { Icon } from './Icon.js'
+import { ScreenHeader } from './Screens.js'
 import { PixelFace } from './PixelFace.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
 import type { RecoverRoutine } from './RoutineRecovery.js'
@@ -82,28 +83,35 @@ export function AutomationsScreen({
 
   return (
     <section className="lc-screen lc-automations" aria-label="Routines">
-      <header className="lc-screen__head">
-        {/*
-          * Called what every control on it already calls the object.
-          *
-          * `Save as routine`, `Edit routine`, `routineRunSummary` -- the app
-          * says routine everywhere except the one place a person reads first.
-          * "Automations" was the right word for a shelf holding two kinds of
-          * thing: routines you can run, and a read-only inventory of what you
-          * configured in the CLIs themselves. That second list has moved to
-          * Settings, under the runtime each fact belongs to, and Colin's
-          * reason for the broader word left with it (design agent,
-          * 2026-09-10).
-          */}
-        <h1 className="lc-screen__title">Routines</h1>
-        <p className="lc-screen__lede">
-          {routines.length === 0
-            ? 'Nothing saved yet.'
+      {/*
+        * Called what every control on it already calls the object.
+        *
+        * `Save as routine`, `Edit routine`, `routineRunSummary` -- the app
+        * says routine everywhere except the one place a person reads first.
+        * "Automations" was the right word for a shelf holding two kinds of
+        * thing: routines you can run, and a read-only inventory of what you
+        * configured in the CLIs themselves. That second list has moved to
+        * Settings, under the runtime each fact belongs to, and Colin's
+        * reason for the broader word left with it (design agent,
+        * 2026-09-10).
+        *
+        * THE SHARED HEADER, since 2026-09-22. This screen had its own --
+        * `.lc-screen__head`, a flex column with a UI-font lede -- and
+        * measured 129px against the 60px every other list screen uses, so
+        * the content under the title jumped 69px on a tab click. The count
+        * goes in the meta slot, in mono, because a count is machine output
+        * and that is what the slot is for.
+        */}
+      <ScreenHeader
+        title="Routines"
+        meta={
+          routines.length === 0
+            ? 'none saved'
             : `${String(routines.length)} saved · ${
                 scheduled === 0 ? 'none on a schedule' : `${String(scheduled)} on a schedule`
-              }`}
-        </p>
-      </header>
+              }`
+        }
+      />
 
       {notice !== undefined && (
         <p className="lc-claim lc-claim--hint lc-tone-amber">
@@ -234,7 +242,13 @@ export function AutomationsScreen({
                   <button type="button" className="lc-ghostbutton" onClick={() => onEditRoutine(routine)}>
                     Edit
                   </button>
-                  <button type="button" className="lc-ghostbutton" onClick={() => onRemoveRoutine(routine.routineId)}>
+                  {/* Named so it can differ on hover. Destructive and the
+                      point of the screen were the same control before. */}
+                  <button
+                    type="button"
+                    className="lc-ghostbutton lc-routinerow__remove"
+                    onClick={() => onRemoveRoutine(routine.routineId)}
+                  >
                     Remove
                   </button>
                 </span>

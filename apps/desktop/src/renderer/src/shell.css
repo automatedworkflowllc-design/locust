@@ -6052,37 +6052,23 @@ textarea {
 }
 
 /* ----------------------------------------------------------------------
- * The Automations screen's own header, and the three names under it.
+ * The Automations screen's remaining names.
  *
- * Written against `lc-screen__head`, `lc-screen__lede`, `lc-screen__note` and
- * `lc-section__title` -- four names this stylesheet never defined. A class
- * with no rule does not warn and does not fail; it simply draws nothing. So
- * the one screen in the app that has a lede was also the only screen with no
- * chrome bar, no hairline and no side padding: its title sat flush against
- * the window edge and its lede was body text at body size.
+ * `.lc-screen__head` and `.lc-screen__lede` LIVED HERE and are gone as of
+ * 2026-09-22. They were written in 2026-09-09 to fix the opposite problem --
+ * four class names this stylesheet never defined, so the one screen with a
+ * lede had no chrome bar, no hairline and no side padding, found by the
+ * `classes-are-styled` control. Giving them rules was right; giving them a
+ * SECOND header shape was not.
  *
- * Found 2026-09-09 by `classes-are-styled`, the control written the same day
- * after `lc-button--quiet` was styled in a component and defined nowhere.
- * It is the same defect class as the undefined `--lc-border` token: silent,
- * and it reads as a choice.
- *
- * A column rather than the 60px row every other screen uses, because this
- * header carries a second line and the row form would clip it.
+ * The note beside them read "a column rather than the 60px row every other
+ * screen uses, because this header carries a second line and the row form
+ * would clip it". MEASURED on the packaged build instead of reasoned about:
+ * the column came to 129px against 60, so landing on Routines pushed
+ * everything below the title down 69px and leaving pulled it back up.
+ * Colin: "why am I so triggered". The second line was not worth a moving
+ * page, and the row's meta slot holds the count without one.
  * -------------------------------------------------------------------- */
-.lc-screen__head {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--lc-space-2);
-  padding: var(--lc-space-5) var(--lc-space-7);
-  border-bottom: 1px solid var(--lc-border-hairline);
-  background: var(--lc-bg-chrome);
-}
-
-.lc-screen__lede {
-  font-size: var(--lc-text-description);
-  color: var(--lc-text-muted);
-}
 
 /* The closing note under the routines: quiet, and kept off the window edge
    the way every other block on this screen is. */
@@ -6399,8 +6385,38 @@ textarea {
   font-weight: 500;
 }
 
+/*
+ * A block's name, not a second screen title.
+ *
+ * `.lc-settings__heading` matches `.lc-screen__title` exactly -- same size
+ * token, same weight -- so on Rooms the words "Rooms" and "New room" sat one
+ * above the other at equal rank and neither read as belonging to the other.
+ * This drops the block name a register: smaller, muted, and in the machine
+ * voice the rest of the app uses for labels of this kind.
+ */
+.lc-settings__heading--section {
+  font-size: var(--lc-text-description);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+/* How many of the roster are ticked, beside the ticking. */
+.lc-roomform__count {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/*
+ * A MEASURE. This declared none, so the paragraph spanned whatever the
+ * scroll area gave it and got harder to read as the window got wider --
+ * which is the wrong way round. The exact figure is a normal reading
+ * measure; the finding was the absence.
+ */
 .lc-settings__lede {
   margin: 0 0 var(--lc-space-4);
+  max-width: 62ch;
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   text-wrap: pretty;
@@ -9046,9 +9062,6 @@ textarea {
  */
 .lc-routinerow__name {
   grid-column: 1 / -1;
-}
-
-.lc-routinerow__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -9061,6 +9074,85 @@ textarea {
  * without saying where it goes lands in one narrow cell and drags the rest of
  * the row out of shape. This says where it goes.
  */
+/* ----------------------------------------------------------------------
+ * The Routines SCREEN's own row, which is not the roster card's row.
+ *
+ * `.lc-routinerow` has two consumers and they have very different room.
+ * Inside a ~300px roster card the name takes a whole grid row on purpose --
+ * the note above `.lc-routinerow__name` records what squeezing four things
+ * onto one line there cost. On the Routines screen the same span leaves the
+ * owner's face alone in row 1 column 1 with two empty cells beside it, and
+ * spends three grid rows per routine.
+ *
+ * So the screen gets its own layout and the card keeps the one written for
+ * it: face, then the name over its own meta line, then the actions. Three
+ * routines fit in about the space one used.
+ * -------------------------------------------------------------------- */
+/*
+ * FOUR columns, because the row has four children.
+ *
+ * Three put the face, the name and Run on line one and wrapped the
+ * Edit/Remove group onto a second -- which made the row TALLER than the one
+ * it replaced (measured: 105px to 112px) while looking like it had been
+ * tidied. A grid with fewer columns than children does not refuse; it wraps,
+ * silently, and the cost shows up as height rather than as an error.
+ */
+.lc-automations .lc-routinerow {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--lc-space-3);
+  align-items: center;
+  padding: var(--lc-space-3) 0;
+  border-bottom: 1px solid var(--lc-border-hairline);
+}
+
+.lc-automations .lc-routinerow:last-child {
+  border-bottom: none;
+}
+
+/* Back into the middle column, one line, with its meta beneath it. */
+.lc-automations .lc-routinerow__name {
+  grid-column: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--lc-text-control);
+  font-weight: 500;
+  color: var(--lc-text-name);
+}
+
+/* The meta stops competing: smaller, muted, and on its own line. */
+.lc-automations .lc-routinerow__meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+
+/* The actions sit together at the end of the row rather than under it. */
+.lc-automations .lc-routinerow > .lc-ghostbutton,
+.lc-automations .lc-routinerow > .lc-routinerow__meta {
+  grid-column: auto;
+}
+
+.lc-automations .lc-routinerow > .lc-routinerow__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+}
+
+/*
+ * Remove is destructive and Run is the point of the screen, and the markup
+ * gave all three `lc-ghostbutton` -- one class, one appearance. Colour on
+ * HOVER only: a permanently red control in a list reads as a warning about
+ * the row rather than a thing you may press.
+ */
+.lc-automations .lc-routinerow__remove:hover,
+.lc-automations .lc-routinerow__remove:focus-visible {
+  border-color: var(--lc-red-border);
+  color: var(--lc-red-text);
+}
+
 .lc-routinerow > .lc-recovery {
   grid-column: 1 / -1;
   /* The inline overrides this used to carry, now that it is a real element in
@@ -9069,7 +9161,19 @@ textarea {
   margin-top: var(--lc-space-2);
 }
 
+/*
+ * A SIZE, not just a colour.
+ *
+ * This set `color` alone, so it inherited `body`'s 13.5px while `.lc-mono`
+ * swapped the family -- and it sits inside `.lc-routinerow__name`, which set
+ * no weight or colour either. Both halves therefore rendered at weight 400
+ * on `--lc-text-primary`, identical but for typeface, and mono reads heavier
+ * at equal size. So `· Jimothy · 1 step · run 1 time` won the line and the
+ * routine's own name, the thing you scan for, lost it. Colin's word for the
+ * result was "trashy".
+ */
 .lc-routinerow__meta {
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
 
