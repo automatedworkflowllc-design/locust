@@ -500,6 +500,7 @@ async function discoverOne(
   recall: RuntimeFactsCache | undefined,
   statFile: StatFile,
   environment: CredentialLookup,
+  readinessFromVersion: boolean,
 ): Promise<RuntimeDiscovery> {
   const executable = await locator.find(definition.commandName);
   if (!executable) {
@@ -554,14 +555,35 @@ async function discoverOne(
    */
   const fingerprint = recall === undefined ? undefined : await fingerprintOf(executable, statFile);
   const remembered = fingerprint === undefined ? undefined : recall?.get(fingerprint);
-  const [versionOutcome, capabilityOutcome, readinessOutcome, listedOutcome] = await Promise.all([
+  const versionAsked: Promise<ProbeOutcome> =
     remembered === undefined
       ? runProbe(runner, executable, "version", definition.versionArgs)
-      : Promise.resolve({ result: { stdout: remembered.versionText, stderr: "", exitCode: 0 } } as ProbeOutcome),
+      : Promise.resolve({ result: { stdout: remembered.versionText, stderr: "", exitCode: 0 } } as ProbeOutcome);
+  /*
+   * WHEN THE READINESS QUESTION IS THE VERSION QUESTION, ASK IT ONCE.
+   *
+   * Copilot and Muse have no free sign-in check, so their readiness command
+   * IS `--version` -- and it was spawned a second time beside the version
+   * probe, and again on every launch after the version was remembered.
+   * Measured at boot on Colin's machine (2026-09-22): Copilot 0.93 s, Muse
+   * 0.60 s, for an answer already in hand. The same outcome is read twice.
+   *
+   * And a runtime the CALLER does not run (`readinessFromVersion`) is not
+   * asked at all past its version: Gemini CLI's `--list-sessions` starts the
+   * whole CLI and was the slowest probe of every launch -- 3.2 s warm, 7.4 s
+   * cold -- for a runtime Locust lists as planned and cannot start a
+   * mission on. Its readiness logic stays here, tested, for the day it can.
+   */
+  const readinessIsVersion =
+    readinessFromVersion
+    || (definition.readinessArgs.length === definition.versionArgs.length
+      && definition.readinessArgs.every((arg, index) => arg === definition.versionArgs[index]));
+  const [versionOutcome, capabilityOutcome, readinessOutcome, listedOutcome] = await Promise.all([
+    versionAsked,
     remembered === undefined
       ? runProbe(runner, executable, "capabilities", definition.capabilityArgs)
       : Promise.resolve({ result: { stdout: remembered.capabilityText, stderr: "", exitCode: 0 } } as ProbeOutcome),
-    runProbe(runner, executable, "readiness", definition.readinessArgs),
+    readinessIsVersion ? versionAsked : runProbe(runner, executable, "readiness", definition.readinessArgs),
     definition.modelsArgs === undefined || sameCommand
       ? Promise.resolve(undefined)
       : runProbe(runner, executable, "models", definition.modelsArgs),
@@ -777,6 +799,18 @@ export interface DiscoverInstalledRuntimesOptions {
    */
   readonly staggerMs?: number;
   /**
+   * Runtimes whose sign-in state this caller does not use: their readiness
+   * is read from the version answer instead of spawning their own check.
+   * Locust passes the runtimes it lists but cannot run a mission on.
+   */
+  readonly readinessFromVersion?: ReadonlySet<string>;
+  /**
+   * Ask only these runtimes. For the moment a run is about to start on one
+   * runtime and its last answer has gone stale: that runtime is the only
+   * question, and asking all of them made the start wait for the slowest.
+   */
+  readonly only?: ReadonlySet<string>;
+  /**
    * What the binaries said last time, so a file that has not changed is not
    * asked its version and its help text again. Absent means ask everything,
    * which is what every caller but the app wants.
@@ -813,9 +847,10 @@ export interface DiscoverInstalledRuntimesOptions {
 export async function discoverInstalledRuntimes(
   options: DiscoverInstalledRuntimesOptions,
 ): Promise<readonly RuntimeDiscovery[]> {
-  const definitions = options.includeOmniRoute === false
+  const definitions = (options.includeOmniRoute === false
     ? DEFINITIONS.filter((definition) => definition.id !== "omniroute")
-    : DEFINITIONS;
+    : DEFINITIONS
+  ).filter((definition) => options.only === undefined || options.only.has(definition.id));
   const stagger = options.staggerMs ?? 0;
   const credentialLookup: CredentialLookup = options.credentialLookup ?? {
     homeDirectory: homedir(),
@@ -874,7 +909,15 @@ export async function discoverInstalledRuntimes(
           displayName: definition.displayName,
           bin: definition.commandName,
         });
-        const running = discoverOne(definition, options.runner, options.locator, options.recall, statFile, credentialLookup);
+        const running = discoverOne(
+          definition,
+          options.runner,
+          options.locator,
+          options.recall,
+          statFile,
+          credentialLookup,
+          options.readinessFromVersion?.has(definition.id) === true,
+        );
         if (stagger > 0) {
           void Promise.race([
             running.then(

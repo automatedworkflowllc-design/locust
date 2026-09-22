@@ -27,9 +27,18 @@ describe('a sweep that cannot learn is not run', () => {
 
   it('learns whether it is worth asking from every answer, and assumes yes until the first', () => {
     expect(APP).toContain('let unanswered = true')
-    expect(APP).toContain("return runtimes.some((entry) => entry.installed && entry.status !== 'ready')")
+    // Installed, runnable here, and not ready -- since 2026-09-22 a runtime
+    // Locust only lists (`planned`) is never waited on.
+    expect(APP).toContain("entry.installed && entry.status !== 'ready' && integrationOf(entry.id) !== 'planned'")
+    expect(APP).toContain('return unreadyRuntimes(runtimes).length > 0')
     // Once from the launch answer, once from every re-check.
     expect(APP.split('unanswered = worthAskingAgain(response.data.runtimes)').length - 1).toBe(2)
+  })
+
+  it('names the runtimes it is waiting on, so only those are asked', () => {
+    // One signed-out CLI used to mean a full sweep (~16 processes) on every
+    // return to the window (main-process audit, 2026-09-22).
+    expect(APP).toContain('.getLocalRuntimes(everything, everything || waitingOn.length === 0 ? undefined : waitingOn)')
   })
 
   it('leaves Check again sweeping everything', () => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { signInCommand } from '../../../shared/runtime-install.js'
+import { SIGN_IN_OPENED_EVENT } from '../signInEvents.js'
 
 /**
  * SIGN IN, as a button.
@@ -55,7 +56,11 @@ export function SignInButton({ runtime }: { readonly runtime: string }): ReactEl
         setState('opening')
         void bridge
           .signInRuntime(runtime)
-          .then((response) => setState(response.ok ? 'opened' : { failed: `${response.what} ${response.next}` }))
+          .then((response) => {
+            setState(response.ok ? 'opened' : { failed: `${response.what} ${response.next}` })
+            // The window asks again the moment the person comes back to it.
+            if (response.ok) window.dispatchEvent(new Event(SIGN_IN_OPENED_EVENT))
+          })
           .catch(() => setState({ failed: 'The sign-in window could not be opened. Run the command shown in a terminal.' }))
       }}
     >

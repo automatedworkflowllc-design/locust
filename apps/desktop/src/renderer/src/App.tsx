@@ -64,6 +64,7 @@ import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
+import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
@@ -125,7 +126,7 @@ import { splitAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, ACCOUNT_DEFAULT_MODEL} from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
@@ -504,9 +505,26 @@ const RUNTIME_RECHECK_MIN_GAP_MS = 10_000
  * the one that ran unconditionally 15 s after launch are skipped. Check
  * again still sweeps everything.
  */
-function worthAskingAgain(runtimes: readonly PublicRuntimeStatus[]): boolean {
-  return runtimes.some((entry) => entry.installed && entry.status !== 'ready')
+/**
+ * The runtimes a re-ask is for: installed, runnable here, and not ready.
+ *
+ * NAMED, so the host asks only these and keeps every other answer. A re-ask
+ * used to sweep everything whenever anything was unready, which with one
+ * signed-out CLI was ~16 processes on every return to the window, all
+ * session (main-process audit, 2026-09-22). A runtime Locust only lists
+ * (`planned`) is never waited on.
+ */
+function unreadyRuntimes(runtimes: readonly PublicRuntimeStatus[]): readonly string[] {
+  return runtimes
+    .filter((entry) => entry.installed && entry.status !== 'ready' && integrationOf(entry.id) !== 'planned')
+    .map((entry) => entry.id)
 }
+
+function worthAskingAgain(runtimes: readonly PublicRuntimeStatus[]): boolean {
+  return unreadyRuntimes(runtimes).length > 0
+}
+
+
 
 /**
  * How many lines of npm output to keep. Enough that the end of a failing
@@ -1997,12 +2015,22 @@ export default function App(): ReactElement {
     // True until the first answer says otherwise: an answer that never comes
     // is exactly the case to ask again about.
     let unanswered = true
+    // The latest answer, so a re-ask can name the runtimes it is for.
+    let known: readonly PublicRuntimeStatus[] = []
+    // A Sign in window was opened: the next return to this window asks at
+    // once, whatever the gap, because that is when the answer changes.
+    let signInOpened = false
+    const onSignInOpened = (): void => {
+      signInOpened = true
+    }
+    window.addEventListener(SIGN_IN_OPENED_EVENT, onSignInOpened)
     void bridge
       .getLocalRuntimes()
       .then((response) => {
         if (!active) return
         if (response.ok) {
           lastCheckedAt = response.data.checkedAt
+          known = response.data.runtimes
           unanswered = worthAskingAgain(response.data.runtimes)
         }
         setRuntimeState(
@@ -2048,8 +2076,9 @@ export default function App(): ReactElement {
     const askAgain = (everything = false): void => {
       if (!active || gaveUp) return
       lastAsked = Date.now()
+      const waitingOn = unreadyRuntimes(known)
       void bridge
-        .getLocalRuntimes(everything)
+        .getLocalRuntimes(everything, everything || waitingOn.length === 0 ? undefined : waitingOn)
         .then((response) => {
           if (!active || gaveUp) return
           /*
@@ -2074,6 +2103,7 @@ export default function App(): ReactElement {
           }
           const fresh = response.data.checkedAt !== lastCheckedAt
           lastCheckedAt = response.data.checkedAt
+          known = response.data.runtimes
           // A re-check must not make the screen go backwards: a probe that
           // has not answered yet keeps whatever the last sweep established.
           setRuntimeState((held) => ({
@@ -2119,6 +2149,11 @@ export default function App(): ReactElement {
       if (unanswered) askAgain()
     }, RUNTIME_RECHECK_MS)
     const onFocus = (): void => {
+      if (signInOpened) {
+        signInOpened = false
+        askAgain()
+        return
+      }
       if (unanswered && Date.now() - lastAsked >= RUNTIME_RECHECK_MIN_GAP_MS) askAgain()
     }
     // So an install can ask for a fresh answer the moment it finishes.
@@ -2313,6 +2348,7 @@ export default function App(): ReactElement {
       active = false
       clearTimeout(firstRecheck)
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener(SIGN_IN_OPENED_EVENT, onSignInOpened)
       removeMissionListener()
       frameBatcher.current.dispose()
       removeApprovalListener()

@@ -6,6 +6,30 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.260.0 - 2026-09-22
+
+- **Locust opens faster.** On a machine with every coding agent installed it
+  took 6.6–7 seconds to open; it now takes about 4.3. Most of the wait was
+  checks that could not change the answer: Gemini CLI, which Locust lists but
+  cannot run yet, was asked whether it was signed in on every launch and was
+  the slowest check of all; Copilot and Muse were asked a question whose
+  answer was already known; and finding Antigravity used a Windows command
+  that takes most of a second where another takes a twentieth. The loading
+  screen also lets go sooner once everything has answered.
+
+- **Sending after a break starts right away.** The first message after a few
+  quiet minutes used to wait while every coding agent was checked again —
+  3 to 6 seconds before anything happened. Now only the one your teammate
+  runs on is checked.
+
+- **Coming back to the window is lighter.** With one coding agent signed out,
+  every return to the window re-checked all of them. Now only the ones that
+  are not ready are checked, and pressing **Sign in** makes the next return
+  check at once.
+
+- **Check again always checks.** Pressed within ten seconds of the last
+  check, it could hand back that check's answer without asking anything.
+
 ## 0.259.0 - 2026-09-22
 
 - **A teammate's face is enough.** Conversations and rooms no longer print

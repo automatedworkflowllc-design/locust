@@ -600,6 +600,78 @@ describe("installed runtime discovery", () => {
     expect(gemini?.readiness).toBe("authentication-required");
   });
 
+  it("does not ask Gemini to sign in when the caller does not run it, and says nothing is wrong", async () => {
+    /*
+     * `--list-sessions` starts the whole CLI: 3.2 s warm and 7.4 s cold on
+     * Colin's machine, the slowest probe of every launch (2026-09-22), for a
+     * runtime Locust lists as planned. A caller that will never use the
+     * answer passes `readinessFromVersion` and the probe is not spawned.
+     */
+    const asked: string[] = [];
+    const runner: CommandRunner = {
+      run: async (command) => {
+        asked.push(command.purpose);
+        if (command.purpose === "version") return { exitCode: 0, stdout: "0.58.0", stderr: "" };
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: GEMINI_HELP, stderr: "" };
+        return { exitCode: 41, stdout: "", stderr: "Please set an Auth method" };
+      },
+    };
+    const [gemini] = (await discoverInstalledRuntimes({
+      runner,
+      locator: newcomerLocator("gemini"),
+      readinessFromVersion: new Set(["gemini"]),
+    })).filter((entry) => entry.id === "gemini");
+    expect(asked).not.toContain("readiness");
+    expect(gemini?.availability).toBe("available");
+    expect(gemini?.version?.version).toBe("0.58.0");
+    // The control is the test above: without the option, the same runner's
+    // readiness answer is read, and a signed-out Gemini says so.
+  });
+
+  it("asks only the runtimes it is told to, and spawns nothing for the rest", async () => {
+    // A run starting on one runtime needs one answer; the sweep that asked
+    // all of them made the start wait for the slowest (2026-09-22).
+    const asked: string[] = [];
+    const locator: ExecutableLocator = {
+      find: async (command) => {
+        asked.push(`find ${command}`);
+        return { ...nativeExecutable, commandName: command, discoveredPath: `C:\\tools\\${command}.exe`, executablePath: `C:\\tools\\${command}.exe` };
+      },
+    };
+    const runner: CommandRunner = {
+      run: async (command) => {
+        asked.push(`${command.purpose} ${command.executablePath}`);
+        return { exitCode: 0, stdout: "2.1.0 (Claude Code)", stderr: "" };
+      },
+    };
+    const found = await discoverInstalledRuntimes({ runner, locator, only: new Set(["claude"]) });
+    expect(found.map((entry) => entry.id)).toEqual(["claude"]);
+    expect(asked.every((line) => /claude/.test(line))).toBe(true);
+  });
+
+  it("asks a CLI whose readiness IS its version question once, not twice", async () => {
+    // Copilot's readiness is `--version`: it was spawned beside the version
+    // probe and again every launch after the version was remembered.
+    const COPILOT_HELP_FOR_READINESS =
+      "-p, --prompt <prompt>  --output-format <format> text | json  --allow-all-tools  --deny-tool <tools>  --session-id  --resume";
+    const asked: { readonly purpose: string; readonly args: readonly string[] }[] = [];
+    const runner: CommandRunner = {
+      run: async (command) => {
+        asked.push({ purpose: command.purpose, args: command.args });
+        return {
+          exitCode: 0,
+          stdout: command.purpose === "capabilities" ? COPILOT_HELP_FOR_READINESS : "GitHub Copilot CLI 1.0.82.",
+          stderr: "",
+        };
+      },
+    };
+    const [copilot] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("copilot") }))
+      .filter((entry) => entry.id === "copilot");
+    expect(copilot?.readiness).toBe("ready");
+    expect(asked.filter((entry) => entry.args.join(" ") === "--version")).toHaveLength(1);
+    expect(asked.map((entry) => entry.purpose)).not.toContain("readiness");
+  });
+
   it("reads Gemini CLI's sign-in state from its session listing's exit code", async () => {
     const answers = new Map<number, RuntimeReadiness>([[41, "authentication-required"], [0, "ready"]]);
     for (const [exitCode, expected] of answers) {

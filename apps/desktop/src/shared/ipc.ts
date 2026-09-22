@@ -138,6 +138,12 @@ export const SPLASH_DONE_CHANNEL = 'splash:done'
  */
 export type DiscoveryEvent =
   | { readonly kind: 'started'; readonly at: number }
+  /*
+   * Named runtimes asked again on their own -- a return to the window, or a
+   * run starting on a runtime whose answer had gone stale. Not a sweep, and
+   * not narrated by the boot screen; recorded so the log says what was asked.
+   */
+  | { readonly kind: 'reasked'; readonly ids: readonly string[]; readonly at: number }
   | {
       readonly kind: 'context'
       readonly version: string
@@ -1940,8 +1946,11 @@ export interface DesktopApi {
    * including whether npm is there, which is otherwise decided once per
    * session. That is the Check again path: the one repair the app offers
    * should be able to repair the npm reading too (Fable, pass 2, finding 3b).
+   *
+   * `only` asks just those runtimes again and keeps every other answer: the
+   * window's re-asks name the runtimes they are waiting on.
    */
-  getLocalRuntimes(fresh?: boolean): Promise<RuntimeDiscoveryResponse>
+  getLocalRuntimes(fresh?: boolean, only?: readonly string[]): Promise<RuntimeDiscoveryResponse>
   getMissionHistory(): Promise<MissionHistoryResponse>
   /** Remove a finished mission's record for good. Refused while it is live. */
   deleteMission(missionId: string): Promise<MissionDeleteResponse>

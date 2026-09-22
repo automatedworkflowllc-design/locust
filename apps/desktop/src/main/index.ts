@@ -86,6 +86,8 @@ import { createRuntimeFactsStore } from './runtime-facts.js'
 import { createRuntimeInstaller } from './runtime-installer.js'
 import { openSignIn } from './runtime-sign-in.js'
 import { freeRoutesOnly } from './free-routes.js'
+import { createStartReadiness } from './start-readiness.js'
+import { plannedRuntimes } from '../shared/runtime-integration.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
@@ -304,11 +306,20 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
        * "would be cool if we actually saw the terminal pop all those up."
        *
        * The stagger delays each probe's START, never its finish, and they
-       * overlap: the only cost is the last row beginning about a second
-       * later than it otherwise would, against probes that take seconds
-       * anyway. That second is the thing this screen exists to fill.
+       * overlap: the only cost is the last row beginning later than it
+       * otherwise would.
+       *
+       * 240 -> 70 on 2026-09-22, MEASURED: at 240 the sixth row (OpenCode,
+       * the slowest real probe at 2.3 s) did not start until 1.2 s into the
+       * sweep and set the end of it, and the whole launch took 6.6-7.0 s.
+       * Colin, the same day: "i want the users to have a seamless, fast
+       * experience". At 70 the rows still arrive one after another, visibly,
+       * which is the effect he asked for -- over half a second, not two.
        */
-      staggerMs: 240,
+      staggerMs: 70,
+      // Listed but not runnable here: their sign-in answer is never used,
+      // so it is not asked for (Gemini's was the slowest probe of a launch).
+      readinessFromVersion: plannedRuntimes(),
       /*
        * `started` reaches the window BEFORE the subprocess is spawned --
        * that is the whole contract. A screen told about the start and the
@@ -451,6 +462,7 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
   })()
     .then((value) => {
       discoveryCache = { at: Date.now(), value }
+      startReadiness.swept(value, Date.now())
       const ready = value.filter((runtime) => runtime.readiness === 'ready').length
       const needsYou = value.filter((runtime) => runtime.readiness === 'authentication-required').length
       discoveryLog.emit({ kind: 'finished', at: Date.now(), ready, needsYou })
@@ -488,21 +500,34 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
  */
 const READY_TO_START_TTL_MS = 5 * 60_000
 
-const discoverForStart = (runtimeId?: string): Promise<readonly RuntimeDiscovery[]> => {
-  const held = discoveryCache
-  if (runtimeId !== undefined && held !== undefined && Date.now() - held.at < READY_TO_START_TTL_MS) {
-    const chosen = held.value.find((entry) => entry.id === runtimeId)
-    if (
-      chosen !== undefined
-      && chosen.availability === 'available'
-      && chosen.readiness === 'ready'
-      && chosen.executable !== undefined
-    ) {
-      return Promise.resolve(held.value)
-    }
-  }
-  return discoverForWork()
-}
+const startReadiness = createStartReadiness({
+  ttlMs: READY_TO_START_TTL_MS,
+  now: () => Date.now(),
+  held: () => discoveryCache,
+  // The sweep's own clock is left alone: the other runtimes were not asked.
+  store: (value) => {
+    discoveryCache = { at: discoveryCache?.at ?? Date.now(), value }
+  },
+  sweep: discoverForWork,
+  askOne: async (runtimeId) => {
+    await runtimeFactsLoaded
+    const [fresh] = await discoverInstalledRuntimes({
+      runner: probeRunner,
+      locator: executableLocator,
+      includeOmniRoute: true,
+      recall: runtimeFacts,
+      readinessFromVersion: plannedRuntimes(),
+      only: new Set([runtimeId])
+    })
+    if (fresh !== undefined) discoveryLog.emit({ kind: 'reasked', ids: [runtimeId], at: Date.now() })
+    return fresh
+  },
+  // Not a CLI: its readiness is whether the app is open, asked by the host.
+  sweepOnly: new Set(['antigravity'])
+})
+
+/** See start-readiness.ts: a stale answer is refreshed for the starting runtime alone. */
+const discoverForStart = (runtimeId?: string): Promise<readonly RuntimeDiscovery[]> => startReadiness.forStart(runtimeId)
 
 /**
  * Can npm be run from here?
@@ -1553,6 +1578,7 @@ if (!ownsSingleInstanceLock) {
       systemNpm: npmPresent,
       nowInstalled: async (runtime) => {
         discoveryCache = undefined
+        runtimeDiscovery.invalidate()
         const found = await discoverForWork()
         return found.some((entry) => entry.id === runtime && entry.availability === 'available')
       }
@@ -1604,6 +1630,7 @@ if (!ownsSingleInstanceLock) {
         // so dropping that is enough for the next ask to be a real one.
         closed: () => {
           discoveryCache = undefined
+          runtimeDiscovery.invalidate()
         }
       })
     })
@@ -2088,7 +2115,7 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
-    ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, (event, fresh: unknown) => {
+    ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, async (event, fresh: unknown, only: unknown) => {
       /*
        * `fresh` DROPS EVERY CACHED ANSWER, INCLUDING THE ONE ABOUT npm.
        *
@@ -2115,6 +2142,11 @@ if (!ownsSingleInstanceLock) {
         npmSeen = undefined
         npmAnswered = true
         discoveryCache = undefined
+        // AND the service's own ten-second answer, which this used to leave
+        // standing: Check again pressed within ten seconds of a sweep got
+        // that sweep back without asking anything (main-process audit,
+        // 2026-09-22).
+        runtimeDiscovery.invalidate()
       }
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
@@ -2125,6 +2157,41 @@ if (!ownsSingleInstanceLock) {
             message: 'Local runtime discovery could not complete.'
           }
         } as const
+      }
+      /*
+       * ASK AGAIN ABOUT THE ONES THAT ARE NOT READY, NOT ABOUT EVERYTHING.
+       *
+       * Returning to the window re-swept every runtime whenever one was not
+       * ready -- so one signed-out CLI meant ~16 processes on every alt-tab,
+       * all session (main-process audit, 2026-09-22; Muse sat signed out on
+       * Colin's machine all afternoon). The window now names the runtimes it
+       * is waiting on and only those are asked; the rest keep their answer.
+       */
+      const named = Array.isArray(only) ? only.filter((id): id is string => typeof id === 'string').slice(0, 16) : []
+      const cached = discoveryCache
+      if (fresh !== true && named.length > 0 && cached !== undefined) {
+        try {
+          await runtimeFactsLoaded
+          const wanted = new Set(named)
+          const [asked, antigravity] = await Promise.all([
+            discoverInstalledRuntimes({
+              runner: probeRunner,
+              locator: executableLocator,
+              includeOmniRoute: true,
+              recall: runtimeFacts,
+              readinessFromVersion: plannedRuntimes(),
+              only: wanted
+            }),
+            wanted.has('antigravity') ? antigravityProbe.discoveryRecord().catch(() => undefined) : Promise.resolve(undefined)
+          ])
+          const answers = new Map([...asked, ...(antigravity === undefined ? [] : [antigravity])].map((entry) => [entry.id, entry]))
+          discoveryCache = { at: Date.now(), value: cached.value.map((entry) => answers.get(entry.id) ?? entry) }
+          startReadiness.swept([...answers.values()], Date.now())
+          runtimeDiscovery.invalidate()
+          discoveryLog.emit({ kind: 'reasked', ids: [...answers.keys()], at: Date.now() })
+        } catch {
+          // A failed partial ask changes nothing; the answer below is the held one.
+        }
       }
       return runtimeDiscovery.get()
     })
@@ -3985,6 +4052,15 @@ ${taskSection({
       replayDiscoveryToWindow()
       // The sweep may begin: there is somebody to watch it now.
       windowIsUp()
+      /*
+       * AND IT DOES BEGIN, rather than waiting to be asked.
+       *
+       * The first sweep used to start when the app's renderer asked for it,
+       * which is after its whole bundle has loaded and run: measured 0.84 s
+       * into a launch, with the window itself there at 0.37 s (2026-09-22).
+       * The renderer's ask now joins the sweep already under way.
+       */
+      void discoverForWork().catch(() => undefined)
     })
 
     app.on('activate', () => {

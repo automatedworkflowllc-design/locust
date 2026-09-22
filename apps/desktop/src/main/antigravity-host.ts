@@ -119,8 +119,10 @@ function powershell(script: string): Promise<string> {
 }
 
 async function listProcessesWindows(): Promise<readonly { readonly pid: number; readonly commandLine: string }[]> {
+  // Filtered by WMI itself, not piped through Where-Object: measured 328 ms
+  // against 392 ms for the same answer (2026-09-22).
   const out = await powershell(
-    "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'language_server*' } | ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }"
+    "Get-CimInstance Win32_Process -Filter \"Name LIKE 'language_server%'\" | ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }"
   )
   return out
     .split(/\r?\n/)
@@ -133,14 +135,39 @@ async function listProcessesWindows(): Promise<readonly { readonly pid: number; 
     .filter((entry) => Number.isFinite(entry.pid))
 }
 
-async function listeningPortsWindows(pid: number): Promise<readonly number[]> {
-  const out = await powershell(
-    `Get-NetTCPConnection -OwningProcess ${String(pid)} -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $_.LocalPort }`
-  )
-  return out
-    .split(/\r?\n/)
-    .map((line) => Number(line.trim()))
-    .filter((port) => Number.isFinite(port) && port > 0)
+/**
+ * The ports a process listens on, from `netstat -ano`.
+ *
+ * It was `Get-NetTCPConnection`, which loads a PowerShell module before it
+ * answers: 724 ms measured on Colin's machine (2026-09-22), the largest part
+ * of Antigravity's 1.7 s check on every launch. `netstat -ano -p TCP` says
+ * the same in 48 ms.
+ *
+ * Read by SHAPE, not by word: netstat translates its state column ("LISTENING"
+ * is "ABHÖREN" in German), so a listening socket is told by its empty remote
+ * end -- `0.0.0.0:0`, or `[::]:0` -- which every locale prints the same.
+ */
+export function listeningPortsIn(netstat: string, pid: number): readonly number[] {
+  const ports = new Set<number>()
+  for (const line of netstat.split(/\r?\n/)) {
+    const columns = line.trim().split(/\s+/)
+    if (columns.length < 5 || !/^tcp/i.test(columns[0] ?? '')) continue
+    if (Number(columns[columns.length - 1]) !== pid) continue
+    const remote = columns[2] ?? ''
+    if (!/^(0\.0\.0\.0|\[::\]):0$/.test(remote)) continue
+    const local = columns[1] ?? ''
+    const port = Number(local.slice(local.lastIndexOf(':') + 1))
+    if (Number.isInteger(port) && port > 0) ports.add(port)
+  }
+  return [...ports]
+}
+
+function listeningPortsWindows(pid: number): Promise<readonly number[]> {
+  return new Promise((resolve) => {
+    execFile('netstat.exe', ['-ano', '-p', 'TCP'], { timeout: 10_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true }, (_error, stdout) =>
+      resolve(listeningPortsIn(String(stdout), pid))
+    )
+  })
 }
 
 /**
@@ -251,15 +278,27 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
         .filter((entry): entry is { pid: number; parsed: NonNullable<ReturnType<typeof parseServerCommandLine>> } => entry.parsed !== undefined)
       for (const server of servers) {
         const ports = await listeningPorts(server.pid)
-        for (const port of ports) {
+        /*
+         * Every port asked AT ONCE, and the first that answers in port order
+         * wins -- the same answer the one-at-a-time loop gave. The language
+         * server listens on two here, and the loop paid a CLI start for the
+         * wrong one before it tried the right one (2026-09-22).
+         */
+        const answers = await Promise.all(
+          ports.map((port) =>
+            // A probe that cannot succeed: the one thing it proves is whether
+            // this port speaks the RPC at all. The wrong port answers with a
+            // connection error; the right one with a clean "not found".
+            run(executablePath, ['agentapi', 'get-conversation-metadata', '00000000-0000-0000-0000-000000000000'], {
+              ANTIGRAVITY_LS_ADDRESS: `localhost:${String(port)}`,
+              ANTIGRAVITY_CSRF_TOKEN: server.parsed.csrfToken
+            })
+          )
+        )
+        for (const [index, port] of ports.entries()) {
           const address = `localhost:${String(port)}`
-          // A probe that cannot succeed: the one thing it proves is whether
-          // this port speaks the RPC at all. The wrong port answers with a
-          // connection error; the right one with a clean "not found".
-          const result = await run(executablePath, ['agentapi', 'get-conversation-metadata', '00000000-0000-0000-0000-000000000000'], {
-            ANTIGRAVITY_LS_ADDRESS: address,
-            ANTIGRAVITY_CSRF_TOKEN: server.parsed.csrfToken
-          })
+          const result = answers[index]
+          if (result === undefined) continue
           const text = `${result.stdout}\n${result.stderr}`
           if (/connection error|wsarecv|is not set/i.test(text)) continue
           let projects: ReadonlyMap<string, string> = new Map()

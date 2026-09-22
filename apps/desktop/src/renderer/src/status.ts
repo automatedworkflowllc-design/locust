@@ -1,4 +1,6 @@
 import { FREE_START_RUNTIME, installSentence } from '../../shared/runtime-install.js'
+import { integrationOf, RUNTIME_INTEGRATION } from '../../shared/runtime-integration.js'
+import type { IntegrationLevel } from '../../shared/runtime-integration.js'
 import { hostCanRunMission, isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import { faceLabel, teammateActivity } from './faceState.js'
 import type { FaceActivity, LiveActivity } from './faceState.js'
@@ -37,56 +39,9 @@ export type RouteTag =
   | 'PLANNED'
   | 'EXPERIMENTAL'
 
-/** How far a runtime's integration actually goes in this build. */
-export type IntegrationLevel =
-  /** Can own a live mission end to end today. */
-  | 'live'
-  /** Discovered and selectable, but the adapter is not finished. */
-  | 'preview'
-  /**
-   * Runs a mission end to end, but through a reverse-engineered surface
-   * that its vendor did not publish and may change without notice. Said on
-   * the row, so nobody mistakes it for a supported route.
-   */
-  | 'experimental'
-  /** Drawn in the design, not implemented at all. */
-  | 'planned'
-
-/**
- * How far each integration actually goes, in ONE place.
- *
- * This lived in three files -- the route picker, Settings and the first-launch
- * panel -- and drifted the moment a runtime was added. On 2026-09-02 the same
- * screen showed Cursor Agent as READY in Settings and PLANNED in the welcome
- * panel, which is precisely the "you can always tell what is really in play"
- * claim failing at the only moment a newcomer looks. A new runtime is now one
- * edit, not three.
- */
-export const RUNTIME_INTEGRATION: Readonly<Record<string, IntegrationLevel>> = {
-  codex: 'live',
-  claude: 'live',
-  cursor: 'live',
-  opencode: 'live',
-  copilot: 'live',
-  antigravity: 'experimental',
-  /*
-   * Muse Code owns a mission end to end and its runs are as durable as any
-   * other -- measured twice through the real builder, runner and normalizer
-   * on the free echo provider. What is NOT measured is a run under a paying
-   * provider: no tool call has ever been seen, so the tool rows are built on
-   * the captured lifecycle and not on a captured tool. That is the gap the
-   * PREVIEW row names, and it closes the first time someone runs a real
-   * mission on it.
-   */
-  muse: 'preview',
-  gemini: 'planned',
-  omniroute: 'planned'
-}
-
-/** What a runtime this build does not know should be treated as. */
-export function integrationOf(runtimeId: string): IntegrationLevel {
-  return RUNTIME_INTEGRATION[runtimeId] ?? 'planned'
-}
+// The integration map moved to shared/ so the main process can read it too.
+export { integrationOf, RUNTIME_INTEGRATION }
+export type { IntegrationLevel }
 
 export interface RouteRowStatus {
   readonly tag: RouteTag

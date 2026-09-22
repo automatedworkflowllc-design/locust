@@ -12,10 +12,19 @@ import { integrationOf } from './status.js'
 
 export type BootPhase = 'idle' | 'probing' | 'settling' | 'settled' | 'dissolving' | 'gone'
 
-/** The beat before the settle, so the screen does not flinch at the last result. */
-export const SETTLE_DELAY_MS = 380
+/**
+ * The beat before the settle, so the screen does not flinch at the last result.
+ *
+ * SHORTER SINCE 2026-09-22. Measured end to end on Colin's machine, the
+ * ceremony after the last runtime answered was 1.96 s of a 6.7 s launch --
+ * the single largest fixed cost once the runtimes were found. Colin, the
+ * same day: "i want the users to have a seamless, fast experience". The
+ * settle and the dissolve are the animations and keep their lengths; the
+ * pause before (380 -> 200) and the hold after (900 -> 350) were waiting.
+ */
+export const SETTLE_DELAY_MS = 200
 export const SETTLE_MS = 420
-export const SETTLED_HOLD_MS = 900
+export const SETTLED_HOLD_MS = 350
 export const DISSOLVE_MS = 260
 /** Past this a counter stops being reassurance and starts being a worry. */
 export const STALLED_AFTER_MS = 6_000
