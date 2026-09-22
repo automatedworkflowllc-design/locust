@@ -28,6 +28,7 @@ Each exits non-zero on any failed assertion, and each kills the app it started.
 | `opencode-smoke.mjs` | OpenCode as a route on a FREE model: picked through the UI, a read-only run that cannot write, a write run whose edit shows in the diff view, ledgers signed by the OpenCode normalizer naming the session | paid providers through OpenCode | **no** |
 | `copilot-smoke.mjs` | Copilot CLI as a route (Auto): the same read-only / write pair, session id minted by the host | model choice (Copilot picks) | yes (two premium requests) |
 | `antigravity-smoke.mjs` | the experimental route: Antigravity open with a folder, Gemini Flash picked (rows tagged EXPERIMENTAL), a write mission whose file really appears, ledger signed by the Antigravity normalizer naming the conversation | read-only (there is none), follow-ups | yes (one flash conversation) |
+| `muse-echo-smoke.mjs` | Muse Code end to end on its FREE echo provider: the real command builder, the real process runner and the real normalizer, read-only and workspace-write | anything under a paying provider -- the echo provider never calls a model or uses a tool | **no** |
 | `update-smoke.mjs` | the packaged build asks the real release channel and gets an answer: `Up to date.` when it matches the newest release, or the version it found | that an install actually completes | **no** (network only) |
 | `packaged-smoke.mjs` | the built `Locust.exe` from its asar: it boots, discovery finds the CLIs with PATH cut to System32, renderer egress is refused, brand faces load | anything needing a provider run | **no** |
 

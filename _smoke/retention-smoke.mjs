@@ -172,6 +172,25 @@ try {
     const nav = [...document.querySelectorAll('button')].find(b => /^settings$/i.test(b.innerText.trim()))
     if (!nav) return JSON.stringify({ found: false })
     nav.click()
+    await new Promise(r => setTimeout(r, 900))
+    /*
+     * SETTINGS IS PAGED, and this smoke predates that.
+     *
+     * It opens on "Your workspace"; Privacy & local data and Trash are both
+     * on "This app" (settingsPages.ts). So every assertion below the first
+     * was reading a page that does not contain what it was looking for, and
+     * reported "never measured" -- seven failures that were the harness
+     * standing on the wrong screen, not the product.
+     *
+     * A miss says which pages WERE there, so the next rename is one run to
+     * diagnose rather than a guess.
+     */
+    const page = [...document.querySelectorAll('button, a, [role=tab]')].find(n => n.innerText.trim() === 'This app')
+    if (!page) {
+      const pages = [...document.querySelectorAll('button, [role=tab]')].map(n => n.innerText.trim()).filter(Boolean).join(' / ')
+      return JSON.stringify({ found: false, value: 'no "This app" page in Settings; pages seen: ' + pages.slice(0, 200) })
+    }
+    page.click()
     for (let i = 0; i < 80; i += 1) {
       await new Promise(r => setTimeout(r, 250))
       const label = [...document.querySelectorAll('.lc-receipt dt')].find(n => /^on disk$/i.test(n.innerText.trim()))

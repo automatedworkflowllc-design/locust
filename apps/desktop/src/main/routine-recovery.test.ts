@@ -30,7 +30,23 @@ async function fixture() {
   const restart = () => createRoutineRunner({ ...options, routines: createRoutineStore({ rootDirectory: directory }) })
   const read = () => createRoutineStore({ rootDirectory: directory }).get(routine.routineId)
   const disk = async () => JSON.parse(await readFile(join(directory, 'routines.json'), 'utf8')) as { routines: PublicRoutine[] }
-  return { directory, routine, store, phases, start, notify, options, restart, read, disk }
+  /*
+   * EVERY TICK RELATIVE TO THE ROUTINE'S OWN CREATION, not to the wall clock.
+   *
+   * These read `new Date()` and `Date.now()` while the routine under test had
+   * its `createdAt` stamped from the real clock a few milliseconds earlier,
+   * so every due/not-due assertion sat on a boundary whose two sides came
+   * from two different readings of the same clock. Under a loaded parallel
+   * run those readings drift, which is the shape of a flake -- both these
+   * files were on the handoff's flaky list.
+   *
+   * NOT a reproduction: they passed alone three times and in the full suite
+   * every run tonight, and a fix claimed for a failure nobody has seen is a
+   * guess. What this removes is the DEPENDENCE. The assertions are unchanged
+   * and still mean what they meant; they just no longer ask the clock twice.
+   */
+  const at = (afterMs: number): Date => new Date(Date.parse(routine.createdAt) + afterMs)
+  return { directory, routine, store, phases, start, notify, options, restart, read, disk, at }
 }
 
 describe('durable routine recovery — policy (c)', () => {
@@ -43,7 +59,7 @@ describe('durable routine recovery — policy (c)', () => {
     // This assertion goes red against the old RAM-only implementation.
     expect((await f.read())?.execution).toMatchObject({ step: 2, missionId: 'mission_2', status: 'running' })
     const next = f.restart()
-    await next.tick(new Date())
+    await next.tick(f.at(0))
     expect((await f.read())?.execution).toMatchObject({ step: 2, status: 'held', canContinue: false })
     expect(f.start).toHaveBeenCalledTimes(2)
     expect(await next.run(f.routine.routineId)).toMatchObject({ ok: false })
@@ -60,10 +76,10 @@ describe('durable routine recovery — policy (c)', () => {
     f.phases.set('mission_1', 'completed')
     await runner.onRunEnded({ missionId: 'mission_1' })
     const next = f.restart()
-    await next.tick(new Date()) // Not due yet: reconciliation must still run.
+    await next.tick(f.at(0)) // Not due yet: reconciliation must still run.
     expect((await f.read())?.execution?.status).toBe('held')
     f.phases.set('mission_2', 'completed') // Runtime finished while Electron was gone.
-    await next.tick(new Date(Date.now() + 60_000))
+    await next.tick(f.at(60_000))
     expect((await f.read())?.execution?.canContinue).toBe(true)
     expect(f.start).toHaveBeenCalledTimes(2) // Only reconciliation retried, never effects.
     expect(f.notify).toHaveBeenCalledWith({ kind: 'routine-recovery-changed' })
@@ -76,7 +92,7 @@ describe('durable routine recovery — policy (c)', () => {
     expect((await f.disk()).routines[0]).toMatchObject({ runs: 1, lastRunAt: expect.any(String) })
     expect((await f.disk()).routines[0]?.execution).toBeUndefined()
     await next.onRunEnded({ missionId: 'mission_3' })
-    await f.restart().tick(new Date())
+    await f.restart().tick(f.at(0))
     expect((await f.read())?.runs).toBe(1)
   })
 
@@ -88,7 +104,7 @@ describe('durable routine recovery — policy (c)', () => {
       throw new Error('crash after spawn')
     })
     await expect(f.restart().run(f.routine.routineId)).rejects.toThrow('crash after spawn')
-    await f.restart().tick(new Date(Date.now() + 4 * 86_400_000))
+    await f.restart().tick(f.at(4 * 86_400_000))
     expect((await f.read())?.execution).toMatchObject({ status: 'held', canContinue: false, reason: expect.stringContaining('uncertain') })
     expect(f.start).toHaveBeenCalledTimes(1)
   })
@@ -105,7 +121,7 @@ describe('durable routine recovery — policy (c)', () => {
     })
     await expect(createRoutineRunner(f.options).run(f.routine.routineId)).rejects.toThrow('receipt write failed')
     expect((await f.read())?.execution?.status).toBe('dispatching')
-    await f.restart().tick(new Date())
+    await f.restart().tick(f.at(0))
     expect((await f.read())?.execution?.status).toBe('held')
     expect(f.start).toHaveBeenCalledTimes(1)
   })
@@ -115,8 +131,8 @@ describe('durable routine recovery — policy (c)', () => {
     await f.store.update({ routineId: f.routine.routineId, name: 'Release', steps: ['Only step.'] })
     await f.restart().run(f.routine.routineId)
     f.phases.set('mission_1', 'completed')
-    await f.restart().tick(new Date())
-    await f.restart().tick(new Date())
+    await f.restart().tick(f.at(0))
+    await f.restart().tick(f.at(0))
     expect((await f.read())?.runs).toBe(1)
     expect((await f.read())?.execution).toBeUndefined()
     expect(f.start).toHaveBeenCalledTimes(1)
@@ -164,7 +180,7 @@ describe('durable routine recovery — policy (c)', () => {
     const execution = (await f.read())!.execution!
     expect(await next.recover({ routineId: f.routine.routineId, attemptId: execution.attemptId, step: execution.step, decision: 'continue' })).toMatchObject({ ok: false })
     expect(await next.recover({ routineId: f.routine.routineId, attemptId: execution.attemptId, step: execution.step, decision: 'abandon' })).toEqual({ ok: true })
-    await f.restart().tick(new Date(Date.now() + 4 * 86_400_000))
+    await f.restart().tick(f.at(4 * 86_400_000))
     expect((await f.read())?.execution?.status).toBe('abandoned')
     expect((await f.read())?.schedule).toBeUndefined()
     expect((await f.read())?.runs).toBe(0)
@@ -200,7 +216,7 @@ describe('durable routine recovery — policy (c)', () => {
     const f = await fixture()
     const file = await f.disk()
     await writeFile(join(f.directory, 'routines.json'), JSON.stringify({ ...file, routines: [{ ...file.routines[0], execution: { nonsense: true } }] }))
-    await f.restart().tick(new Date(Date.now() + 4 * 86_400_000))
+    await f.restart().tick(f.at(4 * 86_400_000))
     expect((await f.read())?.execution?.status).toBe('held')
     expect(f.start).not.toHaveBeenCalled()
   })
@@ -236,7 +252,10 @@ describe('durable routine recovery — policy (c)', () => {
   it('a returned spawn-boundary failure remains uncertain and does not use routine-blocked retry wording', async () => {
     const f = await fixture()
     f.start.mockResolvedValue({ ok: false, error: { code: 'RUNTIME_START_FAILED', message: 'spawn result unavailable' } })
-    const later = new Date(Date.now() + 7 * 3_600_000)
+    // Seven hours past the routine's own creation, so it is due -- measured
+    // from the same instant the routine was stamped with, not from a second
+    // reading of the wall clock.
+    const later = f.at(7 * 3_600_000)
     const runner = f.restart()
     await runner.tick(later)
     await runner.tick(new Date(later.getTime() + 60_000))
@@ -253,7 +272,7 @@ describe('durable routine recovery — policy (c)', () => {
     f.phases.set('mission_1', 'completed')
     vi.spyOn(f.store, 'recordRun').mockRejectedValueOnce(new Error('disk full'))
     await expect(runner.onRunEnded({ missionId: 'mission_1' })).rejects.toThrow('disk full')
-    await runner.tick(new Date())
+    await runner.tick(f.at(0))
     expect((await f.read())?.runs).toBe(1)
     expect((await f.read())?.execution).toBeUndefined()
     expect(f.start).toHaveBeenCalledTimes(1)
