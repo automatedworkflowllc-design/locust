@@ -832,6 +832,21 @@ export type ThreadItem =
       readonly touchedNothing?: boolean
       readonly steps: readonly PlanStep[]
       readonly doneCount: number
+      /**
+       * Whether the run this plan belongs to has ENDED.
+       *
+       * A plan's last state is whatever the runtime last sent. A run that
+       * stops -- finished, failed, cancelled -- without a closing
+       * `plan.updated` therefore leaves its unfinished steps exactly as they
+       * were, and `pending` under a finished answer reads as "still to
+       * come" about work that is never coming.
+       *
+       * The card is told, rather than the steps being rewritten. Marking
+       * them done would be a lie about what happened, and dropping them
+       * would hide that the run planned something it did not do -- which is
+       * often the most useful thing on the card.
+       */
+      readonly finished?: boolean
     }
   | {
       /**
@@ -2342,6 +2357,7 @@ export function buildThread(
       type: 'plan',
       steps: planSteps.steps,
       doneCount: planSteps.doneCount,
+      ...(options.running ? {} : { finished: true }),
       // A turn that ran nothing planned and stopped. Anything else has
       // changed something, whatever its plan says.
       ...(activity.length === 0 ? { touchedNothing: true } : {})

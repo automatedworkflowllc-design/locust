@@ -49,12 +49,38 @@ const BEFORE: Readonly<Record<string, Readonly<Record<string, readonly string[]>
 }
 
 describe('a runtime declares what it can do', () => {
-  it('answers exactly as the if-chain did, for every runtime that already existed', () => {
+  /*
+   * DELIBERATELY CHANGED SINCE, and named here rather than edited out of
+   * BEFORE. The table above is the historical record of what the `if` chain
+   * answered; a correction that quietly rewrote it would destroy the only
+   * evidence of what the refactor was checked against.
+   */
+  const CORRECTED: Readonly<Record<string, readonly string[]>> = {
+    // Gemini is PLANNED, no mission can run under it, and its stream has
+    // never been captured -- Google refuses the CLI to consumer accounts.
+    // It claimed three modes purely through the old fall-through, was
+    // flagged when the table was written, and this is the commit it was
+    // flagged for.
+    gemini: []
+  }
+
+  it('answers exactly as the if-chain did, except where a claim was corrected on purpose', () => {
     for (const [platform, byRuntime] of Object.entries(BEFORE)) {
       for (const [runtime, expected] of Object.entries(byRuntime)) {
         const actual = MODES.filter((mode) => modeRunsOn(mode, runtime as never, platform))
-        expect(actual.sort(), `${runtime} on ${platform}`).toEqual([...expected].sort())
+        const want = CORRECTED[runtime] ?? expected
+        expect(actual.sort(), `${runtime} on ${platform}`).toEqual([...want].sort())
       }
+    }
+  })
+
+  it('claims nothing for a runtime no mission can run under', () => {
+    // The correction itself, asserted rather than implied by the table
+    // above. Muse went the other way on the same day: `modes: []` until a
+    // run proved two, then exactly those two. Same rule, both directions.
+    expect(RUNTIME_CAPABILITIES.gemini.modes).toEqual([])
+    for (const mode of MODES) {
+      expect(modeRunsOn(mode, 'gemini', 'win32'), `gemini must not claim ${mode}`).toBe(false)
     }
   })
 

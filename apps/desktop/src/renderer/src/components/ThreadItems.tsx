@@ -481,12 +481,27 @@ export function PlanSteps({
   steps,
   doneCount,
   outcomes,
-  underway = false
+  underway = false,
+  finished = false
 }: {
   readonly steps: readonly PlanStep[]
   readonly doneCount: number
   /** Whether a run happened and these steps have states to report. */
   readonly outcomes: boolean
+  /**
+   * Whether the run has ENDED, which changes what an unfinished step means.
+   *
+   * While a run is going, `pending` means "not yet". Once it has stopped,
+   * the same value means "never happened" -- and the card drew both the
+   * same way, so a plan whose runtime never sent a closing `plan.updated`
+   * sat under a finished answer with steps that read as still to come.
+   *
+   * The steps are NOT rewritten. Calling them done would be a lie about the
+   * run; hiding them would hide that it planned something it did not do,
+   * which is usually the most useful thing on the card. The card just stops
+   * describing them in the present tense.
+   */
+  readonly finished?: boolean
   /**
    * Whether the turn is still running, so the step underway gets its orb.
    *
@@ -561,11 +576,29 @@ export function PlanSteps({
           </span>
         )}
         <span>PLAN</span>
-        <span>{doneCount} of {steps.length} done</span>
+        {/*
+          * One right-hand group, because the head is `space-between` with
+          * two children: a third span would have pushed the count into the
+          * middle of the card rather than adding to it.
+          *
+          * And said once, on the header, rather than on every row -- a
+          * count is the shape of what happened, and "not reached" repeated
+          * down the list would shout about the ordinary case of a run that
+          * stopped early.
+          */}
+        <span className="lc-plancard__counts">
+          <span>{doneCount} of {steps.length} done</span>
+          {finished && outcomes && steps.length - doneCount > 0 && (
+            <span className="lc-plancard__unreached">{steps.length - doneCount} not reached</span>
+          )}
+        </span>
       </div>
       <ul className="lc-plan">
         {steps.map((step, index) => (
-          <li key={`${String(index)}-${step.text}`} className={`lc-plan__step is-${step.state}`}>
+          <li
+            key={`${String(index)}-${step.text}`}
+            className={`lc-plan__step is-${step.state}${finished && step.state !== 'done' ? ' is-unreached' : ''}`}
+          >
             <span className="lc-plan__marker" aria-hidden="true">
               {/*
                 * The step underway PULSES, with the same `lcPulse` the sidebar
@@ -589,7 +622,9 @@ export function PlanSteps({
                   <Orb state={PLAN_ORB} box={PLAN_STEP_ORB} preset={20} />
                 </span>
               ) : (
-                <span className={`lc-dot${step.state === 'running' ? ' is-pulsing' : ''}`} />
+                // Nothing pulses once the run has stopped: a pulsing dot on
+                // a finished plan says a step is running after the fact.
+                <span className={`lc-dot${step.state === 'running' && !finished ? ' is-pulsing' : ''}`} />
               )}
             </span>
             <span>{step.text}</span>

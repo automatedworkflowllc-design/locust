@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.255.0 - 2026-09-22
+
+- **A plan stops promising work that is never coming.** When a run ends
+  without its runtime closing off the plan, the steps it never got to used to
+  sit under the finished answer looking exactly like steps still to come. The
+  card now says how many were not reached, and those steps read as past. They
+  are not quietly marked done — a plan that was not finished is worth seeing.
+- **Gemini CLI stops offering modes it cannot run.** No mission can run under
+  it at all, yet it listed four permission modes, which is a menu of
+  refusals.
+
 ## 0.254.0 - 2026-09-22
 
 - **The Rooms form says what each field is.** Room name and Who is in it are

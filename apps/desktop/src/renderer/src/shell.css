@@ -5357,6 +5357,28 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/* The two counts on the plan head, kept together on the right. */
+.lc-plancard__counts {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
+/*
+ * What a run planned and did not do. Amber, because it is a fact a person
+ * may want to act on -- run it again, or ask why -- rather than an error:
+ * a run that stops early having planned four steps is ordinary, and the
+ * card's job is to stop describing those steps in the present tense.
+ */
+.lc-plancard__unreached {
+  color: var(--lc-amber-text);
+}
+
+/* A step the run never reached reads as past, not pending. */
+.lc-plan__step.is-unreached {
+  opacity: 0.55;
+}
+
 .lc-plan__marker {
   display: grid;
   place-items: center;

@@ -746,19 +746,26 @@ export const RUNTIME_CAPABILITIES: Readonly<Record<MissionRuntimeId, RuntimeCapa
    */
   cursor: { modes: [...EVERY_ORDINARY_MODE], notOn: { win32: ['ask'] }, evidence: 'measured' },
   /*
-   * KEPT EXACTLY AS IT WAS, AND IT IS PROBABLY WRONG.
+   * NOTHING, AND IT TOOK A SEPARATE COMMIT TO SAY SO.
    *
-   * Gemini is listed PLANNED / "Not built yet" and no mission can run under
-   * it -- its event stream has never been captured -- yet it has always
-   * claimed these three modes through the old fall-through. Correcting it is
-   * a behaviour change, and this commit is a refactor with a control test
-   * proving every runtime answers exactly as it did before. Changing it here
-   * would make that control lie about what it checked.
+   * Gemini is listed PLANNED / "Not built yet", no mission can run under it,
+   * and its event stream has never been captured -- Google refuses the CLI
+   * to consumer accounts, so nobody here can capture one. It claimed three
+   * modes anyway, inherited from the old `modeRunsOn` fall-through where
+   * saying nothing meant yes.
    *
-   * Flagged rather than fixed, which is the entire value of writing the
-   * table down: the claim is now visible instead of implied by silence.
+   * It was left alone when the table was written, deliberately: that commit
+   * was a refactor carrying a control test proving every runtime answered
+   * exactly as before, and correcting a claim inside it would have made the
+   * control lie about what it had checked. Flagging it was the whole value
+   * of writing the table down. This is the separate commit it was flagged
+   * for.
+   *
+   * Muse went the other way on the same day -- `modes: []` until a run
+   * proved two, then exactly those two. Same rule, both directions: a mode
+   * is claimed when a run has proved it and not before.
    */
-  gemini: { modes: [...EVERY_ORDINARY_MODE], evidence: 'unproven' },
+  gemini: { modes: [], evidence: 'unproven' },
   opencode: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
   copilot: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
   /*
