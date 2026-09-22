@@ -19,7 +19,7 @@ import { JumpToBottom } from './JumpToBottom.js'
 import { ledgerFailureRows, ledgerFailureSentence } from '../ledgerFailure.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
-import { costLineOrWhyNot, runCostOf } from '../cost.js'
+import { costLineOrWhyNot, costUnit, runCostOf } from '../cost.js'
 import type { FaceActivity } from '../faceState.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { ActivityCard } from './ActivityCard.js'
@@ -528,7 +528,7 @@ function ReceiptCard({
         <dd>
           {mission.eventCount} recorded{mission.eventsTruncated ? ' · window truncated for display' : ''}
         </dd>
-        <dt>Cost</dt>
+        <dt>{costUnit(runCostOf(mission.events)) === 'money' ? 'Cost' : 'Usage'}</dt>
         <dd className="lc-mono">{costLineOrWhyNot(runCostOf(mission.events))}</dd>
         <dt>Ledger</dt>
         <dd className={verification === 'ledger verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>

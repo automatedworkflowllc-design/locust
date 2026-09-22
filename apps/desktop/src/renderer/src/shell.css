@@ -8633,17 +8633,16 @@ textarea {
   flex: none;
 }
 
+/* Icon buttons since 2026-09-22, drawn as the Routines row draws its own:
+   the size, border and hover come from .lc-iconbutton, and these only undo
+   what the older word-button rules above set. */
 .lc-rostercard__edit,
 .lc-rostercard__remove {
-  height: 24px;
-  padding: 0 var(--lc-space-4);
-  border: 0;
-  border-radius: var(--lc-radius-control);
-  background: transparent;
-  color: var(--lc-text-muted);
-  font-size: var(--lc-text-description);
-  cursor: pointer;
-  transition: background var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease);
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--lc-border-card);
+  font-size: inherit;
 }
 
 .lc-rostercard__edit:hover {
@@ -8803,6 +8802,13 @@ textarea {
   letter-spacing: 0;
   text-transform: none;
   color: var(--lc-text-muted);
+  /* It ran into the heading: "RECENTshortcuts to rows below" (review of
+     0.255.0, #6). A gap and a separator make it the aside it is. */
+  margin-left: var(--lc-space-3);
+}
+
+.lc-picker__grouphint::before {
+  content: '· ';
 }
 
 .lc-picker__row.is-recent {
@@ -10484,7 +10490,14 @@ textarea {
 
 .lc-table {
   border-collapse: collapse;
-  font-size: var(--lc-text-description);
+  /*
+   * With the reply, two pixels under it: 13 / 15 / 17 at Standard / Large /
+   * Largest. It was the fixed description size, so a person who set replies
+   * Large got large prose and a 12px table beside it -- the most structured
+   * part of an answer became the hardest to read (beta review of 0.255.0, #5,
+   * measured 12px under Large prose).
+   */
+  font-size: calc(var(--lc-text-prose) - 2px);
   /* Figures under figures. A comparison table is the whole reason for this. */
   font-variant-numeric: tabular-nums;
 }

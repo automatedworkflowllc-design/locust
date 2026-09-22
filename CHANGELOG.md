@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.263.0 - 2026-09-22
+
+- **Tables in a reply follow your text size.** With replies set to Large, the
+  prose grew and any table stayed small. Tables now grow with it, a touch
+  smaller than the prose around them.
+
+- **Team cards line up.** Edit and Remove are small icons now, the way the
+  Routines screen draws them, so a role like "Code & Migrations" stays on one
+  line and every card in a row is the same height. A teammate that has never
+  run no longer says its usage was "not reported by the runtime".
+
+- The Details panel and the receipt say **Usage** for token counts and
+  **Cost** only when there is a price, as the Team card already did.
+
+- In the model picker, a group's note no longer runs into its heading.
+
 ## 0.262.0 - 2026-09-22
 
 - **Long conversations stay smooth while a teammate works.** Whenever any

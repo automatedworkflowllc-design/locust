@@ -41,6 +41,7 @@ import {
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
 import { PixelFace } from './PixelFace.js'
+import { Icon } from './Icon.js'
 import { COST_NOT_REPORTED_SHORT, costLine, costLineOrWhyNot, costUnit, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
@@ -530,16 +531,33 @@ export function TeammatesScreen({
                     <div className="lc-rostercard__name">{teammate.name}</div>
                     <div className="lc-rostercard__role">{roleLabelOf(teammate)}</div>
                   </div>
+                  {/*
+                    * ICONS, as the Routines row draws the same two actions.
+                    *
+                    * "Edit" and "Remove" as words took the width beside the
+                    * name, so a role like "Code & Migrations" wrapped to two
+                    * lines and cards in one row stood at different heights,
+                    * their stat boxes out of line (design pass and beta review
+                    * of 0.255.0, #4). Both carry a title and an accessible name.
+                    */}
                   <div className="lc-rostercard__actions">
-                    <button type="button" className="lc-rostercard__edit" onClick={() => onEdit(teammate)}>
-                      Edit
+                    <button
+                      type="button"
+                      className="lc-ghostbutton lc-iconbutton lc-rostercard__edit"
+                      title="Edit teammate"
+                      aria-label={`Edit ${teammate.name}`}
+                      onClick={() => onEdit(teammate)}
+                    >
+                      <Icon name="pencil" size={14} />
                     </button>
                     <button
                       type="button"
-                      className="lc-rostercard__remove"
+                      className="lc-ghostbutton lc-iconbutton lc-rostercard__remove"
+                      title="Remove teammate"
+                      aria-label={`Remove ${teammate.name}`}
                       onClick={() => onRemove(teammate.teammateId)}
                     >
-                      Remove
+                      <Icon name="close" size={14} />
                     </button>
                   </div>
                 </div>
@@ -575,14 +593,19 @@ export function TeammatesScreen({
                 {/* Undefined is not zero: a runtime that reported no usage has
                   * not said the work was free, and `not reported` must never
                   * be truncated into saying something else. */}
-                <dl className="lc-rostercard__cost">
-                  {/* `Usage` when the receipts carry tokens and no price: a
-                      free route's numbers are a measurement, not a charge. */}
-                  <dt>{costUnit(work.cost) === 'money' ? 'Cost' : 'Usage'}</dt>
-                  <dd className={`lc-mono${work.cost === undefined ? ' is-unreported' : ''}`}>
-                    {costLineOrWhyNot(work.cost)}
-                  </dd>
-                </dl>
+                {/* Only once there has been a run to report on: before the first,
+                    "not reported by the runtime" blamed a runtime nobody had
+                    used yet (design pass, 2026-09-22). */}
+                {work.lastRunAt !== undefined && (
+                  <dl className="lc-rostercard__cost">
+                    {/* `Usage` when the receipts carry tokens and no price: a
+                        free route's numbers are a measurement, not a charge. */}
+                    <dt>{costUnit(work.cost) === 'money' ? 'Cost' : 'Usage'}</dt>
+                    <dd className={`lc-mono${work.cost === undefined ? ' is-unreported' : ''}`}>
+                      {costLineOrWhyNot(work.cost)}
+                    </dd>
+                  </dl>
+                )}
                 {work.recent.length > 0 && (
                   <div className="lc-rostercard__recent">
                     <div className="lc-rostercard__recentlabel lc-mono">Recent</div>
