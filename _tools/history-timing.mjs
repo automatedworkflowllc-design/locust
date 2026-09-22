@@ -12,11 +12,12 @@
 // The ledger is COPIED into a throwaway profile and the copy is deleted
 // afterwards; nothing is sent anywhere and no mission is started.
 
+import { existsSync } from 'node:fs'
 import { cp, mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { APP_DIR, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
 
 const arg = (name) => {
   const at = process.argv.indexOf(name)
@@ -24,6 +25,9 @@ const arg = (name) => {
 }
 const source = arg('--ledger') ?? join(homedir(), 'AppData', 'Roaming', '@teammate', 'desktop', 'mission-ledger')
 const runs = Number(arg('--runs') ?? '5')
+// `--packaged` times the installer's build instead of out/.
+const EXE = join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
+const packaged = process.argv.includes('--packaged') && existsSync(EXE) ? EXE : undefined
 
 const profile = await mkdtemp(join(tmpdir(), 'locust-history-timing-'))
 await cp(source, join(profile, 'mission-ledger'), { recursive: true })
@@ -33,6 +37,7 @@ const drive = await startDrive({
   profilePath: profile,
   workspace: await scratchRepository('locust-history-ws-'),
   sendsNothing: true,
+  ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off' } }
 })
 try {
