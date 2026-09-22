@@ -27,7 +27,7 @@ const drive = await startDrive({
 const roomState = `JSON.stringify({
   title: document.querySelector('.lc-screen__title')?.innerText ?? '',
   posts: document.querySelectorAll('.lc-roompost').length,
-  cards: [...document.querySelectorAll('.lc-roomanswer')].map(c => (c.querySelector('.lc-roomanswer__name')?.textContent.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__text')?.textContent.replace(/\\s+/g, ' ').trim().slice(0, 60) ?? ''))
+  cards: [...document.querySelectorAll('.lc-roomanswer')].map(c => (c.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__text')?.textContent.replace(/\\s+/g, ' ').trim().slice(0, 60) ?? ''))
 })`
 
 try {

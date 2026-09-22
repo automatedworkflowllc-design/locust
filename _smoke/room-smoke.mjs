@@ -178,7 +178,7 @@ try {
 
   const ROOM_STATE = `(() => {
     const cards = [...document.querySelectorAll('.lc-roomanswer')].map(card => ({
-      name: card.querySelector('.lc-roomanswer__name')?.textContent.trim() ?? '',
+      name: card.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? '',
       phase: card.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? '',
       route: card.querySelector('.lc-roomanswer__route')?.textContent.trim() ?? '',
       // A one-line answer renders as an agent line, the way the thread draws

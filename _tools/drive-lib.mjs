@@ -89,7 +89,7 @@ export function assertMaySpend(name) {
   process.exit(1)
 }
 
-export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false, packaged }) {
+export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false, sendsNothing = false, packaged }) {
   if (spends) assertMaySpend(name)
   try {
     const already = await fetch(`http://127.0.0.1:${String(port)}/json/list`, { signal: AbortSignal.timeout(1500) })
@@ -147,9 +147,22 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
    * directory argument.
    */
   const launch = packaged === undefined ? [ELECTRON, [APP_DIR]] : [packaged, []]
+  /*
+   * FREE ROUTES ONLY, enforced by the app rather than promised by the drive.
+   *
+   * 2026-09-22: `drive-compact.mjs` said "spends nothing" in its header and
+   * sent a turn on Cursor's Grok in its body. The app now refuses to start
+   * any run that is not on a free route when this is set, so a drive that
+   * picks a paid route by accident gets a refusal on screen instead of a
+   * bill. Lifted only by `LOCUST_SPEND=1`, the same word `assertMaySpend`
+   * already asks for -- see apps/desktop/src/main/free-routes.ts.
+   */
+  const appEnv = { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}`, ...env }
+  if (process.env.LOCUST_SPEND === '1') delete appEnv.LOCUST_FREE_ONLY
+  else appEnv.LOCUST_FREE_ONLY = '1'
   const child = spawn(launch[0], [...launch[1], `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`], {
     cwd: workspace,
-    env: { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}`, ...env },
+    env: appEnv,
     stdio: ['ignore', 'pipe', 'pipe']
   })
   const appOutput = []
@@ -369,7 +382,10 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
        */
       const isFree = (text) => /opencode/i.test(String(text)) && /\bfree\b/i.test(String(text))
       let route = await routeText()
-      if (route !== '' && !isFree(route)) {
+      // A drive that sends nothing has no route to protect -- and on a
+      // machine made to look bare there may be no free route to move to.
+      // The app refuses a paid run in any scripted window regardless.
+      if (!sendsNothing && route !== '' && !isFree(route)) {
         say(`this drive does not spend, and the composer is on "${String(route)}". Moving it to the free route.`)
         await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/muse.*1\\.3/i' }))
         route = await routeText()

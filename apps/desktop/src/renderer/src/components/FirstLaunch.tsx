@@ -457,16 +457,35 @@ export function FirstLaunch({
                   // nothing is connected: a lit dot, the name at full weight,
                   // the fact in green, the one filled button.
                   const onRamp = !usable && !checking && !stuck && connected === 0 && runtime.id === FREE_START_RUNTIME
-                  const need =
+                  /*
+                   * THE STATE FIRST: installed or not, signed in or not.
+                   *
+                   * Colin, 2026-09-22: "can that beginning screen know the
+                   * difference if the user needs to install or sign in?" It
+                   * did, but only in the BUTTON -- the words beside it were
+                   * "needs a Cursor account" on a runtime that was not on the
+                   * machine and on one that was installed and signed out
+                   * alike. The sentence now leads with which it is, and the
+                   * account it will want comes after, where truncation in a
+                   * narrow cell takes it rather than the state.
+                   */
+                  const need: { readonly state?: string; readonly detail?: string; readonly free?: boolean } | undefined =
                     usable || checking
                       ? undefined
                       : stuck
-                        ? 'did not answer its version check'
-                        : facts?.account !== undefined
-                          ? `needs ${facts.account}`
-                          : facts?.install.kind === 'vendor'
-                            ? `installs from ${new URL(facts.install.url).host}`
-                            : 'no account needed'
+                        ? { detail: 'did not answer its version check' }
+                        : signIn
+                          ? { state: 'not signed in', detail: facts?.account !== undefined ? `installed; signs in with ${facts.account}` : 'installed' }
+                          : runtime.installed
+                            ? facts?.account !== undefined
+                              ? { detail: `needs ${facts.account}` }
+                              : undefined
+                            : facts?.account !== undefined
+                              ? { state: 'not installed', detail: `needs ${facts.account}` }
+                              : facts?.install.kind === 'vendor'
+                                ? { state: 'not installed', detail: `from ${new URL(facts.install.url).host}` }
+                                : { state: 'not installed', detail: 'no account needed', free: true }
+                  const needSaid = need === undefined ? undefined : [need.state, need.detail].filter((part) => part !== undefined).join(' · ')
                   const dot = usable ? ' is-green' : checking ? ' is-checking' : signIn ? ' is-red' : onRamp ? ' is-lime' : ' is-muted'
                   const waiting = installing !== undefined
                   return (
@@ -476,7 +495,25 @@ export function FirstLaunch({
                         {runtime.displayName}
                       </span>
                       {need !== undefined && (
-                        <span className={`lc-runtimecell__need${need === 'no account needed' ? ' is-green' : ''}`}>{need}</span>
+                        /*
+                          * The STATE alone in the cell, the rest on hover. Two
+                          * columns leave the text about twenty characters, and
+                          * "installed · not signe…" cut off exactly the half
+                          * that told the two cases apart (frame, 2026-09-22).
+                          * "not installed" / "not signed in" is parallel, fits,
+                          * and is what decides the button beside it.
+                          */
+                        <span className="lc-runtimecell__need" title={needSaid}>
+                          {need.state !== undefined ? (
+                            <>
+                              <span className="lc-runtimecell__state">{need.state}</span>
+                              {/* The one detail worth its width: why this row is the recommendation. */}
+                              {need.free === true && <span className="lc-runtimecell__free"> · {need.detail}</span>}
+                            </>
+                          ) : (
+                            need.detail
+                          )}
+                        </span>
                       )}
                       {usable ? (
                         <span className="lc-runtimecell__version">

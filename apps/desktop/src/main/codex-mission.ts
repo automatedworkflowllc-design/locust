@@ -60,6 +60,7 @@ import { recordableCommand } from './command-record.js'
 import { commandTooLong } from './command-length.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
+import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 /**
@@ -285,6 +286,8 @@ interface CodexMissionServiceOptions {
    * get Auto by omission.
    */
   readonly autoModeAllowed?: () => Promise<boolean>
+  /** Refuse every run that is not on a free route. See `free-routes.ts`. */
+  readonly freeRoutesOnly?: boolean
   /**
    * Ask before every connector call: send no allow rules, so each one goes
    * to the permission host. Read at run start, never cached. The env seam
@@ -827,6 +830,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       // does not exist.
       const chosenModel =
         route.model === undefined || route.model === 'account-default' ? undefined : route.model
+      // Before anything is recorded or spawned: a drive's window spends
+      // nothing, whichever way the run was asked for (free-routes.ts).
+      if (options.freeRoutesOnly === true && !isFreeRoute(runtime, chosenModel)) {
+        return error('RUNTIME_START_FAILED', FREE_ONLY_REFUSAL) as CodexMissionStartResponse
+      }
       // Read-only unless the renderer explicitly asked for edits. The host
       // decides the sandbox from this one value; the renderer never passes a
       // sandbox string of its own.

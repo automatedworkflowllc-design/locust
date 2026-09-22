@@ -89,6 +89,14 @@ export interface ListItem {
   readonly text: string
   /** 0 is top level. */
   readonly depth: number
+  /**
+   * The numeral the model wrote, on an ordered item. A list that something
+   * interrupted -- a code block between step 2 and step 3 -- resumes at the
+   * number written rather than starting again at 1.
+   */
+  readonly number?: number
+  /** Paragraphs after the first, when the item has more than one. */
+  readonly paragraphs?: readonly string[]
 }
 
 /** A tab counts as four columns, which is what every runtime here emits. */
@@ -271,7 +279,12 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
         } else {
           while (indents.length > 1 && width < indents[indents.length - 1]!) indents.pop()
         }
-        items.push({ text: (numbered?.[2] ?? bullet![2]!).trim(), depth: indents.length - 1 })
+        const numeral = isOrdered ? Number(/^[ \t]*(\d+)/.exec(line)?.[1]) : Number.NaN
+        items.push({
+          text: (numbered?.[2] ?? bullet![2]!).trim(),
+          depth: indents.length - 1,
+          ...(Number.isFinite(numeral) ? { number: numeral } : {})
+        })
         continue
       }
       /*
@@ -301,8 +314,46 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
           }
         }
       }
-      // A blank line inside a list ends it; prose after it is prose.
+      /*
+       * A BLANK LINE INSIDE A LIST DOES NOT END IT BY ITSELF.
+       *
+       * It used to, and two ordinary shapes broke on it. Models write numbered
+       * steps with a blank line between each -- "1. ...", blank, "2. ..." --
+       * and every step became a list of its own, each drawn as "1.". And an
+       * item with a second paragraph, indented under it the way `CHANGELOG.md`
+       * writes one, dropped out of the list to the left margin with its
+       * source line breaks kept (the What changed page, 2026-09-22).
+       *
+       * So the line after the blank decides, as it does in Markdown: another
+       * item continues the list; a line indented past the item's marker is
+       * that item's next paragraph; anything else is prose, and the list ends
+       * where it always did.
+       */
       if (items.length > 0 && line.trim().length === 0) {
+        let at = index + 1
+        while (at < prose.length && (prose[at] ?? '').trim().length === 0) at += 1
+        const after = prose[at]
+        if (after !== undefined && (BULLET.test(after) || NUMBERED.test(after))) continue
+        const marker = indents[indents.length - 1] ?? 0
+        const indented = (text: string): boolean => indentWidth(/^[ \t]*/.exec(text)?.[0] ?? '') > marker
+        const plain = (text: string): boolean =>
+          !HEADING.test(text) && !QUOTE.test(text) && !RULE.test(text) && !TABLE_ROW.test(text)
+        if (after !== undefined && indented(after) && plain(after)) {
+          const said: string[] = []
+          while (at < prose.length) {
+            const next = prose[at] ?? ''
+            if (next.trim().length === 0 || !indented(next) || !plain(next)) break
+            if (BULLET.test(next) || NUMBERED.test(next)) break
+            said.push(next.trim())
+            at += 1
+          }
+          const last = items[items.length - 1]
+          if (last !== undefined && said.length > 0) {
+            items[items.length - 1] = { ...last, paragraphs: [...(last.paragraphs ?? []), said.join(' ')] }
+            index = at - 1
+            continue
+          }
+        }
         flushList()
         continue
       }
@@ -423,7 +474,7 @@ export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]):
             ? ''
             : block.kind === 'table'
               ? [block.header, ...block.rows].map((row) => row.join(' ')).join('\n')
-              : block.items.map((item) => item.text).join('\n')
+              : block.items.map((item) => [item.text, ...(item.paragraphs ?? [])].join('\n')).join('\n')
     )
     .join('\n')
     .replace(/\s+/g, ' ')

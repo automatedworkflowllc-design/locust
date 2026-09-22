@@ -8,8 +8,10 @@
 // Ian's laptop is not 1480 wide, so this is the size that decides whether the
 // app is usable for him.
 //
-// It needs no model and spends nothing: the layout is the subject, so a seeded
-// roster and the empty state are enough to see whether anything collides.
+// It spends nothing: the layout is the subject, and the one mission it sends
+// -- the workroom only exists once there is one -- goes on OpenCode's free
+// model. Until 2026-09-22 it went on Cursor's Grok while this line said it
+// spent nothing; the app now refuses a paid route in any scripted window.
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -80,15 +82,14 @@ try {
 
   // A real mission, because the workroom and its inspector only exist once
   // there is one -- and the workroom at this width is the thing Ian will
-  // actually be looking at. One short run on Cursor, so it costs almost
-  // nothing.
+  // actually be looking at. On the free route, so it costs nothing.
   await drive.capture('run one short mission at this width', async () => {
     // By aria-label in the rail: the avatar carries no native title there (the
     // flyout says the same facts), and a title-only selector silently clicked
     // nothing -- so the mission below was sent with nobody selected and the
     // flyout, correctly, listed no conversations for Wren (2026-09-08).
     await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') ?? b.getAttribute('aria-label') ?? '').startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
-    await drive.evaluate(pickRouteScript({ group: '/cursor/i', search: 'grok-4.6', row: '/grok-4.6/i' }))
+    await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
     await drive.evaluate(sendAndWaitScript('Reply with exactly one word: ready. Use no tools.', { waitSeconds: 240 }))
     return drive.evaluate(`(() => {
       const header = document.querySelector('.lc-workroom__mission')

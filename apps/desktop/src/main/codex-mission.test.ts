@@ -14,6 +14,7 @@ import { planSection } from './workroom-briefing.js'
 import type { CodexMissionUpdate, MissionApprovalRequest } from '../shared/ipc.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { createCodexMissionService } from './codex-mission.js'
+import { FREE_ONLY_REFUSAL } from './free-routes.js'
 import { createApprovalChannel } from './approval-channel.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
@@ -384,6 +385,61 @@ describe('Codex mission service', () => {
       }
     })
     expect(start).not.toHaveBeenCalled()
+  })
+
+  it('refuses a paid route in a window held to free routes, before anything is asked or recorded', async () => {
+    /*
+     * 2026-09-22: a drive whose header said it "spends nothing" sent a turn
+     * on Cursor's Grok. The refusal lives here, on the path every run takes,
+     * so a drive that picks a paid route by accident is stopped by the app.
+     */
+    const start = vi.fn() satisfies RuntimeProcessRunner['start']
+    const discover = vi.fn(async () => [codexRuntime()])
+    const createMission = vi.fn(async () => undefined as never)
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover,
+      runner: { start },
+      ledger: fakeLedger({ createMission }),
+      freeRoutesOnly: true
+    })
+
+    for (const [runtime, model] of [
+      ['cursor', 'cursor-grok-4.6-medium'],
+      ['codex', undefined],
+      ['claude', 'sonnet'],
+      // OpenCode is not free by being OpenCode: only its free models are.
+      ['opencode', 'anthropic/claude-sonnet-5']
+    ] as const) {
+      await expect(
+        service.start('Reply with one word.', runtime, 'ask', model === undefined ? {} : { model }, () => undefined)
+      ).resolves.toMatchObject({ ok: false, error: { code: 'RUNTIME_START_FAILED', message: FREE_ONLY_REFUSAL } })
+    }
+    expect(discover).not.toHaveBeenCalled()
+    expect(createMission).not.toHaveBeenCalled()
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('lets a free route through a window held to free routes', async () => {
+    // The control: the guard that refuses everything would pass the test above.
+    const discover = vi.fn(async () => [codexRuntime()])
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover,
+      runner: { start: vi.fn() satisfies RuntimeProcessRunner['start'] },
+      ledger: fakeLedger(),
+      freeRoutesOnly: true
+    })
+
+    const answer = await service.start(
+      'Reply with one word.',
+      'opencode',
+      'ask',
+      { model: 'opencode/muse-spark-1.3-contributor-free' },
+      () => undefined
+    )
+    expect(JSON.stringify(answer)).not.toContain(FREE_ONLY_REFUSAL)
+    expect(discover).toHaveBeenCalled()
   })
 
   it('refuses an Auto mission when nobody wired the switch at all', async () => {

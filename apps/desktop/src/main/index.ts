@@ -85,6 +85,7 @@ import { bootOutcome, createDiscoveryLog } from './discovery-log.js'
 import { createRuntimeFactsStore } from './runtime-facts.js'
 import { createRuntimeInstaller } from './runtime-installer.js'
 import { openSignIn } from './runtime-sign-in.js'
+import { freeRoutesOnly } from './free-routes.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
@@ -1300,6 +1301,8 @@ if (!ownsSingleInstanceLock) {
 
     const codexMissions = createCodexMissionService({
       workspacePath,
+      // A scripted launch spends nothing unless told to (free-routes.ts).
+      freeRoutesOnly: freeRoutesOnly(process.argv, process.env),
       permissionHost,
       approvals,
       // A ledger write that fails mid-run names its reason in locust-errors.log.
@@ -1390,6 +1393,7 @@ if (!ownsSingleInstanceLock) {
     // into the transports that read a process.
     const antigravityMissions = createAntigravityMissionService({
       workspacePath,
+      freeRoutesOnly: freeRoutesOnly(process.argv, process.env),
       ledger: missionLedger,
       // One pool -- see the note on codexMissions above.
       liveElsewhere: () => codexMissions.liveMissionIds().length,

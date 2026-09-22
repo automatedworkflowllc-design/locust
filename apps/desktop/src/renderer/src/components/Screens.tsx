@@ -1433,7 +1433,15 @@ export function SettingsScreen({
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Teammates</h2>
           <p className="lc-settings__lede">
-            Teammates answer each other on their own, each on its own route, and stop after {String(relayHopCap)} automatic {relayHopCap === 1 ? 'reply' : 'replies'}.
+            {/*
+              * Says what is TRUE NOW. It stated the relay-on behaviour whatever
+              * the switch said, so with relay off the lede promised automatic
+              * replies while the row under it said messages wait (design
+              * pass, 2026-09-22).
+              */}
+            {relay
+              ? `Teammates answer each other on their own, each on its own route, and stop after ${String(relayHopCap)} automatic ${relayHopCap === 1 ? 'reply' : 'replies'}.`
+              : 'Teammates do not answer each other on their own. A message waits until its recipient next runs.'}
           </p>
           <More>
             <p>

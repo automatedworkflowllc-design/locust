@@ -114,7 +114,7 @@ const shape = `(async () => {
   return JSON.stringify({
     sequenceTurns: said.length,
     answerCards: document.querySelectorAll('.lc-roomanswer').length,
-    speakers: said.map(t => t.querySelector('.lc-roomsaid__name')?.innerText.trim() ?? '(continued)'),
+    speakers: said.map(t => t.querySelector('.lc-roomsaid__gutter .lc-face')?.getAttribute('aria-label')?.trim() ?? '(continued)'),
     foot: document.querySelector('.lc-roomsaid__foot')?.innerText.trim() ?? 'no foot',
     absences: [...document.querySelectorAll('.lc-roomsaid__absent')].map(n => n.innerText.trim().slice(0, 70))
   }, null, 1)

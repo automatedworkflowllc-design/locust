@@ -214,13 +214,27 @@ function NestedList({
     rows.push(
       <li key={`i${String(index)}`}>
         {inline(item.text)}
+        {item.paragraphs?.map((paragraph, at) => (
+          <p className="lc-list__para" key={`p${String(at)}`}>
+            {inline(paragraph)}
+          </p>
+        ))}
         {children.length > 0 && <NestedList items={children} ordered={ordered} level={level + 1} />}
       </li>
     )
     index = end
   }
   const className = level === 0 ? 'lc-list' : 'lc-list lc-list--nested'
-  return ordered ? <ol className={className}>{rows}</ol> : <ul className={className}>{rows}</ul>
+  // Resume at the number written: a list split by a code block between its
+  // steps starts its second half at 3, not at 1 again.
+  const start = items[0]?.number
+  return ordered ? (
+    <ol className={className} {...(start !== undefined && start !== 1 ? { start } : {})}>
+      {rows}
+    </ol>
+  ) : (
+    <ul className={className}>{rows}</ul>
+  )
 }
 
 export function AgentText({
@@ -588,8 +602,22 @@ export function PlanSteps({
           */}
         <span className="lc-plancard__counts">
           <span>{doneCount} of {steps.length} done</span>
+          {/*
+            * "NOT CHECKED OFF", not "not reached" -- which was mine (0.255)
+            * and claimed more than the evidence. The beta review of 0.255.0,
+            * #2: a run that completed, whose file on disk had both requested
+            * lines and whose tool receipts showed the edit and the read-back,
+            * was drawn as "0 of 2 done · 2 not reached". The checklist is
+            * the runtime's bookkeeping; whether the work happened is a
+            * different fact, and this card can only report the first.
+            */}
           {finished && outcomes && steps.length - doneCount > 0 && (
-            <span className="lc-plancard__unreached">{steps.length - doneCount} not reached</span>
+            <span
+              className="lc-plancard__unreached"
+              title="The run ended without checking these off its list. That is the runtime's checklist, not a check of the work: see what it ran below."
+            >
+              {steps.length - doneCount} not checked off
+            </span>
           )}
         </span>
       </div>
@@ -671,7 +699,6 @@ function useElapsed(startedAt: string): { readonly label: string; readonly now: 
  * actual chat, where the animated ...'s appear and all the calls".
  */
 export function LiveRegisterLine({
-  name,
   register,
   label,
   detail,
@@ -690,8 +717,7 @@ export function LiveRegisterLine({
    * doing, and the register word is what says that.
    */
   readonly orb?: OrbState
-  /** Absent in a one-to-one thread, where the header already says whose it is. */
-  readonly name?: string
+  // No name: the face beside the line carries it (see LiveStepCard).
   readonly register: LiveRegister
   /** Whatever the runtime called this step, if it called it anything. */
   readonly label?: string
@@ -726,7 +752,6 @@ export function LiveRegisterLine({
   return (
     <>
       <span className="lc-livestep__label">
-        {name !== undefined && <span className="lc-livestep__who">{name}</span>}
         <span className="lc-livestep__register">
           {/*
             * `data-orb` IS THE SEAM, and the library's `aria-label` is not.
@@ -875,7 +900,8 @@ export function LiveStepCard({
   waiting = false,
   orb,
   owner,
-  activity
+  activity,
+  face: showFace = true
 }: {
   /**
    * The thinking orb for this step, when one is truthful.
@@ -903,6 +929,8 @@ export function LiveStepCard({
     | undefined
   /** Decided once from the events, the same way the sidebar and header decide it. */
   readonly activity: FaceActivity
+  /** Off where the face is already on screen beside this line (a room's answer card). */
+  readonly face?: boolean
 }): ReactElement {
   // The dots meant "a reasoning step is open", which most runtimes never
   // report -- so the nicest signal in the app almost never appeared (Colin,
@@ -914,7 +942,7 @@ export function LiveStepCard({
   const face = owner ?? { hue: 'lime' as const, avatar: RUNTIME_FACE }
   return (
     <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind} data-register={register}>
-      <PixelFace
+      {!showFace ? <span className="lc-livestep__gutter" /> : <PixelFace
         hue={face.hue}
         avatar={face.avatar}
         size={26}
@@ -932,10 +960,19 @@ export function LiveStepCard({
          */
         activity={activity}
         {...(owner?.teammateId === undefined ? {} : { teammateId: owner.teammateId })}
-      />
+        /*
+         * The face is the attribution; the name is its hover title.
+         *
+         * A group conversation used to print the name beside the face --
+         * `[face] ○ Wren · working · 14s`. Colin, 2026-09-22, holding up the
+         * one-to-one version, which never did: *"just make em all like that
+         * ... the name next to it isnt needed"*. The sidebar, the header and
+         * the face's own title all say who it is.
+         */
+        {...(owner?.name === undefined ? {} : { name: owner.name })}
+      />}
 
       <LiveRegisterLine
-        {...(owner?.name === undefined ? {} : { name: owner.name })}
         register={register}
         label={label}
         {...(detail === undefined ? {} : { detail })}

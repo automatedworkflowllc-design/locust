@@ -927,9 +927,16 @@ export function RoomScreen({
                 <div className="lc-roomsaid">
                   {exchange.items.map((item) => {
                     const who = teammates.find((candidate) => candidate.teammateId === item.teammateId)
+                    /*
+                     * The face is who said it; its title is the name. A room
+                     * used to print the name above every speaker's first
+                     * line as well. Colin, 2026-09-22, on the conversation
+                     * view that never did: "the name next to it isnt needed"
+                     * -- the room's member row and the face's own title say it.
+                     */
                     const face =
                       who === undefined ? null : (
-                        <PixelFace hue={who.hue} avatar={who.avatar} size={22} activity="idle" presence="none" />
+                        <PixelFace hue={who.hue} avatar={who.avatar} size={22} activity="idle" presence="none" name={who.name} />
                       )
                     if (item.kind === 'said') {
                       return (
@@ -940,18 +947,15 @@ export function RoomScreen({
                         >
                           <span className="lc-roomsaid__gutter">{item.startsSpeaker ? face : null}</span>
                           <div className="lc-roomsaid__body">
-                            {item.startsSpeaker && (
+                            {/* The one case where a time is load-bearing:
+                                this arrived after a NEWER post exists, so
+                                without it the room looks like it inserted
+                                a message into the past. */}
+                            {item.startsSpeaker && item.showTime && item.at !== undefined && (
                               <span className="lc-roomsaid__who">
-                                <span className="lc-roomsaid__name">{item.name}</span>
-                                {/* The one case where a time is load-bearing:
-                                    this arrived after a NEWER post exists, so
-                                    without it the room looks like it inserted
-                                    a message into the past. */}
-                                {item.showTime && item.at !== undefined && (
-                                  <span className="lc-roomsaid__at lc-mono">
-                                    {new Date(item.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                )}
+                                <span className="lc-roomsaid__at lc-mono">
+                                  {new Date(item.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                </span>
                               </span>
                             )}
                             <RoomAnswerText text={item.text} />
@@ -992,9 +996,6 @@ export function RoomScreen({
                         >
                           <span className="lc-roomsaid__gutter">{face}</span>
                           <div className="lc-roomsaid__body">
-                            <span className="lc-roomsaid__who">
-                              <span className="lc-roomsaid__name">{item.name}</span>
-                            </span>
                             <span className="lc-roomsaid__live">
                               <LiveRegisterLine
                                 register={item.live?.register ?? 'starting'}
@@ -1061,9 +1062,11 @@ export function RoomScreen({
                             size={22}
                             activity={answer.phase === 'running' || answer.phase === 'starting' ? 'thinking' : 'idle'}
                             presence={answer.phase === 'running' || answer.phase === 'starting' ? 'working' : 'none'}
+                            name={name}
                           />
                         )}
-                        <span className="lc-roomanswer__name">{name}</span>
+                        {/* No name beside the face: it is the face's title (Colin, 2026-09-22). */}
+                        {teammate === undefined && <span className="lc-roomanswer__name">{name}</span>}
                         <span className="lc-roomanswer__route lc-mono">
                           {/* The composer's spelling, not the catalog's full
                               display name and a raw model id. One route, one
@@ -1073,6 +1076,7 @@ export function RoomScreen({
                             ? 'default'
                             : modelDisplayName(answer.runtime, answer.model)}
                         </span>
+                        <span className="lc-roomanswer__sep lc-mono" aria-hidden="true">·</span>
                         {answer.phase === 'failed' ? (
                           <span className="lc-roomanswer__phase lc-mono lc-tone-red">{answer.phase}</span>
                         ) : (
@@ -1100,6 +1104,7 @@ export function RoomScreen({
                       <ThreadItems
                         items={answer.items}
                         owner={teammate}
+                        faces={false}
                         activity={answer.phase === 'running' || answer.phase === 'starting' ? 'thinking' : 'idle'}
                         workspacePath={workspacePath}
                         decision={undefined}

@@ -17,8 +17,9 @@ import type { FaceActivity } from '../faceState.js'
  * and because motion can be off (reduced motion), state is always also carried
  * by the presence dot and by adjacent text.
  *
- * Faces are decorative -- identity is the name beside them -- so the chip is
- * aria-hidden.
+ * A face is decorative where a name sits beside it, and aria-hidden there. In
+ * a conversation it stands in place of the name, so it is given the name
+ * (`name`) and carries it as its hover title and accessible label.
  */
 
 export type PixelFaceHue = TeammateHue
@@ -41,6 +42,17 @@ export interface PixelFaceProps {
    * teammate (the runtime's own) carry none.
    */
   readonly teammateId?: string
+  /**
+   * The name, for a face that stands IN PLACE of it.
+   *
+   * Colin, 2026-09-22, with a frame of a face, an orb and "Working… · 14s":
+   * *"the user can hover the name or see the sidebar or the top to see the
+   * name of the teammate, you dont need it right there and this looks way
+   * cleaner"*. So in a conversation the face is the attribution, and a face
+   * that is the attribution has to answer "who?" -- on hover, and to a
+   * screen reader, which a decorative `aria-hidden` chip never could.
+   */
+  readonly name?: string
 }
 
 const HUE_VARIABLE: Readonly<Record<PixelFaceHue, string>> = {
@@ -104,7 +116,8 @@ export function PixelFace({
   activity = 'idle',
   presence = 'none',
   className,
-  teammateId
+  teammateId,
+  name
 }: PixelFaceProps): ReactElement {
   const pixel = facePixelSize(size)
   const grid = pixel * 8
@@ -150,7 +163,7 @@ export function PixelFace({
     <span
       className={`lc-face${className === undefined ? '' : ` ${className}`}`}
       style={outer}
-      aria-hidden="true"
+      {...(name === undefined ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name, title: name })}
       data-activity={activity}
       {...(teammateId === undefined ? {} : { 'data-teammate': teammateId })}
     >

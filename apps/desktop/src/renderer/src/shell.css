@@ -3051,11 +3051,6 @@ textarea {
   gap: var(--lc-space-3);
 }
 
-.lc-roomsaid__name {
-  font-weight: 500;
-  color: var(--lc-text-primary);
-}
-
 /* Drawn only where it is load-bearing -- a message that arrived after a newer
    post exists -- so a time on screen always means something. */
 .lc-roomsaid__at {
@@ -3296,6 +3291,10 @@ textarea {
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   text-wrap: pretty;
+}
+
+.lc-roomanswer__sep {
+  color: var(--lc-text-muted);
 }
 
 .lc-roomanswer__who {
@@ -4211,8 +4210,14 @@ textarea {
   text-overflow: ellipsis;
 }
 
-.lc-runtimecell__need.is-green {
+.lc-runtimecell__free {
   color: var(--lc-green-text);
+}
+
+/* Which state the row is in, ahead of what it needs: brighter than the rest
+   of the sentence, because it is the half that decides the button. */
+.lc-runtimecell__state {
+  color: var(--lc-text-secondary);
 }
 
 .lc-runtimecell__dot.is-lime {
@@ -5460,22 +5465,17 @@ textarea {
   height: 26px;
 }
 
+/* The face's place, kept when the face is already shown beside this line. */
+.lc-livestep__gutter {
+  flex: none;
+  width: 26px;
+}
+
 .lc-livestep__label {
   display: inline-flex;
   align-items: center;
   gap: var(--lc-space-3);
   min-width: 0;
-}
-
-/*
- * Whose, then which register. The same two-part line a room draws over a turn
- * in progress, for the same reason: what follows is the app narrating, not the
- * teammate talking, and a person should never have to work that out from the
- * wording (Colin, 2026-09-11).
- */
-.lc-livestep__who {
-  color: var(--lc-text-primary);
-  font-weight: 500;
 }
 
 /*
@@ -5618,11 +5618,6 @@ textarea {
   .lc-sweep::before {
     display: none;
   }
-}
-
-.lc-livestep__who + .lc-livestep__register::before {
-  content: '·';
-  margin-right: var(--lc-space-3);
 }
 
 .lc-livestep__meta::before {
@@ -6369,6 +6364,14 @@ textarea {
    inside a fold they never open. */
 .lc-folder__warns {
   margin: var(--lc-space-3) 0 0;
+}
+
+/* Inside the card it is part of the folder row above it, so it takes that
+   row's inset. It sat flush against the card's border, 13px left of every
+   other line in the card (design pass, 2026-09-22). */
+.lc-settingcard > .lc-folder__warns {
+  margin: 0;
+  padding: 0 var(--lc-space-5) var(--lc-space-4);
 }
 
 .lc-rostergrid {
@@ -8467,6 +8470,11 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* An item's second paragraph: under the item, the list's own gap above it. */
+.lc-list__para {
+  margin: var(--lc-space-2) 0 0;
+}
+
 /* --- 3. Link labels -----------------------------------------------------
  * Replaces .lc-linklabel. Answer to the brief's question: no, a hairline
  * underline is the one signal every reader has learned means "click". This
@@ -8562,6 +8570,33 @@ textarea {
 .lc-rerun .lc-button:hover:not(:disabled) {
   background: var(--lc-lime-tint-strong);
   border-color: var(--lc-lime-border-strong);
+}
+
+/* The runtime's own words about a refusal: kept, folded, under the remedy. */
+.lc-rerun {
+  flex-wrap: wrap;
+}
+
+.lc-rerun__said {
+  flex-basis: 100%;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-rerun__said summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.lc-rerun__said summary:hover {
+  color: var(--lc-text-secondary);
+}
+
+.lc-rerun__said p {
+  margin: var(--lc-space-2) 0 0;
+  font-family: var(--lc-font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* --- 5. Roster card -----------------------------------------------------

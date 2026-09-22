@@ -175,7 +175,7 @@ try {
   await drive.capture('what each one actually said, and any failure in its own words', () => drive.evaluate(`(async () => {
     const out = []
     for (const card of document.querySelectorAll('.lc-roomanswer')) {
-      const name = card.querySelector('.lc-roomanswer__name')?.textContent.trim() ?? '?'
+      const name = card.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? '?'
       const phase = card.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? '?'
       const text = (card.querySelector('.lc-roomanswer__text')?.textContent ?? '').replace(/\\s+/g, ' ').trim()
       // 250 lines counted correctly is the signal that nothing was dropped;

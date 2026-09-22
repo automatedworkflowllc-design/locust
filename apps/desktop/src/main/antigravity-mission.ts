@@ -48,6 +48,7 @@ export type AntigravityTier = (typeof ANTIGRAVITY_TIERS)[number]
  * A re-export cannot drift.
  */
 import { MAX_LIVE_MISSIONS as MAX_LIVE_ANTIGRAVITY_MISSIONS } from '../shared/live-missions.js'
+import { FREE_ONLY_REFUSAL } from './free-routes.js'
 
 export { MAX_LIVE_ANTIGRAVITY_MISSIONS }
 /** No new transcript line for this long means the agent is not coming back. */
@@ -63,6 +64,11 @@ const NOBODY = ''
 
 export interface AntigravityMissionOptions {
   readonly workspacePath: string
+  /**
+   * Refuse every run: Antigravity has no free route, and a drive's window may
+   * only use free ones. See `free-routes.ts`.
+   */
+  readonly freeRoutesOnly?: boolean
   readonly ledger: MissionLedger
   /** Missions live on the other transports; the cap is one pool. See codex-mission.ts. */
   readonly liveElsewhere?: () => number
@@ -412,6 +418,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
 
     async start(prompt, peer, route) {
       if (disposed) throw new AntigravityStartError('The mission service is shutting down.')
+      if (options.freeRoutesOnly === true) throw new AntigravityStartError(FREE_ONLY_REFUSAL)
       const owner = ownerKeyOf(peer)
       if (starting.has(owner) || [...runs.values()].some((run) => ownerKeyOf(run.peer) === owner)) {
         throw new AntigravityStartError(

@@ -80,7 +80,7 @@ const watch = `(async () => {
     if (step !== null) {
       live += 1
       const register = step.getAttribute('data-register') ?? '(none)'
-      const who = step.querySelector('.lc-livestep__who')?.innerText.trim() ?? ''
+      const who = step.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? ''
       const word = step.querySelector('.lc-livestep__register')?.innerText.trim() ?? ''
       seen.set(register + '|' + who + '|' + word, (seen.get(register + '|' + who + '|' + word) ?? 0) + 1)
     } else if (live > 0) {

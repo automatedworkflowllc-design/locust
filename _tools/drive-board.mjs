@@ -29,7 +29,7 @@ const drive = await startDrive({
 const board = `JSON.stringify({
   count: document.querySelector('.lc-board__count')?.innerText ?? '',
   tasks: [...document.querySelectorAll('.lc-task')].map(t => (t.querySelector('.lc-task__state')?.textContent.trim() ?? '') + ' · ' + (t.querySelector('.lc-task__text')?.innerText ?? '') + ' · ' + (t.querySelector('.lc-task__owner')?.innerText.replace(/\\s+/g, ' ').trim() ?? '')),
-  cards: [...document.querySelectorAll('.lc-roomanswer')].map(c => (c.querySelector('.lc-roomanswer__name')?.textContent.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? ''))
+  cards: [...document.querySelectorAll('.lc-roomanswer')].map(c => (c.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? ''))
 })`
 const addTask = (text) => `(async () => {
   const box = document.querySelector('input[aria-label="Add a task"]')

@@ -165,7 +165,7 @@ try {
   const captured = await drive.evaluate(`(() => {
     clearInterval(window.__frontier.timer);
     return { ...window.__frontier, cards: [...document.querySelectorAll('.lc-roomanswer')].map(c => ({
-      name: c.querySelector('.lc-roomanswer__name')?.textContent.trim(),
+      name: c.querySelector('.lc-face')?.getAttribute('aria-label')?.trim(),
       phase: c.querySelector('.lc-roomanswer__phase')?.textContent.trim(),
       text: c.querySelector('.lc-roomanswer__text')?.textContent ?? ''
     })) };

@@ -6,6 +6,36 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.259.0 - 2026-09-22
+
+- **A teammate's face is enough.** Conversations and rooms no longer print
+  the name beside the face: the face says who it is, and hovering it says
+  the name. A reply that runs several lines shows the face once, and a
+  room's answer card shows it once, in its header.
+
+- **The first screen says whether to install or to sign in.** Each coding
+  agent that is not ready reads **not installed**, with Install beside it,
+  or **not signed in**, with Sign in beside it.
+
+- **Numbered steps count 1, 2, 3.** A teammate that wrote its steps with a
+  blank line between them got a list of its own for every step, each
+  numbered 1. Steps now stay one list, a list interrupted by a code block
+  carries on at the right number, and a second paragraph under a bullet
+  stays inside it — which is also what broke the What changed page.
+
+- **Ask mode stopping a run is one message.** It used to be a note with the
+  way forward and then a red card saying the same thing again, with the
+  runtime's raw words at the end. Now it is one note, the button, and the
+  runtime's words folded under **What the runtime said**.
+
+- **A plan says "not checked off", not "not reached".** A run that finished
+  without ticking its checklist was drawn as if it never got to the steps,
+  even when the work was done. The count now says what it knows.
+
+- Settings: the Teammates section no longer promises automatic replies when
+  they are switched off, and the note under the project folder lines up
+  with the rest of its card.
+
 ## 0.258.0 - 2026-09-22
 
 - **SIGN IN is a button now.** A runtime that needs signing in used to print

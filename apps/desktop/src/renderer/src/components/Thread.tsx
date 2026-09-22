@@ -158,9 +158,18 @@ export function ThreadItems({
   workspacePath,
   decision,
   onOpenFile,
-  planMode = false
+  planMode = false,
+  faces = true
 }: {
   readonly items: readonly ThreadItem[]
+  /**
+   * Draw the teammate's face beside what they said. Off where something
+   * around these items already shows it -- a room's answer card has the face
+   * in its own header, and drawing it again one row down was the same
+   * teammate announced twice (design pass, 2026-09-22). The gutter stays, so
+   * the text keeps its indent.
+   */
+  readonly faces?: boolean
   /** Open a handed file in the panel beside the conversation. */
   readonly onOpenFile?: (path: string) => void
   /** The turn was sent in Plan mode; see `Thread`'s prop of the same name. */
@@ -186,13 +195,29 @@ export function ThreadItems({
    */
   const live = items.find((entry) => entry.type === 'live-step')
   const runningOrb = live !== undefined && live.type === 'live-step' ? live.orb : undefined
+  /*
+   * ONE FACE PER RUN OF SPEECH, not one per paragraph.
+   *
+   * A finished turn drew the teammate's face three times in a row down the
+   * left edge -- once for "Making your HELLO file", once for "File created",
+   * once for "DONE" (design pass, 2026-09-22). Colin, the same day: the face
+   * is already one of "so many indicators". Consecutive things the teammate
+   * SAID share the face of the first; anything between them -- a tool fold,
+   * a plan with outcomes, the live line -- starts a new run.
+   */
+  const continuesSpeech = (index: number): boolean => {
+    const before = items[index - 1]
+    return before !== undefined && (before.type === 'agent-message' || before.type === 'plan')
+  }
+  const face = (index: number): ReactElement =>
+    !faces || continuesSpeech(index) ? <span className="lc-agentline__gutter" /> : <AgentAvatar teammate={owner} />
   return (
     <>
-      {items.map((item) => {
+      {items.map((item, index) => {
         if (item.type === 'agent-message') {
           return (
             <div className="lc-agentline" key={item.key}>
-              <AgentAvatar teammate={owner} />
+              {face(index)}
               <div className="lc-agentline__body">
                 <AgentText text={item.text} streaming={item.streaming === true} />
               </div>
@@ -217,7 +242,7 @@ export function ThreadItems({
            */
           return (
             <div className="lc-agentline" key={item.key}>
-              <AgentAvatar teammate={owner} />
+              {face(index)}
               <div className="lc-agentline__body">
                 {/*
                   * OUTCOMES WHEN THE PLAN WAS ACTUALLY CARRIED OUT.
@@ -340,6 +365,7 @@ export function ThreadItems({
               {...(item.orb === undefined ? {} : { orb: item.orb })}
               owner={owner}
               activity={activity}
+              face={faces}
             />
           )
         }
@@ -1011,59 +1037,19 @@ export function Thread({
           />
         ))}
 
-        {onRunWithEdits !== undefined && (wasPlan === true || answeredWithCode || refusedByMode) && (
-          // Deliberately not an error: the run did exactly what its mode
-          // allows. This is the one click that would otherwise be a mode
-          // change and a retyped prompt. A plan run says so in its own
-          // words -- the point of planning is that carrying it out is the
-          // next, separate decision.
-          <div className="lc-rerun">
-            <span>
-              {wasPlan === true
-                ? 'This is the plan, not the work: nothing in the workspace has changed.'
-                : refusedByMode
-                  ? 'Ask mode does not change files, so this run stopped rather than write one. Nothing in the workspace has changed.'
-                  : 'Ask mode answers in the conversation, so this stayed in the reply. Nothing in the workspace has changed.'}
-            </span>
-            <button type="button" className="lc-button" onClick={onRunWithEdits}>
-              <Icon name="diff" size={13} /> {wasPlan === true ? 'Build this plan' : 'Run again with edits allowed'}
-            </button>
-          </div>
-        )}
-
-        {/*
-          * NOT offered when the mode is what refused it. Sol's beta finding
-          * 3: pressing this would hit the same boundary, correctly, for
-          * ever -- and the sentence beside it ("running this again cannot
-          * repeat anything") is a button admitting it does nothing. The
-          * offer that belongs there is the mode switch above.
-          */}
-        {onRunAgain !== undefined && !refusedByMode && (
-          /*
-           * One press, where retyping was the only way forward.
-           *
-           * Offered ONLY where the runtime never started -- no session, no
-           * tool, nothing touched -- so pressing this cannot repeat work.
-           * A run that got as far as doing something is deliberately not
-           * offered it: whether the half it did matters is the person's
-           * call, and the app does not get to make it for them.
-           *
-           * The case that produced this is a Cursor start failing on its own
-           * config file while a second copy of it held that file open
-           * (Colin, 2026-09-14). It is transient, it is not his fault, and
-           * the message he had typed was still right.
-           */
-          <div className="lc-rerun">
-            <span>Nothing had started, so running this again cannot repeat anything.</span>
-            <button type="button" className="lc-button" onClick={onRunAgain}>
-              <Icon name="play" size={13} /> Run it again
-            </button>
-          </div>
-        )}
-
         {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} />}
 
-        {error !== undefined && !errorAlreadyShown(items, error) && (
+        {/*
+          * A MODE REFUSAL IS ONE CARD, NOT TWO (beta review of 0.255.0, #8).
+          *
+          * It drew a "Run again with edits allowed" line and then, under it,
+          * a red "The run could not continue" card that said the same thing
+          * again and ended on the runtime's raw `permission requested: bash
+          * ... auto-rejecting`. A safety boundary doing its job read as two
+          * failures, with the remedy above the problem. The refusal below
+          * now carries the runtime's own words in a fold instead.
+          */}
+        {error !== undefined && !refusedByMode && !errorAlreadyShown(items, error) && (
           errorIsPersistence ? (
             /*
               The one moment the product's central claim breaks, drawn rather
@@ -1148,6 +1134,63 @@ export function Thread({
               <div className="lc-card__body">{error}</div>
             </div>
           )
+        )}
+
+        {/* After the card that says what happened: the problem, then the remedy. */}
+        {onRunWithEdits !== undefined && (wasPlan === true || answeredWithCode || refusedByMode) && (
+          // Deliberately not an error: the run did exactly what its mode
+          // allows. This is the one click that would otherwise be a mode
+          // change and a retyped prompt. A plan run says so in its own
+          // words -- the point of planning is that carrying it out is the
+          // next, separate decision.
+          <div className="lc-rerun">
+            <span>
+              {wasPlan === true
+                ? 'This is the plan, not the work: nothing in the workspace has changed.'
+                : refusedByMode
+                  ? 'Ask mode does not change files, so this run stopped rather than write one. Nothing in the workspace has changed.'
+                  : 'Ask mode answers in the conversation, so this stayed in the reply. Nothing in the workspace has changed.'}
+            </span>
+            <button type="button" className="lc-button" onClick={onRunWithEdits}>
+              <Icon name="diff" size={13} /> {wasPlan === true ? 'Build this plan' : 'Run again with edits allowed'}
+            </button>
+            {refusedByMode && error !== undefined && (
+              <details className="lc-rerun__said">
+                <summary>What the runtime said</summary>
+                <p>{error}</p>
+              </details>
+            )}
+          </div>
+        )}
+
+        {/*
+          * NOT offered when the mode is what refused it. Sol's beta finding
+          * 3: pressing this would hit the same boundary, correctly, for
+          * ever -- and the sentence beside it ("running this again cannot
+          * repeat anything") is a button admitting it does nothing. The
+          * offer that belongs there is the mode switch above.
+          */}
+        {onRunAgain !== undefined && !refusedByMode && (
+          /*
+           * One press, where retyping was the only way forward.
+           *
+           * Offered ONLY where the runtime never started -- no session, no
+           * tool, nothing touched -- so pressing this cannot repeat work.
+           * A run that got as far as doing something is deliberately not
+           * offered it: whether the half it did matters is the person's
+           * call, and the app does not get to make it for them.
+           *
+           * The case that produced this is a Cursor start failing on its own
+           * config file while a second copy of it held that file open
+           * (Colin, 2026-09-14). It is transient, it is not his fault, and
+           * the message he had typed was still right.
+           */
+          <div className="lc-rerun">
+            <span>Nothing had started, so running this again cannot repeat anything.</span>
+            <button type="button" className="lc-button" onClick={onRunAgain}>
+              <Icon name="play" size={13} /> Run it again
+            </button>
+          </div>
         )}
 
         {/*

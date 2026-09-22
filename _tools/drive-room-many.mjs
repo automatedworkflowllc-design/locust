@@ -58,7 +58,7 @@ const roomState = `JSON.stringify({
   title: document.querySelector('.lc-screen__title')?.innerText ?? '',
   posts: document.querySelectorAll('.lc-roompost').length,
   cards: [...document.querySelectorAll('.lc-roomanswer')].map(c => {
-    const name = c.querySelector('.lc-roomanswer__name')?.textContent.trim() ?? '?'
+    const name = c.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? '?'
     const phase = c.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? '?'
     const text = c.querySelector('.lc-roomanswer__text')?.textContent ?? ''
     const word = ${JSON.stringify(Object.values(WORDS))}.find(w => text.includes(w)) ?? 'none'
@@ -198,7 +198,7 @@ try {
     const wrong = []
     const never = []
     for (const card of document.querySelectorAll('.lc-roomanswer')) {
-      const name = card.querySelector('.lc-roomanswer__name')?.textContent.trim() ?? '?'
+      const name = card.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? '?'
       const text = card.querySelector('.lc-roomanswer__text')?.textContent ?? ''
       const mine = want[name]
       if (!mine) { wrong.push(name + ': not a teammate we seeded'); continue }

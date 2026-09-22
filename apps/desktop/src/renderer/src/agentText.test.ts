@@ -90,14 +90,15 @@ describe('lists', () => {
 
   it('reads a numbered list as ordered', () => {
     expect(parseAgentText(lines('1. first', '2) second'))).toEqual([
-      { kind: 'list', ordered: true, items: [flat('first'), flat('second')] }
+      // Ordered items carry the numeral written, so a split list can resume.
+      { kind: 'list', ordered: true, items: [{ ...flat('first'), number: 1 }, { ...flat('second'), number: 2 }] }
     ])
   })
 
   it('starts a new list when the kind changes', () => {
     expect(parseAgentText(lines('- a', '1. b'))).toEqual([
       { kind: 'list', ordered: false, items: [flat('a')] },
-      { kind: 'list', ordered: true, items: [flat('b')] }
+      { kind: 'list', ordered: true, items: [{ ...flat('b'), number: 1 }] }
     ])
   })
 
