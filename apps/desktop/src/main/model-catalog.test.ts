@@ -264,9 +264,27 @@ describe('Claude models from what its CLI advertised', () => {
     const models = claudeModelsFrom([
       claude('ready', { aliases: ['fable', 'opus', 'sonnet'], efforts: ['low', 'medium', 'high', 'xhigh', 'max'] })
     ])
-    expect(models.map((model) => model.id)).toEqual(['fable', 'opus', 'sonnet'])
+    // The advertised three, then `haiku`: measured to work, never named in
+    // the help -- see CLAUDE_ALIASES_MEASURED.
+    expect(models.map((model) => model.id)).toEqual(['fable', 'opus', 'sonnet', 'haiku'])
     expect(models.every((model) => model.runtime === 'claude')).toBe(true)
     expect(models[0]?.supportedEfforts).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
+  })
+
+  it('offers the cheapest family the help leaves out, once, and only beside advertised ones', () => {
+    /*
+     * The help's aliases are EXAMPLES, and the picker offered exactly the
+     * examples -- so Haiku, the cheapest Claude, could not be picked at all
+     * (found 2026-09-22, when a drive asked for it and the search came back
+     * empty). A help that names it already is not given it twice, and a help
+     * that names no aliases is given none.
+     */
+    const named = claudeModelsFrom([claude('ready', { aliases: ['sonnet', 'haiku'], efforts: [] })])
+    expect(named.map((model) => model.id)).toEqual(['sonnet', 'haiku'])
+    const none = claudeModelsFrom([claude('ready', { aliases: [], efforts: ['high'] })])
+    expect(none).toEqual([])
+    const haiku = claudeModelsFrom([claude('ready', { aliases: ['opus'], efforts: [] })]).at(-1)
+    expect(haiku?.displayName).toBe('Haiku')
   })
 
   it('offers nothing for a Claude that is not ready, or that advertised nothing', () => {
@@ -290,7 +308,8 @@ describe('Claude models from what its CLI advertised', () => {
     // usable, and each one needs a row of its own to be the ACTIVE one.
     expect(response.data.models.map((model) => `${model.runtime}:${model.id}`)).toEqual([
       'claude:account-default',
-      'claude:opus'
+      'claude:opus',
+      'claude:haiku'
     ])
   })
 })

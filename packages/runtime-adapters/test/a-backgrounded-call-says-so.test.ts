@@ -47,9 +47,11 @@ const record = (value: unknown) => {
  * and the assertion failed against working code.
  *
  * Reconstructed from the adapter rather than from a capture, and that is
- * worth stating: this repo holds no Claude fixture. It is the shape the
- * adapter was built against, which is the best evidence available here and
- * is not the same as a recording.
+ * worth stating: when this was written the repo held no Claude fixture. It
+ * is the shape the adapter was built against, which is not the same as a
+ * recording. There is one now (`fixtures/claude/`, 2026-09-22), and it
+ * showed the adapter half of this was right and the thread never read it --
+ * see `background-work-ends-with-the-run.test.ts`.
  */
 function bashCall(input: Record<string, unknown>): readonly NormalizedRuntimeEvent[] {
   const claude = normalizer();

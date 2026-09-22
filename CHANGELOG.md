@@ -6,6 +6,28 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.266.0 - 2026-09-22
+
+- **Claude Code command rows say what the command was for.** Claude writes a
+  one-line description for every command it runs, like "Sleep for 8 seconds
+  then write finished to out.txt". Locust has meant to lead with it since
+  0.56, but for Claude Code it never arrived, and every row showed the raw
+  command instead. Rows now lead with the description. Press the row to see
+  the exact command underneath.
+
+- **A command left in the background says what happened to it.** A
+  teammate's run ends when it answers, and Claude Code stops anything it
+  started in the background at that moment. The row used to say a green
+  **done** beside "in the background", which read as finished work. It
+  now says **stopped · when the run ended**, in amber. It says **done** or
+  **failed** only when the work really finished, and **running** while it
+  still is. Teammates are also told that nothing wakes them when background
+  work finishes, so they wait for results they need before answering.
+
+- **Haiku is in the model picker for Claude Code**, Claude's fastest and
+  cheapest model. Claude Code accepts it, but its help text only names
+  Fable, Opus and Sonnet, so Locust didn't offer it.
+
 ## 0.265.0 - 2026-09-22
 
 - **The controls under the message box stay inside it.** At the usual window

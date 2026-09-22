@@ -407,32 +407,41 @@ export function ActivityCard({
                  * (the runtime never reported output) and `''` (it reported
                  * none) are different facts, so they get different words.
                  */
-                entry.output === undefined || entry.output.trim() === '' ? (
+                /*
+                 * A DESCRIBED command opens too, onto the command.
+                 *
+                 * The row leads with the description, so the command itself
+                 * is the thing to open onto -- and on a row that printed
+                 * nothing, the static branch drew the description IN PLACE
+                 * of the command with no way back to it. That was unreachable
+                 * on Claude Code only because its descriptions never arrived
+                 * here (fixed 2026-09-22); Claude reports no output at all,
+                 * so every Claude command would have lost its command.
+                 */
+                (entry.output === undefined || entry.output.trim() === '') && entry.title === undefined ? (
                   <div className="lc-filerow is-shell is-static">
                     <Icon name="terminal" size={14} />
                     <span className={`lc-shellbadge ${shellResultClass(entry, finished)}`}>{shellResult(entry, finished)}</span>
-                    {/* Nothing printed, so nothing to open onto -- the command
-                      * stays on the row itself, under the sentence. */}
+                    {/* Nothing printed and nothing said about it, so nothing
+                      * to open onto -- the command is the row. */}
                     <span
-                      className={`lc-filerow__path${entry.settled || finished ? '' : ' lc-sweep'}`}
+                      className={`lc-filerow__path${shellSweeping(entry, finished) ? ' lc-sweep' : ''}`}
                       // The highlight is drawn from this, not from the child
                       // text -- see `.lc-sweep`. Harmless when not sweeping.
-                      data-text={entry.title ?? entry.command}
+                      data-text={entry.command}
                     >
-                      {entry.title ?? entry.command}
+                      {entry.command}
                     </span>
-                    {entry.background === true && (
-                      <span className="lc-shellbadge is-background lc-mono">in the background</span>
-                    )}
+                    <BackgroundBadge entry={entry} />
                     {entry.output !== undefined && entry.settled && (
                       <span className="lc-filerow__result is-muted">no output</span>
                     )}
                   </div>
                 ) : (
                   <>
-                    <button type="button" className="lc-filerow is-shell" onClick={() => toggle(entry)}>
+                    <button type="button" className="lc-filerow is-shell" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
                       <Icon name="terminal" size={14} />
-                      <span className={`lc-shellbadge ${shellResultClass(entry)}`}>{shellResult(entry)}</span>
+                      <span className={`lc-shellbadge ${shellResultClass(entry, finished)}`}>{shellResult(entry, finished)}</span>
                       {/*
                         * What it was DOING, where the runtime says so.
                         *
@@ -448,7 +457,12 @@ export function ActivityCard({
                         * may lead with the claim and must not lose the
                         * evidence.
                         */}
-                      <span className="lc-filerow__path">{entry.title ?? entry.command}</span>
+                      <span
+                        className={`lc-filerow__path${shellSweeping(entry, finished) ? ' lc-sweep' : ''}`}
+                        data-text={entry.title ?? entry.command}
+                      >
+                        {entry.title ?? entry.command}
+                      </span>
                       {/*
                         * SENT TO THE BACKGROUND, said on the row.
                         *
@@ -460,11 +474,12 @@ export function ActivityCard({
                         * is most of why a finished background task reads as
                         * a turn that just stopped (Colin, 2026-09-21).
                         *
-                        * It says what the CALL was. It does not claim to
-                        * know when the work ended.
+                        * It says what the CALL was, and what became of the
+                        * work once the runtime says.
                         */}
-                      {entry.background === true && (
-                        <span className="lc-shellbadge is-background lc-mono">in the background</span>
+                      <BackgroundBadge entry={entry} />
+                      {entry.output !== undefined && entry.output.trim() === '' && entry.settled && (
+                        <span className="lc-filerow__result is-muted">no output</span>
                       )}
                       <span className="lc-activity__chev" aria-hidden="true">
                         <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
@@ -473,7 +488,9 @@ export function ActivityCard({
                     {isOpen(entry) && (
                       <>
                         {entry.title !== undefined && <pre className="lc-shellcommand lc-mono">{entry.command}</pre>}
-                        <ShellOutput output={entry.output} failed={entry.failed === true} />
+                        {entry.output !== undefined && entry.output.trim() !== '' && (
+                          <ShellOutput output={entry.output} failed={entry.failed === true} />
+                        )}
                       </>
                     )}
                   </>
@@ -623,10 +640,79 @@ function shellResult(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished 
   // report, and saying `running` about it contradicts the header beside it.
   if (!entry.settled) return finished ? 'did not report' : 'running'
   if (entry.failed) return entry.exitCode === undefined ? 'failed' : `failed · exit ${String(entry.exitCode)}`
+  /*
+   * A call sent to the background returns at once, so `done` on it was a
+   * claim about the COMMAND that nobody had made: the call was done, the
+   * work had not started finishing. Green `done` beside "in the background"
+   * read as finished work, which is the misreading Colin reported on
+   * 2026-09-21. The word follows the work.
+   */
+  if (entry.background === true) {
+    switch (entry.backgroundEnded) {
+      case 'completed':
+        return 'done'
+      case 'failed':
+        return 'failed'
+      case 'stopped':
+      case 'stopped-with-run':
+        return 'stopped'
+      case 'ended':
+        return 'ended'
+      case undefined:
+        return finished ? 'did not report' : 'running'
+    }
+  }
   return entry.exitCode === undefined ? 'done' : `exit ${String(entry.exitCode)}`
+}
+
+/**
+ * Whether the command is still running, for the sweep across its text: the
+ * call is still open, or it went to the background and nothing has said the
+ * work ended. Never once the run is over -- a sweep then would be the row
+ * claiming something is happening after everything stopped.
+ */
+function shellSweeping(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished: boolean): boolean {
+  if (finished) return false
+  return !entry.settled || (entry.background === true && entry.backgroundEnded === undefined && !entry.failed)
 }
 
 function shellResultClass(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished = false): string {
   if (!entry.settled) return finished ? 'is-stalled' : 'is-running'
-  return entry.failed ? 'is-failed' : 'is-ok'
+  if (entry.failed) return 'is-failed'
+  if (entry.background === true) {
+    switch (entry.backgroundEnded) {
+      case 'completed':
+        return 'is-ok'
+      case 'failed':
+        return 'is-failed'
+      case undefined:
+        return finished ? 'is-stalled' : 'is-running'
+      default:
+        return 'is-stalled'
+    }
+  }
+  return 'is-ok'
+}
+
+/**
+ * Where the work went, and for the one ending that needs it, why it stopped.
+ *
+ * `stopped` alone would leave the person to guess who stopped it. Claude Code
+ * stops its background work when its run ends -- measured 2026-09-22, the
+ * command killed right after the answer -- and that is the case a person can
+ * do something about: ask for it again, run in the foreground.
+ */
+function BackgroundBadge({ entry }: { readonly entry: Extract<ActivityEntry, { kind: 'shell' }> }) {
+  if (entry.background !== true) return null
+  if (entry.backgroundEnded === 'stopped-with-run') {
+    return (
+      <span
+        className="lc-shellbadge is-background lc-mono"
+        title="The teammate's run ended while this was still running in the background, and the work stopped with it. Ask for it again and it can run in the foreground."
+      >
+        when the run ended
+      </span>
+    )
+  }
+  return <span className="lc-shellbadge is-background lc-mono">in the background</span>
 }

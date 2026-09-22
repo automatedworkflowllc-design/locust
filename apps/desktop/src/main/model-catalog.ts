@@ -151,6 +151,19 @@ export function withAccountDefaults(models: readonly PublicModel[]): readonly Pu
 }
 
 /**
+ * Aliases Claude Code accepts that its `--help` does not name.
+ *
+ * The help gives EXAMPLES -- "an alias for the latest model (e.g. 'fable',
+ * 'opus', or 'sonnet')" -- and the picker offered exactly the examples, so
+ * the cheapest family could not be chosen in Locust at all. Measured, not
+ * assumed: `claude --model haiku` on Claude Code 2.1.280 ran as
+ * claude-haiku-4-5-20251001 (2026-09-22, the background-task capture).
+ * Offered only beside advertised aliases, so a CLI whose help stops naming
+ * aliases at all is not handed one by this list.
+ */
+export const CLAUDE_ALIASES_MEASURED: readonly string[] = ['haiku']
+
+/**
  * Claude Code's models, from what its CLI advertised at discovery. An alias
  * resolves to the newest model of that family on the runtime's side, which is
  * why it is offered as the alias rather than as a version this build guessed.
@@ -159,7 +172,10 @@ export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   const claude = runtimes.find((entry) => entry.id === 'claude')
   const hints = claude?.modelHints
   if (claude?.readiness !== 'ready' || hints === undefined) return []
-  return hints.aliases.map((alias) => ({
+  const aliases = hints.aliases.length === 0
+    ? []
+    : [...hints.aliases, ...CLAUDE_ALIASES_MEASURED.filter((alias) => !hints.aliases.includes(alias))]
+  return aliases.map((alias) => ({
     id: alias,
     runtime: 'claude',
     // The alias IS the name here. Claude Code resolves it to whichever model

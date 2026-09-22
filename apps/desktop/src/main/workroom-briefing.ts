@@ -301,7 +301,24 @@ function answerSection(): string {
      * the ordinary case, and a person who says how they want the answer
      * has already decided.
      */
-    'If the person said what shape the answer should take -- a single digit, one word, a list, a number -- that shape wins over the sentence above; give it in that shape and stop.'
+    'If the person said what shape the answer should take -- a single digit, one word, a list, a number -- that shape wins over the sentence above; give it in that shape and stop.',
+    /*
+     * The run ends with that message, and background work does not outlive it.
+     *
+     * MEASURED 2026-09-22, Claude Code in print mode with Locust's own flags:
+     * told to background `sleep 8 && echo finished > out.txt` and reply, it
+     * did both, and the command was killed right after the reply -- the file
+     * never appeared. Codex, asked the same, started it detached and nothing
+     * came of that either. Nothing in Locust re-invokes a teammate when
+     * background work finishes, so "when it finished we never got the follow
+     * up reply" (Colin, 2026-09-21) is what every backgrounded command leads
+     * to. The row now says the work stopped; this is what stops it happening.
+     *
+     * One sentence, because it is paid for on every mission and the budget
+     * test measures it against a waiting teammate's message: the instruction
+     * is to WAIT, and the reason is that nothing will come back for it.
+     */
+    'Sending it ends your run, and nothing wakes you when background work finishes: wait for any command whose result you need before you answer.'
   ].join(' ')
 }
 

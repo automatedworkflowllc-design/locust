@@ -42,10 +42,18 @@ export interface ActivityDetail {
    *
    * Locust has no background-task feature and this is not one: the row says
    * what the call was, and a call that was sent to the background is a
-   * different thing from one that was waited on. Nothing here knows when
-   * the work finished.
+   * different thing from one that was waited on.
    */
   readonly background?: boolean
+  /**
+   * What became of the background work, when the runtime said.
+   *
+   * The call returns at once and the work goes on, so `settled` answers for
+   * the call and this answers for the work. Only Claude Code reports it
+   * (`task_notification`, 2026-09-22); undefined means nobody said, which is
+   * a different fact from "still running" once the run is over.
+   */
+  readonly backgroundEnded?: BackgroundEnding
   readonly settled: boolean
   /** True only for a tool the runtime itself reported as failed. */
   readonly failed?: boolean
@@ -58,6 +66,21 @@ export interface ActivityDetail {
   readonly durationMs?: number
   /** What the tool returned, when the runtime reported it in words; a subagent's summary. */
   readonly output?: string
+}
+
+/**
+ * How background work ended: `stopped-with-run` is the run ending under it,
+ * told apart from a stop somebody chose mid-run (see `backgroundEnding` in the
+ * Claude adapter).
+ */
+export type BackgroundEnding = 'completed' | 'failed' | 'stopped' | 'stopped-with-run' | 'ended'
+
+const BACKGROUND_ENDINGS: readonly BackgroundEnding[] = ['completed', 'failed', 'stopped', 'stopped-with-run', 'ended']
+
+/** A ledger's word for it, or `ended` for one this build does not know. */
+function backgroundEndingOf(status: string | undefined, failed: boolean): BackgroundEnding {
+  if (failed) return 'failed'
+  return BACKGROUND_ENDINGS.find((ending) => ending === status) ?? 'ended'
 }
 
 /**
@@ -176,10 +199,11 @@ export type ActivityEntry =
        * wait for looked exactly like one it waited for, which is most of why
        * a finished background task reads as a turn that simply stopped.
        *
-       * This says what the call WAS. It does not know when the work
-       * finished, and nothing re-invokes anybody on it.
+       * This says what the call WAS. Nothing re-invokes anybody on it.
        */
       readonly background?: boolean
+      /** What became of that work, when the runtime said; see `ActivityDetail`. */
+      readonly backgroundEnded?: BackgroundEnding
       readonly settled: boolean
       readonly failed: boolean
       readonly exitCode: number | undefined
@@ -304,6 +328,7 @@ export function activityEntries(
         command: shellCommandText(detail.name),
         title: detail.title,
         ...(detail.background === true ? { background: true } : {}),
+        ...(detail.backgroundEnded === undefined ? {} : { backgroundEnded: detail.backgroundEnded }),
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode,
@@ -2108,6 +2133,12 @@ export function buildThread(
    * runtime drew for the same file is a step already inside it.
    */
   const observedNet = new Map<string, string>()
+  /**
+   * Rows for calls the runtime ran in the background, by item id, kept after
+   * the call settles: the call returns at once and the work goes on, so what
+   * became of it arrives after the row has closed.
+   */
+  const backgroundRows = new Map<string, ActivityDetail>()
   /** The file's own name, however the runtime spelt the path to it. */
   const nameTail = (name: string): string => name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) ?? name
   const activity: ActivityDetail[] = []
@@ -2211,8 +2242,29 @@ export function buildThread(
               // target arrives here. A start that already named one keeps it.
               ...(event.payload.command === undefined || open.name !== open.tool
                 ? {}
-                : { name: event.payload.command })
+                : { name: event.payload.command }),
+              /*
+               * The same late arrival, for what the call was FOR.
+               *
+               * Claude Code writes a description on every Bash call and says
+               * whether it was sent to the background -- both on the call's
+               * input, which comes after the row opens -- so the adapter
+               * carries them on the completion. This read neither from
+               * there. MEASURED 2026-09-22 by running a real Claude capture
+               * through the adapter and this function: the row had the
+               * command, no description and no background flag, so since
+               * 2026-09-09 no Claude command row has led with its
+               * description, and the 0.257.0 "in the background" badge
+               * never reached a Claude row. Both were tested at the adapter
+               * alone, where they were true.
+               */
+              ...(open.title === undefined && typeof event.payload.title === 'string' && event.payload.title.length > 0
+                ? { title: event.payload.title }
+                : {}),
+              ...(event.payload.background === true ? { background: true } : {})
             }
+            const closed = activity[index]
+            if (closed?.background === true) backgroundRows.set(event.payload.itemId, closed)
             /*
              * The observation is the whole change to that file, so the
              * runtime's OTHER rows for it are steps inside it, not more of it.
@@ -2241,6 +2293,10 @@ export function buildThread(
         break
       }
       case 'step.started': {
+        // Background work starting is not what the teammate is doing now --
+        // it sent the work away so it could do something else -- so it does
+        // not take the live line. Its row already says where it went.
+        if (event.payload.itemType === 'background') break
         // A turn opening is not work yet: Codex raises its setup notices
         // right after it, before any tool runs, and counting the turn as work
         // put "skill descriptions were shortened" back in every thread.
@@ -2277,6 +2333,28 @@ export function buildThread(
       }
       case 'step.completed':
       case 'step.failed': {
+        /*
+         * BACKGROUND WORK ENDING lands on the row of the call that started
+         * it, and leaves the live line alone: the teammate may be in the
+         * middle of something else, and ending that line here would say it
+         * had stopped.
+         */
+        if (event.payload.itemType === 'background') {
+          const itemId = event.payload.itemId
+          const row = itemId === undefined ? undefined : backgroundRows.get(itemId) ?? openTools.get(itemId)
+          const index = row === undefined ? -1 : activity.indexOf(row)
+          if (itemId !== undefined && row !== undefined && index >= 0) {
+            const ended: ActivityDetail = {
+              ...row,
+              background: true,
+              backgroundEnded: backgroundEndingOf(event.payload.status, event.type === 'step.failed')
+            }
+            activity[index] = ended
+            backgroundRows.set(itemId, ended)
+            if (openTools.get(itemId) === row) openTools.set(itemId, ended)
+          }
+          break
+        }
         /*
          * REASONING BECOMES A ROW, when the runtime sent its text.
          *

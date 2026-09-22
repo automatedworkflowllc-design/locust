@@ -7105,6 +7105,18 @@ textarea {
 }
 
 /*
+ * Did not finish, and nothing said it failed: a command the run ended
+ * without hearing back from, or background work stopped before it was done.
+ * Amber, the same word the tool rows use for it. The class was already being
+ * given to the badge for the first case and had no rule, so it drew in the
+ * plain row colour with no fill.
+ */
+.lc-shellbadge.is-stalled {
+  color: var(--lc-amber-text);
+  background: var(--lc-amber-tint);
+}
+
+/*
  * What the runtime said about the turn, at the foot of the fold. Standing
  * register -- a left rule, no box, no new species on the census.
  */

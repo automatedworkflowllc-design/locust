@@ -146,6 +146,32 @@ export function claudeToolBackgrounded(name: string, input: unknown): boolean {
 }
 
 /**
+ * How a piece of background work ended, in the words the row uses.
+ *
+ * MEASURED 2026-09-22, Claude Code 2.1.x in print mode on Haiku, with
+ * Locust's own flags: asked to background `sleep 8 && echo finished >
+ * out.txt` and reply, it started the job (`task_started`,
+ * `is_backgrounded: true`), replied, printed its `result` -- and THEN sent
+ * `task_updated {status: "killed"}` and `task_notification {status:
+ * "stopped"}` for it. out.txt was never written. A printed run stops its
+ * background work when it ends, so "the teammate never came back when it
+ * finished" (Colin, 2026-09-21) was the work never finishing at all.
+ *
+ * `stopped-with-run` is that case, told apart by when it arrived: after the
+ * run's own result, nothing but the run ending could have stopped it. A stop
+ * before the result was somebody's decision mid-run, and says only `stopped`.
+ */
+export function backgroundEnding(
+  status: string | undefined,
+  afterResult: boolean,
+): "completed" | "failed" | "stopped" | "stopped-with-run" | "ended" {
+  if (status === "completed") return "completed";
+  if (status === "failed") return "failed";
+  if (status === "stopped" || status === "killed") return afterResult ? "stopped-with-run" : "stopped";
+  return "ended";
+}
+
+/**
  * What a Claude tool acted on, for the activity row to name.
  *
  * MEASURED 2026-09-03 by reading the card after a real run: every row said
@@ -307,6 +333,12 @@ export function createClaudeEventNormalizer(
   /** A subagent's type and one-line summary, by the Agent tool call that started it. */
   const subagentKinds = new Map<string, string>();
   const subagentSummaries = new Map<string, string>();
+  /**
+   * Work Claude Code is running in the background, by its task id, with the
+   * tool call that started it. The call returns at once; this is how its
+   * row later learns what became of the work.
+   */
+  const backgroundTasks = new Map<string, string | undefined>();
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
   let finalized = false;
@@ -442,6 +474,41 @@ export function createClaudeEventNormalizer(
       }
       if (subtype === "task_started" || subtype === "task_progress") {
         const taskId = identityValue(parsed.task_id) ?? "task";
+        /*
+         * BACKGROUND WORK IS NOT A HELPER, and it is not what the teammate
+         * is doing now.
+         *
+         * Claude Code reports a backgrounded command with the same record it
+         * uses for a subagent, and this read every one as a subagent: the
+         * live line took the command's description as the teammate's current
+         * step, and the ending landed on an item called `subagent:<task>`
+         * that no row is keyed by. The record says which it is
+         * (`is_backgrounded`) and names the call that started it
+         * (`tool_use_id`), so the step is keyed by that call and typed
+         * `background`, and the row for the call is what hears about it.
+         *
+         * The call itself is marked too. The runtime's word that it
+         * backgrounded the work is better evidence than the input flag, and
+         * it arrives before the call's result does.
+         */
+        const startedBy = identityValue(parsed.tool_use_id);
+        if (parsed.is_backgrounded === true || backgroundTasks.has(taskId)) {
+          const callId = startedBy ?? backgroundTasks.get(taskId);
+          backgroundTasks.set(taskId, callId);
+          const call = callId === undefined ? undefined : openTools.get(callId);
+          if (callId !== undefined && call !== undefined) openTools.set(callId, { ...call, background: true });
+          const doing = stringValue(parsed.description);
+          return [
+            emit("step.started", {
+              stepKind: "item",
+              itemId: callId ?? `background:${taskId}`,
+              itemType: "background",
+              status: "running",
+              ...(doing === undefined ? {} : { message: boundedMessageText(doing) }),
+              evidence,
+            }),
+          ];
+        }
         const kind = stringValue(parsed.subagent_type);
         const doing = stringValue(parsed.description);
         const tool = stringValue(parsed.last_tool_name);
@@ -461,6 +528,20 @@ export function createClaudeEventNormalizer(
       if (subtype === "task_notification") {
         const taskId = identityValue(parsed.task_id) ?? "task";
         const toolUseId = identityValue(parsed.tool_use_id);
+        if (backgroundTasks.has(taskId)) {
+          const callId = toolUseId ?? backgroundTasks.get(taskId);
+          backgroundTasks.delete(taskId);
+          const ended = backgroundEnding(stringValue(parsed.status), sawResult);
+          return [
+            emit(ended === "failed" ? "step.failed" : "step.completed", {
+              stepKind: "item",
+              itemId: callId ?? `background:${taskId}`,
+              itemType: "background",
+              status: ended,
+              evidence,
+            }),
+          ];
+        }
         const summary = stringValue(parsed.summary);
         if (toolUseId !== undefined && summary !== undefined) subagentSummaries.set(toolUseId, summary);
         const status = stringValue(parsed.status);
@@ -475,6 +556,13 @@ export function createClaudeEventNormalizer(
         ];
       }
       if (subtype === "task_updated" || subtype === "thinking_tokens") return [];
+      // The set of background tasks, restated whole each time it changes.
+      // Every fact in it arrives per task in `task_started` and
+      // `task_notification`, which also say which call each belongs to. Read
+      // as a turn opening -- the fall-through below -- it opened a step with
+      // nothing in it, and in the 2026-09-22 capture one of those came after
+      // the run's answer.
+      if (subtype === "background_tasks_changed") return [];
       return [
         emit("step.started", {
           stepKind: "turn",
