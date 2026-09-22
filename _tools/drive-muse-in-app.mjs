@@ -33,6 +33,8 @@ const workspace = await scratchRepository('locust-drive-muse-ws-')
 const drive = await startDrive({
   name: 'muse-in-app',
   port: 9317,
+  // Set only when this drive is asked to stand in for a signed-in machine.
+  env: process.env.LOCUST_FAKE_MUSE_KEY === undefined ? {} : { META_API_KEY: process.env.LOCUST_FAKE_MUSE_KEY },
   packaged: EXE,
   workspace,
   seed: {
