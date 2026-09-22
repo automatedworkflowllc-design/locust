@@ -6242,10 +6242,16 @@ textarea {
   margin: 0;
 }
 
+/*
+ * Set the way the wordmark is set -- see `--lc-title-*` in tokens.css. The
+ * screen's name is the one place the app names a place, so it borrows the
+ * logo's voice to do it.
+ */
 .lc-screen__title {
-  font-size: var(--lc-text-screen-title);
-  font-weight: 500;
-  letter-spacing: -0.015em;
+  font-size: var(--lc-title-size);
+  font-weight: var(--lc-title-weight);
+  letter-spacing: var(--lc-title-tracking);
+  text-transform: uppercase;
 }
 
 .lc-screen__meta {
@@ -6540,10 +6546,21 @@ textarea {
   border-top: 0;
 }
 
+/* A name inside a title -- a folder -- keeps its own spelling and weight. */
+.lc-title__name {
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* A section of Settings is a place too, so it is named the same way. The
+   `--section` block names below override every property set here. */
 .lc-settings__heading {
   margin: 0 0 var(--lc-space-2);
-  font-size: var(--lc-text-screen-title);
-  font-weight: 500;
+  font-size: var(--lc-title-size);
+  font-weight: var(--lc-title-weight);
+  letter-spacing: var(--lc-title-tracking);
+  text-transform: uppercase;
 }
 
 /*

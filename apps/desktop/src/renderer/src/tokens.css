@@ -113,6 +113,47 @@
   font-display: fallback;
 }
 
+/*
+ * FIGTREE: the app's own voice, since 0.267.0.
+ *
+ * Colin, 2026-09-22, after two rounds of type trials rendered from the app's
+ * own screens: Geist was the face he wanted gone -- neutral by design, with
+ * no relationship to the mono beside it or the wordmark above it, so the app
+ * read as three voices. He picked direction B: Figtree for everything the app
+ * says, and screen and section titles set the way the wordmark is set, bold
+ * capitals spaced wide (`--lc-title-*` below). Geist Mono and the reply serif
+ * are unchanged.
+ *
+ * Figtree is a geometric sans that stays crisp at 12-13px, where this app
+ * spends most of its time. One variable file per style covers every weight
+ * from 300 to 900, which is how titles get a real 700 without a third file.
+ * The italic is shipped too: two chrome states are set in italic (a connector
+ * that is not ready, the default folder) and Geist had none, so they were
+ * slanted by the browser.
+ *
+ * SIL Open Font License 1.1 -- FIGTREE-LICENSE.txt sits beside the files.
+ * Fetched 2026-09-22 from github.com/erikdkennedy/figtree at commit 032dfa7,
+ * fonts/webfonts/Figtree[wght].woff2 and Figtree-Italic[wght].woff2. 391
+ * characters against Geist's 728, all of Latin that the chrome uses (dashes,
+ * curly quotes, arrows, accented names); Geist stays next in the stack so a
+ * rarer character falls back to it rather than to Helvetica.
+ */
+@font-face {
+  font-family: 'Figtree';
+  src: url('./assets/fonts/Figtree-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'Figtree';
+  src: url('./assets/fonts/Figtree-Italic-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: italic;
+  font-display: fallback;
+}
+
 @font-face {
   font-family: 'Geist';
   src: url('./assets/fonts/Geist-Regular.woff2') format('woff2');
@@ -312,11 +353,27 @@
   --lc-clay-text: #f0aea6;
 
   /* --- Typography ------------------------------------------------------
-   * Weights 400/500 only -- no bold headings inside the app.
+   * Weights 400/500 in the chrome, and titles at 700: the handoff's "no bold
+   * headings inside the app" held until Colin chose the wordmark's treatment
+   * for them (2026-09-22). The decision and resume cards have always asked
+   * for 600 and got 500, because Geist shipped only 400 and 500; Figtree's
+   * variable file draws the 600 they asked for.
    * Floor is 10px and only for uppercase mono labels; everything readable
    * is >= 12px.
    */
-  --lc-font-ui: 'Geist', Helvetica, ui-sans-serif, system-ui, sans-serif;
+  --lc-font-ui: 'Figtree', 'Geist', Helvetica, ui-sans-serif, system-ui, sans-serif;
+  /*
+   * A TITLE IS SET THE WAY THE WORDMARK IS: bold capitals, spaced wide.
+   *
+   * Screen titles (Missions, Rooms, Routines, Team, Memory, Settings) and
+   * the section names inside Settings. Nothing else -- a teammate's name, a
+   * conversation, a dialog's action stay in sentence case, because the
+   * wordmark names places and those are not places. The size is the trial's,
+   * 17px: capitals read larger than the 20px lowercase title they replace.
+   */
+  --lc-title-size: 17px;
+  --lc-title-weight: 700;
+  --lc-title-tracking: 0.14em;
   --lc-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* The teammate's voice. Only the reply prose wears it; everything the app says stays in Geist. */
   /*

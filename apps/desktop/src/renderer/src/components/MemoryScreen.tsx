@@ -243,7 +243,11 @@ export function MemoryScreen({
         )}
 
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">This folder · {workspaceName}</h2>
+          {/* The folder's own name keeps its own spelling: titles are set in
+            * capitals, and a name is an identifier, not a title. */}
+          <h2 className="lc-settings__heading">
+            This folder · <span className="lc-title__name">{workspaceName}</span>
+          </h2>
           {here.length === 0 ? <p className="lc-settings__note">Nothing remembered for this folder yet.</p> : <div className="lc-memorylist">{here.map(row)}</div>}
         </section>
 
