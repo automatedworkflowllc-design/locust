@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -753,6 +753,33 @@ export function Thread({
   // one whose index is past every earlier turn.
   const markers = threadMarkers([...earlierTurns.map((turn) => turn.events), events])
   /*
+   * AN EARLIER TURN'S WORK IS BUILT ONCE, not on every render.
+   *
+   * It depends on that turn's events, whether this run may edit, the folder
+   * and the teammate -- none of which move while somebody reads, or while a
+   * teammate streams anywhere in the app. Rebuilding it anyway re-derived
+   * every fold, diff and file row of the whole conversation on every commit:
+   * measured on Colin's largest conversation (30 turns, 11.7k nodes) at 34 ms
+   * a re-render with nothing changed, more than two frames (2026-09-22).
+   *
+   * The SAME element object comes back while its inputs hold, and React skips
+   * a subtree whose element has not changed -- the folds keep their state,
+   * because nothing about them was touched.
+   */
+  const earlierWork = useMemo(
+    () =>
+      earlierTurns.map((turn) => (
+        <ThreadItems
+          items={buildThread(turn.events, { running: false, mayEdit, ...(workspacePath === undefined ? {} : { workspacePath }) })}
+          owner={peers.self}
+          activity="idle"
+          workspacePath={workspacePath}
+          decision={undefined}
+        />
+      )),
+    [earlierTurns, mayEdit, workspacePath, peers.self]
+  )
+  /*
    * The group's line, and its instructions on request -- shown AS THE
    * GROUP'S: read-only here, with the way to edit going to the group's own
    * header, so nobody edits shared text believing it is their own.
@@ -936,7 +963,7 @@ export function Thread({
               {joinNotes((beforeTurn) => beforeTurn === index)}
               {userTurn(turnPromptLine(turn), turnAttachments(turn))}
               {cardsFor(index, 'before-work').map(peerCard)}
-              <ThreadItems items={buildThread(turn.events, { running: false, mayEdit, ...(workspacePath === undefined ? {} : { workspacePath }) })} owner={peers.self} activity="idle" workspacePath={workspacePath} decision={undefined} />
+              {earlierWork[index]}
               {cardsFor(index, 'after-work').map(peerCard)}
               {/* What that turn taught the team, under that turn. */}
               <MemoryCard lines={memoriesOfTurn(peers.memories ?? [], turn.missionId)} />

@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.262.0 - 2026-09-22
+
+- **Long conversations stay smooth while a teammate works.** Whenever any
+  teammate was streaming, Locust redrew the conversation on screen from
+  scratch many times a second — every earlier turn, every fold, every diff.
+  On a 30-turn conversation that took about 34 milliseconds each time, longer
+  than a frame. Earlier turns are now drawn once and left alone until they
+  change: about 3 milliseconds. Nothing on screen looks different.
+
+- The Activity panel's timeline no longer slows the window down while it is
+  open.
+
 ## 0.261.0 - 2026-09-22
 
 - **Locust no longer stalls when a teammate finishes.** Every time a run

@@ -2799,11 +2799,17 @@ export function railLabel(value: string, limit = 72): string {
   return single.length <= limit ? single : `${single.slice(0, limit - 1)}…`
 }
 
-function clockOf(occurredAt: string): string {
+/*
+ * ONE formatter, made once. `toLocaleTimeString` with options builds a new
+ * one on every call -- about 74 us each -- and the Signal Rail formats every
+ * event on every render while it is open: 34 ms a render at the 500-event
+ * cap (renderer audit, 2026-09-22). Same options, so the same string.
+ */
+const RAIL_CLOCK = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
+export function clockOf(occurredAt: string): string {
   const parsed = new Date(occurredAt)
-  return Number.isFinite(parsed.getTime())
-    ? parsed.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : ''
+  return Number.isFinite(parsed.getTime()) ? RAIL_CLOCK.format(parsed) : ''
 }
 
 /**
