@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { KeyboardEvent, ReactElement } from 'react'
+import type { ReactElement } from 'react'
+import { useModal } from '../useModal.js'
 
 import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
@@ -100,16 +101,14 @@ export function NewTeammateDialog({
   const trimmed = name.trim()
   const canCreate = trimmed.length > 0
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onCancel()
-    }
-  }
+  // Focus in (the name field, above), Tab held inside, Escape closes -- from
+  // anywhere now, not only while focus happened to be in the dialog.
+  const box = useRef<HTMLDivElement>(null)
+  useModal(box, onCancel)
 
   return (
-    <div className="lc-scrim" onKeyDown={onKeyDown}>
-      <div className="lc-dialog" role="dialog" aria-modal="true" aria-label={editing ? 'Edit teammate' : 'New teammate'}>
+    <div className="lc-scrim">
+      <div ref={box} className="lc-dialog" role="dialog" aria-modal="true" aria-label={editing ? 'Edit teammate' : 'New teammate'}>
         <div className="lc-dialog__head">
           <span className="lc-dialog__title">{editing ? 'Edit teammate' : 'New teammate'}</span>
           <span className="lc-dialog__sub lc-mono">lives on this machine</span>

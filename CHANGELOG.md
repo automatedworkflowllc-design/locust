@@ -6,6 +6,14 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.264.0 - 2026-09-22
+
+- **Dialogs keep the keyboard.** In the routine editor, Tab walked out of the
+  dialog to the window buttons and the screen behind it, and Escape did
+  nothing once it had. The routine, teammate and group dialogs now keep Tab
+  inside, close on Escape wherever focus is, and hand focus back to the
+  button that opened them.
+
 ## 0.263.0 - 2026-09-22
 
 - **Tables in a reply follow your text size.** With replies set to Large, the

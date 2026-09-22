@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ReactElement } from 'react'
+import { useModal } from '../useModal.js'
 
 import type { PublicTeammate, RoutineSchedule } from '../../../shared/ipc.js'
 import { EVERY_HOURS_CHOICES } from '../../../shared/routine-schedule.js'
@@ -71,10 +72,13 @@ export function RoutineDialog({
 
   const kept = steps.filter((step) => step.trim().length > 0)
   const canSave = name.trim().length > 0 && kept.length > 0 && !busy && (!mustPick || runner.length > 0)
+  // Focus in, Tab held inside, Escape closes, focus back to the opener.
+  const box = useRef<HTMLDivElement>(null)
+  useModal(box, onCancel)
 
   return (
     <div className="lc-scrim">
-      <div className="lc-dialog" role="dialog" aria-modal="true" aria-label={editing ? 'Edit routine' : 'Save as routine'}>
+      <div ref={box} className="lc-dialog" role="dialog" aria-modal="true" aria-label={editing ? 'Edit routine' : 'Save as routine'}>
         <div className="lc-dialog__head">
           <span className="lc-dialog__title">{editing ? 'Edit routine' : 'Save as routine'}</span>
           <span className="lc-dialog__sub lc-mono">replayed step by step</span>
