@@ -77,7 +77,12 @@ try {
     const controls = [...document.querySelectorAll('.lc-control')]
     const box = row.getBoundingClientRect()
     const overflowing = controls.filter(c => c.getBoundingClientRect().right > box.right + 1).length
-    return controls.length + ' controls, ' + overflowing + ' past the right edge'
+    // The chain the width comes down through, so an overflow names its cause:
+    // the container query measures .lc-composer, the person sees the box.
+    const width = (selector) => { const el = document.querySelector(selector); return el ? Math.round(el.getBoundingClientRect().width) : null }
+    const chain = ['.lc-composer', '.lc-composer__inner', '.lc-composer__box', '.lc-composer__controls'].map(s => s + ' ' + width(s)).join(' / ')
+    const each = controls.map(c => (c.getAttribute('aria-label') || c.innerText.trim().slice(0, 18)) + ' ' + Math.round(c.getBoundingClientRect().width)).join(', ')
+    return controls.length + ' controls, ' + overflowing + ' past the right edge // ' + chain + ' // ' + each
   })()`))
 
   // A real mission, because the workroom and its inspector only exist once

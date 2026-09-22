@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.265.0 - 2026-09-22
+
+- **The controls under the message box stay inside it.** At the usual window
+  size the last button — the swarm mark — sat a few pixels past the box's
+  edge, and further once a file was attached; at the smallest window it sat
+  well outside. The row now fits at every size: a long folder name gives up
+  a little more of itself, and on a narrow window the controls take two
+  tidy rows instead of running off the end.
+
 ## 0.264.0 - 2026-09-22
 
 - **Dialogs keep the keyboard.** In the routine editor, Tab walked out of the

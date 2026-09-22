@@ -4642,7 +4642,17 @@ textarea {
   flex-wrap: nowrap;
 }
 
-.lc-composer {
+/*
+ * THE CONTAINER IS THE BOX THE ROW SITS IN, not the whole composer.
+ *
+ * It was `.lc-composer`, which spans the main column: 1056px at the 1120
+ * window beside the rail, while the box and the row under it are capped at
+ * 700 (measured by drive-compact, 2026-09-22). The 720px rule below could
+ * never fire there, so the row stayed on one line and the swarm mark sat
+ * past the box's right edge -- the "incidental" layout the beta review of
+ * 0.255.0 (#6) asked to make deliberate.
+ */
+.lc-composer__inner {
   container-type: inline-size;
 }
 
@@ -4664,6 +4674,14 @@ textarea {
 .lc-composer__group + .lc-composer__group {
   margin-left: auto;
   gap: var(--lc-space-5);
+  /*
+   * The right group never shrinks below what it holds. It did, and its
+   * chips do not shrink, so they spilled out of it -- the swarm mark 4px
+   * past the box at 1215px -- while the folder name on the left, the one
+   * thing built to give ground, never had to (measured 2026-09-22: every
+   * box up the chain had min-width 0; the overflow was INSIDE this group).
+   */
+  flex-shrink: 0;
 }
 
 /*
@@ -4758,12 +4776,23 @@ textarea {
    * a flat cap the row had no slack left to find -- attaching a file added a
    * chip and put it 14px over, with "fixed" running under the swarm mark
    * (Colin, 2026-09-08, watching a drive).
+   *
+   * 18ch -> 16ch (2026-09-22). At the ordinary 1215px window the row came to
+   * 771px in a 760px box and the swarm mark stood 11px past its edge in every
+   * frame of the day's sweep; two characters of folder name are the slack.
+   * Narrower windows now wrap the row on purpose (the container query).
    */
-  max-width: 18ch;
+  max-width: 16ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
+  /* And it GIVES GROUND when the row is short, which the comment above always
+     meant: without these the span's minimum was its own text, so an attached
+     file's chip still pushed the swarm mark 4px past the box at 1215px
+     (drive-composer-overflow, 2026-09-22). */
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 /* A model id can be far longer than the chip that names it -- OpenCode's free
