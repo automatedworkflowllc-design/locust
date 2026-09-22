@@ -425,22 +425,76 @@ describe("installed runtime discovery", () => {
   // probe came to be pointed at the wrong page.
   const MUSE_HELP = readFileSync(new URL("./fixtures/muse/exec-help.txt", import.meta.url), "utf8");
 
+  const museRunner: CommandRunner = {
+    run: async (command) =>
+      command.purpose === "capabilities"
+        ? { exitCode: 0, stdout: MUSE_HELP, stderr: "" }
+        : { exitCode: 0, stdout: MUSE_VERSION, stderr: "" },
+  };
+
+  /** Discovery with the credential lookup answered by this test, not the machine. */
+  async function museWith(lookup: { homeDirectory: string; variables: Record<string, string | undefined> }, signedIn: boolean) {
+    const found = await discoverInstalledRuntimes({
+      runner: museRunner,
+      locator: newcomerLocator("muse"),
+      credentialLookup: lookup,
+      // The only file this test admits to existing is the credential file,
+      // and only when it is meant to be signed in.
+      statFile: async (path: string) => {
+        if (signedIn && /auth\.json$/.test(path)) return { size: 64, mtimeMs: 1 };
+        throw new Error("ENOENT");
+      },
+    });
+    return found.filter((entry) => entry.id === "muse")[0];
+  }
+
   it("calls Muse Code ready from the line its own version command prints", async () => {
-    const runner: CommandRunner = {
-      run: async (command) =>
-        command.purpose === "capabilities"
-          ? { exitCode: 0, stdout: MUSE_HELP, stderr: "" }
-          : { exitCode: 0, stdout: MUSE_VERSION, stderr: "" },
-    };
-    const [muse] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("muse") }))
-      .filter((entry) => entry.id === "muse");
+    const muse = await museWith({ homeDirectory: "C:\Users\dev", variables: {} }, true);
     expect(muse?.availability).toBe("available");
     expect(muse?.readiness).toBe("ready");
     expect(muse?.version?.version).toBe("1.3.0");
     expect(muse?.supportedFeatures).toEqual(expect.arrayContaining([...MUSE_REQUIRED_FEATURES]));
-    // Version IS readiness here, so the caveat has to ride along saying the
-    // sign-in cannot be checked without spending money.
+    // Credentials exist, but whether they are valid and what plan they carry
+    // still costs a run to find out, so the caveat rides along.
     expect(JSON.stringify(muse)).toContain("readiness-unverifiable");
+  });
+
+  it("says nobody has signed in rather than calling Muse Code ready", async () => {
+    /*
+     * Colin, 2026-09-21, before paying for a plan: *"if it cant detect the
+     * account that the user has this is kind of brutal to add and force this
+     * process on the user"*.
+     *
+     * Muse has no free sign-in probe -- its only one is a real run, which
+     * costs money -- so readiness fell back to the version and the app called
+     * a never-signed-in machine READY. The person then met
+     * `missing meta credentials` mid-mission. One stat settles it.
+     */
+    const muse = await museWith({ homeDirectory: "C:\Users\dev", variables: {} }, false);
+    expect(muse?.availability).toBe("available");
+    expect(muse?.readiness).toBe("authentication-required");
+    expect(JSON.stringify(muse)).toContain("nobody has signed in on this machine");
+    expect(JSON.stringify(muse)).toContain("muse login");
+    // And it must NOT claim the weaker "we cannot tell" caveat: we can tell.
+    expect(JSON.stringify(muse)).not.toContain("readiness-unverifiable");
+  });
+
+  it("takes an API key as a credential, with no file at all", async () => {
+    // `META_API_KEY always takes priority over the account login` -- muse
+    // login --help. A machine set up that way has no auth.json and is signed
+    // in, so a file-only check would report SIGN IN over a working runtime.
+    const muse = await museWith(
+      { homeDirectory: "C:\Users\dev", variables: { META_API_KEY: "sk-not-a-real-key" } },
+      false,
+    );
+    expect(muse?.readiness).toBe("ready");
+  });
+
+  it("does not claim nobody signed in when it cannot look", async () => {
+    // No home directory to look under is not evidence of anything. Guessing
+    // SIGN IN there would be the same defect pointed the other way.
+    const muse = await museWith({ homeDirectory: "", variables: {} }, false);
+    expect(muse?.readiness).toBe("ready");
   });
 
   it("reports a signed-in Cursor Agent ready and reads its models off --list-models", async () => {

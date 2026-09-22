@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.249.0 - 2026-09-21
+
+- **Muse Code says when nobody has signed in.** It used to read as ready on a
+  machine that had never logged in, because the only way to ask Muse whether
+  you are signed in is to start a run, and a run on Muse costs money. So the
+  first thing you learned was a raw error in the middle of a mission. Locust
+  now checks for the credentials file Muse itself names, which costs nothing,
+  and the row reads **SIGN IN** with the command to run.
+
+  An API key in `META_API_KEY` counts as signed in, the same as Muse treats
+  it. And a machine Locust cannot look at is never reported as signed out —
+  not being able to check is not the same as knowing.
+
 ## 0.248.0 - 2026-09-21
 
 - **A Muse Code mission actually starts.** Every one of them stopped at

@@ -1,4 +1,6 @@
 import { stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { sep } from "node:path";
 
 import {
   CLAUDE_REQUIRED_FEATURES,
@@ -64,6 +66,30 @@ interface IntegrationDefinition {
    * it is a best guess stays visible.
    */
   readonly readinessCaveat?: RuntimeDiagnostic;
+  /**
+   * Where a runtime keeps its credentials, for the ones that offer no free
+   * way to ask whether they are signed in.
+   *
+   * MUSE CODE IS WHY THIS EXISTS. Its only sign-in signal is a real run,
+   * and a run on Muse costs money -- so readiness fell back to the version,
+   * and Muse read READY on a machine that had never logged in. Colin,
+   * 2026-09-21: *"if it cant detect the account that the user has this is
+   * kind of brutal to add and force this process on the user"*. He is
+   * right: the first thing a new person would learn is a raw CLI error, in
+   * the middle of a mission, after choosing a runtime the app called ready.
+   *
+   * A file is not a valid credential -- a token can be expired or a plan
+   * unpaid, and neither shows here. It is the difference between "we cannot
+   * tell" and "nobody has signed in on this machine", and the second is
+   * worth saying out loud for free. What it buys is the ordinary SIGN IN
+   * row with the command on it, the same as every other runtime.
+   */
+  readonly credentials?: {
+    /** Environment variables that stand in for the file. */
+    readonly environment: readonly string[];
+    /** Path segments under the user's home directory. */
+    readonly homePath: readonly string[];
+  };
 }
 
 const DEFINITIONS: readonly IntegrationDefinition[] = [
@@ -244,12 +270,26 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
      * only reliable answer is not to write source through a heredoc.
      */
     readyWhen: (result) => /muse code\s+\d/i.test(`${result.stdout}\n${result.stderr}`),
+    /*
+     * MEASURED signed-out, 2026-09-21: the run stops with
+     *
+     *   missing meta credentials: run `muse login` or set META_API_KEY, or
+     *   save credentials at C:\Users\<you>\.config\muse\auth.json
+     *
+     * So Muse names the file itself. Checking whether it is there costs one
+     * stat and settles the common case for free -- see `credentials` on the
+     * definition type for why that matters more than it sounds.
+     */
+    credentials: {
+      environment: ["META_API_KEY"],
+      homePath: [".config", "muse", "auth.json"],
+    },
     readinessCaveat: {
       code: "readiness-unverifiable",
       severity: "info",
       message:
-        "Muse Code is installed as far as its version command can tell; whether this machine is "
-        + "signed in cannot be checked without starting a run, and a run on Muse costs money.",
+        "Muse Code has credentials on this machine, but whether they are still valid and what "
+        + "plan they carry cannot be checked without starting a run, and a run on Muse costs money.",
       resolution:
         "If a run fails with 'missing meta credentials', run `muse login` in a terminal.",
     },
@@ -395,12 +435,51 @@ function diagnostic(
   return value;
 }
 
+/**
+ * Where to look for a credential, kept as data so a test can answer without
+ * a home directory and without the machine's real environment.
+ */
+export interface CredentialLookup {
+  readonly homeDirectory: string;
+  readonly variables: Readonly<Record<string, string | undefined>>;
+}
+
+/**
+ * Whether a runtime that keeps its credentials in a file has none.
+ *
+ * `false` for every runtime that does not declare `credentials` -- this must
+ * never change an answer for a runtime with a real sign-in probe. And `false`
+ * when the check cannot be made at all: a home directory we cannot read is
+ * not evidence that nobody signed in, and reporting SIGN IN on a guess would
+ * be the same defect pointed the other way.
+ */
+export async function missingCredentials(
+  definition: IntegrationDefinition,
+  statFile: StatFile,
+  lookup: CredentialLookup,
+): Promise<boolean> {
+  const credentials = definition.credentials;
+  if (credentials === undefined) return false;
+  for (const name of credentials.environment) {
+    if ((lookup.variables[name] ?? "").trim().length > 0) return false;
+  }
+  if (lookup.homeDirectory.length === 0) return false;
+  const path = [lookup.homeDirectory, ...credentials.homePath].join(sep);
+  try {
+    await statFile(path);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 async function discoverOne(
   definition: IntegrationDefinition,
   runner: CommandRunner,
   locator: ExecutableLocator,
   recall: RuntimeFactsCache | undefined,
   statFile: StatFile,
+  environment: CredentialLookup,
 ): Promise<RuntimeDiscovery> {
   const executable = await locator.find(definition.commandName);
   if (!executable) {
@@ -551,7 +630,25 @@ async function discoverOne(
 
   let readiness: RuntimeReadiness = missingFeatures.length > 0 ? "unsupported" : "unknown";
   if (missingFeatures.length === 0) {
-    if (succeeded(readinessOutcome) && (definition.readyWhen?.(readinessOutcome.result) ?? true)) {
+    const signedOut = await missingCredentials(definition, statFile, environment);
+    if (signedOut) {
+      /*
+       * The probe said ready and the credential file is not there. For a
+       * runtime whose readiness IS its version -- the only kind that can
+       * carry `credentials` -- that combination means exactly one thing:
+       * installed, never signed in. Said here, for free, instead of as a
+       * raw CLI error in the middle of somebody's first mission.
+       */
+      readiness = "authentication-required";
+      diagnostics.push(
+        diagnostic({
+          code: "authentication-required",
+          severity: "warning",
+          message: `${definition.displayName} is installed but nobody has signed in on this machine.`,
+          resolution: `Run \`${definition.commandName} login\` in a terminal, then retry discovery.`,
+        }),
+      );
+    } else if (succeeded(readinessOutcome) && (definition.readyWhen?.(readinessOutcome.result) ?? true)) {
       readiness = "ready";
       if (definition.readinessCaveat !== undefined) {
         diagnostics.push(diagnostic(definition.readinessCaveat));
@@ -667,6 +764,8 @@ export interface DiscoverInstalledRuntimesOptions {
   readonly recall?: RuntimeFactsCache;
   /** Test seam: how a file's size and modification time are read. */
   readonly statFile?: StatFile;
+  /** Test seam: where a credential file would live, and what is exported. */
+  readonly credentialLookup?: CredentialLookup;
 }
 
 /**
@@ -698,6 +797,10 @@ export async function discoverInstalledRuntimes(
     ? DEFINITIONS.filter((definition) => definition.id !== "omniroute")
     : DEFINITIONS;
   const stagger = options.staggerMs ?? 0;
+  const credentialLookup: CredentialLookup = options.credentialLookup ?? {
+    homeDirectory: homedir(),
+    variables: process.env,
+  };
   const statFile = options.statFile ?? (async (path: string) => {
     const stats = await stat(path);
     return { size: stats.size, mtimeMs: stats.mtimeMs };
@@ -751,7 +854,7 @@ export async function discoverInstalledRuntimes(
           displayName: definition.displayName,
           bin: definition.commandName,
         });
-        const running = discoverOne(definition, options.runner, options.locator, options.recall, statFile);
+        const running = discoverOne(definition, options.runner, options.locator, options.recall, statFile, credentialLookup);
         if (stagger > 0) {
           void Promise.race([
             running.then(

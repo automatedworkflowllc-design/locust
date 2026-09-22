@@ -91,7 +91,12 @@ const verdict = `(() => {
   const ledgerCard = /mission ledger could not be written/i.test(text)
   const credentials = /missing meta credentials|muse login|META_API_KEY/i.test(text)
   const header = document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''
-  const card = [...document.querySelectorAll('.lc-stopcard, .lc-failure, [class*=stop], [class*=fail]')]
+  // .lc-card.is-terminal is what Thread.tsx actually draws for a run that
+  // ended badly -- the ledger-failure card included. The first version of
+  // this line guessed at .lc-stopcard and .lc-failure, which exist nowhere,
+  // and harness-selectors.test.ts refused it. That test is the reason a
+  // drive cannot quietly report an empty string as "no failure card".
+  const card = [...document.querySelectorAll('.lc-card.is-terminal')]
     .map(n => n.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean)[0] ?? ''
   return 'LEDGER STOPPED IT: ' + (ledgerCard ? 'YES -- the bug is back' : 'no')
     + ' || Muse asked to sign in: ' + (credentials ? 'yes' : 'no')
