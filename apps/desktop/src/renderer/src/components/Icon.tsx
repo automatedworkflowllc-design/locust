@@ -28,6 +28,7 @@ export type IconName =
   | 'message'
   | 'minimize'
   | 'pause'
+  | 'pencil'
   | 'play'
   | 'plus'
   | 'route'
@@ -84,6 +85,22 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }): Re
     settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></>,
     shield: <><path d="M12 3 5 6v5c0 4.7 2.8 8.2 7 10 4.2-1.8 7-5.3 7-10V6z" /><path d="m9 12 2 2 4-5" /></>,
     spark: <><path d="m12 3 1.3 4.3L18 9l-4.7 1.7L12 15l-1.3-4.3L6 9l4.7-1.7z" /><path d="m18.5 15 .7 2.2 2.3.8-2.3.8-.7 2.2-.7-2.2-2.3-.8 2.3-.8z" /></>,
+    /*
+     * THE ONE ADDITION, and it was asked for rather than assumed.
+     *
+     * The 2026-09-21 design brief drew Edit as a pencil and said so plainly:
+     * `IconName` has 32 names -- `settings`, `dots`, `code` among them -- and
+     * not one means edit. So a pencil is a new glyph, not a lookup, and the
+     * brief offered a fallback (Edit keeps its word) in case it was not
+     * wanted. Colin sent a second design showing the same pencil, so it is
+     * wanted.
+     *
+     * Drawn in this set's idiom, not imported: the 24 box, 1.7 stroke and
+     * round caps the wrapper already applies. The nib and the body are one
+     * line; the short stroke is the ferrule, which is what stops it reading
+     * as an arrow at 13px.
+     */
+    pencil: <><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z" /><path d="m14.5 6.5 3 3" /></>,
     terminal: <><path d="m5 7 4 4-4 4" /><path d="M11 16h8" /></>,
     users: <><circle cx="9" cy="8" r="3" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M15 6.5a3 3 0 0 1 0 5.8" /><path d="M17 14a5 5 0 0 1 3.5 5" /></>
   }

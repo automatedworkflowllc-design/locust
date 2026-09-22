@@ -121,7 +121,7 @@ try {
     let text = ''
     for (let i = 0; i < 120; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const found = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
+      const found = [...document.querySelectorAll('.lc-teammate, .lc-conv')].find(r => /Wren|routine/i.test(r.innerText))
       text = found?.innerText ?? ''
       if (/routine · step/.test(text)) break
     }
@@ -139,12 +139,23 @@ try {
       if (wren && /working|running|starting|replying/i.test(wren.innerText)) return 'sidebar: ' + wren.innerText.replace(/\\s+/g, ' ').slice(0, 160)
       if (document.querySelector('button[aria-label^="Stop the running"]')) return 'a run is live: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 160)
     }
-    return 'nothing started in two minutes: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 160)
+    // A miss must say what it looked AT, not just that it saw nothing. This
+    // waited on .lc-teammate rows and reported "nothing started" across two
+    // minutes of a run that had in fact happened -- the sidebar draws those
+    // rows in one branch only. Blind, not broken.
+    const rails = document.querySelectorAll('.lc-teammate').length
+    const convs = document.querySelectorAll('.lc-conv').length
+    return 'nothing seen to start in two minutes (rail rows: ' + rails + ', conversation rows: ' + convs + '): '
+      + (document.querySelector('.lc-sidebar')?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? 'no sidebar')
   })()`))
   await drive.capture('open that run: who started it', () => drive.evaluate(`(async () => {
-    const row = [...document.querySelectorAll('.lc-teammate__mission')][0]
-    if (row) row.click()
-    await new Promise(r => setTimeout(r, 800))
+    // .lc-conv is the sidebar's conversation row; .lc-teammate__mission
+    // belongs to a list this screen does not draw, so this clicked
+    // nothing and then reported the header it never opened as missing.
+    const row = document.querySelector('.lc-conv') ?? document.querySelector('.lc-teammate__mission')
+    if (!row) return 'NO CONVERSATION ROW to open'
+    row.click()
+    await new Promise(r => setTimeout(r, 1200))
     return (document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? 'no header')
   })()`))
   await drive.capture('let it finish, then the Team card', () => drive.evaluate(`(async () => {

@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.253.0 - 2026-09-22
+
+- **The Routines list is a card, and a routine is two lines instead of
+  three.** Each one takes 54px now, against 105px two builds ago — four fit
+  in the room one and a half used to take.
+- **A routine's schedule is a chip you can scan**, not a third line of prose
+  under the name. A routine with no schedule says "no schedule" rather than
+  leaving the space blank, which read as something that had failed to load.
+- **Edit and Remove are icon buttons**, so Run — the thing you came to press
+  — is the only worded control on the row. Both icons carry a tooltip and a
+  screen-reader name.
+
 ## 0.252.0 - 2026-09-22
 
 - **New room is a card.** The name field, the teammate chips and the Create

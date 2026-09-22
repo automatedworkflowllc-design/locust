@@ -194,7 +194,7 @@ export function AutomationsScreen({
           )}
         </div>
       ) : (
-        <div className="lc-routinelist">
+        <div className="lc-routinelist lc-settingcard">
           {ordered.map((routine) => {
             const owner = ownerOf(routine)
             const schedule = routineScheduleSummary(routine, now)
@@ -224,9 +224,13 @@ export function AutomationsScreen({
                         older than that work. */}
                     {routineRunSummary(routine)}
                   </span>
-                  {schedule !== undefined && (
-                    <span className="lc-routinerow__meta lc-mono lc-routinerow__sched">{schedule}</span>
-                  )}
+                </span>
+                {/* The schedule as a CHIP, not a third prose line. It is the
+                    one fact on the row a person scans for -- does this go on
+                    its own, or only when I press Run -- and as prose under
+                    the meta it read as more of the same sentence. */}
+                <span className="lc-routinerow__sched lc-mono">
+                  {schedule ?? 'no schedule'}
                 </span>
                 <button
                   type="button"
@@ -244,17 +248,33 @@ export function AutomationsScreen({
                   Run
                 </button>
                 <span className="lc-routinerow__meta">
-                  <button type="button" className="lc-ghostbutton" onClick={() => onEditRoutine(routine)}>
-                    Edit
-                  </button>
-                  {/* Named so it can differ on hover. Destructive and the
-                      point of the screen were the same control before. */}
+                  {/*
+                    * Run keeps its word; the other two become icons.
+                    *
+                    * All three were `lc-ghostbutton` -- one class, one
+                    * appearance -- so the point of the screen and the
+                    * destructive thing looked identical. Run is what a
+                    * person came to press, so it stays a word. Both icons
+                    * carry `title` AND `aria-label`, because an icon with
+                    * neither is a button nobody can name.
+                    */}
                   <button
                     type="button"
-                    className="lc-ghostbutton lc-routinerow__remove"
+                    className="lc-ghostbutton lc-iconbutton"
+                    title="Edit routine"
+                    aria-label={`Edit ${routine.name}`}
+                    onClick={() => onEditRoutine(routine)}
+                  >
+                    <Icon name="pencil" size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="lc-ghostbutton lc-iconbutton lc-routinerow__remove"
+                    title="Remove routine"
+                    aria-label={`Remove ${routine.name}`}
                     onClick={() => onRemoveRoutine(routine.routineId)}
                   >
-                    Remove
+                    <Icon name="close" size={14} />
                   </button>
                 </span>
                 {/*
