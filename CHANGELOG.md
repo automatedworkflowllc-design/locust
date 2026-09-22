@@ -6,6 +6,17 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.250.0 - 2026-09-22
+
+- **A teammate on its own branch can read again.** In Ask or Plan mode, on
+  the free OpenCode model, every such run came back with "OpenCode's free
+  tier can only be used from within OpenCode" and nothing else. Three of the
+  app's own defaults at once — the recommended free model, the mode a careful
+  person picks first, and Own branch — and the combination was the only one
+  that failed. The permission Locust sent for those runs denied the shell
+  tool outright, and the provider reads a client with no shell tool as not
+  being OpenCode.
+
 ## 0.249.0 - 2026-09-21
 
 - **Muse Code says when nobody has signed in.** It used to read as ready on a

@@ -1003,11 +1003,48 @@ describe("OpenCode and Copilot CLI commands", () => {
       permission: {
         edit: "deny",
         write: "deny",
-        bash: "deny",
+        /*
+         * "ask", and THIS LINE ASSERTED "deny" UNTIL 2026-09-22.
+         *
+         * The bisect recorded in the sibling test above -- a run offering no
+         * bash tool is refused by the free provider with "OpenCode's free
+         * tier can only be used from within OpenCode" -- was applied to
+         * `OPENCODE_READ_ONLY_CONFIG` and to its test, and not to the
+         * worktree builder or to this one. So the same defect survived in
+         * the path that combines three of the app's defaults: a teammate on
+         * its own branch, in Ask or Plan mode, on the free model the first
+         * screen recommends.
+         *
+         * REPRODUCED 2026-09-22 against opencode-ai 1.18.27 by sending both
+         * configs to the real provider: "deny" returns HTTP 403
+         * `FreeTierError`, "ask" answers. A test that agrees with the code
+         * and disagrees with the provider is worse than no test.
+         */
+        bash: "ask",
         patch: "deny",
         external_directory: { "C:\\work\\shop\\.git\\*": "allow", "*": "deny" },
       },
     });
+
+    /*
+     * The drift guard, which is the actual repair.
+     *
+     * Two builders write the same read-only denials, and a correction landed
+     * on one of them. Whatever those denials become, both must carry them --
+     * so this compares the two rather than restating either, and a future
+     * change to one alone fails here instead of at a person's first mission.
+     */
+    const plain = JSON.parse(
+      createOpenCodeRunCommand(openCode, { workspacePath, sandbox: "read-only", prompt: PROMPT })
+        .env?.OPENCODE_CONFIG_CONTENT ?? "{}",
+    ) as { permission: Record<string, unknown> };
+    const inWorktree = JSON.parse(readOnly.env?.OPENCODE_CONFIG_CONTENT ?? "{}") as {
+      permission: Record<string, unknown>;
+    };
+    for (const rule of ["edit", "write", "bash", "patch"]) {
+      expect(inWorktree.permission[rule], `${rule} differs between a plain read-only run and a worktree one`)
+        .toBe(plain.permission[rule]);
+    }
 
     // And a run in the folder itself asks for nothing extra -- the negative
     // control, without which every assertion above passes on a builder that

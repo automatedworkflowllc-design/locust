@@ -958,6 +958,31 @@ export const COPILOT_MODEL_HINTS: RuntimeModelHints = {
  * instruction the model narrates ("In PLAN MODE -- read-only") and not a rule
  * anything upholds, so it is never what a read-only mission rests on.
  */
+/**
+ * The read-only denials, in ONE place, because they were in two and drifted.
+ *
+ * `OPENCODE_READ_ONLY_CONFIG` was corrected on 2026-09-18 from `bash: deny`
+ * to `bash: ask` -- see the long note below for the bisect that found it.
+ * `opencodeWorktreeConfig` builds the same denials for a worktree run and
+ * was NOT corrected, so it kept `bash: "deny"` and kept the 403.
+ *
+ * The blast radius of that miss: a teammate with its own branch, in Ask or
+ * Plan mode, on the free model the first screen recommends -- which is three
+ * defaults at once -- answered nothing but
+ * "OpenCode's free tier can only be used from within OpenCode".
+ *
+ * REPRODUCED 2026-09-22 against opencode-ai 1.18.27 on the free model, both
+ * ways round, from the two configs this file actually builds: `deny` returns
+ * HTTP 403 `FreeTierError`, `ask` answers. Spreading one object means the
+ * next correction cannot land on one of them.
+ */
+const OPENCODE_READ_ONLY_PERMISSIONS = {
+  edit: "deny",
+  write: "deny",
+  bash: "ask",
+  patch: "deny",
+} as const;
+
 export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
   /*
    * `bash` is "ask", NOT "deny", and the difference is whether the free model
@@ -989,7 +1014,7 @@ export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
    * left to the default, a look outside the folder ends the run rather than
    * being refused.
    */
-  permission: { edit: "deny", write: "deny", bash: "ask", patch: "deny", external_directory: "deny" },
+  permission: { ...OPENCODE_READ_ONLY_PERMISSIONS, external_directory: "deny" },
 });
 
 /**
@@ -1011,7 +1036,12 @@ export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
 export function opencodeWorktreeConfig(repositoryRoot: string, readOnly: boolean): string {
   return JSON.stringify({
     permission: {
-      ...(readOnly ? { edit: "deny", write: "deny", bash: "deny", patch: "deny" } : {}),
+      // `bash` is "ask" here for the same measured reason it is "ask" in
+      // OPENCODE_READ_ONLY_PERMISSIONS: denying it outright makes the free
+      // provider refuse the run as somebody else's client. This line said
+      // "deny" until 2026-09-22, and it cost every read-only worktree run
+      // on the free model -- three defaults at once.
+      ...(readOnly ? OPENCODE_READ_ONLY_PERMISSIONS : {}),
       external_directory: { [`${repositoryRoot}\\.git\\*`]: "allow", "*": "deny" },
     },
   });

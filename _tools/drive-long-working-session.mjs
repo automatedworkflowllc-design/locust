@@ -69,16 +69,48 @@ const reading = `(() => {
 
 const send = (text) => `(async () => {
   const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  // A missing composer used to throw inside setter.call, which surfaces as a
+  // stack trace attributed to the evaluate rather than as "the screen this
+  // drive expected was not there". Name it.
+  if (!box) return 'NO COMPOSER: textareas present: ' + document.querySelectorAll('textarea').length
   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
   setter.call(box, ${JSON.stringify(text)})
   box.dispatchEvent(new Event('input', { bubbles: true }))
   await new Promise(r => setTimeout(r, 200))
-  box.focus()
-  box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-  for (let i = 0; i < 180; i += 1) {
-    await new Promise(r => setTimeout(r, 1000))
-    const head = document.querySelector('.lc-workroom__header, header')?.textContent ?? ''
-    if (!/running|starting/i.test(head)) return 'done'
+  /*
+   * PRESS THE BUTTON A PERSON PRESSES.
+   *
+   * This dispatched a bare Enter keydown, which only works while the
+   * composer's own key handler is what starts a mission -- so the day a
+   * disabled-send rule or a different handler lands, the drive stops sending
+   * and reports twelve turns of "done" over a thread that never moved.
+   * Clicking the real control also waits for it to become ENABLED, which is
+   * the send-blocked state this app now has. Enter stays as the fallback so
+   * the drive still runs if the button is renamed.
+   */
+  let started = false
+  for (let i = 0; i < 120; i += 1) {
+    const button = document.querySelector('button[aria-label="Start mission"]')
+    if (button && !button.disabled) { button.click(); started = true; break }
+    await new Promise(r => setTimeout(r, 250))
+  }
+  if (!started) {
+    box.focus()
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  }
+  /*
+   * WAIT ON THE STOP BUTTON, not on header text.
+   *
+   * The header was matched for /running|starting/, so a header that words it
+   * differently -- or a turn whose header has not been written yet when the
+   * first poll lands -- reads as finished immediately. The Stop button exists
+   * for exactly as long as a run does; its absence is the fact, not a word.
+   */
+  const stopping = () => document.querySelector('button[aria-label^="Stop the running"]') !== null
+  for (let i = 0; i < 60 && !stopping(); i += 1) await new Promise(r => setTimeout(r, 250))
+  for (let i = 0; i < 360; i += 1) {
+    await new Promise(r => setTimeout(r, 500))
+    if (!stopping()) return started ? 'done' : 'done (sent with Enter)'
   }
   return 'still running'
 })()`
@@ -88,7 +120,24 @@ const trend = []
 try {
   await drive.capture('launch, on a free model', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    /*
+     * MATCH ON THE NAME, and read `aria-label` as well as `title`.
+     *
+     * This looked for a title STARTING "Message Wren". MEASURED on the
+     * packaged 0.249.0 build: the button reads
+     * `Wren — open their conversation`. So the find returned undefined, the
+     * optional call swallowed it silently, and the drive went on to pick a
+     * route in whatever screen it happened to be on -- the exact failure
+     * `drive-routine.mjs` still throws on at its step 2.
+     */
+    await drive.evaluate(`(async () => {
+      const buttons = [...document.querySelectorAll('button')]
+      const who = buttons.find(b => /Wren/.test((b.getAttribute('title') ?? '') + ' ' + (b.getAttribute('aria-label') ?? '')))
+      if (!who) return 'NO TEAMMATE BUTTON: ' + buttons.map(b => b.getAttribute('title') ?? b.getAttribute('aria-label') ?? '').filter(Boolean).join(' / ').slice(0, 300)
+      who.click()
+      await new Promise(r => setTimeout(r, 600))
+      return 'opened'
+    })()`)
     return drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
   })
 
@@ -112,8 +161,16 @@ try {
   await drive.capture('is the newest turn reachable without hunting', () => drive.evaluate(`(() => {
     // The thing that actually matters: after a long session, is the person
     // looking at the newest work, or at the top of a wall?
-    const scroller = document.querySelector('.lc-thread')?.parentElement ?? document.querySelector('.lc-thread')
-    if (scroller === null) return 'no scroller'
+    //
+    // Found the same way the measurement above finds it. This line used to
+    // read .lc-thread's parentElement -- the very element the comment on the
+    // reading script says does not scroll, and whose ratio of exactly 1 is
+    // the false-green that comment was written about. Two ways of finding
+    // one element, one of them already known to be wrong.
+    const scroller = [...document.querySelectorAll('*')]
+      .filter((el) => el.scrollHeight > el.clientHeight + 40)
+      .sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
+    if (scroller === undefined) return 'no element on this screen scrolls'
     const fromBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
     return 'pixels above the bottom: ' + Math.round(fromBottom) + (fromBottom < 80 ? ' (pinned to the newest turn)' : ' (NOT at the newest turn)')
   })()`))

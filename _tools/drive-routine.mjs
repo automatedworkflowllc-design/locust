@@ -28,10 +28,18 @@ let handoff
 try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('one message to Wren, and its reply', () => drive.evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren') || b.getAttribute('aria-label')?.includes('Wren'))
+    // STEP 2 THREW HERE, and every later step then tested an empty list.
+    // The title is 'Wren — open their conversation' on 0.249.0, not
+    // 'Message Wren', so the find returned undefined and .click() threw.
+    // Matched on the name now, across title and aria-label, and a miss says
+    // what was on screen instead of dying.
+    const buttons = [...document.querySelectorAll('button')]
+    const who = buttons.find(b => /Wren/.test((b.getAttribute('title') ?? '') + ' ' + (b.getAttribute('aria-label') ?? '')))
+    if (!who) return 'NO TEAMMATE BUTTON: ' + buttons.map(b => b.getAttribute('title') ?? b.getAttribute('aria-label') ?? '').filter(Boolean).join(' / ').slice(0, 300)
     who.click()
     await new Promise(r => setTimeout(r, 500))
     const field = document.querySelector('form.command-dock textarea')
+    if (!field) return 'NO COMPOSER: textareas present: ' + document.querySelectorAll('textarea').length
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
     setter.call(field, 'Reply with exactly the word ALPHA and nothing else.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
@@ -47,15 +55,23 @@ try {
     return 'still running'
   })()`))
   await drive.capture('right-click the conversation: the row menu', () => drive.evaluate(`(async () => {
-    const row = document.querySelector('.lc-teammate__mission')
-    if (!row) return 'no conversation row'
+    // .lc-conv is the sidebar's conversation row -- the one whose
+    // onContextMenu opens the mission menu (Sidebar.tsx). This looked for
+    // .lc-teammate__mission, which is a different list, so step 3 found
+    // nothing and steps 4-6 then tested an empty menu.
+    const row = document.querySelector('.lc-conv') ?? document.querySelector('.lc-teammate__mission')
+    if (!row) return 'NO CONVERSATION ROW; sidebar classes: ' + [...new Set([...document.querySelectorAll('.lc-sidebar *')].map(n => String(n.className).split(' ')[0]).filter(Boolean))].join(' / ').slice(0, 300)
     row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 260 }))
     await new Promise(r => setTimeout(r, 400))
     return 'menu: ' + [...document.querySelectorAll('[role=menu] button, [role=menuitem]')].map(b => b.innerText.trim()).join(' / ')
   })()`))
   await drive.capture('Save as routine: the dialog', () => drive.evaluate(`(async () => {
-    const item = [...document.querySelectorAll('[role=menu] button, [role=menuitem]')].find(b => /Save as routine/.test(b.innerText))
-    if (!item) return 'no menu item'
+    // The row menu says "Save CONVERSATION as routine" (App.tsx); the dialog
+    // it opens is still aria-labelled "Save as routine". Matching the
+    // dialog's wording against the menu found nothing, so this step reported
+    // "no menu item" over a menu that had the item in it.
+    const item = [...document.querySelectorAll('[role=menu] button, [role=menuitem]')].find(b => /Save (conversation )?as routine/i.test(b.innerText))
+    if (!item) return 'NO MENU ITEM; menu reads: ' + [...document.querySelectorAll('[role=menu] button, [role=menuitem]')].map(b => b.innerText.replace(/\\s+/g, ' ').trim()).join(' / ').slice(0, 300)
     item.click()
     await new Promise(r => setTimeout(r, 500))
     const dialog = document.querySelector('[role=dialog][aria-label="Save as routine"]')
