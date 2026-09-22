@@ -421,6 +421,9 @@ export function ActivityCard({
                     >
                       {entry.title ?? entry.command}
                     </span>
+                    {entry.background === true && (
+                      <span className="lc-shellbadge is-background lc-mono">in the background</span>
+                    )}
                     {entry.output !== undefined && entry.settled && (
                       <span className="lc-filerow__result is-muted">no output</span>
                     )}
@@ -446,6 +449,23 @@ export function ActivityCard({
                         * evidence.
                         */}
                       <span className="lc-filerow__path">{entry.title ?? entry.command}</span>
+                      {/*
+                        * SENT TO THE BACKGROUND, said on the row.
+                        *
+                        * Claude Code's Bash tool takes `run_in_background`
+                        * and the flag rides on the same input this row
+                        * already reads for the command and the description.
+                        * Without it, a call the runtime was told not to wait
+                        * for looked exactly like one it waited for -- which
+                        * is most of why a finished background task reads as
+                        * a turn that just stopped (Colin, 2026-09-21).
+                        *
+                        * It says what the CALL was. It does not claim to
+                        * know when the work ended.
+                        */}
+                      {entry.background === true && (
+                        <span className="lc-shellbadge is-background lc-mono">in the background</span>
+                      )}
                       <span className="lc-activity__chev" aria-hidden="true">
                         <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
                       </span>

@@ -35,6 +35,7 @@ export type {
   CodexAppServerRunOptions,
 } from "./codex-app-server-run.js";
 export {
+  claudeToolBackgrounded,
   claudeToolTitle,
   createClaudeEventNormalizer,
   limitKindFor,

@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.257.0 - 2026-09-22
+
+- **A command sent to the background says so.** Claude Code can be told not
+  to wait for a command, and Locust drew that call exactly like one it had
+  waited for — which is most of why a background task that finishes reads as
+  a turn that simply stopped. The row now says **in the background**.
+
+  It says what the call was, not when the work ended. Nothing brings the
+  teammate back yet.
+
 ## 0.256.0 - 2026-09-22
 
 - **A turn no longer says `959 min in`.** Time markers count in units a

@@ -129,6 +129,23 @@ export function claudeToolTitle(name: string, input: unknown): string | undefine
 }
 
 /**
+ * Whether Claude Code was asked to run this call in the background.
+ *
+ * Its Bash tool takes `run_in_background`, and the flag rides on the same
+ * `tool_use` input block this adapter already opens for the command and the
+ * description. It was read for neither until now, so the one fact any
+ * runtime gives us about backgrounded work was arriving and being dropped.
+ *
+ * Bash only, because that is the tool that takes the flag. Reading it off
+ * every tool would invent the field on tools that do not have it.
+ */
+export function claudeToolBackgrounded(name: string, input: unknown): boolean {
+  if (name !== "Bash") return false;
+  if (!isObject(input)) return false;
+  return input.run_in_background === true;
+}
+
+/**
  * What a Claude tool acted on, for the activity row to name.
  *
  * MEASURED 2026-09-03 by reading the card after a real run: every row said
@@ -286,7 +303,7 @@ export function createClaudeEventNormalizer(
   const now = context.now ?? (() => new Date());
 
   /** Text buffers per content block index, so a replace can be recognised. */
-  const openTools = new Map<string, { name: string; target?: string; title?: string }>();
+  const openTools = new Map<string, { name: string; target?: string; title?: string; background?: boolean }>();
   /** A subagent's type and one-line summary, by the Agent tool call that started it. */
   const subagentKinds = new Map<string, string>();
   const subagentSummaries = new Map<string, string>();
@@ -530,8 +547,14 @@ export function createClaudeEventNormalizer(
         if (open === undefined) continue;
         const target = claudeToolTarget(open.name, block.input);
         const title = claudeToolTitle(open.name, block.input);
-        if (target !== undefined || title !== undefined) {
-          openTools.set(itemId, { ...open, ...(target === undefined ? {} : { target }), ...(title === undefined ? {} : { title }) });
+        const background = claudeToolBackgrounded(open.name, block.input);
+        if (target !== undefined || title !== undefined || background) {
+          openTools.set(itemId, {
+            ...open,
+            ...(target === undefined ? {} : { target }),
+            ...(title === undefined ? {} : { title }),
+            ...(background ? { background: true } : {})
+          });
         }
       }
       const text = content
@@ -573,6 +596,7 @@ export function createClaudeEventNormalizer(
             name: open?.name ?? "tool",
             ...(open?.target === undefined ? {} : { command: open.target }),
             ...(open?.title === undefined ? {} : { title: open.title }),
+            ...(open?.background === true ? { background: true } : {}),
             phase: "completed",
             ...(failed ? { status: "error" } : subagentKind === undefined ? {} : { status: subagentKind }),
             // What the subagent came back with, in its own words: the row

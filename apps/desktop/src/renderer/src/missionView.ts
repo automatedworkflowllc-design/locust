@@ -37,6 +37,15 @@ export interface ActivityDetail {
   readonly tool?: string
   /** What the model said it was doing, on the runtimes that carry one. */
   readonly title?: string
+  /**
+   * The runtime was asked to run this one in the background.
+   *
+   * Locust has no background-task feature and this is not one: the row says
+   * what the call was, and a call that was sent to the background is a
+   * different thing from one that was waited on. Nothing here knows when
+   * the work finished.
+   */
+  readonly background?: boolean
   readonly settled: boolean
   /** True only for a tool the runtime itself reported as failed. */
   readonly failed?: boolean
@@ -158,6 +167,19 @@ export type ActivityEntry =
        * exactly as they did.
        */
       readonly title: string | undefined
+      /**
+       * Sent to the background rather than waited on.
+       *
+       * Claude Code's Bash tool takes `run_in_background`, and until
+       * 2026-09-22 the adapter read the command and the description off that
+       * same input and ignored this. So a call the runtime was told not to
+       * wait for looked exactly like one it waited for, which is most of why
+       * a finished background task reads as a turn that simply stopped.
+       *
+       * This says what the call WAS. It does not know when the work
+       * finished, and nothing re-invokes anybody on it.
+       */
+      readonly background?: boolean
       readonly settled: boolean
       readonly failed: boolean
       readonly exitCode: number | undefined
@@ -281,6 +303,7 @@ export function activityEntries(
         key: `shell_${String(index)}`,
         command: shellCommandText(detail.name),
         title: detail.title,
+        ...(detail.background === true ? { background: true } : {}),
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode,
@@ -2148,6 +2171,9 @@ export function buildThread(
           ...(typeof event.payload.title === 'string' && event.payload.title.length > 0
             ? { title: event.payload.title }
             : {}),
+          // Claude Code's Bash tool takes `run_in_background`, and the flag
+          // rides on the tool call's own input. Carried, not interpreted.
+          ...(event.payload.background === true ? { background: true } : {}),
           settled: false
         }
         openTools.set(event.payload.itemId, detail)

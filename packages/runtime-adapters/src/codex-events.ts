@@ -126,6 +126,29 @@ export interface ToolPayload {
    * those rows are unchanged.
    */
   readonly title?: string;
+  /**
+   * Whether the runtime was told to run this one IN THE BACKGROUND.
+   *
+   * Colin, 2026-09-21: he ran something that went to the background and
+   * "when it finished we never got the follow up reply", and guessed there
+   * was no UI for a background task anywhere. There was not -- and on
+   * 2026-09-22 I told him Copilot was the only runtime that reports them,
+   * which was wrong and wrongly reasoned. I had checked this repo's
+   * adapters and fixtures, and there are no Claude or Codex fixtures at
+   * all, so that check could not have answered the question. He said he was
+   * "90% sure claude code and codex also report background tasks". He was
+   * right about Claude.
+   *
+   * Claude Code's Bash tool takes `run_in_background`, so the fact arrives
+   * on the tool call's own input and the adapter simply never read it --
+   * `claudeToolTarget` took the command and nothing looked at the input
+   * again, the same shape as the `description` miss recorded above it.
+   *
+   * This is the FACT, not a feature: it says the runtime was asked to
+   * background the call. It does not claim to know when the work finished,
+   * and nothing re-invokes anybody on the strength of it.
+   */
+  readonly background?: boolean;
   readonly output?: RedactedJsonValue;
   readonly exitCode?: number;
   readonly status?: string;

@@ -7034,6 +7034,17 @@ textarea {
  * It sat at the far right, which is where the eye arrives last for the fact
  * that decides whether the output below is worth reading at all.
  */
+/*
+ * A command the runtime was told not to wait for. Muted rather than
+ * coloured: it is a fact about how the call was made, not a verdict on it,
+ * and the badge beside it already carries the verdict.
+ */
+.lc-shellbadge.is-background {
+  border-color: var(--lc-border-strong);
+  background: transparent;
+  color: var(--lc-text-muted);
+}
+
 .lc-shellbadge {
   flex: 0 0 auto;
   padding: 1px var(--lc-space-2);
