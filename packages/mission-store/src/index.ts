@@ -1273,7 +1273,21 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
     nextByteOffsets.delete(missionId)
     metadataByMission.delete(missionId)
     schemaVersions.delete(missionId)
+    reportDates.delete(missionId)
   }
+
+  /**
+   * What the storage report read from each file, by that file's size and
+   * modified time.
+   *
+   * The report parsed EVERY ledger file on every Settings open to find one
+   * date. MEASURED 2026-09-22 on a copy of Colin's 138-mission, 47.8 MB
+   * ledger: 516-563 ms each time, nothing kept. A ledger is appended to, so a
+   * file whose size and modified time are unchanged holds the record it held;
+   * only the files that moved are read again -- the rule the history read has
+   * used since 0.261. The date still comes from the record, never the stamp.
+   */
+  const reportDates = new Map<string, { readonly size: number; readonly mtimeMs: number; readonly updatedAt: number | undefined }>()
 
   const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
     const result = writeTail.then(operation)
@@ -1845,11 +1859,14 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       let oldest: number | undefined
       let counted = 0
       let unreadableCount = 0
+      const present = new Set<string>()
       await mapLimited(ids, READ_CONCURRENCY, async (missionId) => {
+        let file
         try {
-          const file = await stat(missionPath(rootDirectory, missionId))
+          file = await stat(missionPath(rootDirectory, missionId))
           byteTotal += file.size
           counted += 1
+          present.add(missionId)
         } catch {
           // A file that vanished between listing and stat is not history.
           return
@@ -1859,9 +1876,20 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         // tell someone their history reaches back further -- or less far --
         // than the thing they are about to press would act on. Copying a
         // ledger directory is enough to make the two disagree.
-        const parsed = await readLedgerFile(missionPath(rootDirectory, missionId), missionId)
-        const updatedAt = parsed.mission === undefined ? undefined : Date.parse(parsed.mission.lastUpdatedAt)
-        if (updatedAt === undefined || !Number.isFinite(updatedAt)) {
+        //
+        // The file's size and modified time only decide whether the record
+        // needs reading AGAIN: see `reportDates`.
+        const held = reportDates.get(missionId)
+        let updatedAt: number | undefined
+        if (held !== undefined && held.size === file.size && held.mtimeMs === file.mtimeMs) {
+          updatedAt = held.updatedAt
+        } else {
+          const parsed = await readLedgerFile(missionPath(rootDirectory, missionId), missionId)
+          const read = parsed.mission === undefined ? undefined : Date.parse(parsed.mission.lastUpdatedAt)
+          updatedAt = read !== undefined && Number.isFinite(read) ? read : undefined
+          reportDates.set(missionId, { size: file.size, mtimeMs: file.mtimeMs, updatedAt })
+        }
+        if (updatedAt === undefined) {
           // Counted in the total above, so its absence from the date has to be
           // stated rather than left to look like a mission with no history.
           unreadableCount += 1
@@ -1869,6 +1897,9 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         }
         if (oldest === undefined || updatedAt < oldest) oldest = updatedAt
       })
+      for (const missionId of [...reportDates.keys()]) {
+        if (!present.has(missionId)) reportDates.delete(missionId)
+      }
       return {
         missionCount: counted,
         byteTotal,
