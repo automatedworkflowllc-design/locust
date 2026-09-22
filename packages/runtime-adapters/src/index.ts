@@ -182,7 +182,7 @@ export type {
   CopilotEventNormalizer,
   CopilotInvocationContext,
 } from "./copilot-events.js";
-export { killProcessTree } from "./process-runner.js";
+export { killProcessTree, releaseProcessTree } from "./process-runner.js";
 export { toolPatchFrom } from "./codex-events.js";
 export type { ToolPatch } from "./codex-events.js";
 export {

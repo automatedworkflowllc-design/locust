@@ -1,4 +1,5 @@
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from './window-size.js'
+import { startAppServerProcess } from './app-server-process.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
@@ -8,7 +9,6 @@ import electronUpdater from 'electron-updater'
 const { autoUpdater } = electronUpdater
 import {
   createNodeProbeRunner,
-  killProcessTree,
   createNodeRuntimeProcessRunner,
   createPathExecutableLocator,
   cursorCanEnforceReadOnly,
@@ -1546,29 +1546,10 @@ if (!ownsSingleInstanceLock) {
       })
     })()
 
-    // One definition of how an app-server process is started and stopped, used
-    // by both the mission transport and the model probe. Killing the TREE
-    // matters: app-server starts children that outlive their parent.
-    const spawnAppServer = (executablePath: string, args: readonly string[]) => {
-      const child = spawn(executablePath, [...args], { stdio: ['pipe', 'pipe', 'pipe'] })
-      return {
-        write: (line: string) => child.stdin.write(line),
-        kill: () => {
-          try {
-            if (process.platform === 'win32' && child.pid !== undefined) {
-              killProcessTree(child.pid)
-              return
-            }
-          } catch {
-            // Fall through to the ordinary signal.
-          }
-          child.kill()
-        },
-        onData: (listener: (chunk: string) => void) =>
-          child.stdout.on('data', (chunk: Buffer) => listener(String(chunk))),
-        onExit: (listener: () => void) => child.on('exit', () => listener())
-      }
-    }
+    // Started and stopped in one place for the mission transport and the model
+    // probe -- stopped once, without holding the app; see app-server-process.ts.
+    const spawnAppServer = (executablePath: string, args: readonly string[]) =>
+      startAppServerProcess(executablePath, args)
 
     // Installing is its own service: one at a time, and it asks discovery
     // again after a clean exit rather than trusting npm's exit code alone.

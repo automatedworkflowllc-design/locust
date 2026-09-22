@@ -1,4 +1,4 @@
-import { execFileSync, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -336,6 +336,32 @@ export function killProcessTree(pid: number | undefined): void {
     // Best effort. `child.kill` still runs, and the completion path does not
     // depend on either of them succeeding.
   }
+}
+
+/**
+ * The same tree kill, without holding the caller while taskkill walks it.
+ *
+ * MEASURED 2026-09-22 on this machine: a synchronous `taskkill /F /T` holds
+ * the calling thread about 79 ms for a two-process tree, and still 75 ms when
+ * the tree is already gone. The app-server kill ran it twice at the end of
+ * every Codex turn and every model probe -- about 155 ms with the main
+ * process answering nothing.
+ *
+ * Only for a caller that sends NO other signal afterwards. `killProcessTree`
+ * stays synchronous for the stop path, where `child.kill` follows at once and
+ * a parent that dies first leaves `/T` no tree to walk (measured 2026-09-14).
+ * Resolves `true` when taskkill reported success, so a caller can fall back
+ * to its own kill when it did not.
+ */
+export function releaseProcessTree(pid: number | undefined): Promise<boolean> {
+  if (process.platform !== "win32" || pid === undefined) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    try {
+      execFile(windowsTaskkillPath(), ["/F", "/T", "/PID", String(pid)], { windowsHide: true }, (error) => resolve(error === null));
+    } catch {
+      resolve(false);
+    }
+  });
 }
 
 export function createNodeRuntimeProcessRunner(
