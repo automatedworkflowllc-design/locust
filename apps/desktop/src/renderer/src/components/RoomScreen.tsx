@@ -591,24 +591,27 @@ export function RoomScreen({
                   runtime and model; their answers land here, and each one opens the conversation it came from.
                 </p>
                 <div className="lc-roomcardform__fields">
+                {/*
+                  * LABELS, in the machine voice the rest of the app uses for
+                  * them. A placeholder is not a label: it disappears the
+                  * moment a person types, so the field stops saying what it
+                  * is exactly when there is something in it to misread. The
+                  * placeholder stays as an example of a name rather than as
+                  * the name of the field.
+                  */}
+                <label className="lc-roomcardform__label lc-mono" htmlFor="lc-room-name">
+                  Room name
+                </label>
                 <input
+                  id="lc-room-name"
                   className="lc-roomform__name"
                   value={draftName}
                   onChange={(event) => setDraftName(event.target.value)}
-                  placeholder="Room name"
+                  placeholder="Release, standup, research…"
                   aria-label="Room name"
                   maxLength={60}
                 />
-                {/* The count belongs where the ticking happens, and beside
-                    a label rather than floating between the field and the
-                    chips -- which is where it landed first, belonging to
-                    neither. Seen in a drive, 2026-09-22. */}
-                <div className="lc-roomcardform__pick">
-                  <span>Teammates in this room</span>
-                  <span className="lc-roomform__count lc-mono">
-                    {`${String(draftMembers.length)} of ${String(teammates.length)}`}
-                  </span>
-                </div>
+                <div className="lc-roomcardform__label lc-mono">Who is in it</div>
                 <div className="lc-roomform__members" role="group" aria-label="Teammates in the room">
                   {teammates.map((teammate) => {
                     const on = draftMembers.includes(teammate.teammateId)
@@ -627,6 +630,12 @@ export function RoomScreen({
                       >
                         <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={16} activity="idle" presence="none" />
                         {teammate.name}
+                        {/* A tick as well as the lime. `.lc-button.is-active`
+                            is border, tint and text colour -- all three are
+                            colour, and a chip that says it is picked ONLY by
+                            being greener is a state a colour-blind reader
+                            has to infer from its neighbours. */}
+                        {on && <Icon name="check" size={13} />}
                       </button>
                     )
                   })}
@@ -644,6 +653,14 @@ export function RoomScreen({
                 )}
                 </div>
                 <div className="lc-roomform__actions lc-roomcardform__action">
+                  {/* What is about to happen, beside the button that does
+                      it: how many are in, and the fact that each answers on
+                      its own route -- which is the thing about a room that
+                      surprises people. */}
+                  <span className="lc-roomcardform__summary">
+                    {`${String(draftMembers.length)} of ${String(teammates.length)} teammate${teammates.length === 1 ? '' : 's'}`}
+                    {' · each answers on its own route'}
+                  </span>
                   <button
                     type="submit"
                     className="lc-button is-active"
@@ -662,6 +679,18 @@ export function RoomScreen({
                   {formError !== undefined && <span className="lc-settings__note lc-tone-red">{formError}</span>}
                 </div>
               </form>
+            )}
+            {/*
+              * Where the thing you are about to make will appear.
+              *
+              * Only when there are none: a person with rooms already knows
+              * where they live, and repeating it under the form would be
+              * telling them something they can see two inches away.
+              */}
+            {rooms.length === 0 && teammates.length > 0 && (
+              <p className="lc-settings__note lc-roomcardform__after">
+                No rooms yet. The first one you make appears in the sidebar under its own name.
+              </p>
             )}
           </section>
         </div>

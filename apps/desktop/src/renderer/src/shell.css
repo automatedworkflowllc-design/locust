@@ -2861,14 +2861,42 @@ textarea {
   color: var(--lc-text-muted);
 }
 
-/* The chips' own label, with the count beside it. */
-.lc-roomcardform__pick {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--lc-space-3);
+/*
+ * A field's name, in the machine voice used for labels of this kind.
+ *
+ * These were placeholders, which is not the same thing: a placeholder is
+ * gone the moment a person types, so the field stops saying what it is
+ * exactly when there is something in it that could be misread.
+ */
+.lc-roomcardform__label {
+  font-size: var(--lc-text-description);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-roomcardform__label + * {
+  margin-top: calc(var(--lc-space-2) * -1 + 2px);
+}
+
+/* Under the card, not inside it: it is about what happens next. */
+.lc-roomcardform__after {
+  margin-top: var(--lc-space-3);
+}
+
+/* What is about to happen, beside the button that does it. */
+.lc-roomcardform__summary {
+  flex: 1;
+  min-width: 0;
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
+}
+
+/* The tick inside a picked chip sits after the name, not against it. */
+.lc-roomform__members .lc-button .lc-icon,
+.lc-roomform__members .lc-button svg {
+  margin-left: 2px;
+  opacity: 0.85;
 }
 
 /* Band two: what this one will be. */
@@ -9266,6 +9294,36 @@ textarea {
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   white-space: nowrap;
+}
+
+/*
+ * The add row: the same row shape as a routine, so it reads as part of the
+ * list rather than as a banner stuck under it.
+ */
+.lc-routineadd {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--lc-border-card);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lc-routineadd:hover,
+.lc-routineadd:focus-visible {
+  background: var(--lc-bg-raised-2);
+}
+
+.lc-routineadd__plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--lc-border-strong);
+  border-radius: var(--lc-radius-control);
+  color: var(--lc-text-muted);
 }
 
 /* A square button holding one glyph, sized to sit beside a worded one. */

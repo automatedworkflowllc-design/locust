@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.254.0 - 2026-09-22
+
+- **The Rooms form says what each field is.** Room name and Who is in it are
+  labels now, not placeholder text that vanishes the moment you type. The
+  button sits beside a line saying how many teammates are in and that each
+  one answers on its own route.
+- **A picked teammate carries a tick**, not just a green outline — so which
+  ones are in the room does not depend on telling two shades apart.
+- **Rooms tells you where your first room will appear** instead of leaving
+  the space under the form blank.
+- **Saving a conversation as a routine is offered once you already have
+  one.** The offer used to appear only on an empty Routines screen, which
+  left anybody with a single routine and no memory of how they made it with
+  nothing to go on.
+
 ## 0.253.0 - 2026-09-22
 
 - **The Routines list is a card, and a routine is two lines instead of

@@ -301,6 +301,37 @@ export function AutomationsScreen({
               </div>
             )
           })}
+          {/*
+            * THE ENTRANCE STAYS, once there are routines.
+            *
+            * It used to appear only on the empty screen, on the reasoning
+            * that a shelf cannot fill itself. True, and it stopped being
+            * true the moment the shelf had one thing on it: a person with
+            * one routine and no idea how they made it is in the same
+            * position as a person with none. Colin's second design puts the
+            * row inside the card, under the rows, and that is right -- it
+            * is the same list, and adding to it belongs there.
+            *
+            * Only when there is something to save. A row offering to save
+            * from nothing is the blank form this screen refused to grow.
+            */}
+          {onSaveRoutine !== undefined && savable.length > 0 && (
+            <button
+              type="button"
+              className="lc-routinerow lc-routineadd"
+              onClick={() => onSaveRoutine(savable[0]!.missionId)}
+            >
+              <span className="lc-routineadd__plus" aria-hidden="true">
+                <Icon name="plus" size={14} />
+              </span>
+              <span className="lc-routinerow__name">
+                Save a routine from a finished conversation
+                <span className="lc-routinerow__meta lc-mono">
+                  Right-click any conversation, then Save as routine
+                </span>
+              </span>
+            </button>
+          )}
         </div>
       )}
 
