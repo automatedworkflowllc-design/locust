@@ -43,6 +43,10 @@ const FAINT_COLOR_EXCEPTIONS = new Map([
   [
     '.lc-workroom__provenance .lc-separator',
     'the `·` between facts on the header strip: punctuation between values, carrying nothing a reader needs to make out'
+  ],
+  [
+    '.lc-railflyout__action > svg',
+    'the icon beside a flyout action\'s label ("New conversation with Wren"): the label says what it does, the icon only marks the row'
   ]
 ])
 
@@ -127,8 +131,15 @@ function contrastRatio(foreground, background) {
   return (light + 0.05) / (dark + 0.05)
 }
 
-/** Text tokens that carry readable copy, and the surfaces they sit on. */
-const READABLE_TEXT = ['--lc-text-primary', '--lc-text-secondary', '--lc-text-muted', '--lc-text-label']
+/**
+ * Text tokens that carry readable copy, and the surfaces they sit on.
+ *
+ * `--lc-text-label` was retired into `--lc-text-muted` on 2026-09-06 (same
+ * value; see tokens.css), and this list kept asking for it, so the gate
+ * failed on every run from then on -- a gate that always fails checks
+ * nothing. Found 2026-09-22 running it for the font change.
+ */
+const READABLE_TEXT = ['--lc-text-primary', '--lc-text-secondary', '--lc-text-muted']
 const SURFACES = [
   '--lc-bg-window',
   '--lc-bg-chrome',
