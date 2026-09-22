@@ -6,6 +6,25 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.267.0 - 2026-09-22
+
+- **The model picker fits more than twice as many models.** Every model took
+  three lines, with its whole list of effort levels spelled out, so only
+  three fitted on screen. Each model is now one line, the way Claude Code and
+  Codex draw their own pickers: the name, what it is, and whether it is
+  ready. Seven fit at once. Hover a model to see its full description and
+  effort levels.
+
+- **The app no longer stalls for a moment when a Codex reply finishes.**
+  Closing Codex's background process held Locust for about a sixth of a
+  second at the end of every turn, and again each time it checked Codex's
+  model list. It now closes in the background.
+
+- **Settings opens faster the second time.** Locust re-read your whole
+  conversation history to show its size and age: about half a second on a
+  138-conversation history. Now it re-reads only conversations that changed,
+  which takes a few milliseconds.
+
 ## 0.266.0 - 2026-09-22
 
 - **Claude Code command rows say what the command was for.** Claude writes a
