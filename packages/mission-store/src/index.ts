@@ -399,7 +399,37 @@ export interface MissionLedger {
   pruneMissions(options: MissionPruneOptions): Promise<MissionPruneResult>
   getMission(missionId: string): Promise<RecoveredMission | undefined>
   listMissions(options?: MissionLedgerListOptions): Promise<MissionLedgerSnapshot>
+  /**
+   * The ledger files, newest first, by their size and modified time -- read
+   * without opening any of them. With `readMission`, this lets a caller keep
+   * what it parsed and read again only the files that changed: the whole
+   * history was re-parsed on every run end, 490-560 ms on a real 138-mission
+   * ledger, measured in the app (2026-09-22). Optional so a fake ledger in a
+   * test need not grow it; a caller without it uses `listMissions`.
+   */
+  missionFiles?(): Promise<MissionFileListing>
+  /** One mission file, parsed, with the issues reading it raised. */
+  readMission?(missionId: string): Promise<MissionFileRead>
   flush(): Promise<void>
+}
+
+/** A ledger file's identity: when it last changed, and how big it is. */
+export interface MissionFileStamp {
+  readonly missionId: string
+  readonly modifiedAt: number
+  readonly size: number
+}
+
+export interface MissionFileListing {
+  /** Newest first, capped the way `listMissions` caps what it reads. */
+  readonly files: readonly MissionFileStamp[]
+  /** Past the cap: said once, the way `listMissions` says it. */
+  readonly issues: readonly MissionLedgerIssue[]
+}
+
+export interface MissionFileRead {
+  readonly mission?: RecoveredMission
+  readonly issues: readonly MissionLedgerIssue[]
 }
 
 export interface MissionLedgerListOptions {
@@ -1979,6 +2009,46 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       await ensureDirectory()
       const parsed = await readLedgerFile(missionPath(rootDirectory, missionId), missionId)
       return parsed.mission
+    },
+
+    async missionFiles(): Promise<MissionFileListing> {
+      await writeTail
+      await ensureDirectory()
+      let entries
+      try {
+        entries = await readdir(rootDirectory, { withFileTypes: true })
+      } catch {
+        return { files: [], issues: [publicIssue('read-failed', 'Local mission history could not be read.')] }
+      }
+      const ids = entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
+        .map((entry) => entry.name.slice(0, -'.jsonl'.length))
+        .filter((missionId) => SAFE_ID.test(missionId))
+      const stamped = await mapLimited(ids, READ_CONCURRENCY, async (missionId) => {
+        try {
+          const file = await stat(missionPath(rootDirectory, missionId))
+          return { missionId, modifiedAt: file.mtimeMs, size: file.size }
+        } catch {
+          // Sorted last rather than dropped, as `listMissions` does, so a
+          // file that cannot be read can still surface its own issue.
+          return { missionId, modifiedAt: 0, size: -1 }
+        }
+      })
+      stamped.sort((left, right) => right.modifiedAt - left.modifiedAt)
+      const over = stamped.length > MAX_MISSION_FILES
+      return {
+        files: over ? stamped.slice(0, MAX_MISSION_FILES) : stamped,
+        issues: over
+          ? [publicIssue('file-limit-exceeded', `Only the ${MAX_MISSION_FILES} most recently updated local mission ledgers were inspected.`)]
+          : []
+      }
+    },
+
+    async readMission(missionId: string): Promise<MissionFileRead> {
+      requireSafeId(missionId, 'missionId')
+      await writeTail
+      const parsed = await readLedgerFile(missionPath(rootDirectory, missionId), missionId)
+      return parsed.mission === undefined ? { issues: parsed.issues } : { mission: parsed.mission, issues: parsed.issues }
     },
 
     async listMissions(options?: MissionLedgerListOptions): Promise<MissionLedgerSnapshot> {

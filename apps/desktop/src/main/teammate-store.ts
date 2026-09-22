@@ -375,12 +375,23 @@ function parsedFile(text: string): StoredFile {
   // an hour (2026-09-06). Say it once; the roster still loads either way.
   if (dropped > 0) console.warn(`Roster file: dropped ${String(dropped)} teammate record(s) that did not parse.`)
 
+  /*
+   * Counted as it goes, not by `Object.keys(owners).length` per entry: that
+   * rebuilt the key list every iteration, so reading the roster was
+   * quadratic in conversations -- 0.9 ms at 132 owners and 1.07 s at the
+   * 5,000 cap, on every read, and this file is read several times per run
+   * (main-process audit, 2026-09-22). One owner is added per teammate turn.
+   */
   const owners: Record<string, string> = {}
   if (typeof record.missionOwners === 'object' && record.missionOwners !== null) {
+    const known = new Set(teammates.map((teammate) => teammate.teammateId))
+    let kept = 0
     for (const [missionId, teammateId] of Object.entries(record.missionOwners as Record<string, unknown>)) {
-      if (Object.keys(owners).length >= MAX_MISSION_OWNERS) break
+      if (kept >= MAX_MISSION_OWNERS) break
       if (!safeId(missionId) || !safeId(teammateId)) continue
-      if (!teammates.some((teammate) => teammate.teammateId === teammateId)) continue
+      if (!known.has(teammateId)) continue
+      // Object.entries yields each key once, so every one kept is new.
+      kept += 1
       owners[missionId] = teammateId
     }
   }
@@ -400,11 +411,13 @@ function parsedFile(text: string): StoredFile {
    */
   const titles: Record<string, string> = {}
   if (typeof record.missionTitles === 'object' && record.missionTitles !== null) {
+    let kept = 0
     for (const [missionId, title] of Object.entries(record.missionTitles as Record<string, unknown>)) {
-      if (Object.keys(titles).length >= MAX_MISSION_TITLES) break
+      if (kept >= MAX_MISSION_TITLES) break
       if (!safeId(missionId) || typeof title !== 'string') continue
       const trimmed = title.trim().slice(0, MAX_MISSION_TITLE_LENGTH)
       if (trimmed.length === 0) continue
+      kept += 1
       titles[missionId] = trimmed
     }
   }

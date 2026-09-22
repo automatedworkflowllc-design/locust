@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.261.0 - 2026-09-22
+
+- **Locust no longer stalls when a teammate finishes.** Every time a run
+  ended, Locust read your whole conversation history back from disk to
+  refresh the list — about half a second on a history of 138 conversations,
+  and the app was slow to answer anything else while it did. It now keeps
+  what it has read and only reads the conversations that changed: about
+  forty milliseconds, and nothing waits on it.
+
+- Reading your teammates and groups no longer slows down as the number of
+  conversations grows.
+
 ## 0.260.0 - 2026-09-22
 
 - **Locust opens faster.** On a machine with every coding agent installed it

@@ -145,10 +145,14 @@ function parsedFile(text: string): StoredFile {
     })
   }
 
+  // Counted as it goes: `Object.keys(...).length` per entry made each read
+  // quadratic in conversations (main-process audit, 2026-09-22).
   const members: Record<string, GroupMembership> = {}
   if (typeof record.members === 'object' && record.members !== null) {
+    const known = new Set(groups.map((group) => group.groupId))
+    let kept = 0
     for (const [missionId, held] of Object.entries(record.members as Record<string, unknown>)) {
-      if (Object.keys(members).length >= MAX_GROUP_MEMBERS) break
+      if (kept >= MAX_GROUP_MEMBERS) break
       // A bare string is the pre-0.152.0 shape: a membership with no moment.
       const groupId = typeof held === 'string'
         ? held
@@ -162,15 +166,17 @@ function parsedFile(text: string): StoredFile {
       // A membership pointing at a group that is gone is not a membership.
       // Dropping it here is what makes removing a group safe: the file does
       // not have to be swept, and nothing later reads a dangling id.
-      if (!groups.some((group) => group.groupId === groupId)) continue
+      if (!known.has(groupId as string)) continue
+      kept += 1
       members[missionId] = at === undefined ? { groupId } : { groupId, at }
     }
   }
 
   const left: Record<string, readonly LeftMembership[]> = {}
   if (typeof record.left === 'object' && record.left !== null) {
+    let kept = 0
     for (const [missionId, held] of Object.entries(record.left as Record<string, unknown>)) {
-      if (Object.keys(left).length >= MAX_GROUP_MEMBERS) break
+      if (kept >= MAX_GROUP_MEMBERS) break
       if (!safeId(missionId) || !Array.isArray(held)) continue
       const entries: LeftMembership[] = []
       for (const entry of held) {
@@ -186,7 +192,10 @@ function parsedFile(text: string): StoredFile {
           until: raw.until
         })
       }
-      if (entries.length > 0) left[missionId] = entries.slice(-MAX_LEFT_PER_CONVERSATION)
+      if (entries.length > 0) {
+        kept += 1
+        left[missionId] = entries.slice(-MAX_LEFT_PER_CONVERSATION)
+      }
     }
   }
 

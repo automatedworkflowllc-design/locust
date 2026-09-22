@@ -326,6 +326,115 @@ async function ancestorsOf(
   return found
 }
 
+/**
+ * What one ledger file contributed to the last read, kept by the file's
+ * identity so an unchanged file is never parsed twice.
+ *
+ * The history is asked for on every run end and every first open of a
+ * finished conversation, and each ask parsed EVERY ledger file: 490-560 ms
+ * on Colin's 138-mission ledger, measured in the app (2026-09-22), with the
+ * main process slow to answer anything else meanwhile. Nearly every file is
+ * the same as last time.
+ *
+ * Held LIGHT: a parsed ledger kept whole is 63.6 MB for that same ledger
+ * (measured), so everything but the newest few keeps its record with the
+ * events dropped, plus the two numbers a row needs from them.
+ */
+interface CachedLedgerFile {
+  readonly stamp: string
+  readonly issues: number
+  /** The record without its events; absent when the file produced no mission. */
+  readonly light?: RecoveredMission
+  readonly eventCount: number
+  readonly eventsTruncated: boolean
+  /** The whole record, kept only while it is among the newest. */
+  full?: RecoveredMission
+}
+
+interface HistoryPage {
+  /** Newest first: whole records for the first few, light ones after. */
+  readonly missions: readonly { readonly mission: RecoveredMission; readonly eventCount?: number; readonly eventsTruncated?: boolean }[]
+  readonly issueCount: number
+  readonly unreadableCount: number
+}
+
+const ledgerCaches = new WeakMap<MissionLedger, Map<string, CachedLedgerFile>>()
+
+async function eachLimited<T>(items: readonly T[], limit: number, work: (item: T) => Promise<void>): Promise<void> {
+  let next = 0
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const item = items[next]
+      next += 1
+      if (item !== undefined) await work(item)
+    }
+  })
+  await Promise.all(runners)
+}
+
+async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<HistoryPage | undefined> {
+  if (ledger.missionFiles === undefined || ledger.readMission === undefined) return undefined
+  const readMission = ledger.readMission.bind(ledger)
+  const cache = ledgerCaches.get(ledger) ?? new Map<string, CachedLedgerFile>()
+  ledgerCaches.set(ledger, cache)
+  const listing = await ledger.missionFiles()
+  const present = new Set(listing.files.map((file) => file.missionId))
+  for (const missionId of [...cache.keys()]) if (!present.has(missionId)) cache.delete(missionId)
+
+  const read = async (missionId: string, stamp: string): Promise<void> => {
+    const answer = await readMission(missionId)
+    const mission = answer.mission
+    if (mission === undefined) {
+      cache.set(missionId, { stamp, issues: answer.issues.length, eventCount: 0, eventsTruncated: false })
+      return
+    }
+    cache.set(missionId, {
+      stamp,
+      issues: answer.issues.length,
+      light: { ...mission, events: [] },
+      eventCount: mission.events.length,
+      eventsTruncated: joinMessageFragments(mission.events).length > MAX_HISTORY_EVENTS,
+      full: mission
+    })
+  }
+  const stampOf = (file: { readonly modifiedAt: number; readonly size: number }): string => `${String(file.modifiedAt)}:${String(file.size)}`
+  const changed = listing.files.filter((file) => cache.get(file.missionId)?.stamp !== stampOf(file))
+  await eachLimited(changed, 8, (file) => read(file.missionId, stampOf(file)))
+
+  const entries = listing.files.flatMap((file) => {
+    const entry = cache.get(file.missionId)
+    return entry === undefined ? [] : [entry]
+  })
+  const readable = entries
+    .filter((entry): entry is CachedLedgerFile & { readonly light: RecoveredMission } => entry.light !== undefined)
+    .sort((left, right) => Date.parse(right.light.lastUpdatedAt) - Date.parse(left.light.lastUpdatedAt))
+    .slice(0, limit)
+  // Whole records for the newest, and only for them.
+  const newest = new Set(readable.slice(0, MAX_HISTORY_MISSIONS).map((entry) => entry.light.metadata.missionId))
+  for (const entry of entries) {
+    if (entry.light !== undefined && !newest.has(entry.light.metadata.missionId)) entry.full = undefined
+  }
+  // One that moved INTO the newest without changing (another was deleted)
+  // has no whole record yet: read it again.
+  await eachLimited(
+    readable.filter((entry) => newest.has(entry.light.metadata.missionId) && entry.full === undefined),
+    8,
+    async (entry) => {
+      const again = await readMission(entry.light.metadata.missionId)
+      if (again.mission !== undefined) entry.full = again.mission
+    }
+  )
+  return {
+    missions: readable.map((entry) =>
+      entry.full !== undefined
+        ? { mission: entry.full }
+        : { mission: entry.light, eventCount: entry.eventCount, eventsTruncated: entry.eventsTruncated }
+    ),
+    issueCount: listing.issues.length + entries.reduce((total, entry) => total + entry.issues, 0),
+    unreadableCount: entries.filter((entry) => entry.light === undefined).length
+  }
+}
+
 export async function readMissionHistory(
   ledger: MissionLedger,
   workroom?: Workroom,
@@ -333,7 +442,15 @@ export async function readMissionHistory(
   workspacePath: string = process.cwd()
 ): Promise<MissionHistoryResponse> {
   try {
-    const snapshot = await ledger.listMissions({ limit: MAX_LISTED_MISSIONS })
+    // The kept page when the ledger can give one (see CachedLedgerFile);
+    // the whole listing otherwise, which is what a test's fake ledger is.
+    const page: HistoryPage =
+      (await cachedHistoryPage(ledger, MAX_LISTED_MISSIONS)) ??
+      (await ledger.listMissions({ limit: MAX_LISTED_MISSIONS }).then((snapshot) => ({
+        missions: snapshot.missions.map((mission) => ({ mission })),
+        issueCount: snapshot.issues.length,
+        unreadableCount: snapshot.unreadableCount
+      })))
     // The workroom is joined best-effort: a channel that cannot be read makes
     // every peer message show as unreadable, which is the truthful state, and
     // must not take the mission history down with it.
@@ -351,7 +468,7 @@ export async function readMissionHistory(
      * The newest few come whole, because those are the ones about to be
      * opened. Order is the reader's: most recently touched first.
      */
-    const recent = snapshot.missions.slice(0, MAX_HISTORY_MISSIONS)
+    const recent = page.missions.slice(0, MAX_HISTORY_MISSIONS).map((entry) => entry.mission)
     const shown = withinByteBudget(
       recent.map((mission) => publicRecoveredMission(mission, workroomMessages))
     )
@@ -368,21 +485,25 @@ export async function readMissionHistory(
      * the byte budget can cut the whole page short, and anything it dropped
      * must come back here as a row rather than vanish.
      */
-    const listedOnly = snapshot.missions
-      .slice(shown.length)
-      .map((mission) => ({ ...publicRecoveredMission(mission, workroomMessages), events: [] }))
+    const listedOnly = page.missions.slice(shown.length).map((entry) => ({
+      ...publicRecoveredMission(entry.mission, workroomMessages),
+      events: [],
+      // A light record has no events to count; the kept numbers say it.
+      ...(entry.eventCount === undefined ? {} : { eventCount: entry.eventCount }),
+      ...(entry.eventsTruncated === undefined ? {} : { eventsTruncated: entry.eventsTruncated })
+    }))
     const listed = [...shown, ...listedOnly]
     return {
       ok: true,
       data: {
         missions: [...listed, ...(await ancestorsOf(listed, ledger, workroomMessages))],
         currentWorkspaceId: workspaceIdFor(workspacePath),
-        issueCount: snapshot.issues.length,
+        issueCount: page.issueCount,
         // Straight from the reader. It used to be derived here by comparing
         // issue ids against the recovered missions, which is wrong the moment
         // that list is a page rather than the whole ledger -- see
         // `unreadableFileCount` for what that cost.
-        unreadableCount: snapshot.unreadableCount,
+        unreadableCount: page.unreadableCount,
         // These two read EVENTS, so they see the missions that came with
         // events. Widening the list did not widen them: the answer is about
         // recent runs either way, and scanning three hundred transcripts to
