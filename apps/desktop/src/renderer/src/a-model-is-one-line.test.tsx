@@ -1,0 +1,80 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it } from 'vitest'
+
+import { RoutePicker } from './components/RoutePicker.js'
+import type { PublicModel, PublicRuntimeStatus } from '../../shared/ipc.js'
+
+/**
+ * A MODEL IS ONE LINE IN THE PICKER, the way Claude Code's and Codex's own
+ * pickers draw them.
+ *
+ * Each row's second line carried the catalogue's description, the resolved
+ * name and every effort level -- "Newest fable model · resolved by Claude
+ * Code at launch · 5 effort levels · low, medium, high, xhigh, max" -- and
+ * wrapped to three lines at the picker's width, so about four models fitted
+ * in view (frames, 2026-09-22). The effort levels are what nobody chooses a
+ * model by; they move to the row's hover, and the row keeps the rest.
+ */
+
+const claude: PublicRuntimeStatus = {
+  id: 'claude',
+  displayName: 'Claude Code',
+  installed: true,
+  version: '2.1.280',
+  auth: 'authenticated',
+  ready: true,
+  status: 'ready'
+}
+
+const fable: PublicModel = {
+  id: 'fable',
+  runtime: 'claude',
+  displayName: 'Fable',
+  description: 'Newest fable model · resolved by Claude Code at launch',
+  supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max']
+}
+const bare: PublicModel = {
+  id: 'sonnet',
+  runtime: 'claude',
+  displayName: 'Sonnet',
+  // A catalogue with nothing to say about it.
+  description: '',
+  supportedEfforts: ['low', 'high']
+}
+
+const draw = (models: readonly PublicModel[]): string =>
+  renderToStaticMarkup(
+    <RoutePicker
+      runtimes={[claude]}
+      limitedRuntimes={new Map()}
+      models={models}
+      resolvedModels={new Map()}
+      recentRoutes={[]}
+      active={{ runtime: 'claude', model: 'fable' }}
+      onSelect={() => undefined}
+      onClose={() => undefined}
+    />
+  )
+
+/** The visible detail line of the row whose label is `label`. */
+const detailOf = (html: string, label: string): string => {
+  const row = html.slice(html.indexOf(`>${label}<`))
+  return /class="lc-picker__detail lc-mono">([^<]*)</.exec(row)?.[1] ?? ''
+}
+
+describe('a model is one line in the picker', () => {
+  it('keeps what the catalogue says, and leaves the effort levels to the hover', () => {
+    const html = draw([fable])
+    expect(detailOf(html, 'Fable')).toBe('Newest fable model · resolved by Claude Code at launch')
+    // Nothing lost: the hover carries all of it, levels included.
+    expect(html).toContain('title="Fable · Newest fable model · resolved by Claude Code at launch · 5 effort levels · low, medium, high, xhigh, max"')
+  })
+
+  it('a model the catalogue says nothing about keeps its levels as its line', () => {
+    expect(detailOf(draw([bare]), 'Sonnet')).toBe('2 effort levels · low, high')
+  })
+
+  // The layout half -- that the line is DRAWN to stay one line -- is checked
+  // against shell.css in src/main/picker-rows-stay-one-line.test.ts, where
+  // the stylesheet can be read as text.
+})

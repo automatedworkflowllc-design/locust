@@ -20,7 +20,10 @@ interface RouteRow {
   readonly runtime: MissionRuntimeId
   readonly model: string
   readonly label: string
+  /** The row's one line: what the catalogue says, and what it resolved to. */
   readonly detail: string
+  /** Everything known about it, effort levels included, for the row's hover. */
+  readonly fullDetail: string
   readonly tag: RouteTag
   readonly selectable: boolean
 }
@@ -102,9 +105,23 @@ function buildRows(
                * identifiers, it does not restyle anybody's product name.
                */
               label: model.displayName === model.id ? modelDisplayName(runtime.id, model.id) : model.displayName,
-              detail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`,
-              // Carried so the chosen row can offer them; the detail line
-              // above still NAMES them for every row.
+              /*
+               * ONE LINE PER MODEL, the way Claude Code's and Codex's own
+               * pickers draw them.
+               *
+               * The line used to be the description, the resolved name AND
+               * every effort level, and at the picker's width it wrapped to
+               * three lines: about four models fit in view (frames,
+               * 2026-09-22), in the control this product is built around.
+               * The effort levels are the part a person does not choose a
+               * model by -- the effort control beside the composer lists them
+               * for the model that is chosen -- so the row keeps what the
+               * catalogue says and what it resolved to, and the whole detail
+               * moves to the row's hover. A model the catalogue says nothing
+               * about keeps its effort levels as its line, rather than none.
+               */
+              detail: [described, name].filter((part): part is string => part !== undefined && part.length > 0).join(' · ') || efforts,
+              fullDetail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`,
             }
           })
         : // The catalogue could not be read for this runtime, so there is one
@@ -112,7 +129,7 @@ function buildRows(
           // the catalogue labels it -- a person reading a lowercase
           // `account-default` on the only ACTIVE row is reading a placeholder
           // that leaked (outside review, 2026-09-07).
-          [{ model: 'account-default', label: 'Account default', detail: status.detail }]
+          [{ model: 'account-default', label: 'Account default', detail: status.detail, fullDetail: status.detail }]
 
     for (const entry of entries) {
       const isActive = runtime.id === active.runtime && entry.model === active.model
@@ -123,6 +140,7 @@ function buildRows(
         model: entry.model,
         label: entry.label,
         detail: entry.detail,
+        fullDetail: entry.fullDetail,
         // Carried explicitly: this object is rebuilt field by field, so a
         // property added to the entry above is dropped here unless it is
         // named -- which is exactly what happened first (drive, 2026-09-06:
@@ -299,6 +317,8 @@ export function RoutePicker({
                 className={`lc-picker__row${isActive ? ' is-active' : ''}${recent ? ' is-recent' : ''}`}
                 disabled={!row.selectable}
                 aria-current={isActive}
+                // The whole of it, on hover: the row itself is one line.
+                title={`${row.label} · ${row.fullDetail}`}
                 onClick={() => {
                   onSelect({ runtime: row.runtime, model: row.model })
                   onClose()
