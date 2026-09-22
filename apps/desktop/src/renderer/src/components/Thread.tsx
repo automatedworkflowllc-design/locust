@@ -904,7 +904,7 @@ export function Thread({
           return (
             <Fragment key={turn.missionId}>
               {marker !== undefined && (
-                <TimeMarker at={marker.at} minutesIn={marker.minutesIn} note={marker.note} />
+                <TimeMarker at={marker.at} minutesIn={marker.minutesIn} elapsed={marker.elapsed} note={marker.note} {...(marker.day === undefined ? {} : { day: marker.day })} />
               )}
               {leavingNotes((beforeTurn) => beforeTurn === index)}
               {joinNotes((beforeTurn) => beforeTurn === index)}
@@ -919,7 +919,7 @@ export function Thread({
         })}
 
         {currentMarker !== undefined && (
-          <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} note={currentMarker.note} />
+          <TimeMarker at={currentMarker.at} minutesIn={currentMarker.minutesIn} elapsed={currentMarker.elapsed} note={currentMarker.note} {...(currentMarker.day === undefined ? {} : { day: currentMarker.day })} />
         )}
         {leavingNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
         {joinNotes((beforeTurn) => beforeTurn === earlierTurns.length)}

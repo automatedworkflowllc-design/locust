@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.256.0 - 2026-09-22
+
+- **A turn no longer says `959 min in`.** Time markers count in units a
+  person reads — `45 min in`, `5h 5m in`, `2d 4h in` — and once a
+  conversation has carried on into another day, the marker names the day
+  instead of leaving a bare clock time that could be from any of them.
+- **The first screen lines up.** The logo card sat in the middle of the pane
+  while everything under it started further left, so it looked off-centre
+  against the things it was meant to head. One column now, and the opening
+  line says Locust runs the coding agents you already have, on your own
+  accounts.
+- **Copilot's background tasks are recorded.** Locust has no background-task
+  feature, and the one event any runtime sends about them was being dropped
+  by name — so there was nothing to build one from. It is kept now.
+
 ## 0.255.0 - 2026-09-22
 
 - **A plan stops promising work that is never coming.** When a run ends

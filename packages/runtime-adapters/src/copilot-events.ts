@@ -115,7 +115,6 @@ const IGNORED_TYPES = new Set([
   "session.mcp_server_status_changed",
   "session.mcp_servers_loaded",
   "session.tools_updated",
-  "session.background_tasks_changed",
   "assistant.message_start",
   "assistant.tool_call_delta",
   "assistant.idle",
@@ -336,6 +335,39 @@ export function createCopilotEventNormalizer(
       ...evidenceFor(record, scrubbed, type),
       redacted: true,
     };
+
+    /*
+     * BACKGROUND WORK, WHICH THIS APP HAS NO CONCEPT OF.
+     *
+     * Colin, 2026-09-21: he ran something that went to the background and
+     * "when it finished we never got the follow up reply". He also guessed
+     * there is no UI for a background task anywhere in Locust. He is right:
+     * there is no such concept in this codebase, and Copilot CLI is the one
+     * runtime that announces the state at all.
+     *
+     * It was in `IGNORED_TYPES`, so the only signal any runtime gives us was
+     * dropped by name. That is fine as a rendering decision and useless as
+     * an engineering one: nothing can be built on an event nobody has ever
+     * seen the shape of, and no fixture in this repo contains one.
+     *
+     * So it becomes a diagnostic rather than a feature. It is not drawn as a
+     * tool row, it does not re-invoke anybody, and it claims nothing about
+     * what happens when the task ends -- it carries the runtime's own
+     * payload into the ledger so the NEXT Copilot run that backgrounds
+     * something leaves evidence to build the real thing from. Guessing the
+     * shape and shipping a follow-up on it is the mistake this file's
+     * history is mostly made of.
+     */
+    if (type === "session.background_tasks_changed") {
+      return [
+        diagnostic(
+          "info",
+          "copilot.background_tasks_changed",
+          "Copilot reported a change to its background tasks.",
+          evidence,
+        ),
+      ];
+    }
 
     if (type === "session.auto_mode_resolved") {
       // The first record this adapter keeps, and the one that names the model

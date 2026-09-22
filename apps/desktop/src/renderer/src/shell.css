@@ -3595,11 +3595,23 @@ textarea {
    and at 250px the card floated in a dead band above the composer (design
    review, 2026-09-05). */
 .lc-markcard {
-  /* The lockup stays centred; the content under it left-aligns (design
-     agent, 2026-09-19): they are not the same composition. */
-  align-self: center;
-  width: 480px;
-  max-width: 100%;
+  /*
+   * FULL COLUMN WIDTH, and the lockup centred INSIDE it.
+   *
+   * This was 480px, centred in a 760px column, while the prose under it and
+   * the runtime panel below both began at the column's left edge. MEASURED
+   * on the packaged build: card left 502, everything else 362. So the card
+   * was centred in the pane and aligned with nothing, which is what Colin
+   * meant by "its way off center" (2026-09-21) -- the eye reads two left
+   * edges 140px apart, not a centred composition.
+   *
+   * The note this replaces was right that the lockup is centred and the
+   * content under it is not: that stays true, and it is now true INSIDE one
+   * shared column instead of across two. Widening the card rather than
+   * narrowing the panel, because the panel is the screen's real content.
+   */
+  align-self: stretch;
+  width: 100%;
   padding: 22px 0;
   border: 1px solid var(--lc-border-card);
   border-radius: var(--lc-radius-card);

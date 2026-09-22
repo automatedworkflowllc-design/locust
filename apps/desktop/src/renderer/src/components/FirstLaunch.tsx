@@ -271,11 +271,11 @@ export function FirstLaunch({
               */}
             {freeStart === 'no' ? (
               <>
-                Locust runs coding agents installed on this machine. <strong>OpenCode needs no account</strong> — though it is not currently listing a free model, so this one needs a paid route too.
+                Locust runs the coding agents you already have, on your own accounts. <strong>OpenCode needs no account</strong> — though it is not listing a free model right now, so this one needs a paid route too.
               </>
             ) : (
               <>
-                Locust runs coding agents installed on this machine. <strong>OpenCode needs no account</strong> — one install and you have a working teammate.
+                Locust runs the coding agents you already have, on your own accounts. <strong>OpenCode needs no account</strong> — one install and you have a working teammate.
               </>
             )}
           </p>

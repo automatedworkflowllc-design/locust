@@ -541,6 +541,63 @@ export function startedLabel(iso: string, now: Date = new Date()): string | unde
   return `${day}, ${time}`
 }
 
+/**
+ * How far into a conversation a turn is, in units a person thinks in.
+ *
+ * It said `959 min in`, which Colin saw on a five-hour run. Two things were
+ * wrong with that number and only one of them is arithmetic.
+ *
+ * The arithmetic: nobody reads 959 minutes. Past an hour or so a person
+ * thinks in hours, and past a day, in days.
+ *
+ * The bigger one: it is WALL CLOCK from the first event of the whole
+ * conversation, and a conversation chains across missions and across days.
+ * So 959 minutes was mostly the hours he was not at the desk. The count is
+ * true and it is not about work, which is what "in" sounds like it means.
+ * The fix for that is not a better number -- there is no honest single
+ * number for it -- it is to stop pretending a day-spanning total is a
+ * duration you can feel, and to say the DATE once the turn is on a
+ * different day from where the conversation started.
+ */
+export function elapsedInLabel(minutes: number): string {
+  if (minutes < 90) return `${String(minutes)} min in`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) {
+    const rest = minutes % 60
+    return rest === 0 ? `${String(hours)}h in` : `${String(hours)}h ${String(rest)}m in`
+  }
+  const days = Math.floor(hours / 24)
+  const rest = hours % 24
+  return rest === 0 ? `${String(days)}d in` : `${String(days)}d ${String(rest)}h in`
+}
+
+/**
+ * Whether two instants fall on the same calendar day.
+ *
+ * `startedLabel` learned this for the mission rule: a bare time is
+ * unambiguous for exactly as long as you keep the app open, and a mission
+ * from last night then reads as one from five minutes ago. The time marker
+ * had the same hole, against a different reference -- not "today" but "the
+ * day this conversation started".
+ */
+function sameCalendarDay(first: string, second: string): boolean {
+  const left = new Date(first)
+  const right = new Date(second)
+  if (Number.isNaN(left.getTime()) || Number.isNaN(right.getTime())) return true
+  return (
+    left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate()
+  )
+}
+
+/** The day a turn happened, for a marker that has crossed one. */
+function dayLabel(iso: string): string | undefined {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return undefined
+  return at.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 /** Whole minutes between two instants, floored, never negative. */
 export function minutesBetween(from: string, to: string): number {
   const start = new Date(from).getTime()
@@ -562,6 +619,14 @@ export interface ThreadMarker {
   readonly minutesIn: number
   /** Said only when the gap is the point, e.g. `waited 6 min`. */
   readonly note: string | undefined
+  /** `45 min in`, `3h 20m in`, `2d 4h in` -- never `959 min in`. */
+  readonly elapsed: string
+  /**
+   * The date, when this turn is on a different day from the one the
+   * conversation started on. Absent within a single day, where the clock
+   * time alone is unambiguous.
+   */
+  readonly day?: string
 }
 
 /**
@@ -581,11 +646,16 @@ export function threadMarkers(turns: readonly (readonly NormalizedRuntimeEvent[]
     if (previous === undefined || next === undefined) continue
     const gap = minutesBetween(previous, next)
     if (gap < QUIET_GAP_MINUTES) continue
+    const minutesIn = minutesBetween(origin, next)
+    const crossedADay = !sameCalendarDay(origin, next)
+    const day = crossedADay ? dayLabel(next) : undefined
     markers.push({
       beforeTurn: index,
       at: next,
-      minutesIn: minutesBetween(origin, next),
-      note: `waited ${String(gap)} min`
+      minutesIn,
+      note: `waited ${String(gap)} min`,
+      elapsed: elapsedInLabel(minutesIn),
+      ...(day === undefined ? {} : { day })
     })
   }
   return markers
