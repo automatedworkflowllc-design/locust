@@ -52,6 +52,34 @@ const check = (what, ok, detail) => {
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${detail}`}`)
 }
 
+// Where the bots stand, over a moment: a bot hops at idle, so a single frame
+// can catch one in the air. The lowest its drawing reaches is where it rests.
+const RESTING_FEET = `(async () => {
+  const feet = (canvas) => {
+    if (!canvas || canvas.width === 0) return null
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
+    for (let row = canvas.height - 1; row >= 0; row -= 1) {
+      for (let col = 0; col < canvas.width; col += 1) {
+        if (data[(row * canvas.width + col) * 4 + 3] > 40) {
+          const r = canvas.getBoundingClientRect()
+          return r.top + ((row + 1) * r.height) / canvas.height
+        }
+      }
+    }
+    return null
+  }
+  const lowest = {}
+  for (let frame = 0; frame < 8; frame += 1) {
+    for (const bot of document.querySelectorAll('.lc-cover__face .lc-bot')) {
+      const at = feet(bot.querySelector('canvas'))
+      const name = bot.getAttribute('data-bot')
+      if (at !== null && (lowest[name] === undefined || at > lowest[name])) lowest[name] = at
+    }
+    await new Promise((r) => setTimeout(r, 220))
+  }
+  return JSON.stringify(lowest)
+})()`
+
 const MEASURE = `(async () => {
   const card = document.querySelector('.lc-cover')
   const pane = document.querySelector('.lc-empty')
@@ -184,6 +212,8 @@ try {
       await sleep(900)
     }
     const m = JSON.parse(await drive.evaluate(MEASURE))
+    const resting = JSON.parse(await drive.evaluate(RESTING_FEET))
+    if (!m.missing) m.faces = m.faces.map((face) => ({ ...face, feet: resting[face.bot] ?? face.feet }))
     measured[label] = m
     await shoot(`size-${label}.png`)
     if (m.missing) { check(`${label}: the cover is on the home screen`, false); continue }

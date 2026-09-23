@@ -23,15 +23,16 @@ const block = (from: string): string => {
 }
 
 describe('the home screen cover', () => {
-  it('is the cover drawn to scale: its 960x288 numbers times the measured k', () => {
-    expect(block('.lc-cover {')).toContain('height: calc(288px * var(--lc-cover-k))')
-    expect(block('.lc-cover__plate {')).toContain('left: calc(496px * var(--lc-cover-k))')
-    expect(block('.lc-cover .lc-lockup__mark {')).toContain('width: calc(118px * var(--lc-cover-k))')
-    expect(block('.lc-cover .lc-lockup__name {')).toContain('font-size: calc(58px * var(--lc-cover-k))')
+  it('is the cover drawn to scale: its 960x254 numbers times the measured k', () => {
+    // A2 (0.295): the machine -- no plate, the lockup on the glass.
+    expect(block('.lc-cover {')).toContain('height: calc(254px * var(--lc-cover-k))')
+    expect(block('.lc-cover .lc-lockup__mark {')).toContain('width: calc(100px * var(--lc-cover-k))')
+    expect(block('.lc-cover .lc-lockup__name {')).toContain('font-size: calc(48px * var(--lc-cover-k))')
+    expect(shell).not.toContain('.lc-cover__plate {')
   })
 
   it('centres the claim under the lockup, in mono capitals, never under the 10.5px floor', () => {
-    expect(block('.lc-cover__brand {')).toContain('align-items: center')
+    expect(block('.lc-cover__screen {')).toContain('align-items: center')
     const claim = block('.lc-cover__claim {')
     expect(claim).toContain('font-family: var(--lc-font-mono)')
     expect(claim).toContain('text-transform: uppercase')

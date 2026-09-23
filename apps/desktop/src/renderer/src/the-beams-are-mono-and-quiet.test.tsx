@@ -17,9 +17,10 @@ import { HomeCover } from './components/HomeCover.js'
  */
 
 describe('the title box', () => {
-  it('wears a beam round the card, and round nothing else', () => {
+  it('wears a beam round the machine, and round nothing else', () => {
+    // A2 (0.295): the title box is the machine now, and the beam goes round it.
     const html = renderToStaticMarkup(<HomeCover ready tube="full" />)
-    expect(html).toMatch(/<div data-beam="[^"]+"[^>]*class="lc-coverbeam"[^>]*><div class="lc-cover"/)
+    expect(html).toMatch(/<div data-beam="[^"]+"[^>]*class="lc-coverbeam lc-coverbeam--machine"[^>]*><div class="lc-cover__machine"/)
     expect(html.match(/<div data-beam=/g) ?? []).toHaveLength(1)
   })
 
@@ -29,7 +30,7 @@ describe('the title box', () => {
     // while something is. The package marks a running beam `data-active`;
     // the drive (_tools/drive-beams.mjs) reads the animation off the built app.
     const wrapper = (ready: boolean): string =>
-      /<div data-beam="[^"]+"[^>]*class="lc-coverbeam"[^>]*>/.exec(renderToStaticMarkup(<HomeCover ready={ready} tube="full" />))?.[0] ?? ''
+      /<div data-beam="[^"]+"[^>]*class="lc-coverbeam lc-coverbeam--machine"[^>]*>/.exec(renderToStaticMarkup(<HomeCover ready={ready} tube="full" />))?.[0] ?? ''
     expect(wrapper(false)).toContain('data-active')
     expect(wrapper(true)).not.toContain('data-active')
   })

@@ -3731,18 +3731,6 @@ textarea {
 }
 
 /* Inside the glass the lockup is drawn smaller, with air on every side. */
-.lc-cover .lc-cover__glass .lc-lockup {
-  gap: calc(18px * var(--lc-cover-k));
-}
-
-.lc-cover .lc-cover__glass .lc-lockup__mark {
-  width: calc(100px * var(--lc-cover-k));
-}
-
-.lc-cover .lc-cover__glass .lc-lockup__name {
-  font-size: calc(48px * var(--lc-cover-k));
-}
-
 /* What the glass shows: the lockup and, under it, the claim -- both on the
    tube, under its scanlines. */
 .lc-cover__screen {
@@ -3752,18 +3740,6 @@ textarea {
   gap: calc(16px * var(--lc-cover-k));
 }
 
-
-/* The ground the teammates stand on, running off the card's right edge. */
-.lc-cover__plate {
-  position: absolute;
-  left: calc(496px * var(--lc-cover-k));
-  top: calc(48px * var(--lc-cover-k));
-  width: calc(500px * var(--lc-cover-k));
-  height: calc(192px * var(--lc-cover-k));
-  background: var(--lc-bg-window);
-  border: 1px solid var(--lc-border-card);
-  border-radius: calc(14px * var(--lc-cover-k));
-}
 
 .lc-cover__face {
   position: absolute;
@@ -3897,19 +3873,6 @@ textarea {
 
 /* The lockup and the claim, centred in the space left of the plate: the
    same air on either side, and the claim's centre is the lockup's. */
-.lc-cover__brand {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: calc(496px * var(--lc-cover-k));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: calc(20px * var(--lc-cover-k));
-}
-
 /* The claim in the machine's voice: Geist Mono capitals at the mono label's
    tracking, never under the mono label's 10.5px floor. The trailing
    tracking is taken back so the letters, not the last gap, are centred.
@@ -3972,15 +3935,17 @@ textarea {
    given a fallback value: a fallback is what lets an undefined variable pass
    quietly, and --lc-cover-k is only defined inside the card. */
 .lc-cover .lc-lockup {
-  gap: calc(22px * var(--lc-cover-k));
+  gap: calc(18px * var(--lc-cover-k));
 }
 
+/* On the machine's glass (A2): smaller than the old open cover, with air on
+   every side of the screen. */
 .lc-cover .lc-lockup__mark {
-  width: calc(118px * var(--lc-cover-k));
+  width: calc(100px * var(--lc-cover-k));
 }
 
 .lc-cover .lc-lockup__name {
-  font-size: calc(58px * var(--lc-cover-k));
+  font-size: calc(48px * var(--lc-cover-k));
 }
 
 .lc-lockup path {
