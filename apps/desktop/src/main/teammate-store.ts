@@ -3,7 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import { isAvatarSpec, seedAvatar } from '../shared/avatar.js'
+import { cleanAvatar, isAvatarSpec, seedAvatar } from '../shared/avatar.js'
 import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode, LayoutPreference, TubePreference, ReplyTextSize } from '../shared/ipc.js'
 import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
@@ -73,7 +73,7 @@ const MAX_FILE_BYTES = 1_000_000
 export const TEAMMATES_UNREADABLE = 'TEAMMATES_UNREADABLE'
 const SCHEMA_VERSION = 1 as const
 
-export const TEAMMATE_HUES: readonly TeammateHue[] = ['lime', 'blue', 'violet', 'clay']
+export const TEAMMATE_HUES: readonly TeammateHue[] = ['lime', 'blue', 'violet', 'clay', 'teal', 'butter', 'rose', 'slate', 'pearl']
 
 export const TEAMMATE_ROLES: readonly TeammateRole[] = [
   'Code & Migrations',
@@ -556,7 +556,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           role: input.role,
           ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
           ...(input.worktree === true ? { worktree: true } : {}),
-          avatar: input.avatar ?? seedAvatar(teammateId),
+          avatar: input.avatar === undefined ? seedAvatar(teammateId) : cleanAvatar(input.avatar),
           createdAt: new Date().toISOString()
         }
         await write({ ...file, teammates: [...file.teammates, teammate] })
@@ -590,7 +590,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           // Carried like the folder: an edit of the name must not widen a
           // teammate back to every connector.
           ...(existing.connectors === undefined ? {} : { connectors: existing.connectors }),
-          avatar: input.avatar,
+          avatar: cleanAvatar(input.avatar),
           createdAt: existing.createdAt,
           ...(existing.route === undefined ? {} : { route: existing.route }),
           // Carried like the route: renaming a teammate must not lose the

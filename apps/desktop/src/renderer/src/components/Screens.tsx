@@ -40,7 +40,7 @@ import {
   runtimeListOrder
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 import { Icon } from './Icon.js'
 import { COST_NOT_REPORTED_SHORT, costLine, costLineOrWhyNot, costUnit, runCostOf, sumCosts } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
@@ -517,7 +517,7 @@ export function TeammatesScreen({
             return (
               <div className="lc-rostercard" key={teammate.teammateId}>
                 <div className="lc-rostercard__head">
-                  <PixelFace
+                  <TeammateBot
                     hue={teammate.hue}
                     avatar={teammate.avatar}
                     size={36}

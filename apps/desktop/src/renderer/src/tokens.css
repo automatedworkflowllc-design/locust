@@ -310,6 +310,20 @@
   --lc-hue-violet-face: #150f1e;
   --lc-hue-clay: #e4857a;
   --lc-hue-clay-face: #1e100f;
+  /* Five more, for the bots (Colin, 2026-09-22: "add as much as youd like"):
+     the same weight as the four above, so no two teammates need share one.
+     Pearl is the ghost's white. Each `-face` is the ink a pixel face draws
+     its features in on that chip. */
+  --lc-hue-teal: #54c7b5;
+  --lc-hue-teal-face: #0c1a18;
+  --lc-hue-butter: #e6c85c;
+  --lc-hue-butter-face: #1c170a;
+  --lc-hue-rose: #e78fb3;
+  --lc-hue-rose-face: #1e0f16;
+  --lc-hue-slate: #93a4bd;
+  --lc-hue-slate-face: #11151c;
+  --lc-hue-pearl: #ecebf2;
+  --lc-hue-pearl-face: #16161b;
 
   /* THE TWO HUES THAT HAD NO TEXT SIBLING.
    *

@@ -18,6 +18,35 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
+describe('a teammate as a bot', () => {
+  it('keeps the bot the person picked, and only the fields it knows', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({
+      name: 'Sable',
+      hue: 'pearl',
+      role: 'Code & Migrations',
+      avatar: { ...seedAvatar('draft'), bot: { shape: 'swarm', face: 'mouth', glow: true }, extra: 'x' }
+    })
+    expect(made.hue).toBe('pearl')
+    expect(made.avatar.bot).toEqual({ shape: 'swarm', face: 'mouth' })
+    expect(Object.keys(made.avatar).sort()).toEqual(['accessory', 'bot', 'headwear', 'mouth'])
+  })
+
+  it('refuses a shape there is no bot for', async () => {
+    const { store: teammates } = await store()
+    await expect(
+      teammates.create({ name: 'Nope', hue: 'lime', role: 'Code & Migrations', avatar: { ...seedAvatar('draft'), bot: { shape: 'robot', face: 'eyes' } } })
+    ).rejects.toThrow(/avatar is invalid/)
+  })
+
+  it('takes every one of the nine colours', async () => {
+    const { store: teammates } = await store()
+    for (const hue of ['lime', 'blue', 'violet', 'clay', 'teal', 'butter', 'rose', 'slate', 'pearl']) {
+      await expect(teammates.create({ name: `Mate ${hue}`, hue, role: 'Code & Migrations' })).resolves.toMatchObject({ hue })
+    }
+  })
+})
+
 const NUL = String.fromCharCode(0)
 
 describe('teammate names', () => {

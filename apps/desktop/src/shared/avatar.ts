@@ -15,6 +15,73 @@ export const HEADWEAR_COUNT = 6
 export const ACCESSORY_COUNT = 3
 export const MOUTH_COUNT = 4
 
+/**
+ * THE BOTS. Colin, 2026-09-22, on libraries.dev/bots: *"this is actually
+ * fucking perfect brother, this could revamp our design so much"*, and then
+ * *"we're going to have to make miniature versions of the little bots for our
+ * sidebar as well and chat as well and teammate picker panel"*.
+ *
+ * A teammate's face is a bot: one of bot-avatars' eighteen shapes or one of
+ * Locust's own two ("why not both? its our branding"), with eyes alone or a
+ * mouth. A shape the person picks is kept on the record (`bot`); otherwise --
+ * every teammate made before bots, and every shuffled look -- it is DERIVED
+ * from the same three seeded choices the pixel face was drawn from, so it is
+ * as stable as the face was and nothing on disk has to change.
+ */
+export const BOT_SHAPES = [
+  'clover',
+  'flower',
+  'triangle',
+  'square',
+  'blob',
+  'ghost',
+  'circle',
+  'drop',
+  'star',
+  'droid',
+  'mech',
+  'alien',
+  'hexagon',
+  'cat',
+  'cloud',
+  'pill',
+  'pebble',
+  'puddle',
+  'hopper',
+  'swarm'
+] as const
+
+export type BotShape = (typeof BOT_SHAPES)[number]
+export type BotFace = 'eyes' | 'mouth'
+
+export interface BotSpec {
+  readonly shape: BotShape
+  readonly face: BotFace
+}
+
+export function isBotSpec(value: unknown): value is BotSpec {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.shape === 'string' &&
+    (BOT_SHAPES as readonly string[]).includes(record.shape) &&
+    (record.face === 'eyes' || record.face === 'mouth')
+  )
+}
+
+/** The teammate's bot: the one they picked, or the one their seeded look maps to. */
+export function botFor(avatar: AvatarSpec): BotSpec {
+  if (avatar.bot !== undefined && isBotSpec(avatar.bot)) return avatar.bot
+  const index =
+    (avatar.headwear * ACCESSORY_COUNT * MOUTH_COUNT + avatar.accessory * MOUTH_COUNT + avatar.mouth) %
+    BOT_SHAPES.length
+  return {
+    shape: BOT_SHAPES[index] ?? 'clover',
+    // The open mouth of the pixel face is the one that becomes a mouth.
+    face: avatar.mouth === 2 ? 'mouth' : 'eyes'
+  }
+}
+
 export interface AvatarSpec {
   /** plain, cans, bangs, buns, cap, antenna */
   readonly headwear: 0 | 1 | 2 | 3 | 4 | 5
@@ -22,6 +89,8 @@ export interface AvatarSpec {
   readonly accessory: 0 | 1 | 2
   /** line-2, line-4, open, smirk */
   readonly mouth: 0 | 1 | 2 | 3
+  /** The bot the person picked. Absent: derived from the three above (`botFor`). */
+  readonly bot?: BotSpec
 }
 
 /** Half-cell coordinates on the even 0-14 grid, as the spec tabulates them. */
@@ -80,9 +149,28 @@ export function isAvatarSpec(value: unknown): value is AvatarSpec {
   return within(record.headwear, HEADWEAR_COUNT)
     && within(record.accessory, ACCESSORY_COUNT)
     && within(record.mouth, MOUTH_COUNT)
+    && (record.bot === undefined || isBotSpec(record.bot))
 }
 
-/** The next look: every part advances together, so a shuffle always changes something. */
+/**
+ * What goes on disk: the known fields and nothing else. `isAvatarSpec`
+ * checks the fields it knows and lets any others through, so a record could
+ * carry whatever an input added; the store writes this instead.
+ */
+export function cleanAvatar(avatar: AvatarSpec): AvatarSpec {
+  return {
+    headwear: avatar.headwear,
+    accessory: avatar.accessory,
+    mouth: avatar.mouth,
+    ...(avatar.bot === undefined ? {} : { bot: { shape: avatar.bot.shape, face: avatar.bot.face } })
+  }
+}
+
+/**
+ * The next look: every part advances together, so a shuffle always changes
+ * something -- and a shape the person had picked gives way to the derived one,
+ * so shuffling moves through the bots too.
+ */
 export function shuffledAvatar(current: AvatarSpec): AvatarSpec {
   return {
     headwear: ((current.headwear + 1) % HEADWEAR_COUNT) as AvatarSpec['headwear'],

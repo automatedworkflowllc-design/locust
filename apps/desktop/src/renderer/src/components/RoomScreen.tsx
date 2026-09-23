@@ -8,7 +8,7 @@ import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
 import { AgentText, LiveRegisterLine } from './ThreadItems.js'
 import { Icon } from './Icon.js'
 import type { ContextMenuState } from './ContextMenu.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 import { footLine } from '../roomExchange.js'
 import { modelDisplayName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
@@ -628,7 +628,7 @@ export function RoomScreen({
                           )
                         }
                       >
-                        <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={16} activity="idle" presence="none" />
+                        <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={16} activity="idle" presence="none" />
                         {teammate.name}
                         {/* A tick as well as the lime. `.lc-button.is-active`
                             is border, tint and text colour -- all three are
@@ -904,7 +904,7 @@ export function RoomScreen({
                         onClick={() => jumpTo(entry.postId, id)}
                       >
                         {teammate !== undefined && (
-                          <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={22} activity="idle" presence="none" />
+                          <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={22} activity="idle" presence="none" />
                         )}
                         <span className="lc-posthead__pip" aria-hidden="true" />
                       </button>
@@ -936,7 +936,7 @@ export function RoomScreen({
                      */
                     const face =
                       who === undefined ? null : (
-                        <PixelFace hue={who.hue} avatar={who.avatar} size={22} activity="idle" presence="none" name={who.name} />
+                        <TeammateBot hue={who.hue} avatar={who.avatar} size={22} activity="idle" presence="none" name={who.name} />
                       )
                     if (item.kind === 'said') {
                       return (
@@ -1056,7 +1056,7 @@ export function RoomScreen({
                     <div key={teammateId} className="lc-roomanswer" data-answer={`${entry.postId}:${teammateId}`}>
                       <div className="lc-roomanswer__who">
                         {teammate !== undefined && (
-                          <PixelFace
+                          <TeammateBot
                             hue={teammate.hue}
                             avatar={teammate.avatar}
                             size={22}
@@ -1189,7 +1189,7 @@ export function RoomScreen({
                     <span className="lc-settings__note">unassigned</span>
                   ) : (
                     <>
-                      <PixelFace hue={owner.hue} avatar={owner.avatar} size={16} activity="idle" presence="none" />
+                      <TeammateBot hue={owner.hue} avatar={owner.avatar} size={16} activity="idle" presence="none" />
                       {owner.name}
                     </>
                   )}

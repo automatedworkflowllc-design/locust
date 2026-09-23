@@ -6,7 +6,7 @@ import { seedAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { PublicPeerMessage, PublicTeammate, TeammateHue } from '../../../shared/ipc.js'
 import { peerExchangeStartsOpen, peerSnippet } from '../missionView.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 
 /**
  * The exchange between this mission's teammate and one peer.
@@ -141,7 +141,7 @@ export function PeerThread({
         onClick={() => setOpen(!open)}
       >
         <span>{label}</span>
-        <PixelFace hue={peerHue} avatar={faceOf(peer.teammateId, peerProfile)} size={16} />
+        <TeammateBot hue={peerHue} avatar={faceOf(peer.teammateId, peerProfile)} size={16} />
         <span className={`lc-peer__name is-${peerHue}`}>{peer.name}</span>
         {waited !== undefined && <span className="lc-peer__when lc-mono">sent {waited}</span>}
         {!open && snippet !== undefined && <span className="lc-peer__snippet">{snippet}</span>}
@@ -160,7 +160,7 @@ export function PeerThread({
             const author = teammates.find((teammate) => teammate.teammateId === message.from.teammateId)
             return (
               <div key={message.messageId} className="lc-peer__message">
-                <PixelFace hue={hue} avatar={faceOf(message.from.teammateId, author)} size={20} />
+                <TeammateBot hue={hue} avatar={faceOf(message.from.teammateId, author)} size={20} />
                 <div className="lc-peer__body">
                   {/* The pill above already names the sender when every
                     * message came from one side, which is the ordinary case. */}

@@ -5,7 +5,7 @@ import type { PublicTeammate } from '../../../shared/ipc.js'
 import { missionPhaseView } from '../status.js'
 import { railEmptyLine, railRows, shortAgo } from '../railFlyout.js'
 import { Icon } from './Icon.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 import type { SidebarMission } from './Sidebar.js'
 
 /**
@@ -109,7 +109,7 @@ export function RailFlyout({
       onMouseLeave={onPointerLeave}
     >
       <div className="lc-railflyout__head">
-        <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={30} teammateId={teammate.teammateId} />
+        <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={30} teammateId={teammate.teammateId} />
         <span className="lc-railflyout__who">
           <span className="lc-railflyout__name">{teammate.name}</span>
           <span className={`lc-railflyout__status lc-tone-${statusTone}`}>{statusLabel}</span>

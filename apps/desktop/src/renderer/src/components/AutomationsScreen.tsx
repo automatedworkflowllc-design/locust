@@ -7,7 +7,7 @@ import { NOTHING_TO_SAVE_YET, savableConversations, turnsLabel } from '../savabl
 import type { SavableConversation } from '../savableConversations.js'
 import { Icon } from './Icon.js'
 import { ScreenHeader } from './Screens.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
 import type { RecoverRoutine } from './RoutineRecovery.js'
 
@@ -168,7 +168,7 @@ export function AutomationsScreen({
                 return (
                   <div className="lc-savable__row" key={mission.missionId}>
                     {owner !== undefined && (
-                      <PixelFace hue={owner.hue} avatar={owner.avatar} size={16} teammateId={owner.teammateId} />
+                      <TeammateBot hue={owner.hue} avatar={owner.avatar} size={16} teammateId={owner.teammateId} />
                     )}
                     <button
                       type="button"
@@ -204,7 +204,7 @@ export function AutomationsScreen({
             return (
               <div className="lc-routinerow" key={routine.routineId}>
                 {owner !== undefined && (
-                  <PixelFace hue={owner.hue} avatar={owner.avatar} size={18} teammateId={owner.teammateId} />
+                  <TeammateBot hue={owner.hue} avatar={owner.avatar} size={18} teammateId={owner.teammateId} />
                 )}
                 <span className="lc-routinerow__name" title={routine.steps.join(STEP_GAP)}>
                   {routine.name}

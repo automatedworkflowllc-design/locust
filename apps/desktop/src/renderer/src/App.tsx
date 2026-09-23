@@ -91,7 +91,7 @@ import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
-import { PixelFace } from './components/PixelFace.js'
+import { TeammateBot } from './components/TeammateBot.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { ContextMenu } from './components/ContextMenu.js'
@@ -5017,7 +5017,7 @@ export default function App(): ReactElement {
                   {missionOwner === undefined ? (
                     <AgentAvatar size={32} />
                   ) : (
-                    <PixelFace
+                    <TeammateBot
                       hue={missionOwner.hue}
                       avatar={missionOwner.avatar}
                       size={32}

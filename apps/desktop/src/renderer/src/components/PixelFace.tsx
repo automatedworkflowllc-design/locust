@@ -59,17 +59,27 @@ const HUE_VARIABLE: Readonly<Record<PixelFaceHue, string>> = {
   lime: '--lc-hue-lime',
   blue: '--lc-hue-blue',
   violet: '--lc-hue-violet',
-  clay: '--lc-hue-clay'
+  clay: '--lc-hue-clay',
+  teal: '--lc-hue-teal',
+  butter: '--lc-hue-butter',
+  rose: '--lc-hue-rose',
+  slate: '--lc-hue-slate',
+  pearl: '--lc-hue-pearl'
 }
 
 const FACE_VARIABLE: Readonly<Record<PixelFaceHue, string>> = {
   lime: '--lc-hue-lime-face',
   blue: '--lc-hue-blue-face',
   violet: '--lc-hue-violet-face',
-  clay: '--lc-hue-clay-face'
+  clay: '--lc-hue-clay-face',
+  teal: '--lc-hue-teal-face',
+  butter: '--lc-hue-butter-face',
+  rose: '--lc-hue-rose-face',
+  slate: '--lc-hue-slate-face',
+  pearl: '--lc-hue-pearl-face'
 }
 
-const PRESENCE_TONE: Readonly<Record<FacePresence, string | undefined>> = {
+export const PRESENCE_TONE: Readonly<Record<FacePresence, string | undefined>> = {
   working: 'lime',
   approval: 'amber',
   blocked: 'red',

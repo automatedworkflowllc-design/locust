@@ -6,7 +6,7 @@ import type { PublicTeammate, RoutineSchedule } from '../../../shared/ipc.js'
 import { EVERY_HOURS_CHOICES } from '../../../shared/routine-schedule.js'
 import { stepTooLongNotice } from '../../../shared/step-budget.js'
 import { MAX_ROUTINE_STEPS } from '../routines.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 
 /**
  * Saving a conversation as a routine, and correcting one.
@@ -104,7 +104,7 @@ export function RoutineDialog({
 
           {teammate !== undefined && (
             <p className="lc-dialog__note lc-mono">
-              <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={16} /> {teammate.name} runs it
+              <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={16} /> {teammate.name} runs it
               {routeLabel === undefined ? '' : ` on ${routeLabel}`}. A routine saved read-only stays read-only.
             </p>
           )}

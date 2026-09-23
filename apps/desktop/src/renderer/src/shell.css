@@ -6162,6 +6162,74 @@ textarea {
   gap: var(--lc-space-4);
 }
 
+/* The Look section: its label, the face toggle and Shuffle on one line, the
+   shapes under them in the teammate's colour. */
+.lc-lookhead {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
+.lc-lookface {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.lc-lookface button {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-border-strong);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-lookface button.is-selected {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+}
+
+.lc-lookhead .lc-shuffle {
+  margin-left: 0;
+}
+
+.lc-lookgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 6px;
+}
+
+.lc-look {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-border-card);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-look:hover {
+  background: var(--lc-hover-surface);
+}
+
+.lc-look.is-selected {
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+}
+
+.lc-look:focus-visible,
+.lc-lookface button:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
 .lc-rolegrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

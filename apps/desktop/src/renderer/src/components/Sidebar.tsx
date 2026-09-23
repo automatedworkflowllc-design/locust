@@ -19,7 +19,7 @@ import {
   runtimeOfTeammate,
   teammateStatusView
 } from '../status.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 import type { TeammateStatusView } from '../status.js'
 import { ThinkingOrb } from 'thinking-orbs'
 import { Icon } from './Icon.js'
@@ -653,7 +653,7 @@ export function Sidebar({
                     {by === undefined ? (
                       <span className="lc-conv__nobody" aria-hidden="true" />
                     ) : (
-                      <PixelFace hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} />
+                      <TeammateBot hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} />
                     )}
                     <span className="lc-conv__title">{mission.title}</span>
                     {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
@@ -907,7 +907,7 @@ export function Sidebar({
                   * the app reads, so a face here cannot disagree with the
                   * same teammate's face in the workroom header.
                   */}
-                <PixelFace
+                <TeammateBot
                   hue={teammate.hue}
                   avatar={teammate.avatar}
                   size={26}
@@ -1130,7 +1130,7 @@ export function Sidebar({
                     onTeammateMenu(teammate.teammateId, { x: event.clientX, y: event.clientY })
                   }}
                 >
-                  <PixelFace
+                  <TeammateBot
                     hue={teammate.hue}
                     avatar={teammate.avatar}
                     size={30}

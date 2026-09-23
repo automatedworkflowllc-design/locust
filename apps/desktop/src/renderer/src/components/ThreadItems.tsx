@@ -3,12 +3,13 @@ import type { ReactElement } from 'react'
 import { ORB_BOX, Orb } from './Orb.js'
 
 import { seedAvatar } from '../../../shared/avatar.js'
+import type { AvatarSpec } from '../../../shared/avatar.js'
 import { parseAgentText, splitInlineCode } from '../agentText.js'
 import type { ListItem } from '../agentText.js'
 import { splitSettled } from '../settledText.js'
 import { linkHost } from '../../../shared/outbound-links.js'
 import type { OrbState, PlanStep } from '../missionView.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
 
@@ -77,8 +78,11 @@ function OutboundLink({
   )
 }
 
-/** One fixed face for the runtime itself, when a mission belongs to nobody. */
-const RUNTIME_FACE = seedAvatar('locust-runtime')
+/**
+ * One fixed face for the runtime itself, when a mission belongs to nobody:
+ * Locust's own bot, the Swarm -- the mark in flight.
+ */
+const RUNTIME_FACE: AvatarSpec = { ...seedAvatar('locust-runtime'), bot: { shape: 'swarm', face: 'eyes' } }
 
 /**
  * The face beside a mission's turns: the teammate's own when the mission has
@@ -95,12 +99,12 @@ export function AgentAvatar({
   readonly teammate?: { readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike }
 }): ReactElement {
   return teammate === undefined
-    ? <PixelFace hue="lime" avatar={RUNTIME_FACE} size={size} />
-    : <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={size} />
+    ? <TeammateBot hue="lime" avatar={RUNTIME_FACE} size={size} />
+    : <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={size} />
 }
 
-type PixelFaceHueLike = Parameters<typeof PixelFace>[0]['hue']
-type AvatarSpecLike = Parameters<typeof PixelFace>[0]['avatar']
+type PixelFaceHueLike = Parameters<typeof TeammateBot>[0]['hue']
+type AvatarSpecLike = Parameters<typeof TeammateBot>[0]['avatar']
 
 /**
  * A model's reply, drawn the way it was written.
@@ -942,7 +946,7 @@ export function LiveStepCard({
   const face = owner ?? { hue: 'lime' as const, avatar: RUNTIME_FACE }
   return (
     <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind} data-register={register}>
-      {!showFace ? <span className="lc-livestep__gutter" /> : <PixelFace
+      {!showFace ? <span className="lc-livestep__gutter" /> : <TeammateBot
         hue={face.hue}
         avatar={face.avatar}
         size={26}

@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.277.0 - 2026-09-22
+
+- **Every teammate is a bot.** The pixel faces are gone. In the sidebar, the
+  conversation, the Team screen, rooms and routines, every teammate is now
+  one of twenty little bots: the library's eighteen, plus Locust's own
+  Hopper and Swarm. Your teammates each already have one, drawn from the
+  look they had, so nobody turns into a stranger. They keep still while
+  they are idle, hop while they work, and look around while they think or
+  wait on you, still wearing the amber ring and dot when it is you they are
+  waiting for. When Locust itself speaks, it is the Swarm.
+
+- **Choose a look.** New teammate and Edit teammate now have a **Look**
+  grid: pick any of the twenty shapes, eyes alone or a mouth, or Shuffle
+  for a surprise. And five new colours sit beside the four: teal, butter,
+  rose, slate and pearl.
+
 ## 0.276.0 - 2026-09-22
 
 - **New teammate fits the window again.** On a shorter window the New

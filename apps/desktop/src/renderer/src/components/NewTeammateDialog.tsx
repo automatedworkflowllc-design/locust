@@ -2,19 +2,48 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useModal } from '../useModal.js'
 
-import { seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
-import type { AvatarSpec } from '../../../shared/avatar.js'
+import { BOT_SHAPES, botFor, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
+import type { AvatarSpec, BotShape } from '../../../shared/avatar.js'
 import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector} from '../../../shared/ipc.js'
 import { modeSummary } from '../status.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 
 const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
   { hue: 'lime', label: 'Lime' },
   { hue: 'blue', label: 'Blue' },
   { hue: 'violet', label: 'Violet' },
-  { hue: 'clay', label: 'Clay' }
+  { hue: 'clay', label: 'Clay' },
+  { hue: 'teal', label: 'Teal' },
+  { hue: 'butter', label: 'Butter' },
+  { hue: 'rose', label: 'Rose' },
+  { hue: 'slate', label: 'Slate' },
+  { hue: 'pearl', label: 'Pearl' }
 ]
+
+/** What each shape is called in the Look grid; Locust's own two say so. */
+const SHAPE_NAMES: Readonly<Record<BotShape, string>> = {
+  clover: 'Clover',
+  flower: 'Flower',
+  triangle: 'Triangle',
+  square: 'Square',
+  blob: 'Blob',
+  ghost: 'Ghost',
+  circle: 'Circle',
+  drop: 'Drop',
+  star: 'Star',
+  droid: 'Droid',
+  mech: 'Mech',
+  alien: 'Alien',
+  hexagon: 'Hexagon',
+  cat: 'Cat',
+  cloud: 'Cloud',
+  pill: 'Pill',
+  pebble: 'Pebble',
+  puddle: 'Puddle',
+  hopper: 'Hopper, a Locust',
+  swarm: 'Swarm, a Locust'
+}
 
 const ROLES: readonly { readonly role: TeammateRole; readonly description: string }[] = [
   { role: 'Code & Migrations', description: 'Repo work, refactors, test runs' },
@@ -100,6 +129,7 @@ export function NewTeammateDialog({
 
   const trimmed = name.trim()
   const canCreate = trimmed.length > 0
+  const look = botFor(avatar)
 
   // Focus in (the name field, above), Tab held inside, Escape closes -- from
   // anywhere now, not only while focus happened to be in the dialog.
@@ -120,7 +150,7 @@ export function NewTeammateDialog({
         <div className="lc-dialog__body">
           <div className="lc-dialog__identity">
             {/* The preview works, so the person sees the behaviour a live teammate has. */}
-            <PixelFace hue={hue} avatar={avatar} size={56} activity="working" presence="working" />
+            <TeammateBot hue={hue} avatar={avatar} size={56} activity="working" presence="working" />
             <div className="lc-dialog__fields">
               <label className="lc-fieldlabel lc-mono" htmlFor="lc-teammate-name">
                 Name
@@ -146,17 +176,60 @@ export function NewTeammateDialog({
                     className={`lc-hue${hue === option.hue ? ' is-selected' : ''}`}
                     onClick={() => setHue(option.hue)}
                   >
-                    <PixelFace hue={option.hue} avatar={avatar} size={24} />
+                    <TeammateBot hue={option.hue} avatar={avatar} size={24} />
                   </button>
                 ))}
-                <button
-                  type="button"
-                  className="lc-ghostbutton lc-shuffle"
-                  onClick={() => setAvatar((current) => shuffledAvatar(current))}
-                >
-                  Shuffle look
-                </button>
               </div>
+            </div>
+          </div>
+
+          {/*
+            * CHOOSE A LOOK. Colin, 2026-09-22, on the bots: "we could just
+            * have a choose your avatar option or both, whatever you decide".
+            * Both: Shuffle rolls a look, and the grid picks one outright --
+            * every shape in the teammate's own colour, still; the preview
+            * above is the one that moves.
+            */}
+          <div className="lc-dialog__section">
+            <div className="lc-lookhead">
+              <span className="lc-fieldlabel lc-mono">Look</span>
+              <div className="lc-lookface" role="radiogroup" aria-label="Face">
+                {(['eyes', 'mouth'] as const).map((face) => (
+                  <button
+                    key={face}
+                    type="button"
+                    role="radio"
+                    aria-checked={look.face === face}
+                    className={look.face === face ? 'is-selected' : undefined}
+                    onClick={() => setAvatar((current) => ({ ...current, bot: { shape: botFor(current).shape, face } }))}
+                  >
+                    {face === 'eyes' ? 'Eyes' : 'Mouth'}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="lc-ghostbutton lc-shuffle"
+                onClick={() => setAvatar((current) => shuffledAvatar(current))}
+              >
+                Shuffle look
+              </button>
+            </div>
+            <div className="lc-lookgrid" role="radiogroup" aria-label="Look">
+              {BOT_SHAPES.map((shape) => (
+                <button
+                  key={shape}
+                  type="button"
+                  role="radio"
+                  aria-checked={look.shape === shape}
+                  aria-label={SHAPE_NAMES[shape]}
+                  title={SHAPE_NAMES[shape]}
+                  className={`lc-look${look.shape === shape ? ' is-selected' : ''}`}
+                  onClick={() => setAvatar((current) => ({ ...current, bot: { shape, face: botFor(current).face } }))}
+                >
+                  <TeammateBot hue={hue} avatar={{ ...avatar, bot: { shape, face: look.face } }} size={30} />
+                </button>
+              ))}
             </div>
           </div>
 

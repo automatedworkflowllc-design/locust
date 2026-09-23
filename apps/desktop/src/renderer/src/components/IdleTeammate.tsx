@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import type { MissionMode, PublicTeammate, TeammateRole } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import { modeSentence } from '../status.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 
 /**
  * What the current mode lets this teammate do, said for THAT mode. The
@@ -95,7 +95,7 @@ export function IdleTeammate({
   return (
     <div className="lc-empty">
       <div className="lc-empty__inner">
-        <PixelFace hue={teammate.hue} avatar={teammate.avatar} size={56} />
+        <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={56} />
         <h1>{teammate.name}</h1>
         <p>
           {roleLabelOf(teammate)} · reads this workspace and explains what it finds. {modeSentence(mode)}

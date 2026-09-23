@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useState } from 'react'
 
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
-import { PixelFace } from './PixelFace.js'
+import { TeammateBot } from './TeammateBot.js'
 
 /**
  * What the team remembers, and the person's hand on it.
@@ -133,7 +133,7 @@ export function MemoryScreen({
               <span>{memory.by.name}</span>
             ) : (
               <span className="lc-memory__author">
-                <PixelFace hue={author.hue} avatar={author.avatar} size={14} activity="idle" presence="none" />
+                <TeammateBot hue={author.hue} avatar={author.avatar} size={14} activity="idle" presence="none" />
                 {author.name}
               </span>
             )}

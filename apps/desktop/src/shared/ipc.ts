@@ -591,7 +591,7 @@ export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 
 export type LocalRuntimeId = 'codex' | 'claude' | 'cursor' | 'gemini' | 'opencode' | 'copilot' | 'antigravity' | 'muse' | 'omniroute'
 
-export type TeammateHue = 'lime' | 'blue' | 'violet' | 'clay'
+export type TeammateHue = 'lime' | 'blue' | 'violet' | 'clay' | 'teal' | 'butter' | 'rose' | 'slate' | 'pearl'
 
 export type TeammateRole =
   | 'Code & Migrations'
