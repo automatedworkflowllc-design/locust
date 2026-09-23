@@ -410,6 +410,142 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
 }
 
 /**
+ * A LONE TEX MACRO IS ITS SYMBOL.
+ *
+ * Yurt's beta report (#1): an Antigravity reply read `README.md $\rightarrow$
+ * docs/README.md`. Models reach for inline math to write one arrow or one
+ * sign, and the thread has no math renderer. A whole formula is better left
+ * as the model wrote it than half drawn, so only a `$...$` that is exactly
+ * one macro from this table becomes its character: never "$5 and $10", never
+ * `$x \to y$`, and inside backticks it stays code.
+ */
+export const TEX_SYMBOLS: Readonly<Record<string, string>> = {
+  rightarrow: '→',
+  to: '→',
+  longrightarrow: '⟶',
+  leftarrow: '←',
+  gets: '←',
+  leftrightarrow: '↔',
+  Rightarrow: '⇒',
+  implies: '⇒',
+  Leftarrow: '⇐',
+  Leftrightarrow: '⇔',
+  iff: '⇔',
+  mapsto: '↦',
+  uparrow: '↑',
+  downarrow: '↓',
+  times: '×',
+  div: '÷',
+  cdot: '·',
+  pm: '±',
+  mp: '∓',
+  le: '≤',
+  leq: '≤',
+  ge: '≥',
+  geq: '≥',
+  ne: '≠',
+  neq: '≠',
+  approx: '≈',
+  equiv: '≡',
+  sim: '∼',
+  propto: '∝',
+  ll: '≪',
+  gg: '≫',
+  infty: '∞',
+  degree: '°',
+  circ: '∘',
+  bullet: '•',
+  checkmark: '✓',
+  ldots: '…',
+  dots: '…',
+  cdots: '⋯',
+  in: '∈',
+  notin: '∉',
+  subset: '⊂',
+  subseteq: '⊆',
+  cup: '∪',
+  cap: '∩',
+  emptyset: '∅',
+  forall: '∀',
+  exists: '∃',
+  neg: '¬',
+  land: '∧',
+  lor: '∨',
+  therefore: '∴',
+  sum: '∑',
+  prod: '∏',
+  partial: '∂',
+  nabla: '∇',
+  alpha: 'α',
+  beta: 'β',
+  gamma: 'γ',
+  delta: 'δ',
+  epsilon: 'ε',
+  theta: 'θ',
+  lambda: 'λ',
+  mu: 'μ',
+  pi: 'π',
+  sigma: 'σ',
+  tau: 'τ',
+  phi: 'φ',
+  omega: 'ω',
+  Gamma: 'Γ',
+  Delta: 'Δ',
+  Theta: 'Θ',
+  Lambda: 'Λ',
+  Pi: 'Π',
+  Sigma: 'Σ',
+  Phi: 'Φ',
+  Omega: 'Ω'
+}
+
+/** `$\name$`, spaces allowed inside the dollars, for a name in the table and nothing else. */
+const TEX_MACRO = `\\$[ \\t]*\\\\(${Object.keys(TEX_SYMBOLS)
+  .sort((a, b) => b.length - a.length)
+  .join('|')})[ \\t]*\\$`
+
+/*
+ * Inline code first, then links. Models write absolute paths inside link
+ * targets -- `[src/streak.test.js](C:/Users/.../streaks/src/streak.test.js)`
+ * -- and rendering the raw syntax put the whole path in the middle of a
+ * sentence. The label is what the sentence needs; the target is kept on the
+ * element's title so it is available without being in the way. Nothing is
+ * linked: a thread must not become a way to navigate the app somewhere.
+ * Emphasis after code and links, so `**` inside a code span stays literal
+ * and a link label can itself be bold. `**bold**` and `__bold__` are
+ * strong; `*em*` and `_em_` are emphasis, but only when the marker sits at
+ * a word edge -- `snake_case_name` must not become "snake" + em("case") +
+ * "name", and `2 * 3 * 4` is arithmetic. The QA pass on 0.21.2 read a
+ * literal `**Yes, whitespace-only input is already covered.**` in a Claude
+ * reply, which is the model's own emphasis drawn as four asterisks.
+ *
+ * An EMPHASISED link is its own alternative, and it has to come before the
+ * emphasis ones.
+ *
+ * Colin, 2026-09-14, with a screenshot of a Cursor reply: a whole
+ * `*[We Must Pace the Frontier](https://darioamodei.com/post/...)*` rendered
+ * in italics with the brackets and the URL sitting in the middle of the
+ * sentence. Models write this constantly -- an italicised article title
+ * that is also the link.
+ *
+ * The scan finds the earliest match, and `*` comes before `[`, so the
+ * emphasis alternative won and captured the entire link as its text. An
+ * emphasis span's text is not parsed again, so the link syntax inside it
+ * rendered literally. Handling the pair explicitly is enough; going
+ * recursive would mean giving `strong` and `em` children instead of text,
+ * which is a much larger change than one bad line deserves.
+ *
+ * A lone TeX macro last (TEX_SYMBOLS): nothing else starts with a dollar.
+ */
+const INLINE = new RegExp(
+  `${
+    /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)|(?:\*\*|__|\*|_)\[([^\]\n]+)\]\(([^)\s]+)\)(?:\*\*|__|\*|_)|(?:\*\*|__)(?=\S)([^\n]+?\S)(?:\*\*|__)|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]+?\S)(?:\*|_)(?![A-Za-z0-9*_])/
+      .source
+  }|${TEX_MACRO}`,
+  'g'
+)
+
+/**
  * Split prose into plain runs and `inline code` runs.
  *
  * Only a matched pair on one line counts. A lone backtick is a backtick a
@@ -417,40 +553,8 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
  */
 export function splitInlineCode(text: string): readonly InlineSpan[] {
   const spans: InlineSpan[] = []
-  // Inline code first, then links. Models write absolute paths inside link
-  // targets -- `[src/streak.test.js](C:/Users/.../streaks/src/streak.test.js)`
-  // -- and rendering the raw syntax put the whole path in the middle of a
-  // sentence. The label is what the sentence needs; the target is kept on the
-  // element's title so it is available without being in the way. Nothing is
-  // linked: a thread must not become a way to navigate the app somewhere.
-  // Emphasis after code and links, so `**` inside a code span stays literal
-  // and a link label can itself be bold. `**bold**` and `__bold__` are
-  // strong; `*em*` and `_em_` are emphasis, but only when the marker sits at
-  // a word edge -- `snake_case_name` must not become "snake" + em("case") +
-  // "name", and `2 * 3 * 4` is arithmetic. The QA pass on 0.21.2 read a
-  // literal `**Yes, whitespace-only input is already covered.**` in a Claude
-  // reply, which is the model's own emphasis drawn as four asterisks.
-  /*
-   * An EMPHASISED link is its own alternative, and it has to come before the
-   * emphasis ones.
-   *
-   * Colin, 2026-09-14, with a screenshot of a Cursor reply: a whole
-   * `*[We Must Pace the Frontier](https://darioamodei.com/post/...)*` rendered
-   * in italics with the brackets and the URL sitting in the middle of the
-   * sentence. Models write this constantly -- an italicised article title
-   * that is also the link.
-   *
-   * The scan finds the earliest match, and `*` comes before `[`, so the
-   * emphasis alternative won and captured the entire link as its text. An
-   * emphasis span's text is not parsed again, so the link syntax inside it
-   * rendered literally. Handling the pair explicitly is enough; going
-   * recursive would mean giving `strong` and `em` children instead of text,
-   * which is a much larger change than one bad line deserves.
-   */
-  const pattern =
-    /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)|(?:\*\*|__|\*|_)\[([^\]\n]+)\]\(([^)\s]+)\)(?:\*\*|__|\*|_)|(?:\*\*|__)(?=\S)([^\n]+?\S)(?:\*\*|__)|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]+?\S)(?:\*|_)(?![A-Za-z0-9*_])/g
   let cursor = 0
-  for (const match of text.matchAll(pattern)) {
+  for (const match of text.matchAll(INLINE)) {
     const at = match.index
     if (at > cursor) spans.push({ kind: 'plain', text: text.slice(cursor, at) })
     if (match[1] !== undefined) {
@@ -463,8 +567,10 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
       spans.push({ kind: 'link', text: match[4], href: match[5]! })
     } else if (match[6] !== undefined) {
       spans.push({ kind: 'strong', text: match[6] })
+    } else if (match[7] !== undefined) {
+      spans.push({ kind: 'em', text: match[7] })
     } else {
-      spans.push({ kind: 'em', text: match[7]! })
+      spans.push({ kind: 'plain', text: TEX_SYMBOLS[match[8]!] ?? match[0] })
     }
     cursor = at + match[0].length
   }

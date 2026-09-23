@@ -158,6 +158,29 @@ describe('inline code', () => {
   })
 })
 
+describe('a lone TeX macro', () => {
+  // Yurt's beta report (#1): an Antigravity reply read
+  // `README.md $\rightarrow$ docs/README.md`.
+  const shown = (text: string): string => splitInlineCode(text).map((span) => span.text).join('')
+
+  it('is drawn as its symbol, in the words around it', () => {
+    expect(shown('README.md $\\rightarrow$ docs/README.md')).toBe('README.md → docs/README.md')
+    expect(splitInlineCode('README.md $\\rightarrow$ docs/README.md').every((span) => span.kind === 'plain')).toBe(true)
+    expect(shown('a $\\times$ b $\\le$ c, and $ \\to $ d')).toBe('a × b ≤ c, and → d')
+  })
+
+  it('leaves money, a whole formula, an unknown macro and code as they were written', () => {
+    for (const text of ['$5 and $10', 'costs $\\,5', 'so $x \\to y$ holds', 'use $\\frac$ here', '$\\toolong$']) {
+      expect(shown(text)).toBe(text)
+    }
+    expect(splitInlineCode('write `$\\to$` for an arrow')).toEqual([
+      { kind: 'plain', text: 'write ' },
+      { kind: 'code', text: '$\\to$' },
+      { kind: 'plain', text: ' for an arrow' }
+    ])
+  })
+})
+
 describe('headings and emphasis', () => {
   // The QA pass on 0.21.2 read a literal `### Summary` from Codex and a
   // literal `**Yes, whitespace-only input is already covered.**` from
