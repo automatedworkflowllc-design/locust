@@ -140,6 +140,22 @@ try {
   await zoom('04-let-go.png')
   await sleep(700)
   await zoom('05-settled.png')
+
+  // The keyboard still moves it: the range input is the control for keys.
+  const key = async (name, code) => {
+    await drive.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: name, code: name, windowsVirtualKeyCode: code })
+    await drive.send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, code: name, windowsVirtualKeyCode: code })
+  }
+  await drive.evaluate(`document.querySelector('.lc-effortpanel__slider').focus()`)
+  const before = await panel()
+  await key('ArrowRight', 39)
+  await sleep(500)
+  const right = await panel()
+  await key('ArrowRight', 39)
+  await sleep(500)
+  const twice = await panel()
+  say(`keys: ${String(before.value)} -> ${String(right.value)} -> ${String(twice.value)}; the thumb ${String(Math.round(before.thumb))} -> ${String(Math.round(twice.thumb))}`)
+  check('the arrow keys still step it, and the thumb goes with it', Number(right.value) === Number(before.value) + 1 && Number(twice.value) === Number(before.value) + 2 && twice.thumb > before.thumb + 20, `${String(before.value)} -> ${String(right.value)} -> ${String(twice.value)}`)
   say(failures === 0 ? '\nEFFORT SLIDER PASSED' : `\nEFFORT SLIDER: ${String(failures)} FAILED`)
 } catch (error) {
   say(`probe failed: ${error instanceof Error ? error.message : String(error)}`)
