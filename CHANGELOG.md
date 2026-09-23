@@ -11,6 +11,29 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.299.0 - 2026-09-23
+
+### Improved
+
+- **What a teammate says while it works stays where it said it.** Some
+  models narrate as they go — "Creating your file…", "File write is
+  underway…" — and Locust drew all of it after the finished work, so it
+  read as stale. Once a turn is done, those lines now sit in the fold
+  among the steps they came before, the way Claude Code keeps them, and
+  only the answer is below. Nothing is dropped; it is back in the order
+  it was said.
+- **One style for small labels.** The small capital-letter labels across
+  the app — section heads, field names, the code language on a code block,
+  the model picker's groups — now share one size and spacing in the code
+  font. A few were a size off, and three had no working size at all. Room
+  names on the Rooms screen now match teammate names on the Team screen.
+
+### Fixed
+
+- **Click anywhere in the chat box to start typing.** Only the one line of
+  text took a click; the rest of the box did nothing. Now the whole box
+  puts the cursor in the message, and its buttons still work as before.
+
 ## 0.298.0 - 2026-09-23
 
 ### Fixed
