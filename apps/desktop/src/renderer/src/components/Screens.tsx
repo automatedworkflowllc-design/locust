@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { durationText, usagePercent, usageWindowSentence } from '../missionView.js'
+import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../missionView.js'
 import { WhatsNew } from './WhatsNew.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import type { SettingsPageId } from '../settingsPages.js'
@@ -390,7 +390,7 @@ export function MissionsScreen({
                * report: two surfaces computing one fact separately.
                */
               const elapsed = durationText(
-                Math.max(0, Date.parse(mission.lastUpdatedAt) - Date.parse(mission.createdAt))
+                runSpanMs(mission.events) ?? Math.max(0, Date.parse(mission.lastUpdatedAt) - Date.parse(mission.createdAt))
               )
               const secondary = secondaryOf?.(mission.missionId)
               const running = runningMissionIds.has(mission.missionId)
@@ -445,7 +445,10 @@ export function MissionsScreen({
                     {shortRuntimeName(mission.runtime)} / {modelDisplayName(mission.runtime, mission.model)}
                   </span>
                   <span className="lc-missionrow__stats lc-mono">
-                    {mission.checkpoints.length} checkpoint{mission.checkpoints.length === 1 ? '' : 's'} · {elapsed}
+                    {/* A count of none says nothing (Yurt's beta report, #14). */}
+                    {mission.checkpoints.length === 0
+                      ? elapsed
+                      : `${String(mission.checkpoints.length)} checkpoint${mission.checkpoints.length === 1 ? '' : 's'} · ${elapsed}`}
                   </span>
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
                     {costLine(runCostOf(mission.events)) ?? COST_NOT_REPORTED_SHORT}

@@ -42,6 +42,19 @@ describe('how a route reads on a chip', () => {
     expect(modelDisplayName('cursor', 'cursor')).toBe('Cursor')
   })
 
+  it('reads a version written with a hyphen as a version', () => {
+    // A mission on Cursor's `claude-opus-5-5-medium` read "Claude Opus 5 5
+    // Medium" (2026-09-23): Anthropic's ids write the point as a hyphen.
+    expect(modelDisplayName('cursor', 'claude-opus-5-5-medium')).toBe('Claude Opus 5.5 Medium')
+    expect(modelDisplayName('cursor', 'claude-opus-4-8-thinking-low')).toBe('Claude Opus 4.8 Thinking Low')
+    expect(modelDisplayName('cursor', 'claude-3-5-sonnet')).toBe('Claude 3.5 Sonnet')
+    expect(modelDisplayName('claude', 'claude-haiku-4-5-20251001')).toBe('Haiku 4.5 20251001')
+    // A date is not a version, and a version already dotted is left alone.
+    expect(modelDisplayName('codex', 'gpt-4o-2024-08-06')).toBe('GPT-4o 2024 08 06')
+    expect(modelDisplayName('cursor', 'cursor-grok-4.6-high')).toBe('Grok 4.6 High')
+    expect(modelDisplayName('cursor', 'some-model-1-2-3')).toBe('Some Model 1 2 3')
+  })
+
   it('keeps the second word where it is the program being named', () => {
     // Settings is telling you which program this is; the chip is not.
     expect(shortRuntimeName('opencode')).toBe('OpenCode')

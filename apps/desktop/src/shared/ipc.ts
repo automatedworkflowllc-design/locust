@@ -1205,6 +1205,13 @@ export interface PublicModel {
    * this says which id each effort means.
    */
   readonly variants?: Readonly<Record<string, string>>
+  /**
+   * The level the runtime itself starts this model at, when it says one.
+   * Cursor lists that variant under the model's bare name -- "Kimi K3" is
+   * `kimi-k3-max` -- and a new route starts there rather than on Locust's
+   * own guess (`defaultEffort` in status.ts).
+   */
+  readonly defaultEffort?: string
   /** The runtime this model belongs to; a model is never offered under another. */
   readonly runtime: MissionRuntimeId
   readonly displayName: string

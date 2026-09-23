@@ -11,6 +11,36 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.291.0 - 2026-09-23
+
+### Improved
+
+- **Cursor's models read as names.** The picker listed many of Cursor's
+  models by their ids -- `claude-opus-5-5`, `cursor-grok-4.6` -- and gave
+  their Max, None and Minimal levels rows of their own, so Kimi K3 appeared
+  twice. Each model is now one row under the name Cursor gives it ("Claude
+  Opus 5.5 1M"), with every level on its effort slider: 49 rows where there
+  were 78. When the level you were on is not one the new model offers, it
+  starts on the level Cursor itself uses by default -- Max for Kimi K3.
+
+- **A run has one clock.** The Missions row timed a run from when it was
+  created to its last write, so it disagreed with the conversation's own
+  line (10s against 6s). Both use the run's start and finish now, and the
+  row no longer opens with "0 checkpoints".
+
+### Fixed
+
+- **Save as routine proposes only the turns that worked.** A turn you had
+  stopped was offered as a step.
+
+- **A tool call written as text shows as code.** Some free models write the
+  call they meant to make instead of making it, and the thread drew it as
+  the first paragraph of the reply. It is a code block labelled "tool call"
+  now, and what the model said to you stays as words.
+
+- **A Claude version reads as a version.** A Cursor run on Claude Opus 5.5
+  read "Claude Opus 5 5 Medium" in its row.
+
 ## 0.290.0 - 2026-09-23
 
 ### Fixed

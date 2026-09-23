@@ -1241,9 +1241,15 @@ export interface ConversationRowExtras {
  * a two-level model is the higher one -- the same bias as picking `medium`
  * out of five. Undefined only when the model reports no levels at all, and
  * then there is nothing to show.
+ *
+ * All of that is Locust's guess, and it comes second to the runtime's own
+ * answer where the catalogue has one (`PublicModel.defaultEffort`): Cursor
+ * lists Kimi K3's default as its max variant and Opus 4.6's as high, and
+ * "the middle" would have said high and max.
  */
-export function defaultEffort(supportedEfforts: readonly string[]): string | undefined {
+export function defaultEffort(supportedEfforts: readonly string[], runtimeDefault?: string): string | undefined {
   if (supportedEfforts.length === 0) return undefined
+  if (runtimeDefault !== undefined && supportedEfforts.includes(runtimeDefault)) return runtimeDefault
   if (supportedEfforts.includes('medium')) return 'medium'
   return supportedEfforts[Math.floor(supportedEfforts.length / 2)]
 }
@@ -1259,10 +1265,11 @@ export function defaultEffort(supportedEfforts: readonly string[]): string | und
  */
 export function effortAfterRouteChange(
   current: string | undefined,
-  supportedEfforts: readonly string[]
+  supportedEfforts: readonly string[],
+  runtimeDefault?: string
 ): string | undefined {
   if (current !== undefined && supportedEfforts.includes(current)) return current
-  return defaultEffort(supportedEfforts)
+  return defaultEffort(supportedEfforts, runtimeDefault)
 }
 
 /**

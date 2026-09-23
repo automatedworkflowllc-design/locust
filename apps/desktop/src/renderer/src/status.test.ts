@@ -1061,6 +1061,48 @@ describe('the level on the chip is the level the run is given', () => {
     expect(swarmEffortFor(models, 'gpt-5.6-sol', true, 'low', 'codex')).toBe(displayed('gpt-5.6-sol', true, 'low'))
   })
 
+  it("agree on a Cursor family, whose id already names a level", () => {
+    // Cursor's Opus 5.5 stands on its `-medium` variant (Cursor lists that one
+    // under the bare name); the chip reads the level from the id, and so must
+    // the run. And a family whose id is its low variant is not run at medium.
+    const cursor: readonly PublicModel[] = [
+      {
+        id: 'claude-opus-5-5-medium',
+        runtime: 'cursor',
+        displayName: 'Claude Opus 5.5 1M',
+        description: '',
+        supportedEfforts: ['low', 'medium', 'high', 'max'],
+        variants: { low: 'claude-opus-5-5-low', medium: 'claude-opus-5-5-medium', high: 'claude-opus-5-5-high', max: 'claude-opus-5-5-max' },
+        defaultEffort: 'medium'
+      },
+      {
+        id: 'grok-4.7-low',
+        runtime: 'cursor',
+        displayName: 'Grok 4.7',
+        description: '',
+        supportedEfforts: ['low', 'medium', 'high'],
+        variants: { low: 'grok-4.7-low', medium: 'grok-4.7-medium', high: 'grok-4.7-high' }
+      }
+    ]
+    expect(swarmEffortFor(cursor, 'claude-opus-5-5-medium', false, undefined, 'cursor')).toBe('medium')
+    expect(swarmEffortFor(cursor, 'grok-4.7-low', false, undefined, 'cursor')).toBe('low')
+    expect(swarmEffortFor(cursor, 'grok-4.7-low', false, 'high', 'cursor')).toBe('high')
+    expect(swarmEffortFor(cursor, 'claude-opus-5-5-medium', true, undefined, 'cursor')).toBe('max')
+  })
+
+  it("start a new route on the level the runtime names as its default, where it names one", () => {
+    // Cursor lists Kimi K3's max variant under the bare name, and Opus 4.6's
+    // high one; Locust's own rule (medium, else the middle) would have said
+    // high and max.
+    expect(defaultEffort(['low', 'high', 'max'], 'max')).toBe('max')
+    expect(defaultEffort(['high', 'max'], 'high')).toBe('high')
+    expect(defaultEffort(['high', 'max'])).toBe('max')
+    // A default the model does not offer is not a default.
+    expect(defaultEffort(['low', 'medium', 'high'], 'ultra')).toBe('medium')
+    expect(effortAfterRouteChange('xhigh', ['high', 'max'], 'high')).toBe('high')
+    expect(effortAfterRouteChange('max', ['high', 'max'], 'high')).toBe('max')
+  })
+
   it('agree on a model with no levels: both say nothing, and nothing is sent', () => {
     expect(swarmEffortFor(models, 'auto', false, undefined, 'copilot')).toBeUndefined()
     expect(displayed('auto', false, undefined)).toBeUndefined()

@@ -1214,6 +1214,20 @@ export function durationText(ms: number): string {
 }
 
 /**
+ * How long a run took: its first event to its last, in milliseconds, or
+ * undefined with fewer than two.
+ *
+ * ONE measure for every surface. The Missions row timed from the mission's
+ * creation to its last ledger write -- the launch before the runtime's first
+ * word and the receipt after its last -- and read 43s for a turn whose fold
+ * said 37s (Yurt's beta report, 2026-09-23, #14).
+ */
+export function runSpanMs(events: readonly NormalizedRuntimeEvent[]): number | undefined {
+  const times = events.map((event) => Date.parse(event.occurredAt)).filter((t) => Number.isFinite(t))
+  return times.length >= 2 ? Math.max(...times) - Math.min(...times) : undefined
+}
+
+/**
  * What a finished turn did, as one line a person reads coming back to the
  * laptop: duration, delegation, work, exceptions -- outermost fact to
  * innermost (SURFACES-0.22 §1). A segment that is zero is absent; the floor
@@ -1279,9 +1293,7 @@ export function activityTrace(
   workspacePath?: string
 ): readonly TraceSegment[] {
   const segments: TraceSegment[] = []
-  const times = events.map((event) => Date.parse(event.occurredAt)).filter((t) => Number.isFinite(t))
-  const elapsed = times.length >= 2 ? Math.max(...times) - Math.min(...times) : 0
-  const duration = durationText(elapsed)
+  const duration = durationText(runSpanMs(events) ?? 0)
   const finished = outcome !== 'running'
   const entries = activityEntries(details, workspacePath)
   // How many FILES this run changed, which is not how many rows the card

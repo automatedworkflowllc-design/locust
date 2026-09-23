@@ -9,6 +9,7 @@ function turn(
   options: {
     readonly follows?: string
     readonly startedBy?: PublicRecoveredMission['startedBy']
+    readonly phase?: PublicRecoveredMission['phase']
   } = {}
 ): PublicRecoveredMission {
   return {
@@ -23,7 +24,7 @@ function turn(
     cliVersion: null,
     createdAt: '2026-09-05T10:00:00.000Z',
     lastUpdatedAt: '2026-09-05T10:00:00.000Z',
-    phase: 'completed',
+    phase: options.phase ?? 'completed',
     events: [],
     eventCount: 0,
     eventsTruncated: false,
@@ -74,6 +75,25 @@ describe('saving a conversation as a routine', () => {
     const draft = routineDraft(missions[3]!, index(missions))
     expect(draft?.steps).toEqual(['Read status.ts.', 'List every file.'])
     expect(draft?.learnedFrom).toEqual(['m1', 'm4'])
+  })
+
+  it('leaves out a turn the person stopped, and keeps the ones that worked', () => {
+    // The 0.271 recheck: "Save as routine" proposed a CANCELLED prompt as a
+    // step. A routine replays what a conversation did.
+    const missions = [
+      turn('m1', 'Read status.ts.'),
+      turn('m2', 'Delete everything in dist.', { follows: 'm1', phase: 'cancelled' }),
+      turn('m3', 'List every file.', { follows: 'm2' })
+    ]
+    expect(routineDraft(missions[2]!, index(missions))?.steps).toEqual(['Read status.ts.', 'List every file.'])
+  })
+
+  it('still offers a conversation whose every turn failed, less the ones stopped', () => {
+    const missions = [
+      turn('m1', 'Summarise the report.', { phase: 'failed' }),
+      turn('m2', 'Not this one.', { follows: 'm1', phase: 'cancelled' })
+    ]
+    expect(routineDraft(missions[1]!, index(missions))?.steps).toEqual(['Summarise the report.'])
   })
 
   it('has nothing to save when a person typed nothing in it', () => {

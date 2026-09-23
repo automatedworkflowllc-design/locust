@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
-import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
+import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, modelFamily, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
 import { modelDisplayName, routeModelName } from '../routeName.js'
 import { FREE_START_RUNTIME } from '../../../shared/runtime-install.js'
@@ -143,7 +143,12 @@ function buildRows(
           [{ model: 'account-default', label: 'Account default', detail: status.detail, fullDetail: status.detail, older: false }]
 
     for (const entry of entries) {
-      const isActive = runtime.id === active.runtime && entry.model === active.model
+      // A route saved on one of a family's variants is still on that row: a
+      // teammate on `claude-opus-5-5-high` is on Claude Opus 5.5, whichever
+      // variant the row itself stands on.
+      const isActive =
+        runtime.id === active.runtime &&
+        (entry.model === active.model || modelFamily(models, runtime.id, active.model)?.id === entry.model)
       rows.push({
         key: `${runtime.id}:${entry.model}`,
         group,

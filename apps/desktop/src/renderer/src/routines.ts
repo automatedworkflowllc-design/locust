@@ -46,15 +46,26 @@ export function routineDraft(
   byId: ReadonlyMap<string, PublicRecoveredMission>
 ): RoutineDraft | undefined {
   const turns = conversationTurns(mission, byId)
-  const typed: { readonly missionId: string; readonly prompt: string }[] = []
+  const said: { readonly missionId: string; readonly prompt: string; readonly phase: string | undefined }[] = []
   for (const turn of turns) {
     const held = byId.get(turn.missionId)
     // Host-written turns carry a briefing, not a person's words.
     if (held?.startedBy !== undefined) continue
     const prompt = (held?.prompt ?? turn.prompt).trim()
     if (prompt.length === 0) continue
-    typed.push({ missionId: turn.missionId, prompt })
+    said.push({ missionId: turn.missionId, prompt, phase: held?.phase })
   }
+  /*
+   * The turns that WORKED, where there are any.
+   *
+   * A routine replays what a conversation did, and a turn the person stopped
+   * or that never finished is not something it did: the 0.271 recheck found
+   * "Save as routine" proposing a cancelled prompt as a step. Completed turns
+   * first; failing those, anything not cancelled, so a conversation whose
+   * every turn failed on a quota can still be saved and replayed later.
+   */
+  const completed = said.filter((turn) => turn.phase === 'completed')
+  const typed = completed.length > 0 ? completed : said.filter((turn) => turn.phase !== 'cancelled')
   const first = typed[0]
   if (first === undefined) return undefined
   const kept = typed.slice(0, MAX_ROUTINE_STEPS)

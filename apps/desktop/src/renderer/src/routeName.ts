@@ -48,6 +48,23 @@ const ACRONYMS: ReadonlySet<string> = new Set(['gpt', 'cli', 'ai'])
 const capitalised = (token: string): string =>
   ACRONYMS.has(token.toLowerCase()) ? token.toUpperCase() : token.charAt(0).toUpperCase() + token.slice(1)
 
+const SHORT_NUMBER = /^\d{1,2}$/
+
+/**
+ * Whether `tokens[index]` is the minor half of a version written with a
+ * hyphen: `claude-opus-5-5` is Opus 5.5, and `claude-3-5-sonnet` Claude 3.5.
+ * Anthropic's ids -- and Cursor's copies of them -- write the point as a
+ * hyphen, and a mission on Cursor's `claude-opus-5-5-medium` read "Claude Opus
+ * 5 5 Medium" (2026-09-23). Exactly two short numbers after a word: a third,
+ * or a longer number before them, is a date (`gpt-4o-2024-08-06`), not a
+ * version.
+ */
+function isMinorVersion(tokens: readonly string[], index: number): boolean {
+  if (index < 2 || !SHORT_NUMBER.test(tokens[index] ?? '') || !SHORT_NUMBER.test(tokens[index - 1] ?? '')) return false
+  if (/^\d+$/.test(tokens[index - 2] ?? '')) return false
+  return !SHORT_NUMBER.test(tokens[index + 1] ?? '')
+}
+
 function spellOut(id: string): string {
   const tokens = id.split('-')
   let out = ''
@@ -55,6 +72,10 @@ function spellOut(id: string): string {
     const token = tokens[index] ?? ''
     if (index === 0) {
       out = capitalised(token)
+      continue
+    }
+    if (isMinorVersion(tokens, index)) {
+      out += `.${token}`
       continue
     }
     // `GPT-6`, but `Grok 4.6`: the hyphen survives only where the makers keep

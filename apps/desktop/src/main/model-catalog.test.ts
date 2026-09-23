@@ -10,6 +10,7 @@ import {
   claudeModelsFrom,
   createModelCatalog,
   cursorModelsFrom,
+  sharedCursorName,
   parseModels,
   splitCursorModelId
 } from './model-catalog.js'
@@ -219,16 +220,21 @@ describe('Cursor models from what its CLI listed', () => {
       })
     ])
 
-    expect(models.map((model) => model.id)).toEqual(['composer-2.5', 'cursor-grok-4.6-low'])
+    // Grok stands on the variant Cursor lists under the bare name -- its
+    // default -- rather than on whichever variant happened to come first.
+    expect(models.map((model) => model.id)).toEqual(['composer-2.5', 'cursor-grok-4.6-high'])
     const composer = models[0]
     expect(composer?.displayName).toBe('Composer 2.5')
     expect(composer?.supportedEfforts).toEqual(['fast'])
     expect(composer?.variants).toEqual({ fast: 'composer-2.5-fast' })
+    expect(composer?.defaultEffort).toBeUndefined()
 
-    // Grok appears only through its variants, so the family name is the id
-    // rather than one variant's label, and every effort is offered.
+    // Grok appears only through its variants, so it is named by the words
+    // they share -- Cursor's own name, never the id -- and every effort is
+    // offered.
     const grok = models[1]
-    expect(grok?.displayName).toBe('cursor-grok-4.6')
+    expect(grok?.displayName).toBe('Cursor Grok 4.6')
+    expect(grok?.defaultEffort).toBe('high')
     expect(grok?.supportedEfforts).toEqual(['low', 'high', 'high-fast'])
     expect(grok?.variants).toEqual({
       low: 'cursor-grok-4.6-low',
@@ -243,6 +249,79 @@ describe('Cursor models from what its CLI listed', () => {
     expect(splitCursorModelId('auto')).toEqual({ family: 'auto' })
     // A name that IS an effort word must not be split into nothing.
     expect(splitCursorModelId('fast')).toEqual({ family: 'fast' })
+    // The levels Cursor added: max, none and minimal are levels, not models.
+    expect(splitCursorModelId('claude-opus-5-5-max-fast')).toEqual({ family: 'claude-opus-5-5', effort: 'max-fast' })
+    expect(splitCursorModelId('gpt-5.6-sol-none')).toEqual({ family: 'gpt-5.6-sol', effort: 'none' })
+    expect(splitCursorModelId('muse-spark-1.3-minimal')).toEqual({ family: 'muse-spark-1.3', effort: 'minimal' })
+    // GPT-5.5 spells xhigh out.
+    expect(splitCursorModelId('gpt-5.5-extra-high-fast')).toEqual({ family: 'gpt-5.5', effort: 'xhigh-fast' })
+    // Thinking is a model of its own, on either side of the level.
+    expect(splitCursorModelId('claude-opus-5-thinking-high-fast')).toEqual({ family: 'claude-opus-5-thinking', effort: 'high-fast' })
+    expect(splitCursorModelId('claude-4.6-opus-max-thinking')).toEqual({ family: 'claude-4.6-opus-thinking', effort: 'max' })
+    expect(splitCursorModelId('claude-4.5-sonnet-thinking')).toEqual({ family: 'claude-4.5-sonnet-thinking' })
+  })
+
+  it('names every model the way Cursor does, on the list a real account printed', () => {
+    // `cursor-agent --list-models`, 2026-09-23, the lines for five models --
+    // zero-width padding and doubled spaces as Cursor printed them. Before,
+    // twenty-six of the account's rows read as ids (`claude-opus-5-5`), and
+    // `-max`, `-none` and `-minimal` were rows of their own.
+    const listed = [
+      ['claude-opus-5-5-low', 'Claude Opus 5.5 1M Low'],
+      ['claude-opus-5-5-low-fast', 'Claude Opus 5.5 1M Low Fast'],
+      ['claude-opus-5-5-medium', 'Claude Opus 5.5 1M'],
+      ['claude-opus-5-5-medium-fast', 'Claude Opus 5.5 1M Fast'],
+      ['claude-opus-5-5-xhigh', 'Claude Opus 5.5 1M Extra High'],
+      ['claude-opus-5-5-max', 'Claude Opus 5.5 1M Max'],
+      ['claude-opus-5-5-max-fast', 'Claude Opus 5.5 1M Max Fast'],
+      ['claude-opus-5-thinking-high', 'Claude Opus 5 1M Thinking'],
+      ['claude-opus-5-thinking-high-fast', 'Claude Opus 5 1M Thinking Fast'],
+      ['claude-opus-5-thinking-low', 'Claude Opus 5 1M Low Thinking'],
+      ['claude-opus-5-thinking-low-fast', 'Claude Opus 5 1M Low Thinking Fast'],
+      ['claude-opus-5-thinking-max', 'Claude Opus 5 1M Max Thinking'],
+      ['claude-fable-5-1-low', 'Claude Fable 5.1 1M Low (NO ZDR)'],
+      ['claude-fable-5-1-high', 'Claude Fable 5.1 1M (NO ZDR)'],
+      ['claude-fable-5-1-max', 'Claude Fable 5.1 1M Max (NO ZDR)'],
+      ['grok-4.7-low', 'Grok 4.7  Low'],
+      ['grok-4.7-low-fast', 'Grok 4.7  Low Fast\u200B\u200B'],
+      ['grok-4.7-high', 'Grok 4.7  High'],
+      ['kimi-k3-low', 'Kimi K3 Low'],
+      ['kimi-k3-high', 'Kimi K3 High'],
+      ['kimi-k3-max', 'Kimi K3']
+    ].map(([id, displayName]) => ({ id: id as string, displayName: displayName as string }))
+    const models = cursorModelsFrom([cursor('ready', { aliases: [], efforts: [], models: listed })])
+    const row = (name: string) => models.find((model) => model.displayName === name)
+
+    expect(models.map((model) => model.displayName)).toEqual([
+      'Claude Opus 5.5 1M',
+      'Claude Opus 5 1M Thinking',
+      'Claude Fable 5.1 1M (NO ZDR)',
+      'Grok 4.7',
+      'Kimi K3'
+    ])
+    // Each stands on Cursor's default, and a new route starts at its level.
+    expect(row('Claude Opus 5.5 1M')?.id).toBe('claude-opus-5-5-medium')
+    expect(row('Claude Opus 5.5 1M')?.defaultEffort).toBe('medium')
+    expect(row('Claude Opus 5.5 1M')?.variants?.['max-fast']).toBe('claude-opus-5-5-max-fast')
+    expect(row('Claude Opus 5 1M Thinking')?.defaultEffort).toBe('high')
+    expect(row('Claude Fable 5.1 1M (NO ZDR)')?.defaultEffort).toBe('high')
+    expect(row('Kimi K3')?.id).toBe('kimi-k3-max')
+    expect(row('Kimi K3')?.supportedEfforts).toEqual(['low', 'high', 'max'])
+    // Grok 4.7 names every level, so Cursor states no default and none is
+    // claimed; Locust's own rule decides, as before.
+    expect(row('Grok 4.7')?.defaultEffort).toBeUndefined()
+    expect(row('Grok 4.7')?.id).toBe('grok-4.7-low')
+  })
+
+  it('reads the name a family shares, never inventing a word', () => {
+    expect(sharedCursorName(['Claude Opus 5 1M Low Thinking', 'Claude Opus 5 1M Thinking', 'Claude Opus 5 1M Extra High Thinking'])).toBe('Claude Opus 5 1M Thinking')
+    expect(sharedCursorName(['GPT-5.5 1M None', 'GPT-5.5 1M', 'GPT-5.5 1M High'])).toBe('GPT-5.5 1M')
+    expect(sharedCursorName(['Grok 4.7  Low', 'Grok 4.7  High'])).toBe('Grok 4.7')
+    // Only one variant: its name is the name.
+    expect(sharedCursorName(['Claude Sonnet 4.6 1M'])).toBe('Claude Sonnet 4.6 1M')
+    // Nothing shared, nothing claimed.
+    expect(sharedCursorName(['Alpha', 'Beta'])).toBeUndefined()
+    expect(sharedCursorName([])).toBeUndefined()
   })
 
   it('offers nothing for a Cursor that is signed out, or that listed nothing', () => {

@@ -457,9 +457,8 @@ export function swarmEffortFor(
   chosen: string | undefined,
   runtime?: MissionRuntimeId
 ): string | undefined {
-  const supported =
-    models.find((model) => model.id === modelId && (runtime === undefined || model.runtime === runtime))
-      ?.supportedEfforts ?? []
+  const family = models.find((model) => model.id === modelId && (runtime === undefined || model.runtime === runtime))
+  const supported = family?.supportedEfforts ?? []
   if (swarm) return supported[supported.length - 1]
   // The SAME fallback the chip renders (`effort ?? defaultEffort(...)` in
   // Composer.tsx), so the level on screen and the level the run is given are
@@ -471,7 +470,13 @@ export function swarmEffortFor(
   // no effort argument at all. The comment in status.ts claiming otherwise
   // ("because it is SET rather than merely displayed") was wrong when I wrote
   // it. Found by auditing 0.38.7's own release note, 2026-09-07.
-  return chosen ?? defaultEffort(supported)
+  //
+  // And the chip reads a Cursor family's level from its id before any default
+  // (`effortOfShownId`): the family stands on one of its own variants, so its
+  // id already names a level. Without the same step here the chip said the
+  // variant's level and the run was sent `medium`.
+  const ownLevel = Object.entries(family?.variants ?? {}).find(([, id]) => id === modelId)?.[0]
+  return chosen ?? ownLevel ?? defaultEffort(supported, family?.defaultEffort)
 }
 
 function missionTitle(prompt: string): string {
@@ -5506,15 +5511,11 @@ export default function App(): ReactElement {
               // Colin, 2026-09-07: "if the user just clicks the model it
               // instantly defaults to no effort, it was cleaner before". So
               // it lands on the new model's default instead.
-              setEffort(
-                effortAfterRouteChange(
-                  effort,
-                  // Through `modelFamily`, not a bare id match: a Cursor route
-                  // resolved to a variant finds no family by id, and the effort
-                  // control then reads as though the model had none.
-                  modelFamily(models, next.runtime, next.model)?.supportedEfforts ?? []
-                )
-              )
+              // Through `modelFamily`, not a bare id match: a Cursor route
+              // resolved to a variant finds no family by id, and the effort
+              // control then reads as though the model had none.
+              const family = modelFamily(models, next.runtime, next.model)
+              setEffort(effortAfterRouteChange(effort, family?.supportedEfforts ?? [], family?.defaultEffort))
             }}
             models={models}
             resolvedModels={resolvedModels}

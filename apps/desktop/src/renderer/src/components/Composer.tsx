@@ -805,7 +805,7 @@ export function Composer({
    */
   const effortOfShownId = Object.entries(shownFamily?.variants ?? {})
     .find(([, id]) => id === shownModel)?.[0]
-  const shownEffort = swarm ? swarmEffort : effort ?? effortOfShownId ?? defaultEffort(supportedEfforts)
+  const shownEffort = swarm ? swarmEffort : effort ?? effortOfShownId ?? defaultEffort(supportedEfforts, shownFamily?.defaultEffort)
   // The scale this model actually offers, and where the current level sits on
   // it. Four stops and a switch rather than eight rows; see `effortScale.ts`.
   const { bases: effortBases, hasFast: effortHasFast } = effortScale(supportedEfforts)
@@ -822,11 +822,13 @@ export function Composer({
   const exactRoute = `${shownRuntimeStatus?.displayName ?? runtimeDisplayName(shownRuntime)} / ${shownModel}`
   // A family known only through its effort variants is listed under its
   // family name; showing the stand-in variant's id ("cursor-grok-4.6-high-fast")
-  // beside "effort · low" read as two different answers (2026-09-06).
-  const shownEntry = models.find((model) => model.runtime === shownRuntime && model.id === shownModel)
+  // beside "effort · low" read as two different answers (2026-09-06). Found
+  // through its variants as well, so a route on a sibling id -- a teammate
+  // saved on `claude-opus-5-5-high` -- reads "Claude Opus 5.5 1M" too, not
+  // its own id spelled out.
   const namedModel = routeModelName(
     shownRuntime,
-    shownEntry?.variants !== undefined ? shownEntry.displayName : shownModel,
+    shownFamily?.variants !== undefined ? shownFamily.displayName : shownModel,
     resolvedModels.get(`${shownRuntime}:${shownModel}`)
   )
   /*

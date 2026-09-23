@@ -213,35 +213,100 @@ export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   return [...current, ...older]
 }
 
-/** The effort suffixes Cursor encodes in a model id, longest first. */
-const CURSOR_EFFORTS = [
-  'xhigh-fast',
-  'high-fast',
-  'medium-fast',
-  'low-fast',
-  'xhigh',
-  'high',
-  'medium',
-  'low',
-  'fast'
-] as const
+/**
+ * The effort words Cursor writes into a model id -- the same words, in the
+ * same order, as the effort control's scale (`effortScale.ts`).
+ *
+ * `none`, `minimal` and `max` were missing until 2026-09-23, so
+ * `claude-opus-5-5-max` was a model of its own beside `claude-opus-5-5`, and
+ * `kimi-k3-max` -- which Cursor lists as plain "Kimi K3", its default -- sat
+ * beside a second "Kimi K3" made of the low and high variants.
+ */
+const CURSOR_EFFORT_WORDS: readonly string[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 
 /**
  * Split `cursor-grok-4.6-high-fast` into the model and the effort.
  *
- * Cursor lists every effort of every model as its own entry -- 217 of them on
+ * Cursor lists every effort of every model as its own entry -- 241 of them on
  * a real account -- which turned the picker into a wall nobody could read.
  * They are one model with an effort each, which is what the picker already
  * knows how to show, and what the effort control exists for.
+ *
+ * The id's last words, read from the end: an optional `fast`, then the
+ * effort (`xhigh`, or GPT-5.5's `extra-high`, which is the same level), with
+ * `thinking` on either side of it -- Cursor writes `claude-opus-5-thinking-high`
+ * and `claude-4.6-opus-high-thinking` for the same kind of model. `thinking`
+ * stays in the family: Cursor names those as models of their own ("Claude
+ * Opus 5 1M Thinking"), not as a level. A word is only taken while another is
+ * left, so a name that IS an effort word ("fast") is a name.
  */
 export function splitCursorModelId(id: string): { readonly family: string; readonly effort?: string } {
-  for (const effort of CURSOR_EFFORTS) {
-    const suffix = `-${effort}`
-    if (id.endsWith(suffix) && id.length > suffix.length) {
-      return { family: id.slice(0, -suffix.length), effort }
-    }
+  const words = id.split('-')
+  const last = (): string => words[words.length - 1] ?? ''
+  let fast = false
+  let thinking = false
+  let level: string | undefined
+  if (words.length > 1 && last() === 'fast') {
+    fast = true
+    words.pop()
   }
-  return { family: id }
+  if (words.length > 1 && last() === 'thinking') {
+    thinking = true
+    words.pop()
+  }
+  if (words.length > 2 && words[words.length - 2] === 'extra' && last() === 'high') {
+    level = 'xhigh'
+    words.splice(-2)
+  } else if (words.length > 1 && CURSOR_EFFORT_WORDS.includes(last())) {
+    level = words.pop()
+  }
+  if (!thinking && level !== undefined && words.length > 1 && last() === 'thinking') {
+    thinking = true
+    words.pop()
+  }
+  const effort = level === undefined ? (fast ? 'fast' : undefined) : fast ? `${level}-fast` : level
+  if (effort === undefined) return { family: id }
+  const family = `${words.join('-')}${thinking ? '-thinking' : ''}`
+  return { family, effort }
+}
+
+/** A Cursor display name as words: its zero-width padding and doubled spaces gone. */
+function cursorNameWords(name: string): readonly string[] {
+  return name.replace(/[​-‍﻿]/g, '').trim().split(/\s+/).filter((word) => word.length > 0)
+}
+
+/**
+ * THE NAME A FAMILY'S VARIANTS SHARE, in Cursor's own words.
+ *
+ * Cursor lists `claude-opus-5-5-low` as "Claude Opus 5.5 1M Low",
+ * `claude-opus-5-5-medium` as "Claude Opus 5.5 1M" and `-xhigh` as
+ * "Claude Opus 5.5 1M Extra High": the effort is a word it adds to the
+ * model's name, before any trailing part ("Claude Fable 5.1 1M Low (NO
+ * ZDR)", "Claude Opus 5 1M Low Thinking"). The words every variant has at the
+ * start, and the ones every variant has at the end, are the model's own name
+ * -- the name Cursor gives the variant it treats as the default, when it lists
+ * one that way. Nothing is invented: every word is Cursor's.
+ *
+ * Undefined when the variants share no word at all, and the caller keeps what
+ * it had.
+ */
+export function sharedCursorName(names: readonly string[]): string | undefined {
+  const lists = names.map(cursorNameWords)
+  const first = lists[0]
+  if (first === undefined) return undefined
+  let head = 0
+  while (head < first.length && lists.every((words) => words[head] === first[head])) head += 1
+  let tail = 0
+  // A shared ending is counted only where it does not reach back into the
+  // shared start of any variant, so no word is used twice.
+  while (
+    tail < first.length - head &&
+    lists.every((words) => words.length - 1 - tail >= head && words[words.length - 1 - tail] === first[first.length - 1 - tail])
+  ) {
+    tail += 1
+  }
+  const shared = [...first.slice(0, head), ...first.slice(first.length - tail)]
+  return shared.length === 0 ? undefined : shared.join(' ')
 }
 
 /**
@@ -255,8 +320,10 @@ export function cursorModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   if (cursor?.readiness !== 'ready' || listed === undefined) return []
 
   const families = new Map<string, {
-    displayName: string
+    plainName?: string
     defaultId: string
+    readonly variantNames: string[]
+    readonly fastNames: string[]
     readonly variants: Record<string, string>
     readonly efforts: string[]
   }>()
@@ -265,33 +332,66 @@ export function cursorModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
     const held = families.get(family) ?? {
       // Until a plain variant turns up, the first one seen stands in, so a
       // family that only ever appears with an effort is still selectable.
-      displayName: model.displayName,
       defaultId: model.id,
+      variantNames: [],
+      fastNames: [],
       variants: {},
       efforts: []
     }
     if (effort === undefined) {
-      held.displayName = model.displayName
+      held.plainName = model.displayName
       held.defaultId = model.id
     } else {
       held.variants[effort] = model.id
       if (!held.efforts.includes(effort)) held.efforts.push(effort)
+      // A fast variant is the same model sooner, and Cursor puts "Fast" LAST
+      // ("Claude Opus 5 1M Thinking Fast"), which would hide the shared
+      // ending the rest have. It names the family only if nothing else does.
+      if (effort.endsWith('fast')) held.fastNames.push(model.displayName)
+      else held.variantNames.push(model.displayName)
     }
     families.set(family, held)
   }
 
-  return [...families.entries()].map(([family, held]) => ({
-    id: held.defaultId,
-    runtime: 'cursor' as const,
-    // A family known only through its variants has no name of its own; the
-    // id is then the honest label rather than one variant's name.
-    displayName: held.efforts.length > 0 && held.defaultId !== family
-      ? family
-      : held.displayName,
-    description: 'Listed by cursor-agent --list-models',
-    supportedEfforts: held.efforts,
-    ...(Object.keys(held.variants).length === 0 ? {} : { variants: held.variants })
-  }))
+  return [...families.entries()].map(([family, held]) => {
+    /*
+     * A family Cursor lists only through its variants is named by what those
+     * variants share -- "Claude Opus 5.5 1M", Cursor's own name for it.
+     *
+     * It used to be the family's id, on the reasoning that one variant's name
+     * would claim that variant's effort; and the picker prints a name that is
+     * not the row's id as it stands, so every such row read as an
+     * identifier: `claude-opus-5-5`, `cursor-grok-4.6`, `gpt-5.5`, twenty-six
+     * of Cursor's rows on a real account (2026-09-23). The shared words carry
+     * no effort, because the effort is the word the variants differ by.
+     */
+    const shared = sharedCursorName(held.variantNames) ?? sharedCursorName([...held.variantNames, ...held.fastNames])
+    /*
+     * CURSOR'S OWN DEFAULT, where it says one: the variant it lists under the
+     * bare name. "Claude Opus 5.5 1M" is `-medium`, "Kimi K3" is `-max`,
+     * "GLM 5.2" is `-high`. That variant stands for the family, and its level
+     * is the one a new route starts on -- the level Cursor itself would run,
+     * where Locust's own rule (`medium`, else the middle) would have put Kimi
+     * on high and Opus 4.6, whose levels are high and max, on max.
+     */
+    const named =
+      held.plainName === undefined && shared !== undefined
+        ? Object.entries(held.variants).find(
+            ([effort, id]) =>
+              !effort.endsWith('fast') &&
+              cursorNameWords(listed.find((model) => model.id === id)?.displayName ?? '').join(' ') === shared
+          )
+        : undefined
+    return {
+      id: named?.[1] ?? held.defaultId,
+      runtime: 'cursor' as const,
+      displayName: held.plainName ?? shared ?? family,
+      description: 'Listed by cursor-agent --list-models',
+      supportedEfforts: held.efforts,
+      ...(Object.keys(held.variants).length === 0 ? {} : { variants: held.variants }),
+      ...(named === undefined ? {} : { defaultEffort: named[0] })
+    }
+  })
 }
 
 /**

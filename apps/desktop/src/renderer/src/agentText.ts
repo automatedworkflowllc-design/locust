@@ -162,10 +162,24 @@ function columnAlignment(rule: string): ('left' | 'right' | 'center' | undefined
 }
 
 /**
+ * A tool call a model wrote as TEXT, fenced so it is drawn as code.
+ *
+ * Some free models answer with the call they meant to make --
+ * `<tool_call><function=edit>...` -- as words, and the thread drew it as the
+ * reply's first paragraph (the 0.271 design recheck). It is the model's
+ * technical detail, not something it said to the person, so it is shown as a
+ * code block labelled "tool call". An unclosed one runs to the end.
+ */
+export function fenceToolCalls(text: string): string {
+  if (!/<tool_call>/i.test(text)) return text
+  return text.replace(/<tool_call>([\s\S]*?)(?:<\/tool_call>|$)/gi, (_match, body: string) => `\n\`\`\`tool call\n${body.trim()}\n\`\`\`\n`)
+}
+
+/**
  * Split a reply into prose and fenced code blocks, in the order written.
  */
 export function parseAgentText(text: string): readonly AgentBlock[] {
-  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const lines = fenceToolCalls(text).replace(/\r\n/g, '\n').split('\n')
   const blocks: AgentBlock[] = []
   let prose: string[] = []
   let open: { readonly ticks: string; readonly language: string | undefined; readonly lines: string[] } | undefined
