@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.294.0 - 2026-09-23
+
+### Improved
+
+- **Settings › Runtimes fits on one screen.** Each CLI's own agents and
+  commands were listed in full under it, so the page was a long scroll of
+  other programs' settings. They are folded under a line that counts them
+  -- "3 agents · 3 commands set up in this CLI" -- and open with a press.
+
+- **Cursor's models say their levels in the picker.** Every Cursor row read
+  "Listed by cursor-agent --list-models". Each now says what it offers in
+  words, like "Low to Max · Fast".
+
 ## 0.293.0 - 2026-09-23
 
 ### Improved
