@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.296.0 - 2026-09-23
+
+### Improved
+
+- **A face says what its teammate is doing, in words.** The faces along
+  the top of the sidebar, and the faces in the narrow sidebar of a small
+  window, showed a teammate working or waiting on you only by moving, a dot
+  and a colour. A screen reader now hears it too: "working", "waiting on
+  you", or why the teammate is blocked.
+
+### Fixed
+
+- **Arrows and signs in a reply are drawn as themselves.** A teammate that
+  wrote `$\rightarrow$` for an arrow showed exactly that. A lone symbol
+  written that way — an arrow, ×, ≤, ≠, ∞, a Greek letter — is now drawn
+  as the symbol; sums of money and whole formulas stay as written.
+- **Locust's own teammates draw at once.** The Hopper and the Swarm waited
+  for the screen's next frame before drawing, so where none came — a
+  window or tab not yet shown — they were blank beside teammates of every
+  other shape.
+
 ## 0.295.0 - 2026-09-23
 <!-- big -->
 
