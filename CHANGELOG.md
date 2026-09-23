@@ -11,6 +11,34 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.295.0 - 2026-09-23
+<!-- big -->
+
+### New
+
+- **The title screen is a machine.** The home screen's logo and name now
+  sit on a small screen of their own -- the same screen the loading
+  display uses -- with "Autonomous teammates on your own machine" on the
+  glass under them, and the three teammates standing on top of it. The logo
+  powers on inside the screen. It also fits the smallest window without
+  scrolling.
+
+### Improved
+
+- **The usage warning is said once a conversation.** "You've used 64% of
+  your 7-day window" appeared on every turn. It now appears once in each
+  conversation; a limit actually reached still shows every time.
+- **A long turn keeps its answer in view.** A finished turn's work stays
+  open, as before, but past a dozen steps it shows the first ten and "Show
+  N more", so the answer is not pushed off the screen.
+- **A routine says which step it is on.** While a routine runs, its
+  conversation shows "step 2 of 3" in the sidebar and names the routine and
+  step at the top of the conversation.
+- **A subagent at work shows in the sidebar.** While a teammate has a
+  subagent working, that conversation's row says "subagent working".
+- **A room you have not posted to yet stays in the sidebar**, so a room you
+  make and leave is still one click away.
+
 ## 0.294.0 - 2026-09-23
 
 ### Improved
