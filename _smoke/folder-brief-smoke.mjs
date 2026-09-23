@@ -118,7 +118,7 @@ try {
   check('discovery finished', ready === true)
 
   const settingsLine = `(async () => {
-    if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /Project folder|folder/i.test(h.innerText))) {
+    if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /Project folder|folder/i.test(h.textContent))) {
       document.querySelector('button[title="Settings (Ctrl 3)"]').click()
       await new Promise(r => setTimeout(r, 600))
     }

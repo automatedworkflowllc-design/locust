@@ -138,7 +138,7 @@ try {
     let heading
     for (let i = 0; i < 40; i += 1) {
       await new Promise(r => setTimeout(r, 250))
-      heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => h.innerText.trim() === 'Updates')
+      heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => h.textContent.trim() === 'Updates')
       if (heading) break
     }
     if (!heading) return JSON.stringify({ opened: true, section: false })

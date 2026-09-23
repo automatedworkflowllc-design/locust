@@ -185,7 +185,7 @@ try {
 
   say('5. Settings lists both trees; Remove takes one away and keeps its branch')
   const settings = JSON.parse(await evaluate(`(async () => {
-    if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /Project folder/.test(h.innerText))) {
+    if (![...document.querySelectorAll('.lc-settings__heading')].some(h => /Project folder/.test(h.textContent))) {
       document.querySelector('button[title="Settings (Ctrl 3)"]').click()
     }
     for (let i = 0; i < 40; i += 1) {
