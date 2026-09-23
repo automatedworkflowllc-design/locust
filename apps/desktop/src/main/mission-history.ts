@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { workspaceIdFor } from './workspace.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
 import type { MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
@@ -241,15 +243,66 @@ export function withinByteBudget(
   missions: readonly PublicRecoveredMission[],
   budget = MAX_HISTORY_BYTES
 ): readonly PublicRecoveredMission[] {
-  const kept: PublicRecoveredMission[] = []
+  return budgeted(missions, budget).map((entry) => entry.mission)
+}
+
+/** `withinByteBudget`, keeping each mission's JSON: the digest is taken from it. */
+function budgeted(
+  missions: readonly PublicRecoveredMission[],
+  budget = MAX_HISTORY_BYTES
+): readonly { readonly mission: PublicRecoveredMission; readonly json: string }[] {
+  const kept: { readonly mission: PublicRecoveredMission; readonly json: string }[] = []
   let used = 0
   for (const mission of missions) {
-    const size = Buffer.byteLength(JSON.stringify(mission), 'utf8')
+    const json = JSON.stringify(mission)
+    const size = Buffer.byteLength(json, 'utf8')
     if (kept.length > 0 && used + size > budget) break
-    kept.push(mission)
+    kept.push({ mission, json })
     used += size
   }
   return kept
+}
+
+/**
+ * THE WINDOW ALREADY HAS MOST OF THIS.
+ *
+ * The history is read on every run end and every first open of a finished
+ * conversation, and each read sent the newest twenty missions whole: 2.69 MB
+ * a read on Colin's 138-mission ledger (Batch C, 2026-09-22), almost all of
+ * it the same events as the read before. Structured-cloned across the IPC
+ * boundary, parsed, and then handed to React as new objects -- so every
+ * earlier turn on screen, memoised on its events since 0.262, was built
+ * again for nothing.
+ *
+ * So a whole record carries a digest of itself as sent, the window hands the
+ * digests of what it holds back with its next read, and a record whose
+ * digest has not moved comes back with `events: []` and `eventsKept`. The
+ * window keeps its own copy -- the same object, so nothing built from it is
+ * rebuilt. The digest is of the PROJECTION, not the ledger file, because the
+ * projection also carries what the workroom said, which changes on its own.
+ */
+export function missionDigest(json: string): string {
+  return createHash('sha1').update(json, 'utf8').digest('hex').slice(0, 24)
+}
+
+/** How many held records a window may name in one read -- far past what one read returns. */
+const MAX_KNOWN = 1000
+
+/**
+ * What the window says it holds, or nothing when it says it in a shape this
+ * does not recognise. Anything odd is simply a full read: the only cost of
+ * ignoring this is the bytes it would have saved.
+ */
+export function knownDigests(value: unknown): ReadonlyMap<string, string> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const entries = Object.entries(value as Record<string, unknown>)
+  if (entries.length === 0 || entries.length > MAX_KNOWN) return undefined
+  const known = new Map<string, string>()
+  for (const [missionId, digest] of entries) {
+    if (typeof digest !== 'string' || digest.length === 0 || digest.length > 64 || missionId.length > 200) return undefined
+    known.set(missionId, digest)
+  }
+  return known
 }
 
 /** Bound on the extra ledger reads one history call may do to find roots. */
@@ -439,7 +492,9 @@ export async function readMissionHistory(
   ledger: MissionLedger,
   workroom?: Workroom,
   /** The folder this window works in; defaults to the process's own. */
-  workspacePath: string = process.cwd()
+  workspacePath: string = process.cwd(),
+  /** What the window already holds, `missionId -> digest` (see `missionDigest`). */
+  known?: ReadonlyMap<string, string>
 ): Promise<MissionHistoryResponse> {
   try {
     // The kept page when the ledger can give one (see CachedLedgerFile);
@@ -469,8 +524,14 @@ export async function readMissionHistory(
      * opened. Order is the reader's: most recently touched first.
      */
     const recent = page.missions.slice(0, MAX_HISTORY_MISSIONS).map((entry) => entry.mission)
-    const shown = withinByteBudget(
-      recent.map((mission) => publicRecoveredMission(mission, workroomMessages))
+    const shown = budgeted(recent.map((mission) => publicRecoveredMission(mission, workroomMessages))).map(
+      ({ mission, json }): PublicRecoveredMission => {
+        const digest = missionDigest(json)
+        // Unchanged since the window last had it: the window keeps its own.
+        return known?.get(mission.missionId) === digest
+          ? { ...mission, events: [], digest, eventsKept: true }
+          : { ...mission, digest }
+      }
     )
     /*
      * And every OTHER conversation as a row and nothing else.

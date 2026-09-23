@@ -1872,6 +1872,17 @@ export interface PublicRecoveredMission {
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly eventCount: number
   readonly eventsTruncated: boolean
+  /**
+   * A fingerprint of this record exactly as it was sent, on a record that came
+   * with its events. The window hands it back on its next history read, and a
+   * record that has not changed since comes back without them (`eventsKept`).
+   */
+  readonly digest?: string
+  /**
+   * The events are the ones the window already holds under `digest`: keep
+   * those. Set only on a record the window said it had.
+   */
+  readonly eventsKept?: boolean
   readonly hostFailureMessage?: string
   readonly integrityIssueCount: number
   readonly sandbox: 'read-only' | 'workspace-write' | 'full-access'
@@ -1998,7 +2009,13 @@ export interface DesktopApi {
    * window's re-asks name the runtimes they are waiting on.
    */
   getLocalRuntimes(fresh?: boolean, only?: readonly string[]): Promise<RuntimeDiscoveryResponse>
-  getMissionHistory(): Promise<MissionHistoryResponse>
+  /**
+   * The mission history. `known` is what this window already holds, as
+   * `missionId -> digest`: a whole record that has not changed since comes
+   * back as `eventsKept` with no events, so an unchanged history is not sent
+   * again on every run end.
+   */
+  getMissionHistory(known?: Readonly<Record<string, string>>): Promise<MissionHistoryResponse>
   /** Remove a finished mission's record for good. Refused while it is live. */
   deleteMission(missionId: string): Promise<MissionDeleteResponse>
   /** What is in the trash, newest deletion first. */

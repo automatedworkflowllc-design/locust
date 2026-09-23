@@ -59,6 +59,7 @@ import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
 import { createFrameBatcher } from './streamFrames.js'
+import { heldDigests, mergeHistory } from './historyMerge.js'
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
@@ -1000,7 +1001,7 @@ export default function App(): ReactElement {
       // host rather than adjusting counts here, where they could drift.
       const [next, listed, roster] = await Promise.all([
         bridge.readStorageReport(),
-        bridge.getMissionHistory(),
+        bridge.getMissionHistory(heldDigests(historyRef.current)),
         bridge.listTeammates()
       ])
       if (next.ok) setStorage(next.data)
@@ -1017,6 +1018,11 @@ export default function App(): ReactElement {
   /** Which run's thread is on screen; undefined shows the addressed teammate's idle state. */
   const [shownKey, setShownKey] = useState<string>()
   const [history, setHistory] = useState<readonly PublicRecoveredMission[]>([])
+  /** The history as last committed, for a read to say what it already holds (historyMerge.ts). */
+  const historyRef = useRef<readonly PublicRecoveredMission[]>([])
+  useEffect(() => {
+    historyRef.current = history
+  }, [history])
   /** Ledger files that raised an issue and yielded no mission. See the history read. */
   const [unreadableLedgers, setUnreadableLedgers] = useState(0)
   /** The ledger could not be read AT ALL -- not the same as having no missions. */
@@ -1047,7 +1053,9 @@ export default function App(): ReactElement {
       return
     }
     setLedgerUnreadable(false)
-    setHistory(response.data.missions)
+    // What the host kept back is what this window already holds: the same
+    // objects, so nothing built from them is built again.
+    setHistory((current) => mergeHistory(current, response.data.missions))
     setUnreadableLedgers(response.data.unreadableCount)
   }
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
@@ -1789,7 +1797,7 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     if (!bridge) return
     void bridge
-      .getMissionHistory()
+      .getMissionHistory(heldDigests(historyRef.current))
       .then((response) => {
         seedLimitsFrom(response)
         applyHistory(response)

@@ -67,7 +67,7 @@ import { MEMORY_FILE, writeMemoryFile } from './memory-file.js'
 const ROUTINE_TICK_MS = 60_000
 const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
-import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
+import { deleteMissionRecord, knownDigests, readMissionHistory } from './mission-history.js'
 import { changelogPaths, entries as changelogEntries, readChangelog, splashEntries } from './changelog.js'
 import type { ChangelogEntry } from './changelog.js'
 import type { CodexMissionService } from './codex-mission.js'
@@ -3391,7 +3391,7 @@ ${taskSection({
       }
     })
 
-    ipcMain.handle(MISSION_HISTORY_CHANNEL, async (event) => {
+    ipcMain.handle(MISSION_HISTORY_CHANNEL, async (event, known: unknown) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
         return {
@@ -3402,8 +3402,9 @@ ${taskSection({
           }
         } as const
       }
-      // The window's own folder decides which conversation it opens on.
-      const history = await readMissionHistory(missionLedger, workroom, workspacePath)
+      // The window's own folder decides which conversation it opens on; what
+      // it already holds decides which records come without their events.
+      const history = await readMissionHistory(missionLedger, workroom, workspacePath, knownDigests(known))
       /*
        * DID A DELETED MISSION COME BACK?
        *
