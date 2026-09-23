@@ -99,6 +99,25 @@ export function HomeCover({
 }): ReactElement {
   const card = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(() => coverScale(0))
+  /*
+   * RESTING WHILE NOBODY IS LOOKING. The three move on every frame, and
+   * plastic is lit per pixel: measured on the built app, about 11% of the
+   * renderer while the home screen is up. A home screen left open behind
+   * other work was paying that for no one. So they rest while the window is
+   * in the background and pick up again when it comes back; a hidden window
+   * already stops them.
+   */
+  const [awake, setAwake] = useState(() => typeof document === 'undefined' || document.hasFocus())
+  useEffect(() => {
+    const wake = (): void => setAwake(true)
+    const rest = (): void => setAwake(false)
+    window.addEventListener('focus', wake)
+    window.addEventListener('blur', rest)
+    return () => {
+      window.removeEventListener('focus', wake)
+      window.removeEventListener('blur', rest)
+    }
+  }, [])
 
   useEffect(() => {
     const element = card.current
@@ -121,7 +140,7 @@ export function HomeCover({
         return (
           <span key={mate.key} className="lc-cover__face" style={{ left: at(mate.x), top: at(mate.y) }}>
             <span
-              className={`lc-bot${ready && mate.floats === true ? ' is-floating' : ''}`}
+              className={`lc-bot${ready && mate.floats === true ? ' is-floating' : ''}${ready && !awake ? ' is-resting' : ''}`}
               data-bot={mate.type}
               data-state={ready ? mate.state : 'still'}
               style={{ width: size, height: size }}
@@ -131,7 +150,7 @@ export function HomeCover({
                 type={mate.type}
                 size={size}
                 state={ready ? mate.state : 'default'}
-                paused={!ready}
+                paused={!ready || !awake}
                 interactive
                 seed={0.2 + index * 0.3}
                 {...(mate.floats === true ? { jumpEvery: 0 } : {})}

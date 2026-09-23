@@ -3671,6 +3671,13 @@ textarea {
   }
 }
 
+/* In the background, the float and the waiting ring hold where they are
+   (see HomeCover's rest). */
+.lc-bot.is-floating.is-resting,
+.lc-bot.is-resting .lc-bot__ring {
+  animation-play-state: paused;
+}
+
 /* On the cover the dot is ringed in the plate it stands on. */
 .lc-cover .lc-bot .lc-presence {
   border-color: var(--lc-bg-window);

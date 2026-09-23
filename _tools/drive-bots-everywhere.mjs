@@ -89,6 +89,15 @@ try {
     return busy
   }
   const homeBusy = await busyFor("home screen, the title's three bots animating")
+  // The same screen with the window in the background: the three rest.
+  await drive.evaluate(`(window.dispatchEvent(new Event('blur')), 'blurred')`)
+  await sleep(600)
+  const restingBusy = await busyFor('home screen, window in the background')
+  const resting = await drive.evaluate(`document.querySelectorAll('.lc-cover .lc-bot.is-resting').length`)
+  check('in the background the title bots rest, and cost next to nothing', resting === 3 && restingBusy < 3, `${String(resting)} resting, ${restingBusy.toFixed(1)}%`)
+  await drive.evaluate(`(window.dispatchEvent(new Event('focus')), 'focused')`)
+  await sleep(600)
+  check('they wake when the window comes back', (await drive.evaluate(`document.querySelectorAll('.lc-cover .lc-bot.is-resting').length`)) === 0)
 
   // The Team screen.
   await drive.evaluate(`(async () => {
