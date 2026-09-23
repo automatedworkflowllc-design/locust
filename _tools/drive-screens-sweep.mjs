@@ -51,7 +51,7 @@ const openTab = (name) => `(async () => {
   const text = flat(main)
   // Anything that reads as a hole rather than a screen.
   const holes = ['undefined', 'NaN', '[object Object]', 'null'].filter((bad) => text.includes(bad))
-  const headings = [...document.querySelectorAll('h1, h2, h3, .lc-section__title, .lc-context__title')]
+  const headings = [...document.querySelectorAll('h1, h2, h3, .lc-screen__title, .lc-settings__heading')]
     .map(flat)
     .filter((t) => t.length > 0)
     .slice(0, 10)

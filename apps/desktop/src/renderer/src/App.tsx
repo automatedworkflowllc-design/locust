@@ -617,10 +617,11 @@ export default function App(): ReactElement {
       y: at.y,
       title: teammate.name,
       items: [
-        { label: 'Message them', onSelect: () => selectTeammate(teammateId) },
-        { label: 'Edit', onSelect: () => setEditingTeammate(teammate) },
+        { label: 'Message them', shortcut: 'm', onSelect: () => selectTeammate(teammateId) },
+        { label: 'Edit', shortcut: 'e', onSelect: () => setEditingTeammate(teammate) },
         {
           label: 'Remove teammate',
+          dividerAbove: true,
           confirmLabel:
             theirRoutines === 0
               ? 'Remove for good?'
@@ -718,8 +719,8 @@ export default function App(): ReactElement {
          * (there is a default / here it is / replace it / with this). Design
          * agent, 2026-09-16: 556px -> 208px, widest item 94px of ink.
          */
-        { label: 'Group settings…', onSelect: () => setInstructingGroupId(groupId) },
-        { label: 'Rename', onSelect: () => setRenamingGroupId(groupId) },
+        { label: 'Group settings…', shortcut: 's', onSelect: () => setInstructingGroupId(groupId) },
+        { label: 'Rename', shortcut: 'r', onSelect: () => setRenamingGroupId(groupId) },
         {
           label: 'Remove group',
           confirmLabel: 'Remove for good?',
@@ -762,10 +763,18 @@ export default function App(): ReactElement {
       x: at.x,
       y: at.y,
       title,
+      /*
+       * Four kinds of action, a hairline between each, the way Claude's own
+       * menu reads (Colin, 2026-09-22, with the two side by side): open or
+       * rename it; move it or hand it over, each a list behind `›`; keep a
+       * copy of it; delete it. A letter at the end of a row is a real key
+       * while the menu is open.
+       */
       items: [
-        { label: 'Open', onSelect: () => openMission(missionId) },
+        { label: 'Open', shortcut: 'o', onSelect: () => openMission(missionId) },
         {
           label: 'Rename',
+          shortcut: 'r',
           onSelect: () => setRenamingMissionId(missionId)
         },
         /*
@@ -792,6 +801,7 @@ export default function App(): ReactElement {
         ...[
               {
                 label: 'Move to group',
+                dividerAbove: true,
                 submenu: [
                   ...groupsRef.current.map((group) => ({
                     label: group.name,
@@ -835,26 +845,39 @@ export default function App(): ReactElement {
                 ]
               }
             ],
-        // Hand a conversation to a teammate after the fact. Flat items, one
-        // per teammate, so the menu stays one press deep; a roster longer
-        // than six says where the rest are.
-        ...teammatesRef.current
-          .filter((teammate) => missionOwnersRef.current[missionId] !== teammate.teammateId)
-          .slice(0, 6)
-          .map((teammate) => ({
-            label: `Assign to ${teammate.name}`,
-            disabledReason: notYet ?? (live ? 'Wait for the run to finish before handing it over.' : undefined),
-            onSelect: () => assignMissionTo(missionId, teammate.teammateId)
-          })),
-        ...(teammatesRef.current.length > 6
-          ? [{ label: 'More teammates in Team', onSelect: () => setScreen('teammates') }]
-          : []),
-        {
-          label: 'Copy mission id',
-          onSelect: () => {
-            void navigator.clipboard.writeText(missionId).catch(() => undefined)
-          }
-        },
+        /*
+         * Hand a conversation to a teammate after the fact: ONE row opening
+         * the roster, the shape `Move to group` already has.
+         *
+         * It was one `Assign to <name>` row per teammate, up to six, which
+         * is what made this menu tall enough to run off the bottom of the
+         * window (Colin, 2026-09-22: "right click folding under window").
+         * As a list it holds the whole roster at any size, and the tick on
+         * whoever has it now answers "whose is this?" too.
+         */
+        ...(teammatesRef.current.length === 0
+          ? []
+          : [
+              {
+                label: 'Assign to',
+                ...(notYet !== undefined
+                  ? { disabledReason: notYet }
+                  : live
+                    ? { disabledReason: 'Wait for the run to finish before handing it over.' }
+                    : {}),
+                submenu: teammatesRef.current.map((teammate) => {
+                  const owns = missionOwnersRef.current[missionId] === teammate.teammateId
+                  return {
+                    label: teammate.name,
+                    checked: owns,
+                    // Choosing whoever already has it changes nothing.
+                    onSelect: () => {
+                      if (!owns) assignMissionTo(missionId, teammate.teammateId)
+                    }
+                  }
+                })
+              }
+            ]),
         {
           /*
            * "Save CONVERSATION as routine", because that is what it does.
@@ -872,6 +895,8 @@ export default function App(): ReactElement {
            * editor is the other half and is still open.
            */
           label: 'Save conversation as routine',
+          shortcut: 's',
+          dividerAbove: true,
           // Only where there is something to replay: a conversation whose
           // turns were all written by the host has no words of the person's
           // in it, and one still running has not finished the work yet.
@@ -885,7 +910,16 @@ export default function App(): ReactElement {
           onSelect: () => openSaveRoutine(missionId)
         },
         {
+          label: 'Copy mission id',
+          shortcut: 'c',
+          onSelect: () => {
+            void navigator.clipboard.writeText(missionId).catch(() => undefined)
+          }
+        },
+        {
           label: 'Delete',
+          shortcut: 'd',
+          dividerAbove: true,
           confirmLabel: 'Delete for good?',
           danger: true,
           ...(notYet !== undefined

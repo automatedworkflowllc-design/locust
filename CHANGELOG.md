@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.269.0 - 2026-09-22
+
+- **The right-click menu stays in the window, and reads like Claude's.**
+  Right-clicking a conversation low in the sidebar opened a menu that ran
+  off the bottom of the window. It now opens upward, or to the left, when it
+  would not fit, and so do the lists it opens. It is shorter and quieter too:
+  no title bar, a thin line between kinds of action, and **Assign to** is one
+  row that opens your whole roster, where it used to be a row per teammate.
+  A letter at the end of a row is a real key while the menu is open: R
+  renames, D deletes (after asking), and the arrow keys move through it. The
+  teammate and group menus got the same treatment.
+
 ## 0.268.0 - 2026-09-22
 
 - **A new typeface.** Everything Locust says is now set in **Figtree**, in

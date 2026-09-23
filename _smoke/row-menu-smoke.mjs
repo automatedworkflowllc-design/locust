@@ -180,8 +180,8 @@ try {
       const menu = document.querySelector('.lc-context')
       if (!menu) continue
       return JSON.stringify({
-        title: menu.querySelector('.lc-context__title').innerText.trim(),
-        items: [...menu.querySelectorAll('.lc-context__item')].map(b => b.innerText.trim())
+        title: (menu.getAttribute('aria-label') ?? ''),
+        items: [...menu.querySelectorAll('.lc-context__item')].map(b => (b.querySelector('.lc-context__label')?.textContent ?? b.innerText).trim())
       })
     }
     return JSON.stringify({ items: [] })
@@ -203,7 +203,7 @@ try {
     const menu = document.querySelector('.lc-context')
     return JSON.stringify({
       open: menu !== null,
-      label: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => b.innerText.trim()).at(-1) : ''
+      label: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => (b.querySelector('.lc-context__label')?.textContent ?? b.innerText).trim()).at(-1) : ''
     })
   })()`)
   const armedState = JSON.parse(armed)
@@ -243,8 +243,8 @@ try {
     return JSON.stringify({
       found: true,
       open: menu !== null,
-      title: menu ? menu.querySelector('.lc-context__title').innerText.trim() : '',
-      items: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => b.innerText.trim()) : []
+      title: menu ? (menu.getAttribute('aria-label') ?? '') : '',
+      items: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => (b.querySelector('.lc-context__label')?.textContent ?? b.innerText).trim()) : []
     })
   })()`))
   say(`       menu: ${onTeammate.title} · ${JSON.stringify(onTeammate.items)}`)
@@ -261,7 +261,7 @@ try {
     const menu = document.querySelector('.lc-context')
     return JSON.stringify({
       open: menu !== null,
-      label: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => b.innerText.trim()).at(-1) : '',
+      label: menu ? [...menu.querySelectorAll('.lc-context__item')].map(b => (b.querySelector('.lc-context__label')?.textContent ?? b.innerText).trim()).at(-1) : '',
       // The rail draws no NAMES -- the face is the whole identity since
       // 0.207 -- so who is still on the team is read from the labels it
       // writes for anyone who cannot see it, not from the sidebar's text.
