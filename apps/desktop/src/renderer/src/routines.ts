@@ -83,6 +83,26 @@ export function routineStepLabel(progress: { readonly step: number; readonly of:
 }
 
 /**
+ * A running routine step, where the conversation it runs in is named: its
+ * header says "routine Morning check, step 2 of 3" in place of "running".
+ *
+ * Only the compact sidebar said which step a routine was on; the conversation
+ * the routine was running in said "running" like any other. Colin, asked
+ * where the progress belongs: "maybe put in convo hub for teammate".
+ * Undefined for a run no routine started.
+ */
+export function routineStepPhrase(
+  startedBy: { readonly kind: string; readonly routineId?: string; readonly step?: number } | undefined,
+  routines: readonly { readonly routineId: string; readonly name: string; readonly steps: readonly string[] }[]
+): string | undefined {
+  if (startedBy?.kind !== 'routine' || startedBy.routineId === undefined || startedBy.step === undefined) return undefined
+  const routine = routines.find((entry) => entry.routineId === startedBy.routineId)
+  return routine === undefined
+    ? `routine, step ${String(startedBy.step)}`
+    : `routine ${routine.name}, step ${String(startedBy.step)} of ${String(routine.steps.length)}`
+}
+
+/**
  * What a routine's card says about its last run. Never "never run" dressed up
  * as a time: a routine that has not run says so.
  */

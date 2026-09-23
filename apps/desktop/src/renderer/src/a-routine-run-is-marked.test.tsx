@@ -6,6 +6,7 @@ import type { PublicRoutine, PublicTeammate } from '../../shared/ipc.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { routineOf } from './conversationList.js'
+import { routineStepPhrase } from './routines.js'
 
 /**
  * TWO ROWS WITH ONE TITLE ARE TOLD APART WITHOUT OPENING THEM.
@@ -26,14 +27,18 @@ const row = (missionId: string, extra: Partial<SidebarMission> = {}): SidebarMis
 
 const noop = (): void => undefined
 
-function sidebar(missions: readonly SidebarMission[], routines: readonly PublicRoutine[]): string {
+function sidebar(
+  missions: readonly SidebarMission[],
+  routines: readonly PublicRoutine[],
+  steps: Readonly<Record<string, { readonly name: string; readonly step: number; readonly of: number }>> = {}
+): string {
   return renderToStaticMarkup(
     <Sidebar
       runtimes={[]}
       missions={missions}
       teammates={[wren]}
       viewByTeammate={{}}
-      routineStepByTeammate={{}}
+      routineStepByTeammate={steps}
       missionOwners={Object.fromEntries(missions.map((mission) => [mission.missionId, 'tm_wren']))}
       selectedMissionId={undefined}
       selectedTeammateId={undefined}
@@ -83,6 +88,21 @@ describe("a routine's run in the sidebar", () => {
   it('still marks a run whose routine was since deleted', () => {
     const html = sidebar([row('mission_replay', { routineId: 'rt_gone' })], [])
     expect(html).toContain('aria-label="From a routine"')
+  })
+
+  it('says which step it is on while it runs, where its age would be', () => {
+    const running = row('mission_replay', { routineId: 'rt_morning', phase: 'running' })
+    const html = sidebar([running], [routine], { tm_wren: { name: 'Morning check', step: 2, of: 3 } })
+    expect(html).toContain('title="Morning check: step 2 of 3">step 2 of 3</span>')
+    // Finished, it is back to its age.
+    expect(sidebar([row('mission_replay', { routineId: 'rt_morning' })], [routine], { tm_wren: { name: 'Morning check', step: 2, of: 3 } })).not.toContain('step 2 of 3')
+  })
+
+  it('names the step in the header, in place of "running"', () => {
+    expect(routineStepPhrase({ kind: 'routine', routineId: 'rt_morning', step: 2 }, [{ routineId: 'rt_morning', name: 'Morning check', steps: ['a', 'b', 'c'] }])).toBe('routine Morning check, step 2 of 3')
+    expect(routineStepPhrase({ kind: 'routine', routineId: 'rt_gone', step: 1 }, [])).toBe('routine, step 1')
+    expect(routineStepPhrase({ kind: 'relay' }, [])).toBeUndefined()
+    expect(routineStepPhrase(undefined, [])).toBeUndefined()
   })
 
   it('reads a routine from a live starter or a recorded one, and nothing else', () => {

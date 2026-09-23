@@ -599,6 +599,11 @@ export function Sidebar({
                     ? 'from a routine'
                     : `from the routine ${routineName}`
               const hover = [mission.title, ...(by === undefined ? [] : [by.name]), ...(fromRoutine === undefined ? [] : [fromRoutine])].join(' · ')
+              // The step a routine is on, when this is its conversation and it is running.
+              const runningStep =
+                mission.phase === 'running' && mission.routineId !== undefined && by !== undefined
+                  ? routineStepByTeammate[by.teammateId]
+                  : undefined
               return (
                 <div className="lc-convrow" key={mission.missionId}>
                   {/*
@@ -731,7 +736,18 @@ export function Sidebar({
                       </span>
                     )}
                     <span className="lc-conv__title">{mission.title}</span>
-                    {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
+                    {/*
+                      * A routine's conversation says which step it is on
+                      * while one runs, where its age would be -- the clock
+                      * before the title already says it is a routine.
+                      */}
+                    {runningStep !== undefined ? (
+                      <span className="lc-conv__age lc-mono" title={`${runningStep.name}: step ${String(runningStep.step)} of ${String(runningStep.of)}`}>
+                        step {runningStep.step} of {runningStep.of}
+                      </span>
+                    ) : (
+                      age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>
+                    )}
                   </button>
                   )}
                   <button

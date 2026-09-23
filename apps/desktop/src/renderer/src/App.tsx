@@ -51,7 +51,7 @@ import type {
   PublicConnector
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
-import { routineDraft } from './routines.js'
+import { routineDraft, routineStepPhrase } from './routines.js'
 import { combineQueued, queuedVerdict, requeuedRows } from './steering.js'
 import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
@@ -5154,7 +5154,8 @@ export default function App(): ReactElement {
                               : modelDisplayName(liveRun.data.runtime, liveRun.data.model)
                           } · ${
                             running
-                              ? 'running'
+                              ? // A routine's step says which one it is on.
+                                routineStepPhrase(liveRun.startedBy, routines) ?? 'running'
                               : liveRun.restored === true
                                 ? 'restored from the local ledger'
                                 : liveRun.phase
