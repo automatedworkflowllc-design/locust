@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.297.0 - 2026-09-23
+
+### Improved
+
+- **Less work at the end of every turn.** Each time a turn finished, Locust
+  sent its window the newest twenty conversations again in full — about
+  3 MB on a busy history, nearly all of it what the window already had —
+  and the window rebuilt every earlier turn on screen from it. It now sends
+  only what changed: about 0.16 MB on the same history, in roughly half the
+  time, and the turns you are reading are left as they are.
+
 ## 0.296.0 - 2026-09-23
 
 ### Improved
