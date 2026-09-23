@@ -701,7 +701,7 @@ textarea {
 .lc-thread__marker {
   text-align: center;
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-caption);
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -1095,10 +1095,11 @@ textarea {
 
 /* The model's own word for what the block is, kept out of the code itself. */
 .lc-code__lang {
+  font-family: var(--lc-font-mono);
   display: block;
   margin-bottom: var(--lc-space-3);
   font-size: var(--lc-text-mono-label);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
 }
@@ -1900,13 +1901,14 @@ textarea {
 
 /* The fold's own line: the Settings disclosure's chevron and voice. */
 .lc-cliartifacts__summary {
+  font-family: var(--lc-font-mono);
   cursor: pointer;
   list-style: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: var(--lc-text-mono-label);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
   user-select: none;
@@ -1933,7 +1935,7 @@ textarea {
 
 .lc-cliartifacts__note {
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-mono-caption);
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   margin-bottom: var(--lc-space-2);
@@ -1948,12 +1950,13 @@ textarea {
 }
 
 .lc-cliartifacts__kind {
+  font-family: var(--lc-font-mono);
   flex: none;
   min-width: 8ch;
   color: var(--lc-text-muted);
   font-size: var(--lc-text-mono-label);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--lc-tracking-label);
 }
 
 .lc-cliartifacts__name {
@@ -2023,7 +2026,7 @@ textarea {
 }
 
 .lc-savable__head {
-  font-size: var(--lc-text-mono-caption);
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -2304,10 +2307,11 @@ textarea {
 }
 
 .lc-folder__label {
-  font-size: var(--lc-text-muted);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
   color: var(--lc-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--lc-tracking-label);
 }
 
 .lc-folder__path {
@@ -2397,7 +2401,7 @@ textarea {
   gap: var(--lc-space-2);
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-label);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
 }
@@ -2838,9 +2842,13 @@ textarea {
   border-color: var(--lc-border-hover);
 }
 
+/* The Team card's name, on the Rooms screen's card. It read `font-size:
+   var(--lc-text-name)` -- the names' COLOUR, which a browser drops, so the
+   name drew at whatever the card inherited (sweep D4). */
 .lc-roomcard__name {
-  font-size: var(--lc-text-name);
+  font-size: var(--lc-text-teammate-name);
   font-weight: 500;
+  color: var(--lc-text-name);
 }
 
 .lc-roomcard__meta {
@@ -2921,8 +2929,9 @@ textarea {
  * exactly when there is something in it that could be misread.
  */
 .lc-roomcardform__label {
-  font-size: var(--lc-text-description);
-  letter-spacing: 0.04em;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
   color: var(--lc-text-muted);
 }
@@ -3317,9 +3326,10 @@ textarea {
 }
 
 .lc-roomwaiting__label {
+  font-family: var(--lc-font-mono);
   flex: none;
-  font-size: var(--lc-text-mono-caption);
-  letter-spacing: 0.04em;
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
 }
@@ -4699,8 +4709,8 @@ textarea {
 
 .lc-agenthead__label {
   font-family: var(--lc-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
 }
@@ -6392,7 +6402,8 @@ textarea {
 }
 
 .lc-fieldlabel {
-  font-size: 10px;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -7231,9 +7242,10 @@ textarea {
  * voice the rest of the app uses for labels of this kind.
  */
 .lc-settings__heading--section {
-  font-size: var(--lc-text-description);
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  font-weight: 400;
+  letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
   color: var(--lc-text-muted);
 }
@@ -7359,14 +7371,15 @@ textarea {
   color: var(--lc-text-muted);
 }
 .lc-settings__more > summary {
+  font-family: var(--lc-font-mono);
   cursor: pointer;
   list-style: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--lc-tracking-label);
   color: var(--lc-text-muted);
   user-select: none;
 }
@@ -7537,7 +7550,7 @@ textarea {
 .lc-palette__group {
   padding: var(--lc-space-4) 10px var(--lc-space-2);
   font-family: var(--lc-font-mono);
-  font-size: 10px;
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -7846,6 +7859,7 @@ textarea {
 
 /* Who said it, the way the untrusted-input label carries its own source. */
 .lc-shellnotice__source {
+  font-family: var(--lc-font-mono);
   margin-right: var(--lc-space-3);
   font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
@@ -8139,10 +8153,11 @@ textarea {
 }
 
 .lc-picker__swarmhint {
+  font-family: var(--lc-font-mono);
   color: var(--lc-text-muted);
   font-size: var(--lc-text-mono-label);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--lc-tracking-label);
 }
 
 /* Effort, under the model it belongs to and only under the chosen one. */
@@ -8189,7 +8204,7 @@ textarea {
 .lc-picker__group {
   padding: var(--lc-space-4) var(--lc-space-4) var(--lc-space-2);
   font-family: var(--lc-font-mono);
-  font-size: 10px;
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label-wide);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -8553,7 +8568,7 @@ textarea {
   align-items: center;
   gap: var(--lc-space-3);
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-caption);
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -9245,6 +9260,7 @@ textarea {
 }
 
 .lc-code__lang {
+  font-family: var(--lc-font-mono);
   position: absolute;
   top: var(--lc-space-3);
   right: var(--lc-space-4);
@@ -9253,8 +9269,8 @@ textarea {
   border-radius: 4px;
   border: 1px solid var(--lc-border-hairline);
   background: var(--lc-bg-raised-2);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
   /* A first line longer than the block runs under the label; it fades out
@@ -9528,7 +9544,7 @@ textarea {
 
 .lc-rostercard__stat dt {
   font-family: var(--lc-font-mono);
-  font-size: 10px;
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -9558,7 +9574,7 @@ textarea {
 .lc-rostercard__cost dt {
   flex: none;
   font-family: var(--lc-font-mono);
-  font-size: 10px;
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -9593,7 +9609,7 @@ textarea {
 .lc-rostercard__recentlabel {
   padding: 0 var(--lc-space-4) var(--lc-space-2);
   font-family: var(--lc-font-mono);
-  font-size: 10px;
+  font-size: var(--lc-text-mono-label);
   letter-spacing: var(--lc-tracking-label);
   text-transform: uppercase;
   color: var(--lc-text-muted);
@@ -10534,9 +10550,9 @@ textarea {
 .lc-ledgerfail__label {
   margin: 0;
   font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-caption);
+  font-size: var(--lc-text-mono-label);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--lc-tracking-label);
   white-space: nowrap;
 }
 
@@ -11227,11 +11243,12 @@ textarea {
 }
 
 .lc-question__header {
+  font-family: var(--lc-font-mono);
   margin: 0;
-  font-size: var(--lc-text-mono-caption);
+  font-size: var(--lc-text-mono-label);
   color: var(--lc-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--lc-tracking-label);
 }
 
 /* A question answered in the runtime's own window: its options, listed. */
