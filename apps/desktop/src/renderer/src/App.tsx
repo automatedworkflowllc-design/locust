@@ -5650,7 +5650,22 @@ export default function App(): ReactElement {
               workspacePath={workspacePath}
               running={running}
               route={liveRun.data}
-              restoredMission={liveRun.restoredMission}
+              /*
+               * THE RECEIPT OF A RUN THAT FINISHED ON SCREEN.
+               *
+               * Only a conversation reopened from history carried its ledger
+               * record, so the Receipt tab of a run that had just finished
+               * said "the durable receipt appears once this mission has been
+               * recovered from the ledger" and offered nothing -- the run was
+               * over and its record was on disk. Found twice by the design
+               * reviews (0.255 and 0.268: "a trust issue, not just copy").
+               * The history is read again the moment a run ends, so its
+               * record is the one the reopened view would have shown.
+               */
+              restoredMission={
+                liveRun.restoredMission
+                ?? (running || liveRun.data?.missionId === undefined ? undefined : historyById.get(liveRun.data.missionId))
+              }
               onClose={() => setInspectorOpen(false)}
             />
           )

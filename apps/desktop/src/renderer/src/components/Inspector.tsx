@@ -244,7 +244,19 @@ export function Inspector({
 
         {tab === 'Receipt' &&
           (restoredMission === undefined ? (
-            <Empty>The durable receipt appears once this mission has been recovered from the ledger.</Empty>
+            /*
+             * Only two honest things to say without a record: it is not
+             * written yet because the run is still going, or it is being
+             * read. The old line -- "appears once this mission has been
+             * recovered from the ledger" -- described a mechanism, sent the
+             * person nowhere, and stood under runs whose record was already
+             * on disk.
+             */
+            <Empty>
+              {running
+                ? 'The receipt is written when this run finishes: its phase, checkpoints, event count and whether the ledger verifies.'
+                : 'Reading this run’s receipt from the ledger…'}
+            </Empty>
           ) : (
             <dl className="lc-receipt lc-receipt--flush">
               <dt>Phase</dt>
