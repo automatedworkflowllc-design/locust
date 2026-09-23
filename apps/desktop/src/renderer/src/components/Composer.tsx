@@ -1037,7 +1037,10 @@ export function Composer({
               // A mono beam travels the stop button while the run goes --
               // Colin: "a loading hue for their stop button ... make it mono
               // instead to make it subtle". It stops with the stopping.
-              <Beam size="sm" strength={0.7} active={!cancelling} className="lc-stopbeam">
+              // Colin, 2026-09-23: "slightly raise the intensity for the current
+              // mono beam, its not too visible rn" -- full strength here, and
+              // the layers lifted in shell.css (.lc-stopbeam).
+              <Beam size="sm" strength={1} active={!cancelling} className="lc-stopbeam">
                 <button
                   type="button"
                   className="send-button lc-send is-stop"
@@ -1059,7 +1062,7 @@ export function Composer({
                 aria-label="Send this when the mission finishes"
                 title="Send this when the mission finishes"
               >
-                <Icon name="arrow-up" size={15} />
+                <Icon name="arrow-up" size={14} />
               </button>
             ) : (
               /*
@@ -1110,7 +1113,7 @@ export function Composer({
                   }) ?? 'Start mission — Shift+Enter for a new line'
                 }
               >
-                <Icon name="arrow-up" size={15} />
+                <Icon name="arrow-up" size={14} />
               </MetalSend>
             )}
           </div>

@@ -3676,6 +3676,17 @@ textarea {
    across the full column. */
 .lc-stopbeam {
   flex: none;
+  /*
+   * Brighter than the package's mono, which is faint on purpose: it halves
+   * every layer's opacity for mono. Colin, 2026-09-23: "slightly raise the
+   * intensity for the current mono beam, its not too visible rn". Its
+   * `brightness` does nothing here (a filter inside the hue animation that
+   * mono switches off -- measured, 1.45 and 2.2 drew the same); these are
+   * the package's own per-layer hooks, multiplied into each layer's opacity.
+   */
+  --beam-stroke-opacity: 1.8;
+  --beam-inner-opacity: 1.5;
+  --beam-bloom-opacity: 1.5;
 }
 
 .lc-coverbeam {
@@ -4978,16 +4989,41 @@ textarea {
   cursor: default;
 }
 
+/*
+ * THE STOP BUTTON, as libraries.dev's beam draws its round icon button.
+ *
+ * Colin, 2026-09-23, with a frame of it: "use this exact same design just
+ * ignore the rainbow hue". A dark disc, a faint ring and glow inside its
+ * edge (shadows, not a border, so nothing sits between the edge and the
+ * beam), a small rounded square in the middle. Their button is 36px with a
+ * 12px square; this slot is 30px, so the square is theirs to scale (10px).
+ *
+ * And both are EVEN, which is the other thing he asked: "all the buttons are
+ * kind off center". The row sits at fractional pixels (measured y 590.27);
+ * a 9px square in a 28px box sat half a pixel off, and was drawn a pixel
+ * right and down (drive-composer-buttons). An even square in an even box
+ * snaps the same way its button does, wherever the row lands.
+ */
+.lc-send.is-stop {
+  border: 0;
+  border-radius: 999px;
+  background: var(--lc-bg-raised-2);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-border-card),
+    inset 0 0 50px 0 var(--lc-stop-glow);
+  color: var(--lc-text-secondary);
+}
+
 .lc-send.is-stop:not(:disabled):hover {
   background: var(--lc-red-tint);
-  border-color: var(--lc-red-border);
+  box-shadow: inset 0 0 0 1px var(--lc-red-border);
   color: var(--lc-red-text);
 }
 
 /* The stop glyph is a small rounded square, not an icon. */
 .lc-stopsquare {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 2px;
   background: currentColor;
   display: block;

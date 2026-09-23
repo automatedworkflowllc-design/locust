@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.282.0 - 2026-09-23
+
+### Improved
+
+- **A clearer Stop button.** While a teammate works, Stop is now a round
+  button with a small square in the middle, and the grey light that travels
+  its edge is easier to see.
+
+### Fixed
+
+- **Centred buttons.** The arrow on Send and the square on Stop sat half a
+  pixel right of centre and a little low. Both are in the middle now.
+
 ## 0.281.0 - 2026-09-23
 
 ### New
