@@ -17,8 +17,8 @@ heading: the home screen then shows it once, as a splash.
 ### New
 
 - **The title screen is a machine.** The home screen's logo and name now
-  sit on a small screen of their own -- the same screen the loading
-  display uses -- with "Autonomous teammates on your own machine" on the
+  sit on a small screen of their own — the same screen the loading
+  display uses — with "Autonomous teammates on your own machine" on the
   glass under them, and the three teammates standing on top of it. The logo
   powers on inside the screen. It also fits the smallest window without
   scrolling.
@@ -46,7 +46,7 @@ heading: the home screen then shows it once, as a splash.
 - **Settings › Runtimes fits on one screen.** Each CLI's own agents and
   commands were listed in full under it, so the page was a long scroll of
   other programs' settings. They are folded under a line that counts them
-  -- "3 agents · 3 commands set up in this CLI" -- and open with a press.
+  — "3 agents · 3 commands set up in this CLI" — and open with a press.
 
 - **Cursor's models say their levels in the picker.** Every Cursor row read
   "Listed by cursor-agent --list-models". Each now says what it offers in
@@ -87,7 +87,7 @@ heading: the home screen then shows it once, as a splash.
   and, for a routine's run, the routine.
 
 - **The inspector speaks in words.** Activity listed the record's own event
-  names -- `runtime.started · codex`, `tool.completed · shell`,
+  names — `runtime.started · codex`, `tool.completed · shell`,
   `run.completed`. It now reads "Started on Codex CLI", "shell · wc -l
   README.md", "shell finished · exit code 0", "Finished". Details names the
   runtime and model the way the composer does and says which sign-in the run
@@ -111,12 +111,12 @@ heading: the home screen then shows it once, as a splash.
 ### Improved
 
 - **Cursor's models read as names.** The picker listed many of Cursor's
-  models by their ids -- `claude-opus-5-5`, `cursor-grok-4.6` -- and gave
+  models by their ids — `claude-opus-5-5`, `cursor-grok-4.6` — and gave
   their Max, None and Minimal levels rows of their own, so Kimi K3 appeared
   twice. Each model is now one row under the name Cursor gives it ("Claude
   Opus 5.5 1M"), with every level on its effort slider: 49 rows where there
   were 78. When the level you were on is not one the new model offers, it
-  starts on the level Cursor itself uses by default -- Max for Kimi K3.
+  starts on the level Cursor itself uses by default — Max for Kimi K3.
 
 - **A run has one clock.** The Missions row timed a run from when it was
   created to its last write, so it disagreed with the conversation's own
@@ -160,8 +160,8 @@ heading: the home screen then shows it once, as a splash.
 
 - **A long command says what it is for while it runs.** Under a Claude Code
   teammate the live line read "Using a tool... Bash" for as long as a command
-  ran. It now says what the teammate said the command is for -- "Run the test
-  suite" -- within a second of it starting.
+  ran. It now says what the teammate said the command is for — "Run the test
+  suite" — within a second of it starting.
 
 ### Fixed
 
@@ -435,7 +435,7 @@ heading: the home screen then shows it once, as a splash.
 - **The home screen is the whole cover now.** 0.270 put only the Locust
   logo there. The card now carries all of the design system's cover: the
   logo, with *Autonomous teammates on your own machine* centred under it in
-  the app's mono capitals, and three teammates on a plate beside it -- one
+  the app's mono capitals, and three teammates on a plate beside it — one
   working, one waiting on you, one idle. They sit still until your coding
   agents have been found, then come on with the logo, which still lights up
   after the loading screen and again every 7 to 10 seconds. The name is set
@@ -925,13 +925,13 @@ The first hour, from a beta review driven on a blank machine.
 
 - **A routine saved from a conversation runs the way that conversation ran.**
   Saving a routine from a conversation nobody owned stored the permission
-  mode as "Ask", whatever the conversation had actually used -- and on a
+  mode as "Ask", whatever the conversation had actually used — and on a
   route that cannot be held read-only, that routine could never start at all.
   It now takes the mode the conversation really ran in, and follows whichever
   teammate you pick when it asks who should run it.
 - **A routine that was refused says why it was refused.** When a runtime turns
-  a routine down -- "Cursor Agent cannot be held read-only on this system",
-  say -- that sentence is what the card shows. It used to be replaced,
+  a routine down — "Cursor Agent cannot be held read-only on this system",
+  say — that sentence is what the card shows. It used to be replaced,
   moments later, with "the app stopped before saving a mission receipt":
   blaming a crash that never happened and sending you to review work that had
   never started.
@@ -939,17 +939,17 @@ The first hour, from a beta review driven on a blank machine.
   its own questions in its own window, where Locust cannot see them, so a run
   could sit silent for a long time looking like it was working. After a
   minute and a half of silence with a step still open, the thread now says so
-  and names the step. The run is not ended -- it is a note, not a verdict.
+  and names the step. The run is not ended — it is a note, not a verdict.
 
 ## 0.238.0 - 2026-09-21
 
 - **A long answer no longer stops the run that wrote it.** A Cursor run that
   had already printed a full account summary on screen ended with "the
-  mission ledger could not be written -- too many mission events in one
+  mission ledger could not be written — too many mission events in one
   append", and the work was thrown away. The limit it hit is about how much
   Locust writes to disk at once, not about how much a run may say; a burst
   bigger than that is now written in several goes instead of being refused.
-  The ledger from that run was intact all along -- 547 records, nothing
+  The ledger from that run was intact all along — 547 records, nothing
   wrong with it.
 - **Locust asks a CLI its version and its help text only when the CLI has
   changed.** Both answers are fixed by the program on disk, so they are
@@ -968,13 +968,13 @@ The first hour, from a beta review driven on a blank machine.
   whatever was written most recently. The memories that share words with your
   message come first now, then the newest as before; the file is unchanged.
   Measured on the free model before the change: it did open the file and
-  find the answer -- this saves it the trip.
+  find the answer — this saves it the trip.
 
 ## 0.236.0 - 2026-09-21
 
 - **Locust stops re-checking runtimes that have nothing to report.** Every
   return to the window, and a timer fifteen seconds after launch, re-ran the
-  whole runtime sweep -- six seconds on the machine this was built on -- even
+  whole runtime sweep — six seconds on the machine this was built on — even
   when every installed runtime was already ready. Those sweeps now run only
   when something installed is not ready (signed out, or not yet answered).
   Check again still checks everything.
@@ -987,8 +987,8 @@ The first hour, from a beta review driven on a blank machine.
 
 ## 0.235.0 - 2026-09-21
 
-- **Locust finds your runtimes in half the time.** Each runtime's checks --
-  version, help, sign-in, model list -- ran one after another, and eight
+- **Locust finds your runtimes in half the time.** Each runtime's checks —
+  version, help, sign-in, model list — ran one after another, and eight
   runtimes' worth of that took twelve seconds on the machine this was built
   on. They run together now, and a check that answers two questions is asked
   once: six seconds, same answers. A single slow check is also given ten
@@ -1003,9 +1003,9 @@ The first hour, from a beta review driven on a blank machine.
 - **Each teammate has one conversation their replies go to.** When a
   teammate wrote to another, the reply started a new conversation every
   time, and the sidebar filled with them. A reply that is not part of an
-  exchange you can see now continues that teammate's own conversation --
+  exchange you can see now continues that teammate's own conversation —
   named "Wren's replies" the first time it is made, renameable like any
-  other -- and clicking their face at the top of the sidebar opens it. The
+  other — and clicking their face at the top of the sidebar opens it. The
   "only their conversations" filter the face used to be moved into the card
   that opens when you hover a face, which is where their conversations are
   listed anyway.
@@ -1015,8 +1015,8 @@ The first hour, from a beta review driven on a blank machine.
 - **A gap the runtime left is marked as one.** Antigravity notes its own
   dropped bytes inside the text it sends, so the note arrived mid-sentence in
   a teammate's reply, in their voice, splitting a word across it. The words
-  either side are untouched -- nothing is hidden, because something really was
-  lost -- but the note is now drawn as Locust saying it, not the teammate.
+  either side are untouched — nothing is hidden, because something really was
+  lost — but the note is now drawn as Locust saying it, not the teammate.
 
 ## 0.232.0 - 2026-09-21
 
@@ -1029,7 +1029,7 @@ The first hour, from a beta review driven on a blank machine.
 ## 0.231.0 - 2026-09-21
 
 - **The window opens narrower.** It opened up to 1280 wide, which on a big
-  display left a column of empty panel beside the thread -- the app looking
+  display left a column of empty panel beside the thread — the app looking
   like it had nothing to put there. It opens at the width the app is actually
   worked at now, and still takes a fraction of smaller screens rather than a
   fixed number.
@@ -1037,8 +1037,8 @@ The first hour, from a beta review driven on a blank machine.
 ## 0.230.0 - 2026-09-21
 
 - **Sending starts the run instead of re-checking every runtime first.**
-  Starting one mission re-probed all of them -- version, help, readiness and
-  model list -- to answer one question about the one it was using, which on a
+  Starting one mission re-probed all of them — version, help, readiness and
+  model list — to answer one question about the one it was using, which on a
   slow machine was several seconds between pressing Send and anything
   happening. The Stop button appeared immediately, so the screen said running
   for the whole wait. A runtime that was ready in the last few minutes is now
@@ -1049,7 +1049,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **"Downloaded" names the version that is actually downloaded.** If a newer
   release appeared after one had been fetched, the window kept saying an
-  update was ready and put the NEWER number on it -- so Restart and install
+  update was ready and put the NEWER number on it — so Restart and install
   came back on the same version with the same button showing. It only happens
   when releases land close together, which is why it took until tonight to
   surface. A fetched update is now offered as ready only while it is the one
@@ -1058,7 +1058,7 @@ The first hour, from a beta review driven on a blank machine.
 ## 0.228.0 - 2026-09-21
 
 - **A run that is writing says so, on every runtime.** Text arriving is the
-  model writing, and the live line now shows that -- which on runtimes that
+  model writing, and the live line now shows that — which on runtimes that
   report their tools only once those tools have finished was the difference
   between one mark for a whole run and a line that actually changes.
 
@@ -1066,7 +1066,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **A refusal reads as a refusal, not a crash.** In Ask mode, a run that tried
   to use a tool the mode does not allow ended with "OpenCode ended without a
-  step that reported it had stopped" -- so the safety boundary working
+  step that reported it had stopped" — so the safety boundary working
   correctly looked like a broken runtime. It now says which tool the mode
   refused, and that nothing was changed.
 - **Free routes stop being described as priced.** A run whose receipt reports
@@ -1080,7 +1080,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **A run that is cut off mid-sentence no longer leaves plumbing on screen.**
   When a turn is interrupted inside one of the blocks Locust reads, the stream
-  stops mid-word -- so what reached you was the first few characters of a tag
+  stops mid-word — so what reached you was the first few characters of a tag
   with nothing to close it, sitting at the end of the reply as though the
   teammate had typed it. It comes off now. A stray angle bracket in ordinary
   prose is left exactly where it is.
@@ -1094,7 +1094,7 @@ The first hour, from a beta review driven on a blank machine.
   now, at the size that drawing was made for.
 - **A running conversation in the sidebar wears the dotted outline**, and at
   full size rather than shrunk. The orbiting particles were shrunk because
-  they were the loudest thing in a row whose job is to name a teammate -- but
+  they were the loudest thing in a row whose job is to name a teammate — but
   a cloud of points has no silhouette to keep, so it read as noise at any size
   that row can spare. An outline stays itself all the way down.
 
@@ -1104,7 +1104,7 @@ The first hour, from a beta review driven on a blank machine.
   sphere moved off the individual step and up beside PLAN at a size its bands
   can actually be read at. It appears only while a step is underway.
 - **The step underway gets its small orbiting mark back**, which is what a
-  row marker is the right size for -- and the rows line up again.
+  row marker is the right size for — and the rows line up again.
 - **The plan reads in mono**, like the card's own header and ordinals. It was
   the only part of that card speaking in the prose face.
 
@@ -1114,7 +1114,7 @@ The first hour, from a beta review driven on a blank machine.
   10.5px in the monospace face, which next to a bigger orb read as a caption
   on a picture rather than a sentence. It is 14px in the app's own UI face
   now, in the app's own medium weight, capitalised, with an ellipsis after it
-  -- three dots, which is what people write, rather than the four the
+  — three dots, which is what people write, rather than the four the
   library's own page happens to use.
 - **The travelling highlight is brighter, and safer.** It is the library's own
   technique now: the word stays solidly painted and a bright band slides over
@@ -1125,7 +1125,7 @@ The first hour, from a beta review driven on a blank machine.
 ## 0.222.0 - 2026-09-20
 
 - **The orbs look like the orbs.** The library ships two separate drawings per
-  orb -- one tuned for 64px and one for inline text at 20px -- and Locust was
+  orb — one tuned for 64px and one for inline text at 20px — and Locust was
   showing the small one everywhere. At 20 the connector orb keeps a fifth of
   its points at one and a half times the size, which is why it looked like
   nothing on the library's own page. The six whose shape lives in their
@@ -1139,7 +1139,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **Conversations stop disappearing.** The sidebar only ever received the 20
   most recently touched conversations, so one you had not opened in a while
-  was not hidden or renamed -- it was absent, and its group read empty. It now
+  was not hidden or renamed — it was absent, and its group read empty. It now
   lists every conversation you have. Twenty was a budget on how much
   TRANSCRIPT one message could carry, which a row does not need: the newest
   still arrive with their transcripts, the rest arrive as rows and fetch
@@ -1148,7 +1148,7 @@ The first hour, from a beta review driven on a blank machine.
 ## 0.220.0 - 2026-09-20
 
 - **The orbs are back to one size.** 0.218 drew one of them larger, on the
-  wrong row -- and larger turned out to be the wrong idea anyway: these are
+  wrong row — and larger turned out to be the wrong idea anyway: these are
   drawings made for their size, so scaling one softens every stroke, which on
   a mark this small reads as broken rather than as big.
 - **The plan's step has its rubik sphere back.** It lost it when that shape
@@ -1167,7 +1167,7 @@ The first hour, from a beta review driven on a blank machine.
   "using a connector" without naming one, because it does not know.
 - **MCP and connectors have their own animation.** The scrambling sphere is
   theirs; ordinary tools and shell commands take the one it used to share with
-  them. The rarer event gets the louder mark -- a tool call already has its
+  them. The rarer event gets the louder mark — a tool call already has its
   name on the row beside it, and a call leaving your machine is the one worth
   spotting without reading.
 
@@ -1320,10 +1320,10 @@ The first hour, from a beta review driven on a blank machine.
   percentage taken off one screenshot, which meant a different line length at
   every window size. It is now set by counting the characters the column
   actually renders, and stops growing once a line is long enough to read
-  comfortably -- past that the panel would only be taking room from the
+  comfortably — past that the panel would only be taking room from the
   conversation.
 - **The panel says why it will not open a file.** "Locust does not open files
-  -- a teammate chose this file's name and contents. Reveal hands it to
+  — a teammate chose this file's name and contents. Reveal hands it to
   Windows." A missing button reads as an oversight; this is a decision, and
   now it says so.
 
@@ -1331,7 +1331,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **An open file says which turns changed it, and you can look at each one.**
   A strip under the file's name counts the turns of this conversation that
-  touched it -- "changed in 2 turns" -- with a numbered button for each and
+  touched it — "changed in 2 turns" — with a numbered button for each and
   "Now" for the file as it stands. Pressing a number shows what that turn
   changed, with the ask that caused it on the button's tooltip. It says
   *changed in*, never *as it looked*: the record is a list of changes, some of
@@ -1342,7 +1342,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **The conversation keeps its room when a file is open on a smaller window.**
   In a 1120-wide window the open file panel was squeezing the conversation
-  into a column half the panel's width -- replies breaking after three words,
+  into a column half the panel's width — replies breaking after three words,
   "Write a message..." on two lines, the model's name cut off. The panel now
   floats over the workroom the way the activity drawer already did, so the
   conversation beside it keeps three times the width it had.
@@ -1361,7 +1361,7 @@ The first hour, from a beta review driven on a blank machine.
 - **Click a file a teammate handed you and it opens beside the conversation.**
   Markdown is rendered the way a reply is; anything else is shown as code. The
   panel has its own buttons to show the file in your file manager or save a
-  copy. It never hands the file to Windows to open -- Locust draws it.
+  copy. It never hands the file to Windows to open — Locust draws it.
 
 - **The plan card has its border back, and its finished steps are filled in.**
   It was drawn without either, which was never what the design called for.
@@ -1391,7 +1391,7 @@ The first hour, from a beta review driven on a blank machine.
   looked exactly like it having worked.
 
 - **The message box counts.** With five coding agents installed and none of
-  them answering, it said "A coding agent is installed but not answering" --
+  them answering, it said "A coding agent is installed but not answering" —
   singular, over five rows that each said so.
 
 - **"On this machine" means on this machine.** The count above the agent list
@@ -1402,7 +1402,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **A coding agent that is on your machine is always shown.** Yesterday's
   first screen tidied the list down to one step, and it tidied away installed
-  agents too -- so a Codex that was installed and not answering hid behind
+  agents too — so a Codex that was installed and not answering hid behind
   "they each need their own account", which was untrue of it, along with the
   Check again that would have fixed it.
 
@@ -1432,7 +1432,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **A teammate's reply is set bigger, and its lines are shorter.** The reply
   was the smallest thing on screen that you actually read rather than scan,
-  and its lines ran to 111 characters -- past the point where the eye loses
+  and its lines ran to 111 characters — past the point where the eye loses
   its place coming back to the left. It is now 18px with a shorter line.
 
 - **Emphasis in a reply is real.** The reply's typeface ships no italic, so
@@ -1455,7 +1455,7 @@ The first hour, from a beta review driven on a blank machine.
 
 - **A run that has not answered yet says Starting, not Working.** The moment
   Locust had launched a coding agent, the line under your message said the
-  teammate was working -- on the strength of a process having been spawned,
+  teammate was working — on the strength of a process having been spawned,
   before the agent had said a word. One measured run showed "working" for over
   two minutes of complete silence. It says Starting until the agent actually
   reports something, which is also when the clock stops being a guess.
@@ -1463,29 +1463,29 @@ The first hour, from a beta review driven on a blank machine.
 ## 0.196.0 - 2026-09-19
 
 - **A conversation you started without picking anyone can be saved as a
-  routine.** The menu item was there and greyed out, and the reason it gave --
-  "nothing here was typed by you" -- was not true: you had typed every word of
+  routine.** The menu item was there and greyed out, and the reason it gave —
+  "nothing here was typed by you" — was not true: you had typed every word of
   it. What was actually missing is whose turn it replays on, so the dialog now
   asks that once and saves it like any other.
 
 - **The model picker reads as names.** A model whose program reports no name
   for it was listed by its identifier, so one row read
   `muse-spark-1.3-contributor-free` in a list where everything else read as a
-  proper name -- and the chip under the message box, an inch away, spelled the
+  proper name — and the chip under the message box, an inch away, spelled the
   same model out properly. They match now. A name a program does give is
   printed exactly as it wrote it.
 
 ## 0.195.0 - 2026-09-19
 
-- **A teammate can hand you a file.** Ask for one -- "send me an md of your
-  report" -- and the file arrives in the conversation as a button under the
+- **A teammate can hand you a file.** Ask for one — "send me an md of your
+  report" — and the file arrives in the conversation as a button under the
   reply, with its name and a line saying what it is. Pressing it shows the
   file in your file manager. Until now you could send files to a teammate
   but they could only tell you where they had put theirs.
 
 - **A teammate stops messaging the others just to keep them posted.** Telling
   a teammate something starts a whole run on their side, and the rule they
-  were given -- pass it on if they need to know it -- read as an invitation to
+  were given — pass it on if they need to know it — read as an invitation to
   share anything interesting. They now message a teammate when you asked them
   to, or when the turn made work that is genuinely theirs to do.
 
@@ -1728,13 +1728,13 @@ first). This build is the small half of what they found; the rest is in
   own copy of npm and runs it with its own binary, so the Install buttons on
   the first screen work on a machine with nothing else on it. Before this
   they were all switched off, on a screen whose entire job is installing
-  something -- the app that could not install anything was the app you had
+  something — the app that could not install anything was the app you had
   just downloaded in order to install something.
 - **The screen says which npm it used.** When Node is absent Locust says the
   install ran on the copy it carries, and says the part that is still true:
   the CLI works inside Locust, and your own terminal will not see it until
   you install Node.js yourself.
-- A CLI installed this way **runs without Node too** -- Locust hands it the
+- A CLI installed this way **runs without Node too** — Locust hands it the
   same runtime it uses itself.
 
 ## 0.177.0 - 2026-09-17
@@ -1746,7 +1746,7 @@ first). This build is the small half of what they found; the rest is in
   can look up what this build was at any time.
 - **The changelog is public.** It is published to the releases repo with
   every ship, and locust.lol links to it. Before this it existed only in the
-  private repo -- the one account of what changed that nobody could read.
+  private repo — the one account of what changed that nobody could read.
 
   The notes ship inside the installer, so what the app tells you was
   packaged with the bytes it is telling you about, and reading it needs no
@@ -1757,7 +1757,7 @@ first). This build is the small half of what they found; the rest is in
 - **Settings is a list of pages, not one long scroll.** The five areas are
   now pages with a list beside them, the way Claude Code does it: you can
   see the whole map at once and land on any of it in one press. Nothing
-  about the settings themselves changed -- same sections, same order, same
+  about the settings themselves changed — same sections, same order, same
   explanations behind **How it works**.
 - **Search finds a setting by its own name.** Typing *auto* narrows the list
   to the page that holds Auto mode and says so underneath it.
@@ -1770,7 +1770,7 @@ first). This build is the small half of what they found; the rest is in
 
 - **Deleting a conversation can be undone.** It still leaves every list the
   moment you delete it, which is what deleting means. What changed is that
-  the record itself is kept, byte for byte, until you empty the trash --
+  the record itself is kept, byte for byte, until you empty the trash —
   under **Settings → Trash**, where each one can be put back whole, owner
   and name included. Emptying is still two presses and still permanent.
 - **Bulk retention is undoable too**, because it goes through the same path:
@@ -1778,7 +1778,7 @@ first). This build is the small half of what they found; the rest is in
   disk.
 
   Why: on 2026-09-17 eighteen conversations went in four seconds through the
-  Missions screen's select-and-confirm, and the files were unlinked --
+  Missions screen's select-and-confirm, and the files were unlinked —
   no Recycle Bin, no shadow copy, nothing to undo. A day of portfolio work
   came back only because those runs happened to be on Cursor, which keeps
   its own transcripts. A product whose claim is a durable local record
@@ -2702,7 +2702,7 @@ screen rather than read out of the source.
 ## 0.111.0 - 2026-09-14
 
 - **A teammate that fails to forget something says so.** When a teammate
-  corrected itself, it quoted the memory it was replacing -- and if the quote
+  corrected itself, it quoted the memory it was replacing — and if the quote
   was not word-for-word, nothing was removed and nobody was told. The wrong
   memory stayed in every brief, the correction landed beside it, and both were
   read by every mission afterwards. It now says what it could not forget, and
@@ -3456,7 +3456,7 @@ screen rather than read out of the source.
 
 - **A teammate runs on the route you gave it, even in the first seconds after
   launch.** While Locust was still finding your runtimes, a message sent
-  straight away could start on whichever one happened to be ready first -- a
+  straight away could start on whichever one happened to be ready first — a
   teammate set to Codex CLI running on OpenCode, and failing. Its own saved
   route decides now. Changing the model in the bar still wins, and a
   conversation with no teammate is unchanged.
@@ -3464,7 +3464,7 @@ screen rather than read out of the source.
 ## 0.67.0 - 2026-09-11
 
 - **A conversation in "approve each action" continues.** A reply used to
-  start over with no memory of the turn before it -- ask a teammate to
+  start over with no memory of the turn before it — ask a teammate to
   remember a word and it could not tell you the word. It keeps the thread now,
   like every other mode.
 - **Routines, room posts and relayed messages can use "approve each action".**
@@ -3521,7 +3521,7 @@ screen rather than read out of the source.
   think in silence and then drop the whole reply in one paint; only
   Approve-each streamed. Ask, Accept edits, Plan and Auto now run over the
   same transport Approve-each always used, and the reply arrives as it is
-  written -- measured 2 paints before, 33 after, on the same prompt.
+  written — measured 2 paints before, 33 after, on the same prompt.
 - A Codex run's header shows what it cost again (`40k in · 275 out`), and
   counts up while it runs. Approve-each never showed this and does now.
 - Follow-ups on Codex keep the earlier turns, as before.
@@ -4313,7 +4313,7 @@ screen rather than read out of the source.
 
 - **The next thing you type no longer goes missing.** Typing a second line
   before a teammate had finished starting could leave it stuck in NEXT under
-  "that conversation is no longer open" -- about the conversation on screen --
+  "that conversation is no longer open" — about the conversation on screen —
   where it sat until you noticed and sent it by hand. A mission moves to its
   real id the moment the host answers, and anything queued against it now
   moves with it. The same applies across a handoff, where the conversation
@@ -4513,7 +4513,7 @@ Effort is its own control again, and it always says something.
 - **The swarm mark is back on the composer.** The design review moved it into
   the route picker's header; it belongs where you can see it. It is the app's
   own logo and it says, at a glance, that every mission is running at its
-  model's maximum. It is never disabled now either -- swarm is a statement
+  model's maximum. It is never disabled now either — swarm is a statement
   about every mission, not about the one route you happen to be on. The
   picker keeps the consequence rather than a second switch: the effort levels
   grey out and say who is holding them.
@@ -4531,7 +4531,7 @@ only on routes that name a model; this is the one that fixes a fresh install.
 
 - **The account default is a row you can select.** It is the route a new
   profile starts on, and it was the only route in the app naming a model no
-  list contained -- so the picker had no ACTIVE row for it, and the effort
+  list contained — so the picker had no ACTIVE row for it, and the effort
   levels, which sit under that row, had nothing to attach to. It now appears
   as **Account default**, carrying the levels every model on your account
   agrees on. An intersection, not a union: a level only some models accept
@@ -4546,19 +4546,19 @@ only on routes that name a model; this is the one that fixes a fresh install.
 The effort control, which 0.38.1 removed and did not replace.
 
 - **You can choose reasoning effort again.** 0.38.1 dropped the composer's
-  `effort · fixed` chip, and the chips that replace it -- under the selected
-  model in the route picker -- landed after that build was cut. So the shipped
+  `effort · fixed` chip, and the chips that replace it — under the selected
+  model in the route picker — landed after that build was cut. So the shipped
   app had the old control gone and the new one absent. Open the route picker
   and the levels sit under the model you are on; the one you pick rides on the
   route chip as `Claude Code / sonnet · high`.
 - **Swarm is always there.** It was drawn only when the selected route
-  reported effort levels, so on a route that reports none -- including the one
-  a fresh profile starts on -- the setting vanished from the app entirely
+  reported effort levels, so on a route that reports none — including the one
+  a fresh profile starts on — the setting vanished from the app entirely
   rather than moving. It is a pill in the picker's header now, always.
 - **A run stopped for output volume says so.** Locust caps a single line of
   runtime output at 256 KB and kills the process past it. It used to report
-  "Codex invocation did not complete successfully" -- the words it uses when it
-  has no idea what happened -- while knowing exactly what happened. It now
+  "Codex invocation did not complete successfully" — the words it uses when it
+  has no idea what happened — while knowing exactly what happened. It now
   names the cause and suggests narrowing the ask.
 - **The finished-exchange line is still the exchange.** Collapsing it dropped
   its identity along with its band, so screen readers lost it.
@@ -4667,14 +4667,14 @@ Three corrections, two of them to fixes from earlier the same day.
 - **A teammate replying to another is no longer told the folder was shared.**
   When one teammate passes work to another, the second was told "another
   teammate was working in this folder at the same time, so what changed on
-  disk cannot be told apart" -- about a run that had already finished. Its own
+  disk cannot be told apart" — about a run that had already finished. Its own
   work then counted for nothing. Two runs share a folder when both are
   running in it, which is now what gets asked.
 
 - **Teammates on their own branch are told so even in a folder with no
   LOCUST.md.** The sentence that stopped those runs dying was riding along
   with the project's own instructions, so a folder without an instructions
-  file never got it -- which is every folder, for someone who has just
+  file never got it — which is every folder, for someone who has just
   installed the app. The team's memory also stopped naming the main folder to
   a teammate that is not standing in it.
 
@@ -4691,8 +4691,8 @@ Three corrections, two of them to fixes from earlier the same day.
 
 - **Install the runtime Locust asked you to install, and it just works.** It
   did not before. The composer was pointed at Codex CLI from the moment the
-  app opened and never moved, so someone who installed OpenCode -- because
-  Settings told them to -- came back to a box still reading "Install a coding
+  app opened and never moved, so someone who installed OpenCode — because
+  Settings told them to — came back to a box still reading "Install a coding
   agent and sign in to start a mission", pressed Enter, and got nothing at
   all. The route now follows what is actually on the machine, preferring the
   one that needs no account; a route you pick yourself is never moved for you.
@@ -4703,7 +4703,7 @@ Three corrections, two of them to fixes from earlier the same day.
 
 - **The model list keeps up.** It was read once when the app opened, so a
   runtime whose check finished a moment later showed a single "account
-  default" row for the rest of the session -- Claude's Sonnet, Opus and Fable
+  default" row for the rest of the session — Claude's Sonnet, Opus and Fable
   simply missing, and every OpenCode model too. It is re-read when the
   runtimes change and when you open the picker.
 
@@ -4721,14 +4721,14 @@ Three corrections, two of them to fixes from earlier the same day.
 ## 0.36.5 — 2026-09-06
 
 - **A runtime Locust cannot find now tells you how to get it.** It used to say
-  only "Claude Code was not found on this machine. Install it and sign in" --
+  only "Claude Code was not found on this machine. Install it and sign in" —
   true, and a dead end that sends you off to search. Each one now shows the
   exact line to run, with a button that copies it, and says what signing in
   takes afterwards. The two that do not install from a package manager link to
   their own page rather than to a command line invented for them.
 
 - **And on a machine with none of them, it says which one to start with.**
-  OpenCode needs no account at all -- one command and its free model runs --
+  OpenCode needs no account at all — one command and its free model runs —
   so that is the sentence at the top of the list, instead of leaving you to
   read down a list that opens with one wanting a paid subscription.
 
@@ -4739,7 +4739,7 @@ Three corrections, two of them to fixes from earlier the same day.
   it was the least reliable way to run them: with three going at once, six of
   nine runs died with nothing but "the run could not continue". A teammate was
   being told its instructions belonged to the main folder, which is not the
-  folder it works in, so it went looking -- and OpenCode ends a run that asks
+  folder it works in, so it went looking — and OpenCode ends a run that asks
   for a directory outside its own. A teammate on a branch is now told what is
   true for it: this is the project, you have your own copy, work inside it. Nine
   runs since, none lost, and nothing written outside anyone's own copy.
@@ -4749,8 +4749,8 @@ Three corrections, two of them to fixes from earlier the same day.
 - **A shared folder now says it is shared.** 0.36.2 stopped a teammate taking
   credit for another's files, and went too quiet doing it: a run that had just
   edited a file could show five tool calls and no file at all. It now says what
-  it honestly knows -- "another teammate was working in this folder at the same
-  time, so what changed on disk cannot be told apart" -- and names how many
+  it honestly knows — "another teammate was working in this folder at the same
+  time, so what changed on disk cannot be told apart" — and names how many
   files in the folder are different, counted against nobody. What each model
   reports about its own work is still counted as its own.
 
@@ -4799,8 +4799,8 @@ outside review.
 - **How full the model's context is**, as a small ring beside the route.
   Hovering says it in words. It is drawn only where the runtime reports
   its own window size, so nothing is measured against a guess.
-- **Real model names.** Claude Code takes an alias -- sonnet, opus,
-  fable -- and only its result says which model that meant. The picker
+- **Real model names.** Claude Code takes an alias — sonnet, opus,
+  fable — and only its result says which model that meant. The picker
   now learns from there, so a route reads "Sonnet · claude-sonnet-5"
   after its first run.
 
@@ -4867,8 +4867,8 @@ From a targeted QA pass on 0.35.0, and one thing Colin saw on the bar.
   and may change files anywhere on this machine, not only this folder."
   Every other mode still refuses a write outside the folder. The switch
   is checked again each time a run starts, so turning it off stops the
-  next one -- including one a teammate or a saved routine was about to
-  start -- and the mission's record says `auto · whole machine` rather
+  next one — including one a teammate or a saved routine was about to
+  start — and the mission's record says `auto · whole machine` rather
   than leaving a reader to guess what that run was allowed.
 
   What each runtime is actually given, measured off its own `--help`:
@@ -4929,7 +4929,7 @@ From a targeted QA pass on 0.35.0, and one thing Colin saw on the bar.
   runs now use an id of their own, and a packaged start removes such a
   shortcut if one exists. Also: the packaged window is handed a real
   `.ico` beside the archive rather than a path inside it, and the icon
-  is the designer's dark tile -- the bare white mark on a transparent
+  is the designer's dark tile — the bare white mark on a transparent
   ground was invisible on a light taskbar.
 
 ## 0.34.0 — 2026-09-06
@@ -5083,16 +5083,16 @@ Signal parity with Claude Code, measured from its own stream
 ## 0.30.0 — 2026-09-05
 
 - **The approval card shows the change.** When Codex asks to change files
-  in "Approve each action" mode, the card now carries the diff itself --
+  in "Approve each action" mode, the card now carries the diff itself —
   each file named, added and removed lines counted, the lines drawn with
-  the same viewer the activity fold uses -- instead of a summary of what
+  the same viewer the activity fold uses — instead of a summary of what
   it was told. Nothing changes until you approve, as before.
 
 ## 0.29.0 — 2026-09-05
 
 - **One instruction file for the whole team: LOCUST.md.** Put a LOCUST.md
   at the root of the project folder and every teammate, on every runtime,
-  is given it before each mission -- the file they all read in common,
+  is given it before each mission — the file they all read in common,
   beside each runtime's own CLAUDE.md, AGENTS.md or rules. Read fresh at
   every start, so an edit lands on the next mission. Bounded at 200 lines,
   and the brief says when the rest was cut. Settings shows whether one was
@@ -5102,7 +5102,7 @@ Signal parity with Claude Code, measured from its own stream
 
 - **Two more things reach the desk while you are away.** A teammate that
   ends a run with a question card, and a run that stops at its account's
-  limit, now show a desktop notification like an approval does -- only when
+  limit, now show a desktop notification like an approval does — only when
   Locust is not the window in front. Clicking it brings Locust forward.
 
 ## 0.28.0 — 2026-09-05
@@ -5152,7 +5152,7 @@ Signal parity with Claude Code, measured from its own stream
 - **Memory lives in Settings.** The sidebar row is gone; Settings has the
   mode, the count, what is waiting for you, and Open memory (Ctrl 5).
 - **What a conversation taught the team folds like tool activity.** One
-  quiet line -- "Wren remembered 2 things" -- with the lines a click away,
+  quiet line — "Wren remembered 2 things" — with the lines a click away,
   instead of warning-coloured notices at the bottom of the thread.
 
 ## 0.27.2 — 2026-09-05
@@ -5172,7 +5172,7 @@ Signal parity with Claude Code, measured from its own stream
 ## 0.27.0 — 2026-09-05
 
 - **Your team remembers.** Teammates keep a shared memory per project
-  folder, plus a smaller set marked everywhere -- the way Claude Code and
+  folder, plus a smaller set marked everywhere — the way Claude Code and
   Cursor do, managed from Locust. A teammate writes one by ending a reply
   with it; every teammate in the folder reads what is kept, with who wrote
   it and where. The Memory screen (Ctrl 5, or the row at the top of the
@@ -5191,8 +5191,8 @@ Signal parity with Claude Code, measured from its own stream
 
 - **Routines can run on their own.** Saving or editing a routine now offers
   a schedule: every few hours (1 to 24, counted from its last run) or daily
-  at a time. A scheduled routine starts exactly as if you pressed Run -- on
-  its teammate's route, recorded as started by the routine -- and the Team
+  at a time. A scheduled routine starts exactly as if you pressed Run — on
+  its teammate's route, recorded as started by the routine — and the Team
   card says the rule and the next run. It runs only while Locust is open
   and only when its teammate is free; a run missed while Locust was closed
   happens once, when it is next open, not once per missed interval. A start
@@ -5202,7 +5202,7 @@ Signal parity with Claude Code, measured from its own stream
 
 - **Rooms tell you when something happened while you were away.** A teammate
   moving the board, or the last teammate answering a post, shows a desktop
-  notification -- only when Locust is not the window in front. Changes to
+  notification — only when Locust is not the window in front. Changes to
   one room are gathered for two minutes and said once, newest last, so three
   teammates finishing together are one thing to read, not three.
 
@@ -5211,8 +5211,8 @@ Signal parity with Claude Code, measured from its own stream
 - **Tasks in a room.** Every room has a board: a task is a line of text, an
   owner, a state (open, in hand, done) and the conversation that last moved
   it. Add, assign, finish, reopen or remove tasks from the room. Teammates
-  move the board themselves by ending a reply with a task block -- they are
-  told the board and the block with every post -- and the room says what
+  move the board themselves by ending a reply with a task block — they are
+  told the board and the block with every post — and the room says what
   they did.
 
 ## 0.23.0 — 2026-09-05
@@ -5611,7 +5611,7 @@ screen at every step kept and read afterwards.
 
 - **You can see both halves of a conversation between two teammates.** Ask one
   of them to message another and the thread showed the reply and never the
-  question -- so it read as though the second teammate had answered *you*. The
+  question — so it read as though the second teammate had answered *you*. The
   message asking is written on an earlier turn than the answer, and the thread
   only ever drew the newest turn's. Every turn's now shows, filed against the
   turn it happened on.
@@ -5621,14 +5621,14 @@ screen at every step kept and read afterwards.
 - **Pressing send does something immediately.** The working line appeared only
   once the runtime reported its first step, so for a CLI that has to launch a
   process the thread sat blank for seconds and the bounce looked late. It was
-  not late -- there was no line for it to be on. A live run always shows one
+  not late — there was no line for it to be on. A live run always shows one
   now, and it says what is true: with no step reported it names the wait rather
   than inventing a step.
 - **The `...` shows up where you are actually waiting.** It used to mean "a
   reasoning step is open", which most runtimes never report, so it almost never
   appeared. It now means waiting on the model with nothing to show yet.
 - **The composer lets go of what you sent.** A start the host refused left your
-  text on screen twice -- as a failed turn and still in the box -- which read as
+  text on screen twice — as a failed turn and still in the box — which read as
   though nothing had been sent. If the bridge is missing the text stays, because
   then the box is the only copy of it.
 - **The window remembers its size and position.** It also refuses to reopen onto
@@ -5639,7 +5639,7 @@ screen at every step kept and read afterwards.
 ## 0.16.4 — 2026-09-04
 
 - **A new app icon.** The mark is a fine engraving, and downsampled to the
-  sizes a taskbar actually uses it averaged to grey -- under 2% of the tile
+  sizes a taskbar actually uses it averaged to grey — under 2% of the tile
   carried solid ink at 32px, so it stopped reading as a locust. The new one is
   the same artwork, thickened and zoomed so the wings reach the edges: 43% at
   32px, and the `.ico` now carries every size Windows picks from rather than
@@ -5665,7 +5665,7 @@ screen at every step kept and read afterwards.
 
 - **The routes you move between sit at the top of the picker.** Recency
   already ordered models within a runtime, which helps when you stay on one
-  and does nothing for the move this app exists for -- putting two models on
+  and does nothing for the move this app exists for — putting two models on
   the same work. The other runtime's group sat below six rows of the one you
   were on, in a list showing less than half its height. A Recent group now
   carries the routes actually used, across runtimes. It appears only once
@@ -5688,7 +5688,7 @@ screen at every step kept and read afterwards.
 ## 0.16.0 — 2026-09-03
 
 - **The Teammates screen says what a teammate has been doing.** It could tell
-  you a teammate existed, their route, and how many missions they owned --
+  you a teammate existed, their route, and how many missions they owned —
   which answers "who is on my team" and not "what have they been up to". Each
   card now carries when they last ran, what their work has cost, and their
   newest missions, and clicking one opens it. A teammate who has never run
@@ -5700,19 +5700,19 @@ screen at every step kept and read afterwards.
 - **A retrying mission stops looking frozen.** Against a dead endpoint Codex
   retries five times across several minutes and reports each attempt. Every
   one of those notices arrives before the first tool runs, and the thread
-  dropped everything that arrived that early -- so the mission sat reading
+  dropped everything that arrived that early — so the mission sat reading
   "running" with an empty thread while the runtime was working. Setup chatter
   still stays hidden; trouble with the run itself no longer does.
 - **A mission from another day says which day.** The marker read `started
   12:25 AM` with no date, which is unambiguous only until tomorrow.
 - **A teammate's card shows the mode they actually ran in.** It printed
-  `read-only` for everyone, whatever they had run in -- a fact the card never
+  `read-only` for everyone, whatever they had run in — a fact the card never
   had, and simply false once a runtime could edit.
 
 ## 0.15.7 — 2026-09-03
 
 - **Claude's activity rows say what they touched.** They read `Read done`,
-  `Glob done`, `Write failed` -- the tool and nothing else, so the card could
+  `Glob done`, `Write failed` — the tool and nothing else, so the card could
   not tell you which file was read or written. A Claude tool's input arrives
   after the call opens, streamed as JSON, and nothing had picked it up from
   the finished block. Rows now read `src/format.js Read`, `src/cli.js Read`,
@@ -5728,11 +5728,11 @@ screen at every step kept and read afterwards.
   host coerced Claude's sandbox to `read-only` outright, and the Claude branch
   built its command without passing a sandbox at all. The receipt claimed
   `workspace-write` while the run was in plan mode and answered "I don't have
-  a Write tool available in this session" -- the record and the process
+  a Write tool available in this session" — the record and the process
   disagreeing, which is the one thing a receipt must never do. Verified from
   the ledger this time: a mission recorded `runtime: claude` and
   `sandbox: workspace-write`, and Claude created a new file.
-  **0.15.5's note that this was "verified live" was wrong** -- the run used to
+  **0.15.5's note that this was "verified live" was wrong** — the run used to
   verify it was Codex, not Claude. Corrected here rather than quietly.
 
 ## 0.15.5 — 2026-09-03
@@ -5758,7 +5758,7 @@ The rest of what using the app turned up. Notes in
 
 - **Asking a teammate to talk to another teammate now reaches them.** Asked to
   review some tests and ask a colleague whether they agreed, a teammate wrote
-  the colleague's name into its reply and stopped -- and the colleague never
+  the colleague's name into its reply and stopped — and the colleague never
   ran. Nothing had told it that naming someone in prose does not reach them,
   and the briefing opened with wording that discouraged a hand-off exactly when
   you had just asked for one. Both are now said plainly.
@@ -5797,8 +5797,8 @@ Found by using the app on a real project rather than testing it. Notes in
 
 - **Fixes a Codex regression 0.15.1 introduced.** Making PATH win meant
   reaching npm's `codex.ps1`, and that shim cannot take Codex's own arguments
-  -- the bare `-` that sends the prompt on stdin makes PowerShell reject the
-  whole call -- so every Codex mission failed for anyone whose Codex came from
+  — the bare `-` that sends the prompt on stdin makes PowerShell reject the
+  whole call — so every Codex mission failed for anyone whose Codex came from
   npm. Windows itself runs the `.cmd`, and now so does Locust. **If you are on
   0.15.1 and Codex stopped working, this is why; install this one.**
 - **Replies render as written.** Fenced code blocks are code blocks and
@@ -5812,7 +5812,7 @@ Found by using the app on a real project rather than testing it. Notes in
   reply instead, with nothing saying the mode was why. Ask is still one click
   away, and a teammate you have run keeps whatever they last ran on.
 - **A read-only run that answers with code offers to run again with edits
-  allowed** -- one click, instead of changing the mode and retyping. It
+  allowed** — one click, instead of changing the mode and retyping. It
   appears only when the reply actually carries code, and it is an offer, not
   an error: the run did exactly what its mode permits.
 
@@ -5820,7 +5820,7 @@ Found by using the app on a real project rather than testing it. Notes in
 
 - **Locust now runs the runtime you installed, not an older copy it found
   somewhere else.** It searched every likely install directory for a `.exe`
-  before it looked on PATH for a shim -- and a tool installed from npm lands
+  before it looked on PATH for a shim — and a tool installed from npm lands
   as a `.cmd` and a `.ps1`, never a `.exe`. So a runtime you installed or
   updated could be ignored in favour of an older copy sitting somewhere the
   app had guessed, with nothing on screen to say which one was running. What a
@@ -5841,7 +5841,7 @@ Found by using the app on a real project rather than testing it. Notes in
 - **Missions and Teammates are one click away** in the sidebar footer, with
   their shortcuts in the tooltips.
 - **A failure now says what the runtime said.** Every failure card showed the
-  app's own sentence -- "Codex invocation did not complete successfully" --
+  app's own sentence — "Codex invocation did not complete successfully" —
   and threw away the runtime's explanation, which the ledger had been
   recording all along. Two runs lost this way turned out to be a folder Codex
   refused to work in and a Cursor account out of capacity; on screen both read
@@ -5850,8 +5850,8 @@ Found by using the app on a real project rather than testing it. Notes in
 - **Codex missions work in a folder that is not a git repository.** Codex CLI
   refuses to start outside a repo unless asked not to check, so a mission in a
   plain folder died in half a second before the model was ever reached. Locust
-  decides what a run may touch itself -- read-only or accept-edits, an approval
-  gate, and a recorded diff of every write -- so it now asks Codex to skip that
+  decides what a run may touch itself — read-only or accept-edits, an approval
+  gate, and a recorded diff of every write — so it now asks Codex to skip that
   check.
 - **A reply after a failed run stays in the same conversation.** Being the next
   turn and resuming a runtime's session are different things, and the second
