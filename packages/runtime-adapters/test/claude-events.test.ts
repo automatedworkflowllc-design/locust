@@ -148,7 +148,8 @@ describe("trap 1: the answer arrives twice", () => {
         event: { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "PROBE_OK" } },
       }),
     );
-    expect(delta?.type === "message.delta" && delta.payload.itemId).toBe("block_1");
+    // The block the text streamed into (index 1), in this message.
+    expect(delta?.type === "message.delta" && delta.payload.itemId).toMatch(/block_1$/);
 
     const [complete] = claude.accept(
       record({
@@ -156,8 +157,47 @@ describe("trap 1: the answer arrives twice", () => {
         message: { content: [{ type: "text", text: "PROBE_OK" }] },
       }),
     );
-    expect(complete?.type === "message.delta" && complete.payload.itemId).toBe("block_1");
+    // The SAME item: the complete record replaces what streamed, wherever it streamed.
+    expect(complete?.type === "message.delta" && complete.payload.itemId).toBe(delta?.type === "message.delta" ? delta.payload.itemId : "");
     expect(complete?.type === "message.delta" && complete.payload.operation).toBe("replace");
+  });
+
+  it("gives every message its own item, so a later one never replaces an earlier one", () => {
+    // A replay of a Bash-heavy Haiku run (2026-09-23): three things Claude
+    // said to the person streamed into ONE item, each replacing the last,
+    // because the block index restarts in every message.
+    const claude = normalizer();
+    const say = (id: string, text: string) => {
+      claude.accept(record({ type: "stream_event", parent_tool_use_id: null, event: { type: "message_start", message: { id, usage: { input_tokens: 2 } } } }));
+      const [streamed] = claude.accept(record({ type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } } }));
+      const [complete] = claude.accept(record({ type: "assistant", parent_tool_use_id: null, message: { id, content: [{ type: "text", text }] } }));
+      return { streamed, complete };
+    };
+    const first = say("msg_a", "I'll run these one at a time.");
+    const second = say("msg_b", "The subagent is still working.");
+    const ids = [first, second].map(({ streamed, complete }) => {
+      const a = streamed?.type === "message.delta" ? streamed.payload.itemId : "";
+      const b = complete?.type === "message.delta" ? complete.payload.itemId : "";
+      expect(a).toBe(b);
+      return a;
+    });
+    expect(ids[0]).not.toBe(ids[1]);
+  });
+
+  it("gives each message its own item when the run does not stream", () => {
+    const claude = normalizer();
+    const [a] = claude.accept(record({ type: "assistant", message: { id: "msg_a", content: [{ type: "text", text: "First." }] } }));
+    const [b] = claude.accept(record({ type: "assistant", message: { id: "msg_b", content: [{ type: "text", text: "Second." }] } }));
+    expect(a?.type === "message.delta" && b?.type === "message.delta" && a.payload.itemId !== b.payload.itemId).toBe(true);
+  });
+
+  it("never speaks a subagent's words as the teammate's", () => {
+    // In the same replay the subagent's "The file data/log.txt contains 5
+    // lines." replaced the teammate's message, and the teammate's next one
+    // then streamed onto the end of it.
+    const claude = normalizer();
+    expect(claude.accept(record({ type: "assistant", parent_tool_use_id: "toolu_agent", message: { id: "msg_sub", content: [{ type: "text", text: "The file contains 5 lines." }] } }))).toEqual([]);
+    expect(claude.accept(record({ type: "stream_event", parent_tool_use_id: "toolu_agent", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "5" } } }))).toEqual([]);
   });
 });
 
@@ -761,5 +801,25 @@ describe("a long call is named while it runs", () => {
     expect(events[0]).toMatchObject({ type: "tool.started", payload: { itemId: "toolu_long", name: "Bash", command: "cd C:/work && npm test", title: "Run the test suite", phase: "started" } });
     // Said once: the same message again restates nothing.
     expect(n.accept(record({ type: "assistant", message: { id: "msg_1", content: [{ type: "tool_use", id: "toolu_long", name: "Bash", input: { command: "cd C:/work && npm test", description: "Run the test suite" } }] } }))).toEqual([]);
+  });
+});
+
+describe("a call Claude Code refused", () => {
+  // Claude Code 2.1.280 says so when it refuses (`system` / `permission_denied`,
+  // with the call and the reason), then returns the call as an error. Read as
+  // an error it counted as a command that ran and exited non-zero.
+  it("is reported as refused, with the reason, not as failed", () => {
+    const n = normalizer();
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_loop", name: "Bash" } } }));
+    expect(n.accept(record({ type: "system", subtype: "permission_denied", tool_name: "Bash", tool_use_id: "toolu_loop", decision_reason_type: "other", decision_reason: "Contains simple_expansion", message: "Contains simple_expansion" }))).toEqual([]);
+    const [done] = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_loop", is_error: true, content: "Contains simple_expansion" }] } }));
+    expect(done).toMatchObject({ type: "tool.failed", payload: { itemId: "toolu_loop", status: "refused", output: "Contains simple_expansion" } });
+  });
+
+  it("leaves an ordinary failure a failure", () => {
+    const n = normalizer();
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_x", name: "Bash" } } }));
+    const [done] = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_x", is_error: true, content: "exit code 1" }] } }));
+    expect(done).toMatchObject({ type: "tool.failed", payload: { status: "error" } });
   });
 });

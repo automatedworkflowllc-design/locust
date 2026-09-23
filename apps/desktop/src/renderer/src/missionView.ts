@@ -208,6 +208,12 @@ export type ActivityEntry =
       readonly failed: boolean
       readonly exitCode: number | undefined
       /**
+       * The runtime refused it before it ran, with its reason ('' when it gave
+       * none). Not a failure: nothing ran (see `refusedCalls` in the Claude
+       * adapter).
+       */
+      readonly refused?: string
+      /**
        * What the command printed, where the runtime reported it.
        *
        * Undefined is the ordinary case, not a failure: only the Codex exec
@@ -332,6 +338,7 @@ export function activityEntries(
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode,
+        ...(detail.status === 'refused' ? { refused: detail.output ?? '' } : {}),
         /*
          * Carried whenever the runtime SAID something about output, including
          * when what it said was "none".
@@ -1344,7 +1351,13 @@ export function activityTrace(
   const cannotAttribute = diagnostics.some(
     (event) => event.payload.code === 'host.shared_workspace'
   )
-  const refused = diagnostics.filter((event) => /denied|refus|permission/i.test(event.payload.code) || /not permitted|refused/i.test(event.payload.message)).length
+  // Counted by the calls that were refused, where the rows say so; by the
+  // runtime's notices otherwise. One notice named two refused calls in the
+  // replay of 2026-09-23 and the line said "1 refused".
+  const refusedRows = details.filter((detail) => detail.status === 'refused').length
+  const refused = refusedRows > 0
+    ? refusedRows
+    : diagnostics.filter((event) => /denied|refus|permission/i.test(event.payload.code) || /not permitted|refused/i.test(event.payload.message)).length
 
   if (outcome === 'failed' || outcome === 'cancelled') {
     segments.push({ key: 'duration', text: `stopped at ${duration}` })
@@ -1399,7 +1412,8 @@ export function activityTrace(
    * rows' job. Bounded, because a command can be a paragraph and this line
    * shares its row with the duration, the file count and the cost.
    */
-  const shellCommands = details.filter((detail) => detail.kind === 'shell')
+  // What RAN: a command the runtime refused is counted as refused, below.
+  const shellCommands = details.filter((detail) => detail.kind === 'shell' && detail.status !== 'refused')
   // Through `shellCommandText`, the same unwrapping the command ROW uses. A
   // raw name on Windows begins with the whole
   // `"C:\Windows\...\powershell.exe" -NoProfile -Command` preamble, so a
@@ -1529,7 +1543,8 @@ export interface CommandsRun {
 }
 
 export function commandsRun(details: readonly ActivityDetail[], finished: boolean): CommandsRun {
-  const shell = details.filter((detail) => detail.kind === 'shell')
+  // A command the runtime refused never ran, so it is none of these.
+  const shell = details.filter((detail) => detail.kind === 'shell' && detail.status !== 'refused')
   return {
     ran: shell.length,
     nonZero: shell.filter((detail) => detail.failed === true || (detail.exitCode !== undefined && detail.exitCode !== 0)).length,

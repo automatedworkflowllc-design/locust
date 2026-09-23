@@ -410,6 +410,17 @@ export function createClaudeEventNormalizer(
    * row later learns what became of the work.
    */
   const backgroundTasks = new Map<string, string | undefined>();
+  /**
+   * Calls Claude Code refused before they ran, by tool call, with its reason.
+   *
+   * Claude Code 2.1.280 says so the moment it refuses -- a `system` record,
+   * `permission_denied`, naming the call and why ("Contains simple_expansion")
+   * -- and then returns the call as an error. Read as an error, a refused
+   * command counted as one that ran and "exited non-zero": a replay of a
+   * Haiku run (2026-09-23) read "ran 7 commands · 2 exited non-zero · 1
+   * refused" over five that ran and two that never did.
+   */
+  const refusedCalls = new Map<string, string>();
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
   let finalized = false;
@@ -454,6 +465,18 @@ export function createClaudeEventNormalizer(
    * replace has to land on the block the text was written to.
    */
   let textBlockId: string | undefined;
+  /**
+   * Which of the conversation's messages is streaming, and its id.
+   *
+   * The text item was `block_<index>`, and the index restarts in every
+   * message, so a run's second message streamed into its first message's
+   * item and replaced it: a replay of a Bash-heavy Haiku run (2026-09-23) put
+   * three things Claude said to the person on screen one after another in
+   * the same place, and the finished thread showed only the last. It is
+   * `m<ordinal>_block_<index>` now: one item per message, in order.
+   */
+  let messageOrdinal = 0;
+  let streamingMessageId: string | undefined;
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -655,6 +678,14 @@ export function createClaudeEventNormalizer(
         ];
       }
       if (subtype === "task_updated" || subtype === "thinking_tokens") return [];
+      // Kept for the call's own result, which follows (see `refusedCalls`).
+      // It was a step with nothing in it.
+      if (subtype === "permission_denied") {
+        const callId = identityValue(parsed.tool_use_id);
+        const why = stringValue(parsed.decision_reason) ?? stringValue(parsed.message);
+        if (callId !== undefined) refusedCalls.set(callId, why ?? "");
+        return [];
+      }
       // The set of background tasks, restated whole each time it changes.
       // Every fact in it arrives per task in `task_started` and
       // `task_notification`, which also say which call each belongs to. Read
@@ -680,6 +711,11 @@ export function createClaudeEventNormalizer(
         const prompt = promptTokensOf(message.usage);
         if (prompt !== undefined && !fromSubagent(parsed)) {
           lastCall = { id: identityValue(message.id), prompt, output: outputTokensOf(message.usage) ?? 0 };
+        }
+        if (!fromSubagent(parsed)) {
+          messageOrdinal += 1;
+          textBlockId = undefined;
+          streamingMessageId = identityValue(message.id);
         }
         return [emit("step.started", { stepKind: "turn", evidence })];
       }
@@ -712,8 +748,10 @@ export function createClaudeEventNormalizer(
       if (innerType === "content_block_delta") {
         const delta = isObject(inner.delta) ? inner.delta : {};
         const text = stringValue(delta.text);
-        if (text === undefined) return [];
-        textBlockId = `block_${String(inner.index ?? 0)}`;
+        // A subagent's words are its report to the teammate, not the
+        // teammate's to the person; they arrive through the Agent call.
+        if (text === undefined || fromSubagent(parsed)) return [];
+        textBlockId = `m${String(messageOrdinal)}_block_${String(inner.index ?? 0)}`;
         return [
           emit("message.delta", {
             itemId: textBlockId,
@@ -750,6 +788,18 @@ export function createClaudeEventNormalizer(
           lastCall = { id, prompt, output: output ?? 0 };
         }
       }
+      /*
+       * A subagent's message is not the teammate's answer.
+       *
+       * It came through here as the teammate's own text and REPLACED it: in
+       * the same replay the subagent's "The file data/log.txt contains 5
+       * lines." stood in the teammate's place, and the teammate's next message
+       * then streamed onto the end of it ("...5 lines.I executed"). If the
+       * subagent reports after the teammate's last word -- a background one
+       * does -- it is the answer the person is left with. What the subagent
+       * found reaches the thread through its Agent call's row.
+       */
+      if (fromSubagent(parsed)) return [];
       // The same record carries every tool_use block with its input filled
       // in, which is the first point the target is knowable.
       const restated: NormalizedRuntimeEvent[] = [];
@@ -801,11 +851,14 @@ export function createClaudeEventNormalizer(
         .filter((value): value is string => value !== undefined)
         .join("");
       if (text.length === 0) return restated;
+      // The block the text streamed into, not an assumed one; a message that
+      // did not stream is an item of its own.
+      const messageId = identityValue(message.id);
+      const streamedHere = textBlockId !== undefined && (messageId === undefined || messageId === streamingMessageId);
       return [
         ...restated,
         emit("message.delta", {
-          // The block the text streamed into, not an assumed one.
-          itemId: textBlockId ?? "block_0",
+          itemId: streamedHere ? textBlockId! : `${messageId ?? `m${String(messageOrdinal)}`}:text`,
           operation: "replace",
           text: boundedMessageText(text),
           final: true,
@@ -825,6 +878,8 @@ export function createClaudeEventNormalizer(
         const open = openTools.get(itemId);
         openTools.delete(itemId);
         const failed = block.is_error === true;
+        const refusedFor = refusedCalls.get(itemId);
+        refusedCalls.delete(itemId);
         const subagentKind = subagentKinds.get(itemId);
         const subagentSummary = subagentSummaries.get(itemId);
         subagentKinds.delete(itemId);
@@ -838,7 +893,10 @@ export function createClaudeEventNormalizer(
             ...(open?.title === undefined ? {} : { title: open.title }),
             ...(open?.background === true ? { background: true } : {}),
             phase: "completed",
-            ...(failed ? { status: "error" } : subagentKind === undefined ? {} : { status: subagentKind }),
+            // Refused is not failed: it never ran. The reason rides along.
+            ...(refusedFor !== undefined
+              ? { status: "refused", ...(refusedFor.length > 0 ? { output: boundedMessageText(refusedFor) } : {}) }
+              : failed ? { status: "error" } : subagentKind === undefined ? {} : { status: subagentKind }),
             // What the subagent came back with, in its own words: the row
             // reads "reported back · 3" instead of only "reported back".
             ...(subagentSummary === undefined ? {} : { output: boundedMessageText(subagentSummary) }),

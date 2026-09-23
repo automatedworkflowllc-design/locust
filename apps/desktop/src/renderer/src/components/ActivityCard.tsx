@@ -421,7 +421,7 @@ export function ActivityCard({
                 (entry.output === undefined || entry.output.trim() === '') && entry.title === undefined ? (
                   <div className="lc-filerow is-shell is-static">
                     <Icon name="terminal" size={14} />
-                    <span className={`lc-shellbadge ${shellResultClass(entry, finished)}`}>{shellResult(entry, finished)}</span>
+                    <span className={`lc-shellbadge ${shellResultClass(entry, finished)}`} title={refusedWhy(entry)}>{shellResult(entry, finished)}</span>
                     {/* Nothing printed and nothing said about it, so nothing
                       * to open onto -- the command is the row. */}
                     <span
@@ -441,7 +441,7 @@ export function ActivityCard({
                   <>
                     <button type="button" className="lc-filerow is-shell" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
                       <Icon name="terminal" size={14} />
-                      <span className={`lc-shellbadge ${shellResultClass(entry, finished)}`}>{shellResult(entry, finished)}</span>
+                      <span className={`lc-shellbadge ${shellResultClass(entry, finished)}`} title={refusedWhy(entry)}>{shellResult(entry, finished)}</span>
                       {/*
                         * What it was DOING, where the runtime says so.
                         *
@@ -639,6 +639,8 @@ function shellResult(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished 
   // See the tool row above: a command the run ended without settling did not
   // report, and saying `running` about it contradicts the header beside it.
   if (!entry.settled) return finished ? 'did not report' : 'running'
+  // Refused is not failed: the command never ran.
+  if (entry.refused !== undefined) return 'refused'
   if (entry.failed) return entry.exitCode === undefined ? 'failed' : `failed · exit ${String(entry.exitCode)}`
   /*
    * A call sent to the background returns at once, so `done` on it was a
@@ -676,8 +678,15 @@ function shellSweeping(entry: Extract<ActivityEntry, { kind: 'shell' }>, finishe
   return !entry.settled || (entry.background === true && entry.backgroundEnded === undefined && !entry.failed)
 }
 
+/** Why the runtime refused a command, for the badge's hover. */
+function refusedWhy(entry: Extract<ActivityEntry, { kind: 'shell' }>): string | undefined {
+  if (entry.refused === undefined) return undefined
+  return entry.refused.length > 0 ? `Refused before it ran: ${entry.refused}` : 'Refused before it ran'
+}
+
 function shellResultClass(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished = false): string {
   if (!entry.settled) return finished ? 'is-stalled' : 'is-running'
+  if (entry.refused !== undefined) return 'is-stalled'
   if (entry.failed) return 'is-failed'
   if (entry.background === true) {
     switch (entry.backgroundEnded) {

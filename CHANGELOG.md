@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.290.0 - 2026-09-23
+
+### Fixed
+
+- **Everything a Claude teammate says in a turn stays in the thread.** Each
+  new message replaced the one before it, so a turn that spoke three times
+  around its work showed only its last sentence. They are all kept now, in
+  order.
+
+- **A subagent's words are never shown as the teammate's.** A helper's report
+  could take the teammate's place in the conversation, or have the
+  teammate's next words run on after it.
+
+- **A command Claude Code refused says "refused".** It read as failed, and
+  the turn's line counted it as a command that ran and exited with an error.
+  It never ran; the row says so, with Claude Code's reason when you point at
+  it.
+
 ## 0.289.0 - 2026-09-23
 
 ### Improved
