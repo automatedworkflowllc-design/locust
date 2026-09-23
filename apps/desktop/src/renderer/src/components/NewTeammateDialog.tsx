@@ -149,8 +149,9 @@ export function NewTeammateDialog({
 
         <div className="lc-dialog__body">
           <div className="lc-dialog__identity">
-            {/* The preview works, so the person sees the behaviour a live teammate has. */}
-            <TeammateBot hue={hue} avatar={avatar} size={56} activity="working" presence="working" />
+            {/* The preview works, so the person sees the behaviour a live
+                teammate has -- all of it, as the face in a conversation does. */}
+            <TeammateBot hue={hue} avatar={avatar} size={56} activity="working" presence="working" motion="full" />
             <div className="lc-dialog__fields">
               <label className="lc-fieldlabel lc-mono" htmlFor="lc-teammate-name">
                 Name

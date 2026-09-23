@@ -26,26 +26,63 @@ import type { PixelFaceProps } from './PixelFace.js'
  */
 
 /**
+ * HOW MUCH A BOT MOVES, BY WHERE IT STANDS.
+ *
+ * Colin, 2026-09-23, with a frame of the sidebar and the workroom header both
+ * hopping the same working teammate: *"these two bot versions have the same
+ * amount of movement as the one in the chat and its a bit distracting ...
+ * besides the one in the chat just give them a slight bounce or look around,
+ * the one in the chat can remain as is"*, and then, to be sure: *"the one in
+ * the chat where you're speaking to, all that movement is fine and great ...
+ * but its mirrored in the sidebar and the top, lets tame those two down"*.
+ *
+ * So there are two levels. `full` is the whole performance -- a working
+ * teammate hops, and one looking around flips now and then -- and it is kept
+ * for the face beside the thread's live line, the one you are talking to
+ * (and the New teammate preview, which exists to show that performance).
+ * Everywhere else is `subtle`, the default: a working teammate looks around
+ * and bounces a little, nobody flips, and nothing hops.
+ */
+export type BotMotionLevel = 'full' | 'subtle'
+
+export interface BotMotion {
+  readonly state: BotAvatarState
+  /** Still, in the state's resting pose. */
+  readonly paused: boolean
+  /** Seconds between the library's idle flips; 0 for none. Absent: the library's own. */
+  readonly jumpEvery?: number
+  /** The slight bounce (shell.css) a subtle bot does where a full one hops. */
+  readonly bounces: boolean
+}
+
+/**
  * Only work moves. Colin, on whether an idle bot should sleep or keep still:
  * *"ill run with your suggestion"* -- still, everywhere but the title screen.
- * Working and delegating hop; a teammate thinking, answering, receiving or
- * waiting on you looks around; idle, blocked and done keep their resting pose.
+ * Working and delegating are work; a teammate thinking, answering, receiving
+ * or waiting on you is alive and looks around; idle, blocked and done keep
+ * their resting pose.
  */
-export function botMotion(activity: FaceActivity): { readonly state: BotAvatarState; readonly paused: boolean } {
+function kindOf(activity: FaceActivity): 'work' | 'alive' | 'still' {
   switch (activity) {
     case 'working':
     case 'delegating':
-      return { state: 'working', paused: false }
+      return 'work'
     case 'thinking':
     case 'responding':
     case 'receiving':
     case 'waiting':
-      return { state: 'default', paused: false }
+      return 'alive'
     case 'blocked':
     case 'done':
     case 'idle':
-      return { state: 'default', paused: true }
+      return 'still'
   }
+}
+
+export function botMotion(activity: FaceActivity, level: BotMotionLevel = 'subtle'): BotMotion {
+  const kind = kindOf(activity)
+  if (level === 'full') return { state: kind === 'work' ? 'working' : 'default', paused: kind === 'still', bounces: false }
+  return { state: 'default', paused: kind === 'still', jumpEvery: 0, bounces: kind === 'work' }
 }
 
 const hueColors = new Map<string, string | undefined>()
@@ -70,6 +107,11 @@ function seedOf(text: string): number {
   return (hash >>> 0) / 4294967296
 }
 
+export interface TeammateBotProps extends PixelFaceProps {
+  /** How much it moves: `subtle` unless this is the face you are talking to. */
+  readonly motion?: BotMotionLevel
+}
+
 export function TeammateBot({
   hue,
   avatar,
@@ -78,19 +120,21 @@ export function TeammateBot({
   presence = 'none',
   className,
   teammateId,
-  name
-}: PixelFaceProps): ReactElement {
+  name,
+  motion = 'subtle'
+}: TeammateBotProps): ReactElement {
   const bot = botFor(avatar)
-  const { state, paused } = botMotion(activity)
+  const { state, paused, jumpEvery, bounces } = botMotion(activity, motion)
   const color = hueColor(hue)
   const tone = PRESENCE_TONE[presence]
   return (
     <span
-      className={`lc-face lc-bot${className === undefined ? '' : ` ${className}`}`}
+      className={`lc-face lc-bot${bounces ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
       style={{ position: 'relative', display: 'inline-flex', width: size, height: size, flexShrink: 0 }}
       {...(name === undefined ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name, title: name })}
       data-activity={activity}
       data-bot={bot.shape}
+      data-motion={motion}
       {...(teammateId === undefined ? {} : { 'data-teammate': teammateId })}
     >
       {activity === 'waiting' && <span className="lc-bot__ring" />}
@@ -102,6 +146,7 @@ export function TeammateBot({
         face={bot.face}
         seed={seedOf(teammateId ?? name ?? bot.shape)}
         {...(color === undefined ? {} : { color })}
+        {...(jumpEvery === undefined ? {} : { jumpEvery })}
       />
       {tone !== undefined && <span className={`lc-presence lc-presence--${tone}`} />}
     </span>

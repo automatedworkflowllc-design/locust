@@ -62,6 +62,7 @@ export function Bot({ type, size, color, state = 'default', paused = false, face
         {...(color === undefined ? {} : { color })}
         {...(face === undefined ? {} : { face })}
         {...(seed === undefined ? {} : { seed })}
+        {...(jumpEvery === undefined ? {} : { jumpEvery })}
       />
     )
   }
@@ -90,7 +91,8 @@ function LocustBot({
   paused,
   face = 'eyes',
   seed = 0.37,
-  interactive
+  interactive,
+  jumpEvery
 }: {
   readonly type: LocustBotType
   readonly size: number
@@ -100,6 +102,7 @@ function LocustBot({
   readonly face?: BotAvatarFace
   readonly seed?: number
   readonly interactive: boolean
+  readonly jumpEvery?: number
 }): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null)
   const rig = useRef<BotAvatarSim | null>(null)
@@ -122,6 +125,9 @@ function LocustBot({
     warmBotAvatarPlastic(key, path, size * dpr)
     const sim = new BotAvatarSim(seed, state)
     sim.setTurn(shape.turn)
+    // The library's BotAvatar takes `jumpEvery` as a prop; our rig is set
+    // the same way, so a subtle Locust bot never flips either.
+    if (jumpEvery !== undefined) sim.setJump({ every: jumpEvery })
     rig.current = sim
     const still = paused || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
     const draw = (): void => {
@@ -175,7 +181,7 @@ function LocustBot({
     }
     // A new state eases in on the running rig (below); only a still bot is
     // redrawn from scratch for one.
-  }, [type, size, color, face, seed, paused, paused ? state : undefined])
+  }, [type, size, color, face, seed, paused, paused ? state : undefined, jumpEvery])
 
   useEffect(() => {
     if (!paused) rig.current?.setState(state)

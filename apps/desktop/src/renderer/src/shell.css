@@ -3684,6 +3684,24 @@ textarea {
   flex-shrink: 0;
 }
 
+/* A subtle bot at work bounces a little where the face you are talking to
+   hops (TeammateBot's motion levels): a short lift and a longer rest, the
+   dot and the ring riding with it. */
+.lc-bot.is-bouncing {
+  animation: lcBotBounce 1.5s ease-in-out infinite;
+}
+
+@keyframes lcBotBounce {
+  0%,
+  46%,
+  100% {
+    transform: translateY(0);
+  }
+  23% {
+    transform: translateY(-7%);
+  }
+}
+
 /* In the background, the float and the waiting ring hold where they are
    (see HomeCover's rest). */
 .lc-bot.is-floating.is-resting,
@@ -3698,7 +3716,8 @@ textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .lc-bot__ring,
-  .lc-bot.is-floating {
+  .lc-bot.is-floating,
+  .lc-bot.is-bouncing {
     animation: none;
   }
 }

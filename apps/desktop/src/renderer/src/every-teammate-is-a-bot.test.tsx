@@ -73,10 +73,10 @@ describe("a teammate's bot", () => {
 })
 
 describe('how a bot moves', () => {
-  it('only work moves: idle, blocked and done keep still; working hops; the rest look around', () => {
+  it('only work moves: idle, blocked and done keep still; at full motion working hops, the rest look around', () => {
     const all: readonly FaceActivity[] = ['thinking', 'working', 'delegating', 'responding', 'waiting', 'receiving', 'blocked', 'done', 'idle']
     const summary = Object.fromEntries(all.map((activity) => {
-      const motion = botMotion(activity)
+      const motion = botMotion(activity, 'full')
       return [activity, motion.paused ? 'still' : motion.state]
     }))
     expect(summary).toEqual({
@@ -98,7 +98,7 @@ describe('what a teammate bot draws', () => {
 
   it('keeps the hooks the face had: the activity, the teammate, and its own shape', () => {
     const html = renderToStaticMarkup(<TeammateBot hue="teal" avatar={look} size={26} activity="working" teammateId="tm_atlas" />)
-    expect(html).toMatch(/class="lc-face lc-bot"/)
+    expect(html).toMatch(/class="lc-face lc-bot[^"]*"/)
     expect(html).toContain('data-activity="working"')
     expect(html).toContain('data-bot="droid"')
     expect(html).toContain('data-teammate="tm_atlas"')

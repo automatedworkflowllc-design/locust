@@ -963,6 +963,14 @@ export function LiveStepCard({
          * is what catches the eye at a glance the 20px orb cannot.
          */
         activity={activity}
+        /*
+         * The one face that keeps every hop: the one you are talking to.
+         * The sidebar's and the header's copies of the same teammate are
+         * subtle (Colin, 2026-09-23: "the one in the chat where you're
+         * speaking to, all that movement is fine and great ... but its
+         * mirrored in the sidebar and the top, lets tame those two down").
+         */
+        motion="full"
         {...(owner?.teammateId === undefined ? {} : { teammateId: owner.teammateId })}
         /*
          * The face is the attribution; the name is its hover title.
