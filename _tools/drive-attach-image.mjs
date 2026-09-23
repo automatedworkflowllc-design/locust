@@ -16,7 +16,7 @@ import { copyFile, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-attachimg-ws-')
 // A real screenshot, from a drive record, kept outside the workspace so this
@@ -45,7 +45,7 @@ try {
   await drive.capture('launch', () => drive.ready())
 
   await drive.capture('open a mission', () => drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+    ${teammateFace('Wren')}?.click()
     await new Promise(r => setTimeout(r, 700))
     return 'opened'
   })()`))

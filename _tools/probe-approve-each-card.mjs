@@ -18,7 +18,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends a Codex turn. Set LOCUST_SPEND=1 to allow it.')
@@ -87,7 +87,7 @@ const approveEverything = `(async () => {
 try {
   await drive.capture('it stops and asks before writing a file', async () => {
     await drive.ready()
-    await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()`)
+    await drive.evaluate(`${teammateFace('Wren')}?.click()`)
     await drive.evaluate(`new Promise(r => setTimeout(r, 700))`)
     await drive.evaluate(`(async () => {
       const field = document.querySelector('form.command-dock textarea')

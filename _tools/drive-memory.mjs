@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto'
 
-import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-memory-ws-')
 const workspaceId = `ws_${createHash('sha256').update(workspace, 'utf8').digest('hex').slice(0, 32)}`
@@ -35,7 +35,7 @@ const drive = await startDrive({
   }
 })
 
-const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
+const pick = (name) => `(async () => { ${teammateFace(name)}.click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
 
 try {
   await drive.capture('launch', () => drive.ready())

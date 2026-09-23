@@ -21,7 +21,7 @@
 //
 // SPENDS two Claude Code turns on sonnet at low effort.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends two Claude Code turns. Set LOCUST_SPEND=1 to allow it.')
@@ -73,7 +73,7 @@ const settle = `(async () => {
 try {
   await drive.capture('turn one: send, and stop it', async () => {
     await drive.ready()
-    await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()`)
+    await drive.evaluate(`${teammateFace('Wren')}?.click()`)
     await drive.evaluate(`new Promise(r => setTimeout(r, 700))`)
     await drive.evaluate(send('Count slowly from 1 to 60, one number per line, with a sentence about each.'))
     await drive.evaluate(`new Promise(r => setTimeout(r, 6000))`)

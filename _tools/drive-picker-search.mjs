@@ -9,7 +9,7 @@
 // it replaces would empty the list at exactly the moment a person is looking
 // at it. This checks the rows before and after that refresh lands.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-picker-ws-')
 const drive = await startDrive({
@@ -35,7 +35,7 @@ try {
   await drive.capture('open the picker and wait for it to settle', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 800))
       const chip = [...document.querySelectorAll('.lc-control')].find(b => /Codex|OpenCode|Claude/.test(b.innerText))
       chip?.click()

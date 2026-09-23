@@ -18,7 +18,7 @@
 // SPENDS NOTHING. It never sends: what it reads is the composer's own state
 // and the menu on a mission row.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-home-ws-')
 const drive = await startDrive({
@@ -67,7 +67,7 @@ try {
   })
 
   await drive.capture('picking a teammate in the sidebar is still how you address one', async () => {
-    await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Gem'))?.click()`)
+    await drive.evaluate(`${teammateFace('Gem')}?.click()`)
     await drive.evaluate(`new Promise(r => setTimeout(r, 700))`)
     return drive.evaluate(`JSON.stringify({
       placeholder: document.querySelector('form.command-dock textarea')?.getAttribute('placeholder') ?? 'NO FIELD'

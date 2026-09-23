@@ -14,7 +14,7 @@
 
 import { rm } from 'node:fs/promises'
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-plan-ws-')
 const seed = {
@@ -40,7 +40,7 @@ let handoff
 try {
   await drive.capture('a plan run, finished', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))
     const mode = await drive.evaluate(`(async () => {
       const control = [...document.querySelectorAll('.lc-control')].find(b => /Ask|Accept edits|Plan|Approve|Auto/.test(b.innerText))
@@ -76,8 +76,8 @@ try {
   await drive.capture('opened again: the same plan, from the ledger', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
-      const row = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
-      row?.querySelector('.lc-teammate__mission')?.click()
+      const row = ${teammateRows()}.find(r => /Wren/.test(r.innerText))
+      row?.conversation?.click()
       await new Promise(r => setTimeout(r, 1400))
       return 'opened'
     })()`)

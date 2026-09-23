@@ -9,7 +9,7 @@
 // fold rows with each tool's name, and the header. Spends one short run on
 // each of Colin's Codex and Cursor accounts.
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, FREE_ROUTE } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-subagents-ws-')
 const T0 = '2026-09-05T05:00:00.000Z'
@@ -30,12 +30,12 @@ const drive = await startDrive({
   }
 })
 const ASK = 'Use a subagent (a helper agent, if your tools offer one) to count the lines in README.md and report the number to you. Then reply with one sentence giving that number. If you have no way to start a subagent, say so in one sentence and count the lines yourself. Do not edit anything.'
-const pick = (name) => `(async () => { document.querySelector('.lc-brand__lockup').click(); await new Promise(r => setTimeout(r, 300)); [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
+const pick = (name) => `(async () => { document.querySelector('.lc-brand__lockup').click(); await new Promise(r => setTimeout(r, 300)); ${teammateFace(name)}.click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
 const watch = (name) => `(async () => {
   const seen = []
   for (let i = 0; i < 480; i += 1) {
     await new Promise(r => setTimeout(r, 500))
-    const row = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + ${JSON.stringify(name)}).test(r.innerText.trim()))
+    const row = ${teammateRows()}.find(r => new RegExp('^' + ${JSON.stringify(name)}).test(r.innerText.trim()))
     const line = row ? row.innerText.replace(/\\s+/g, ' ').slice(0, 70) : ''
     if (seen[seen.length - 1] !== line) seen.push(line)
     if (i > 6 && !document.querySelector('button[aria-label^="Stop the running"]')) break
@@ -72,8 +72,8 @@ try {
   await drive.capture('the three headers', () => drive.evaluate(`(async () => {
     const out = []
     for (const name of ['Wren', 'Booty', 'Gem']) {
-      const row = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + name).test(r.innerText.trim()))
-      row?.querySelector('.lc-teammate__mission')?.click()
+      const row = ${teammateRows()}.find(r => new RegExp('^' + name).test(r.innerText.trim()))
+      row?.conversation?.click()
       await new Promise(r => setTimeout(r, 600))
       out.push(name + ': ' + (document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 130) ?? ''))
     }

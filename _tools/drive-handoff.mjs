@@ -28,7 +28,7 @@
 //    checkpoint, and hands the work over -- it cannot be undone."
 
 
-import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-handoff-ws-')
 const drive = await startDrive({
@@ -46,7 +46,7 @@ const drive = await startDrive({
 try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('start a slow task on the free model', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     return drive.evaluate(sendAndWaitScript('Count from 1 to 400. Put each number on its own line, in order, with no other text and no commentary. Do not stop early and do not summarise. Do not edit any files.', { settle: false }))
   })
   await drive.capture('the run is live; the picker warns that switching stops it', () => drive.evaluate(`(async () => {

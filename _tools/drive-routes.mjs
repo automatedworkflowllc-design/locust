@@ -8,7 +8,7 @@
 // pickers, each thread, each activity fold, each header. Spends one short
 // run on each of Colin's accounts.
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-routes-ws-')
 const drive = await startDrive({
@@ -26,7 +26,7 @@ const drive = await startDrive({
   }
 })
 
-const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
+const pick = (name) => `(async () => { ${teammateFace(name)}.click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
 const askMode = `(async () => {
   const mode = document.querySelector('button[aria-label="Permission mode"], button[title="Permission mode"]')
   if (!mode) return 'no mode control'

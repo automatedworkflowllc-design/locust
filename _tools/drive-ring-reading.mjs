@@ -17,7 +17,7 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -69,7 +69,7 @@ try {
     await drive.ready()
     await drive.resize(1280, 800)
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 700))
     })()`)
     return drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'haiku', row: '/haiku/i' }))

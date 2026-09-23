@@ -26,7 +26,7 @@
 import { readdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const ROUNDS = 8
 const TEAM = [
@@ -72,7 +72,7 @@ const reading = `(() => {
 
 /** Address a teammate by name, then send and wait. */
 const turn = (who, text) => `(async () => {
-  const chip = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ' + ${JSON.stringify(who)}))
+  const chip = ${teammateFace(who)}
   if (!chip) return 'no teammate chip for ' + ${JSON.stringify(who)}
   chip.click()
   await new Promise(r => setTimeout(r, 700))
@@ -113,7 +113,7 @@ try {
     // Each teammate gets the free route, chosen once through their own picker.
     for (const member of TEAM) {
       await drive.evaluate(`(async () => {
-        [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ' + ${JSON.stringify(member.name)}))?.click()
+        ${teammateFace(member.name)}?.click()
         await new Promise(r => setTimeout(r, 600))
       })()`)
       await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))

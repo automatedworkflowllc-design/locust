@@ -15,7 +15,7 @@
 // the third is Cursor's composer-2.5, which is what the house rules say to use
 // where the model does not matter.
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-routines-ws-')
 
@@ -47,7 +47,7 @@ const drive = await startDrive({
 /** One conversation for a teammate, on its own route. */
 const converse = async (member) => {
   await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${member.name}'))?.click()
+    ${teammateFace(member.name)}?.click()
     await new Promise(r => setTimeout(r, 700))
   })()`)
   await drive.evaluate(pickRouteScript({ group: member.group, search: member.search, row: member.row }))
@@ -59,8 +59,8 @@ const converse = async (member) => {
 
 /** Right-click that teammate's conversation and save it as a routine. */
 const saveRoutine = (member) => drive.evaluate(`(async () => {
-  const card = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + ${JSON.stringify(member.name)}).test(r.innerText.trim()))
-  const row = card?.querySelector('.lc-teammate__mission')
+  const card = ${teammateRows()}.find(r => new RegExp('^' + ${JSON.stringify(member.name)}).test(r.innerText.trim()))
+  const row = card?.conversation
   if (!row) return 'no conversation to save'
   const box = row.getBoundingClientRect()
   row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: Math.round(box.left + 20), clientY: Math.round(box.top + 8) }))

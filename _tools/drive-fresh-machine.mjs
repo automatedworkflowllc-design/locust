@@ -24,7 +24,7 @@ import { mkdtemp, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-fresh-ws-')
 // Somewhere with no CLI in it, standing in for a machine that has none.
@@ -138,7 +138,7 @@ try {
     // the drive standing in the wrong room.
     // The Missions LIST has no composer either -- it is a list. The composer
     // lives where a person writes to a teammate.
-    ;[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+    ;${teammateFace('Wren')}?.click()
     await new Promise(r => setTimeout(r, 1200))
     const field = document.querySelector('form.command-dock textarea')
     const placeholder = field?.getAttribute('placeholder') ?? 'no composer'

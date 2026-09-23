@@ -17,7 +17,7 @@
 // unfalsifiable pass. Asking for the LIVE class keeps the same question and
 // makes a wrong answer possible again.
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-composer-ws-')
 
@@ -36,7 +36,7 @@ const drive = await startDrive({
 try {
   await drive.capture('the controls row, counted', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
     return drive.evaluate(`(() => {
       const row = document.querySelector('.lc-composer__controls')
       const controls = [...(row?.querySelectorAll('button') ?? [])]

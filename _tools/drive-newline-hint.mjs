@@ -12,7 +12,7 @@
 //
 // Spends nothing.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-hint-ws-')
 const drive = await startDrive({
@@ -38,7 +38,7 @@ try {
   await drive.capture('at rest, with an empty box', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
+      const open = ${teammateFace('Wren')}
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 1000))
     })()`)

@@ -18,7 +18,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import './scratch-root.mjs'
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const WIDTH = 1120
 const HEIGHT = 720
@@ -93,7 +93,7 @@ try {
     // flyout says the same facts), and a title-only selector silently clicked
     // nothing -- so the mission below was sent with nobody selected and the
     // flyout, correctly, listed no conversations for Wren (2026-09-08).
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') ?? b.getAttribute('aria-label') ?? '').startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
     await drive.evaluate(sendAndWaitScript('Reply with exactly one word: ready. Use no tools.', { waitSeconds: 240 }))
     return drive.evaluate(`(() => {

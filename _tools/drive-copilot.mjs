@@ -7,7 +7,7 @@
 // thread, the fold, the header. Spends one premium request on Colin's
 // Copilot plan.
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-copilot-ws-')
 const drive = await startDrive({
@@ -25,7 +25,7 @@ const drive = await startDrive({
 try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('Wren: choose Copilot CLI / Auto', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     return drive.evaluate(pickRouteScript({ group: '/copilot/i', search: 'auto', row: '/auto/i' }))
   })
   await drive.capture('read-only mode', () => drive.evaluate(`(async () => {

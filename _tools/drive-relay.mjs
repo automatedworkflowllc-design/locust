@@ -12,7 +12,7 @@
 // click path in this drive already uses. Counting the dead one made
 // "underlined links: 0" true by construction.
 
-import { FREE_ROUTE, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const CODE = 'TANGERINE'
 const workspace = await scratchRepository('locust-drive-relay-ws-')
@@ -40,7 +40,7 @@ try {
     // what the relay said even when the screen shows nothing.
     window.__updates = []
     window.desktop.onCodexMissionUpdate(u => { if (u.kind !== 'event') window.__updates.push({ kind: u.kind, message: u.message, teammateId: u.teammateId, startedBy: u.startedBy, phase: u.phase }) })
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+    const who = ${teammateFace('Wren')}
     who.click()
     await new Promise(r => setTimeout(r, 500))
     const field = document.querySelector('form.command-dock textarea')
@@ -73,14 +73,14 @@ try {
   await drive.capture("Booty's run starts on its own", () => drive.evaluate(`(async () => {
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const booty = [...document.querySelectorAll('.lc-teammate')].find(r => (r.querySelector('.lc-teammate__name, .lc-row__name')?.textContent ?? r.innerText.split('\\n')[0]).trim() === 'Booty')
-      if (booty && (/working|running|starting|replying/i.test(booty.innerText) || booty.querySelector('.lc-teammate__mission'))) return 'Booty: ' + booty.innerText.replace(/\\s+/g, ' ').slice(0, 160)
+      const booty = ${teammateRows()}.find(r => (r.querySelector('.lc-teammate__name, .lc-row__name')?.textContent ?? r.innerText.split('\\n')[0]).trim() === 'Booty')
+      if (booty && (/working|running|starting|replying/i.test(booty.innerText) || booty.conversation)) return 'Booty: ' + booty.innerText.replace(/\\s+/g, ' ').slice(0, 160)
     }
     return 'Booty never showed a run in two minutes: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
   })()`))
   await drive.capture("open Booty's conversation while it runs", () => drive.evaluate(`(async () => {
-    const row = [...document.querySelectorAll('.lc-teammate')].find(r => /Booty/.test(r.innerText))
-    const conversation = row && row.querySelector('.lc-teammate__mission')
+    const row = ${teammateRows()}.find(r => /Booty/.test(r.innerText))
+    const conversation = row && row.conversation
     if (conversation) conversation.click()
     await new Promise(r => setTimeout(r, 800))
     return (document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? 'no header') + ' || ' + (document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? '')
@@ -90,13 +90,13 @@ try {
       await new Promise(r => setTimeout(r, 500))
       // "listening" is Wren waiting for the reply-back turn, "thinking" is a run
       // between tool calls: both are the exchange still going.
-      if (i > 20 && !document.querySelector('button[aria-label^="Stop the running"]') && ![...document.querySelectorAll('.lc-teammate')].some(r => /working|running|starting|replying|listening|thinking|waiting/i.test(r.innerText))) return 'settled: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
+      if (i > 20 && !document.querySelector('button[aria-label^="Stop the running"]') && !${teammateRows()}.some(r => /working|running|starting|replying|listening|thinking|waiting/i.test(r.innerText))) return 'settled: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 200)
     }
     return 'still going'
   })()`))
   await drive.capture("Wren's thread: what Wren sent, and Booty's answer", () => drive.evaluate(`(async () => {
-    const row = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
-    const conversation = row && row.querySelector('.lc-teammate__mission')
+    const row = ${teammateRows()}.find(r => /Wren/.test(r.innerText))
+    const conversation = row && row.conversation
     if (conversation) conversation.click()
     await new Promise(r => setTimeout(r, 900))
     for (const toggle of document.querySelectorAll('.lc-peer:not(.is-open) .lc-peer__toggle')) toggle.click()
@@ -124,7 +124,9 @@ try {
     // The three surfaces that disagreed after this click: the header, the
     // composer's placeholder, and which teammate card is lit (0.35.0 QA).
     const placeholder = document.querySelector('form.command-dock textarea')?.getAttribute('placeholder') ?? 'no composer'
-    const lit = [...document.querySelectorAll('.lc-teammate')].find(r => r.querySelector('[aria-current="true"]'))
+    // A face says it is the one shown with aria-pressed (Sidebar.tsx); the
+    // compact rows said it with an aria-current inside them.
+    const lit = ${teammateRows()}.find(r => r.face.getAttribute('aria-pressed') === 'true')
     const litName = lit ? lit.innerText.replace(/\\s+/g, ' ').trim().split(' ')[0] : 'none'
     // The three that disagreed lead, because the record's table truncates.
     return 'composer: ' + placeholder + ' || teammate lit: ' + litName + ' || header: ' + header

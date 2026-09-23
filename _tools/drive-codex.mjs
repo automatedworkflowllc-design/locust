@@ -9,7 +9,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-codex-ws-')
 const drive = await startDrive({
@@ -39,7 +39,7 @@ const fold = `(async () => {
 try {
   await drive.capture('launch: Wren on Codex CLI, Accept edits', () => drive.ready())
   await drive.capture('turn 1: create NOTES.md', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     return drive.evaluate(sendAndWaitScript('Create a file named NOTES.md containing exactly two lines: "# Notes" and "First entry." Do not run shell commands. Reply with the single word DONE when it exists.'))
   })
   await drive.capture('the fold after turn 1', () => drive.evaluate(fold))

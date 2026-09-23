@@ -14,7 +14,7 @@
 //
 // Runs no model and spends nothing: it only opens and closes menus.
 
-import { FREE_ROUTE, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-probe-menus-ws-')
 const drive = await startDrive({
@@ -79,7 +79,7 @@ try {
   await drive.capture('launch and open Wren', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+      const open = ${teammateFace('Wren')}
       if (open) open.click()
       await new Promise(r => setTimeout(r, 600))
       return 'opened'

@@ -7,7 +7,7 @@
 // waiting; Settings and Memory must count it; Keep on the Memory screen
 // makes it kept; Wren then quotes it.
 
-import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-askmem-ws-')
 const T0 = '2026-09-05T05:00:00.000Z'
@@ -25,7 +25,7 @@ const drive = await startDrive({
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'ask' }
   }
 })
-const pick = (name) => `(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
+const pick = (name) => `(async () => { ${teammateFace(name)}.click(); await new Promise(r => setTimeout(r, 500)); return 'picked ${name}' })()`
 
 try {
   await drive.capture('launch, mode Ask me first', () => drive.ready())

@@ -26,7 +26,7 @@ describe('recovery where a person looks for routines', () => {
       routineStepByTeammate={{}} onRunRoutine={nothing} onEditRoutine={nothing} onRemoveRoutine={nothing}
       notice={undefined} onDismissNotice={nothing}  />)
     const team = renderToStaticMarkup(<TeammatesScreen teammates={[teammate]} missions={[]} missionOwners={{}} viewByTeammate={{}}
-      titleOf={() => ''} onOpenMission={nothing} onNewTeammate={nothing} onEdit={nothing} onRemove={nothing}
+      titleOf={() => ''} onOpenMission={nothing} onNewTeammate={nothing} onEdit={nothing} onRemove={nothing} onMessage={nothing}
       routines={[persisted]} routineStepByTeammate={{}} onRunRoutine={nothing} onEditRoutine={nothing} onRemoveRoutine={nothing} />)
     for (const html of [automations, team]) {
       expect(html).toContain('Waiting for your review')

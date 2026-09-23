@@ -14,7 +14,7 @@
 //
 // Spends nothing -- it opens the picker and types.
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-search-ws-')
 const drive = await startDrive({
@@ -68,7 +68,7 @@ const searchReport = (needle) => `(async () => {
 })()`
 
 const OPEN_PICKER = `(async () => {
-  const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
+  const open = ${teammateFace('Wren')}
   if (open) open.click()
   await new Promise((r) => setTimeout(r, 900))
   const control = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')

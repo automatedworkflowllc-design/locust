@@ -17,7 +17,7 @@
 // SPENDS two Claude Code turns on sonnet at low effort. get_watchlists reads;
 // Sable's call is DENIED at the card, so it never runs at all.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends two Claude Code turns. Set LOCUST_SPEND=1 to allow it.')
@@ -50,7 +50,7 @@ const PROMPT = 'Call the Robinhood connector tool get_watchlists once and reply 
 
 /** Pick a teammate, send the prompt, and watch for either a card or the end. */
 const askAs = (name) => `(async () => {
-  [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}'))?.click()
+  ${teammateFace(name)}?.click()
   await new Promise(r => setTimeout(r, 700))
   const field = document.querySelector('form.command-dock textarea')
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set

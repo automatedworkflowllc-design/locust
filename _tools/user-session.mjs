@@ -14,6 +14,7 @@ import { spawn, execFile } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { teammateFace } from './drive-lib.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
@@ -152,7 +153,7 @@ try {
   })()`))
 
   await capture('pick Nova and choose the free OpenCode route', () => evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Nova'))
+    const who = ${teammateFace('Nova')}
     if (!who) return 'no Nova row'
     who.click()
     await new Promise(r => setTimeout(r, 400))

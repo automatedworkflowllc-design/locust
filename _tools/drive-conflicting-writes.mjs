@@ -22,7 +22,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const TARGET = 'ledger.txt'
 /** One word each, so a lost line is identifiable rather than merely a count. */
@@ -59,7 +59,7 @@ const drive = await startDrive({
 
 const startFor = async ({ name, word }) => {
   await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click()
+    ${teammateFace(name)}.click()
     await new Promise(r => setTimeout(r, 350))
   })()`)
   await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
@@ -78,7 +78,7 @@ const startFor = async ({ name, word }) => {
 
 try {
   await drive.ready()
-  const rostered = Number(await drive.evaluate(`document.querySelectorAll('.lc-teammate').length`))
+  const rostered = Number(await drive.evaluate(`document.querySelectorAll('.lc-faces__one').length`))
   if (rostered !== TEAM.length) {
     throw new Error(`roster holds ${String(rostered)} teammates, not ${String(TEAM.length)} -- a seeded record did not parse`)
   }
@@ -93,7 +93,7 @@ try {
     let peak = 0
     for (let i = 0; i < 300; i += 1) {
       await new Promise(r => setTimeout(r, 400))
-      const rows = [...document.querySelectorAll('.lc-teammate')]
+      const rows = ${teammateRows()}
       const working = rows.filter(r => !/idle/.test(r.innerText)).length
       if (working > peak) peak = working
       if (peak > 0 && working === 0) break
@@ -104,7 +104,7 @@ try {
   await drive.capture('all settled', () => drive.evaluate(`(async () => {
     for (let i = 0; i < 360; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const rows = [...document.querySelectorAll('.lc-teammate')].map(r => r.innerText)
+      const rows = ${teammateRows()}.map(r => r.innerText)
       if (rows.every(r => /idle|done/.test(r))) return 'all settled after ' + String(i / 2) + 's'
     }
     return 'STILL GOING'
@@ -115,8 +115,8 @@ try {
     const team = ${JSON.stringify(TEAM.map(({ name, word }) => ({ name, word })))}
     const out = []
     for (const member of team) {
-      const row = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + member.name).test(r.innerText.trim()))
-      row?.querySelector('.lc-teammate__mission')?.click()
+      const row = ${teammateRows()}.find(r => new RegExp('^' + member.name).test(r.innerText.trim()))
+      row?.conversation?.click()
       await new Promise(r => setTimeout(r, 1100))
       const fold = document.querySelector('.lc-activity')
       const trace = fold ? fold.innerText.split(String.fromCharCode(10)).map(t => t.trim()).filter(Boolean).join(' ') : 'no fold'

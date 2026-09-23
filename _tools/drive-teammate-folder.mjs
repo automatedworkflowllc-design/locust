@@ -23,7 +23,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends a Claude Code turn. Set LOCUST_SPEND=1 to allow it.')
@@ -64,7 +64,7 @@ try {
   await drive.capture('launch, with the project folder unchanged', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 700))
       return 'mode: ' + ([...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Permission mode')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'none')
     })()`)
@@ -99,7 +99,7 @@ try {
     : `  DID NOT: the token is absent, so the run did not stand in ${elsewhere}`)
 
   await drive.capture('and the dialog says which folder it is', () => drive.evaluate(`(async () => {
-    const rail = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+    const rail = ${teammateFace('Wren')}
     if (!rail) return 'no rail button'
     const event = new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 200 })
     rail.dispatchEvent(event)

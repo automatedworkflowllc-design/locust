@@ -16,7 +16,7 @@
 //
 // SPENDS two short Claude Code turns on sonnet at low effort.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends two Claude Code turns. Set LOCUST_SPEND=1 to allow it.')
@@ -67,7 +67,7 @@ const waitDone = `(async () => {
 try {
   await drive.capture('send turn one and read the header and sidebar WHILE it starts and works', async () => {
     await drive.ready()
-    await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()`)
+    await drive.evaluate(`${teammateFace('Wren')}?.click()`)
     await new Promise((r) => setTimeout(r, 700))
     await drive.evaluate(send('In two short paragraphs, say what a cache is.'))
     return drive.evaluate(`(async () => {

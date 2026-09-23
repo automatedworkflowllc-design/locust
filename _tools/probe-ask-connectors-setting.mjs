@@ -11,7 +11,7 @@
 //
 // SPENDS one Claude Code turn on sonnet at low effort. `get_watchlists` reads.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends a Claude Code turn. Set LOCUST_SPEND=1 to allow it.')
@@ -81,7 +81,7 @@ try {
     await drive.evaluate(`[...document.querySelectorAll('button, a')].find(n => /^missions$/i.test((n.innerText ?? '').trim()))?.click()`)
     await new Promise((r) => setTimeout(r, 600))
     return drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 700))
       const field = document.querySelector('form.command-dock textarea')
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set

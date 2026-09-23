@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { writeFile } from 'node:fs/promises'
+import { teammateFace } from './drive-lib.mjs'
 
 process.env.LOCUST_SCRATCH = join(homedir(), 'Documents', 'locust-route-start-scratch-20260910')
 const { scratchRepository, startDrive, FREE_ROUTE } = await import('./drive-lib.mjs')
@@ -46,7 +47,7 @@ try {
     }
     let teammate
     for (let i = 0; i < 600; i++) {
-      teammate = [...document.querySelectorAll('button')].find(b => b.title.startsWith('Message Wren'))
+      teammate = ${teammateFace('Wren')}
       if (teammate && document.querySelector('form.command-dock textarea')) break
       await sleep(25)
     }

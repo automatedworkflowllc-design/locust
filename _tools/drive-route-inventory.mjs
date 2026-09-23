@@ -14,7 +14,7 @@
 //
 // Spends nothing -- it opens the picker and reads it.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const flat = (text) => text.split(/\s+/).join(' ').trim()
 
@@ -72,7 +72,7 @@ try {
   await drive.capture('the route a new user starts on, and every route offered', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
+      const open = ${teammateFace('Wren')}
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 900))
     })()`)

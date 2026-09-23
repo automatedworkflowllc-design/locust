@@ -18,7 +18,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-recovery-ws-')
 const seed = {
@@ -50,7 +50,7 @@ const automations = `(async () => {
 try {
   await drive.capture('launch and teach a two-step routine', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     return drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
   })
 

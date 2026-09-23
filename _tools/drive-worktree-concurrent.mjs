@@ -24,7 +24,7 @@
 import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const WORDS = { Wren: 'ALMANAC', Booty: 'BRAMBLE', Gem: 'CINDER' }
 const workspace = await scratchRepository('locust-drive-worktree-ws-')
@@ -56,7 +56,7 @@ const drive = await startDrive({
 
 const startFor = async (name) => {
   await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click()
+    ${teammateFace(name)}.click()
     await new Promise(r => setTimeout(r, 350))
   })()`)
   await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
@@ -74,8 +74,8 @@ const startFor = async (name) => {
 
 /** The fold line and any host notice, for one teammate. */
 const receiptFor = (name) => drive.evaluate(`(async () => {
-  const row = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + ${JSON.stringify(name)}).test(r.innerText.trim()))
-  row?.querySelector('.lc-teammate__mission')?.click()
+  const row = ${teammateRows()}.find(r => new RegExp('^' + ${JSON.stringify(name)}).test(r.innerText.trim()))
+  row?.conversation?.click()
   await new Promise(r => setTimeout(r, 1200))
   const thread = document.querySelector('.lc-thread')?.innerText ?? ''
   const shared = /cannot be told apart/.test(thread) ? 'SAYS SHARED' : 'no shared notice'
@@ -88,7 +88,7 @@ const receiptFor = (name) => drive.evaluate(`(async () => {
 
 try {
   await drive.ready()
-  const rostered = await drive.evaluate(`document.querySelectorAll('.lc-teammate').length`)
+  const rostered = await drive.evaluate(`document.querySelectorAll('.lc-faces__one').length`)
   if (Number(rostered) !== 3) throw new Error(`roster holds ${String(rostered)} teammates, not 3`)
 
   await drive.capture('three teammates, each on its own branch', () => `roster: ${String(rostered)} teammates, all with worktree: true`)
@@ -103,7 +103,7 @@ try {
     let peak = 0
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 400))
-      const working = [...document.querySelectorAll('.lc-teammate')].filter(r => !/idle/.test(r.innerText)).length
+      const working = ${teammateRows()}.filter(r => !/idle/.test(r.innerText)).length
       if (working > peak) peak = working
       if (peak > 0 && working === 0) break
     }

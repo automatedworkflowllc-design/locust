@@ -27,7 +27,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends a Codex turn. Set LOCUST_SPEND=1 to allow it.')
@@ -105,7 +105,7 @@ const waitForTheAsk = `(async () => {
 
 // Step two: the click a person makes after reading that line.
 const openTheTeammate = `(async () => {
-  const card = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+  const card = ${teammateFace('Wren')}
   if (card === undefined) return JSON.stringify({ cardAfterClicking: false, says: 'no Wren to click' }, null, 1)
   card.click()
   await new Promise(r => setTimeout(r, 1200))

@@ -15,6 +15,7 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { teammateFace } from './drive-lib.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
@@ -186,7 +187,7 @@ try {
 
   // Select the teammate so the mission is composed as theirs.
   const chosen = await evaluate(`(async () => {
-    const button = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+    const button = ${teammateFace('Wren')}
     if (!button) return 'no teammate button'
     button.click()
     await new Promise(r => setTimeout(r, 500))

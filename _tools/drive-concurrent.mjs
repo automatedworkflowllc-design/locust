@@ -14,7 +14,7 @@
 // wrong thread is visible rather than plausible. Three short runs on the free
 // OpenCode model, so the whole thing costs nothing.
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const WORDS = { Wren: 'ALMANAC', Booty: 'BRAMBLE', Gem: 'CINDER' }
 const workspace = await scratchRepository('locust-drive-concurrent-ws-')
@@ -38,7 +38,7 @@ const drive = await startDrive({
 /** Open a teammate, put it on the free model, and send without waiting. */
 const startFor = async (name) => {
   await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click()
+    ${teammateFace(name)}.click()
     await new Promise(r => setTimeout(r, 350))
   })()`)
   await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
@@ -63,7 +63,7 @@ try {
   // defect. Check the premise BEFORE measuring, and outside a capture -- a
   // step that throws is recorded and the drive carries on regardless.
   await drive.ready()
-  const rostered = await drive.evaluate(`document.querySelectorAll('.lc-teammate').length`)
+  const rostered = await drive.evaluate(`document.querySelectorAll('.lc-faces__one').length`)
   if (Number(rostered) !== 3) {
     throw new Error(`roster holds ${String(rostered)} teammates, not 3 -- a seeded record did not parse`)
   }
@@ -82,10 +82,10 @@ try {
     let peakLine = ''
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 400))
-      const rows = [...document.querySelectorAll('.lc-teammate')].map(r => r.innerText.split(String.fromCharCode(10)).slice(0, 2).join(' '))
+      const rows = ${teammateRows()}.map(r => r.innerText.split(String.fromCharCode(10)).slice(0, 2).join(' '))
       const line = rows.join(' | ')
       if (seen[seen.length - 1] !== line) seen.push(line)
-      const working = [...document.querySelectorAll('.lc-teammate')].filter(r => !/idle/.test(r.innerText)).length
+      const working = ${teammateRows()}.filter(r => !/idle/.test(r.innerText)).length
       if (working > peak) { peak = working; peakLine = line }
       // Nothing more to see once they have all settled.
       if (peak > 0 && working === 0) break
@@ -96,7 +96,7 @@ try {
   await drive.capture('wait for all three to settle', () => drive.evaluate(`(async () => {
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const rows = [...document.querySelectorAll('.lc-teammate')].map(r => r.innerText)
+      const rows = ${teammateRows()}.map(r => r.innerText)
       if (rows.every(r => /idle|done/.test(r))) return 'all settled after ' + String(i / 2) + 's'
     }
     return 'still going'
@@ -106,8 +106,8 @@ try {
     const want = ${JSON.stringify(WORDS)}
     const found = {}
     for (const name of Object.keys(want)) {
-      const row = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + name).test(r.innerText.trim()))
-      row?.querySelector('.lc-teammate__mission')?.click()
+      const row = ${teammateRows()}.find(r => new RegExp('^' + name).test(r.innerText.trim()))
+      row?.conversation?.click()
       await new Promise(r => setTimeout(r, 1100))
       const thread = document.querySelector('.lc-thread')?.innerText ?? ''
       const header = document.querySelector('.lc-workroom__header')?.innerText.replace(/[ \\t\\n]+/g, ' ').slice(0, 40) ?? ''

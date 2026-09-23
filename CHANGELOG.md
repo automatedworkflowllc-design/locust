@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.286.0 - 2026-09-23
+
+### Fixed
+
+- **Message anyone on your team.** With six or more teammates the sidebar
+  shows four faces and a count, and the Team screen that count opens had no
+  way to start a conversation with the others. Every card on the Team screen
+  now has a Message button.
+
 ## 0.285.0 - 2026-09-23
 
 ### Fixed

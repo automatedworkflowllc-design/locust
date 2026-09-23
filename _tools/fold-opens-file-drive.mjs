@@ -18,7 +18,7 @@
 // `waitForSelector` landed in `drive-lib.mjs` alongside this file; a wait here
 // that times out names what it was waiting for and what the screen last said.
 
-import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-foldfile-ws-')
 const T0 = '2026-09-20T05:00:00.000Z'
@@ -48,7 +48,7 @@ try {
   await drive.capture('launch', () => drive.ready())
 
   await drive.capture('ask for a file to be written', async () => {
-    await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Yurt'))?.click()`)
+    await drive.evaluate(`${teammateFace('Yurt')}?.click()`)
     /*
      * PICK THE ROUTE. A teammate's seeded route is not the composer's route
      * on a new conversation -- the first run of this drive learned that the

@@ -19,7 +19,7 @@
 // Free model throughout: this is about which teammate a row sits under, and
 // that costs nothing to look at.
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-assign-ws-')
 let handoff
@@ -41,9 +41,9 @@ let drive = await startDrive({
 /** How many conversation rows sit under each teammate right now. */
 const rowsUnder = `(() => {
   const out = {}
-  for (const card of document.querySelectorAll('.lc-teammate')) {
-    const name = (card.querySelector('.lc-row__name')?.innerText ?? '?').trim()
-    out[name] = card.querySelectorAll('.lc-teammate__mission').length
+  for (const card of ${teammateRows()}) {
+    const name = (card.name ?? '?').trim()
+    out[name] = card.conversations.length
   }
   return JSON.stringify(out)
 })()`
@@ -52,7 +52,7 @@ try {
   await drive.capture('launch', () => drive.ready())
 
   await drive.capture('Wren runs a TWO-turn conversation on the free model', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
     await drive.evaluate(sendAndWaitScript('Reply with exactly one word: one.', { waitSeconds: 240 }))
     // The second turn is what makes this a CONVERSATION rather than a mission,
@@ -62,7 +62,7 @@ try {
   })
 
   await drive.capture('right-click that conversation under Wren', () => drive.evaluate(`(async () => {
-    const row = document.querySelector('.lc-teammate__mission')
+    const row = document.querySelector('.lc-conv, .lc-teammate__mission')
     if (!row) return 'no conversation under any teammate'
     const box = row.getBoundingClientRect()
     row.dispatchEvent(new MouseEvent('contextmenu', {
@@ -76,14 +76,14 @@ try {
   })()`))
 
   await drive.capture('press Assign to Gem, and see whether it actually moves', () => drive.evaluate(`(async () => {
-    const before = document.querySelectorAll('.lc-teammate')[0]?.querySelectorAll('.lc-teammate__mission').length ?? -1
+    const before = ${teammateRows()}[0]?.conversations.length ?? -1
     const assign = [...document.querySelectorAll('.lc-context__item')].find(b => /^Assign to Gem/.test(b.innerText.trim()))
     if (assign === undefined) return 'NO ASSIGN-TO-GEM ITEM'
     if (assign.disabled) return 'ASSIGN IS DISABLED: ' + (assign.title || 'no reason given')
     assign.click()
     await new Promise(r => setTimeout(r, 2000))
-    const cards = [...document.querySelectorAll('.lc-teammate')]
-    const counts = cards.map(c => (c.querySelector('.lc-row__name')?.innerText ?? '?').trim() + '=' + c.querySelectorAll('.lc-teammate__mission').length)
+    const cards = ${teammateRows()}
+    const counts = cards.map(c => (c.name ?? '?').trim() + '=' + c.conversations.length)
     const notice = document.querySelector('.lc-sidebar__error, .lc-notice, .lc-toast')
     return 'Wren had ' + before + ' || after: ' + counts.join(', ')
       + (notice ? ' || notice on screen: ' + notice.innerText.trim().slice(0, 120) : ' || no notice anywhere')
@@ -118,7 +118,7 @@ try {
   })
 
   await drive.capture('right-click it and assign it BACK to Wren', () => drive.evaluate(`(async () => {
-    const row = document.querySelector('.lc-teammate__mission') ?? document.querySelector('.lc-row--mission')
+    const row = document.querySelector('.lc-conv, .lc-teammate__mission') ?? document.querySelector('.lc-row--mission')
     if (!row) return 'no conversation row anywhere after the restart'
     const box = row.getBoundingClientRect()
     row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: Math.round(box.left + 20), clientY: Math.round(box.top + 10) }))
@@ -130,8 +130,8 @@ try {
     if (assign.disabled) return 'ASSIGN IS DISABLED: ' + (assign.title || 'no reason given')
     assign.click()
     await new Promise(r => setTimeout(r, 2000))
-    const counts = [...document.querySelectorAll('.lc-teammate')]
-      .map(c => (c.querySelector('.lc-row__name')?.innerText ?? '?').trim() + '=' + c.querySelectorAll('.lc-teammate__mission').length)
+    const counts = ${teammateRows()}
+      .map(c => (c.name ?? '?').trim() + '=' + c.conversations.length)
     return 'after pressing Assign to Wren: ' + counts.join(', ')
   })()`))
 } catch (error) {

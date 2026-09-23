@@ -28,7 +28,7 @@ import { readFile, writeFile, mkdtemp, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const seed = {
   schemaVersion: 1,
@@ -65,7 +65,7 @@ try {
   })
 
   await drive.capture('send a message to a teammate whose receipts cannot be written', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
     return drive.evaluate(`(async () => {
       const box = document.querySelector('textarea[aria-label="Mission instruction"]')

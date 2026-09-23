@@ -23,7 +23,7 @@
 // unfalsifiable pass. Asking for the LIVE class keeps the same question and
 // makes a wrong answer possible again.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-composer-ws-')
 const drive = await startDrive({
@@ -47,7 +47,7 @@ const drive = await startDrive({
 })
 
 const OPEN_WORKROOM = `(async () => {
-  const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
+  const open = ${teammateFace('Wren')}
   if (open) open.click()
   await new Promise((r) => setTimeout(r, 1200))
   const dock = document.querySelector('form.command-dock')

@@ -23,7 +23,7 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const PASTED = 'Replace notes.md so the file contains exactly two lines:\nlocust-was-here\nsecond-line-ok'
 
@@ -46,7 +46,7 @@ try {
   await drive.capture('a three-line prompt, pasted', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
+      const open = ${teammateFace('Wren')}
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 1000))
       const field = document.querySelector('form.command-dock textarea')

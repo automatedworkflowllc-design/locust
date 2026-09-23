@@ -18,7 +18,8 @@
 import './scratch-root.mjs'
 
 import { spawn, execFile } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { readFileSync, rmSync } from 'node:fs'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -31,6 +32,57 @@ export const say = (line) => console.error(line)
 export const git = (args, cwd) => new Promise((resolve, reject) => {
   execFile('git', args, { cwd, windowsHide: true }, (error, stdout) => (error ? reject(error) : resolve(stdout)))
 })
+
+/**
+ * DRIVES TAKE TURNS TO START.
+ *
+ * Four drives started together on this machine each launched an app that
+ * probed seven runtimes at once -- some eighty CLI spawns -- and the probes
+ * ran past their ten-second limit: two of four apps came up with five
+ * runtimes of seven, and none could be put on the free route in two and a
+ * half minutes, where one alone gets there in eight seconds (Yurt's beta
+ * report and a measurement of it, 2026-09-23). Retrying the pick did not help;
+ * the renderers were starved.
+ *
+ * So the launch, up to the end of `ready()`, holds a machine-wide turn: a
+ * directory made atomically in the temp folder. The runs themselves still go
+ * side by side -- only the start is one at a time. A turn older than three
+ * minutes belongs to a drive that died holding it, and is taken over.
+ */
+const LAUNCH_TURN = join(tmpdir(), 'locust-drive-launch-turn')
+
+async function takeLaunchTurn(name) {
+  let waited = false
+  for (;;) {
+    try {
+      await mkdir(LAUNCH_TURN)
+      await writeFile(join(LAUNCH_TURN, 'holder'), `${String(process.pid)} ${name}`, 'utf8')
+      if (waited) say(`${name}: my turn to start`)
+      // A drive that dies or exits before giving the turn back must not
+      // leave the others waiting out the three minutes.
+      process.once('exit', () => {
+        try {
+          if (readFileSync(join(LAUNCH_TURN, 'holder'), 'utf8').startsWith(`${String(process.pid)} `)) rmSync(LAUNCH_TURN, { recursive: true, force: true })
+        } catch { /* already given back */ }
+      })
+      return
+    } catch {
+      const held = await stat(LAUNCH_TURN).catch(() => undefined)
+      if (held !== undefined && Date.now() - held.mtimeMs > 180_000) {
+        await rm(LAUNCH_TURN, { recursive: true, force: true })
+        continue
+      }
+      if (!waited) say(`${name}: another drive is starting; waiting for my turn`)
+      waited = true
+      await sleep(1000)
+    }
+  }
+}
+
+async function giveBackLaunchTurn() {
+  const holder = await readFile(join(LAUNCH_TURN, 'holder'), 'utf8').catch(() => '')
+  if (holder.startsWith(`${String(process.pid)} `)) await rm(LAUNCH_TURN, { recursive: true, force: true })
+}
 
 /**
  * A scratch git repository with a README and a LOCUST.md, committed.
@@ -160,6 +212,8 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   const appEnv = { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}`, ...env }
   if (process.env.LOCUST_SPEND === '1') delete appEnv.LOCUST_FREE_ONLY
   else appEnv.LOCUST_FREE_ONLY = '1'
+  // Held until `ready()` returns (or `finish`, for a drive that never asks).
+  await takeLaunchTurn(name)
   const child = spawn(launch[0], [...launch[1], `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`], {
     cwd: workspace,
     env: appEnv,
@@ -174,13 +228,20 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   let page
   for (let i = 0; i < 80 && page === undefined; i += 1) {
     await sleep(500)
-    if (child.exitCode !== null) throw new Error(`app exited ${String(child.exitCode)}\n${appOutput.join('').slice(-800)}`)
+    if (child.exitCode !== null) {
+      await giveBackLaunchTurn()
+      throw new Error(`app exited ${String(child.exitCode)}\n${appOutput.join('').slice(-800)}`)
+    }
     try {
       const list = await (await fetch(`http://127.0.0.1:${String(port)}/json/list`)).json()
       page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl && !t.url.includes('#splash'))
     } catch { /* not up */ }
   }
-  if (page === undefined) { try { child.kill() } catch { /* gone */ } throw new Error('renderer never came up') }
+  if (page === undefined) {
+    try { child.kill() } catch { /* gone */ }
+    await giveBackLaunchTurn()
+    throw new Error('renderer never came up')
+  }
   const socket = new WebSocket(page.webSocketDebuggerUrl)
   await new Promise((res, rej) => { socket.addEventListener('open', res, { once: true }); socket.addEventListener('error', rej, { once: true }) })
   let id = 0
@@ -387,8 +448,21 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
       // The app refuses a paid run in any scripted window regardless.
       if (!sendsNothing && route !== '' && !isFree(route)) {
         say(`this drive does not spend, and the composer is on "${String(route)}". Moving it to the free route.`)
-        await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/muse.*1\\.3/i' }))
-        route = await routeText()
+        /*
+         * Retried, because one pick waits 30 seconds for the free row and a
+         * busy machine can take longer to list it: four drives started
+         * together each ran OpenCode's model discovery at once and all four
+         * gave up here, while each passed alone (Yurt's beta report,
+         * 2026-09-23). Up to four picks, five seconds apart.
+         */
+        for (let attempt = 0; attempt < 4 && !isFree(route); attempt += 1) {
+          const said = await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/muse.*1\\.3/i' }))
+          route = await routeText()
+          if (!isFree(route) && attempt < 3) {
+            say(`the free route is not there yet (${String(said).slice(0, 140)}); trying again`)
+            await sleep(5000)
+          }
+        }
         if (!isFree(route)) {
           say(`could not put a non-spending drive on a free route; it is on "${String(route)}".`)
           say('pass spends: true if this drive is meant to spend, or pick a free route before sending.')
@@ -397,11 +471,15 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
       }
       say(`route: ${String(route === '' ? 'no route control on this screen' : route)}`)
     }
+    // Discovered and on its route: the next drive may start.
+    await giveBackLaunchTurn()
     return settled
   }
 
   /** Write SESSION.md with the step table and close the app. */
   const finish = async ({ intro, extra = '', last = true }) => {
+    // A drive that never called `ready()` still gives its turn back.
+    await giveBackLaunchTurn()
     const rows = record.map((r) => `| ${String(r.step)} | ${r.title} | ${String(r.note).replace(/\|/g, '/').replace(/\s+/g, ' ').slice(0, 220)} | ${r.errors.length === 0 ? '0' : `${String(r.errors.length)} — ${String(r.errors[0]).replace(/\|/g, '/').replace(/\s+/g, ' ').slice(0, 120)}`} |`)
     const session = join(out, 'SESSION.md')
     const { readFile } = await import('node:fs/promises')
@@ -500,6 +578,101 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
 }
 
 /**
+ * A teammate's face in the sidebar rail, as a page-script expression: the ONE
+ * way a harness finds a teammate to open.
+ *
+ * 108 drives found the teammate by a button titled "Message <name>". The rail
+ * became faces (2026-09-21, Colin: "we can just make those clickable") and
+ * the face has no title -- its hover card says it -- so every one of those
+ * lookups found nothing, and the ones written `?.click()` went on in an
+ * unassigned conversation without a word (Yurt's beta report, 2026-09-23:
+ * "most drives die on open the teammate"). The face's label is
+ * "<name> — open their conversation" (Sidebar.tsx), and clicking it opens the
+ * teammate's hub, or selects them when they have none yet -- what the old
+ * button did. The next change to the rail is a change here.
+ */
+export function teammateFace(name) {
+  return `[...document.querySelectorAll('.lc-faces__one')].find((face) => (face.getAttribute('aria-label') ?? '').startsWith(${JSON.stringify(`${name} — `)}))`
+}
+
+/**
+ * The team as the sidebar draws it, as a page-script expression: one entry per
+ * face, `{ face, id, name, activity, innerText, conversations, conversation,
+ * click(), querySelector() }`. `conversations` are the sidebar's rows wearing
+ * this teammate's face, newest first; `conversation` is the newest -- what the
+ * compact rows nested as `.lc-teammate__mission`.
+ *
+ * Drives read `.lc-teammate` rows for a teammate's name and state ("Wren ·
+ * working"). Those rows are the COMPACT sidebar's; the ordinary one draws
+ * faces and nothing else, so every such read found no rows -- 57 of them
+ * across 22 harnesses, and drive-routine's "nothing seen to start" while the
+ * routine ran (Yurt's beta report, 2026-09-23). A face's state is its bot's
+ * `data-activity` (TeammateBot.tsx), worded as `faceLabel` words it
+ * (faceState.ts), and `innerText` is "<name>\n<state>" so a read written
+ * against a row still means the same thing.
+ */
+export function teammateRows() {
+  return `[...document.querySelectorAll('.lc-faces__one')].map((face) => {
+    const name = (face.getAttribute('aria-label') ?? '').split(' — ')[0]
+    const id = face.querySelector('[data-teammate]')?.getAttribute('data-teammate') ?? ''
+    const state = face.querySelector('[data-activity]')?.getAttribute('data-activity') ?? 'idle'
+    const activity = ({ thinking: 'thinking', working: 'working', delegating: 'subagent working', responding: 'replying', waiting: 'waiting on you', receiving: 'listening', blocked: 'blocked', done: 'done', idle: 'idle' })[state] ?? state
+    const conversations = [...document.querySelectorAll('.lc-conv')].filter((row) => id !== '' && row.querySelector('[data-teammate]')?.getAttribute('data-teammate') === id)
+    return { face, id, name, activity, innerText: name + String.fromCharCode(10) + activity, conversations, conversation: conversations[0], click: () => face.click(), querySelector: (selector) => face.querySelector(selector) }
+  })`
+}
+
+/**
+ * The conversations in the sidebar, as a page-script expression: one entry per
+ * row, `{ row, title, owner, active, running, click() }`. `owner` is the
+ * teammate id on the row's face (`data-teammate`), or '' for nobody's.
+ *
+ * What the compact sidebar nests under each teammate (`.lc-teammate__mission`),
+ * the ordinary one lists once, each row wearing its owner's face.
+ */
+export function conversationRows() {
+  return `[...document.querySelectorAll('.lc-conv')].map((row) => ({
+    row,
+    title: row.getAttribute('title') ?? '',
+    owner: row.querySelector('[data-teammate]')?.getAttribute('data-teammate') ?? '',
+    active: row.getAttribute('aria-current') === 'true',
+    running: row.querySelector('[data-orb]') !== null,
+    click: () => row.click()
+  }))`
+}
+
+/**
+ * Open a teammate's conversation and wait until the composer is theirs
+ * ("Message <name>…"). Says what went wrong otherwise, rather than carrying on.
+ *
+ * The rail draws every face up to five teammates, and four and a `+N` from
+ * six (Sidebar.tsx, newest first), so past those it goes the way a person
+ * would: the Team screen, and the card's Message button.
+ */
+export function openTeammateScript(name) {
+  return `(async () => {
+    const face = ${teammateFace(name)}
+    if (face) {
+      face.click()
+    } else {
+      // The Team button toggles: from the Team screen it would close it.
+      if (!document.querySelector('.lc-rostergrid')) document.querySelector('.lc-faces__team')?.click()
+      await new Promise((r) => setTimeout(r, 500))
+      const card = [...document.querySelectorAll('.lc-rostercard')].find((one) => one.querySelector('.lc-rostercard__name')?.textContent.trim() === ${JSON.stringify(name)})
+      const message = card?.querySelector('.lc-rostercard__message')
+      if (!message) return 'no face for ' + ${JSON.stringify(name)} + ' in the rail and no card on the Team screen; faces: ' + [...document.querySelectorAll('.lc-faces__one')].map((one) => one.getAttribute('aria-label')).join(' | ')
+      message.click()
+    }
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise((r) => setTimeout(r, 150))
+      const said = document.querySelector('form.command-dock textarea')?.getAttribute('placeholder') ?? ''
+      if (said.startsWith(${JSON.stringify(`Message ${name}`)})) return 'opened ' + ${JSON.stringify(name)}
+    }
+    return 'clicked ' + ${JSON.stringify(name)} + ' but the composer says: ' + (document.querySelector('form.command-dock textarea')?.getAttribute('placeholder') ?? 'no composer')
+  })()`
+}
+
+/**
  * Pick a route from the composer's picker the way a person does: open it,
  * type a search, click the first enabled row under the runtime's group.
  * Returns what the controls read afterwards, or why nothing was picked.
@@ -532,7 +705,11 @@ export function pickRouteScript({ group, search, row }) {
       if (!picker) { control.click(); await new Promise(r => setTimeout(r, 500)); continue }
       notice = picker.querySelector('.lc-picker__notice')?.innerText ?? null
       const box = picker.querySelector('.lc-picker__input')
-      if (box && ${JSON.stringify(search ?? '')}) {
+      // Typed once, then the list is watched. Typed on every attempt, a
+      // renderer too busy to filter within the half second between them was
+      // re-filtered forever and never showed a row (four apps at once,
+      // 2026-09-23).
+      if (box && ${JSON.stringify(search ?? '')} && box.value !== ${JSON.stringify(search ?? '')}) {
         const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
         setInput.call(box, ${JSON.stringify(search ?? '')})
         box.dispatchEvent(new Event('input', { bubbles: true }))

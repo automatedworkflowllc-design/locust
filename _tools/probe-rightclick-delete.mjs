@@ -19,7 +19,7 @@
 //
 // FREE: three short runs on the free OpenCode model, read-only.
 
-import { FREE_ROUTE, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-probe-rcdelete-ws-')
 const drive = await startDrive({
@@ -73,7 +73,7 @@ try {
   await drive.capture('launch and open Wren', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 600))
       return 'opened'
     })()`)

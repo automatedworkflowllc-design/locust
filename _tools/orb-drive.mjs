@@ -15,7 +15,7 @@
 //
 // Live and free: one turn on the free OpenCode model.
 
-import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-orb-ws-')
 const T0 = '2026-09-20T05:00:00.000Z'
@@ -73,7 +73,7 @@ try {
   await drive.capture('launch', () => drive.ready())
 
   await drive.capture('start a turn that reads and then runs a command', async () => {
-    await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()`)
+    await drive.evaluate(`${teammateFace('Wren')}?.click()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/free/i' }))
     check('the turn runs on a free route', /opencode/i.test(String(route)) && /\bfree\b/i.test(String(route)), route)
     await drive.evaluate(WATCH)

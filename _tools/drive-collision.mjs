@@ -26,7 +26,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const MARKS = { Wren: 'WREN-WAS-HERE', Gem: 'GEM-WAS-HERE' }
 const SHARED = 'shared.md'
@@ -54,7 +54,7 @@ const drive = await startDrive({
 /** Open a teammate, put them on the free model, and send without waiting. */
 const startFor = async (name) => {
   await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click()
+    ${teammateFace(name)}.click()
     await new Promise(r => setTimeout(r, 350))
   })()`)
   await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
@@ -72,8 +72,8 @@ const startFor = async (name) => {
 
 /** What one teammate's finished card claims it did. */
 const traceFor = (name) => drive.evaluate(`(async () => {
-  const row = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + ${JSON.stringify(name)}).test(r.innerText.trim()))
-  row?.querySelector('.lc-teammate__mission')?.click()
+  const row = ${teammateRows()}.find(r => new RegExp('^' + ${JSON.stringify(name)}).test(r.innerText.trim()))
+  row?.conversation?.click()
   await new Promise(r => setTimeout(r, 1100))
   const fold = [...document.querySelectorAll('.lc-activity, .lc-fold, .lc-row')]
     .map(n => n.innerText.split(String.fromCharCode(10))[0])
@@ -83,7 +83,7 @@ const traceFor = (name) => drive.evaluate(`(async () => {
 
 try {
   await drive.ready()
-  const rostered = await drive.evaluate(`document.querySelectorAll('.lc-teammate').length`)
+  const rostered = await drive.evaluate(`document.querySelectorAll('.lc-faces__one').length`)
   // A seeded record that does not parse is DROPPED in silence by design, and
   // a drive measuring one teammate while believing it has two is worse than
   // no drive at all.
@@ -100,7 +100,7 @@ try {
   await drive.capture('wait for both to settle', () => drive.evaluate(`(async () => {
     for (let i = 0; i < 300; i += 1) {
       await new Promise(r => setTimeout(r, 400))
-      const rows = [...document.querySelectorAll('.lc-teammate')]
+      const rows = ${teammateRows()}
       if (rows.every(r => /idle/.test(r.innerText))) return 'both settled after ' + String(i * 0.4) + 's'
     }
     return 'still going'

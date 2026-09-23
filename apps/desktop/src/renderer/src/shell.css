@@ -9306,6 +9306,7 @@ textarea {
 /* Icon buttons since 2026-09-22, drawn as the Routines row draws its own:
    the size, border and hover come from .lc-iconbutton, and these only undo
    what the older word-button rules above set. */
+.lc-rostercard__message,
 .lc-rostercard__edit,
 .lc-rostercard__remove {
   width: 26px;
@@ -9315,6 +9316,7 @@ textarea {
   font-size: inherit;
 }
 
+.lc-rostercard__message:hover,
 .lc-rostercard__edit:hover {
   background: var(--lc-hover-surface);
   color: var(--lc-text-secondary);

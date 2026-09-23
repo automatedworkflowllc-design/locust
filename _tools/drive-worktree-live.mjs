@@ -8,7 +8,7 @@
 // Remove takes the tree away and the branch stays; a new message makes the
 // tree again on the same branch.
 
-import { FREE_ROUTE, pickRouteScript, git, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, git, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-wt-ws-')
 const drive = await startDrive({
@@ -50,7 +50,7 @@ try {
     drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/free/i' }))
   )
   await drive.capture('start a slow run in the own branch', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     return drive.evaluate(sendAndWaitScript('Read README.md, then write a numbered list of 40 distinct one-sentence ideas for improving this scratch project, thinking carefully about each. Do not edit any files.', { settle: false }))
   })
   await drive.capture('Settings while it runs: the row reads In use', async () => {
@@ -89,7 +89,7 @@ try {
   drive.record.push({ step: drive.record.length + 1, title: 'git after Remove', note: `branches: ${branches.trim().replace(/\s+/g, ' ')} · worktrees mention tm_wren: ${String(/tm_wren/.test(trees.replace(/\\/g, '/')))}`, errors: [] })
   await drive.capture('message Wren again: the tree comes back', async () => {
     await drive.evaluate(`document.querySelector('.lc-brand__lockup').click()`)
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     return drive.evaluate(sendAndWaitScript('Reply with the single word READY. Do not read or edit any files.'))
   })
   await drive.capture('Settings once more', () => drive.evaluate(settingsRows))

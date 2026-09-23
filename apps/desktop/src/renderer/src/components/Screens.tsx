@@ -468,6 +468,7 @@ export function TeammatesScreen({
   onNewTeammate,
   onEdit,
   onRemove,
+  onMessage,
   routines,
   routineStepByTeammate,
   onRunRoutine,
@@ -487,6 +488,8 @@ export function TeammatesScreen({
   readonly onNewTeammate: () => void
   readonly onEdit: (teammate: PublicTeammate) => void
   readonly onRemove: (teammateId: string) => void
+  /** Their conversation, as a face in the rail opens it. */
+  readonly onMessage: (teammateId: string) => void
   /** Every routine on file. Each is filed under the teammate that runs it. */
   readonly routines: readonly PublicRoutine[]
   /** Which routine each teammate is replaying right now, if any. */
@@ -536,6 +539,22 @@ export function TeammatesScreen({
                     * of 0.255.0, #4). Both carry a title and an accessible name.
                     */}
                   <div className="lc-rostercard__actions">
+                    {/*
+                      * The rail draws four faces once the team is six or more,
+                      * and its +N opens this screen -- which had no way to
+                      * talk to anyone on it. A fifth teammate could be edited
+                      * and removed, never messaged (found fixing the drives'
+                      * one way to open a teammate, 2026-09-23).
+                      */}
+                    <button
+                      type="button"
+                      className="lc-ghostbutton lc-iconbutton lc-rostercard__message"
+                      title="Message teammate"
+                      aria-label={`Message ${teammate.name}`}
+                      onClick={() => onMessage(teammate.teammateId)}
+                    >
+                      <Icon name="message" size={14} />
+                    </button>
                     <button
                       type="button"
                       className="lc-ghostbutton lc-iconbutton lc-rostercard__edit"

@@ -17,7 +17,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pickRouteScript, say, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, startDrive, teammateFace } from './drive-lib.mjs'
 
 // Deliberately NOT scratchRepository: a plain folder with one file in it.
 const workspace = await mkdtemp(join(tmpdir(), 'locust-nongit-'))
@@ -61,7 +61,7 @@ try {
   await drive.capture('a plain folder, no git', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
+      const open = ${teammateFace('Wren')}
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 1000))
     })()`)

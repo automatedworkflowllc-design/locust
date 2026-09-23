@@ -20,7 +20,7 @@
 // Runs no model: it seeds a finished mission into the ledger and drives the
 // menu, so it costs nothing and cannot be flaky on a runtime.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-menu-ws-')
 
@@ -41,7 +41,7 @@ const drive = await startDrive({
 
 /** Right-click the first row in the Missions section and read the menu out. */
 const openMenu = `(async () => {
-  const rows = [...document.querySelectorAll('.lc-teammate__mission, .lc-row:not(.lc-row--button)')]
+  const rows = [...document.querySelectorAll('.lc-conv, .lc-teammate__mission, .lc-row:not(.lc-row--button)')]
   const row = rows[0]
   if (row === undefined) return 'NO MISSION ROW TO RIGHT-CLICK'
   const box = row.getBoundingClientRect()
@@ -62,7 +62,7 @@ try {
     // One short run so there is a real conversation to right-click. The free
     // model, so this costs nothing.
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 500))
     })()`)
     const { pickRouteScript, sendAndWaitScript } = await import('./drive-lib.mjs')
@@ -73,8 +73,8 @@ try {
 
   await drive.capture('press Assign to Gem, and see whether the owner moves', () => drive.evaluate(`(async () => {
     const rowsUnder = (name) => {
-      const card = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + name).test(r.innerText.trim()))
-      return card === null || card === undefined ? 0 : card.querySelectorAll('.lc-teammate__mission').length
+      const card = ${teammateRows()}.find(r => new RegExp('^' + name).test(r.innerText.trim()))
+      return card === null || card === undefined ? 0 : card.conversations.length
     }
     const assign = [...document.querySelectorAll('.lc-context__item')].find(b => /^Assign to /.test(b.innerText.trim()))
     if (assign === undefined) return 'NO ASSIGN ITEM AT ALL IN THE MENU'
@@ -89,7 +89,7 @@ try {
   })()`))
 
   await drive.capture('right-click again and press Delete, twice for the confirm', () => drive.evaluate(`(async () => {
-    const rows = [...document.querySelectorAll('.lc-teammate__mission, .lc-row:not(.lc-row--button)')]
+    const rows = [...document.querySelectorAll('.lc-conv, .lc-teammate__mission, .lc-row:not(.lc-row--button)')]
     const row = rows[0]
     if (row === undefined) return 'no row left to delete'
     const box = row.getBoundingClientRect()
@@ -98,7 +98,7 @@ try {
     const del = [...document.querySelectorAll('.lc-context__item')].find(b => /^Delete/.test(b.innerText.trim()))
     if (del === undefined) return 'NO DELETE ITEM IN THE MENU'
     if (del.disabled) return 'DELETE IS DISABLED: ' + (del.title || 'no reason given')
-    const rowsBefore = document.querySelectorAll('.lc-teammate__mission, .lc-row:not(.lc-row--button)').length
+    const rowsBefore = document.querySelectorAll('.lc-conv, .lc-teammate__mission, .lc-row:not(.lc-row--button)').length
     del.click()
     await new Promise(r => setTimeout(r, 400))
     // It arms first and asks; the second press is the confirmation.
@@ -106,7 +106,7 @@ try {
     if (armed === undefined) return 'first press did not arm the confirm'
     armed.click()
     await new Promise(r => setTimeout(r, 1200))
-    const rowsAfter = document.querySelectorAll('.lc-teammate__mission, .lc-row:not(.lc-row--button)').length
+    const rowsAfter = document.querySelectorAll('.lc-conv, .lc-teammate__mission, .lc-row:not(.lc-row--button)').length
     return 'rows ' + rowsBefore + ' -> ' + rowsAfter + (rowsAfter < rowsBefore ? ' (deleted)' : ' (NOTHING WAS DELETED)')
   })()`))
   // The state Colin was actually in. His title bar read "1 running" while he
@@ -117,7 +117,7 @@ try {
   await drive.capture('right-click WHILE a run is going', async () => {
     const { pickRouteScript } = await import('./drive-lib.mjs')
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 600))
     })()`)
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
@@ -134,8 +134,8 @@ try {
       return 'sent'
     })()`)
     return drive.evaluate(`(async () => {
-      const running = [...document.querySelectorAll('.lc-teammate')].some(r => !/idle/.test(r.innerText))
-      const row = document.querySelector('.lc-teammate__mission, .lc-row:not(.lc-row--button)')
+      const running = ${teammateRows()}.some(r => !/idle/.test(r.innerText))
+      const row = document.querySelector('.lc-conv, .lc-teammate__mission, .lc-row:not(.lc-row--button)')
       if (row === null) return 'no conversation row while running'
       const box = row.getBoundingClientRect()
       row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: Math.round(box.left + 20), clientY: Math.round(box.top + 10) }))
@@ -151,7 +151,7 @@ try {
   // left is what pressing them DOES. A control that is offered and then does
   // nothing is exactly what "isn't working" describes.
   await drive.capture('press Delete on a conversation that is still running', () => drive.evaluate(`(async () => {
-    const count = () => document.querySelectorAll('.lc-teammate__mission, .lc-row:not(.lc-row--button)').length
+    const count = () => document.querySelectorAll('.lc-conv, .lc-teammate__mission, .lc-row:not(.lc-row--button)').length
     const del = [...document.querySelectorAll('.lc-context__item')].find(b => /^Delete/.test(b.innerText.trim()))
     if (del === undefined) return 'no Delete item -- the menu may have closed'
     if (del.disabled) return 'Delete IS disabled while running: ' + (del.title || 'no reason given')
@@ -163,7 +163,7 @@ try {
     armed.click()
     await new Promise(r => setTimeout(r, 2500))
     const after = count()
-    const stillRunning = [...document.querySelectorAll('.lc-teammate')].some(r => !/idle/.test(r.innerText))
+    const stillRunning = ${teammateRows()}.some(r => !/idle/.test(r.innerText))
     return 'rows ' + before + ' -> ' + after
       + (after < before ? ' (deleted)' : ' (STILL THERE -- pressed and nothing happened)')
       + ' · a run is still going: ' + stillRunning

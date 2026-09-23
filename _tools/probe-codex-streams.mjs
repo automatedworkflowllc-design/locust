@@ -19,7 +19,7 @@
 //
 // SPENDS three small Codex turns on gpt-5.6-luna at low effort. Never Astra.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends three Codex turns. Set LOCUST_SPEND=1 to allow it.')
@@ -95,7 +95,7 @@ try {
   if (onlyStop) {
     await drive.capture('stop ends a run', async () => {
       await drive.ready()
-      await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()`)
+      await drive.evaluate(`${teammateFace('Wren')}?.click()`)
       await drive.evaluate(`new Promise(r => setTimeout(r, 700))`)
       await drive.evaluate(send('Count slowly from 1 to 200, one number per line, with a sentence about each.'))
       await drive.evaluate(`new Promise(r => setTimeout(r, 6000))`)
@@ -121,7 +121,7 @@ try {
 
   await drive.capture('a first turn streams and its receipt says what it cost', async () => {
     await drive.ready()
-    await drive.evaluate(`[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()`)
+    await drive.evaluate(`${teammateFace('Wren')}?.click()`)
     await drive.evaluate(`new Promise(r => setTimeout(r, 700))`)
     await drive.evaluate(send('Remember the word "gantry". Reply with just: ok'))
     return drive.evaluate(settle)

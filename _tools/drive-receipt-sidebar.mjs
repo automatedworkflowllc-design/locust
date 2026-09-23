@@ -12,7 +12,7 @@
 
 import { rm } from 'node:fs/promises'
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-receipt-ws-')
 const seed = {
@@ -31,7 +31,7 @@ let handoff
 try {
   await drive.capture('one run, so there is something to restore', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
     await drive.evaluate(sendAndWaitScript('Reply with exactly the word KEPT and nothing else.', { waitSeconds: 300 }))
     return 'ran'
@@ -55,8 +55,8 @@ try {
   await drive.capture('the receipt, reopened from the ledger', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
-      const row = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
-      row?.querySelector('.lc-teammate__mission')?.click()
+      const row = ${teammateRows()}.find(r => /Wren/.test(r.innerText))
+      row?.conversation?.click()
       await new Promise(r => setTimeout(r, 1600))
       const summary = document.querySelector('.lc-receipt__summary')
       const table = document.querySelector('.lc-receipt')
@@ -73,7 +73,7 @@ try {
   })()`))
 
   await drive.capture('the teammate rows, counted by line', () => drive.evaluate(`(() => {
-    return [...document.querySelectorAll('.lc-teammate')].map(r => {
+    return ${teammateRows()}.map(r => {
       const lines = r.innerText.split(String.fromCharCode(10)).map(t => t.trim()).filter(t => t.length > 0)
       return lines[0] + ': ' + lines.length + ' lines [' + lines.join(' / ') + ']'
     }).join('  ||  ')

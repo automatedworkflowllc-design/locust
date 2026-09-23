@@ -19,7 +19,7 @@
 
 import { rm } from 'node:fs/promises'
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-interrupted-ws-')
 const seed = {
@@ -35,7 +35,7 @@ let handoff
 try {
   await drive.capture('launch, and a run started but not waited for', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/muse/i' }))
     // `settle: false` returns as soon as it is sent; the point is to be mid-run.
     await drive.evaluate(sendAndWaitScript('Count slowly from 1 to 40, one number per line, then say done.', { settle: false }))
@@ -83,8 +83,8 @@ try {
   })
 
   await drive.capture('the interrupted conversation, opened', () => drive.evaluate(`(async () => {
-    const row = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
-    row?.querySelector('.lc-teammate__mission')?.click()
+    const row = ${teammateRows()}.find(r => /Wren/.test(r.innerText))
+    row?.conversation?.click()
     await new Promise(r => setTimeout(r, 1200))
     const header = document.querySelector('.lc-workroom__header')?.innerText.replace(/[ \\t\\n]+/g, ' ').slice(0, 140) ?? 'no header'
     const thread = document.querySelector('.lc-thread')?.innerText.replace(/[ \\t\\n]+/g, ' ').slice(-200) ?? 'no thread'
@@ -92,7 +92,7 @@ try {
   })()`))
 
   await drive.capture('and the profile still works: a fresh run on it', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
     await drive.evaluate(sendAndWaitScript('Reply with the single word RECOVERED.', { waitSeconds: 240 }))
     return drive.evaluate(`(document.querySelector('.lc-thread')?.innerText.replace(/[ \\t\\n]+/g, ' ').slice(-160) ?? '')`)
   })

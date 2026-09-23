@@ -18,7 +18,7 @@
 // 300 lines of output rather than 1,200. 300 still crosses the 200-line bound,
 // which is the half that needed seeing.
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-shellout-ws-')
 const drive = await startDrive({
@@ -44,7 +44,7 @@ const drive = await startDrive({
 try {
   await drive.capture('launch, on Codex at the cheapest effort', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 700)) })()`)
     return drive.evaluate(`[...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' · ')`)
   })
 

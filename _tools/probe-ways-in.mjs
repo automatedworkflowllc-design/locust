@@ -13,7 +13,7 @@
 
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-waysin-ws-')
 const packaged = join(
@@ -79,7 +79,7 @@ try {
     const back = [...document.querySelectorAll('button, a')].find(n => /^missions$/i.test((n.innerText ?? '').trim()))
     if (back) back.click()
     await new Promise(r => setTimeout(r, 500))
-    const rail = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+    const rail = ${teammateFace('Wren')}
     if (rail) rail.click()
     await new Promise(r => setTimeout(r, 800))
     const chip = [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Permission mode')

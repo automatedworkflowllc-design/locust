@@ -10,7 +10,7 @@
 // No mission is sent, so nothing is spent: every command here maps to a
 // control on the composer row, and changing a mode costs nothing.
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-slash-ws-')
 const drive = await startDrive({
@@ -68,7 +68,7 @@ try {
   await drive.capture('launch', () => drive.ready())
 
   await drive.capture('open a mission on a runtime with every mode', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     return drive.evaluate(pickRouteScript({ group: '/cursor/i', search: 'grok', row: '/grok/i' }))
   })
 

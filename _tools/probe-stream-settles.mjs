@@ -28,7 +28,7 @@
 // purpose: those are the two tokens that caused the reflow, so a reply
 // without them would measure nothing.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends a Claude Code turn. Set LOCUST_SPEND=1 to allow it.')
@@ -74,7 +74,7 @@ try {
   await drive.capture('stream a reply that uses emphasis and a fence, sampling as it arrives', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 700))
       const field = document.querySelector('form.command-dock textarea')
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set

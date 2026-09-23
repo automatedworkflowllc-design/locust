@@ -9,7 +9,7 @@
 //
 // Free model, so it costs nothing and cannot be confused with a spent quota.
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-nofiles-ws-')
 const drive = await startDrive({
@@ -50,7 +50,7 @@ try {
   await drive.capture('a free model, Accept edits left ON', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
+      const open = ${teammateFace('Wren')}
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 1000))
     })()`)

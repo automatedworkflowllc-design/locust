@@ -4773,6 +4773,7 @@ export default function App(): ReactElement {
                 setEditingTeammate(teammate)
               }}
               onRemove={removeTeammate}
+              onMessage={openHub}
             />
           ) : screen === 'memory' ? (
             <MemoryScreen

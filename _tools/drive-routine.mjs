@@ -13,7 +13,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { FREE_ROUTE, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { conversationRows, FREE_ROUTE, say, scratchRepository, sleep, startDrive, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-routine-ws-')
 const seed = {
@@ -59,7 +59,7 @@ try {
     // onContextMenu opens the mission menu (Sidebar.tsx). This looked for
     // .lc-teammate__mission, which is a different list, so step 3 found
     // nothing and steps 4-6 then tested an empty menu.
-    const row = document.querySelector('.lc-conv') ?? document.querySelector('.lc-teammate__mission')
+    const row = document.querySelector('.lc-conv') ?? document.querySelector('.lc-conv, .lc-teammate__mission')
     if (!row) return 'NO CONVERSATION ROW; sidebar classes: ' + [...new Set([...document.querySelectorAll('.lc-sidebar *')].map(n => String(n.className).split(' ')[0]).filter(Boolean))].join(' / ').slice(0, 300)
     row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 260 }))
     await new Promise(r => setTimeout(r, 400))
@@ -118,13 +118,22 @@ try {
     // Wait for the routine to actually be running: read too early and the
     // teammate is idle, the step has not appeared, and the drive measures the
     // uninteresting case.
+    //
+    // The step and the branch are drawn by the COMPACT sidebar's rows
+    // (.lc-teammate, Sidebar.tsx); the ordinary sidebar draws faces and
+    // conversation rows and says neither. Waiting a minute for a line this
+    // layout never draws is what used up the free model's whole run and left
+    // the next step with nothing to see (2026-09-23), so without those rows
+    // this reads once and moves on.
     let text = ''
-    for (let i = 0; i < 120; i += 1) {
+    const compact = document.querySelector('.lc-teammate') !== null
+    for (let i = 0; i < (compact ? 120 : 1); i += 1) {
       await new Promise(r => setTimeout(r, 500))
       const found = [...document.querySelectorAll('.lc-teammate, .lc-conv')].find(r => /Wren|routine/i.test(r.innerText))
       text = found?.innerText ?? ''
       if (/routine · step/.test(text)) break
     }
+    if (!compact) return 'this sidebar draws no routine step or branch (they are the compact rows’); the rows read: ' + ${conversationRows()}.map((c) => c.title.slice(0, 50) + (c.running ? ' (running)' : '')).join(' / ')
     const lines = text.split(String.fromCharCode(10)).map(t => t.trim()).filter(t => t.length > 0)
     return 'lines: ' + lines.length
       + ' || routine step shown: ' + /routine · step/.test(text)
@@ -133,17 +142,26 @@ try {
   })()`))
 
   await drive.capture('the routine starts a run by itself', () => drive.evaluate(`(async () => {
+    // Nothing has been pressed since the reopen, so a second conversation of
+    // Wren's is the routine's even when the free model has already finished
+    // it -- which a run of a few seconds usually has by the time this looks.
+    const wrensNow = () => ${conversationRows()}.filter((c) => c.owner === 'tm_wren').length
     for (let i = 0; i < 240; i += 1) {
+      if (wrensNow() >= 2) return 'a second conversation of Wren’s is in the sidebar, started by the routine: ' + ${conversationRows()}.filter((c) => c.owner === 'tm_wren').map((c) => c.title.slice(0, 50) + (c.running ? ' (running)' : '')).join(' / ')
       await new Promise(r => setTimeout(r, 500))
-      const wren = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
-      if (wren && /working|running|starting|replying/i.test(wren.innerText)) return 'sidebar: ' + wren.innerText.replace(/\\s+/g, ' ').slice(0, 160)
+      const wren = ${teammateRows()}.find(r => /Wren/.test(r.innerText))
+      if (wren && /working|running|starting|replying|thinking/i.test(wren.innerText)) return 'sidebar: ' + wren.innerText.replace(/\\s+/g, ' ').slice(0, 160)
+      // The routine's run is a conversation of its own, not the one on
+      // screen, so there is no Stop button to see: its row runs instead.
+      const running = ${conversationRows()}.find((c) => c.running && c.owner === 'tm_wren')
+      if (running) return 'a conversation of Wren’s is running: ' + running.title.slice(0, 120)
       if (document.querySelector('button[aria-label^="Stop the running"]')) return 'a run is live: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 160)
     }
     // A miss must say what it looked AT, not just that it saw nothing. This
     // waited on .lc-teammate rows and reported "nothing started" across two
     // minutes of a run that had in fact happened -- the sidebar draws those
     // rows in one branch only. Blind, not broken.
-    const rails = document.querySelectorAll('.lc-teammate').length
+    const rails = ${teammateRows()}.length
     const convs = document.querySelectorAll('.lc-conv').length
     return 'nothing seen to start in two minutes (rail rows: ' + rails + ', conversation rows: ' + convs + '): '
       + (document.querySelector('.lc-sidebar')?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? 'no sidebar')
@@ -152,7 +170,7 @@ try {
     // .lc-conv is the sidebar's conversation row; .lc-teammate__mission
     // belongs to a list this screen does not draw, so this clicked
     // nothing and then reported the header it never opened as missing.
-    const row = document.querySelector('.lc-conv') ?? document.querySelector('.lc-teammate__mission')
+    const row = document.querySelector('.lc-conv') ?? document.querySelector('.lc-conv, .lc-teammate__mission')
     if (!row) return 'NO CONVERSATION ROW to open'
     row.click()
     await new Promise(r => setTimeout(r, 1200))

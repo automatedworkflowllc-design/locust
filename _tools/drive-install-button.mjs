@@ -20,7 +20,7 @@ import { mkdtemp, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-button-ws-')
 const emptyHome = await mkdtemp(join(tmpdir(), 'locust-drive-button-home-'))
@@ -103,7 +103,7 @@ try {
 
   await drive.capture('and a message runs on what the button installed', async () => {
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 1200))
     })()`)
     await drive.evaluate(sendAndWaitScript('Reply with exactly the word INSTALLED and nothing else.', { waitSeconds: 300 }))

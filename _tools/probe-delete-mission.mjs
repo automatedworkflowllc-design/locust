@@ -15,7 +15,7 @@
 //
 // FREE: one short run on the free OpenCode model, read-only.
 
-import { FREE_ROUTE, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-probe-delete-ws-')
 const drive = await startDrive({
@@ -35,7 +35,7 @@ const drive = await startDrive({
 
 /** Send a one-word task to a teammate and wait for it to end. */
 const runOne = (name) => drive.evaluate(`(async () => {
-  const open = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}'))
+  const open = ${teammateFace(name)}
   if (!open) return 'no button for ${name}'
   open.click()
   await new Promise(r => setTimeout(r, 400))

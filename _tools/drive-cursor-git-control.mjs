@@ -25,7 +25,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const TARGET = 'notes.ts'
 const SEED = [
@@ -86,7 +86,7 @@ try {
   await drive.capture('Wren on Cursor Agent / Composer 2.5, inside a git repo', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))
+      const open = ${teammateFace('Wren')}
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 900))
     })()`)

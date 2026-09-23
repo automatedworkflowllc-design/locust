@@ -21,7 +21,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-auto-ws-')
 // A directory the mission is never told about and never given: the only way a
@@ -74,7 +74,7 @@ const modeMenuScript = `(async () => {
 try {
   await drive.capture('launch: Auto is in the menu even with the workspace switch off', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))
     return route + ' || ' + (await drive.evaluate(modeMenuScript))
   })
@@ -111,7 +111,7 @@ try {
     await drive.evaluate(`(async () => {
       document.querySelector('button[title="All missions (Ctrl 1)"]')?.click()
       await new Promise(r => setTimeout(r, 500))
-      ;[...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Vale')).click()
+      ;${teammateFace('Vale')}.click()
       await new Promise(r => setTimeout(r, 900))
     })()`)
     await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))
@@ -148,8 +148,8 @@ try {
     // Back to the CONVERSATION, not the missions list: the list has no
     // composer, so the mode control is simply absent there and the step
     // reported an error object instead of an answer (2026-09-06).
-    const row = [...document.querySelectorAll('.lc-teammate')].find(r => /Vale/.test(r.innerText))
-    row?.querySelector('.lc-teammate__mission')?.click()
+    const row = ${teammateRows()}.find(r => /Vale/.test(r.innerText))
+    row?.conversation?.click()
     await new Promise(r => setTimeout(r, 900))
     const control = [...document.querySelectorAll('.lc-control')].find(b => /Ask|Accept edits|Plan|Approve|Auto/.test(b.innerText))
     if (!control) return 'no mode control on screen'

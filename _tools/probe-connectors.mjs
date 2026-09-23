@@ -35,7 +35,7 @@
 // listing and then call one anyway -- it did on 2026-09-09 -- so the listing
 // alone is not evidence either way.
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 if (process.env.LOCUST_SPEND !== '1') {
   say('refusing to run: this spends a Claude Code turn. Set LOCUST_SPEND=1 to allow it.')
@@ -69,7 +69,7 @@ try {
   await drive.capture('launch on Claude Code in Auto', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 700))
       const chip = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
       return 'route: ' + (chip?.innerText.replace(/\\s+/g, ' ').trim() ?? 'none') +

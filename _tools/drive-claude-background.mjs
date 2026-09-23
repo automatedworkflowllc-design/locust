@@ -21,7 +21,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-claude-bg-ws-')
 const drive = await startDrive({
@@ -46,7 +46,7 @@ try {
   await drive.capture('Wren on Claude Code / haiku', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 700))
     })()`)
     return drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'haiku', row: '/haiku/i' }))

@@ -30,7 +30,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, sleep, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, sleep, startDrive, teammateRows } from './drive-lib.mjs'
 
 const OUT = new URL('../docs/design-frames-2026-09-14/', import.meta.url).pathname.slice(1)
 const PS = new URL('./window-frame.ps1', import.meta.url).pathname.slice(1)
@@ -95,7 +95,7 @@ const size = async (spec) => {
 const evaluate = (expression) => drive.evaluate(expression)
 const openTeammate = (name) =>
   evaluate(`(() => {
-    const row = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp(${JSON.stringify(name)}).test(r.innerText))
+    const row = ${teammateRows()}.find(r => new RegExp(${JSON.stringify(name)}).test(r.innerText))
     if (!row) return 'no row for ' + ${JSON.stringify(name)}
     row.click()
     return 'opened ' + ${JSON.stringify(name)}

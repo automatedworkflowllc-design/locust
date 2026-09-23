@@ -20,7 +20,7 @@
 // a feature whose whole job is to open a window is not proven by a button that
 // exists. Close it afterwards.
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-reveal-ws-')
 const drive = await startDrive({
@@ -39,7 +39,7 @@ try {
   await drive.capture('launch', () => drive.ready())
 
   await drive.capture('Wren on Cursor / grok 4.6, accept edits', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     return drive.evaluate(pickRouteScript({ group: '/cursor/i', search: 'grok-4.6', row: '/grok-4.6/i' }))
   })
 

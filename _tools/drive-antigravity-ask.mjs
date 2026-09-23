@@ -31,7 +31,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, startDrive, teammateFace } from './drive-lib.mjs'
 
 const WAIT_SECONDS = 150
 
@@ -96,7 +96,7 @@ try {
   await drive.capture('Antigravity / flash, Accept edits', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Gem'))
+      const open = ${teammateFace('Gem')}
       if (open) open.click()
       await new Promise((r) => setTimeout(r, 1000))
     })()`)

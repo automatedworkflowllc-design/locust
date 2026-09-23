@@ -39,7 +39,7 @@
 // Second surface in a week with the same constraint -- command output is the
 // other -- which is worth knowing when planning what can be verified for free.
 
-import { assertMaySpend, say, scratchRepository, startDrive, pickRouteScript } from './drive-lib.mjs'
+import { assertMaySpend, pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 assertMaySpend('drive-plan-answer')
 
@@ -56,7 +56,7 @@ const drive = await startDrive({ name: 'plan-answer', port: 9413, workspace, see
 try {
   await drive.capture('ask for a plan, in Plan mode', async () => {
     await drive.ready()
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     // Codex, at the cheapest setting available, because only Codex reports a
     // structured plan. Effort is the only cost lever: model/list reports one
     // Codex model.

@@ -7,7 +7,7 @@
 // against a seeded ledger; this is the first time a live helper is
 // watched arriving. Spends one short Claude Code run with one subagent.
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-subagent-ws-')
 const drive = await startDrive({
@@ -25,7 +25,7 @@ const drive = await startDrive({
 try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('Wren: choose Claude Code / sonnet, read-only', async () => {
-    await drive.evaluate(`(async () => { [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren')).click(); await new Promise(r => setTimeout(r, 500)) })()`)
+    await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 500)) })()`)
     const route = await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))
     const mode = await drive.evaluate(`(async () => {
       const control = document.querySelector('button[aria-label="Permission mode"], button[title="Permission mode"]')
@@ -42,7 +42,7 @@ try {
       const seen = []
       for (let i = 0; i < 240; i += 1) {
         await new Promise(r => setTimeout(r, 250))
-        const wren = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
+        const wren = ${teammateRows()}.find(r => /Wren/.test(r.innerText))
         const line = wren ? wren.innerText.replace(/\\s+/g, ' ').slice(0, 60) : ''
         if (seen[seen.length - 1] !== line) seen.push(line)
         if (/subagent working/.test(line)) return 'sidebar until now: ' + seen.join(' -> ') + ' || glyph: ' + (wren.querySelector('.lc-teammate__delegating') ? 'drawn' : 'MISSING')
@@ -55,7 +55,7 @@ try {
     const seen = []
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const wren = [...document.querySelectorAll('.lc-teammate')].find(r => /Wren/.test(r.innerText))
+      const wren = ${teammateRows()}.find(r => /Wren/.test(r.innerText))
       const line = wren ? wren.innerText.replace(/\\s+/g, ' ').slice(0, 60) : ''
       if (seen[seen.length - 1] !== line) seen.push(line)
       if (i > 2 && !document.querySelector('button[aria-label^="Stop the running"]')) break

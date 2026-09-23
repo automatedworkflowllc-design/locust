@@ -20,7 +20,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-attach-ws-')
 // A file that is definitively NOT in the workspace, which is the case the old
@@ -48,7 +48,7 @@ try {
   await drive.capture('launch', () => drive.ready())
 
   await drive.capture('the attach control is on the composer', () => drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') ?? b.getAttribute('aria-label') ?? '').startsWith('Message Wren'))?.click()
+    ${teammateFace('Wren')}?.click()
     await new Promise(r => setTimeout(r, 700))
     const plus = document.querySelector('button[data-satellite="attach"]')
     if (!plus) return 'NO ATTACH CONTROL on the composer'

@@ -19,7 +19,7 @@
 // FREE: one short run on the free OpenCode model, in accept-edits so it may
 // actually run a command.
 
-import { FREE_ROUTE, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-probe-cmdrow-ws-')
 const drive = await startDrive({
@@ -40,7 +40,7 @@ try {
   await drive.capture('launch and ask for something that needs a command', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise(r => setTimeout(r, 600))
       const field = document.querySelector('form.command-dock textarea')
       if (!field) return 'no composer'

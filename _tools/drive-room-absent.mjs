@@ -22,7 +22,7 @@
 //
 // FREE: eleven short runs on the free OpenCode model, read-only.
 
-import { FREE_ROUTE, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const BUSY = ['Ash', 'Bryn', 'Cove']
 const ROOM = ['Wren', 'Booty', 'Gem', 'Fen', 'Otto', 'Pike', 'Dell', 'Ember']
@@ -53,7 +53,7 @@ const drive = await startDrive({
 
 /** Address one teammate and send without waiting. */
 const startFor = (name) => drive.evaluate(`(async () => {
-  const open = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}'))
+  const open = ${teammateFace(name)}
   if (!open) return 'no button for ${name}'
   open.click()
   await new Promise(r => setTimeout(r, 400))

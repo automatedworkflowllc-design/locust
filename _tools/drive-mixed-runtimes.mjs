@@ -1,7 +1,5 @@
 // Two teammates, two DIFFERENT runtimes, one folder, at the same time.
 //
-//   node _tools/drive-mixed-runtimes.mjs
-//
 // `drive-concurrent.mjs` ran three teammates at once and found a real defect:
 // every activity card counted all three teammates' work, because for a run
 // allowed to write the host takes a `git status` before and after and treats
@@ -13,22 +11,29 @@
 // and it is the case where the attribution logic has to hold across two
 // adapters and two normalizers rather than one.
 //
-// So: Wren on OpenCode's free model, Booty on Cursor's Composer, started
+// So: Wren on OpenCode's free model, Booty on Claude Code's Haiku, started
 // without waiting, each writing a file only it was told about. The questions
 // are the same three that matter -- does each finish, does each reply land in
 // its own thread, and does either card claim the other's file.
 //
-// One free OpenCode turn and one short Cursor turn.
+// Booty was on Cursor's Composer. Cursor is not one of the accounts these
+// drives may spend (Colin, 2026-09-22: Claude and Codex, cheap models only),
+// so the drive could not run as written; Haiku keeps what it tests -- two
+// adapters and two normalizers in one folder at once.
+//
+//   LOCUST_SPEND=1 node _tools/drive-mixed-runtimes.mjs
+//
+// One free OpenCode turn and one Claude Code turn on Haiku.
 
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
 
 /** Each teammate's own file and word, so a crossed wire is visible. */
 const WORK = {
-  Wren: { word: 'ALMANAC', file: 'wren-note.txt', route: { group: '/opencode/i', search: 'free', row: '/free/i' } },
-  Booty: { word: 'BRAMBLE', file: 'booty-note.txt', route: { group: '/cursor/i', search: 'composer 2.5', row: '/composer 2\\.5/i' } }
+  Wren: { word: 'ALMANAC', file: 'wren-note.txt', route: { group: '/opencode/i', search: 'free', row: '/free/i' }, chip: /free/i },
+  Booty: { word: 'BRAMBLE', file: 'booty-note.txt', route: { group: '/claude/i', search: 'haiku', row: '/haiku/i' }, chip: /haiku/i }
 }
 
 const workspace = await scratchRepository('locust-mixed-ws-')
@@ -37,6 +42,7 @@ const drive = await startDrive({
   name: 'mixed-runtimes',
   port: 9357,
   workspace,
+  spends: true,
   seed: {
     schemaVersion: 1,
     teammates: [
@@ -50,12 +56,16 @@ const drive = await startDrive({
 
 /** Open a teammate, put it on ITS OWN runtime, and send without waiting. */
 const startFor = async (name) => {
-  const { word, file, route } = WORK[name]
+  const { word, file, route, chip } = WORK[name]
   await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message ${name}')).click()
+    ${teammateFace(name)}.click()
     await new Promise(r => setTimeout(r, 400))
   })()`)
   await drive.evaluate(pickRouteScript(route))
+  // Asserted BEFORE sending: a drive that sends on the wrong route spends
+  // first and notices second.
+  const on = await drive.evaluate(`[...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`)
+  if (!chip.test(on)) throw new Error(`refusing to send for ${name}: the composer is on "${on}"`)
   return drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
@@ -73,7 +83,7 @@ try {
   // does not parse is DROPPED rather than reported, and every prompt would
   // then pile onto whichever teammate survived.
   await drive.ready()
-  const rostered = Number(await drive.evaluate(`document.querySelectorAll('.lc-teammate').length`))
+  const rostered = Number(await drive.evaluate(`document.querySelectorAll('.lc-faces__one').length`))
   if (rostered !== 2) throw new Error(`roster holds ${String(rostered)} teammates, not 2 -- a seeded record did not parse`)
 
   await drive.capture('two teammates, two runtimes', async () => {
@@ -87,7 +97,7 @@ try {
     let peakLine = ''
     for (let i = 0; i < 240; i += 1) {
       await new Promise(r => setTimeout(r, 400))
-      const rows = [...document.querySelectorAll('.lc-teammate')]
+      const rows = ${teammateRows()}
       const working = rows.filter(r => !/idle/.test(r.innerText)).length
       if (working > peak) {
         peak = working
@@ -101,7 +111,7 @@ try {
   await drive.capture('both settled', () => drive.evaluate(`(async () => {
     for (let i = 0; i < 300; i += 1) {
       await new Promise(r => setTimeout(r, 500))
-      const rows = [...document.querySelectorAll('.lc-teammate')].map(r => r.innerText)
+      const rows = ${teammateRows()}.map(r => r.innerText)
       if (rows.every(r => /idle|done/.test(r))) return 'both settled after ' + String(i / 2) + 's'
     }
     return 'STILL GOING after 150s'
@@ -113,8 +123,8 @@ try {
     const want = ${JSON.stringify(Object.fromEntries(Object.entries(WORK).map(([n, w]) => [n, w])))}
     const out = []
     for (const name of Object.keys(want)) {
-      const row = [...document.querySelectorAll('.lc-teammate')].find(r => new RegExp('^' + name).test(r.innerText.trim()))
-      row?.querySelector('.lc-teammate__mission')?.click()
+      const row = ${teammateRows()}.find(r => new RegExp('^' + name).test(r.innerText.trim()))
+      row?.conversation?.click()
       await new Promise(r => setTimeout(r, 1200))
       const thread = document.querySelector('.lc-thread')?.innerText ?? ''
       const fold = document.querySelector('.lc-activity')

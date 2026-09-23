@@ -21,7 +21,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { APP_DIR, pickRouteScript, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { APP_DIR, pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const DEV = process.argv.includes('--dev')
 const EXE = join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
@@ -54,7 +54,7 @@ try {
   await drive.capture('open a teammate, then pick a route as a real drive does', async () => {
     await drive.ready()
     await drive.evaluate(`(async () => {
-      [...document.querySelectorAll('button')].find((b) => b.getAttribute('title')?.startsWith('Message Wren'))?.click()
+      ${teammateFace('Wren')}?.click()
       await new Promise((r) => setTimeout(r, 900))
     })()`)
     const before = String(await drive.evaluate(CHIP))

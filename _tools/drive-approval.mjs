@@ -28,7 +28,7 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-drive-approval-ws-')
 const drive = await startDrive({
@@ -47,7 +47,7 @@ const drive = await startDrive({
 try {
   await drive.capture('launch', () => drive.ready())
   await drive.capture('pick Wren: the composer shows Approve each action on Codex', () => drive.evaluate(`(async () => {
-    const who = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+    const who = ${teammateFace('Wren')}
     who.click()
     await new Promise(r => setTimeout(r, 500))
     const controls = [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' · ')

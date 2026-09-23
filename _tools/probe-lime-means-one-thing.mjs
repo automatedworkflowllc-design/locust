@@ -21,7 +21,7 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive, FREE_ROUTE } from './drive-lib.mjs'
+import { FREE_ROUTE, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
 
 const workspace = await scratchRepository('locust-lime-ws-')
 const now = '2026-09-05T05:00:00.000Z'
@@ -45,7 +45,7 @@ const drive = await startDrive({
 
 // No backticks inside these template literals.
 const startAndSelect = `(async () => {
-  const wren = [...document.querySelectorAll('button')].find(b => b.getAttribute('title')?.startsWith('Message Wren'))
+  const wren = ${teammateFace('Wren')}
   if (wren === undefined) return 'no Wren'
   wren.click()
   await new Promise(r => setTimeout(r, 700))
