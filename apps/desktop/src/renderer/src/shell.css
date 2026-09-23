@@ -9110,11 +9110,16 @@ textarea {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--lc-text-muted);
+  /* A first line longer than the block runs under the label; it fades out
+     before it rather than being cut mid-letter (a one-line tool call, frame
+     2026-09-23). */
+  box-shadow: -14px 0 10px 2px var(--lc-diff-surface);
 }
 
-/* A code block that carries a label needs room for it on its first line. */
+/* A code block that carries a label needs room for it on its first line --
+   "TOOL CALL" and "TYPESCRIPT" as well as "TS". */
 .lc-code:has(.lc-code__lang) code {
-  padding-right: 64px;
+  padding-right: 96px;
 }
 
 /* Inline code: fill only, no border. Two outlines on a dark surface read as
