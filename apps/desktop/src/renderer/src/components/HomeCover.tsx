@@ -38,7 +38,7 @@ import { PoweredLockup } from './PoweredLockup.js'
 
 /** The cover's canvas, in its own units. Everything is placed on it. */
 export const COVER_WIDTH = 960
-export const COVER_HEIGHT = 288
+export const COVER_HEIGHT = 254
 
 /** The narrowest reading column, and so the scale the card starts at before it is measured. */
 const FIRST_SCALE = 760 / COVER_WIDTH
@@ -72,10 +72,30 @@ interface CoverBot {
  * library's idle look-around with no jumps, carried on a slow bob.
  */
 export const COVER_CAST: readonly CoverBot[] = [
-  { key: 'wren', type: 'ghost', state: 'default', floats: true, dot: 'lime', x: 536, y: 76 },
-  { key: 'atlas', type: 'droid', hue: 'blue', state: 'default', dot: 'amber', waiting: true, x: 680, y: 100 },
-  { key: 'sable', type: 'hopper', hue: 'lime', state: 'sleeping', x: 824, y: 64 }
+  { key: 'wren', type: 'ghost', state: 'default', floats: true, dot: 'lime', x: 245, y: -10 },
+  { key: 'atlas', type: 'droid', hue: 'blue', state: 'default', dot: 'amber', waiting: true, x: 432, y: 0 },
+  { key: 'sable', type: 'hopper', hue: 'lime', state: 'sleeping', x: 619, y: -2 }
 ]
+
+/*
+ * THE MACHINE (A2). His words,
+ * 2026-09-23: "the title screen with border around logo and text,
+ * teammates on top of logo, this would give it a more centered look, give
+ * the locust logo and text have something to actually run the crt effect,
+ * and the teammates could have a structure to be on top of, the border, crt
+ * effect, would almost make it look like a machine as well so the text
+ * under it would have a cooler meaning". So: the boot screen's own bezel and
+ * glass, small, centred on the cover; the lockup lights INSIDE the glass;
+ * the three stand on the bezel's top edge; the claim is its label.
+ */
+export const COVER_MACHINE = { x: 200, y: 86, width: 560, height: 162 } as const
+/*
+ * Colin, looking at the sample: "Let's make the screen bigger and put the
+ * text in it as well". So the claim is on the glass under the lockup, where
+ * the tube runs over it too, and the screen took the height the label under
+ * it had used -- the cover stays 254 tall, so the first screen still fits at
+ * 1120x720 (first-screen-fits.mjs, B11).
+ */
 
 /**
  * A teammate hue as a colour a canvas can take: the token's own value, read
@@ -88,7 +108,7 @@ function hueColor(hue: TeammateHue): string | undefined {
   return value.length === 0 ? undefined : value
 }
 
-const FACE = 120
+const FACE = 96
 
 export function HomeCover({
   ready,
@@ -151,9 +171,23 @@ export function HomeCover({
      * does not wait for the window's focus as the bots do: loading is a few
      * seconds, and a window that is still being shown may not have it yet.
      */
-    <Beam size="md" strength={0.85} active={!ready} className="lc-coverbeam">
-      <div className="lc-cover" ref={card} style={{ '--lc-cover-k': String(scale) } as CSSProperties}>
-        <div className="lc-cover__plate" aria-hidden="true" />
+      <div className="lc-cover lc-cover--machine" ref={card} style={{ '--lc-cover-k': String(scale) } as CSSProperties}>
+        <div
+          className="lc-cover__machineslot"
+          style={{ left: at(COVER_MACHINE.x), top: at(COVER_MACHINE.y), width: at(COVER_MACHINE.width), height: at(COVER_MACHINE.height) }}
+        >
+          <Beam size="md" strength={0.85} active={!ready} className="lc-coverbeam lc-coverbeam--machine">
+            <div className="lc-cover__machine">
+              <div className="lc-cover__glass">
+                <span className="lc-cover__scan" aria-hidden="true" />
+                <div className="lc-cover__screen">
+                  <PoweredLockup ready={ready} tube={tube} />
+                  <p className="lc-cover__claim">Autonomous teammates on your own machine</p>
+                </div>
+              </div>
+            </div>
+          </Beam>
+        </div>
         {COVER_CAST.map((mate, index) => {
           const size = at(FACE)
           const color = mate.hue === undefined ? undefined : hueColor(mate.hue)
@@ -183,11 +217,6 @@ export function HomeCover({
             </span>
           )
         })}
-        <div className="lc-cover__brand">
-          <PoweredLockup ready={ready} tube={tube} />
-          <p className="lc-cover__claim">Autonomous teammates on your own machine</p>
-        </div>
       </div>
-    </Beam>
   )
 }

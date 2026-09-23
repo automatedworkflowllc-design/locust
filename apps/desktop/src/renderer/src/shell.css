@@ -3655,12 +3655,103 @@ textarea {
   position: relative;
   align-self: stretch;
   width: 100%;
-  height: calc(288px * var(--lc-cover-k));
+  height: calc(254px * var(--lc-cover-k));
   flex-shrink: 0;
   border: 1px solid var(--lc-border-card);
   border-radius: var(--lc-radius-card);
   overflow: hidden;
 }
+
+/*
+ * THE MACHINE (A2 sample): the boot screen's bezel and glass, small, centred
+ * on the cover; the lockup lights inside the glass and the teammates stand on
+ * the bezel's top edge. No card around it: the machine is the object.
+ */
+.lc-cover--machine {
+  border: 0;
+  overflow: visible;
+}
+
+.lc-cover__machineslot {
+  position: absolute;
+}
+
+.lc-coverbeam--machine {
+  width: 100%;
+  height: 100%;
+  border-radius: calc(18px * var(--lc-cover-k));
+}
+
+.lc-cover__machine {
+  width: 100%;
+  height: 100%;
+  padding: calc(9px * var(--lc-cover-k));
+  border-radius: calc(18px * var(--lc-cover-k));
+  background: linear-gradient(170deg, var(--lc-boot-bezel-hi) 8%, var(--lc-boot-bezel-lo) 100%);
+  border: 1px solid var(--lc-border-hairline);
+  box-shadow: var(--lc-shadow-window);
+}
+
+.lc-cover__glass {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: calc(10px * var(--lc-cover-k));
+  border: 1px solid var(--lc-boot-screen-cold);
+  background: radial-gradient(
+    130% 100% at 50% 40%,
+    var(--lc-boot-screen-hot) 0%,
+    var(--lc-boot-screen-mid) 58%,
+    var(--lc-boot-screen-cold) 100%
+  );
+  box-shadow: inset 0 0 0 1px var(--lc-boot-glow-soft), inset 0 2px 14px var(--lc-boot-screen-cold);
+}
+
+/* The glass is always a tube: its scanlines stay, faint, when it is not lighting. */
+.lc-cover__scan {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--lc-boot-scan) 0px,
+    var(--lc-boot-scan) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* The lockup's own tube fills the glass it sits in, rather than a box round the lockup. */
+.lc-cover__glass .lc-lockup__tube {
+  inset: -80px -140px;
+}
+
+/* Inside the glass the lockup is drawn smaller, with air on every side. */
+.lc-cover .lc-cover__glass .lc-lockup {
+  gap: calc(18px * var(--lc-cover-k));
+}
+
+.lc-cover .lc-cover__glass .lc-lockup__mark {
+  width: calc(100px * var(--lc-cover-k));
+}
+
+.lc-cover .lc-cover__glass .lc-lockup__name {
+  font-size: calc(48px * var(--lc-cover-k));
+}
+
+/* What the glass shows: the lockup and, under it, the claim -- both on the
+   tube, under its scanlines. */
+.lc-cover__screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(16px * var(--lc-cover-k));
+}
+
 
 /* The ground the teammates stand on, running off the card's right edge. */
 .lc-cover__plate {

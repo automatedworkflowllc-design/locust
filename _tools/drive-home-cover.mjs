@@ -22,7 +22,8 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tube = arg('--tube') ?? 'full'
 // Bots since 0.274; the pixel-face cover's frames stay in docs/home-cover-2026-09-22.
-const OUT = join(new URL('../docs/home-cover-bots-2026-09-22/', import.meta.url).pathname.slice(1), (packaged === undefined ? 'local' : 'packaged') + (tube === 'full' ? '' : '-tube-' + tube))
+// --out keeps a new run from writing over the 9/22 records, which are tracked.
+const OUT = arg('--out') ?? join(new URL('../docs/home-cover-bots-2026-09-22/', import.meta.url).pathname.slice(1), (packaged === undefined ? 'local' : 'packaged') + (tube === 'full' ? '' : '-tube-' + tube))
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-cover-ws-')
@@ -60,7 +61,10 @@ const MEASURE = `(async () => {
   const mark = card.querySelector('.lc-lockup__mark')
   const name = card.querySelector('.lc-lockup__name')
   const claim = card.querySelector('.lc-cover__claim')
-  const plate = card.querySelector('.lc-cover__plate')
+  // A2 (0.295): the machine -- the boot screen's bezel and glass -- with the
+  // lockup and claim on the glass and the teammates standing on the bezel.
+  const machine = card.querySelector('.lc-cover__machine')
+  const glass = card.querySelector('.lc-cover__glass')
   // The letters' own extent, not the element's: a text range's box still
   // carries the tracking after the last letter, so that is taken off.
   const cs = (el) => getComputedStyle(el)
@@ -73,10 +77,26 @@ const MEASURE = `(async () => {
   }
   const letters = ink(claim)
   const nameLetters = ink(name)
-  const faces = [...card.querySelectorAll('.lc-cover__face .lc-bot')].map((bot) => ({ bot: bot.getAttribute('data-bot'), state: bot.getAttribute('data-state'), width: Math.round(bot.getBoundingClientRect().width), canvas: bot.querySelector('canvas')?.width ?? 0 }))
+  // Where a bot's drawing ends, not its box: the canvas is half again the box
+  // and a Locust's legs reach below it. The lowest row with ink, in page px.
+  const feet = (canvas) => {
+    if (!canvas || canvas.width === 0) return null
+    const context = canvas.getContext('2d')
+    const data = context.getImageData(0, 0, canvas.width, canvas.height).data
+    for (let row = canvas.height - 1; row >= 0; row -= 1) {
+      for (let col = 0; col < canvas.width; col += 1) {
+        if (data[(row * canvas.width + col) * 4 + 3] > 40) {
+          const r = canvas.getBoundingClientRect()
+          return r.top + ((row + 1) * r.height) / canvas.height
+        }
+      }
+    }
+    return null
+  }
+  const faces = [...card.querySelectorAll('.lc-cover__face .lc-bot')].map((bot) => ({ bot: bot.getAttribute('data-bot'), state: bot.getAttribute('data-state'), width: Math.round(bot.getBoundingClientRect().width), feet: feet(bot.querySelector('canvas')), canvas: bot.querySelector('canvas')?.width ?? 0 }))
   return JSON.stringify({
     k: card.style.getPropertyValue('--lc-cover-k'),
-    card: box(card), pane: box(pane), lockup: box(lockup), mark: box(mark), plate: box(plate),
+    card: box(card), pane: box(pane), lockup: box(lockup), mark: box(mark), machine: box(machine), glass: box(glass), claim: box(claim),
     lockupInk: { left: box(mark).left, right: nameLetters.right, mid: (box(mark).left + nameLetters.right) / 2 },
     claimLetters: { left: letters.left, right: letters.right, mid: (letters.left + letters.right) / 2, width: letters.width },
     claimFont: { size: cs(claim).fontSize, family: cs(claim).fontFamily.split(',')[0], tracking: cs(claim).letterSpacing, transform: cs(claim).textTransform },
@@ -168,9 +188,15 @@ try {
     await shoot(`size-${label}.png`)
     if (m.missing) { check(`${label}: the cover is on the home screen`, false); continue }
     say(`${label}: card ${Math.round(m.card.width)}x${Math.round(m.card.height)} at k=${m.k}; bots ${m.faces.map((f) => `${f.bot} ${f.width}px (canvas ${f.canvas})`).join(', ')}; claim ${m.claimFont.size} ${m.claimFont.family} ${m.claimFont.tracking}; name ${m.nameFont.size} ${m.nameFont.family} ${m.nameFont.weight}; pane overflow ${Math.round(m.scrolled.overflow)}px, scrolled ${Math.round(m.scrolled.top)}px`)
-    check(`${label}: k is the card's width over the cover's 960`, Math.abs(Number(m.k) - (m.card.width - 2) / 960) < 0.002, `${m.k} vs ${((m.card.width - 2) / 960).toFixed(3)}`)
+    // The machine cover has no card border, so its width is the cover's.
+    check(`${label}: k is the card's width over the cover's 960`, Math.abs(Number(m.k) - m.card.width / 960) < 0.002, `${m.k} vs ${(m.card.width / 960).toFixed(3)}`)
     check(`${label}: the claim is centred under the lockup (letters to letters)`, Math.abs(m.claimLetters.mid - m.lockupInk.mid) <= 1.5, `claim centre ${m.claimLetters.mid.toFixed(1)}, lockup centre ${m.lockupInk.mid.toFixed(1)}`)
-    check(`${label}: the lockup is centred in the space left of the plate`, Math.abs((m.lockupInk.left - m.card.left) - (m.plate.left - m.lockupInk.right)) <= 3, `left air ${(m.lockupInk.left - m.card.left).toFixed(1)}, right air ${(m.plate.left - m.lockupInk.right).toFixed(1)}`)
+    check(`${label}: the lockup is centred on the machine's glass`, Math.abs(m.lockupInk.mid - m.glass.mid) <= 3, `lockup centre ${m.lockupInk.mid.toFixed(1)}, glass centre ${m.glass.mid.toFixed(1)}`)
+    check(`${label}: the claim is on the glass, under the lockup`, m.claim.top >= m.glass.top && m.claim.bottom <= m.glass.bottom && m.claim.top > m.lockup.bottom, `claim ${Math.round(m.claim.top)}-${Math.round(m.claim.bottom)}, glass ${Math.round(m.glass.top)}-${Math.round(m.glass.bottom)}`)
+    check(`${label}: the machine is centred on the card`, Math.abs(m.machine.mid - m.card.mid) <= 2, `machine ${m.machine.mid.toFixed(1)}, card ${m.card.mid.toFixed(1)}`)
+    // The droid and the Locust stand on the bezel's top edge; the ghost floats.
+    const standing = m.faces.filter((face) => face.bot !== 'ghost')
+    check(`${label}: the teammates stand on the machine (their lowest drawn pixel at the bezel's top)`, standing.length === 2 && standing.every((face) => face.feet !== null && Math.abs(face.feet - m.machine.top) <= 8), standing.map((face) => `${face.bot} ${face.feet === null ? 'no ink' : Math.round(face.feet - m.machine.top) + 'px'}`).join(', '))
     check(`${label}: the claim is Geist Mono capitals, the name Figtree 700`, /Geist Mono/.test(m.claimFont.family) && m.claimFont.transform === 'uppercase' && /Figtree/.test(m.nameFont.family) && m.nameFont.weight === '700', JSON.stringify({ claim: m.claimFont, name: m.nameFont }))
     check(`${label}: both faces are loaded, not fallbacks`, m.fontsReady.figtree700 && m.fontsReady.geistMono, JSON.stringify(m.fontsReady))
     check(`${label}: the claim is never under 10.5px`, parseFloat(m.claimFont.size) >= 10.5, m.claimFont.size)
@@ -180,5 +206,5 @@ try {
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: 'The home screen is the design system cover.' })
+  await drive.finish({ intro: 'The home screen is the design system cover, as a machine (A2).' })
 }
