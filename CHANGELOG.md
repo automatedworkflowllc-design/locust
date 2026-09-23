@@ -11,6 +11,30 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.293.0 - 2026-09-23
+
+### Improved
+
+- **Small teammates have smooth edges.** Bots in the sidebar, the
+  conversation and the lists were drawn with hard, jagged outlines at their
+  small sizes. They are drawn at twice the size and shrunk, so their edges
+  are smooth, at no measurable cost.
+
+- **Shorter Settings names.** The pages are Workspace, Runtimes, Teammates,
+  Appearance, General and Changelog. "The send button" and "The boot screen"
+  lose their "The", and the Workspace section about teammates replying to
+  each other is "Between teammates".
+
+- **A new teammate starts on a new colour.** Every new teammate started on
+  lime, so a team made with the defaults was all one colour. The colour
+  picker now starts on the first one nobody on the team wears yet.
+
+### Fixed
+
+- **A turn's reads name their files.** A model that reports the whole path
+  of each file it read showed "read 3 — C:\Users\…" cut off at the edge of
+  the row. The row names the folder and the files within it.
+
 ## 0.292.0 - 2026-09-23
 
 ### Improved
