@@ -11,6 +11,34 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.283.0 - 2026-09-23
+
+### New
+
+- **A new message box.** The box you type in is now one rounded box with its
+  controls inside it: round buttons, frosted chips, and a metal Send. The
+  permission mode sits beside the +, and the model and its effort sit
+  together on the right.
+
+- **The + opens up.** Press + and it splits into two: Attach files, and
+  Choose a folder. The folder chip is off the row, since the folder's name is
+  in the title bar, and the row still warns you when no folder is chosen.
+
+### Improved
+
+- **Shorter mode names.** The chip reads Ask, Edit, Plan, Approve or Auto,
+  the same words the / commands use. The menu still gives each one's full
+  name and what it allows.
+
+- **Swarm is a command.** The Swarm button is gone from the message box.
+  Type /swarm, or turn it on in Settings, and the effort chip shows the
+  locust mark while it is on.
+
+### Fixed
+
+- **Centred buttons.** The +, Send and Stop glyphs sit exactly in the middle
+  of their buttons.
+
 ## 0.282.0 - 2026-09-23
 
 ### Improved

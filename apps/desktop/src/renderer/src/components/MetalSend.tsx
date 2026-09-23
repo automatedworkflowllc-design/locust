@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactElement, ReactNode } from 'react'
+import type { ReactElement, ReactNode, RefObject } from 'react'
 import { BEND, MetalFx, setBendConfig, useMetalBend } from 'metal-fx'
 
 import { METAL_STRENGTHS, metalBendConfig } from '../metal.js'
@@ -88,9 +88,15 @@ export function MetalSend({
   strength = 'standard',
   motion = 'hover',
   bend = true,
+  innerShadow = false,
+  reflectionTargets,
   ...button
 }: {
   readonly children: ReactNode
+  /** A rim of light along the ring's top inside edge, as the page's composer draws it. */
+  readonly innerShadow?: boolean
+  /** The chips the metal is cast onto -- the page casts it onto the chip beside the send. */
+  readonly reflectionTargets?: ReadonlyArray<RefObject<HTMLElement | null>>
   /** `off` renders the plain button and mounts no shader at all. */
   readonly preset?: MetalPreset
   readonly strength?: MetalStrength
@@ -261,6 +267,8 @@ export function MetalSend({
       {bend ? <MetalBend node={painted} /> : null}
       <MetalFx
         variant="circle"
+        {...(innerShadow ? { innerShadow: true } : {})}
+        {...(reflectionTargets === undefined ? {} : { reflectionTargets })}
         preset={preset}
         strength={METAL_STRENGTHS[strength]}
         // Pinned, not `auto`: `auto` falls back to the OS setting and Locust

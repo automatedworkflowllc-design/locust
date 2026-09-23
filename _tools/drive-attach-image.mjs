@@ -51,7 +51,7 @@ try {
   })()`))
 
   await drive.capture('attach a PNG from outside the workspace', () => drive.evaluate(`(async () => {
-    document.querySelector('button[aria-label="Attach files"]').click()
+    document.querySelector('button[data-satellite="attach"]').click()
     // A data: URL has to be built by the host and decoded by the renderer, so
     // this waits longer than a plain state change would need.
     await new Promise(r => setTimeout(r, 2500))

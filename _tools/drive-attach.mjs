@@ -50,7 +50,7 @@ try {
   await drive.capture('the attach control is on the composer', () => drive.evaluate(`(async () => {
     [...document.querySelectorAll('button')].find(b => (b.getAttribute('title') ?? b.getAttribute('aria-label') ?? '').startsWith('Message Wren'))?.click()
     await new Promise(r => setTimeout(r, 700))
-    const plus = document.querySelector('button[aria-label="Attach files"]')
+    const plus = document.querySelector('button[data-satellite="attach"]')
     if (!plus) return 'NO ATTACH CONTROL on the composer'
     const box = plus.getBoundingClientRect()
     return 'present, ' + Math.round(box.width) + 'x' + Math.round(box.height)
@@ -74,7 +74,7 @@ try {
     // much like claude." Measured first: of four runtimes only Cursor will
     // read an absolute path outside its folder, so the file is brought to
     // where all of them can already read it.
-    document.querySelector('button[aria-label="Attach files"]').click()
+    document.querySelector('button[data-satellite="attach"]').click()
     await new Promise(r => setTimeout(r, 1200))
     const tiles = [...document.querySelectorAll('.lc-attached__tile')].map(t => t.getAttribute('title'))
     const notice = document.querySelector('.lc-notice')?.textContent?.trim()

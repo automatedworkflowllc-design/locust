@@ -57,7 +57,7 @@ try {
   })
 
   await drive.capture('attach NOTES.md, as the picker would', () => drive.evaluate(`(async () => {
-    const plus = document.querySelector('button[aria-label="Attach files"]')
+    const plus = document.querySelector('button[data-satellite="attach"]')
     if (!plus) return 'no attach control'
     plus.click()
     await new Promise(r => setTimeout(r, 900))

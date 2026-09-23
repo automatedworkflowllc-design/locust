@@ -86,7 +86,7 @@ try {
   })()`)
   await sleep(600)
   await measure('send', 'button[aria-label="Start mission"]', 'svg')
-  await measure('attach', 'button[aria-label="Attach files"]', 'svg')
+  await measure('attach', '.lc-plusmenu__main', 'svg')
   await drive.evaluate(`(document.querySelector('button[aria-label="Start mission"]').click(), 'sent')`)
   await drive.waitFor(`!!document.querySelector('button[aria-label="Stop the running mission"]')`, { timeoutMs: 30_000, what: 'the stop button' })
   await sleep(1500)

@@ -593,6 +593,23 @@
   /* The stop disc's inner glow: libraries.dev's round icon button, a third
      of a hover's lift. */
   --lc-stop-glow: rgba(255, 255, 255, 0.02);
+  /* The metal composer, as libraries.dev's metal page draws its chatbox
+     (2026-09-23): the translucent box, its frosted chips, the dark discs. */
+  --lc-chat-bg: rgba(29, 29, 29, 0.7);
+  --lc-chip-bg: rgba(255, 255, 255, 0.04);
+  --lc-chip-bg-hover: rgba(255, 255, 255, 0.07);
+  --lc-chip-ring: rgba(255, 255, 255, 0.02);
+  --lc-chip-highlight: rgba(255, 255, 255, 0.04);
+  --lc-chip-text: #caccd2;
+  --lc-chip-chevron: #8e8e8e;
+  --lc-circle-bg: #1d1d1d;
+  --lc-circle-border: rgba(44, 47, 54, 0.52);
+  --lc-circle-fg: #f8f8f8;
+  /* The gooey +, libraries.dev's plus menu: its liquid surface, and the
+     page's "Figma soft" shadow for it, rebuilt by the library on the merged
+     silhouette. */
+  --lc-plusmenu-fill: #202020;
+  --lc-plusmenu-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 6px 0 rgba(0, 0, 0, 0.05), 0 4px 42px 0 rgba(0, 0, 0, 0.24);
   --lc-hover-surface-strong: rgba(255, 255, 255, 0.07);
   --lc-hover-border: rgba(255, 255, 255, 0.2);
   --lc-focus-ring: var(--lc-lime);

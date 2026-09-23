@@ -4830,28 +4830,28 @@ textarea {
 }
 
 /*
- * The field is its own bordered box and the controls sit BELOW it, unenclosed
- * -- not a second row inside the border. Exact values ported from the
- * reference: 50px tall, 12px radius, 15px left padding, 8px right.
+ * THE BOX IS LIBRARIES.DEV'S METAL CHATBOX, the field and the row of controls
+ * inside one translucent, 20px-round box (their `.mx-chat`).
+ *
+ * It was the field alone in a bordered box with the controls unenclosed below
+ * it. Colin, 2026-09-23, with a frame of the metal page's composer: "its
+ * honestly a little cleaner than what we have now", and "i wanted those same
+ * drop downs and chat box as well, the exact thing besides the additions i
+ * told you". The row's own pieces are in THE METAL COMPOSER, at the end.
  */
 .lc-composer__box {
   display: flex;
-  align-items: center;
-  /* Wraps, so the who-answers row can take a line of its own under the
-     field instead of being squeezed into it beside the send control. With
-     nothing to wrap this is the row it always was. */
-  flex-wrap: wrap;
-  gap: var(--lc-space-4);
-  min-height: 50px;
-  padding: 0 var(--lc-space-4) 0 15px;
-  border: 1px solid var(--lc-border-control);
-  border-radius: var(--lc-radius-popover);
-  background: var(--lc-bg-field);
-  transition: border-color var(--lc-motion-hover) var(--lc-ease);
+  flex-direction: column;
+  align-items: stretch;
+  padding: 20px 16px 16px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--lc-chat-bg);
+  transition: box-shadow var(--lc-motion-hover) var(--lc-ease);
 }
 
 .lc-composer__box:hover {
-  border-color: var(--lc-border-hover);
+  box-shadow: 0 0 0 1px var(--lc-border-hairline);
 }
 
 .lc-composer__box:focus-within {
@@ -4872,8 +4872,7 @@ textarea {
    * they tie on specificity and source order decides -- a focused box under
    * the pointer must show focus, not hover.
    */
-  border-color: var(--lc-focus-edge);
-  box-shadow: 0 0 0 3px var(--lc-focus-glow);
+  box-shadow: 0 0 0 1px var(--lc-focus-edge), 0 0 0 3px var(--lc-focus-glow);
 }
 
 /* The newline hint, beside the send control and only while there is something
@@ -4889,21 +4888,32 @@ textarea {
   user-select: none;
 }
 
+/*
+ * The page's field (`.mx-chat-input`): 14px on a 16px line, no padding of its
+ * own, 16px above the row. A whole-pixel line is also what puts the row on
+ * whole pixels: the old 13.5px x 1.4 line was 18.9px, and every control below
+ * it sat at a fraction (measured y 590.27, drive-composer-buttons).
+ */
 .lc-composer textarea {
-  flex: 1;
+  flex: none;
+  width: 100%;
   min-width: 0;
-  min-height: 48px;
+  min-height: 16px;
   max-height: 180px;
+  margin: 0 0 16px;
+  padding: 0;
   resize: none;
   border: 0;
   outline: none;
   background: transparent;
-  padding: 15px 0;
-  font-size: var(--lc-text-body);
-  line-height: 1.4;
+  font-size: 14px;
+  line-height: 16px;
   color: var(--lc-text-primary);
 }
 
+/* Readable, not the page's #4e4e4e: here the placeholder says who the
+   message goes to ("it goes to Yurt when this finishes"), which is not
+   decoration. */
 .lc-composer textarea::placeholder {
   color: var(--lc-text-muted);
 }
@@ -5032,9 +5042,9 @@ textarea {
 .lc-composer__controls {
   display: flex;
   align-items: center;
-  gap: var(--lc-space-1);
-  margin-top: 9px;
-  padding: 0 var(--lc-space-1);
+  /* The page's row: 12px between everything (`.mx-chat-bottom`), inside the
+     box now rather than under it. */
+  gap: 12px;
   /*
    * The row does not wrap. It used to, on the reasoning that a wrapped
    * control is better than a cut-off one -- but the composer is capped at
@@ -5080,14 +5090,14 @@ textarea {
 .lc-composer__group {
   display: flex;
   align-items: center;
-  gap: var(--lc-space-1);
+  gap: 12px;
   min-width: 0;
 }
 
 /* Mode and add sit left; route, effort and swarm sit right. */
 .lc-composer__group + .lc-composer__group {
   margin-left: auto;
-  gap: var(--lc-space-5);
+  gap: 12px;
   /*
    * The right group never shrinks below what it holds. It did, and its
    * chips do not shrink, so they spilled out of it -- the swarm mark 4px
@@ -12883,4 +12893,227 @@ textarea {
    * shapes that would survive shrinking are the dense spheres -- a different
    * look, and not the one he picked for this row.
    */
+}
+
+/*
+ * THE METAL COMPOSER -- libraries.dev's metal chatbox, exactly, with Colin's
+ * moves (2026-09-23): the permission mode ("Auto") beside the +, the route
+ * ("Agent") and effort together on the right, the metal send last. Every
+ * value is the page's (`.mx-chip`, `.mx-plus`, `.mx-circle` in its
+ * examples.css); the colours are tokens (tokens.css, "The metal composer").
+ * Last in the file on purpose: these restyle controls whose own rules sit
+ * above, and at equal specificity the later rule wins.
+ */
+
+/* A chip: 36px, a pill, frosted -- a ring and a top highlight, no border. */
+.lc-composer__controls .lc-control--boxed,
+.lc-composer__controls .lc-control--folder {
+  height: 36px;
+  padding: 0 10px 0 14px;
+  gap: 4px;
+  border: 0;
+  border-radius: 50px;
+  background: var(--lc-chip-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--lc-chip-ring),
+    inset 0 1px 0 0 var(--lc-chip-highlight);
+  color: var(--lc-chip-text);
+  font-size: 12px;
+  line-height: 14px;
+}
+
+.lc-composer__controls .lc-control--boxed:hover:not(:disabled),
+.lc-composer__controls .lc-control--folder:hover:not(:disabled) {
+  background: var(--lc-chip-bg-hover);
+}
+
+/* A chip with nothing to open carries no chevron, so no chevron's room. */
+.lc-composer__controls .lc-control--boxed.is-static {
+  padding: 0 14px;
+}
+
+/* The page draws its chevron pointing right and turns it down. */
+.lc-chevron {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--lc-chip-chevron);
+  transform: rotate(90deg);
+}
+
+/*
+ * The gooey + (PlusMenu.tsx), the page's plus menu. A 36px seat in the row;
+ * the liquid's own box is the page's 200 x 140, placed so its slot is the
+ * seat, with room above and to the right for the satellites -- and it lets
+ * clicks through everywhere but its buttons.
+ */
+.lc-plusmenu__seat {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+}
+
+.lc-plusmenu {
+  position: absolute;
+  left: -82px;
+  top: -104px;
+  width: 200px;
+  height: 140px;
+  z-index: 5;
+  pointer-events: none;
+  /* The page's timings: the closing dip, and the icons' fade. */
+  --lc-plusmenu-anticip: 5px;
+  --lc-plusmenu-anticip-dur: 700ms;
+  --lc-plusmenu-icon-dur: 180ms;
+}
+
+.lc-plusmenu__slot {
+  position: absolute;
+  left: 82px;
+  top: 104px;
+}
+
+.lc-plusmenu__button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--lc-chip-text);
+  pointer-events: auto;
+}
+
+.lc-plusmenu__button:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+.lc-plusmenu__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* A satellite answers only once it is out. */
+.lc-plusmenu__satellite {
+  pointer-events: none;
+}
+
+.lc-plusmenu.is-open .lc-plusmenu__satellite {
+  pointer-events: auto;
+}
+
+.lc-plusmenu.is-open .lc-plusmenu__satellite:hover {
+  background: var(--lc-hover-surface);
+}
+
+/* The icons hold back while the blob is merged, then materialise with a soft
+   cross-blur as the satellite pulls clear. */
+.lc-plusmenu__icon {
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  filter: blur(2px);
+  transition: opacity 120ms ease, filter 120ms ease;
+}
+
+.lc-plusmenu.is-open .lc-plusmenu__icon {
+  opacity: 1;
+  filter: blur(0);
+  transition-duration: var(--lc-plusmenu-icon-dur);
+}
+
+.lc-plusmenu__plus {
+  display: grid;
+  place-items: center;
+  transform: rotate(0deg);
+  transition: transform 250ms ease-in-out;
+}
+
+.lc-plusmenu.is-open .lc-plusmenu__plus {
+  transform: rotate(45deg);
+}
+
+/* Closing dips the surface, and the + riding it, toward the returning
+   satellites, then settles. */
+.lc-plusmenu.is-anticipating [data-gooey-svg],
+.lc-plusmenu.is-anticipating .lc-plusmenu__main {
+  animation: lcPlusAnticipate var(--lc-plusmenu-anticip-dur) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lcPlusAnticipate {
+  0% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(var(--lc-plusmenu-anticip));
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-plusmenu__plus,
+  .lc-plusmenu__icon {
+    transition: none;
+  }
+
+  .lc-plusmenu.is-anticipating [data-gooey-svg],
+  .lc-plusmenu.is-anticipating .lc-plusmenu__main {
+    animation: none;
+  }
+}
+
+/* Swarm is a command now (`/swarm`); while it holds the effort, the chip
+   wears the mark, so it is still plain when it is on. */
+.lc-control__swarmmark {
+  height: 14px;
+  width: auto;
+  flex: none;
+}
+
+/* The send: a 40px dark disc, the metal ring around it (`.mx-circle`). Its
+   16px arrow in the 38px inside the border sits 11px in: whole pixels. */
+.lc-composer__controls .lc-send {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--lc-circle-border);
+  border-radius: 50%;
+  background: var(--lc-circle-bg);
+  box-shadow: inset 0 0 50px 0 var(--lc-stop-glow);
+  color: var(--lc-circle-fg);
+}
+
+.lc-composer__controls .lc-send:not(:disabled):hover {
+  border-color: var(--lc-circle-border);
+  background: var(--lc-circle-bg);
+  color: var(--lc-circle-fg);
+}
+
+/* The stop takes the send's seat and size: the same disc, no border, and the
+   page's 12-of-36 square at 14 of 40 -- even, so it lands on whole pixels. */
+.lc-composer__controls .lc-send.is-stop {
+  border: 0;
+  box-shadow:
+    inset 0 0 0 1px var(--lc-border-card),
+    inset 0 0 50px 0 var(--lc-stop-glow);
+  color: var(--lc-text-secondary);
+}
+
+.lc-composer__controls .lc-send.is-stop:not(:disabled):hover {
+  border: 0;
+  background: var(--lc-red-tint);
+  box-shadow: inset 0 0 0 1px var(--lc-red-border);
+  color: var(--lc-red-text);
+}
+
+.lc-composer__controls .lc-stopsquare {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
 }

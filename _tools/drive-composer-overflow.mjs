@@ -84,7 +84,7 @@ try {
   await drive.capture('the row with nothing attached', () => drive.evaluate(measure))
 
   await drive.capture('attach a file', () => drive.evaluate(`(async () => {
-    document.querySelector('button[aria-label="Attach files"]')?.click()
+    document.querySelector('button[data-satellite="attach"]')?.click()
     await new Promise(r => setTimeout(r, 900))
     return 'attached'
   })()`))

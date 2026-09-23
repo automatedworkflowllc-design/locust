@@ -800,6 +800,15 @@ export interface ModeFacts {
   readonly consequence: string
   /** Said to the person, second person, where they are about to choose. */
   readonly sentence: string
+  /**
+   * The chip's word: the slash command's own name for the mode.
+   *
+   * Colin, 2026-09-23, with a frame of the metal composer wrapping onto two
+   * lines: "maybe we can reword accept edits to make room". The menu keeps the
+   * full names and what each one does; the chip on the row says it in the
+   * word `/edit` already uses.
+   */
+  readonly chip: string
 }
 
 /** In the order the composer offers them. */
@@ -807,6 +816,7 @@ export const MODE_FACTS: readonly ModeFacts[] = [
   {
     mode: 'ask',
     name: 'Ask',
+    chip: 'Ask',
     scope: 'read-only',
     short: 'reads and explains, every write refused',
     consequence: 'Reads and explains. Every write is refused by the sandbox.',
@@ -815,6 +825,7 @@ export const MODE_FACTS: readonly ModeFacts[] = [
   {
     mode: 'accept-edits',
     name: 'Accept edits',
+    chip: 'Edit',
     short: 'may change files in this workspace',
     consequence: 'May edit files inside this workspace folder, and nowhere else.',
     sentence:
@@ -823,6 +834,7 @@ export const MODE_FACTS: readonly ModeFacts[] = [
   {
     mode: 'plan',
     name: 'Plan',
+    chip: 'Plan',
     scope: 'read-only',
     short: 'answers with the steps it would take, changes nothing',
     consequence: 'Answers with the steps it would take, and changes nothing.',
@@ -831,6 +843,7 @@ export const MODE_FACTS: readonly ModeFacts[] = [
   {
     mode: 'approve-each',
     name: 'Approve each action',
+    chip: 'Approve',
     short: 'asks before every command or change',
     consequence: 'Stops and asks before every command or file change.',
     sentence: 'Every change waits for your approval before it lands.'
@@ -838,6 +851,7 @@ export const MODE_FACTS: readonly ModeFacts[] = [
   {
     mode: 'auto',
     name: 'Auto',
+    chip: 'Auto',
     scope: 'whole machine',
     short: 'may edit anything on this machine',
     consequence:

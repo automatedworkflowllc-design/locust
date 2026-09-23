@@ -1,5 +1,5 @@
 import mark from '../assets/locust-mark.svg'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
 import type { ClipboardEvent, FormEvent, KeyboardEvent, ReactElement } from 'react'
@@ -30,6 +30,8 @@ import { MetalSend } from './MetalSend.js'
 import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import { isImagePath } from '../../../shared/image-files.js'
 import { ContextRing } from './ContextRing.js'
+import { ArrowUpGlyph, ChevronGlyph } from './ChatGlyphs.js'
+import { PlusMenu } from './PlusMenu.js'
 import type { ContextReading } from '../cost.js'
 import { Icon } from './Icon.js'
 import { Beam } from './Beam.js'
@@ -393,6 +395,9 @@ export function Composer({
   const modeAnchor = useRef<HTMLSpanElement>(null)
   const pickerAnchor = useRef<HTMLSpanElement>(null)
   const effortAnchor = useRef<HTMLSpanElement>(null)
+  /** The chips the send's metal is cast onto -- see `reflectOnto`. */
+  const routeChip = useRef<HTMLButtonElement>(null)
+  const effortChip = useRef<HTMLButtonElement>(null)
   const closeMode = useCallback(() => setModeOpen(false), [])
   const closePicker = useCallback(() => setPickerOpen(false), [])
   const closeEffort = useCallback(() => setEffortOpen(false), [])
@@ -845,6 +850,52 @@ export function Composer({
       ? route
       : { runtime: activeRoute.runtime, model: activeRoute.model }
 
+  /** Attaching, as the + menu's first satellite does it. */
+  const attachFiles = (): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setAttaching(true)
+    void bridge
+      .attachFiles()
+      .then((answer) => {
+        if (answer.ok) {
+          // Deduplicated and capped: the same file twice is one
+          // reference, and the cap is what keeps a stray
+          // multi-select out of the prompt budget.
+          setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
+          /*
+           * The "copied in" fact goes on the TILE, not in a note.
+           *
+           * It was a full-width bordered box above the composer,
+           * the same shape as a text input and directly above
+           * one -- two objects for one event, three stacked rows
+           * above the box, and a transient object carrying a
+           * permanent fact. The file stays copied for as long as
+           * the tile exists, so dismissing the note lost
+           * something still true (design, 2026-09-08).
+           *
+           * Remembered across picks rather than replaced: two
+           * separate attaches each copying one file must leave
+           * both tiles marked.
+           */
+          if (answer.copied !== undefined && answer.copied.length > 0) {
+            setCopiedIn((current) => new Set([...current, ...(answer.copied ?? [])]))
+          }
+        } else if (answer.message.length > 0) {
+          setNote(answer.message)
+        }
+      })
+      .catch(() => setNote('Those files could not be attached. Your message is untouched.'))
+      .finally(() => setAttaching(false))
+  }
+
+  /*
+   * What the send's metal reflects onto: the chip beside it. Held in a memo so
+   * the shader is not handed a new list -- and re-registering -- on every
+   * keystroke.
+   */
+  const effortShown = shownEffort !== undefined && supportedEfforts.length > 0
+  const reflectOnto = useMemo(() => [effortShown ? effortChip : routeChip], [effortShown])
   return (
     <div className="lc-composer">
       <div className="lc-composer__inner">
@@ -1033,92 +1084,30 @@ export function Composer({
               * The fact itself is not lost: it is on the send button's title,
               * where it costs no space in the box.
               */}
-            {running && !canQueue ? (
-              // A mono beam travels the stop button while the run goes --
-              // Colin: "a loading hue for their stop button ... make it mono
-              // instead to make it subtle". It stops with the stopping.
-              // Colin, 2026-09-23: "slightly raise the intensity for the current
-              // mono beam, its not too visible rn" -- full strength here, and
-              // the layers lifted in shell.css (.lc-stopbeam).
-              <Beam size="sm" strength={1} active={!cancelling} className="lc-stopbeam">
-                <button
-                  type="button"
-                  className="send-button lc-send is-stop"
-                  onClick={onCancel}
-                  disabled={cancelling}
-                  aria-label="Stop the running mission"
-                >
-                  {/* A small rounded square, as drawn -- not a pause icon. */}
-                  <span className="lc-stopsquare" />
-                </button>
-              </Beam>
-            ) : canQueue ? (
-              // Typed text turns the control into "queue this", so the stop
-              // button is still one click away with an empty box. What the
-              // button does is what the placeholder just promised.
-              <button
-                type="submit"
-                className="send-button lc-send is-queue"
-                aria-label="Send this when the mission finishes"
-                title="Send this when the mission finishes"
-              >
-                <Icon name="arrow-up" size={14} />
-              </button>
-            ) : (
-              /*
-               * ONE send control, which grows a label when it is about to
-               * do more than send.
-               *
-               * The drawing gives the multi-teammate case a button reading
-               */
-              /*
-               * METAL, AND ONLY ON THIS ONE.
-               *
-               * The design agent's answer to "use it more widely" is no, and
-               * the reason is worth keeping next to the one place it is used:
-               * three metal buttons in a view and metal stops meaning
-               * anything — it becomes the button style, which is decoration.
-               * This button earns it by being the only control in the app
-               * that is purely an invitation rather than a state.
-               *
-               * And two of the candidates are worse than redundant: `Deny` is
-               * destructive and `Approve once` is consequential. Making
-               * either delightful to hover is the wrong nudge on a card whose
-               * whole job is to slow a person down.
-               *
-               * The stop and queue variants above stay plain for the same
-               * reason: one is a state, the other is a deferral.
-               */
-              <MetalSend
-                {...(metal === undefined ? {} : { preset: metal })}
-                {...(metalStrength === undefined ? {} : { strength: metalStrength })}
-                {...(metalMotion === undefined ? {} : { motion: metalMotion })}
-                {...(metalBend === undefined ? {} : { bend: metalBend })}
-                type="submit"
-                className="send-button lc-send"
-                disabled={!canStart}
-                aria-label="Start mission"
-                /*
-                  * A disabled control says why. Sol's beta finding 6: with
-                  * nothing installed, Send was grey and its only word about
-                  * itself was the thing it would not do.
-                  */
-                title={
-                  sendBlockedReason({
-                    nothingInstalled: nothingConnected,
-                    runtimeReady: selectedReady,
-                    routeCanRun,
-                    busy: busyWith !== undefined,
-                    empty: value.trim().length === 0
-                  }) ?? 'Start mission — Shift+Enter for a new line'
-                }
-              >
-                <Icon name="arrow-up" size={14} />
-              </MetalSend>
-            )}
-          </div>
           <div className="lc-composer__controls">
             <div className="lc-composer__group">
+              {/*
+                * The `+`, back as the real thing.
+                *
+                * It was removed in the 0906 design review because it was a
+                * permanently disabled control titled "not built yet" on the
+                * most-visited surface in the app -- "a dead plus costs more
+                * than a missing one". It only returns now because attaching
+                * actually works: the picker is limited to the workspace and
+                * the chosen paths are named in the message, which every
+                * runtime can act on (docs/ATTACHMENTS-INTAKE-2026-09-08.md).
+                */}
+              {/*
+                * The + is libraries.dev's gooey plus menu since the metal
+                * composer (PlusMenu.tsx): Attach files, and Choose a folder,
+                * which left the row with it.
+                */}
+              <PlusMenu
+                disabled={running || attaching}
+                folderMissing={workspacePath === undefined}
+                onAttach={attachFiles}
+                onChooseFolder={onChooseFolder}
+              />
               <span className="lc-control__anchor" ref={modeAnchor}>
                 {modeOpen && (
                   <div className="lc-menu" role="menu" aria-label="Permission mode">
@@ -1197,104 +1186,50 @@ export function Composer({
                   disabled={running}
                   onClick={() => setModeOpen(!modeOpen)}
                 >
-                  <Icon name="shield" size={12} />
-                  {MODES.find((option) => option.mode === effectiveMode)?.name ?? 'Ask'}
-                  <Icon name="chevron-down" size={11} />
+                  {MODES.find((option) => option.mode === effectiveMode)?.chip ?? 'Ask'}
+                  <ChevronGlyph />
                 </button>
               </span>
+              {/*
+                * NO SWARM BUTTON ON THE ROW, since the metal composer.
+                *
+                * Colin put it back once (2026-09-07: "its a good indicator ...
+                * it just looks cool, its our logo"), and let it go on
+                * 2026-09-23: "its going to cause a cache reread for most
+                * models, and is very very niche. we can leave it as a
+                * command maybe?" So it is `/swarm` and Settings, and while
+                * it is on, the effort chip it holds wears the mark.
+                */}
               {/*
                 * Which folder this message runs in. Stated on the bar that
                 * says what the message will do, because it is the same kind
                 * of fact as the mode and the model -- and because an app
                 * launched from the Start menu had no folder at all and no
                 * surface said so (Colin, 2026-09-05).
-                */}
-              <button
-                type="button"
-                className={`lc-control lc-control--folder${workspacePath === undefined ? ' is-missing' : ''}`}
-                disabled={running}
-                title={
-                  workspacePath === undefined
-                    ? 'No folder chosen. Every teammate works inside one project folder.'
-                    : workspaceMade
-                      ? `Teammates work in ${workspacePath}. Locust made this folder; pick any other to work there instead.`
-                      : `Teammates work in ${workspacePath}`
-                }
-                onClick={onChooseFolder}
-              >
-                <Icon name="folder" size={13} />
-                <span className="lc-control__folder">{workspaceName ?? 'No folder'}</span>
-              </button>
-              {/*
-                * The `+`, back as the real thing.
                 *
-                * It was removed in the 0906 design review because it was a
-                * permanently disabled control titled "not built yet" on the
-                * most-visited surface in the app -- "a dead plus costs more
-                * than a missing one". It only returns now because attaching
-                * actually works: the picker is limited to the workspace and
-                * the chosen paths are named in the message, which every
-                * runtime can act on (docs/ATTACHMENTS-INTAKE-2026-09-08.md).
+                * ON THE ROW ONLY WHEN THERE IS NONE, since the metal composer
+                * (2026-09-23): the chosen folder's name is in the title bar,
+                * and choosing another is on the + menu. A missing folder is
+                * still said here, where the message it blocks is written.
                 */}
-              <button
-                type="button"
-                /*
-                 * A bare `+`, not a chip.
-                 *
-                 * It WAS bare, and the design agent's app-wide read
-                 * (2026-09-10) boxed it to stop the row being "seven items,
-                 * four looks". Colin, 2026-09-11, reversing that on purpose:
-                 * "the + for attachments probably doesnt need its own button,
-                 * it can just be the + like it is on claude code." He has the
-                 * final say and this is the reference the app follows. The
-                 * consistency argument was real; it is outranked by the one
-                 * that attaching a file is not a mode you switch, which is
-                 * what the other chips on this row are.
-                 */
-                className="lc-control lc-control--icon lc-control--bare"
-                aria-label="Attach files"
-                title="Attach a file — anywhere on this machine"
-                disabled={running || attaching}
-                onClick={() => {
-                  const bridge = window.desktop
-                  if (bridge === undefined) return
-                  setAttaching(true)
-                  void bridge
-                    .attachFiles()
-                    .then((answer) => {
-                      if (answer.ok) {
-                        // Deduplicated and capped: the same file twice is one
-                        // reference, and the cap is what keeps a stray
-                        // multi-select out of the prompt budget.
-                        setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
-                        /*
-                         * The "copied in" fact goes on the TILE, not in a note.
-                         *
-                         * It was a full-width bordered box above the composer,
-                         * the same shape as a text input and directly above
-                         * one -- two objects for one event, three stacked rows
-                         * above the box, and a transient object carrying a
-                         * permanent fact. The file stays copied for as long as
-                         * the tile exists, so dismissing the note lost
-                         * something still true (design, 2026-09-08).
-                         *
-                         * Remembered across picks rather than replaced: two
-                         * separate attaches each copying one file must leave
-                         * both tiles marked.
-                         */
-                        if (answer.copied !== undefined && answer.copied.length > 0) {
-                          setCopiedIn((current) => new Set([...current, ...(answer.copied ?? [])]))
-                        }
-                      } else if (answer.message.length > 0) {
-                        setNote(answer.message)
-                      }
-                    })
-                    .catch(() => setNote('Those files could not be attached. Your message is untouched.'))
-                    .finally(() => setAttaching(false))
-                }}
-              >
-                <Icon name="plus" size={14} />
-              </button>
+              {workspacePath === undefined && (
+                <button
+                  type="button"
+                  className={`lc-control lc-control--folder${workspacePath === undefined ? ' is-missing' : ''}`}
+                  disabled={running}
+                  title={
+                    workspacePath === undefined
+                      ? 'No folder chosen. Every teammate works inside one project folder.'
+                      : workspaceMade
+                        ? `Teammates work in ${workspacePath}. Locust made this folder; pick any other to work there instead.`
+                        : `Teammates work in ${workspacePath}`
+                  }
+                  onClick={onChooseFolder}
+                >
+                  <Icon name="folder" size={13} />
+                  <span className="lc-control__folder">{workspaceName ?? 'No folder'}</span>
+                </button>
+              )}
             </div>
             <div className="lc-composer__group">
               {context !== undefined ? (
@@ -1338,6 +1273,7 @@ export function Composer({
                   race the first.
                 */}
                 <button
+                  ref={routeChip}
                   type="button"
                   className={`lc-control lc-control--boxed${usagePressing ? ' is-pressing' : ''}`}
                   /*
@@ -1397,7 +1333,7 @@ export function Composer({
                     * on the reference: "allows the user to see effort and
                     * still has dropdown for it."
                     */}
-                  <Icon name="chevron-down" size={11} />
+                  <ChevronGlyph />
                 </button>
               </span>
               {/*
@@ -1512,6 +1448,7 @@ export function Composer({
                     </div>
                   )}
                   <button
+                    ref={effortChip}
                     type="button"
                     className="lc-control lc-control--boxed"
                     aria-haspopup="menu"
@@ -1525,8 +1462,9 @@ export function Composer({
                     disabled={running || swarm}
                     onClick={() => setEffortOpen(!effortOpen)}
                   >
+                    {swarm && <img className="lc-control__swarmmark" src={mark} alt="" aria-hidden="true" />}
                     <span className="lc-control__mono lc-control__effort">{shownEffort}</span>
-                    <Icon name="chevron-down" size={11} />
+                    <ChevronGlyph />
                   </button>
                 </span>
               )}
@@ -1550,40 +1488,100 @@ export function Composer({
                   <span className="lc-control__mono lc-control__effort">effort · fixed</span>
                 </span>
               )}
-              {/*
-                * The swarm mark, back on the composer.
-                *
-                * The design review moved it into the picker's header, and
-                * Colin put it back (2026-09-07): "still leave the swarm button
-                * though, its a good indicator and a fun part of the build...
-                * it just looks cool, its our logo, and feels like something
-                * the user should know is on." The review itself called the
-                * mark "the best small thing in the app", so as an
-                * always-visible state indicator it earns the slot the effort
-                * chip vacated.
-                *
-                * Unlike that chip it is never dead: it stays pressable
-                * whatever the route reports, because swarm is a statement
-                * about every mission rather than about this one.
-                */}
-              <button
-                type="button"
-                className={`lc-swarm${swarm ? ' is-on' : ''}`}
-                aria-pressed={swarm}
-                aria-label="Swarm mode"
-                disabled={running}
-                title={
-                  swarm
-                    ? swarmEffort === undefined
-                      ? 'Swarm on — every mission runs at its model maximum'
-                      : `Swarm on — every mission runs at ${swarmEffort}`
-                    : 'Swarm: run every mission at its model maximum'
-                }
-                onClick={() => onSwarmChange(!swarm)}
-              >
-                <img src={mark} alt="" aria-hidden="true" />
-              </button>
+              {running && !canQueue ? (
+                // A mono beam travels the stop button while the run goes --
+                // Colin: "a loading hue for their stop button ... make it mono
+                // instead to make it subtle". It stops with the stopping.
+                // Colin, 2026-09-23: "slightly raise the intensity for the current
+                // mono beam, its not too visible rn" -- full strength here, and
+                // the layers lifted in shell.css (.lc-stopbeam).
+                <Beam size="sm" strength={1} active={!cancelling} className="lc-stopbeam">
+                  <button
+                    type="button"
+                    className="send-button lc-send is-stop"
+                    onClick={onCancel}
+                    disabled={cancelling}
+                    aria-label="Stop the running mission"
+                  >
+                    {/* A small rounded square, as drawn -- not a pause icon. */}
+                    <span className="lc-stopsquare" />
+                  </button>
+                </Beam>
+              ) : canQueue ? (
+                // Typed text turns the control into "queue this", so the stop
+                // button is still one click away with an empty box. What the
+                // button does is what the placeholder just promised.
+                <button
+                  type="submit"
+                  className="send-button lc-send is-queue"
+                  aria-label="Send this when the mission finishes"
+                  title="Send this when the mission finishes"
+                >
+                  <ArrowUpGlyph />
+                </button>
+              ) : (
+                /*
+                 * ONE send control, which grows a label when it is about to
+                 * do more than send.
+                 *
+                 * The drawing gives the multi-teammate case a button reading
+                 */
+                /*
+                 * METAL, AND ONLY ON THIS ONE.
+                 *
+                 * The design agent's answer to "use it more widely" is no, and
+                 * the reason is worth keeping next to the one place it is used:
+                 * three metal buttons in a view and metal stops meaning
+                 * anything — it becomes the button style, which is decoration.
+                 * This button earns it by being the only control in the app
+                 * that is purely an invitation rather than a state.
+                 *
+                 * And two of the candidates are worse than redundant: `Deny` is
+                 * destructive and `Approve once` is consequential. Making
+                 * either delightful to hover is the wrong nudge on a card whose
+                 * whole job is to slow a person down.
+                 *
+                 * The stop and queue variants above stay plain for the same
+                 * reason: one is a state, the other is a deferral.
+                 */
+                <MetalSend
+                  /*
+                   * As the page's composer draws it: a rim of light along the
+                   * ring's top inside edge, and the metal cast onto the chip
+                   * beside it (there the Auto chip; here whichever sits next
+                   * to the send -- the effort chip, or the route when a model
+                   * has no effort to choose).
+                   */
+                  innerShadow
+                  reflectionTargets={reflectOnto}
+                  {...(metal === undefined ? {} : { preset: metal })}
+                  {...(metalStrength === undefined ? {} : { strength: metalStrength })}
+                  {...(metalMotion === undefined ? {} : { motion: metalMotion })}
+                  {...(metalBend === undefined ? {} : { bend: metalBend })}
+                  type="submit"
+                  className="send-button lc-send"
+                  disabled={!canStart}
+                  aria-label="Start mission"
+                  /*
+                    * A disabled control says why. Sol's beta finding 6: with
+                    * nothing installed, Send was grey and its only word about
+                    * itself was the thing it would not do.
+                    */
+                  title={
+                    sendBlockedReason({
+                      nothingInstalled: nothingConnected,
+                      runtimeReady: selectedReady,
+                      routeCanRun,
+                      busy: busyWith !== undefined,
+                      empty: value.trim().length === 0
+                    }) ?? 'Start mission — Shift+Enter for a new line'
+                  }
+                >
+                  <ArrowUpGlyph />
+                </MetalSend>
+              )}
             </div>
+          </div>
           </div>
         </form>
       </div>
