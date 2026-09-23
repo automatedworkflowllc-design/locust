@@ -23,7 +23,7 @@ import {
   runtimeIsUsable
 } from '../status.js'
 import { defaultEffort, sendBlockedReason } from '../status.js'
-import { routeModelName, shortRuntimeName } from '../routeName.js'
+import { freeTagOf, routeModelName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
 import { MetalSend } from './MetalSend.js'
@@ -842,6 +842,15 @@ export function Composer({
     trailing.length > 0 && namedModel.endsWith(trailing) && namedModel.length > trailing.length
       ? namedModel.slice(0, -trailing.length)
       : namedModel
+  /*
+   * "Free" is its own tag, outside the part that truncates.
+   *
+   * The name ends in it -- "Muse Spark 1.3 Contributor Free" -- and the chip
+   * cuts names at 18 characters, so the one word that says this route costs
+   * nothing was the word cut: "OpenCode / Muse Spark 1.3 C..." on every free
+   * run (Yurt's beta report, #12; the 0.268 design recheck asked for this).
+   */
+  const { name: modelName, free: freeModel } = freeTagOf(modelLabel)
   // What the RUNNING mission is actually on, which is not always what the
   // composer's next-run route says. A handoff has to be measured against the
   // live run, or picking "the same" route would still stop it.
@@ -1322,7 +1331,8 @@ export function Composer({
                     <>
                       {runtimeLabel}
                       <span className="lc-separator">/</span>
-                      <span className="lc-control__mono lc-control__model">{modelLabel}</span>
+                      <span className="lc-control__mono lc-control__model">{modelName}</span>
+                      {freeModel && <span className="lc-control__free">Free</span>}
                     </>
                   )}
                   {/*

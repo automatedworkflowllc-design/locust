@@ -743,3 +743,23 @@ describe("a run the host stopped for output volume", () => {
     expect(failed?.message).not.toContain("without a terminal result record");
   });
 });
+
+describe("a long call is named while it runs", () => {
+  // Colin, 2026-09-23, with a frame of a Claude run eight minutes in: the live
+  // line read "Using a tool... Bash" for the whole call. The start goes out
+  // when the block opens, with the tool's name only; the command and Claude
+  // Code's description of it arrive with the complete message.
+  it("announces the call again once its command and description are known", () => {
+    const n = normalizer();
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "toolu_long", name: "Bash" } } }));
+    const events = n.accept(record({
+      type: "assistant",
+      parent_tool_use_id: null,
+      message: { id: "msg_1", content: [{ type: "tool_use", id: "toolu_long", name: "Bash", input: { command: "cd C:/work && npm test", description: "Run the test suite" } }] },
+    }));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "tool.started", payload: { itemId: "toolu_long", name: "Bash", command: "cd C:/work && npm test", title: "Run the test suite", phase: "started" } });
+    // Said once: the same message again restates nothing.
+    expect(n.accept(record({ type: "assistant", message: { id: "msg_1", content: [{ type: "tool_use", id: "toolu_long", name: "Bash", input: { command: "cd C:/work && npm test", description: "Run the test suite" } }] } }))).toEqual([]);
+  });
+});

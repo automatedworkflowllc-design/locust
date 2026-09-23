@@ -111,3 +111,13 @@ export function routeModelName(runtime: string, modelId: string, earned?: string
   }
   return modelDisplayName(runtime, modelId)
 }
+
+/**
+ * A model name with its trailing "Free" split off, so the route chip can draw
+ * it as a tag that is never cut. The chip truncates names at 18 characters,
+ * and "Muse Spark 1.3 Contributor Free" lost exactly the word that says the
+ * route costs nothing (Yurt's beta report, 2026-09-23, #12).
+ */
+export function freeTagOf(label: string): { readonly name: string; readonly free: boolean } {
+  return / free$/i.test(label) && label.length > 5 ? { name: label.slice(0, -5), free: true } : { name: label, free: false }
+}

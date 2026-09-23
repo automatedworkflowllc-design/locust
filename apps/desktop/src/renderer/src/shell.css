@@ -5266,6 +5266,18 @@ textarea {
   vertical-align: bottom;
 }
 
+/* A free route's tag: never cut, whatever the name beside it is. */
+.lc-control__free {
+  flex: none;
+  margin-left: var(--lc-space-2);
+  padding: 0 5px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: 4px;
+  font-size: var(--lc-text-mono-caption);
+  line-height: 16px;
+  color: var(--lc-text-muted);
+}
+
 .lc-separator {
   color: var(--lc-text-faint);
 }

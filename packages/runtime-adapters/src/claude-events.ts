@@ -752,6 +752,7 @@ export function createClaudeEventNormalizer(
       }
       // The same record carries every tool_use block with its input filled
       // in, which is the first point the target is knowable.
+      const restated: NormalizedRuntimeEvent[] = [];
       for (const block of content) {
         if (!isObject(block) || stringValue(block.type) !== "tool_use") continue;
         const itemId = identityValue(block.id);
@@ -768,14 +769,40 @@ export function createClaudeEventNormalizer(
             ...(title === undefined ? {} : { title }),
             ...(background ? { background: true } : {})
           });
+          /*
+           * And the call is announced again, now that it can be named.
+           *
+           * The start went out when the block opened, with the tool's name
+           * and nothing else, and the command and its description only
+           * travelled with the call's END -- so a Bash call running for eight
+           * minutes read "Using a tool... Bash" the whole time (Colin, with
+           * a frame of it, 2026-09-23: "i find it hard to believe ... after 8
+           * minutes of working thats the only info the user has been given").
+           * The thread updates the open row it already has.
+           */
+          if (open.target === undefined && open.title === undefined) {
+            restated.push(
+              emit("tool.started", {
+                itemId,
+                toolKind: "tool_use",
+                name: open.name,
+                ...(target === undefined ? {} : { command: target }),
+                ...(title === undefined ? {} : { title }),
+                ...(background ? { background: true } : {}),
+                phase: "started",
+                evidence,
+              }),
+            );
+          }
         }
       }
       const text = content
         .map((block) => (isObject(block) ? stringValue(block.text) : undefined))
         .filter((value): value is string => value !== undefined)
         .join("");
-      if (text.length === 0) return [];
+      if (text.length === 0) return restated;
       return [
+        ...restated,
         emit("message.delta", {
           // The block the text streamed into, not an assumed one.
           itemId: textBlockId ?? "block_0",

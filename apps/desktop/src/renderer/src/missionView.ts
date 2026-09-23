@@ -2298,6 +2298,21 @@ export function buildThread(
           ...(event.payload.background === true ? { background: true } : {}),
           settled: false
         }
+        /*
+         * A call announced again is the same call, named now.
+         *
+         * Claude Code's start carries the tool's name only; its adapter
+         * restates the start when the call's input arrives, with the command
+         * and the model's description of it (claude-events.ts). The row it
+         * already drew takes the names, and keeps its place and its clock.
+         */
+        const already = openTools.get(event.payload.itemId)
+        if (already !== undefined) {
+          const at = activity.indexOf(already)
+          openTools.set(event.payload.itemId, detail)
+          if (at !== -1) activity[at] = detail
+          break
+        }
         openTools.set(event.payload.itemId, detail)
         // Whether it reaches OFF this machine, decided by the same split the
         // row uses. `tool !== name` cannot answer it: an ordinary call names
@@ -2792,7 +2807,10 @@ export function buildThread(
       items.push({
         key: 'live-step',
         type: 'live-step',
-        label: openTool.name,
+        // What the model said the call is for, where it said: "Run the test
+        // suite" says more over eight minutes than `npm test`, and far more
+        // than "Bash". The command is on its row below.
+        label: openTool.title ?? openTool.name,
         detail: openToolMeta.connector,
         startedAt: turnStartedAt ?? openToolMeta.at,
         kind: 'item',

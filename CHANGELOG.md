@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.289.0 - 2026-09-23
+
+### Improved
+
+- **A long command says what it is for while it runs.** Under a Claude Code
+  teammate the live line read "Using a tool... Bash" for as long as a command
+  ran. It now says what the teammate said the command is for -- "Run the test
+  suite" -- within a second of it starting.
+
+### Fixed
+
+- **"Free" stays on the model chip.** A free model's name was cut just before
+  the word Free. It is a tag of its own now, and never cut.
+
+- **Settings say why.** The relay's own settings are greyed out until
+  teammates reply to each other, and now say so when you point at them.
+
 ## 0.288.0 - 2026-09-23
 
 ### Fixed

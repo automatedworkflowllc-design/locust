@@ -66,6 +66,10 @@ export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms
  * One component, so a third form cannot appear by being written rather than
  * imported.
  */
+
+/** Why the relay's own settings are off while it is. */
+const RELAY_FIRST = 'This applies once teammates reply to each other. Switch that on first.'
+
 export function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
   return (
     <div className="lc-screen__header">
@@ -1548,6 +1552,9 @@ export function SettingsScreen({
                 aria-checked={interrupt}
                 aria-label={interrupt ? 'Switch this off' : 'Switch this on'}
                 disabled={!relay}
+                // A control that is off for a reason says the reason (Yurt's
+                // beta report, #13: "disabled with no reason given").
+                title={relay ? undefined : RELAY_FIRST}
                 onClick={() => onInterruptChange(!interrupt)}
               >
                 <span className="lc-switch__knob" />
@@ -1572,6 +1579,7 @@ export function SettingsScreen({
                     aria-checked={relayHopCap === cap}
                     className={`lc-button${relayHopCap === cap ? ' is-active' : ''}`}
                     disabled={!relay}
+                    title={relay ? undefined : RELAY_FIRST}
                     onClick={() => onRelayHopCapChange(cap)}
                   >
                     {String(cap)}
