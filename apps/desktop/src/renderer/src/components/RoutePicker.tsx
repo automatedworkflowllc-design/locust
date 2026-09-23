@@ -5,7 +5,7 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
-import { modelDisplayName } from '../routeName.js'
+import { modelDisplayName, routeModelName } from '../routeName.js'
 import { FREE_START_RUNTIME } from '../../../shared/runtime-install.js'
 
 export interface RouteChoice {
@@ -104,7 +104,15 @@ function buildRows(
                * gave is left exactly as the runtime wrote it: this spells
                * identifiers, it does not restyle anybody's product name.
                */
-              label: model.displayName === model.id ? modelDisplayName(runtime.id, model.id) : model.displayName,
+              // Claude's rows name the version their alias runs -- what a
+              // finished run on the route reported, else Claude Code's own
+              // table (see routeModelName) -- the same words as the chip.
+              label:
+                runtime.id === 'claude'
+                  ? routeModelName(runtime.id, model.id, name)
+                  : model.displayName === model.id
+                    ? modelDisplayName(runtime.id, model.id)
+                    : model.displayName,
               /*
                * ONE LINE PER MODEL, the way Claude Code's and Codex's own
                * pickers draw them.

@@ -37,6 +37,7 @@ function chip(mode: MissionMode, runtime = 'claude'): string {
     limitedRuntimes: new Map(),
     discoveryPhase: 'ready',
     models: [],
+    resolvedModels: new Map(),
     route: ROUTE(runtime),
     mode,
     onModeChange: () => undefined,

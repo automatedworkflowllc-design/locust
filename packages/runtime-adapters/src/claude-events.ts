@@ -398,6 +398,14 @@ export function createClaudeEventNormalizer(
     if (type === undefined) return [];
     const evidence = evidenceFor(record, parsed, type);
 
+    // A running tool's heartbeat: which tool, and how long it has been going
+    // (Claude Code 2.1.280 sends one while a long tool runs, and for a
+    // subagent's API retries). The tool's own result arrives separately and
+    // the live line already times the step, so there is nothing in it a
+    // person reads -- it was reaching the thread as "Unhandled Claude record:
+    // tool_progress" (Colin, 2026-09-22, with a frame of it).
+    if (type === "tool_progress") return [];
+
     if (type === "rate_limit_event") {
       const info = isObject(parsed.rate_limit_info) ? parsed.rate_limit_info : {};
       const kind = limitKindFor(info.status);

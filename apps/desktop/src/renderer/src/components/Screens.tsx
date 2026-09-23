@@ -4,7 +4,7 @@ import { AgentText } from './ThreadItems.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
-import { modelDisplayName, shortRuntimeName } from '../routeName.js'
+import { modelDisplayName, routeModelName, shortRuntimeName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type {
@@ -572,7 +572,7 @@ export function TeammatesScreen({
                   ) : (
                     <>
                       <span className="lc-rostercard__model">
-                        {shortRuntimeName(teammate.route.runtime)} / {modelDisplayName(teammate.route.runtime, teammate.route.model)}
+                        {shortRuntimeName(teammate.route.runtime)} / {routeModelName(teammate.route.runtime, teammate.route.model)}
                       </span>
                       <span>{modeLabel(teammate.route.mode)}</span>
                     </>

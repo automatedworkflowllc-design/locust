@@ -567,6 +567,20 @@ describe("the signals Claude Code gives a person about what is happening (measur
   });
 });
 
+describe("a running tool's heartbeat", () => {
+  // The shapes Claude Code 2.1.280 writes, from its own emitter: a heartbeat
+  // for a long tool, and a subagent's API retry.
+  it("is not a thread item, and never an unhandled record", () => {
+    const n = normalizer();
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_9", name: "Bash" } } }));
+    expect(n.accept(record({ type: "tool_progress", tool_use_id: "toolu_9", tool_name: "Bash", parent_tool_use_id: null, elapsed_time_seconds: 31, heartbeat: true, session_id: "s1", uuid: "u1" }))).toEqual([]);
+    expect(n.accept(record({ type: "tool_progress", tool_use_id: "toolu_9", tool_name: "Agent", parent_tool_use_id: null, elapsed_time_seconds: 0, subagent_type: "Explore", subagent_retry: { agent_id: "a1", attempt: 2, max_retries: 10 }, session_id: "s1", uuid: "u2" }))).toEqual([]);
+    // The tool still finishes as itself.
+    const result = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_9", content: "ok" }] } }));
+    expect(result[0]).toMatchObject({ type: "tool.completed", payload: { itemId: "toolu_9", name: "Bash" } });
+  });
+});
+
 describe("a still-allowed rate limit is a usage window", () => {
   it("words the windows, fullest first, with when they reset", () => {
     expect(usageWindowText({ five_hour: { utilization: 0.35, resetsAt: 1788660600 }, seven_day: { utilization: 0.5, resetsAt: 1788764400 } })).toMatch(/^7-day window 50% used · resets .+ · 5-hour window 35% used · resets .+$/);

@@ -29,14 +29,14 @@ const claude: PublicRuntimeStatus = {
 const fable: PublicModel = {
   id: 'fable',
   runtime: 'claude',
-  displayName: 'Fable',
-  description: 'Newest fable model · resolved by Claude Code at launch',
+  displayName: 'Fable 5.1',
+  description: 'Always the newest Fable',
   supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max']
 }
 const bare: PublicModel = {
   id: 'sonnet',
   runtime: 'claude',
-  displayName: 'Sonnet',
+  displayName: 'Sonnet 5',
   // A catalogue with nothing to say about it.
   description: '',
   supportedEfforts: ['low', 'high']
@@ -65,13 +65,13 @@ const detailOf = (html: string, label: string): string => {
 describe('a model is one line in the picker', () => {
   it('keeps what the catalogue says, and leaves the effort levels to the hover', () => {
     const html = draw([fable])
-    expect(detailOf(html, 'Fable')).toBe('Newest fable model · resolved by Claude Code at launch')
+    expect(detailOf(html, 'Fable 5.1')).toBe('Always the newest Fable')
     // Nothing lost: the hover carries all of it, levels included.
-    expect(html).toContain('title="Fable · Newest fable model · resolved by Claude Code at launch · 5 effort levels · low, medium, high, xhigh, max"')
+    expect(html).toContain('title="Fable 5.1 · Always the newest Fable · 5 effort levels · low, medium, high, xhigh, max"')
   })
 
   it('a model the catalogue says nothing about keeps its levels as its line', () => {
-    expect(detailOf(draw([bare]), 'Sonnet')).toBe('2 effort levels · low, high')
+    expect(detailOf(draw([bare]), 'Sonnet 5')).toBe('2 effort levels · low, high')
   })
 
   // The layout half -- that the line is DRAWN to stay one line -- is checked

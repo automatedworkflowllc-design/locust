@@ -284,7 +284,23 @@ describe('Claude models from what its CLI advertised', () => {
     const none = claudeModelsFrom([claude('ready', { aliases: [], efforts: ['high'] })])
     expect(none).toEqual([])
     const haiku = claudeModelsFrom([claude('ready', { aliases: ['opus'], efforts: [] })]).at(-1)
-    expect(haiku?.displayName).toBe('Haiku')
+    expect(haiku?.displayName).toBe('Haiku 4.5')
+  })
+
+  it("names the version each alias runs, from Claude Code's own alias table", () => {
+    /*
+     * Colin, 2026-09-22: "can we have the model type listed for claude?
+     * right now it just shows opus latest model, fable latest model". The
+     * names come from the registry compiled into Claude Code 2.1.280
+     * (`aliases.<family>.default`) -- see shared/claude-models.ts.
+     */
+    const models = claudeModelsFrom([claude('ready', { aliases: ['fable', 'opus', 'sonnet'], efforts: [] })])
+    expect(models.map((model) => model.displayName)).toEqual(['Fable 5.1', 'Opus 5.5', 'Sonnet 5', 'Haiku 4.5'])
+    // What the alias is for: it moves with its family.
+    expect(models[1]?.description).toBe('Always the newest Opus')
+    // An alias the table does not know keeps its own name, not a made-up version.
+    const unknown = claudeModelsFrom([claude('ready', { aliases: ['mythic'], efforts: [] })])
+    expect(unknown[0]?.displayName).toBe('Mythic')
   })
 
   it('offers nothing for a Claude that is not ready, or that advertised nothing', () => {

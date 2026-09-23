@@ -2457,7 +2457,14 @@ export function buildThread(
         // item. Only the former is worth interrupting an empty thread for.
         // A usage window is state the host keeps, not a line in the thread.
         if (/\.usage_window$/.test(event.payload.code)) break
-        if (!workBegan && !/\.(runtime_error|notification)$/.test(event.payload.code)) {
+        // A record the adapter does not know yet is this app's gap, not the
+        // run's news: a runtime updates and adds record types before Locust
+        // has learned them, and Claude Code 2.1.280's `tool_progress` heartbeat
+        // reached the middle of a conversation as "Unhandled Claude record:
+        // tool_progress" (Colin, 2026-09-22: "?"). It goes to the fold's foot
+        // with the turn's other remarks -- still readable, out of the thread.
+        const unknownRecord = /\.unknown_event$/.test(event.payload.code)
+        if (unknownRecord || (!workBegan && !/\.(runtime_error|notification)$/.test(event.payload.code))) {
           /*
            * Not shown in the thread -- and, until now, not shown anywhere.
            *

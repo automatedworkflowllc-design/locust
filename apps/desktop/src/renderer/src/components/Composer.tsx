@@ -23,7 +23,7 @@ import {
   runtimeIsUsable
 } from '../status.js'
 import { defaultEffort, sendBlockedReason } from '../status.js'
-import { modelDisplayName, shortRuntimeName } from '../routeName.js'
+import { routeModelName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
 import { MetalSend } from './MetalSend.js'
@@ -817,9 +817,10 @@ export function Composer({
   // family name; showing the stand-in variant's id ("cursor-grok-4.6-high-fast")
   // beside "effort · low" read as two different answers (2026-09-06).
   const shownEntry = models.find((model) => model.runtime === shownRuntime && model.id === shownModel)
-  const namedModel = modelDisplayName(
+  const namedModel = routeModelName(
     shownRuntime,
-    shownEntry?.variants !== undefined ? shownEntry.displayName : shownModel
+    shownEntry?.variants !== undefined ? shownEntry.displayName : shownModel,
+    resolvedModels.get(`${shownRuntime}:${shownModel}`)
   )
   /*
    * Not twice on one row. Cursor carries the effort INSIDE the id

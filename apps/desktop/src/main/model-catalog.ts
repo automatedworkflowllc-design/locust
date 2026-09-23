@@ -2,6 +2,7 @@ import { createAppServerClient } from '@teammate/runtime-adapters'
 import type { MissionRuntimeId, RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 import type { PublicModel, ModelCatalogResponse } from '../shared/ipc.js'
+import { CLAUDE_ALIAS_DEFAULTS, claudeModelName } from '../shared/claude-models.js'
 import type { AppServerRunProcess as AppServerProcess } from '@teammate/runtime-adapters'
 
 /**
@@ -175,18 +176,24 @@ export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   const aliases = hints.aliases.length === 0
     ? []
     : [...hints.aliases, ...CLAUDE_ALIASES_MEASURED.filter((alias) => !hints.aliases.includes(alias))]
-  return aliases.map((alias) => ({
-    id: alias,
-    runtime: 'claude',
-    // The alias IS the name here. Claude Code resolves it to whichever model
-    // is newest in that family at the moment a mission starts, so a version
-    // number printed here would be this build's guess about the runtime's
-    // future -- the shell shows the resolved name once a mission has reported
-    // one instead.
-    displayName: `${alias.charAt(0).toUpperCase()}${alias.slice(1)}`,
-    description: `Newest ${alias} model · resolved by Claude Code at launch`,
-    supportedEfforts: hints.efforts
-  }))
+  return aliases.map((alias) => {
+    const family = `${alias.charAt(0).toUpperCase()}${alias.slice(1)}`
+    const meant = CLAUDE_ALIAS_DEFAULTS[alias]
+    return {
+      id: alias,
+      runtime: 'claude',
+      // The version the alias means, from Claude Code's own model registry
+      // (see shared/claude-models.ts) -- "Opus 5.5", not "Opus". A run that
+      // reports something else wins on its own route (the picker and the
+      // chip read the resolved name first). An alias the table does not
+      // know keeps its own name rather than a made-up version.
+      displayName: (meant === undefined ? undefined : claudeModelName(meant)) ?? family,
+      // What the alias is FOR: it moves with the family, which is the one
+      // thing a pinned version would not do.
+      description: `Always the newest ${family}`,
+      supportedEfforts: hints.efforts
+    }
+  })
 }
 
 /** The effort suffixes Cursor encodes in a model id, longest first. */

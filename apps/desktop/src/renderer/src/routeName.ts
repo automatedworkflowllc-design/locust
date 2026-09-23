@@ -2,6 +2,7 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
 import { modelLabelFor } from './status.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
+import { claudeRouteModelName } from '../../shared/claude-models.js'
 
 /**
  * How a route reads when it is CHROME rather than prose.
@@ -90,4 +91,23 @@ export function modelDisplayName(runtime: string, modelId: string): string {
   // An id that is ONLY the runtime's name has nothing left to show; the id
   // itself is then the honest label.
   return bare.length === 0 ? spellOut(named) : spellOut(bare)
+}
+
+/**
+ * The model a ROUTE will run, for the controls that pick or show one: the
+ * composer's chip, the picker, a teammate's route.
+ *
+ * For Claude Code that is the version the alias means -- `Claude / Opus 5.5`,
+ * the chip Colin wrote out on 2026-09-11 (*"Claude / Fable 5.1"*) -- taken
+ * from what a finished run on that route reported (`earned`) and otherwise
+ * from Claude Code's own alias table. A past mission's row keeps
+ * `modelDisplayName`: `opus` in August meant whatever it meant then, and
+ * today's version would be a claim about a run nobody measured.
+ */
+export function routeModelName(runtime: string, modelId: string, earned?: string): string {
+  if (runtime === 'claude') {
+    const named = claudeRouteModelName(modelId, earned)
+    if (named !== undefined) return named
+  }
+  return modelDisplayName(runtime, modelId)
 }

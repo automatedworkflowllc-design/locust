@@ -6,6 +6,23 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.273.0 - 2026-09-22
+
+- **Claude's models say which version they are.** The picker listed Claude
+  Code's models as Opus, Fable, Sonnet and Haiku, each "the newest", without
+  saying which. They now read **Opus 5.5, Fable 5.1, Sonnet 5 and Haiku
+  4.5**, and the chip under the message box reads *Claude / Opus 5.5*. The
+  versions come from Claude Code's own table of what each name means; they
+  still move with the family, and once you have run one, it shows exactly
+  what that run used.
+
+- **No more "Unhandled Claude record" in the middle of a conversation.** A
+  new kind of message from Claude Code, sent while a long tool is still
+  running, showed up as a line of its own reading *Unhandled Claude record:
+  tool_progress*. Locust now understands it and says nothing. And the next
+  time any coding agent sends something Locust has not learned yet, the note
+  goes into the run's folded work details instead of your conversation.
+
 ## 0.272.0 - 2026-09-22
 
 - **The home screen is the whole cover now.** 0.270 put only the Locust
