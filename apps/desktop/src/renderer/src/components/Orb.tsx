@@ -1,4 +1,5 @@
-import { ThinkingOrb } from 'thinking-orbs'
+import { useEffect, useRef, useState } from 'react'
+import { MODE_DRAWS, ThinkingOrb, resolvePreset } from 'thinking-orbs'
 
 import type { OrbState } from 'thinking-orbs'
 import type { ReactElement } from 'react'
@@ -89,15 +90,149 @@ export function Orb({
   readonly preset?: 20 | 64
 }): ReactElement {
   const dense = preset === undefined ? DENSE.has(state) : preset === 64
+  if (dense) return <PaintedDown state={state} box={box} label={label} />
   return (
     <ThinkingOrb
       state={state}
-      size={dense ? 64 : 20}
+      size={20}
       theme="dark"
       // An outline shape keeps its own 20px drawing at its own 20px size,
       // centred in the same box. Painting it into 26 would stretch a design
       // tuned for 20 and undo the point of keeping it.
-      style={dense ? { width: box, height: box, display: 'block' } : { display: 'block' }}
+      style={{ display: 'block' }}
+      {...(label === undefined ? { 'aria-hidden': true } : { 'aria-label': label })}
+    />
+  )
+}
+
+/** How many times larger the 64 design is drawn before it is painted down. */
+export const PAINT_DOWN_FACTOR = 4
+
+/**
+ * THE 64 DESIGN, PAINTED DOWN WELL.
+ *
+ * Colin, 2026-09-22: "make sure they are as sharp as they can be ... is there
+ * anyway you would improve on them visually". The designs were never the
+ * problem -- every file is the published tarball's -- but the LAST STEP was.
+ * The library sizes its canvas by its preset, 64 CSS px, and this box is 26,
+ * so the browser shrank a finished 64px bitmap by 2.46 on every frame. At a
+ * ratio that is not a whole number, and more than two, the compositor's
+ * filter samples some of a dot's pixels and skips others: dots flared,
+ * vanished, and swapped as they moved.
+ *
+ * MEASURED against the best picture 26 device pixels can hold -- the same
+ * frame drawn 8x larger and averaged down exactly -- at eight moments of all
+ * six density shapes (scratchpad orbs/score.py, 2026-09-22):
+ *
+ *   the library's 64 canvas shrunk by CSS  mean error 10.4, swinging up to 1.3 frame to frame
+ *   drawn by the engine straight at 26     17.7 (sub-pixel dots are painted fat)
+ *   drawn at exactly 2x, shrunk by CSS      5.3
+ *   drawn at 4x, shrunk with 'high'         0.9, steady to 0.08
+ *
+ * So: the library's own engine and presets (`resolvePreset`, `MODE_DRAWS`,
+ * the 64 design, its speed), drawn four times larger than the box, and
+ * shrunk by the canvas with high-quality smoothing -- the same "bigger asset
+ * painted down" rule as before, done by a filter that looks at every pixel.
+ * Everything else the library does is kept: a still frame for reduced
+ * motion, and no drawing while the orb is off screen or the window hidden.
+ */
+function PaintedDown({
+  state,
+  box,
+  label
+}: {
+  readonly state: OrbState
+  readonly box: number
+  readonly label: string | undefined
+}): ReactElement {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const [reduced, setReduced] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+  )
+
+  useEffect(() => {
+    const query = typeof window === 'undefined' ? undefined : window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    if (query === undefined) return undefined
+    const change = (event: MediaQueryListEvent): void => setReduced(event.matches)
+    query.addEventListener('change', change)
+    return () => query.removeEventListener('change', change)
+  }, [])
+
+  useEffect(() => {
+    const canvas = ref.current
+    if (canvas === null) return undefined
+    // The library's own rule for pixel density, capped at 2.
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    const side = Math.round(box * dpr)
+    canvas.width = side
+    canvas.height = side
+    const shown = canvas.getContext('2d')
+    const big = document.createElement('canvas')
+    big.width = side * PAINT_DOWN_FACTOR
+    big.height = side * PAINT_DOWN_FACTOR
+    const drawn = big.getContext('2d')
+    if (shown === null || drawn === null) return undefined
+    const { mode, speed, opts } = resolvePreset(state, 64)
+    const paint = MODE_DRAWS[mode]
+    const k = big.width / 64
+    const frame = (t: number): void => {
+      drawn.setTransform(k, 0, 0, k, 0, 0)
+      drawn.clearRect(0, 0, 64, 64)
+      paint(drawn, 64, t, true, opts)
+      shown.clearRect(0, 0, side, side)
+      shown.imageSmoothingEnabled = true
+      shown.imageSmoothingQuality = 'high'
+      shown.drawImage(big, 0, 0, side, side)
+    }
+    if (reduced) {
+      // The library's own still: the same moment it shows.
+      frame(0.6)
+      return undefined
+    }
+    let handle = 0
+    let running = false
+    const loop = (): void => {
+      frame((performance.now() / 1000) * speed)
+      if (running) handle = requestAnimationFrame(loop)
+    }
+    const start = (): void => {
+      if (running) return
+      running = true
+      handle = requestAnimationFrame(loop)
+    }
+    const stop = (): void => {
+      running = false
+      cancelAnimationFrame(handle)
+    }
+    frame((performance.now() / 1000) * speed)
+    let onScreen = true
+    const watch =
+      typeof IntersectionObserver === 'undefined'
+        ? undefined
+        : new IntersectionObserver(([entry]) => {
+            onScreen = entry?.isIntersecting ?? true
+            if (onScreen && document.visibilityState !== 'hidden') start()
+            else stop()
+          })
+    watch?.observe(canvas)
+    const onVisibility = (): void => {
+      if (document.visibilityState === 'hidden') stop()
+      else if (onScreen) start()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    if (watch === undefined) start()
+    return () => {
+      stop()
+      watch?.disconnect()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [state, box, reduced])
+
+  return (
+    <canvas
+      ref={ref}
+      role="img"
+      style={{ width: box, height: box, display: 'block' }}
       {...(label === undefined ? { 'aria-hidden': true } : { 'aria-label': label })}
     />
   )

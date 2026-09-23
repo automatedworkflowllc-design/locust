@@ -41,7 +41,10 @@ describe('the orb uses the asset that reads', () => {
     // design fattens them on purpose; the 64 one is hairline.
     expect(set).not.toContain("'shaping'")
     expect(set).not.toContain("'breathing'")
-    expect(orb).toContain('size={dense ? 64 : 20}')
+    // The outline shapes keep the library's own 20px component; the density
+    // shapes are the 64 design, painted down (see the next test).
+    expect(orb).toContain('size={20}')
+    expect(orb).toContain('resolvePreset(state, 64)')
   })
 
   it('does not shrink the sidebar row, because this shape has no room to', () => {
@@ -61,6 +64,16 @@ describe('the orb uses the asset that reads', () => {
      */
     const row = css.slice(css.indexOf('.lc-row__orb > * {'))
     expect(row.slice(0, 1600)).not.toContain('transform: scale(')
+  })
+
+  it('paints the 64 design down with a filter that looks at every pixel', () => {
+    // 2026-09-22: the CSS shrink of the 64 canvas (2.46x) sampled some of a
+    // dot's pixels and skipped others -- error 10.4 against the ideal 26px
+    // picture, flickering frame to frame. Drawn 4x and shrunk with 'high'
+    // smoothing: 0.9, steady.
+    expect(orb).toContain('export const PAINT_DOWN_FACTOR = 4')
+    expect(orb).toContain("imageSmoothingQuality = 'high'")
+    expect(orb).toContain('MODE_DRAWS[mode]')
   })
 
   it('never scales a raster to get a bigger orb', () => {
