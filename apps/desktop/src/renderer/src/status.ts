@@ -302,6 +302,17 @@ export interface TeammateStatusView {
 }
 
 /**
+ * A teammate's state in words, for a face that stands with none beside it --
+ * the faces strip, the compact rail. There a bot said "working" or "waiting
+ * on you" by moving, a dot and a colour, and a screen reader heard only the
+ * name (the harness pass, 2026-09-23; Yurt's #4 took colour away as well).
+ * Blocked says why, since "blocked" alone is no use to act on.
+ */
+export function stateInWords(view: TeammateStatusView): string {
+  return view.status === 'blocked' ? view.label : faceLabel(view.activity)
+}
+
+/**
  * Which runtime a teammate is judged against, decided in ONE place.
  *
  * Their running mission's, then any past mission's, then the route they are

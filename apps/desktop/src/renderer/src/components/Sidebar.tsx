@@ -17,6 +17,7 @@ import {
   runtimeIsUsable,
   shortMissionId,
   runtimeOfTeammate,
+  stateInWords,
   teammateStatusView
 } from '../status.js'
 import { TeammateBot } from './TeammateBot.js'
@@ -981,6 +982,10 @@ export function Sidebar({
                 // unbroken line underneath it is the worse of two answers.
                 // The label stays for anyone who cannot see either.
                 aria-label={`${teammate.name} — open their conversation`}
+                // What the bot says by moving, in words. A description, not
+                // part of the name: the name is what pressing it does, and
+                // the drives find a face by it (drive-lib's teammateFace).
+                aria-description={status === undefined ? undefined : stateInWords(status)}
                 ref={(node) => {
                   if (node === null) railSlots.current.delete(teammate.teammateId)
                   else railSlots.current.set(teammate.teammateId, node)
@@ -1223,7 +1228,11 @@ export function Sidebar({
                   // No native title in the rail: the flyout says the same three
                   // facts as real text, and a tooltip fading in over a panel is
                   // two answers to one question. The full sidebar keeps it.
-                  {...(compact ? { 'aria-label': teammateTooltip(teammate) } : { title: teammateTooltip(teammate) })}
+                  // The rail hides the row's words, the state among them, so
+                  // a screen reader is told it here; the full row says it.
+                  {...(compact
+                    ? { 'aria-label': teammateTooltip(teammate), 'aria-description': stateInWords(status) }
+                    : { title: teammateTooltip(teammate) })}
                   aria-expanded={compact ? railOpenFor === teammate.teammateId : undefined}
                   onClick={() => {
                     onSelectTeammate(teammate.teammateId)
