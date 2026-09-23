@@ -1,12 +1,16 @@
-// The mono beams: round the title box, and round the stop button while a run
-// goes -- photographed, and what they cost.
+// The mono beams: round the title box while the runtimes are being found, and
+// round the stop button while a run goes -- photographed, and what they cost.
 //
 //   node _tools/drive-beams.mjs [--packaged <exe>]
 //
 // Colin, 2026-09-23, on libraries.dev/beam: "a loading hue for their stop
 // button ... make it mono instead to make it subtle", and "a rotate large
-// mono around the title box with the logo in it". One message on the free
-// OpenCode route, to have a stop button to look at. Spends nothing.
+// mono around the title box with the logo in it" -- and then, having seen the
+// title's run beside the bots: "it just makes it look like something is
+// loading that isnt loading". So the title's beam is checked twice: running
+// while discovery runs (the bots still), and out once the lockup lights.
+// One message on the free OpenCode route, to have a stop button to look at.
+// Spends nothing.
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -53,8 +57,25 @@ const metric = async () => {
   return result?.result?.metrics?.find((entry) => entry.name === 'TaskDuration')?.value ?? 0
 }
 
+// The cover's own word for whether discovery is done: its bots are drawn
+// still, as `data-state="still"`, until the runtimes have answered.
+const LOADING = `!!document.querySelector('.lc-cover .lc-bot[data-state="still"]')`
+
 try {
+  // BEFORE drive.ready(), which waits for discovery to finish: the beam is
+  // meant to be seen while it has not.
+  await drive.waitFor(`!!document.querySelector('.lc-coverbeam')`, { timeoutMs: 30_000, what: 'the home screen' })
+  const loading = await drive.evaluate(LOADING)
+  if (loading) {
+    const whileLoading = JSON.parse(await drive.evaluate(beamAnimations('.lc-coverbeam')))
+    say(`while the runtimes are being found: ${JSON.stringify(whileLoading)}`)
+    check('while the runtimes are being found, the title box wears a travelling beam', whileLoading.some((a) => a.state === 'running'), JSON.stringify(whileLoading))
+    await clip('title-loading.png', '.lc-coverbeam', 16)
+  } else {
+    check('the home screen was seen while the runtimes were still being found', false, 'discovery had finished before the first look')
+  }
   await drive.ready()
+  await drive.waitFor(`!document.querySelector('.lc-cover .lc-bot[data-state="still"]')`, { timeoutMs: 40_000, what: 'the lockup to light' })
   await drive.waitFor(`!!document.querySelector('.lc-intro')`, { timeoutMs: 40_000, what: 'probing done' })
   await sleep(4000)
   const cover = JSON.parse(await drive.evaluate(`(() => {
@@ -66,17 +87,14 @@ try {
   say(`title box beam: ${JSON.stringify(cover)}`)
   const coverAnims = JSON.parse(await drive.evaluate(beamAnimations('.lc-coverbeam')))
   say(`running in the title box beam: ${JSON.stringify(coverAnims)}`)
-  check('the title box wears the beam, travelling', cover.wrap && coverAnims.some((a) => a.state === 'running'), JSON.stringify(coverAnims))
-  check("the beam takes the card's whole width", cover.width === cover.card, `${cover.width} vs ${cover.card}`)
-  for (const [index, wait] of [[1, 0], [2, 500], [3, 500]]) {
-    await sleep(wait)
-    await clip(`title-${String(index)}.png`, '.lc-coverbeam', 16)
-  }
+  check('once the lockup lights and the bots move, the beam is out', cover.wrap && !coverAnims.some((a) => a.state === 'running') && !/data-active/.test(cover.attrs), `${JSON.stringify(coverAnims)}; ${cover.attrs}`)
+  check("the box keeps the card's whole width", cover.width === cover.card, `${cover.width} vs ${cover.card}`)
+  await clip('title-ready.png', '.lc-coverbeam', 16)
   await drive.send('Performance.enable')
   const a = await metric()
   await sleep(5000)
   const b = await metric()
-  say(`renderer busy on the home screen with the beam and the bots: ${(((b - a) / 5) * 100).toFixed(1)}%`)
+  say(`renderer busy on the home screen, the bots and no beam: ${(((b - a) / 5) * 100).toFixed(1)}% (0.278 measured about 18% with the beam)`)
 
   // A run, to have a stop button.
   say(await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' })))

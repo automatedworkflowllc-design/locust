@@ -133,10 +133,20 @@ export function HomeCover({
 
   const at = (value: number): number => Math.round(value * scale)
   return (
-    // A mono beam goes round the title box once the runtimes have answered,
-    // and rests with the bots in the background (Colin: "a rotate large
-    // mono around the title box with the logo in it").
-    <Beam size="md" strength={0.85} active={ready && awake} className="lc-coverbeam">
+    /*
+     * A mono beam goes round the title box WHILE THE RUNTIMES ARE BEING
+     * FOUND, and goes out as the lockup lights and the bots wake.
+     *
+     * Colin asked for it (2026-09-23: "a rotate large mono around the title
+     * box with the logo in it"), and 0.278 ran it for as long as the home
+     * screen was up. Then, having looked at it: "it just makes it look like
+     * something is loading that isnt loading ... it just drags away your
+     * eyes from all the other movement on screen". Both true, and the same
+     * fact: a travelling light reads as loading. So it is shown exactly when
+     * something IS loading -- before the bots move, never beside them -- and
+     * rests, like everything here, while the window is in the background.
+     */
+    <Beam size="md" strength={0.85} active={!ready && awake} className="lc-coverbeam">
       <div className="lc-cover" ref={card} style={{ '--lc-cover-k': String(scale) } as CSSProperties}>
         <div className="lc-cover__plate" aria-hidden="true" />
         {COVER_CAST.map((mate, index) => {

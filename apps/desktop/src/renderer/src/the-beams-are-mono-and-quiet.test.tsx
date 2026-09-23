@@ -23,13 +23,15 @@ describe('the title box', () => {
     expect(html.match(/<div data-beam=/g) ?? []).toHaveLength(1)
   })
 
-  it('comes on with the lockup, once the runtimes have answered', () => {
-    // The package marks a running beam `data-active`; the drive
-    // (_tools/drive-beams.mjs) reads the animation itself off the built app.
+  it('travels while the runtimes are being found, and goes out when the lockup lights', () => {
+    // Colin, having looked at it running beside the bots: "it just makes it
+    // look like something is loading that isnt loading". So it runs only
+    // while something is. The package marks a running beam `data-active`;
+    // the drive (_tools/drive-beams.mjs) reads the animation off the built app.
     const wrapper = (ready: boolean): string =>
       /<div data-beam="[^"]+"[^>]*class="lc-coverbeam"[^>]*>/.exec(renderToStaticMarkup(<HomeCover ready={ready} tube="full" />))?.[0] ?? ''
-    expect(wrapper(false)).not.toContain('data-active')
-    expect(wrapper(true)).toContain('data-active')
+    expect(wrapper(false)).toContain('data-active')
+    expect(wrapper(true)).not.toContain('data-active')
   })
 })
 
