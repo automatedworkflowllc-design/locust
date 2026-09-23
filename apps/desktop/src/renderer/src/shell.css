@@ -4985,6 +4985,8 @@ textarea {
   border-radius: 20px;
   background: var(--lc-chat-bg);
   transition: box-shadow var(--lc-motion-hover) var(--lc-ease);
+  /* Anywhere in it starts a message (Composer's `pressBox`), so it says so. */
+  cursor: text;
 }
 
 .lc-composer__box:hover {

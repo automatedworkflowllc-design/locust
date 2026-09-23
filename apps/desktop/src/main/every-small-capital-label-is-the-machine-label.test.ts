@@ -18,8 +18,8 @@ import { describe, expect, it } from 'vitest'
  * `font-size: var(--lc-text-muted)` -- which a browser drops, so they drew at
  * whatever their parent was. The second test is that class of mistake.
  */
-const shell = readFileSync(fileURLToPath(new URL('./shell.css', import.meta.url)), 'utf8')
-const tokens = readFileSync(fileURLToPath(new URL('./tokens.css', import.meta.url)), 'utf8')
+const shell = readFileSync(fileURLToPath(new URL('../renderer/src/shell.css', import.meta.url)), 'utf8')
+const tokens = readFileSync(fileURLToPath(new URL('../renderer/src/tokens.css', import.meta.url)), 'utf8')
 const withoutComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, (comment) => ' '.repeat(comment.length))
 
 function rules(css: string): { readonly selector: string; readonly props: Record<string, string> }[] {

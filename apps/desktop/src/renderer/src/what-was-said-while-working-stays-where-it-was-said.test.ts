@@ -60,7 +60,7 @@ describe('where each message goes', () => {
   it('puts what was said before the last step into the fold, before the step that came after it', () => {
     const events = walkthrough()
     // The fold's two rows came from the two tool.started events.
-    const born = [events.findIndex((e) => e.type === 'tool.started'), events.findLastIndex((e) => e.type === 'tool.started')]
+    const born = events.flatMap((e, index) => (e.type === 'tool.started' ? [index] : []))
     expect(narrationOf(events, born, ['m1', 'm2', 'm3'])).toEqual([
       { itemId: 'm1', beforeRow: 0 },
       { itemId: 'm2', beforeRow: 1 }

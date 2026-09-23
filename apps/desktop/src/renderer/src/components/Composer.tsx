@@ -2,7 +2,7 @@ import mark from '../assets/locust-mark.svg'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
-import type { ClipboardEvent, FormEvent, KeyboardEvent, ReactElement } from 'react'
+import type { ClipboardEvent, FormEvent, KeyboardEvent, MouseEvent, ReactElement } from 'react'
 
 import type {
   MissionMode,
@@ -622,6 +622,31 @@ export function Composer({
    * Text pastes fall through untouched. `clipboardData.files` is empty for
    * those, so pasting a paragraph still just types it.
    */
+  /**
+   * THE WHOLE BOX TAKES A CLICK.
+   *
+   * Colin, 2026-09-23: "only a very small portion of the chat window is
+   * actually clickable to begin chatting". The field is one line at the top
+   * of a box six times its height -- measured, 728x16 inside 760x108 -- and a
+   * press on the padding or between the chips did nothing: 61 of 468 points
+   * off the controls started a message (probe-composer-click). Claude Code's
+   * input takes a click anywhere in its frame. So a press on the box that is
+   * not on one of its controls puts the caret in the field, at the end; a
+   * control keeps its press, and a press on the field itself is the field's.
+   */
+  const field = useRef<HTMLTextAreaElement>(null)
+  const pressBox = (event: MouseEvent<HTMLDivElement>): void => {
+    if (event.button !== 0) return
+    const target = event.target as HTMLElement
+    const input = field.current
+    if (input === null || input.disabled || target === input) return
+    if (target.closest('button, a, input, select, textarea, [role="button"], [role="menu"], [role="menuitem"], [role="listbox"], [role="option"]') !== null) return
+    // Kept from landing on the box, where it would only leave again.
+    event.preventDefault()
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }
+
   const paste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
     const bridge = window.desktop
     const files = [...(event.clipboardData?.files ?? [])]
@@ -1073,8 +1098,9 @@ export function Composer({
           </div>
         )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>
-          <div className="lc-composer__box">
+          <div className="lc-composer__box" onMouseDown={pressBox}>
             <textarea
+              ref={field}
               value={value}
               onChange={(changeEvent) => type(changeEvent.target.value)}
               onKeyDown={keyDown}
