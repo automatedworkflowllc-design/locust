@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.268.0 - 2026-09-22
+
+- **A new typeface.** Everything Locust says is now set in **Figtree**, in
+  place of Geist: the sidebar, buttons, settings, cards and your own
+  messages. Screen titles (Missions, Team, Rooms, Memory, Routines, Settings)
+  and the sections inside Settings are now bold, widely spaced capitals,
+  set the way the LOCUST wordmark is. Teammate replies keep their serif, and
+  commands, paths and routes keep Geist Mono. Names are never capitalised:
+  a folder named in a title keeps its own spelling.
+
+- The decision cards' titles are drawn in the semibold they always asked
+  for. Geist had no semibold, so they were showing at medium weight.
+
 ## 0.267.0 - 2026-09-22
 
 - **The model picker fits more than twice as many models.** Every model took
