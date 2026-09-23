@@ -37,7 +37,7 @@
  * the better sentence. The two lists are kept apart so the drift guard goes
  * on meaning exactly what it means.
  */
-export type SettingsPageId = 'workspace' | 'runtimes' | 'teammates' | 'appearance' | 'app'
+export type SettingsPageId = 'workspace' | 'runtimes' | 'teammates' | 'appearance' | 'app' | 'whatsnew'
 
 export interface SettingsPage {
   readonly id: SettingsPageId
@@ -107,7 +107,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'This app',
     headings: ['Updates', 'Privacy & local data', 'Trash', 'Report a problem'],
     alsoKnownAs: {
-      Updates: ['version', 'changelog', 'what changed', 'upgrade'],
+      Updates: ['version', 'upgrade'],
       // "ledger" is a word the app itself says to people, in the sentence
       // telling them where the record of a run lives -- and it was the
       // fourth miss.
@@ -116,6 +116,15 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
       // platform this ships to.
       Trash: ['deleted', 'delete', 'restore', 'undo', 'recycle', 'recycle bin', 'bin'],
       'Report a problem': ['bug', 'feedback', 'support', 'crash']
+    }
+  },
+  {
+    // The whole changelog, as Claude Code's What's new (Colin, 2026-09-23).
+    id: 'whatsnew',
+    label: 'What’s new',
+    headings: ['What’s new'],
+    alsoKnownAs: {
+      'What’s new': ['changelog', 'what changed', 'release notes', 'releases', 'history', 'versions', 'new']
     }
   }
 ]

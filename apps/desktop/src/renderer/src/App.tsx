@@ -84,7 +84,9 @@ import type { PaletteAction } from './components/CommandPalette.js'
 import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
 import { FileViewer } from './components/FileViewer.js'
-import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner, WhatChangedBanner } from './components/Screens.js'
+import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
+import { WhatsNewSplash } from './components/WhatsNew.js'
+import type { SettingsPageId } from './settingsPages.js'
 import type { RouteChoice } from './components/RoutePicker.js'
 import { composerRouteFor } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
@@ -4344,19 +4346,42 @@ export default function App(): ReactElement {
   const noRuntimeReady =
     runtimeState.phase !== 'ready' || !runtimes.some((runtime) => runtime.ready && runtime.status === 'ready')
   /*
-   * The version is marked seen when the "what changed" banner is actually
-   * on screen -- the same condition that draws it below -- and once. It was
-   * marked when the changelog was READ, at mount, so a banner held for a
-   * runtime to connect was never shown after a relaunch either (Fable,
+   * WHAT'S NEW, AND THE SPLASH.
+   *
+   * The home banner ("Locust 0.277.0 is running. Here is what changed.") is
+   * gone -- Colin: "it adds a needless scrollbar on that title menu" -- and the
+   * whole changelog lives in Settings as What's new. After an update, the
+   * home screen says anything only when a build since the last one seen is
+   * marked big ("if we have really good big updates where the user has to
+   * know things, we can have a splash page on update"), and then once.
+   *
+   * Held to the banner's old conditions: Home (no conversation on screen)
+   * with a runtime ready -- nothing interrupts a person talking, and a launch
+   * whose runtimes are still signed out does not spend the one showing.
+   */
+  const [splashClosed, setSplashClosed] = useState(false)
+  const [settingsLanding, setSettingsLanding] = useState<SettingsPageId | undefined>(undefined)
+  const splashEntries = changelog?.firstRun === true ? (changelog.splash ?? []) : []
+  const splashOpen = splashEntries.length > 0 && !splashClosed && screen === 'workroom' && !noRuntimeReady && shownKey === undefined
+  // The landing is for the one opening "See every version" asked for.
+  useEffect(() => {
+    if (screen !== 'settings') setSettingsLanding(undefined)
+  }, [screen])
+  /*
+   * The version is marked seen when the splash is actually on screen -- or,
+   * on an update with nothing big, when Home first is -- and once. It was
+   * once marked when the changelog was READ, at mount, so a banner held for
+   * a runtime to connect was never shown after a relaunch either (Fable,
    * pass 1, finding 7).
    */
   const changelogMarked = useRef(false)
   useEffect(() => {
     if (changelogMarked.current) return
-    if (screen !== 'workroom' || noRuntimeReady || changelog?.firstRun !== true || changelog.body === undefined) return
+    if (screen !== 'workroom' || noRuntimeReady || changelog?.firstRun !== true) return
+    if (splashEntries.length > 0 && !splashOpen) return
     changelogMarked.current = true
     void window.desktop?.markChangelogSeen().catch(() => undefined)
-  }, [screen, noRuntimeReady, changelog])
+  }, [screen, noRuntimeReady, changelog, splashEntries.length, splashOpen])
 
   // Whose mission is on screen: the owner the host recorded, never the
   // composer's current target, which may already be someone else.
@@ -4908,6 +4933,7 @@ export default function App(): ReactElement {
             onRestoreMission={restoreMission}
             onEmptyTrash={emptyTrash}
             changelog={changelog}
+            {...(settingsLanding === undefined ? {} : { initialPage: settingsLanding })}
               onPrune={prune}
             />
           ) : liveRun === undefined ? (
@@ -5413,25 +5439,8 @@ export default function App(): ReactElement {
               )}
             </div>
           )}
-          {/*
-            * Held until a runtime is connected. On a fresh profile "here is
-            * what changed" has no referent -- it is addressed to somebody
-            * who used a previous version -- and on a first launch it sat in
-            * the middle of the one job that screen has (design agent,
-            * 2026-09-18, after four beta passes said so). The banner marks
-            * the version as seen only when it is shown, so held here means
-            * shown on the next launch after something connects.
-            *
-            * ALSO held while a conversation is open. Sol's beta review found
-            * it still sitting over the live thread after four turns, on both
-            * 0.239 and 0.242: *"A first-hour user is trying to talk."* It
-            * only ever needed Home, where there is nothing to interrupt, and
-            * Home is where a person lands before their first send anyway.
-            * `shownKey` undefined IS Home -- no conversation on screen.
-            */}
-          {screen === 'workroom' && !noRuntimeReady && shownKey === undefined && (
-            <WhatChangedBanner changelog={changelog} />
-          )}
+          {/* What changed lives in Settings > What's new now, and a big build
+              gets the splash (see `splashOpen`); the banner that sat here is gone. */}
           {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer
@@ -5785,6 +5794,18 @@ export default function App(): ReactElement {
           />
         )
       })()}
+      {splashOpen && (
+        <WhatsNewSplash
+          entries={splashEntries}
+          onClose={() => setSplashClosed(true)}
+          onSeeEverything={() => {
+            setSplashClosed(true)
+            setSettingsLanding('whatsnew')
+            refreshStorage()
+            setScreen('settings')
+          }}
+        />
+      )}
       {newTeammateOpen && (
         <NewTeammateDialog
           error={teammateError}

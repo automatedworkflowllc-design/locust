@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { durationText, usagePercent, usageWindowSentence } from '../missionView.js'
-import { AgentText } from './ThreadItems.js'
+import { WhatsNew } from './WhatsNew.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
@@ -1164,6 +1164,7 @@ export function SettingsScreen({
   onRestoreMission,
   onEmptyTrash,
   changelog,
+  initialPage,
   onPrune
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
@@ -1249,9 +1250,11 @@ export function SettingsScreen({
   readonly onEmptyTrash: () => Promise<TrashMutationResponse>
   /** What changed in the running build; undefined until the host has answered. */
   readonly changelog: AppChangelog | undefined
+  /** The page Settings opens on: What's new, from the splash's "See every version". */
+  readonly initialPage?: SettingsPageId
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
-  const [page, setPage] = useState<SettingsPageId>('workspace')
+  const [page, setPage] = useState<SettingsPageId>(initialPage ?? 'workspace')
   const [query, setQuery] = useState('')
   const asked = query.trim()
   // A page earns its place in the list when its name or one of its settings
@@ -2210,8 +2213,13 @@ export function SettingsScreen({
             </p>
           </More>
           <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
-          <h3 className="lc-settings__subheading">What changed in {changelog?.version ?? 'this version'}</h3>
-          <WhatChanged changelog={changelog} />
+          <p className="lc-settings__note">
+            This is {changelog?.version ?? 'this version'}. Every version, and what it changed, is in{' '}
+            <button type="button" className="lc-linkbutton" onClick={() => setPage('whatsnew')}>
+              What’s new
+            </button>
+            .
+          </p>
         </section>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Privacy &amp; local data</h2>
@@ -2261,6 +2269,13 @@ export function SettingsScreen({
 
           </>
         )}
+        {shownPage === 'whatsnew' && (
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">What’s new</h2>
+          <p className="lc-settings__lede">Every version of Locust, newest first. This is {changelog?.version ?? 'the one running'}.</p>
+          <WhatsNew changelog={changelog} />
+        </section>
+        )}
         </div>
       </div>
     </div>
@@ -2274,75 +2289,6 @@ export function SettingsScreen({
  * composer, offers the install, and never installs on its own -- a running
  * mission must not be cut off mid-run, and the host refuses if one is.
  */
-/**
- * What changed in the build you are running.
- *
- * Rendered with the same component a teammate's reply uses, so a changelog
- * entry reads in the app's own voice and typography rather than as a pasted
- * file. The text is the entry from `CHANGELOG.md`, which ships beside the
- * binary -- no network, and the notes cannot describe a different build.
- */
-export function WhatChanged({ changelog }: { readonly changelog: AppChangelog | undefined }): ReactElement | null {
-  if (changelog?.body === undefined || changelog.body.trim().length === 0) {
-    return (
-      <p className="lc-settings__note">
-        {changelog === undefined
-          ? 'Reading what changed…'
-          : `No entry for ${changelog.version} in the changelog that shipped with it.`}
-      </p>
-    )
-  }
-  return (
-    <div className="lc-whatchanged">
-      <AgentText text={changelog.body} streaming={false} />
-    </div>
-  )
-}
-
-/**
- * Said once, the first time you open a version.
- *
- * The app downloaded updates quietly and installed them at quit, so a new
- * build looked exactly like the old one and nothing ever said what you had
- * got. Colin, 2026-09-17, asking whether a changelog existed anywhere:
- * GitHub had one nobody outside could read, the site linked to releases, and
- * the app said nothing at all.
- *
- * Dismissed by reading it -- there is no "don't show again", because it does
- * not come back: the host writes the version down the moment it answers.
- */
-export function WhatChangedBanner({
-  changelog
-}: {
-  readonly changelog: AppChangelog | undefined
-}): ReactElement | null {
-  const [open, setOpen] = useState(false)
-  const [gone, setGone] = useState(false)
-  if (gone || changelog === undefined || !changelog.firstRun || changelog.body === undefined) return null
-  return (
-    <div className="lc-updatebanner lc-whatchanged__banner" role="status">
-      <span className="lc-updatebanner__text">
-        {open ? (
-          <>
-            <strong>What changed in {changelog.version}</strong>
-            <WhatChanged changelog={changelog} />
-          </>
-        ) : (
-          <>Locust {changelog.version} is running. Here is what changed.</>
-        )}
-      </span>
-      <span className="lc-whatchanged__actions">
-        <button type="button" className="lc-button" onClick={() => setOpen((held) => !held)}>
-          {open ? 'Hide' : 'Read it'}
-        </button>
-        <button type="button" className="lc-button" onClick={() => setGone(true)}>
-          Dismiss
-        </button>
-      </span>
-    </div>
-  )
-}
-
 export function UpdateBanner({
   update,
   onInstall

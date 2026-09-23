@@ -1,0 +1,111 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vitest'
+
+import { entries, splashEntries } from './changelog.js'
+
+/**
+ * WHAT'S NEW IS THE WHOLE CHANGELOG, AND A SPLASH IS FOR A BIG BUILD ONLY.
+ *
+ * Colin, 2026-09-23, with a frame of Claude Code's What's new: "we can really
+ * get this and just introduce a proper changelog the way claude code does, if
+ * we have really good big updates where the user has to know things, we can
+ * have a splash page on update" -- and, of the home banner, "it adds a
+ * needless scrollbar on that title menu".
+ */
+
+const FILE = [
+  '# Changelog',
+  '',
+  '## 0.281.0 - 2026-09-23',
+  '',
+  '### New',
+  '',
+  "- **What's new, in Settings.** Every version.",
+  '',
+  '### Improved',
+  '',
+  '- **No banner.** Gone.',
+  '',
+  '## 0.280.0 - 2026-09-23',
+  '',
+  '- **Antigravity asks here.** Written before the groups.',
+  '',
+  '## 0.277.0 - 2026-09-22',
+  '<!-- big -->',
+  '',
+  '- **Every teammate is a bot.**',
+  '',
+  '## 0.276.0 - 2026-09-22',
+  '',
+  '- **Dialogs fit.**'
+].join('\n')
+
+describe('an entry', () => {
+  it("keeps its groups -- New, Improved, Fixed -- as Claude Code's What's new does", () => {
+    const [newest] = entries(FILE)
+    expect(newest?.groups).toEqual([
+      { label: 'New', text: "- **What's new, in Settings.** Every version." },
+      { label: 'Improved', text: '- **No banner.** Gone.' }
+    ])
+  })
+
+  it('written before the groups, stays as it was written: one group, no label guessed for it', () => {
+    expect(entries(FILE)[1]?.groups).toEqual([{ text: '- **Antigravity asks here.** Written before the groups.' }])
+  })
+
+  it('marked big says so, and the mark itself is nowhere in what is shown', () => {
+    const bot = entries(FILE).find((entry) => entry.version === '0.277.0')
+    expect(bot?.big).toBe(true)
+    expect(bot?.body).not.toContain('<!--')
+    expect(JSON.stringify(bot?.groups)).not.toContain('<!--')
+    expect(entries(FILE).filter((entry) => entry.big).map((entry) => entry.version)).toEqual(['0.277.0'])
+  })
+})
+
+describe('the splash', () => {
+  const all = entries(FILE)
+
+  it('shows the big builds between the one last seen and the one running', () => {
+    expect(splashEntries(all, '0.276.0', '0.281.0').map((entry) => entry.version)).toEqual(['0.277.0'])
+  })
+
+  it('shows nothing when nothing big came since, on the same version, or on a first install', () => {
+    expect(splashEntries(all, '0.277.0', '0.281.0')).toEqual([])
+    expect(splashEntries(all, '0.281.0', '0.281.0')).toEqual([])
+    expect(splashEntries(all, undefined, '0.281.0')).toEqual([])
+  })
+
+  it('shows nothing when the version last seen is not in the file -- a splash about the wrong builds is worse', () => {
+    expect(splashEntries(all, '9.9.9', '0.281.0')).toEqual([])
+    expect(splashEntries(all, '0.280.0', '0.276.0')).toEqual([])
+  })
+})
+
+describe('the changelog that ships', () => {
+  const shipped = readFileSync(fileURLToPath(new URL('../../../../CHANGELOG.md', import.meta.url)), 'utf8')
+  const all = entries(shipped)
+
+  it('is read whole: hundreds of builds, each with something to say', () => {
+    expect(all.length).toBeGreaterThan(300)
+    expect(all.every((entry) => entry.groups.length > 0)).toBe(true)
+  })
+
+  it('gives someone arriving from 0.276 the bots, and someone arriving from 0.280 nothing', () => {
+    const newest = all[0]!.version
+    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.277.0'])
+    expect(splashEntries(all, '0.280.0', newest)).toEqual([])
+  })
+})
+
+describe('the home banner', () => {
+  it('is gone: What changed lives in Settings, and a big build gets the splash', () => {
+    const app = readFileSync(fileURLToPath(new URL('../renderer/src/App.tsx', import.meta.url)), 'utf8')
+    const screens = readFileSync(fileURLToPath(new URL('../renderer/src/components/Screens.tsx', import.meta.url)), 'utf8')
+    expect(app).not.toContain('WhatChangedBanner')
+    expect(screens).not.toContain('Here is what changed')
+    expect(app).toContain('<WhatsNewSplash')
+    expect(screens).toContain("shownPage === 'whatsnew'")
+  })
+})

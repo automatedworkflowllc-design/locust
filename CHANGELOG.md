@@ -6,7 +6,31 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+Settings shows this file as What's new. An entry may group its changes under
+`### New`, `### Improved` and `### Fixed`, and a build a person should be told
+about when they arrive on it carries `<!-- big -->` on the line under its
+heading: the home screen then shows it once, as a splash.
+
+## 0.281.0 - 2026-09-23
+
+### New
+
+- **What's new, in Settings.** Every version of Locust and what it changed,
+  newest first, the way Claude Code shows its own: the date, the version, and
+  the changes grouped as New, Improved and Fixed. Settings, then What's new.
+
+- **A splash for big updates.** When an update changes something you need to
+  know about, the home screen tells you once, the first time you open it.
+  Everything else waits in What's new.
+
+### Improved
+
+- **No banner on the home screen.** "Locust 0.277.0 is running. Here is what
+  changed." is gone, and so is the scrollbar it added to the title screen.
+
 ## 0.280.0 - 2026-09-23
+
+### New
 
 - **Antigravity's questions reach you.** When a teammate on Antigravity asks
   you to choose between options, the question now appears in the
@@ -18,6 +42,8 @@ Dates are when the build was cut. Versions are the number Settings shows.
   this, the question only showed inside the folded tool calls, and the
   teammate sat waiting on an answer nobody could see.
 
+### Fixed
+
 - **Answers on question cards arrive.** Fixed answers given on any question
   card being lost on the way to the teammate, so it was told you said
   nothing.
@@ -26,6 +52,8 @@ Dates are when the build was cut. Versions are the number Settings shows.
   the line above it no longer says the teammate is busy with a tool.
 
 ## 0.279.0 - 2026-09-23
+
+### Improved
 
 - **Calmer bots, except the one you are talking to.** The bot beside a
   conversation's live line keeps all its moves: it hops while it works and
@@ -54,6 +82,7 @@ Dates are when the build was cut. Versions are the number Settings shows.
   other work no longer keeps your computer busy.
 
 ## 0.277.0 - 2026-09-22
+<!-- big -->
 
 - **Every teammate is a bot.** The pixel faces are gone. In the sidebar, the
   conversation, the Team screen, rooms and routines, every teammate is now

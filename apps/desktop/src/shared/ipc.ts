@@ -192,6 +192,20 @@ export const APP_CHANGELOG_CHANNEL = 'app:changelog'
 /** The banner was drawn: this version is seen. Not when the changelog was read. */
 export const APP_CHANGELOG_SEEN_CHANNEL = 'app:changelog-seen'
 
+/** One group of a build's changes -- "New", "Improved", "Fixed" -- or, before the groups, the whole entry. */
+export interface AppChangelogGroup {
+  readonly label?: string
+  /** Markdown. */
+  readonly text: string
+}
+
+/** One build in What's new. */
+export interface AppChangelogEntry {
+  readonly version: string
+  readonly date?: string
+  readonly groups: readonly AppChangelogGroup[]
+}
+
 /** What changed in the build that is running. */
 export interface AppChangelog {
   readonly version: string
@@ -204,6 +218,13 @@ export interface AppChangelog {
    * version it remembers; the window has nowhere durable to keep that.
    */
   readonly firstRun: boolean
+  /** Every build the changelog that shipped with this one describes, newest first. */
+  readonly entries?: readonly AppChangelogEntry[]
+  /**
+   * The builds marked big since the one this person last saw -- the home
+   * screen's splash, once. Empty on most updates, and on a first install.
+   */
+  readonly splash?: readonly AppChangelogEntry[]
 }
 export const MISSION_STORAGE_CHANNEL = 'mission:storage'
 export const APP_UPDATE_CHECK_CHANNEL = 'app:update-check'

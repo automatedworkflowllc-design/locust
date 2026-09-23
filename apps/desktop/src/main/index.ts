@@ -16,7 +16,7 @@ import {
   killSpawnedTree
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
-import type { AppChangelog } from '../shared/ipc.js'
+import type { AppChangelog, AppChangelogEntry } from '../shared/ipc.js'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
@@ -68,7 +68,8 @@ const ROUTINE_TICK_MS = 60_000
 const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
 import { deleteMissionRecord, readMissionHistory } from './mission-history.js'
-import { changelogPaths, entryFor, readChangelog } from './changelog.js'
+import { changelogPaths, entries as changelogEntries, readChangelog, splashEntries } from './changelog.js'
+import type { ChangelogEntry } from './changelog.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createConnectorReader } from './connector-reader.js'
@@ -3451,12 +3452,23 @@ ${taskSection({
          * the banner is on screen, on `APP_CHANGELOG_SEEN_CHANNEL`.
          */
         const text = await readChangelog(changelogPaths(process.resourcesPath, app.getAppPath()))
-        const entry = text === undefined ? undefined : entryFor(text, version)
+        const all = text === undefined ? [] : changelogEntries(text)
+        const entry = all.find((candidate) => candidate.version === version)
+        // What's new shows every build; the splash, the big ones this person
+        // has not been shown (Colin: "if we have really good big updates
+        // where the user has to know things, we can have a splash page").
+        const shown = (candidate: ChangelogEntry): AppChangelogEntry => ({
+          version: candidate.version,
+          ...(candidate.date === undefined ? {} : { date: candidate.date }),
+          groups: candidate.groups
+        })
         return {
           version,
           ...(entry?.body === undefined ? {} : { body: entry.body }),
           ...(entry?.date === undefined ? {} : { date: entry.date }),
-          firstRun: seen !== version
+          firstRun: seen !== version,
+          entries: all.map(shown),
+          splash: splashEntries(all, seen, version).map(shown)
         }
       })()
       return changelogAnswer
