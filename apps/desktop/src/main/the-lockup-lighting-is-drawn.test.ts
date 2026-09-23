@@ -22,6 +22,25 @@ const block = (from: string): string => {
   return ''
 }
 
+describe('the home screen cover', () => {
+  it('is the cover drawn to scale: its 960x288 numbers times the measured k', () => {
+    expect(block('.lc-cover {')).toContain('height: calc(288px * var(--lc-cover-k))')
+    expect(block('.lc-cover__plate {')).toContain('left: calc(496px * var(--lc-cover-k))')
+    expect(block('.lc-lockup__mark {')).toContain('width: calc(118px * var(--lc-cover-k, 1))')
+  })
+
+  it('centres the claim under the lockup, in mono capitals, never under the 10.5px floor', () => {
+    expect(block('.lc-cover__brand {')).toContain('align-items: center')
+    const claim = block('.lc-cover__claim {')
+    expect(claim).toContain('font-family: var(--lc-font-mono)')
+    expect(claim).toContain('text-transform: uppercase')
+    expect(claim).toContain('letter-spacing: 0.16em')
+    expect(claim).toContain('font-size: max(10.5px,')
+    // The trailing tracking is taken back, or the centre sits half a gap left.
+    expect(claim).toContain('margin: 0 -0.16em 0 0')
+  })
+})
+
 describe('the lockup lighting', () => {
   it('powers on from dark, lit lime, and ends in the app ink', () => {
     const power = block('@keyframes lcLockupPower')
@@ -42,6 +61,14 @@ describe('the lockup lighting', () => {
   it('lays the boot screen tube over it: its scanlines and its sweep', () => {
     expect(block('.lc-lockup__scan {')).toContain('var(--lc-boot-scan)')
     expect(block('.lc-lockup__sweep {')).toContain('var(--lc-boot-glow-soft)')
+  })
+
+  it('sets the name the way the cover does: Figtree 700 capitals at the title tracking', () => {
+    const name = block('.lc-lockup__name {')
+    expect(name).toContain('font-family: var(--lc-font-ui)')
+    expect(name).toContain('font-weight: 700')
+    expect(name).toContain('letter-spacing: var(--lc-title-tracking)')
+    expect(name).toContain('text-transform: uppercase')
   })
 
   it('stops for reduced motion', () => {

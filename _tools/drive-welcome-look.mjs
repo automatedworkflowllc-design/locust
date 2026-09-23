@@ -33,7 +33,7 @@ const drive = await startDrive({
 })
 
 const edges = `(() => {
-  const card = document.querySelector('.lc-markcard')
+  const card = document.querySelector('.lc-cover')
   const intro = document.querySelector('.lc-intro')
   const inner = document.querySelector('.lc-empty__inner')
   if (!card || !inner) return 'NO WELCOME SCREEN; body reads: ' + document.body.innerText.replace(/\\s+/g, ' ').slice(0, 200)

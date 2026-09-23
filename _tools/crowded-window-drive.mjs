@@ -176,7 +176,7 @@ try {
   const firstScreen = JSON.parse(await cdp.eval(`(async () => {
     await new Promise(r => setTimeout(r, 2500))
     const pane = document.querySelector('.lc-empty')
-    const card = document.querySelector('.lc-markcard')
+    const card = document.querySelector('.lc-cover')
     if (!pane || !card) return JSON.stringify({ pane: !!pane, card: !!card })
     const top = (el) => Math.round(el.getBoundingClientRect().top)
     const install = document.querySelector('.lc-runtimecell__install, .lc-runtimecell')

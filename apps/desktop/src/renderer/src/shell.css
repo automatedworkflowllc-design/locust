@@ -3584,40 +3584,81 @@ textarea {
   text-align: left;
 }
 
-/* The mark in its own card, at panel A's measurements: 480px wide, 40px of
-   air above and below, mark 172px over wordmark 232px with 22px between.
-   The 2026-09-04 pass had removed the card as "a box around a logo that is
-   already in the rail"; Colin ratified panel A on 2026-09-05 -- "do it
-   exactly this way" -- and the card comes back with the two images sized
-   as drawn rather than one combined logo scaled to fit. */
-/* Smaller than the reference drew it: the mark is 40px away in the sidebar,
-   and at 250px the card floated in a dead band above the composer (design
-   review, 2026-09-05). */
-.lc-markcard {
-  /*
-   * FULL COLUMN WIDTH, and the lockup centred INSIDE it.
-   *
-   * This was 480px, centred in a 760px column, while the prose under it and
-   * the runtime panel below both began at the column's left edge. MEASURED
-   * on the packaged build: card left 502, everything else 362. So the card
-   * was centred in the pane and aligned with nothing, which is what Colin
-   * meant by "its way off center" (2026-09-21) -- the eye reads two left
-   * edges 140px apart, not a centred composition.
-   *
-   * The note this replaces was right that the lockup is centred and the
-   * content under it is not: that stays true, and it is now true INSIDE one
-   * shared column instead of across two. Widening the card rather than
-   * narrowing the panel, because the panel is the screen's real content.
-   */
+/*
+ * THE COVER -- see HomeCover.tsx.
+ *
+ * The design system's cover, whole, in the card the lockup used to have to
+ * itself (Colin, of 0.270's lockup alone: "it can be a 1:1 once you fix the
+ * text description under locust"). Every length is the cover's own number
+ * times --lc-cover-k, the card's width over the cover's 960, which HomeCover
+ * measures and sets: one drawing at the column's size, not a rearrangement.
+ *
+ * Still FULL COLUMN WIDTH, with the lockup centred in its half: the card
+ * was once 480px centred in the pane while everything under it began at the
+ * column's edge, which is what Colin meant by "its way off center"
+ * (2026-09-21). The card's edges are the column's edges.
+ */
+.lc-cover {
+  --lc-cover-k: 0.792;
+  position: relative;
   align-self: stretch;
   width: 100%;
-  padding: 22px 0;
+  height: calc(288px * var(--lc-cover-k));
+  flex-shrink: 0;
   border: 1px solid var(--lc-border-card);
   border-radius: var(--lc-radius-card);
+  overflow: hidden;
+}
+
+/* The ground the teammates stand on, running off the card's right edge. */
+.lc-cover__plate {
+  position: absolute;
+  left: calc(496px * var(--lc-cover-k));
+  top: calc(48px * var(--lc-cover-k));
+  width: calc(500px * var(--lc-cover-k));
+  height: calc(192px * var(--lc-cover-k));
+  background: var(--lc-bg-window);
+  border: 1px solid var(--lc-border-card);
+  border-radius: calc(14px * var(--lc-cover-k));
+}
+
+.lc-cover__face {
+  position: absolute;
+  display: block;
+  line-height: 0;
+}
+
+/* The lockup and the claim, centred in the space left of the plate: the
+   same air on either side, and the claim's centre is the lockup's. */
+.lc-cover__brand {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(496px * var(--lc-cover-k));
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
+  gap: calc(20px * var(--lc-cover-k));
+}
+
+/* The claim in the machine's voice: Geist Mono capitals at the mono label's
+   tracking, never under the mono label's 10.5px floor. The trailing
+   tracking is taken back so the letters, not the last gap, are centred.
+   Scoped under the card because `.lc-empty p` outranks a lone class: it
+   set this to the description size with no margin, which made the claim
+   wider than the lockup and put its centre a pixel left (measured on the
+   built app, 2026-09-22). */
+.lc-cover .lc-cover__claim {
+  margin: 0 -0.16em 0 0;
+  font-family: var(--lc-font-mono);
+  font-size: max(10.5px, calc(13px * var(--lc-cover-k)));
+  line-height: 1.4;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--lc-text-muted);
 }
 
 /*
@@ -3633,22 +3674,30 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: calc(22px * var(--lc-cover-k, 1));
   color: var(--lc-text-primary);
 }
 
 .lc-lockup__mark {
   display: block;
-  width: 108px;
-  max-width: 34%;
+  flex: none;
+  width: calc(118px * var(--lc-cover-k, 1));
   height: auto;
 }
 
-.lc-lockup__word {
+/* The name in live type, as the cover sets it: Figtree 700 capitals at the
+   title tracking. The tracking trails the T, so it is taken back and the
+   lockup ends on the letter. */
+.lc-lockup__name {
   display: block;
-  width: 196px;
-  max-width: 56%;
-  height: auto;
+  margin: 0 -0.14em 0 0;
+  font-family: var(--lc-font-ui);
+  font-weight: 700;
+  font-size: calc(58px * var(--lc-cover-k, 1));
+  line-height: 1;
+  letter-spacing: var(--lc-title-tracking);
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .lc-lockup path {

@@ -38,14 +38,15 @@ describe('when the lockup lights', () => {
 describe('what the lockup draws', () => {
   const html = renderToStaticMarkup(<PoweredLockup ready={false} tube="full" />)
 
-  it('is the brand files themselves, inline, named Locust', () => {
+  it('is the traced mark beside the name in live type, named Locust', () => {
     expect(html).toContain('role="img"')
     expect(html).toContain('aria-label="Locust"')
-    // Both traced paths, with their real outlines -- not a placeholder.
+    // The mark's traced path, with its real outline -- not a placeholder.
     const paths = [...html.matchAll(/<path fill-rule="evenodd" d="([^"]+)"/g)].map((match) => match[1] ?? '')
-    expect(paths).toHaveLength(2)
+    expect(paths).toHaveLength(1)
     expect(paths[0]!.length).toBeGreaterThan(10_000)
-    expect(paths[1]!.length).toBeGreaterThan(1_000)
+    // The name as the cover sets it: type, not the lighter traced wordmark.
+    expect(html).toMatch(/<span class="lc-lockup__name" aria-hidden="true">Locust<\/span>/)
   })
 
   it('is still until the runtimes have answered', () => {

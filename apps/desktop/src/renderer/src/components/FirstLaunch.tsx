@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import type { PublicRuntimeStatus, TubePreference } from '../../../shared/ipc.js'
 import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
-import { PoweredLockup } from './PoweredLockup.js'
+import { HomeCover } from './HomeCover.js'
 import { SignInButton } from './SignInButton.js'
 
 /**
@@ -223,10 +223,8 @@ export function FirstLaunch({
   return (
     <div className="lc-empty" ref={pane}>
       <div className="lc-empty__inner">
-        {/* The lockup in its own card, powering on once the runtimes have answered. */}
-        <div className="lc-markcard">
-          <PoweredLockup ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} />
-        </div>
+        {/* The design system's cover: the lockup lighting up once the runtimes have answered, and the teammates. */}
+        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} />
 
         {/*
           * The only words on the screen, both carrying information: what

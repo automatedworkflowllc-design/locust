@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { AnimationEvent, ReactElement } from 'react'
 
 import markSvg from '../assets/locust-mark.svg?raw'
-import wordmarkSvg from '../assets/locust-wordmark.svg?raw'
 import type { TubePreference } from '../../../shared/ipc.js'
 
 /**
@@ -26,8 +25,13 @@ import type { TubePreference } from '../../../shared/ipc.js'
  * tube: Full lights and relights, Subtle lights once, Off never does. And
  * reduced motion stops all of it: the still lockup is the finished one.
  *
- * The mark and the wordmark are the traced files, drawn inline rather than
- * as images, because an image cannot take a colour.
+ * The mark is the traced file, drawn inline rather than as an image, because
+ * an image cannot take a colour. The name is live type, set the way the
+ * design system's cover sets it -- Figtree 700 capitals at the title
+ * tracking -- because the home screen is that cover now (see HomeCover) and
+ * the traced wordmark is a lighter drawing: side by side at the same width,
+ * its letters are thinner and shorter than the cover's (Colin, of the cover:
+ * "it can be a 1:1").
  */
 
 /** The traced path of one of the brand files. */
@@ -39,7 +43,6 @@ function traced(svg: string): { readonly viewBox: string; readonly d: string } {
 }
 
 const MARK = traced(markSvg)
-const WORDMARK = traced(wordmarkSvg)
 
 /** How the lockup lights, from the boot screen's preference and the system's motion setting. */
 export function lightingPlan(tube: TubePreference, reducedMotion: boolean): 'none' | 'once' | 'repeat' {
@@ -117,9 +120,9 @@ export function PoweredLockup({
       <svg className="lc-lockup__mark" viewBox={MARK.viewBox} aria-hidden="true" focusable="false">
         <path fillRule="evenodd" d={MARK.d} />
       </svg>
-      <svg className="lc-lockup__word" viewBox={WORDMARK.viewBox} aria-hidden="true" focusable="false">
-        <path fillRule="evenodd" d={WORDMARK.d} />
-      </svg>
+      <span className="lc-lockup__name" aria-hidden="true">
+        Locust
+      </span>
       <span className="lc-lockup__tube" aria-hidden="true">
         <span className="lc-lockup__scan" />
         <span className="lc-lockup__sweep" />

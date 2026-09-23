@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.272.0 - 2026-09-22
+
+- **The home screen is the whole cover now.** 0.270 put only the Locust
+  logo there. The card now carries all of the design system's cover: the
+  logo, with *Autonomous teammates on your own machine* centred under it in
+  the app's mono capitals, and three teammates on a plate beside it -- one
+  working, one waiting on you, one idle. They sit still until your coding
+  agents have been found, then come on with the logo, which still lights up
+  after the loading screen and again every 7 to 10 seconds. The name is set
+  in the app's own Figtree, bolder than the old traced lettering, exactly as
+  the cover sets it, and the whole card is drawn to fit your window's width.
+
 ## 0.271.0 - 2026-09-22
 
 - **The working orbs are sharper.** The six busy orbs beside a working
