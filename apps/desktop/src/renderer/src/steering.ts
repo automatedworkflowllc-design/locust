@@ -147,6 +147,13 @@ export function canMergeFollower(row: QueuedRow): boolean {
  * Only the LEADING run folds. A host row in the middle stops it and keeps its
  * place, so a routine step queued behind two follow-ups still runs after them
  * rather than being absorbed into them.
+ *
+ * And only rows typed in ONE conversation fold. The queue is every
+ * conversation's, in the order things were typed, and this used to fold
+ * across them: a line queued for Pip and one queued for Gem became one
+ * instruction and went to whichever teammate's run was in front (outside
+ * beta recheck of 0.299, P1). A row for another conversation stops the fold
+ * the way a host row does.
  */
 export function combineQueued(rows: readonly QueuedRow[]): readonly QueuedRow[] {
   const front = rows[0]
@@ -154,7 +161,7 @@ export function combineQueued(rows: readonly QueuedRow[]): readonly QueuedRow[] 
   let taken = 1
   while (taken < rows.length) {
     const next = rows[taken]
-    if (next === undefined || !canMergeFollower(next)) break
+    if (next === undefined || next.key !== front.key || !canMergeFollower(next)) break
     taken += 1
   }
   if (taken === 1) return rows
@@ -166,6 +173,44 @@ export function combineQueued(rows: readonly QueuedRow[]): readonly QueuedRow[] 
       .join(QUEUE_SEPARATOR)
   }
   return [merged, ...rows.slice(taken)]
+}
+
+/**
+ * WHAT IS WAITING IN ONE CONVERSATION.
+ *
+ * The queue holds every conversation's rows in the order they were typed,
+ * and the box under a conversation is about that conversation alone: it
+ * shows, edits, discards and sends its own rows and nobody else's. It used
+ * to show the queue's first row wherever you were -- a line queued for Pip
+ * sat under Gem's thread reading "sends when Gem finishes", and Edit there
+ * rewrote Pip's (outside beta recheck of 0.299, P1).
+ */
+export function queuedIn(rows: readonly QueuedRow[], key: string | undefined): readonly QueuedRow[] {
+  return key === undefined ? [] : rows.filter((row) => row.key === key)
+}
+
+/**
+ * The next message one conversation sends -- its own rows folded -- and the
+ * queue without what went. Every other conversation's rows stay as they were,
+ * in place.
+ */
+export function takeNext(
+  rows: readonly QueuedRow[],
+  key: string
+): { readonly going: QueuedRow | undefined; readonly rest: readonly QueuedRow[] } {
+  const own = queuedIn(rows, key)
+  const folded = combineQueued(own)
+  const going = folded[0]
+  if (going === undefined) return { going: undefined, rest: rows }
+  // The rows that went: the front and every follower folded into it. By the
+  // row itself, not its id -- two rows can be given the same id.
+  const went = new Set(own.slice(0, own.length - (folded.length - 1)))
+  return { going, rest: rows.filter((row) => !went.has(row)) }
+}
+
+/** A conversation's queue, gone: Discard, or Edit taking the words back into the box. */
+export function withoutQueueOf(rows: readonly QueuedRow[], key: string | undefined): readonly QueuedRow[] {
+  return key === undefined ? rows : rows.filter((row) => row.key !== key)
 }
 
 /**

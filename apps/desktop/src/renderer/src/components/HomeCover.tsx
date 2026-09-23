@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactElement } from 'react'
 
 import type { BotAvatarState } from 'bot-avatars'
@@ -34,6 +34,12 @@ import { PoweredLockup } from './PoweredLockup.js'
  * The bots wake with the lockup: still, with no presence dot, until the
  * runtimes have answered -- the moment the loading screen's work is done and
  * the cover comes on.
+ *
+ * AND THE SCREEN NOTICES YOU (0.300). Colin's "have fun" list, 2026-09-23 --
+ * "you can run all those": the sleeping Hopper opens its eyes and watches a
+ * pointer that comes near, and dozes off again once it has gone; a click on
+ * the glass powers the lockup on again; turning swarm on sends a few small
+ * swarm bots up across the screen, once.
  */
 
 /** The cover's canvas, in its own units. Everything is placed on it. */
@@ -110,16 +116,198 @@ function hueColor(hue: TeammateHue): string | undefined {
 
 const FACE = 96
 
+/** The one asleep on the cover, who wakes for a pointer. */
+const SLEEPER = 'sable'
+
+/** How near a pointer wakes the Hopper, in its own widths from the middle of it. */
+export const WAKE_WITHIN = 1.6
+
+/** How long the pointer has to have been gone before it dozes off again. */
+export const DOZE_AFTER_MS = 4_000
+
+export interface Wakefulness {
+  readonly awake: boolean
+  /** When the pointer went, while it is still awake; undefined while the pointer is near. */
+  readonly awaySince: number | undefined
+}
+
+export const ASLEEP: Wakefulness = { awake: false, awaySince: undefined }
+
+/**
+ * The Hopper, one reading of the pointer later: awake while it is near,
+ * awake still for DOZE_AFTER_MS after it goes, then asleep. `distance` is in
+ * the Hopper's widths, undefined when there is no pointer (it left the
+ * window). The same value back when nothing changed, so a pointer moving
+ * far away costs no render.
+ */
+export function hopperWakes(held: Wakefulness, distance: number | undefined, now: number): Wakefulness {
+  if (distance !== undefined && distance <= WAKE_WITHIN) {
+    return held.awake && held.awaySince === undefined ? held : { awake: true, awaySince: undefined }
+  }
+  if (!held.awake) return held
+  const since = held.awaySince ?? now
+  if (now - since >= DOZE_AFTER_MS) return ASLEEP
+  return held.awaySince === since ? held : { awake: true, awaySince: since }
+}
+
+/** How far a point is from the middle of a box, in the box's widths. */
+export function widthsFrom(
+  box: { readonly left: number; readonly top: number; readonly width: number; readonly height: number },
+  x: number,
+  y: number
+): number {
+  return Math.hypot(x - (box.left + box.width / 2), y - (box.top + box.height / 2)) / (box.width || 1)
+}
+
+/**
+ * ONE SWARM FLIGHT: where a small swarm bot comes from and goes, on the
+ * cover's own canvas, how big it is, and when. The swarm bot is the mark in
+ * flight seen from above, head up, so each climbs up and to the right and
+ * leans into its heading -- out of the lower left, over the machine and
+ * behind the three standing on it, and off the top.
+ */
+export interface SwarmFlight {
+  readonly x0: number
+  readonly y0: number
+  readonly x1: number
+  readonly y1: number
+  readonly size: number
+  readonly delay: number
+  readonly duration: number
+  /** How far it weaves off its line, either side. */
+  readonly sway: number
+}
+
+export const SWARM_FLIGHTS: readonly SwarmFlight[] = [
+  { x0: 150, y0: 262, x1: 470, y1: -90, size: 26, delay: 0, duration: 2300, sway: 10 },
+  { x0: 250, y0: 280, x1: 590, y1: -70, size: 22, delay: 120, duration: 2500, sway: -8 },
+  { x0: 60, y0: 250, x1: 380, y1: -100, size: 30, delay: 260, duration: 2200, sway: 12 },
+  { x0: 330, y0: 270, x1: 700, y1: -80, size: 24, delay: 380, duration: 2600, sway: -10 },
+  { x0: 190, y0: 300, x1: 540, y1: -60, size: 20, delay: 520, duration: 2400, sway: 8 },
+  { x0: 420, y0: 265, x1: 800, y1: -95, size: 28, delay: 640, duration: 2350, sway: -12 },
+  { x0: 100, y0: 290, x1: 430, y1: -85, size: 22, delay: 780, duration: 2550, sway: 9 }
+]
+
+/** The whole flight, first take-off to the last one gone. */
+export const SWARM_MS = Math.max(...SWARM_FLIGHTS.map((flight) => flight.delay + flight.duration))
+
+/** Degrees clockwise from straight up: the way a flight is heading. */
+export function headingOf(flight: SwarmFlight): number {
+  return Math.round((Math.atan2(flight.x1 - flight.x0, flight.y0 - flight.y1) * 180) / Math.PI)
+}
+
+/**
+ * A flight's keyframes on a cover drawn at `scale`: along its line with a
+ * weave, fading in as it leaves and out as it goes.
+ */
+export function flightFrames(flight: SwarmFlight, scale: number): Keyframe[] {
+  const dx = flight.x1 - flight.x0
+  const dy = flight.y1 - flight.y0
+  const length = Math.hypot(dx, dy) || 1
+  const heading = headingOf(flight)
+  return [
+    { offset: 0, opacity: 0 },
+    { offset: 0.12, opacity: 1 },
+    { offset: 0.5, opacity: 1 },
+    { offset: 0.85, opacity: 1 },
+    { offset: 1, opacity: 0 }
+  ].map((frame) => {
+    const weave = flight.sway * Math.sin(2 * Math.PI * frame.offset)
+    const x = flight.x0 + dx * frame.offset + (-dy / length) * weave - flight.size / 2
+    const y = flight.y0 + dy * frame.offset + (dx / length) * weave - flight.size / 2
+    return {
+      offset: frame.offset,
+      opacity: frame.opacity,
+      transform: `translate(${String(Math.round(x * scale))}px, ${String(Math.round(y * scale))}px) rotate(${String(heading)}deg)`
+    }
+  })
+}
+
+function reducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+}
+
+/** The swarm, once: every flight, then it tells the cover it has gone. */
+function SwarmRun({ scale, onGone }: { readonly scale: number; readonly onGone: () => void }): ReactElement {
+  const flyers = useRef<(HTMLSpanElement | null)[]>([])
+  useEffect(() => {
+    const running: Animation[] = []
+    for (const [index, flight] of SWARM_FLIGHTS.entries()) {
+      const element = flyers.current[index]
+      if (element === null || element === undefined || typeof element.animate !== 'function') continue
+      running.push(
+        element.animate(flightFrames(flight, scale), {
+          duration: flight.duration,
+          delay: flight.delay,
+          easing: 'cubic-bezier(0.3, 0.05, 0.5, 1)',
+          fill: 'both'
+        })
+      )
+    }
+    if (running.length === 0) {
+      onGone()
+      return undefined
+    }
+    let flying = running.length
+    for (const animation of running) {
+      animation.onfinish = () => {
+        flying -= 1
+        if (flying === 0) onGone()
+      }
+    }
+    return () => {
+      for (const animation of running) animation.cancel()
+    }
+    // One run per mount: the cover gives each run its own key.
+  }, [])
+  return (
+    <span className="lc-cover__swarm" aria-hidden="true">
+      {SWARM_FLIGHTS.map((flight, index) => (
+        <span
+          key={index}
+          className="lc-cover__flyer"
+          ref={(node) => {
+            flyers.current[index] = node
+          }}
+          style={{ width: Math.round(flight.size * scale), height: Math.round(flight.size * scale) }}
+        >
+          <Bot type="swarm" size={Math.round(flight.size * scale)} state="default" jumpEvery={0} seed={0.11 + index * 0.13} />
+        </span>
+      ))}
+    </span>
+  )
+}
+
 export function HomeCover({
   ready,
-  tube
+  tube,
+  swarmCalls = 0
 }: {
   /** The runtimes have answered: the loading screen's work is done. */
   readonly ready: boolean
   readonly tube: TubePreference
+  /** How many times swarm has been turned on this session: each new one flies the swarm across. */
+  readonly swarmCalls?: number
 }): ReactElement {
   const card = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(() => coverScale(0))
+  const faces = useRef(new Map<string, HTMLSpanElement>())
+  const [sleeper, setSleeper] = useState<Wakefulness>(ASLEEP)
+  const [relights, setRelights] = useState(0)
+  /*
+   * Only a swarm turned on while the cover is up flies. The count the cover
+   * came up with is the past -- swarm turned on in a conversation, or before
+   * this screen was shown -- and flying it now would say something had just
+   * happened that had not.
+   */
+  const swarmSeen = useRef(swarmCalls)
+  const [swarmRun, setSwarmRun] = useState<number>()
+  useEffect(() => {
+    if (swarmCalls === swarmSeen.current) return
+    swarmSeen.current = swarmCalls
+    if (!reducedMotion()) setSwarmRun(swarmCalls)
+  }, [swarmCalls])
+  const swarmGone = useCallback(() => setSwarmRun(undefined), [])
   /*
    * RESTING WHILE NOBODY IS LOOKING. The three move on every frame, and
    * plastic is lit per pixel: measured on the built app, about 11% of the
@@ -143,6 +331,38 @@ export function HomeCover({
       window.removeEventListener('blur', rest)
     }
   }, [])
+
+  /*
+   * THE HOPPER WAKES FOR A POINTER. It sleeps on the machine until a pointer
+   * comes within WAKE_WITHIN of it, opens its eyes and follows it (every bot
+   * on the cover follows a pointer that comes near), and dozes off again
+   * DOZE_AFTER_MS after the pointer has gone. Only once the cover is on.
+   */
+  useEffect(() => {
+    if (!ready) return undefined
+    const read = (x: number | undefined, y: number | undefined): void => {
+      const face = faces.current.get(SLEEPER)
+      const distance = face === undefined || x === undefined || y === undefined ? undefined : widthsFrom(face.getBoundingClientRect(), x, y)
+      setSleeper((held) => hopperWakes(held, distance, performance.now()))
+    }
+    const moved = (event: PointerEvent): void => read(event.clientX, event.clientY)
+    const gone = (): void => read(undefined, undefined)
+    window.addEventListener('pointermove', moved, { passive: true })
+    document.addEventListener('pointerleave', gone)
+    window.addEventListener('blur', gone)
+    return () => {
+      window.removeEventListener('pointermove', moved)
+      document.removeEventListener('pointerleave', gone)
+      window.removeEventListener('blur', gone)
+    }
+  }, [ready])
+  // Dozing off needs no pointer: it comes once the pointer has been gone long enough.
+  useEffect(() => {
+    if (!sleeper.awake || sleeper.awaySince === undefined) return undefined
+    const left = DOZE_AFTER_MS - (performance.now() - sleeper.awaySince)
+    const timer = window.setTimeout(() => setSleeper((held) => hopperWakes(held, undefined, performance.now())), Math.max(0, left) + 20)
+    return () => window.clearTimeout(timer)
+  }, [sleeper])
 
   useEffect(() => {
     const element = card.current
@@ -178,32 +398,39 @@ export function HomeCover({
         >
           <Beam size="md" strength={0.85} active={!ready} className="lc-coverbeam lc-coverbeam--machine">
             <div className="lc-cover__machine">
-              <div className="lc-cover__glass">
+              {/* A click on the glass powers the lockup on again (PoweredLockup's `replay`). */}
+              <div className="lc-cover__glass" onClick={ready ? () => setRelights((count) => count + 1) : undefined}>
                 <span className="lc-cover__scan" aria-hidden="true" />
                 <div className="lc-cover__screen">
-                  <PoweredLockup ready={ready} tube={tube} />
+                  <PoweredLockup ready={ready} tube={tube} replay={relights} />
                   <p className="lc-cover__claim">Autonomous teammates on your own machine</p>
                 </div>
               </div>
             </div>
           </Beam>
         </div>
+        {swarmRun !== undefined && <SwarmRun key={swarmRun} scale={scale} onGone={swarmGone} />}
         {COVER_CAST.map((mate, index) => {
           const size = at(FACE)
           const color = mate.hue === undefined ? undefined : hueColor(mate.hue)
+          const state = mate.key === SLEEPER && sleeper.awake ? 'default' : mate.state
           return (
             <span key={mate.key} className="lc-cover__face" style={{ left: at(mate.x), top: at(mate.y) }}>
               <span
                 className={`lc-bot${ready && mate.floats === true ? ' is-floating' : ''}${ready && !awake ? ' is-resting' : ''}`}
                 data-bot={mate.type}
-                data-state={ready ? mate.state : 'still'}
+                data-state={ready ? state : 'still'}
                 style={{ width: size, height: size }}
+                ref={(node) => {
+                  if (node === null) faces.current.delete(mate.key)
+                  else faces.current.set(mate.key, node)
+                }}
               >
                 {ready && mate.waiting === true && <span className="lc-bot__ring" />}
                 <Bot
                   type={mate.type}
                   size={size}
-                  state={ready ? mate.state : 'default'}
+                  state={ready ? state : 'default'}
                   paused={!ready || !awake}
                   interactive
                   seed={0.2 + index * 0.3}

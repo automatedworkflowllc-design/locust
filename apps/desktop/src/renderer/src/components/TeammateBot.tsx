@@ -3,7 +3,9 @@ import type { BotAvatarState } from 'bot-avatars'
 
 import { botFor } from '../../../shared/avatar.js'
 import type { FaceActivity } from '../faceState.js'
+import type { GlanceSide } from '../glances.js'
 import { Bot } from './Bot.js'
+import type { Glance } from './Bot.js'
 import { PRESENCE_TONE } from './PixelFace.js'
 import type { PixelFaceProps } from './PixelFace.js'
 
@@ -53,16 +55,25 @@ export interface BotMotion {
   readonly jumpEvery?: number
   /** The slight bounce (shell.css) a subtle bot does where a full one hops. */
   readonly bounces: boolean
+  /** One hop, straight up, now: a turn just finished. */
+  readonly hops: boolean
 }
 
 /**
  * Only work moves. Colin, on whether an idle bot should sleep or keep still:
  * *"ill run with your suggestion"* -- still, everywhere but the title screen.
  * Working and delegating are work; a teammate thinking, answering, receiving
- * or waiting on you is alive and looks around; idle, blocked and done keep
- * their resting pose.
+ * or waiting on you is alive and looks around; idle and blocked keep their
+ * resting pose.
+ *
+ * AND A TEAMMATE THAT JUST FINISHED HOPS, ONCE. The pixel faces did (`done`
+ * ran `lcHop` once); the bots that replaced them kept still, so the one
+ * thing a glance at the sidebar used to say -- who just finished -- went.
+ * Colin, 2026-09-23, of "a hop when a teammate finishes": *"you can run all
+ * those"*. The library's jump with no turn in it, at either level: a moment,
+ * not a performance, so it is the same size everywhere.
  */
-function kindOf(activity: FaceActivity): 'work' | 'alive' | 'still' {
+function kindOf(activity: FaceActivity): 'work' | 'alive' | 'finished' | 'still' {
   switch (activity) {
     case 'working':
     case 'delegating':
@@ -72,8 +83,9 @@ function kindOf(activity: FaceActivity): 'work' | 'alive' | 'still' {
     case 'receiving':
     case 'waiting':
       return 'alive'
-    case 'blocked':
     case 'done':
+      return 'finished'
+    case 'blocked':
     case 'idle':
       return 'still'
   }
@@ -81,8 +93,17 @@ function kindOf(activity: FaceActivity): 'work' | 'alive' | 'still' {
 
 export function botMotion(activity: FaceActivity, level: BotMotionLevel = 'subtle'): BotMotion {
   const kind = kindOf(activity)
-  if (level === 'full') return { state: kind === 'work' ? 'working' : 'default', paused: kind === 'still', bounces: false }
-  return { state: 'default', paused: kind === 'still', jumpEvery: 0, bounces: kind === 'work' }
+  if (kind === 'finished') return { state: 'default', paused: false, jumpEvery: 0, bounces: false, hops: true }
+  if (level === 'full') return { state: kind === 'work' ? 'working' : 'default', paused: kind === 'still', bounces: false, hops: false }
+  return { state: 'default', paused: kind === 'still', jumpEvery: 0, bounces: kind === 'work', hops: false }
+}
+
+/** Where a glance points, for each side a teammate can be on. */
+const GLANCE_TOWARD: Readonly<Record<GlanceSide, Glance>> = {
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 }
 }
 
 const hueColors = new Map<string, string | undefined>()
@@ -110,6 +131,17 @@ function seedOf(text: string): number {
 export interface TeammateBotProps extends PixelFaceProps {
   /** How much it moves: `subtle` unless this is the face you are talking to. */
   readonly motion?: BotMotionLevel
+  /**
+   * Hops when the teammate finishes. The workroom header says no: it sits
+   * over the reply you are already reading, and Colin asked for it, with the
+   * sidebar, to be calmer than the face you talk to (0.279).
+   */
+  readonly hopsWhenDone?: boolean
+  /**
+   * Looks this way for a moment: toward a teammate it just handed a message
+   * to, or that just handed it one (glances.ts). Wakes a still bot for it.
+   */
+  readonly glance?: GlanceSide
 }
 
 export function TeammateBot({
@@ -121,10 +153,12 @@ export function TeammateBot({
   className,
   teammateId,
   name,
-  motion = 'subtle'
+  motion = 'subtle',
+  hopsWhenDone = true,
+  glance
 }: TeammateBotProps): ReactElement {
   const bot = botFor(avatar)
-  const { state, paused, jumpEvery, bounces } = botMotion(activity, motion)
+  const { state, paused, jumpEvery, bounces, hops } = botMotion(activity === 'done' && !hopsWhenDone ? 'idle' : activity, motion)
   const color = hueColor(hue)
   const tone = PRESENCE_TONE[presence]
   return (
@@ -142,9 +176,11 @@ export function TeammateBot({
         type={bot.shape}
         size={size}
         state={state}
-        paused={paused}
+        paused={paused && glance === undefined}
         face={bot.face}
         seed={seedOf(teammateId ?? name ?? bot.shape)}
+        hop={hops}
+        {...(glance === undefined ? {} : { glance: GLANCE_TOWARD[glance] })}
         {...(color === undefined ? {} : { color })}
         {...(jumpEvery === undefined ? {} : { jumpEvery })}
       />

@@ -492,10 +492,12 @@ export function Composer({
   const canQueue = workingNow && queued === undefined && value.trim().length > 0
   const workingName = busyWith ?? 'this mission'
 
+  // With a message queued the box is shut, and the caption under that
+  // message already says when it goes: the box says how to change it.
   const placeholder = workingNow
     ? queued === undefined
       ? `Say what is next — it goes to ${workingName} when this finishes…`
-      : `Waiting to send when ${workingName} finishes…`
+      : 'Edit the queued message to change it…'
     : !routeCanRun
       ? `The ${selected?.displayName ?? 'selected'} adapter is not finished — switch the route to run a mission…`
       : selectedReady
@@ -954,18 +956,45 @@ export function Composer({
             {refusal.text}
           </div>
         )}
+        {/*
+          * A QUEUED MESSAGE IS YOUR NEXT MESSAGE, WAITING.
+          *
+          * Colin, 2026-09-23, with a frame of it: "lets clean this up, looks
+          * a bit trashy compared to the rest of the app". It was a label in
+          * the mono face at body size, the message at full strength beside
+          * it, a caption in mono under that, a lone rule down the side and
+          * two buttons floating at the far right -- five voices for one
+          * fact, over a box saying the same "when Pip finishes" again.
+          *
+          * Claude Code shows a queued message as the person's own message,
+          * dimmed, just over the box. Here that is the thread's own bubble,
+          * on the person's side and outlined where a sent one is filled --
+          * what you will see in the thread once it goes -- and one quiet line
+          * under it: when it goes, or why it is held, and what can be done.
+          */}
         {queued !== undefined && (
           <div className="lc-queued" role="status" aria-live="polite">
-            {/* The count only appears once there is more than one thing
-                waiting -- "NEXT · 3" is a fact worth having, "NEXT · 1" is
-                the label said twice. */}
-            <span className="lc-queued__label lc-mono">
-              NEXT{queuedCount !== undefined && queuedCount > 1 ? ` · ${String(queuedCount)}` : ''}
-            </span>
-            <span className="lc-queued__text">{queued}</span>
-            <span className="lc-queued__actions">
+            <div className="lc-queued__bubble">
+              <span className="lc-queued__text">{queued}</span>
+            </div>
+            <div className="lc-queued__meta">
+              <Icon name="clock" size={12} />
+              {/*
+                * The reason, or what will happen -- never a description of
+                * the button. "ready to send" was the one state a person could
+                * not act on intelligently (design pass, objection 1), and it
+                * is unreachable: a queue that is ready has already gone. The
+                * count only once there is more than one: several lines typed
+                * during one run go as one message.
+                */}
+              <span className={`lc-queued__note${queuedNote === undefined ? '' : ' is-held'}`}>
+                {queuedCount !== undefined && queuedCount > 1 ? `${String(queuedCount)} messages, sent as one · ` : ''}
+                {queuedNote === undefined
+                  ? `Sends when ${workingName} finishes`
+                  : `${queuedNote.charAt(0).toUpperCase()}${queuedNote.slice(1)}`}
+              </span>
               {!workingNow && (
-                <button type="button" className="lc-ghostbutton" onClick={onSendQueued}>
+                <button type="button" className="lc-queued__action" onClick={onSendQueued}>
                   {/* It always goes into the conversation ON SCREEN, so where
                       that is not the one it was typed at, the button says so
                       rather than reading as "send it where it was going". */}
@@ -981,7 +1010,7 @@ export function Composer({
                 */}
               <button
                 type="button"
-                className="lc-ghostbutton"
+                className="lc-queued__action"
                 onClick={() => {
                   setValue(queued)
                   onUnqueue()
@@ -989,19 +1018,10 @@ export function Composer({
               >
                 Edit
               </button>
-              <button type="button" className="lc-ghostbutton" onClick={onUnqueue} aria-label="Discard the queued message">
+              <button type="button" className="lc-queued__action" onClick={onUnqueue} aria-label="Discard the queued message">
                 Discard
               </button>
-            </span>
-            {/*
-              * The reason, or what will happen -- never a description of the
-              * button. "ready to send" was the one state a person could not
-              * act on intelligently (design pass, objection 1), and it is now
-              * unreachable: a queue that is ready has already gone.
-              */}
-            <span className="lc-queued__note lc-mono">
-              {queuedNote ?? `sends when ${workingName} finishes`}
-            </span>
+            </div>
           </div>
         )}
         {continuationNote !== undefined && (

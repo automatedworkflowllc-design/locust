@@ -4,6 +4,8 @@ import type { ReactElement, ReactNode } from 'react'
 import type { GroupMembership, PublicGroup, PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
 import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
+import { glancesAmong } from '../glances.js'
+import type { Handoff } from '../glances.js'
 import { routeModelName, shortRuntimeName } from '../routeName.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
@@ -186,6 +188,7 @@ export function Sidebar({
   starting,
   recentlyDone,
   recentlyReceived,
+  handoffs = [],
   onSelectTeammate,
   onOpenHub,
   onNewConversationWith,
@@ -270,6 +273,8 @@ export function Sidebar({
   /** Teammates whose mission just finished, or who just received a message. */
   readonly recentlyDone: readonly string[]
   readonly recentlyReceived: readonly string[]
+  /** Messages just handed between teammates: the two faces look at each other. */
+  readonly handoffs?: readonly Handoff[]
   readonly onSelectTeammate: (teammateId: string) => void
   /**
    * Open the teammate's hub -- the conversation their replies to other
@@ -519,6 +524,10 @@ export function Sidebar({
     facesByRecency.length <= FACES_WITHOUT_CHIP ? FACES_WITHOUT_CHIP : FACES_WITH_CHIP
   )
   const restOfTeam = facesByRecency.length - shownFaces.length
+  // The strip is a row and the roster a column: a handoff between two faces
+  // in either turns them toward each other along it.
+  const stripGlances = glancesAmong(shownFaces.map((teammate) => teammate.teammateId), handoffs, 'row')
+  const rosterGlances = glancesAmong(teammates.map((teammate) => teammate.teammateId), handoffs, 'column')
 
   const ungroupedConversations = shownConversations.filter(
     (mission) => heldFor(mission, groupMembers) === undefined
@@ -1022,6 +1031,7 @@ export function Sidebar({
                   size={26}
                   teammateId={teammate.teammateId}
                   {...(status === undefined ? {} : { activity: status.activity, presence: facePresenceFor(status.status) })}
+                  {...(stripGlances.has(teammate.teammateId) ? { glance: stripGlances.get(teammate.teammateId) } : {})}
                 />
                 {status !== undefined && (
                   <span className={`lc-faces__pip lc-tone-${status.tone}`} aria-hidden="true" />
@@ -1250,6 +1260,7 @@ export function Sidebar({
                     activity={status.activity}
                     presence={facePresenceFor(status.status)}
                     teammateId={teammate.teammateId}
+                    {...(rosterGlances.has(teammate.teammateId) ? { glance: rosterGlances.get(teammate.teammateId) } : {})}
                   />
                   <span className="lc-row__text">
                     <span className="lc-row__name">

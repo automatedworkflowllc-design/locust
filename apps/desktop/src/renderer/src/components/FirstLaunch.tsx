@@ -60,6 +60,7 @@ export function FirstLaunch({
   limitedRuntimes,
   discoveryPhase,
   tube,
+  swarmCalls = 0,
   freeStart = 'unknown',
   workspacePath,
   teammateCount,
@@ -88,6 +89,8 @@ export function FirstLaunch({
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
   /** The boot screen's preference; the lockup's lighting follows it. Absent reads as full. */
   readonly tube?: TubePreference
+  /** How many times swarm has been turned on this session: the cover flies the swarm for a new one. */
+  readonly swarmCalls?: number
   /** The folder the teammates work in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly teammateCount: number
@@ -224,7 +227,7 @@ export function FirstLaunch({
     <div className="lc-empty" ref={pane}>
       <div className="lc-empty__inner">
         {/* The design system's cover: the lockup lighting up once the runtimes have answered, and the teammates. */}
-        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} />
+        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} />
 
         {/*
           * The only words on the screen, both carrying information: what

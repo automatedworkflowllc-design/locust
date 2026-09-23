@@ -11,6 +11,33 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.300.0 - 2026-09-23
+
+### New
+
+- **Teammates notice things.** A teammate's face in the sidebar hops once
+  when its turn ends, so you can see who just finished without reading
+  anything. When one teammate hands another a message, their two faces
+  turn and look at each other for a moment.
+- **The title screen notices you.** The sleeping Hopper opens its eyes when
+  your pointer comes near and watches it, then dozes off again once you
+  have gone. A click on the screen powers the logo on again, and turning
+  swarm on sends a few small swarm bots up across it.
+
+### Improved
+
+- **A queued message looks like the message it will be.** A message
+  waiting to send sits over the box as your own message, outlined until it
+  goes, with one line under it: when it sends, then Edit and Discard.
+
+### Fixed
+
+- **A queued message stays with its own conversation.** A message queued
+  for one teammate showed under every other conversation too, and Edit or
+  Discard there changed or removed it. Two messages queued for two
+  teammates could even be joined into one and sent to one of them. Each
+  conversation now shows, edits and sends only its own.
+
 ## 0.299.0 - 2026-09-23
 
 ### Improved

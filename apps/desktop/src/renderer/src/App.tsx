@@ -52,7 +52,7 @@ import type {
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft, routineStepPhrase } from './routines.js'
-import { combineQueued, queuedVerdict, requeuedRows, retriedAfterBusy } from './steering.js'
+import { combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, takeNext, withoutQueueOf } from './steering.js'
 import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
@@ -133,6 +133,7 @@ import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteCha
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
+import type { Handoff } from './glances.js'
 import type { LiveActivity } from './faceState.js'
 import type { TeammateStatusView } from './status.js'
 
@@ -1607,6 +1608,13 @@ export default function App(): ReactElement {
   }, [awaitingModels, runtimeState.phase, models])
   const [effort, setEffort] = useState<string>()
   const [swarm, setSwarm] = useState(false)
+  /*
+   * How many times the person has turned swarm on this session. The title
+   * screen flies the swarm across for each new one (HomeCover's SwarmRun) --
+   * a count, not the setting, because the setting also turns on by itself
+   * at launch, read back from disk, and that is not a moment.
+   */
+  const [swarmCalls, setSwarmCalls] = useState(0)
   // Off until the workspace says otherwise, and re-read from the host rather
   // than remembered: this is the switch that decides whether a mode which can
   // write anywhere on the machine is offered at all.
@@ -1651,6 +1659,9 @@ export default function App(): ReactElement {
   // for a moment, then still. Keyed by teammate; cleared by their own timers.
   const [recentlyDone, setRecentlyDone] = useState<readonly string[]>([])
   const [recentlyReceived, setRecentlyReceived] = useState<readonly string[]>([])
+  // And a message just handed from one to another: the two look at each
+  // other where both faces are in one line (glances.ts), for the same moment.
+  const [handoffs, setHandoffs] = useState<readonly Handoff[]>([])
   const missionOwnersRef = useRef<Readonly<Record<string, string>>>({})
   const groupsRef = useRef<readonly PublicGroup[]>([])
   const groupMembersRef = useRef<Readonly<Record<string, GroupMembership>>>({})
@@ -1884,6 +1895,9 @@ export default function App(): ReactElement {
         const to = update.message.to.teammateId
         setRecentlyReceived((current) => [...current.filter((id) => id !== to), to])
         setTimeout(() => setRecentlyReceived((current) => current.filter((id) => id !== to)), RECEIVED_GLANCE_MS)
+        const handoff: Handoff = { key: update.message.messageId, from: update.message.from.teammateId, to }
+        setHandoffs((current) => [...current.filter((held) => held.key !== handoff.key), handoff])
+        setTimeout(() => setHandoffs((current) => current.filter((held) => held.key !== handoff.key)), RECEIVED_GLANCE_MS)
       }
       if (update.kind === 'room-posted') {
         refreshRooms()
@@ -3777,9 +3791,15 @@ export default function App(): ReactElement {
   // waiting with the reason on screen: sending the next instruction into a
   // conversation whose last turn did not happen would build on work that
   // never ran, which is the same rule a routine's steps follow.
-  // The queue is judged by its FRONT, because that is the row that goes next
-  // and every row behind it is waiting on the same run.
-  const front = queued[0]
+  //
+  // Only the conversation ON SCREEN sends, because a turn is started into the
+  // conversation on screen: a message queued elsewhere waits in its own
+  // conversation and goes when that is opened again. Each conversation is
+  // judged by its own FRONT -- the row that goes next there, which every row
+  // behind it is waiting on too -- and never by another's: one queue for
+  // every conversation made a line for Gem wait on Pip's run and then ride
+  // along with Pip's (outside beta recheck of 0.299, P1).
+  const front = queuedIn(queued, shownKey)[0]
   const queuedRun = front === undefined ? undefined : runs.get(front.key)
   const verdict =
     front === undefined
@@ -3787,13 +3807,12 @@ export default function App(): ReactElement {
       : queuedVerdict({
           running: queuedRun !== undefined && liveRunIsActive(queuedRun),
           phase: queuedRun?.phase,
-          onScreen: shownKey === front.key
+          onScreen: true
         })
-  const queuedNote = verdict?.kind === 'held' ? verdict.note : undefined
   /** Ticks when a queued message's retry time comes round, so the effect below looks again. */
   const [queueClock, setQueueClock] = useState(0)
   useEffect(() => {
-    if (front === undefined || verdict?.kind !== 'send') return undefined
+    if (front === undefined || shownKey === undefined || verdict?.kind !== 'send') return undefined
     // Refused as busy a moment ago: not before its retry time.
     const wait = (front.retryAt ?? 0) - Date.now()
     if (wait > 0) {
@@ -3802,22 +3821,50 @@ export default function App(): ReactElement {
     }
     // Folded at the moment of sending rather than as it is typed, so a person
     // can still edit or drop any row right up until it goes.
-    const folded = combineQueued(queued)
-    const going = folded[0]
+    const { going, rest } = takeNext(queued, shownKey)
     if (going === undefined) return undefined
     // Cleared BEFORE sending: this effect runs again on the state the send
     // produces, and a queue still holding the message would send it twice.
     // Only what actually went is dropped -- anything the fold refused to
-    // merge stays queued and takes its own turn.
-    setQueued(folded.slice(1))
+    // merge stays queued and takes its own turn, and every other
+    // conversation's rows stay where they are.
+    setQueued(rest)
     void startMission(going.text, undefined, { requeue: going })
     return undefined
-  }, [queued, front, verdict?.kind, queueClock])
+  }, [queued, front, shownKey, verdict?.kind, queueClock])
 
   /** The addressed teammate's live run, if they have one: they cannot be given a second. */
   const busyRun = [...runs.values()].find(
     (run) => liveRunIsActive(run) && pickedTeammate !== undefined && ownerOf(run) === pickedTeammate.teammateId
   )
+
+  /*
+   * THE CONVERSATION THE BOX QUEUES INTO, AND SHOWS THE QUEUE OF: the live
+   * run on screen -- that is the conversation being replied into -- else the
+   * addressed teammate's busy run, else the conversation on screen, for what
+   * is still waiting there after its run ended. Keyed on the addressed
+   * teammate's busy run first, queueing did nothing at all on a fresh
+   * profile, where every mission belongs to nobody (steering smoke,
+   * 2026-09-05); the teammate's run is the fallback for when the thread on
+   * screen is someone else's.
+   *
+   * One key for both, so what the box shows as NEXT is exactly what typing
+   * adds to, and Edit, Discard and Send act on that and nothing else.
+   */
+  const liveOnScreen = shownKey !== undefined && liveRunIsActive(runs.get(shownKey)) ? shownKey : undefined
+  const busyKey = busyRun === undefined ? undefined : [...runs.entries()].find(([, run]) => run === busyRun)?.[0]
+  const queueKey = liveOnScreen ?? busyKey ?? shownKey
+  const waitingHere = queuedIn(queued, queueKey)
+  const waitingRun = queueKey === undefined ? undefined : runs.get(queueKey)
+  const waitingVerdict =
+    waitingHere[0] === undefined
+      ? undefined
+      : queuedVerdict({
+          running: waitingRun !== undefined && liveRunIsActive(waitingRun),
+          phase: waitingRun?.phase,
+          onScreen: queueKey === shownKey
+        })
+  const queuedNote = waitingVerdict?.kind === 'held' ? waitingVerdict.note : undefined
 
   /**
    * Show a run's thread. A run the shell already knows about is shown as it
@@ -4749,6 +4796,7 @@ export default function App(): ReactElement {
           starting={Object.keys(relayStarting)}
           recentlyDone={recentlyDone}
           recentlyReceived={recentlyReceived}
+          handoffs={handoffs}
           onSelectTeammate={selectTeammate}
           onNewConversationWith={newConversationWith}
           onOpenHub={openHub}
@@ -4917,6 +4965,7 @@ export default function App(): ReactElement {
                 // The same write the composer mark performs: optimistic, then
                 // reconciled with what the store actually saved.
                 setSwarm(next)
+                if (next) setSwarmCalls((count) => count + 1)
                 void window.desktop
                   ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                   .then((settings) => setSwarm(settings.swarm === true))
@@ -5049,6 +5098,7 @@ export default function App(): ReactElement {
                 limitedRuntimes={limitedRuntimes}
                 discoveryPhase={runtimeState.phase}
                 tube={tube}
+                swarmCalls={swarmCalls}
                 workspacePath={workspacePath}
                 workspaceMade={workspaceMade}
                 teammateCount={teammates.length}
@@ -5104,6 +5154,7 @@ export default function App(): ReactElement {
                       size={32}
                       teammateId={missionOwner.teammateId}
                       activity={workroomOwnerView?.activity ?? 'idle'}
+                      hopsWhenDone={false}
                       /*
                        * The dot comes from the same status as the face.
                        *
@@ -5573,6 +5624,7 @@ export default function App(): ReactElement {
               // saved -- a rejected write must not leave the chip claiming a
               // setting that is not on disk.
               setSwarm(next)
+              if (next) setSwarmCalls((count) => count + 1)
               void window.desktop
                 ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                 .then((settings) => setSwarm(settings.swarm === true))
@@ -5630,19 +5682,14 @@ export default function App(): ReactElement {
             // What is waiting, as the person will see it go: folded, so the
             // strip shows the one instruction that will actually be sent
             // rather than the pieces it was typed in.
-            queued={combineQueued(queued)[0]?.text}
-            queuedCount={queued.length}
+            queued={combineQueued(waitingHere)[0]?.text}
+            queuedCount={waitingHere.length}
             queuedNote={queuedNote}
-            queuedElsewhere={front !== undefined && shownKey !== front.key}
+            queuedElsewhere={queueKey !== shownKey}
             onQueue={(text) => {
-              // Against the LIVE run on screen -- that is the conversation
-              // being replied into. Keyed on the addressed teammate's busy
-              // run instead, this did nothing at all on a fresh profile,
-              // where every mission belongs to nobody (steering smoke,
-              // 2026-09-05); the teammate's run is the fallback for when the
-              // thread on screen is someone else's.
-              const onScreen = shownKey !== undefined && liveRunIsActive(runs.get(shownKey)) ? shownKey : undefined
-              const key = onScreen ?? [...runs.entries()].find(([, run]) => run === busyRun)?.[0]
+              // Into the conversation the box shows the queue of (queueKey):
+              // the live run on screen, else the addressed teammate's busy run.
+              const key = liveOnScreen ?? busyKey
               if (key !== undefined) {
                 setQueued((rows) => [
                   ...rows,
@@ -5650,11 +5697,11 @@ export default function App(): ReactElement {
                 ])
               }
             }}
-            onUnqueue={() => setQueued([])}
+            onUnqueue={() => setQueued((rows) => withoutQueueOf(rows, queueKey))}
             onSendQueued={() => {
-              const folded = combineQueued(queued)
-              const going = folded[0]
-              setQueued(folded.slice(1))
+              if (queueKey === undefined) return
+              const { going, rest } = takeNext(queued, queueKey)
+              setQueued(rest)
               if (going !== undefined) void startMission(going.text, undefined, { requeue: going })
             }}
           />
@@ -5760,6 +5807,7 @@ export default function App(): ReactElement {
                   // needs one way in from anywhere.
                   const next = !swarm
                   setSwarm(next)
+                  if (next) setSwarmCalls((count) => count + 1)
                   void window.desktop
                     ?.writeWorkspaceSettings({ swarm: next, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube })
                     .then((settings) => setSwarm(settings.swarm === true))

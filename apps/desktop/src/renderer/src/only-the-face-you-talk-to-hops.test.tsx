@@ -26,7 +26,7 @@ const ALL: readonly FaceActivity[] = ['thinking', 'working', 'delegating', 'resp
 describe('a subtle bot, everywhere but the conversation', () => {
   it('looks around at work instead of hopping, and bounces a little', () => {
     for (const activity of ['working', 'delegating'] as const) {
-      expect(botMotion(activity)).toEqual({ state: 'default', paused: false, jumpEvery: 0, bounces: true })
+      expect(botMotion(activity)).toEqual({ state: 'default', paused: false, jumpEvery: 0, bounces: true, hops: false })
     }
   })
 
@@ -34,10 +34,10 @@ describe('a subtle bot, everywhere but the conversation', () => {
     for (const activity of ALL) expect(botMotion(activity).jumpEvery).toBe(0)
   })
 
-  it('bounces only at work: thinking and answering look around, still keeps still', () => {
+  it('bounces only at work: thinking and answering look around, still keeps still, and a finish hops once', () => {
     const summary = Object.fromEntries(ALL.map((activity) => {
       const motion = botMotion(activity)
-      return [activity, motion.paused ? 'still' : motion.bounces ? 'bounce' : 'look']
+      return [activity, motion.hops ? 'hop' : motion.paused ? 'still' : motion.bounces ? 'bounce' : 'look']
     }))
     expect(summary).toEqual({
       thinking: 'look',
@@ -47,7 +47,7 @@ describe('a subtle bot, everywhere but the conversation', () => {
       waiting: 'look',
       receiving: 'look',
       blocked: 'still',
-      done: 'still',
+      done: 'hop',
       idle: 'still'
     })
   })
@@ -64,8 +64,8 @@ describe('a subtle bot, everywhere but the conversation', () => {
 
 describe('the face you are talking to', () => {
   it('keeps the whole performance: it hops at work, and flips on its own schedule', () => {
-    expect(botMotion('working', 'full')).toEqual({ state: 'working', paused: false, bounces: false })
-    expect(botMotion('thinking', 'full')).toEqual({ state: 'default', paused: false, bounces: false })
+    expect(botMotion('working', 'full')).toEqual({ state: 'working', paused: false, bounces: false, hops: false })
+    expect(botMotion('thinking', 'full')).toEqual({ state: 'default', paused: false, bounces: false, hops: false })
     expect(botMotion('thinking', 'full')).not.toHaveProperty('jumpEvery')
   })
 

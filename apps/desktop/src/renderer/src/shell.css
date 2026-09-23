@@ -3757,6 +3757,26 @@ textarea {
   line-height: 0;
 }
 
+/* Swarm, turned on (HomeCover's SwarmRun): small swarm bots crossing the
+   cover once -- over the machine, under the three standing on it (the order
+   they are drawn in), and never in the way of a click. Each is placed by its
+   own animation, and unseen before it leaves and after it has gone. */
+.lc-cover__swarm {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lc-cover__flyer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  line-height: 0;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
 /*
  * A BOT, AND LOCUST'S OWN MARKS ON IT -- see Bot.tsx.
  *
@@ -10314,72 +10334,82 @@ textarea {
   color: var(--lc-text-muted);
 }
 
-/* What is waiting to be sent when the running mission finishes. Sits above
-   the composer, in the composer's own well, because it is about the next
-   thing you will say rather than about the work on screen. */
 /*
- * A MESSAGE WAITING ITS TURN IS NOT AN ALERT.
+ * A MESSAGE WAITING ITS TURN: your next message, over the box.
  *
- * Colin, 2026-09-14: "our steer/queued message is brutal looking". It was a
- * full-width bordered card on a raised ground with two 32px bordered
- * buttons in it -- the weight of an error, for the most ordinary thing in
- * the app: something you typed that will send by itself in a moment.
+ * Colin, 2026-09-14: "our steer/queued message is brutal looking" -- a
+ * bordered card with two 32px buttons, the weight of an error. Then the
+ * quiet version: a left rule, a mono label, a mono caption, and, 2026-09-23,
+ * "lets clean this up, looks a bit trashy compared to the rest of the app".
  *
- * So it takes the quiet-note register the thread already has: a left rule,
- * no card, no fill. Nothing is hidden -- both controls are still there and
- * still reachable by keyboard -- they simply stop shouting.
+ * So it is the thread's own bubble for the person (.lc-bubble): the same
+ * side, width and corners, outlined where a sent message is filled, in the
+ * secondary ink -- the message it will be once it goes -- with one caption
+ * line under it in the thread's small type. Nothing shouts and nothing is
+ * hidden: the controls are words, reachable by keyboard.
  */
 .lc-queued {
-  display: grid;
-  /* Label, the message, then the actions -- with the reason on a second row
-     under the message, where a caption belongs, instead of competing with it
-     for the same line (design pass, 2026-09-05). */
-  grid-template-columns: auto 1fr auto;
-  gap: 0.2rem 0.5rem;
-  align-items: center;
-  margin-bottom: 0.4rem;
-  padding: 0.3rem 0 0.3rem 0.6rem;
-  border-left: 2px solid var(--lc-border-button);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--lc-space-2);
+  margin-bottom: var(--lc-space-4);
 }
 
-/* Quieter than the app's ordinary ghost button, which is 32px with a strong
-   border: two of those is what made this read as an alert. The border
-   arrives on hover and on keyboard focus, so nothing is lost. */
-.lc-queued .lc-ghostbutton {
-  height: 24px;
-  padding: 0 9px;
-  border-color: transparent;
-  color: var(--lc-text-muted);
-  font-size: var(--lc-text-description);
-}
-
-.lc-queued .lc-ghostbutton:hover,
-.lc-queued .lc-ghostbutton:focus-visible {
-  border-color: var(--lc-border-control);
+.lc-queued__bubble {
+  max-width: 78%;
+  padding: var(--lc-space-3) var(--lc-space-5);
+  border: 1px dashed var(--lc-border-strong);
+  border-radius: var(--lc-radius-card);
   color: var(--lc-text-secondary);
+  text-wrap: pretty;
 }
 
-.lc-queued__label {
-  color: var(--lc-text-muted);
-  letter-spacing: 0.08em;
-}
-
+/* Three lines at most: several lines typed during a run go as one message,
+   and the box under it must stay where it is. */
 .lc-queued__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-line;
+}
+
+.lc-queued__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  padding: 0 var(--lc-space-2);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
 }
 
 .lc-queued__note {
-  grid-column: 2;
+  margin-right: var(--lc-space-2);
   color: var(--lc-text-muted);
 }
 
-.lc-queued__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  grid-row: span 2;
+/* Held: the run in front stopped or failed, and the message waits on you. */
+.lc-queued__note.is-held {
+  color: var(--lc-amber-text);
+}
+
+/* The actions a step brighter than the caption they follow, so the line
+   reads as a fact and then two things you can do. */
+.lc-queued__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--lc-text-secondary);
+  cursor: pointer;
+}
+
+.lc-queued__action:hover,
+.lc-queued__action:focus-visible {
+  color: var(--lc-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* "Open the run this reached" on an exchange message. Quiet: it is a way

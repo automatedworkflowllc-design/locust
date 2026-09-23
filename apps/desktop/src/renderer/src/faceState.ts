@@ -187,6 +187,11 @@ export function teammateActivity(input: {
   return 'idle'
 }
 
-/** How long a finished mission's hop, and a received message's glance, stay on the face. */
-export const DONE_HOP_MS = 1_400
+/**
+ * How long a finished mission's hop, and a received message's glance, stay on
+ * the face. The hop is the bot library's jump, about 1.5 s from the crouch to
+ * its own shape again (Bot.tsx's HOP_MS), so the moment outlasts it: a bot
+ * stilled before it lands is snapped out of the air.
+ */
+export const DONE_HOP_MS = 1_800
 export const RECEIVED_GLANCE_MS = 2_800

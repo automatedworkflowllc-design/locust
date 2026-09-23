@@ -73,11 +73,13 @@ describe("a teammate's bot", () => {
 })
 
 describe('how a bot moves', () => {
-  it('only work moves: idle, blocked and done keep still; at full motion working hops, the rest look around', () => {
+  // Colin, 2026-09-23, of "a hop when a teammate finishes": "you can run all
+  // those". A finish is a moment, not a state: one hop, then still.
+  it('only work moves, and a finish hops once: idle and blocked keep still; at full motion working hops, the rest look around', () => {
     const all: readonly FaceActivity[] = ['thinking', 'working', 'delegating', 'responding', 'waiting', 'receiving', 'blocked', 'done', 'idle']
     const summary = Object.fromEntries(all.map((activity) => {
       const motion = botMotion(activity, 'full')
-      return [activity, motion.paused ? 'still' : motion.state]
+      return [activity, motion.hops ? 'hop' : motion.paused ? 'still' : motion.state]
     }))
     expect(summary).toEqual({
       thinking: 'default',
@@ -87,7 +89,7 @@ describe('how a bot moves', () => {
       waiting: 'default',
       receiving: 'default',
       blocked: 'still',
-      done: 'still',
+      done: 'hop',
       idle: 'still'
     })
   })

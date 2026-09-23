@@ -55,15 +55,27 @@ export function nextLightingDelay(random: () => number = Math.random): number {
   return 7_000 + Math.round(Math.min(1, Math.max(0, random())) * 3_000)
 }
 
+/**
+ * Whether a click on the glass lights it again: once it has lit on its own,
+ * and as the tube allows -- Off and reduced motion never light, so a click
+ * does not either.
+ */
+export function replaysOnAsk(plan: 'none' | 'once' | 'repeat', litSoFar: number): boolean {
+  return plan !== 'none' && litSoFar > 0
+}
+
 const LIGHTINGS = new Set(['lcLockupPower', 'lcLockupRelight'])
 
 export function PoweredLockup({
   ready,
-  tube
+  tube,
+  replay = 0
 }: {
   /** The runtimes have answered: the loading screen's work is done. */
   readonly ready: boolean
   readonly tube: TubePreference
+  /** Counts up for each time someone asks to see it power on again: a click on the glass. */
+  readonly replay?: number
 }): ReactElement {
   const [inFront, setInFront] = useState(() => typeof document !== 'undefined' && document.hasFocus())
   const [lighting, setLighting] = useState<'power' | 'relight'>()
@@ -105,6 +117,22 @@ export function PoweredLockup({
     }, nextLightingDelay())
     return () => window.clearTimeout(timer)
   }, [lighting, plan, waitRound])
+
+  /*
+   * ASKED FOR AGAIN. A click on the glass powers it on again (Colin's "have
+   * fun" list, 2026-09-23: "you can run all those") -- the power-on, not the
+   * relight, because the power-on is the one people miss. Once it has lit
+   * the first time, and only as the tube allows: Off and reduced motion
+   * never light, so a click does not either. A click while it is lighting
+   * lets that lighting finish.
+   */
+  useEffect(() => {
+    if (replay === 0 || !replaysOnAsk(plan, lit.current)) return
+    lit.current += 1
+    setLighting((current) => current ?? 'power')
+    // Only a new ask replays: a changed plan is not one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replay])
 
   const onAnimationEnd = (event: AnimationEvent<HTMLDivElement>): void => {
     if (LIGHTINGS.has(event.animationName)) setLighting(undefined)
