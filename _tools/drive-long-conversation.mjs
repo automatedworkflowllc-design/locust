@@ -147,13 +147,18 @@ try {
         return {}
       }
     })()
-    atBottom.push({ bottom: read.scrolledToBottom === true, finished: read.running === false })
-    say(`turn ${String(number)}: ${read.running === false ? 'finished' : 'STILL RUNNING'}, ${read.scrolledToBottom === true ? 'at the bottom' : 'NOT at the bottom'} -- ${String(read.lastWords ?? '').slice(-50)}`)
+    // No thread at all is the conversation gone from the screen -- 0.297's
+    // turn 5, dropped by a host still winding turn 4 down -- not a slow turn.
+    const gone = read.error !== undefined
+    atBottom.push({ bottom: read.scrolledToBottom === true, finished: read.running === false, gone })
+    say(`turn ${String(number)}: ${gone ? 'NO CONVERSATION ON SCREEN (' + String(read.error) + ')' : read.running === false ? 'finished' : 'STILL RUNNING'}, ${read.scrolledToBottom === true ? 'at the bottom' : 'NOT at the bottom'} -- ${String(read.lastWords ?? '').slice(-50)}`)
   }
 
   await drive.capture('the whole conversation, at the end', async () => {
     return drive.evaluate(SHAPE)
   })
+  const lost = atBottom.filter((turn) => turn.gone).length
+  if (lost > 0) say(`  [FAIL] the conversation stays on screen through every turn -- it was gone at ${String(lost)} read(s)`)
   const finished = atBottom.filter((turn) => turn.finished)
   const held = finished.filter((turn) => turn.bottom).length
   if (finished.length < TURNS.length) say(`  [NOTE] ${String(TURNS.length - finished.length)} turn(s) were still running when read -- they prove nothing either way`)

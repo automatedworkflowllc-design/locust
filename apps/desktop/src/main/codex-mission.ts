@@ -885,8 +885,22 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // One live mission per teammate: a teammate is one identity doing one
         // piece of work, and two runs sharing a name would share a workroom
         // voice. Missions of nobody keep the old rule and run one at a time.
-        const ownerBusy =
-          starting.has(owner) || [...active.values()].some((mission) => ownerKeyOf(mission.peer) === owner)
+        //
+        // EXCEPT the next turn of a run that has already ended. A run's
+        // terminal events reach the window before this service lets go of it
+        // -- the disk observation and the share come after -- and a message
+        // queued behind that run goes the moment the window sees it end. It
+        // was refused here as "already has a mission running", and the queue
+        // had nothing left to wait behind, so the message was dropped and the
+        // window was left on a run that no longer existed (drive-long-
+        // conversation on 0.297, 2026-09-23: turn 5 never ran). A follow-up of
+        // that very mission, on the same runtime, is the conversation going
+        // on, not a second run beside it. On another runtime it checkpoints
+        // the record the bookkeeping is still writing to, so that one waits.
+        const winding = (mission: ActiveCodexMission): boolean =>
+          mission.settled && followUpOf !== undefined && mission.missionId === followUpOf && mission.runtime === runtime
+        const live = [...active.values()].filter((mission) => !winding(mission))
+        const ownerBusy = starting.has(owner) || live.some((mission) => ownerKeyOf(mission.peer) === owner)
         if (ownerBusy) {
           return error(
             'RUN_ALREADY_ACTIVE',
@@ -895,7 +909,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
           ) as CodexMissionStartResponse
         }
-        if (starting.size + active.size + (options.liveElsewhere ?? (() => 0))() >= MAX_LIVE_MISSIONS) {
+        if (starting.size + live.length + (options.liveElsewhere ?? (() => 0))() >= MAX_LIVE_MISSIONS) {
           return error(
             'RUN_ALREADY_ACTIVE',
             `Up to ${MAX_LIVE_MISSIONS} missions can run at once. Wait for one to finish or stop it first.`

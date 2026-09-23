@@ -91,6 +91,29 @@ export interface QueuedRow {
   readonly origin: 'person' | 'host'
   /** Attachments ride with the row. Only the FIRST of a merge may carry them. */
   readonly attachments?: readonly string[]
+  /**
+   * Not before this time (ms since the epoch): the host refused it as still
+   * busy a moment ago. See `retriedAfterBusy`.
+   */
+  readonly retryAt?: number
+  /** How many times the host has refused it as busy. */
+  readonly tries?: number
+}
+
+/**
+ * A QUEUED MESSAGE THE HOST REFUSED AS BUSY GOES BACK IN LINE.
+ *
+ * It went because the run in front of it ended in this window, and the host
+ * can still be finishing that run (drive-long-conversation on 0.297: turn 5
+ * was refused and dropped). The host now takes the next turn of a run it is
+ * winding down; anything else it refuses -- a turn on another runtime, a
+ * teammate busy with something this window cannot see -- waits here instead
+ * of vanishing, pointed at the conversation it was typed in, and is tried
+ * again after half a second, then one, two, four, and every eight after that.
+ */
+export function retriedAfterBusy(row: QueuedRow, key: string, now: number): QueuedRow {
+  const tries = (row.tries ?? 0) + 1
+  return { ...row, key, tries, retryAt: now + Math.min(8_000, 250 * 2 ** tries) }
 }
 
 /** What separates two merged follow-ups in the text the runtime receives. */

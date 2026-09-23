@@ -52,7 +52,7 @@ import type {
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft, routineStepPhrase } from './routines.js'
-import { combineQueued, queuedVerdict, requeuedRows } from './steering.js'
+import { combineQueued, queuedVerdict, requeuedRows, retriedAfterBusy } from './steering.js'
 import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
@@ -2886,8 +2886,15 @@ export default function App(): ReactElement {
     ).finally(() => setStoppingExchange(false))
   }
 
-  const startMission = async (prompt: string, modeOverride?: MissionMode): Promise<boolean> => {
+  const startMission = async (
+    prompt: string,
+    modeOverride?: MissionMode,
+    /** Sent from the queue: refused as busy, it goes back in line (retriedAfterBusy). */
+    options?: { readonly requeue?: QueuedRow }
+  ): Promise<boolean> => {
     const route = composerRoute
+    // What was on screen before this turn's own row took its place.
+    const previousKey = shownKey
     const bridge = window.desktop
     const teammateId = pickedTeammate?.teammateId
     // No folder, no run. The main process refuses this too; saying it here
@@ -3027,13 +3034,25 @@ export default function App(): ReactElement {
             next.delete(key)
             return next
           })
+          // The row just deleted was what the window showed: put back the
+          // conversation it replaced, or the window is left on nothing and
+          // falls back to the teammate's home screen (0.297 drive, turn 5).
+          setShownKey((current) => (current === key ? previousKey : current))
           if (inFront !== undefined) {
             setQueued((rows) => [...rows, { id: `q_${String(rows.length)}_${inFront}`, key: inFront, text: prompt, origin: 'person' as const }])
             return true
           }
           // Nothing of theirs is on screen to wait behind -- the cap is full,
           // or the run belongs to a window this one cannot see. The words go
-          // back in the box, which is the only other honest place for them.
+          // back in the box, which is the only other honest place for them --
+          // or, for a message the queue sent, back in the queue: it went
+          // because the run in front ended HERE, and the host can still be
+          // finishing that run. Dropped, it was simply gone.
+          if (options?.requeue !== undefined) {
+            const back = retriedAfterBusy(options.requeue, previousKey ?? options.requeue.key, Date.now())
+            setQueued((rows) => [back, ...rows])
+            return true
+          }
           return false
         }
         // A ledger that cannot be written is the same failure whether it hits
@@ -3771,20 +3790,29 @@ export default function App(): ReactElement {
           onScreen: shownKey === front.key
         })
   const queuedNote = verdict?.kind === 'held' ? verdict.note : undefined
+  /** Ticks when a queued message's retry time comes round, so the effect below looks again. */
+  const [queueClock, setQueueClock] = useState(0)
   useEffect(() => {
-    if (front === undefined || verdict?.kind !== 'send') return
+    if (front === undefined || verdict?.kind !== 'send') return undefined
+    // Refused as busy a moment ago: not before its retry time.
+    const wait = (front.retryAt ?? 0) - Date.now()
+    if (wait > 0) {
+      const timer = window.setTimeout(() => setQueueClock((tick) => tick + 1), wait)
+      return () => window.clearTimeout(timer)
+    }
     // Folded at the moment of sending rather than as it is typed, so a person
     // can still edit or drop any row right up until it goes.
     const folded = combineQueued(queued)
     const going = folded[0]
-    if (going === undefined) return
+    if (going === undefined) return undefined
     // Cleared BEFORE sending: this effect runs again on the state the send
     // produces, and a queue still holding the message would send it twice.
     // Only what actually went is dropped -- anything the fold refused to
     // merge stays queued and takes its own turn.
     setQueued(folded.slice(1))
-    void startMission(going.text)
-  }, [queued, front, verdict?.kind])
+    void startMission(going.text, undefined, { requeue: going })
+    return undefined
+  }, [queued, front, verdict?.kind, queueClock])
 
   /** The addressed teammate's live run, if they have one: they cannot be given a second. */
   const busyRun = [...runs.values()].find(
@@ -5627,7 +5655,7 @@ export default function App(): ReactElement {
               const folded = combineQueued(queued)
               const going = folded[0]
               setQueued(folded.slice(1))
-              if (going !== undefined) void startMission(going.text)
+              if (going !== undefined) void startMission(going.text, undefined, { requeue: going })
             }}
           />
           )}
