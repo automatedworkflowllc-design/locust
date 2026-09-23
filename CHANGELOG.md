@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.278.0 - 2026-09-23
+
+- **A quiet beam of light.** While a run is going, a soft grey light now
+  travels round the Stop button, so you can see at a glance that something
+  is working and where to stop it. It leaves when the run ends. And the
+  title box on the home screen has one too, a slow grey beam running round
+  its edge once your coding agents have been found.
+
+- **The home screen rests when you are not looking.** The bots and the
+  beam on the home screen stop moving while Locust is in the background and
+  pick up again when you come back, so a home screen left open behind your
+  other work no longer keeps your computer busy.
+
 ## 0.277.0 - 2026-09-22
 
 - **Every teammate is a bot.** The pixel faces are gone. In the sidebar, the

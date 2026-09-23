@@ -32,6 +32,7 @@ import { isImagePath } from '../../../shared/image-files.js'
 import { ContextRing } from './ContextRing.js'
 import type { ContextReading } from '../cost.js'
 import { Icon } from './Icon.js'
+import { Beam } from './Beam.js'
 import { effortDescription, effortFooter } from '../effortLevels.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
 import { ATTACHMENT_DIR, attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
@@ -1033,16 +1034,21 @@ export function Composer({
               * where it costs no space in the box.
               */}
             {running && !canQueue ? (
-              <button
-                type="button"
-                className="send-button lc-send is-stop"
-                onClick={onCancel}
-                disabled={cancelling}
-                aria-label="Stop the running mission"
-              >
-                {/* A small rounded square, as drawn -- not a pause icon. */}
-                <span className="lc-stopsquare" />
-              </button>
+              // A mono beam travels the stop button while the run goes --
+              // Colin: "a loading hue for their stop button ... make it mono
+              // instead to make it subtle". It stops with the stopping.
+              <Beam size="sm" strength={0.7} active={!cancelling} className="lc-stopbeam">
+                <button
+                  type="button"
+                  className="send-button lc-send is-stop"
+                  onClick={onCancel}
+                  disabled={cancelling}
+                  aria-label="Stop the running mission"
+                >
+                  {/* A small rounded square, as drawn -- not a pause icon. */}
+                  <span className="lc-stopsquare" />
+                </button>
+              </Beam>
             ) : canQueue ? (
               // Typed text turns the control into "queue this", so the stop
               // button is still one click away with an empty box. What the

@@ -3671,6 +3671,19 @@ textarea {
   }
 }
 
+/* The beams' wrappers take the place of what they wrap in its row or column
+   (see Beam.tsx): the stop button's slot in the controls, and the title box
+   across the full column. */
+.lc-stopbeam {
+  flex: none;
+}
+
+.lc-coverbeam {
+  align-self: stretch;
+  width: 100%;
+  flex-shrink: 0;
+}
+
 /* In the background, the float and the waiting ring hold where they are
    (see HomeCover's rest). */
 .lc-bot.is-floating.is-resting,

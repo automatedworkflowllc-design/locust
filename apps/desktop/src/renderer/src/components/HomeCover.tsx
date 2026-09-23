@@ -4,6 +4,7 @@ import type { CSSProperties, ReactElement } from 'react'
 import type { BotAvatarState } from 'bot-avatars'
 
 import type { TeammateHue, TubePreference } from '../../../shared/ipc.js'
+import { Beam } from './Beam.js'
 import { Bot } from './Bot.js'
 import type { BotType } from './Bot.js'
 import { PoweredLockup } from './PoweredLockup.js'
@@ -132,41 +133,46 @@ export function HomeCover({
 
   const at = (value: number): number => Math.round(value * scale)
   return (
-    <div className="lc-cover" ref={card} style={{ '--lc-cover-k': String(scale) } as CSSProperties}>
-      <div className="lc-cover__plate" aria-hidden="true" />
-      {COVER_CAST.map((mate, index) => {
-        const size = at(FACE)
-        const color = mate.hue === undefined ? undefined : hueColor(mate.hue)
-        return (
-          <span key={mate.key} className="lc-cover__face" style={{ left: at(mate.x), top: at(mate.y) }}>
-            <span
-              className={`lc-bot${ready && mate.floats === true ? ' is-floating' : ''}${ready && !awake ? ' is-resting' : ''}`}
-              data-bot={mate.type}
-              data-state={ready ? mate.state : 'still'}
-              style={{ width: size, height: size }}
-            >
-              {ready && mate.waiting === true && <span className="lc-bot__ring" />}
-              <Bot
-                type={mate.type}
-                size={size}
-                state={ready ? mate.state : 'default'}
-                paused={!ready || !awake}
-                interactive
-                seed={0.2 + index * 0.3}
-                {...(mate.floats === true ? { jumpEvery: 0 } : {})}
-                {...(color === undefined ? {} : { color })}
-              />
-              {ready && mate.dot !== undefined && (
-                <span className={`lc-presence lc-presence--${mate.dot}`} style={{ width: Math.max(8, Math.round(size * 0.08)), height: Math.max(8, Math.round(size * 0.08)) }} />
-              )}
+    // A mono beam goes round the title box once the runtimes have answered,
+    // and rests with the bots in the background (Colin: "a rotate large
+    // mono around the title box with the logo in it").
+    <Beam size="md" strength={0.85} active={ready && awake} className="lc-coverbeam">
+      <div className="lc-cover" ref={card} style={{ '--lc-cover-k': String(scale) } as CSSProperties}>
+        <div className="lc-cover__plate" aria-hidden="true" />
+        {COVER_CAST.map((mate, index) => {
+          const size = at(FACE)
+          const color = mate.hue === undefined ? undefined : hueColor(mate.hue)
+          return (
+            <span key={mate.key} className="lc-cover__face" style={{ left: at(mate.x), top: at(mate.y) }}>
+              <span
+                className={`lc-bot${ready && mate.floats === true ? ' is-floating' : ''}${ready && !awake ? ' is-resting' : ''}`}
+                data-bot={mate.type}
+                data-state={ready ? mate.state : 'still'}
+                style={{ width: size, height: size }}
+              >
+                {ready && mate.waiting === true && <span className="lc-bot__ring" />}
+                <Bot
+                  type={mate.type}
+                  size={size}
+                  state={ready ? mate.state : 'default'}
+                  paused={!ready || !awake}
+                  interactive
+                  seed={0.2 + index * 0.3}
+                  {...(mate.floats === true ? { jumpEvery: 0 } : {})}
+                  {...(color === undefined ? {} : { color })}
+                />
+                {ready && mate.dot !== undefined && (
+                  <span className={`lc-presence lc-presence--${mate.dot}`} style={{ width: Math.max(8, Math.round(size * 0.08)), height: Math.max(8, Math.round(size * 0.08)) }} />
+                )}
+              </span>
             </span>
-          </span>
-        )
-      })}
-      <div className="lc-cover__brand">
-        <PoweredLockup ready={ready} tube={tube} />
-        <p className="lc-cover__claim">Autonomous teammates on your own machine</p>
+          )
+        })}
+        <div className="lc-cover__brand">
+          <PoweredLockup ready={ready} tube={tube} />
+          <p className="lc-cover__claim">Autonomous teammates on your own machine</p>
+        </div>
       </div>
-    </div>
+    </Beam>
   )
 }

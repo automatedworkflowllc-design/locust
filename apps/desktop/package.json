@@ -1,6 +1,6 @@
 {
   "name": "@teammate/desktop",
-  "version": "0.277.0",
+  "version": "0.278.0",
   "private": true,
   "description": "Run AI coding agents as a team you can watch, on runtimes and models you choose.",
   "author": "Automated Workflow",
@@ -21,6 +21,7 @@
   "dependencies": {
     "@teammate/mission-store": "workspace:*",
     "@teammate/runtime-adapters": "workspace:*",
+    "border-beam": "1.3.0",
     "bot-avatars": "0.1.1",
     "electron-updater": "^6.8.9",
     "metal-fx": "^2.0.10",
