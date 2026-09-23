@@ -32,6 +32,13 @@ const board = `JSON.stringify({
   cards: [...document.querySelectorAll('.lc-roomanswer')].map(c => (c.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? ''))
 })`
 const addTask = (text) => `(async () => {
+  // The field is behind "+ Add a task" now (RoomScreen's .lc-board__addlink);
+  // this looked for the field alone and reported "no add field" before and
+  // after 0.259 alike -- drive rot, not the board (Batch D).
+  if (!document.querySelector('input[aria-label="Add a task"]')) {
+    document.querySelector('.lc-board__addlink')?.click()
+    for (let i = 0; i < 20 && !document.querySelector('input[aria-label="Add a task"]'); i += 1) await new Promise(r => setTimeout(r, 100))
+  }
   const box = document.querySelector('input[aria-label="Add a task"]')
   if (!box) return 'no add field'
   const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set

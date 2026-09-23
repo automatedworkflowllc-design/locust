@@ -199,6 +199,10 @@ try {
     if (!settings) return 'no Settings button'
     settings.click()
     await new Promise(r => setTimeout(r, 900))
+    // Settings opens on its first page; the layout control is on Appearance
+    // (Batch D drive rot: this looked on the first page and found nothing).
+    ;[...document.querySelectorAll('button, a')].find(b => b.innerText.trim() === 'Appearance')?.click()
+    await new Promise(r => setTimeout(r, 600))
     const group = [...document.querySelectorAll('[role=radiogroup]')].find(g => /Sidebar layout/.test(g.getAttribute('aria-label') || ''))
     if (!group) return 'no Sidebar layout control in Settings'
     const full = [...group.querySelectorAll('button')].find(b => b.innerText.trim() === 'Full')
