@@ -2,7 +2,7 @@ import { createAppServerClient } from '@teammate/runtime-adapters'
 import type { MissionRuntimeId, RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 import type { PublicModel, ModelCatalogResponse } from '../shared/ipc.js'
-import { CLAUDE_ALIAS_DEFAULTS, claudeModelName } from '../shared/claude-models.js'
+import { CLAUDE_ALIAS_DEFAULTS, CLAUDE_OLDER_MODELS, claudeModelName } from '../shared/claude-models.js'
 import type { AppServerRunProcess as AppServerProcess } from '@teammate/runtime-adapters'
 
 /**
@@ -110,8 +110,11 @@ export function accountDefaultModel(
   models: readonly PublicModel[],
   runtime: MissionRuntimeId = 'codex'
 ): PublicModel | undefined {
+  // Current models only: an older, fixed version is not what the account
+  // answers with, and two of Claude's report no levels at all -- counted, they
+  // would empty the account default's levels for everyone.
   const listed = models.filter(
-    (model) => model.runtime === runtime && model.id !== ACCOUNT_DEFAULT_MODEL
+    (model) => model.runtime === runtime && model.id !== ACCOUNT_DEFAULT_MODEL && model.older !== true
   )
   if (listed.length === 0) return undefined
   const shared = listed
@@ -176,7 +179,7 @@ export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
   const aliases = hints.aliases.length === 0
     ? []
     : [...hints.aliases, ...CLAUDE_ALIASES_MEASURED.filter((alias) => !hints.aliases.includes(alias))]
-  return aliases.map((alias) => {
+  const current: PublicModel[] = aliases.map((alias) => {
     const family = `${alias.charAt(0).toUpperCase()}${alias.slice(1)}`
     const meant = CLAUDE_ALIAS_DEFAULTS[alias]
     return {
@@ -194,6 +197,20 @@ export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
       supportedEfforts: hints.efforts
     }
   })
+  // The fixed versions, folded under the current ones. Offered only beside
+  // advertised aliases: a CLI that names none may not take full names either.
+  const older: PublicModel[] =
+    current.length === 0
+      ? []
+      : CLAUDE_OLDER_MODELS.map((model) => ({
+          id: model.id,
+          runtime: 'claude',
+          displayName: claudeModelName(model.id) ?? model.id,
+          description: 'This version, always',
+          supportedEfforts: model.efforts,
+          older: true
+        }))
+  return [...current, ...older]
 }
 
 /** The effort suffixes Cursor encodes in a model id, longest first. */

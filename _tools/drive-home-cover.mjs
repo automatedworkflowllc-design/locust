@@ -148,7 +148,7 @@ try {
   const readyLines = log.filter((line) => line.includes('| ready |'))
   if (probingLines.length > 0) check('while probing, the teammates are still and dotless', probingLines.every((line) => /still,still,still dots=0/.test(line) || /nofaces/.test(line)), probingLines.join(' / '))
   else say('  note  probing finished before the watch began; the before-state was not seen on screen')
-  check('once ready, Wren (a ghost) works, Atlas waits on you, Sable sleeps', readyLines.some((line) => /working,default,sleeping dots=2/.test(line)), readyLines.slice(-1)[0])
+  check('once ready, Wren (a white ghost) floats, Atlas waits on you, Sable (a green Locust) sleeps', readyLines.some((line) => /default,default,sleeping dots=2/.test(line)), readyLines.slice(-1)[0])
   if (tube === 'full') check('the lockup lit, and lit again', shotPower && shotRelight)
   else check(`tube ${tube}: the lockup never lit`, !shotPower && !shotRelight)
 

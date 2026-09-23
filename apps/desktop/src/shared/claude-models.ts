@@ -33,6 +33,41 @@ export const CLAUDE_ALIAS_DEFAULTS: Readonly<Record<string, string>> = {
 }
 
 /**
+ * THE OLDER VERSIONS, for anyone who wants one on purpose.
+ *
+ * Colin, 2026-09-22: *"will the user be able to choose older models if theyd
+ * like or are we limited to newest models?"*, then *"folded claude models is
+ * great, accessible but not crowding"*. Claude Code takes a model's full name
+ * as readily as an alias, and its own registry (2.1.280) names what it knows:
+ * each entry below is its id there, newest first, with the effort levels its
+ * capabilities list (`effort` gives low, medium and high; `xhigh_effort` and
+ * `max_effort` add the rest). The alias targets are not repeated.
+ *
+ * Left out on purpose: the Claude 3 generation, which Anthropic has retired,
+ * and the registry's `mythos` family, which only the first-party API lists
+ * and no alias points at -- a version nobody can be sure runs is a row that
+ * fails. Opus 4 and 4.1 and Sonnet 4 are left out for the same reason.
+ */
+export interface ClaudeOlderModel {
+  readonly id: string
+  readonly efforts: readonly string[]
+}
+
+const FIVE = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+const FOUR = ['low', 'medium', 'high', 'max'] as const
+
+export const CLAUDE_OLDER_MODELS: readonly ClaudeOlderModel[] = [
+  { id: 'claude-opus-5', efforts: FIVE },
+  { id: 'claude-opus-4-8', efforts: FIVE },
+  { id: 'claude-opus-4-7', efforts: FIVE },
+  { id: 'claude-opus-4-6', efforts: FOUR },
+  { id: 'claude-opus-4-5', efforts: [] },
+  { id: 'claude-fable-5', efforts: FIVE },
+  { id: 'claude-sonnet-4-6', efforts: FOUR },
+  { id: 'claude-sonnet-4-5', efforts: [] }
+]
+
+/**
  * `claude-opus-5-5` reads `Opus 5.5`, `claude-haiku-4-5-20251001` reads
  * `Haiku 4.5`, `claude-sonnet-5` reads `Sonnet 5`.
  *

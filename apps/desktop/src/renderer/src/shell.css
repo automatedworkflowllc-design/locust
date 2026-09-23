@@ -3656,13 +3656,29 @@ textarea {
   z-index: 1;
 }
 
+/* A ghost floats rather than hops: a slow bob, the dot riding with it. */
+.lc-bot.is-floating {
+  animation: lcBotFloat 3.8s ease-in-out infinite;
+}
+
+@keyframes lcBotFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6%);
+  }
+}
+
 /* On the cover the dot is ringed in the plate it stands on. */
 .lc-cover .lc-bot .lc-presence {
   border-color: var(--lc-bg-window);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lc-bot__ring {
+  .lc-bot__ring,
+  .lc-bot.is-floating {
     animation: none;
   }
 }
@@ -7790,6 +7806,58 @@ textarea {
   font-size: 10px;
   letter-spacing: var(--lc-tracking-label-wide);
   color: var(--lc-text-muted);
+}
+
+/*
+ * The fold for a runtime's older versions: one quiet row under its current
+ * models, set in from the rows' own edge the way "N more models" is, that
+ * opens them in place (Colin: "folded claude models is great, accessible but
+ * not crowding").
+ */
+.lc-picker__fold {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px 6px 30px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-picker__fold:hover {
+  background: var(--lc-bg-selected);
+  color: var(--lc-text-primary);
+}
+
+.lc-picker__fold:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+/* A chevron drawn from two edges, pointing right, turned down when open. */
+.lc-picker__foldmark {
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-picker__foldmark.is-open {
+  transform: rotate(45deg);
+}
+
+.lc-picker__foldcount {
+  font-size: 10px;
+  letter-spacing: var(--lc-tracking-label-wide);
 }
 
 .lc-picker__row {

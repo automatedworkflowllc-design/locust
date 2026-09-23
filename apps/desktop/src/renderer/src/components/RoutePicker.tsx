@@ -26,6 +26,8 @@ interface RouteRow {
   readonly fullDetail: string
   readonly tag: RouteTag
   readonly selectable: boolean
+  /** An older, fixed version: shown under its runtime's fold, or by a search. */
+  readonly older?: boolean
 }
 
 /**
@@ -130,6 +132,7 @@ function buildRows(
                */
               detail: [described, name].filter((part): part is string => part !== undefined && part.length > 0).join(' · ') || efforts,
               fullDetail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`,
+              older: model.older === true
             }
           })
         : // The catalogue could not be read for this runtime, so there is one
@@ -137,7 +140,7 @@ function buildRows(
           // the catalogue labels it -- a person reading a lowercase
           // `account-default` on the only ACTIVE row is reading a placeholder
           // that leaked (outside review, 2026-09-07).
-          [{ model: 'account-default', label: 'Account default', detail: status.detail, fullDetail: status.detail }]
+          [{ model: 'account-default', label: 'Account default', detail: status.detail, fullDetail: status.detail, older: false }]
 
     for (const entry of entries) {
       const isActive = runtime.id === active.runtime && entry.model === active.model
@@ -155,7 +158,10 @@ function buildRows(
         // the row's own detail said "5 effort levels" while the control
         // under it drew none).
         tag: routeRowTag(status, isActive),
-        selectable: status.selectable
+        selectable: status.selectable,
+        // An ACTIVE older version is shown with the current ones: the route in
+        // use is never folded out of sight.
+        older: entry.older && !isActive
       })
     }
   }
@@ -163,8 +169,51 @@ function buildRows(
   // families, then the rest as the runtime listed them. The routes they move
   // between are then lifted to a group of their own at the top, because the
   // move this product exists for is between runtimes, not within one.
-  const ordered = orderRouteRows(rows, recent)
+  const ordered = olderLast(orderRouteRows(rows, recent))
   return [...recentRouteRows(ordered, recent), ...ordered]
+}
+
+/** Older versions at the end of their own runtime's group, in order, where the fold opens. */
+function olderLast<TRow extends { readonly group: string; readonly older?: boolean }>(rows: readonly TRow[]): readonly TRow[] {
+  const groups = new Map<string, number>()
+  for (const row of rows) if (!groups.has(row.group)) groups.set(row.group, groups.size)
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort(
+      (a, b) =>
+        (groups.get(a.row.group) ?? 0) - (groups.get(b.row.group) ?? 0) ||
+        Number(a.row.older === true) - Number(b.row.older === true) ||
+        a.index - b.index
+    )
+    .map((entry) => entry.row)
+}
+
+/**
+ * THE FOLD FOR OLDER VERSIONS.
+ *
+ * Colin, 2026-09-22: "folded claude models is great, accessible but not
+ * crowding". Unsearched, a runtime's older versions are one row under its
+ * current models -- "Older versions  8" -- that opens them in place. A
+ * search reaches into the fold without opening it: typing "opus 4.8" finds
+ * Opus 4.8. A recent shortcut to one stays in Recent, where it was put.
+ */
+export function unfoldedRows<TRow extends { readonly group: string; readonly older?: boolean }>(
+  rows: readonly TRow[],
+  searching: boolean
+): readonly TRow[] {
+  return searching ? rows : rows.filter((row) => row.older !== true || row.group === 'Recent')
+}
+
+/** Each group's older versions, for its fold. */
+export function olderByGroup<TRow extends { readonly group: string; readonly older?: boolean }>(
+  rows: readonly TRow[]
+): ReadonlyMap<string, readonly TRow[]> {
+  const byGroup = new Map<string, TRow[]>()
+  for (const row of rows) {
+    if (row.older !== true || row.group === 'Recent') continue
+    byGroup.set(row.group, [...(byGroup.get(row.group) ?? []), row])
+  }
+  return byGroup
 }
 
 /**
@@ -235,6 +284,7 @@ export function RoutePicker({
   /** The maximum level swarm would hold every mission at, when one is known. */
 }): ReactElement {
   const [query, setQuery] = useState('')
+  const [olderOpen, setOlderOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -246,13 +296,16 @@ export function RoutePicker({
     [runtimes, models, active, resolvedModels, recentRoutes, limitedRuntimes]
   )
   const needle = routeSearchText(query)
+  const searching = needle.length > 0
   const matched = useMemo(
     () =>
-      needle.length === 0
-        ? rows
-        : rows.filter((row) => routeSearchText(`${row.group} ${row.label}`).includes(needle)),
-    [rows, needle]
+      unfoldedRows(
+        searching ? rows.filter((row) => routeSearchText(`${row.group} ${row.label}`).includes(needle)) : rows,
+        searching
+      ),
+    [rows, needle, searching]
   )
+  const folds = useMemo(() => olderByGroup(rows), [rows])
   // One runtime can list hundreds of models. Every group is capped until the
   // person searches, and each capped group says how many it is not showing.
   const { rows: shown, hiddenByGroup } = useMemo(
@@ -265,6 +318,69 @@ export function RoutePicker({
       event.preventDefault()
       onClose()
     }
+  }
+
+  /** One model row, the same wherever it is drawn: in its group or under a fold. */
+  const drawRow = (row: RouteRow): ReactElement => {
+    const isActive = row.tag === 'ACTIVE'
+    const recent = row.group === 'Recent'
+    // Which runtime the canonical row below sits under, so a recent row can
+    // say why it appears twice.
+    const pointsAt = recent
+      ? rows.find((other) => other.key === row.key.replace(/^recent:/, ''))?.group.replace(/ · your account$/, '')
+      : undefined
+    return (
+      <button
+        type="button"
+        className={`lc-picker__row${isActive ? ' is-active' : ''}${recent ? ' is-recent' : ''}`}
+        disabled={!row.selectable}
+        aria-current={isActive}
+        // The whole of it, on hover: the row itself is one line.
+        title={`${row.label} · ${row.fullDetail}`}
+        onClick={() => {
+          onSelect({ runtime: row.runtime, model: row.model })
+          onClose()
+        }}
+      >
+        <span
+          className={`lc-dot ${
+            row.tag === 'ACTIVE'
+              ? 'lc-tone-lime'
+              : row.tag === 'READY'
+                ? 'lc-tone-green'
+                : row.tag === 'PREVIEW' || row.tag === 'EXPERIMENTAL' || row.tag === 'AT LIMIT'
+                  ? 'lc-tone-amber'
+                  : 'lc-tone-muted'
+          }`}
+        />
+        <span className="lc-picker__text">
+          <span className="lc-picker__label">{row.label}</span>
+          {/* A shortcut row carries neither detail nor tag: the
+            * canonical row below owns those, so ACTIVE appears exactly
+            * once on screen. */}
+          {!recent && <span className="lc-picker__detail lc-mono">{row.detail}</span>}
+        </span>
+        {recent ? (
+          pointsAt === undefined ? null : (
+            <span className="lc-picker__pointer lc-mono">{`↓ ${pointsAt}`}</span>
+          )
+        ) : (
+        <span
+          className={`lc-picker__tag lc-mono ${
+            row.tag === 'ACTIVE'
+              ? 'lc-tone-lime'
+              : row.tag === 'PREVIEW' || row.tag === 'EXPERIMENTAL'
+                ? 'lc-tone-amber'
+                : row.tag === 'SIGN IN'
+                  ? 'lc-tone-red'
+                  : 'lc-tone-muted'
+          }`}
+        >
+          {row.tag}
+        </span>
+        )}
+      </button>
+    )
   }
 
   let lastGroup: string | undefined
@@ -305,13 +421,9 @@ export function RoutePicker({
           lastGroup = row.group
           // The last row of a capped group carries the count it held back.
           const hidden = shown[index + 1]?.group === row.group ? 0 : hiddenByGroup.get(row.group) ?? 0
-          const isActive = row.tag === 'ACTIVE'
           const recent = row.group === 'Recent'
-          // Which runtime the canonical row below sits under, so a recent row
-          // can say why it appears twice.
-          const pointsAt = recent
-            ? rows.find((other) => other.key === row.key.replace(/^recent:/, ''))?.group.replace(/ · your account$/, '')
-            : undefined
+          // The fold closes a runtime's own group, under its current models.
+          const fold = !searching && shown[index + 1]?.group !== row.group ? folds.get(row.group) : undefined
           return (
             <div key={row.key} className={recent ? 'lc-picker__tray' : undefined}>
               {header !== undefined && (
@@ -320,56 +432,7 @@ export function RoutePicker({
                   {recent && <span className="lc-picker__grouphint">shortcuts to rows below</span>}
                 </div>
               )}
-              <button
-                type="button"
-                className={`lc-picker__row${isActive ? ' is-active' : ''}${recent ? ' is-recent' : ''}`}
-                disabled={!row.selectable}
-                aria-current={isActive}
-                // The whole of it, on hover: the row itself is one line.
-                title={`${row.label} · ${row.fullDetail}`}
-                onClick={() => {
-                  onSelect({ runtime: row.runtime, model: row.model })
-                  onClose()
-                }}
-              >
-                <span
-                  className={`lc-dot ${
-                    row.tag === 'ACTIVE'
-                      ? 'lc-tone-lime'
-                      : row.tag === 'READY'
-                        ? 'lc-tone-green'
-                        : row.tag === 'PREVIEW' || row.tag === 'EXPERIMENTAL' || row.tag === 'AT LIMIT'
-                          ? 'lc-tone-amber'
-                          : 'lc-tone-muted'
-                  }`}
-                />
-                <span className="lc-picker__text">
-                  <span className="lc-picker__label">{row.label}</span>
-                  {/* A shortcut row carries neither detail nor tag: the
-                    * canonical row below owns those, so ACTIVE appears exactly
-                    * once on screen. */}
-                  {!recent && <span className="lc-picker__detail lc-mono">{row.detail}</span>}
-                </span>
-                {recent ? (
-                  pointsAt === undefined ? null : (
-                    <span className="lc-picker__pointer lc-mono">{`↓ ${pointsAt}`}</span>
-                  )
-                ) : (
-                <span
-                  className={`lc-picker__tag lc-mono ${
-                    row.tag === 'ACTIVE'
-                      ? 'lc-tone-lime'
-                      : row.tag === 'PREVIEW' || row.tag === 'EXPERIMENTAL'
-                        ? 'lc-tone-amber'
-                        : row.tag === 'SIGN IN'
-                          ? 'lc-tone-red'
-                          : 'lc-tone-muted'
-                  }`}
-                >
-                  {row.tag}
-                </span>
-                )}
-              </button>
+              {drawRow(row)}
               {/*
                 * No effort control here. It lived under the selected model
                 * for one release and was removed on Colin's word
@@ -383,6 +446,21 @@ export function RoutePicker({
                 <p className="lc-picker__more lc-mono">
                   {hidden} more {hidden === 1 ? 'model' : 'models'} {needle.length > 0 ? 'match · keep typing' : '· type to search them'}
                 </p>
+              )}
+              {fold !== undefined && fold.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="lc-picker__fold"
+                    aria-expanded={olderOpen}
+                    onClick={() => setOlderOpen((open) => !open)}
+                  >
+                    <span className={`lc-picker__foldmark${olderOpen ? ' is-open' : ''}`} aria-hidden="true" />
+                    Older versions
+                    <span className="lc-picker__foldcount lc-mono">{fold.length}</span>
+                  </button>
+                  {olderOpen && fold.map((older) => <div key={older.key}>{drawRow(older)}</div>)}
+                </>
               )}
             </div>
           )

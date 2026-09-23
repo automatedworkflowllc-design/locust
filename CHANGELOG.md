@@ -6,6 +6,19 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.275.0 - 2026-09-22
+
+- **Older Claude versions, folded away.** Under Claude Code's models in the
+  picker there is now one quiet row, **Older versions**, that opens eight
+  earlier models in place: Opus 5, 4.8, 4.7, 4.6 and 4.5, Fable 5, and
+  Sonnet 4.6 and 4.5. Each stays on exactly that version, where the models
+  above it always move to the newest. Searching finds them without opening
+  the fold, and the one you are using is never folded out of sight. The chip
+  names it too: *Claude / Opus 4.8*.
+
+- **A calmer home screen.** The ghost is white now and floats instead of
+  hopping and spinning, and the Locust bot is green.
+
 ## 0.274.0 - 2026-09-22
 
 - **Bots on the home screen.** The three teammates on the home screen are

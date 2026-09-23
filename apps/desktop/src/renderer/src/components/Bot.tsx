@@ -46,9 +46,11 @@ export interface BotProps {
   readonly seed?: number
   /** Eyes follow a nearby pointer, and a click makes it hop. */
   readonly interactive?: boolean
+  /** Seconds between idle jumps, give or take; 0 for none (the library's `jumpEvery`). */
+  readonly jumpEvery?: number
 }
 
-export function Bot({ type, size, color, state = 'default', paused = false, face, seed, interactive = false }: BotProps): ReactElement {
+export function Bot({ type, size, color, state = 'default', paused = false, face, seed, interactive = false, jumpEvery }: BotProps): ReactElement {
   if (isLocustBot(type)) {
     return (
       <LocustBot
@@ -75,6 +77,7 @@ export function Bot({ type, size, color, state = 'default', paused = false, face
       {...(color === undefined ? {} : { color, saturation: SATURATION })}
       {...(face === undefined ? {} : { face })}
       {...(seed === undefined ? {} : { seed })}
+      {...(jumpEvery === undefined ? {} : { jumpEvery })}
     />
   )
 }

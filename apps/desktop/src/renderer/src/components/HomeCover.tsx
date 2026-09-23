@@ -51,8 +51,11 @@ export function coverScale(width: number): number {
 interface CoverBot {
   readonly key: string
   readonly type: BotType
-  readonly hue: TeammateHue
+  /** A teammate hue, or none for the shape's own colour (the ghost's white). */
+  readonly hue?: TeammateHue
   readonly state: BotAvatarState
+  /** Floats instead of hopping: a slow bob, no idle jumps. */
+  readonly floats?: boolean
   /** Locust's own marks: the presence dot, and the ring of a teammate waiting on you. */
   readonly dot?: 'lime' | 'amber'
   readonly waiting?: boolean
@@ -61,11 +64,16 @@ interface CoverBot {
   readonly y: number
 }
 
-/** The cover's cast. */
+/**
+ * The cover's cast. Colin, 2026-09-22: *"maybe make the ghost white and the
+ * locust green lol"*, and of the ghost's working hops and spins: *"a little
+ * loud for a title screen, especially for a ghost"* -- so it floats: the
+ * library's idle look-around with no jumps, carried on a slow bob.
+ */
 export const COVER_CAST: readonly CoverBot[] = [
-  { key: 'wren', type: 'ghost', hue: 'lime', state: 'working', dot: 'lime', x: 536, y: 76 },
+  { key: 'wren', type: 'ghost', state: 'default', floats: true, dot: 'lime', x: 536, y: 76 },
   { key: 'atlas', type: 'droid', hue: 'blue', state: 'default', dot: 'amber', waiting: true, x: 680, y: 100 },
-  { key: 'sable', type: 'hopper', hue: 'clay', state: 'sleeping', x: 824, y: 64 }
+  { key: 'sable', type: 'hopper', hue: 'lime', state: 'sleeping', x: 824, y: 64 }
 ]
 
 /**
@@ -109,10 +117,15 @@ export function HomeCover({
       <div className="lc-cover__plate" aria-hidden="true" />
       {COVER_CAST.map((mate, index) => {
         const size = at(FACE)
-        const color = hueColor(mate.hue)
+        const color = mate.hue === undefined ? undefined : hueColor(mate.hue)
         return (
           <span key={mate.key} className="lc-cover__face" style={{ left: at(mate.x), top: at(mate.y) }}>
-            <span className="lc-bot" data-bot={mate.type} data-state={ready ? mate.state : 'still'} style={{ width: size, height: size }}>
+            <span
+              className={`lc-bot${ready && mate.floats === true ? ' is-floating' : ''}`}
+              data-bot={mate.type}
+              data-state={ready ? mate.state : 'still'}
+              style={{ width: size, height: size }}
+            >
               {ready && mate.waiting === true && <span className="lc-bot__ring" />}
               <Bot
                 type={mate.type}
@@ -121,6 +134,7 @@ export function HomeCover({
                 paused={!ready}
                 interactive
                 seed={0.2 + index * 0.3}
+                {...(mate.floats === true ? { jumpEvery: 0 } : {})}
                 {...(color === undefined ? {} : { color })}
               />
               {ready && mate.dot !== undefined && (

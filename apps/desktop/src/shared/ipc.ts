@@ -1187,6 +1187,12 @@ export interface PublicModel {
   readonly displayName: string
   readonly description: string
   readonly supportedEfforts: readonly string[]
+  /**
+   * An older, fixed version -- offered folded under the runtime's current
+   * models rather than beside them. Colin, 2026-09-22: "folded claude models
+   * is great, accessible but not crowding".
+   */
+  readonly older?: boolean
 }
 
 export type ModelCatalogResponse =

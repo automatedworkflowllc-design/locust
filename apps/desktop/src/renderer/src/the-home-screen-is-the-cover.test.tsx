@@ -14,7 +14,7 @@ import { COVER_CAST, COVER_WIDTH, HomeCover, coverScale } from './components/Hom
  */
 
 const botAttr = (html: string, name: string): string[] =>
-  [...html.matchAll(new RegExp(`class="lc-bot"[^>]*${name}="([a-z]+)"`, 'g'))].map((match) => match[1] ?? '')
+  [...html.matchAll(new RegExp(`class="lc-bot[^"]*"[^>]*${name}="([a-z]+)"`, 'g'))].map((match) => match[1] ?? '')
 
 describe('the cover, drawn to the column', () => {
   it('is the cover at the column width: 960 is its own size, 760 is 0.79 of it', () => {
@@ -46,15 +46,28 @@ describe('what the home screen draws', () => {
     expect(COVER_CAST.map((mate) => mate.key)).toEqual(['wren', 'atlas', 'sable'])
     // Colin: "lets definitely include ghost in there".
     expect(botAttr(after, 'data-bot')).toEqual(['ghost', 'droid', 'hopper'])
-    expect(botAttr(after, 'data-state')).toEqual(['working', 'default', 'sleeping'])
+    expect(botAttr(after, 'data-state')).toEqual(['default', 'default', 'sleeping'])
+  })
+
+  it('has a white ghost that floats, and a green Locust', () => {
+    // Colin: "maybe make the ghost white and the locust green lol", and of
+    // its hops: "a little loud for a title screen, especially for a ghost".
+    const ghost = COVER_CAST.find((mate) => mate.type === 'ghost')
+    const locust = COVER_CAST.find((mate) => mate.type === 'hopper')
+    expect(ghost?.hue).toBeUndefined()
+    expect(ghost?.floats).toBe(true)
+    expect(locust?.hue).toBe('lime')
+    expect(after).toContain('class="lc-bot is-floating" data-bot="ghost"')
+    // Nothing floats before the runtimes have answered.
+    expect(before).not.toContain('is-floating')
   })
 
   it('wakes the teammates with the lockup: still and unmarked until the runtimes answer', () => {
     expect(botAttr(before, 'data-state')).toEqual(['still', 'still', 'still'])
     expect(before).not.toContain('lc-presence')
     expect(before).not.toContain('lc-bot__ring')
-    // Then Wren works, Atlas waits on you -- Locust's amber ring and dot --
-    // and Sable sleeps, unmarked.
+    // Then Wren floats, lit; Atlas waits on you -- Locust's amber ring and
+    // dot -- and Sable sleeps, unmarked.
     expect(after).toContain('lc-presence--lime')
     expect(after).toContain('lc-presence--amber')
     expect(after.match(/lc-bot__ring/g) ?? []).toHaveLength(1)
@@ -63,7 +76,7 @@ describe('what the home screen draws', () => {
   it('places each bot on the cover grid at the starting scale, in whole pixels', () => {
     // Wren is 120 across at (536, 76) on the cover; at 0.792 that is 95 at (425, 60).
     expect(after).toMatch(/<span class="lc-cover__face" style="left:425px;top:60px">/)
-    expect(after).toMatch(/class="lc-bot" data-bot="ghost" data-state="working" style="width:95px;height:95px"/)
+    expect(after).toMatch(/class="lc-bot is-floating" data-bot="ghost" data-state="default" style="width:95px;height:95px"/)
   })
 
   it('is decorative apart from its words: no bot answers to a name', () => {

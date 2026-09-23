@@ -74,6 +74,33 @@ try {
   say(`the composer chip reads: "${chip}"`)
   check('the chip reads Claude / Opus 5.5', /Claude\s*\/\s*Opus 5\.5/.test(chip), chip)
   await shoot('02-chip-opus.png')
+
+  // The older versions: folded under Claude's current rows, opened by a press.
+  const fold = JSON.parse(await drive.evaluate(`(async () => {
+    const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
+    if (!document.querySelector('.lc-picker')) control?.click()
+    await new Promise(r => setTimeout(r, 500))
+    const toggle = document.querySelector('.lc-picker__fold')
+    if (!toggle) return JSON.stringify({ toggle: false })
+    const before = { expanded: toggle.getAttribute('aria-expanded'), text: toggle.textContent.replace(/\\s+/g, ' ').trim(), older: [...document.querySelectorAll('.lc-picker__label')].filter((l) => /^(Opus 4|Sonnet 4|Fable 5$|Opus 5$)/.test(l.textContent)).length }
+    toggle.click()
+    await new Promise(r => setTimeout(r, 400))
+    const labels = [...document.querySelectorAll('.lc-picker__label')].map((l) => l.textContent)
+    return JSON.stringify({ toggle: true, before, after: { expanded: document.querySelector('.lc-picker__fold')?.getAttribute('aria-expanded'), labels } })
+  })()`))
+  say(`the fold: ${JSON.stringify(fold.before)} -> opened: ${JSON.stringify(fold.after?.labels?.filter((l) => /Opus 4|Sonnet 4|Fable 5$|Opus 5$/.test(l)))}`)
+  check('older versions are folded, and the fold says how many', fold.toggle && fold.before.expanded === 'false' && fold.before.older === 0 && /Older versions\s*8/.test(fold.before.text), JSON.stringify(fold.before))
+  check('opening it shows them in place', fold.after?.expanded === 'true' && ['Opus 5', 'Opus 4.8', 'Opus 4.7', 'Opus 4.6', 'Opus 4.5', 'Fable 5', 'Sonnet 4.6', 'Sonnet 4.5'].every((name) => fold.after.labels.includes(name)))
+  await shoot('03-fold-open.png')
+  const picked = await drive.evaluate(`(async () => {
+    const row = [...document.querySelectorAll('.lc-picker__row')].find((r) => r.querySelector('.lc-picker__label')?.textContent === 'Opus 4.8')
+    row?.click()
+    await new Promise(r => setTimeout(r, 500))
+    return ${chipText}
+  })()`)
+  say(`after picking Opus 4.8 the chip reads: "${picked}"`)
+  check('a pinned version names itself on the chip', /Claude\s*\/\s*Opus 4\.8/.test(picked), picked)
+  await shoot('04-chip-opus-4-8.png')
   say(failures === 0 ? '\nCLAUDE NAMES PASSED' : `\nCLAUDE NAMES: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

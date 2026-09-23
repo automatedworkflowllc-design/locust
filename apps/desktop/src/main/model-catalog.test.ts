@@ -266,7 +266,7 @@ describe('Claude models from what its CLI advertised', () => {
     ])
     // The advertised three, then `haiku`: measured to work, never named in
     // the help -- see CLAUDE_ALIASES_MEASURED.
-    expect(models.map((model) => model.id)).toEqual(['fable', 'opus', 'sonnet', 'haiku'])
+    expect(models.filter((model) => model.older !== true).map((model) => model.id)).toEqual(['fable', 'opus', 'sonnet', 'haiku'])
     expect(models.every((model) => model.runtime === 'claude')).toBe(true)
     expect(models[0]?.supportedEfforts).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
   })
@@ -280,10 +280,12 @@ describe('Claude models from what its CLI advertised', () => {
      * that names no aliases is given none.
      */
     const named = claudeModelsFrom([claude('ready', { aliases: ['sonnet', 'haiku'], efforts: [] })])
-    expect(named.map((model) => model.id)).toEqual(['sonnet', 'haiku'])
+    expect(named.filter((model) => model.older !== true).map((model) => model.id)).toEqual(['sonnet', 'haiku'])
     const none = claudeModelsFrom([claude('ready', { aliases: [], efforts: ['high'] })])
     expect(none).toEqual([])
-    const haiku = claudeModelsFrom([claude('ready', { aliases: ['opus'], efforts: [] })]).at(-1)
+    const haiku = claudeModelsFrom([claude('ready', { aliases: ['opus'], efforts: [] })])
+      .filter((model) => model.older !== true)
+      .at(-1)
     expect(haiku?.displayName).toBe('Haiku 4.5')
   })
 
@@ -295,12 +297,33 @@ describe('Claude models from what its CLI advertised', () => {
      * (`aliases.<family>.default`) -- see shared/claude-models.ts.
      */
     const models = claudeModelsFrom([claude('ready', { aliases: ['fable', 'opus', 'sonnet'], efforts: [] })])
-    expect(models.map((model) => model.displayName)).toEqual(['Fable 5.1', 'Opus 5.5', 'Sonnet 5', 'Haiku 4.5'])
+    expect(models.filter((model) => model.older !== true).map((model) => model.displayName)).toEqual(['Fable 5.1', 'Opus 5.5', 'Sonnet 5', 'Haiku 4.5'])
     // What the alias is for: it moves with its family.
     expect(models[1]?.description).toBe('Always the newest Opus')
     // An alias the table does not know keeps its own name, not a made-up version.
     const unknown = claudeModelsFrom([claude('ready', { aliases: ['mythic'], efforts: [] })])
     expect(unknown[0]?.displayName).toBe('Mythic')
+  })
+
+  it('offers the older versions after the current ones, marked for the fold', () => {
+    const models = claudeModelsFrom([claude('ready', { aliases: ['fable', 'opus', 'sonnet'], efforts: ['low', 'high'] })])
+    const older = models.filter((model) => model.older === true)
+    expect(models.findIndex((model) => model.older === true)).toBe(4)
+    expect(older.map((model) => model.displayName)).toEqual([
+      'Opus 5', 'Opus 4.8', 'Opus 4.7', 'Opus 4.6', 'Opus 4.5', 'Fable 5', 'Sonnet 4.6', 'Sonnet 4.5'
+    ])
+    // Their levels are their own, not the aliases' advertised ones.
+    expect(older.find((model) => model.id === 'claude-sonnet-4-5')?.supportedEfforts).toEqual([])
+    // A CLI that names no aliases is given no full names either.
+    expect(claudeModelsFrom([claude('ready', { aliases: [], efforts: ['high'] })])).toEqual([])
+  })
+
+  it("keeps the account default's levels to the current models", () => {
+    // Two older versions report no levels at all; counted, they would empty
+    // the account default's for everyone.
+    const models = withAccountDefaults(claudeModelsFrom([claude('ready', { aliases: ['opus'], efforts: ['low', 'high'] })]))
+    const fallback = models.find((model) => model.runtime === 'claude' && model.id === 'account-default')
+    expect(fallback?.supportedEfforts).toEqual(['low', 'high'])
   })
 
   it('offers nothing for a Claude that is not ready, or that advertised nothing', () => {
@@ -322,7 +345,7 @@ describe('Claude models from what its CLI advertised', () => {
     // Claude gets its own account-default row now, the way Codex always had
     // one: `defaultRoute` can stamp `account-default` on whichever runtime is
     // usable, and each one needs a row of its own to be the ACTIVE one.
-    expect(response.data.models.map((model) => `${model.runtime}:${model.id}`)).toEqual([
+    expect(response.data.models.filter((model) => model.older !== true).map((model) => `${model.runtime}:${model.id}`)).toEqual([
       'claude:account-default',
       'claude:opus',
       'claude:haiku'
