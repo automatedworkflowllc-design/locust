@@ -6,6 +6,25 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.280.0 - 2026-09-23
+
+- **Antigravity's questions reach you.** When a teammate on Antigravity asks
+  you to choose between options, the question now appears in the
+  conversation as a card with each option, a box for your own answer, and
+  Skip. The teammate shows as waiting on you in the sidebar and the top bar,
+  and you get a notification if you are in another window. Answer it in
+  Locust and Antigravity carries on with your choice. Answer it in
+  Antigravity's own window instead and the card goes away by itself. Before
+  this, the question only showed inside the folded tool calls, and the
+  teammate sat waiting on an answer nobody could see.
+
+- **Answers on question cards arrive.** Fixed answers given on any question
+  card being lost on the way to the teammate, so it was told you said
+  nothing.
+
+- **No "Using a tool" line above a question.** While a card waits on you,
+  the line above it no longer says the teammate is busy with a tool.
+
 ## 0.279.0 - 2026-09-23
 
 - **Calmer bots, except the one you are talking to.** The bot beside a
