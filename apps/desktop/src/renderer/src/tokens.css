@@ -498,6 +498,9 @@
   --lc-ease: ease;
 
   /* --- Layout ---------------------------------------------------------- */
+  /* The window's own title bar: a drag region, so nothing clickable may sit
+     on it -- an overlay starts below it (see .lc-scrim). */
+  --lc-titlebar-height: 38px;
   --lc-sidebar-width: 268px;
   --lc-sidebar-rail-width: 64px;
   --lc-inspector-width: 344px;

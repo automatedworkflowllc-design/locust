@@ -6,6 +6,15 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.276.0 - 2026-09-22
+
+- **New teammate fits the window again.** On a shorter window the New
+  teammate form ran off the top and the bottom of the window, taking its
+  title and its **Create teammate** button with it. Every dialog now stays
+  inside the window and below its title bar: the title and the buttons stay
+  where they are, and the form between them scrolls. Save as routine and
+  Group settings get the same.
+
 ## 0.275.0 - 2026-09-22
 
 - **Older Claude versions, folded away.** Under Claude Code's models in the
