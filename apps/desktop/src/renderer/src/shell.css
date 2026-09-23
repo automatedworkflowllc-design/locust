@@ -3674,14 +3674,15 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: calc(22px * var(--lc-cover-k, 1));
+  gap: 22px;
   color: var(--lc-text-primary);
 }
 
+/* The cover's own numbers, at its own size. */
 .lc-lockup__mark {
   display: block;
   flex: none;
-  width: calc(118px * var(--lc-cover-k, 1));
+  width: 118px;
   height: auto;
 }
 
@@ -3693,11 +3694,26 @@ textarea {
   margin: 0 -0.14em 0 0;
   font-family: var(--lc-font-ui);
   font-weight: 700;
-  font-size: calc(58px * var(--lc-cover-k, 1));
+  font-size: 58px;
   line-height: 1;
   letter-spacing: var(--lc-title-tracking);
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* On the home screen's cover, drawn at the cover's scale. Scoped rather than
+   given a fallback value: a fallback is what lets an undefined variable pass
+   quietly, and --lc-cover-k is only defined inside the card. */
+.lc-cover .lc-lockup {
+  gap: calc(22px * var(--lc-cover-k));
+}
+
+.lc-cover .lc-lockup__mark {
+  width: calc(118px * var(--lc-cover-k));
+}
+
+.lc-cover .lc-lockup__name {
+  font-size: calc(58px * var(--lc-cover-k));
 }
 
 .lc-lockup path {

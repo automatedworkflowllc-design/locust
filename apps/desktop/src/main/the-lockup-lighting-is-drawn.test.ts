@@ -26,7 +26,8 @@ describe('the home screen cover', () => {
   it('is the cover drawn to scale: its 960x288 numbers times the measured k', () => {
     expect(block('.lc-cover {')).toContain('height: calc(288px * var(--lc-cover-k))')
     expect(block('.lc-cover__plate {')).toContain('left: calc(496px * var(--lc-cover-k))')
-    expect(block('.lc-lockup__mark {')).toContain('width: calc(118px * var(--lc-cover-k, 1))')
+    expect(block('.lc-cover .lc-lockup__mark {')).toContain('width: calc(118px * var(--lc-cover-k))')
+    expect(block('.lc-cover .lc-lockup__name {')).toContain('font-size: calc(58px * var(--lc-cover-k))')
   })
 
   it('centres the claim under the lockup, in mono capitals, never under the 10.5px floor', () => {
