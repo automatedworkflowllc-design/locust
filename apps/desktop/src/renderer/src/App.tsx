@@ -5819,6 +5819,7 @@ export default function App(): ReactElement {
         <NewTeammateDialog
           error={teammateError}
           mode={mode}
+          takenHues={teammates.map((teammate) => teammate.hue)}
           onCancel={() => setNewTeammateOpen(false)}
           onCreate={createTeammate}
         />

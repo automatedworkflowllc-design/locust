@@ -21,6 +21,20 @@ const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
   { hue: 'pearl', label: 'Pearl' }
 ]
 
+/**
+ * The colour a new teammate starts on: the first one nobody on the team wears
+ * yet, then round again once every colour is taken.
+ *
+ * It was always lime, so a team built by accepting the defaults was a row of
+ * one colour, and the sidebar's faces -- the thing that says whose each
+ * conversation is -- could not tell them apart (the design review, #7). The
+ * person can still pick any colour; this is only where the picker starts.
+ */
+export function freshHue(taken: readonly TeammateHue[]): TeammateHue {
+  const unused = HUES.find((option) => !taken.includes(option.hue))
+  return unused?.hue ?? HUES[taken.length % HUES.length]!.hue
+}
+
 /** What each shape is called in the Look grid; Locust's own two say so. */
 const SHAPE_NAMES: Readonly<Record<BotShape, string>> = {
   clover: 'Clover',
@@ -81,6 +95,7 @@ export function NewTeammateDialog({
   error,
   initial,
   mode,
+  takenHues = [],
   onChooseFolder,
   folderNotice,
   connectors,
@@ -93,6 +108,8 @@ export function NewTeammateDialog({
   readonly initial?: PublicTeammate
   /** The mode the next mission would actually run in, so the card cannot promise another. */
   readonly mode: MissionMode
+  /** The colours the team already wears, so a new teammate starts on one it does not. */
+  readonly takenHues?: readonly TeammateHue[]
   /**
    * Ask the host for this teammate's own folder, or clear it.
    *
@@ -114,7 +131,7 @@ export function NewTeammateDialog({
 }): ReactElement {
   const editing = initial !== undefined
   const [name, setName] = useState(initial?.name ?? '')
-  const [hue, setHue] = useState<TeammateHue>(initial?.hue ?? 'lime')
+  const [hue, setHue] = useState<TeammateHue>(initial?.hue ?? freshHue(takenHues))
   const [avatar, setAvatar] = useState<AvatarSpec>(
     () => initial?.avatar ?? seedAvatar(`draft_${Date.now()}_${Math.random()}`)
   )

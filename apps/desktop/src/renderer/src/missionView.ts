@@ -408,7 +408,12 @@ export function activityEntries(
       entries.push({
         kind: detail.kind === 'edit' ? 'unreported' : 'tool',
         key: `item_${String(index)}`,
-        name: detail.name,
+        // A read's name is the path it read, and OpenCode reports it whole:
+        // the fold said "read 3 — C:\Users\<home>\Documents\locust-scratch\
+        // locust-walk-ws-EfOL3P, C:\Users\..." and was cut off there (Yurt's
+        // beta report, #16). Relative to the folder like every file row; a
+        // name that is not a path comes back as it was.
+        name: relativePath(detail.name, workspacePath),
         tool: detail.tool === detail.name ? undefined : detail.tool,
         settled: detail.settled,
         failed
