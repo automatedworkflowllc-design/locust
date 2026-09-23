@@ -128,10 +128,10 @@ try {
     settings.click()
     await new Promise(r => setTimeout(r, 600))
     // Settings is a list of PAGES since 0.176.0, so Updates is no longer in
-    // whatever Settings opens on: it is on "This app". Reaching it is part of
+    // whatever Settings opens on: it is on "General" ("This app" until 0.293). Reaching it is part of
     // what a person does, so the smoke does it too.
     for (let i = 0; i < 40; i += 1) {
-      const item = [...document.querySelectorAll('.lc-settings__navitem')].find(b => /This app/.test(b.innerText || ''))
+      const item = [...document.querySelectorAll('.lc-settings__navitem')].find(b => /^General$/.test((b.innerText || '').trim()))
       if (item) { item.click(); break }
       await new Promise(r => setTimeout(r, 250))
     }

@@ -176,8 +176,8 @@ try {
     /*
      * SETTINGS IS PAGED, and this smoke predates that.
      *
-     * It opens on "Your workspace"; Privacy & local data and Trash are both
-     * on "This app" (settingsPages.ts). So every assertion below the first
+     * It opens on "Workspace"; Privacy & local data and Trash are both
+     * on "General" (settingsPages.ts; "This app" until 0.293). So every assertion below the first
      * was reading a page that does not contain what it was looking for, and
      * reported "never measured" -- seven failures that were the harness
      * standing on the wrong screen, not the product.
@@ -185,10 +185,10 @@ try {
      * A miss says which pages WERE there, so the next rename is one run to
      * diagnose rather than a guess.
      */
-    const page = [...document.querySelectorAll('button, a, [role=tab]')].find(n => n.innerText.trim() === 'This app')
+    const page = [...document.querySelectorAll('button, a, [role=tab]')].find(n => n.innerText.trim() === 'General')
     if (!page) {
       const pages = [...document.querySelectorAll('button, [role=tab]')].map(n => n.innerText.trim()).filter(Boolean).join(' / ')
-      return JSON.stringify({ found: false, value: 'no "This app" page in Settings; pages seen: ' + pages.slice(0, 200) })
+      return JSON.stringify({ found: false, value: 'no "General" page in Settings; pages seen: ' + pages.slice(0, 200) })
     }
     page.click()
     for (let i = 0; i < 80; i += 1) {
