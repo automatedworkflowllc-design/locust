@@ -11,6 +11,36 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.292.0 - 2026-09-23
+
+### Improved
+
+- **A routine's run is marked in the sidebar.** A routine replays a
+  conversation's words, so its run had the same title as the conversation it
+  came from, and the two could only be told apart by opening them. Its row
+  carries the Routines clock now, and pointing at any row names the teammate
+  and, for a routine's run, the routine.
+
+- **The inspector speaks in words.** Activity listed the record's own event
+  names -- `runtime.started · codex`, `tool.completed · shell`,
+  `run.completed`. It now reads "Started on Codex CLI", "shell · wc -l
+  README.md", "shell finished · exit code 0", "Finished". Details names the
+  runtime and model the way the composer does and says which sign-in the run
+  used, with the exact strings still there when you point at them.
+
+- **Appearance puts reading first.** Reply text size is at the top of the
+  page, above the sidebar and the send button's effects.
+
+- **The update banner matches the app.** A card with the install in the
+  app's offer colour, not a navy strip.
+
+- **A cost column never shows a bare dash.** A run that reported no cost
+  says "not reported", and a free model's run says "free".
+
+- **Teammates trust a file over a note copied from it.** A remembered value
+  that came from a file in the folder is the file as it read then; when the
+  file matters to the work, the teammate reads the file.
+
 ## 0.291.0 - 2026-09-23
 
 ### Improved
