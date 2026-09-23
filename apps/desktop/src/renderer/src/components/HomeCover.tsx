@@ -114,6 +114,10 @@ export function HomeCover({
     const rest = (): void => setAwake(false)
     window.addEventListener('focus', wake)
     window.addEventListener('blur', rest)
+    // The window is shown, and focused, as the app loads: a focus that lands
+    // between the first render and these listeners is missed by both, and
+    // the loading beam would wait for the next one. Read it now instead.
+    setAwake(document.hasFocus())
     return () => {
       window.removeEventListener('focus', wake)
       window.removeEventListener('blur', rest)
@@ -143,10 +147,11 @@ export function HomeCover({
      * something is loading that isnt loading ... it just drags away your
      * eyes from all the other movement on screen". Both true, and the same
      * fact: a travelling light reads as loading. So it is shown exactly when
-     * something IS loading -- before the bots move, never beside them -- and
-     * rests, like everything here, while the window is in the background.
+     * something IS loading -- before the bots move, never beside them. It
+     * does not wait for the window's focus as the bots do: loading is a few
+     * seconds, and a window that is still being shown may not have it yet.
      */
-    <Beam size="md" strength={0.85} active={!ready && awake} className="lc-coverbeam">
+    <Beam size="md" strength={0.85} active={!ready} className="lc-coverbeam">
       <div className="lc-cover" ref={card} style={{ '--lc-cover-k': String(scale) } as CSSProperties}>
         <div className="lc-cover__plate" aria-hidden="true" />
         {COVER_CAST.map((mate, index) => {

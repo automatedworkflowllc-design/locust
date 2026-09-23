@@ -65,14 +65,24 @@ try {
   // BEFORE drive.ready(), which waits for discovery to finish: the beam is
   // meant to be seen while it has not.
   await drive.waitFor(`!!document.querySelector('.lc-coverbeam')`, { timeoutMs: 30_000, what: 'the home screen' })
-  const loading = await drive.evaluate(LOADING)
-  if (loading) {
+  // Give it the moment to come on, and say so if the loading ended first.
+  // (It does not wait for the window's focus, which a drive's window may
+  // never get: 0.279's first try did, and never lit here.)
+  const firstLook = await drive.waitFor(`(() => {
+    const wrap = document.querySelector('.lc-coverbeam')
+    if (!(${LOADING})) return 'loading over; focused ' + document.hasFocus()
+    return wrap && wrap.hasAttribute('data-active') ? 'beam on' : false
+  })()`, { timeoutMs: 30_000, everyMs: 100, what: 'the beam to come on, or the loading to end' })
+  say(`first look: ${firstLook}`)
+  if (firstLook === 'beam on') {
+    await sleep(700)
     const whileLoading = JSON.parse(await drive.evaluate(beamAnimations('.lc-coverbeam')))
-    say(`while the runtimes are being found: ${JSON.stringify(whileLoading)}`)
-    check('while the runtimes are being found, the title box wears a travelling beam', whileLoading.some((a) => a.state === 'running'), JSON.stringify(whileLoading))
+    const stillLoading = await drive.evaluate(LOADING)
+    say(`while the runtimes are being found (${stillLoading ? 'still' : 'no longer'} loading): ${JSON.stringify(whileLoading)}`)
+    check('while the runtimes are being found, the title box wears a travelling beam', whileLoading.some((a) => a.name.startsWith('beam-spin') && a.state === 'running'), JSON.stringify(whileLoading))
     await clip('title-loading.png', '.lc-coverbeam', 16)
   } else {
-    check('the home screen was seen while the runtimes were still being found', false, 'discovery had finished before the first look')
+    check('the beam came on while the runtimes were still being found', false, firstLook)
   }
   await drive.ready()
   await drive.waitFor(`!document.querySelector('.lc-cover .lc-bot[data-state="still"]')`, { timeoutMs: 40_000, what: 'the lockup to light' })
@@ -87,7 +97,10 @@ try {
   say(`title box beam: ${JSON.stringify(cover)}`)
   const coverAnims = JSON.parse(await drive.evaluate(beamAnimations('.lc-coverbeam')))
   say(`running in the title box beam: ${JSON.stringify(coverAnims)}`)
-  check('once the lockup lights and the bots move, the beam is out', cover.wrap && !coverAnims.some((a) => a.state === 'running') && !/data-active/.test(cover.attrs), `${JSON.stringify(coverAnims)}; ${cover.attrs}`)
+  // The bots' own float and ring run inside the same box; the beam's are
+  // the package's `beam-*` animations.
+  const beamStillGoing = coverAnims.filter((a) => a.name.startsWith('beam-') && a.state === 'running')
+  check('once the lockup lights and the bots move, the beam is out', cover.wrap && beamStillGoing.length === 0 && !/data-active/.test(cover.attrs), `${JSON.stringify(beamStillGoing)}; ${cover.attrs}`)
   check("the box keeps the card's whole width", cover.width === cover.card, `${cover.width} vs ${cover.card}`)
   await clip('title-ready.png', '.lc-coverbeam', 16)
   await drive.send('Performance.enable')
