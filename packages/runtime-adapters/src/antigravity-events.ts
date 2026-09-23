@@ -349,28 +349,30 @@ export function createAntigravityEventNormalizer(
         ?? identityValue(call.toolCallId)
         ?? `tool_${String(stepIndex)}_${String(index)}`;
       /*
-       * `ask_question` says what it is asking, on the row.
+       * `ask_question` says what it is asking, on the row, and carries the
+       * question structured for the card that answers it.
        *
        * It used to read "Prompting user with options · ask_question · still
        * running" while the run sat blocked for the full idle timeout, and the
        * question and its four options were in the record the whole time
        * (`docs/FINDING-antigravity-ask-question.md`, Colin's screenshot).
+       * 2026-09-08 then found no way to answer it from Locust -- `agentapi
+       * send-message` arrives as a SYSTEM_MESSAGE, not as the answer -- so the
+       * row said "answer in Antigravity" and that was all.
        *
-       * Locust cannot ANSWER it -- measured 2026-09-08: an answer is a tool
-       * completion the IDE writes as `A1: <text>`, while the only channel
-       * Locust has, `agentapi send-message`, arrives as a SYSTEM_MESSAGE
-       * labelled "not actually sent by the user". So this row does the one
-       * honest thing available: it shows what is being asked, and says where
-       * the answer has to go. A person who can read the question in Locust can
-       * go and answer it; a person reading a spinner cannot.
+       * 2026-09-23 found the way (Yurt's beta hung on one, "the google question
+       * wasnt popping up in our chat"): Antigravity's IDE answers through its
+       * language server's `HandleCascadeUserInteraction`, the same server the
+       * CLI talks to. So the desktop raises a question card from `question`
+       * below and answers it there; the row is the record of what was asked.
        */
       const asked = name === "ask_question" ? antigravityQuestion(args) : undefined;
       const command = asked === undefined
         ? antigravityToolCommand(args)
         : oneLine(
             asked.options.length === 0
-              ? `${asked.question} — answer in Antigravity`
-              : `${asked.question} — ${asked.options.join(" / ")} — answer in Antigravity`,
+              ? asked.question
+              : `${asked.question} — ${asked.options.join(" / ")}`,
           );
       const open: OpenTool = {
         itemId,
@@ -384,6 +386,7 @@ export function createAntigravityEventNormalizer(
         emit("tool.started", {
           ...open,
           ...(patch === undefined ? {} : { patch }),
+          ...(asked === undefined ? {} : { question: { ...asked, askedAtStep: stepIndex } }),
           phase: "started",
           evidence,
         }),
@@ -557,16 +560,12 @@ export interface AntigravityQuestion {
  * timeout (`docs/FINDING-antigravity-ask-question.md`). The question and its
  * options were in the record the whole time; nothing read them.
  *
- * Reading them is worth doing even though Locust CANNOT answer. Measured
- * 2026-09-08 against real transcripts: an answer arrives as a MODEL/GENERIC
- * record whose content is `A1: <text>` -- a tool COMPLETION, written when the
- * IDE resolves the card -- while `agentapi send-message`, the only channel
- * Locust has, arrives as a SYSTEM_MESSAGE explicitly labelled "not actually
- * sent by the user". Those are two different transports, and only the first
- * one ends the tool.
- *
- * So the honest thing is to show the person exactly what is being asked and
- * where to answer it, instead of a row that names a tool and a spinner.
+ * An answer arrives as a MODEL/GENERIC record whose content is `A1: <text>`
+ * -- a tool COMPLETION, written when the card is resolved (measured
+ * 2026-09-08). `agentapi send-message` is not that: it arrives as a
+ * SYSTEM_MESSAGE labelled "not actually sent by the user". The completion is
+ * made by the language server's `HandleCascadeUserInteraction`, which is
+ * what the desktop now calls (2026-09-23); this is what its card shows.
  *
  * `args.questions` is a JSON-encoded ARRAY, and every value in an Antigravity
  * `args` is JSON-encoded (see `antigravityToolArg`). Only the first question is

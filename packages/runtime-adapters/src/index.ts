@@ -184,7 +184,7 @@ export type {
 } from "./copilot-events.js";
 export { killProcessTree, releaseProcessTree } from "./process-runner.js";
 export { toolPatchFrom } from "./codex-events.js";
-export type { ToolPatch } from "./codex-events.js";
+export type { ToolPatch, ToolQuestion } from "./codex-events.js";
 export {
   antigravityToolArg,
   antigravityToolCommand,

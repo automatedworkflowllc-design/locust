@@ -1830,6 +1830,11 @@ export default function App(): ReactElement {
         current.some((entry) => entry.approvalId === request.approvalId) ? current : [...current, request]
       )
     })
+    // A question answered somewhere else -- in Antigravity's own window --
+    // or whose run ended leaves the card with nothing to ask.
+    const removeWithdrawnListener = bridge.onMissionApprovalWithdrawn((approvalId) => {
+      setApprovals((current) => current.filter((entry) => entry.approvalId !== approvalId))
+    })
 
     const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
       // A finished mission hops once; a message that just arrived earns a
@@ -2386,6 +2391,7 @@ export default function App(): ReactElement {
       removeMissionListener()
       frameBatcher.current.dispose()
       removeApprovalListener()
+      removeWithdrawnListener()
       stopUpdates()
     }
   }, [])

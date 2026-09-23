@@ -5,6 +5,7 @@ import {
   CODEX_MISSION_UPDATE_CHANNEL,
   MISSION_APPROVAL_CHANNEL,
   MISSION_APPROVAL_DECIDE_CHANNEL,
+  MISSION_APPROVAL_WITHDRAWN_CHANNEL,
   MISSION_HANDOFF_CHANNEL,
   MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
@@ -306,6 +307,15 @@ const desktopApi: DesktopApi = {
     ipcRenderer.on(MISSION_APPROVAL_CHANNEL, wrapped)
     return () => {
       ipcRenderer.removeListener(MISSION_APPROVAL_CHANNEL, wrapped)
+    }
+  },
+  onMissionApprovalWithdrawn: (listener: (approvalId: string) => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, approvalId: string): void => {
+      if (typeof approvalId === 'string') listener(approvalId)
+    }
+    ipcRenderer.on(MISSION_APPROVAL_WITHDRAWN_CHANNEL, wrapped)
+    return () => {
+      ipcRenderer.removeListener(MISSION_APPROVAL_WITHDRAWN_CHANNEL, wrapped)
     }
   },
   onCodexMissionUpdate: (listener: (update: CodexMissionUpdate) => void) => {

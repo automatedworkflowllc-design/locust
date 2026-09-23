@@ -27,7 +27,7 @@ import { release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createCodexMissionService } from './codex-mission.js'
-import { createApprovalChannel } from './approval-channel.js'
+import { approvalAnswerFrom, createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
 import { bundledNpmBinDirectory, bundledNpmPrefix, findBundledNpm } from './bundled-npm.js'
@@ -94,6 +94,7 @@ import {
   CODEX_MISSION_UPDATE_CHANNEL,
   MISSION_APPROVAL_CHANNEL,
   MISSION_APPROVAL_DECIDE_CHANNEL,
+  MISSION_APPROVAL_WITHDRAWN_CHANNEL,
   MISSION_HANDOFF_CHANNEL,
   MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
@@ -1434,6 +1435,15 @@ if (!ownsSingleInstanceLock) {
       emitUpdate: (update) => sendToWindow(update),
       // A silence that looks like a question, said in the run's own thread.
       notify: ({ runId, missionId, message }) => sendToWindow({ kind: 'relay-notice', runId, missionId, message }),
+      // Its `ask_question`, as the same card Codex's questions use -- and
+      // taken down again when it was answered in Antigravity's own window.
+      emitApproval: raiseApproval,
+      withdrawApproval: (approvalId) => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(MISSION_APPROVAL_WITHDRAWN_CHANNEL, approvalId)
+        }
+      },
       onShared: async (mission, posted) => {
         await relay?.onShared(mission, posted)
       },
@@ -1645,20 +1655,17 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
-    ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL, (event, answer: unknown) => {
+    ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL, async (event, answer: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false } as const
-      const payload = (typeof answer === 'object' && answer !== null ? answer : {}) as Record<string, unknown>
-      const decision = payload.decision
-      // Anything but a recognized answer is a refusal. A malformed message must
-      // never be able to approve an action.
-      const normalized =
-        decision === 'approve-once' || decision === 'approve-always' ? decision : 'deny'
-      if (typeof payload.approvalId !== 'string') return { ok: false } as const
+      // A decision, or a question's answers -- see approvalAnswerFrom, and why
+      // the answers used to be dropped right here.
+      const decided = approvalAnswerFrom(answer)
+      if (decided === undefined) return { ok: false } as const
       // Whichever host is holding this id. A Codex approval lives in the
       // mission service's approval channel; a Claude Code connector permission
-      // lives in the permission host. An id is minted by exactly one of them.
-      const decided = { approvalId: payload.approvalId, decision: normalized } as const
-      return { ok: codexMissions.decide(decided) || permissionHost.decide(decided) } as const
+      // in the permission host; an Antigravity question in its mission
+      // service. An id is minted by exactly one of them.
+      return { ok: codexMissions.decide(decided) || permissionHost.decide(decided) || (await antigravityMissions.decide(decided)) } as const
     })
 
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })

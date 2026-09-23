@@ -10936,6 +10936,15 @@ textarea {
   letter-spacing: 0.06em;
 }
 
+/* A question answered in the runtime's own window: its options, listed. */
+.lc-question__listed {
+  margin: 0;
+  padding-left: var(--lc-space-5);
+  display: grid;
+  gap: var(--lc-space-1);
+  color: var(--lc-text-secondary);
+}
+
 .lc-question__text {
   margin: 0;
   font-size: var(--lc-text-body);

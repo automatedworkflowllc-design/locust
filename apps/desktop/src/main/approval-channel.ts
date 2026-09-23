@@ -162,6 +162,37 @@ export function questionsOf(params: Record<string, unknown>): readonly MissionQu
   return questions
 }
 
+/**
+ * What the renderer sent, as an answer a host can take -- or undefined.
+ *
+ * A question's ANSWERS never got past here. The handler rebuilt every
+ * payload as `{ approvalId, decision }`, a missing decision became `deny`,
+ * and the channel then refused it as a decision sent to a question -- so no
+ * question card in Locust could be answered, Codex's included. Found
+ * 2026-09-23, wiring Antigravity's questions to the same card.
+ *
+ * Anything but a recognized answer is still refused or read as a denial: a
+ * malformed message must never be able to approve an action. And answers
+ * reach only a question -- the channel checks the pairing.
+ */
+export function approvalAnswerFrom(raw: unknown): MissionApprovalAnswer | undefined {
+  const payload = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>
+  if (typeof payload.approvalId !== 'string') return undefined
+  if ('answers' in payload) {
+    const answers = payload.answers
+    if (typeof answers !== 'object' || answers === null || Array.isArray(answers)) return undefined
+    const clean: Record<string, readonly string[]> = {}
+    for (const [questionId, given] of Object.entries(answers as Record<string, unknown>)) {
+      if (!Array.isArray(given) || !given.every((entry) => typeof entry === 'string')) return undefined
+      // Bounded: an answer is words a person typed, not a file.
+      clean[questionId] = (given as string[]).slice(0, 64).map((entry) => entry.slice(0, 4_000))
+    }
+    return { approvalId: payload.approvalId, answers: clean }
+  }
+  const decision = payload.decision
+  return { approvalId: payload.approvalId, decision: decision === 'approve-once' || decision === 'approve-always' ? decision : 'deny' }
+}
+
 /** The protocol decision for each of the product's three authorization answers. */
 export function protocolDecisionFor(decision: MissionApprovalDecision): string {
   if (decision === 'approve-once') return 'accept'

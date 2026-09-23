@@ -515,17 +515,29 @@ describe("the row an ask_question draws", () => {
     expect(command).toContain("Review system environment settings");
   })
 
-  it("says where the answer has to go, because it cannot go here", () => {
-    // Measured 2026-09-08: an answer is a tool completion the IDE writes as
-    // `A1: <text>`; `agentapi send-message`, the only channel Locust has,
-    // arrives as a SYSTEM_MESSAGE labelled "not actually sent by the user".
-    // A row that showed the question without saying that would read as an
-    // invitation to answer it here.
+  it("carries the question, structured, for the card that answers it", () => {
+    // Yurt's beta run, 2026-09-23, hung on a question that showed only as a
+    // row inside the folded tool calls. The desktop raises a question card
+    // from this and answers it through Antigravity's own server, looking the
+    // waiting step up from the step that asked.
     const antigravity = normalizer();
     const started = antigravity
       .accept({ sequence: 1, raw: askRecord })
       .find((event) => event.type === "tool.started");
-    expect(String((started?.payload as { command?: string } | undefined)?.command)).toContain(
+    expect((started?.payload as { question?: unknown } | undefined)?.question).toEqual({
+      question: "Which test option would you like to select?",
+      options: [
+        "(Recommended) Run performance benchmark tests",
+        "Inspect codebase architecture",
+        "Execute automated unit tests",
+        "Review system environment settings",
+      ],
+      multiSelect: false,
+      askedAtStep: 4,
+    });
+    // The row is the record of what was asked; it no longer sends the
+    // person somewhere else to answer.
+    expect(String((started?.payload as { command?: string } | undefined)?.command)).not.toContain(
       "answer in Antigravity",
     );
   })
@@ -545,7 +557,7 @@ describe("the row an ask_question draws", () => {
       .accept({ sequence: 1, raw: write })
       .find((event) => event.type === "tool.started");
     const command = String((started?.payload as { command?: string } | undefined)?.command ?? "");
-    expect(command).not.toContain("answer in Antigravity");
+    expect((started?.payload as { question?: unknown } | undefined)?.question).toBeUndefined();
     expect(command).toContain("notes.md");
   })
 })

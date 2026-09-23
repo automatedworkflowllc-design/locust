@@ -149,12 +149,34 @@ export interface ToolPayload {
    * and nothing re-invokes anybody on the strength of it.
    */
   readonly background?: boolean;
+  /**
+   * A question the runtime put to the person with its OWN tool, structured.
+   *
+   * Antigravity's `ask_question` holds its agent until the person answers,
+   * and Yurt's beta run on 2026-09-23 sat on one Locust never raised: the
+   * question showed only as a row inside the folded tool calls. The desktop
+   * builds its question card from this, and answers through Antigravity's
+   * own server. Absent on every other tool.
+   */
+  readonly question?: ToolQuestion;
   readonly output?: RedactedJsonValue;
   readonly exitCode?: number;
   readonly status?: string;
   readonly patch?: ToolPatch;
   readonly phase: "started" | "updated" | "completed";
   readonly evidence: CodexEventEvidence;
+}
+
+/** A question asked through a runtime's own tool, as the tool call carried it. */
+export interface ToolQuestion {
+  readonly question: string;
+  readonly options: readonly string[];
+  readonly multiSelect: boolean;
+  /**
+   * The transcript step that asked. The step that WAITS for the answer comes
+   * after it, and is looked up from here.
+   */
+  readonly askedAtStep: number;
 }
 
 interface LimitDetectedPayload {

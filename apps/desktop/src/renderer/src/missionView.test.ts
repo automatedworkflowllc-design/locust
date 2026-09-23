@@ -701,6 +701,18 @@ describe('thread composition', () => {
     expect(items.some((i) => i.type === 'live-step')).toBe(false)
   })
 
+  it('says nothing above an approval even with a tool open -- the tool IS what is waiting', () => {
+    // Antigravity's ask_question stays open until the person answers, and a
+    // Codex command stays open while its approval card is up. The line above
+    // the card read "Using a tool..." with a working face while the header
+    // said "waiting on you" (drive-antigravity-answer, 2026-09-23).
+    const opened = event('tool.started', { itemId: 'tool_7_0', toolKind: 'ask_question', name: 'ask_question', command: 'How would you like to organize this folder?', phase: 'started' })
+    const items = buildThread([opened], { running: true, startedAt: '2026-09-23T04:43:02.000Z', awaitingDecision: true })
+    expect(items.some((i) => i.type === 'live-step')).toBe(false)
+    // The control: the same open tool with nobody asked draws its line.
+    expect(buildThread([opened], { running: true, startedAt: '2026-09-23T04:43:02.000Z' }).some((i) => i.type === 'live-step')).toBe(true)
+  })
+
   it('draws no live line once the run is over', () => {
     expect(buildThread([], { running: false, startedAt: '2026-09-04T21:47:00.000Z' })).toEqual([])
   })

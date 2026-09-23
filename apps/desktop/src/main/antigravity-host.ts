@@ -35,6 +35,11 @@ export interface AntigravityHost {
   readonly address: string
   readonly csrfToken: string
   readonly projects: ReadonlyMap<string, string>
+  /**
+   * Every port the server listens on. The CLI's is `address`; a question is
+   * answered over the plain-HTTP one of the two (antigravity-cascade.ts).
+   */
+  readonly ports?: readonly number[]
 }
 
 export interface AntigravityProbeOptions {
@@ -307,7 +312,7 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
           } catch {
             projects = new Map()
           }
-          return { executablePath, version: server.parsed.version, address, csrfToken: server.parsed.csrfToken, projects }
+          return { executablePath, version: server.parsed.version, address, csrfToken: server.parsed.csrfToken, projects, ports }
         }
       }
       return undefined

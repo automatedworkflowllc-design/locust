@@ -5,9 +5,11 @@ import { homedir } from 'node:os'
 
 import type { MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import { createAntigravityEventNormalizer } from '@teammate/runtime-adapters'
-import type { NormalizedRuntimeEvent, RuntimeProcessCompletion } from '@teammate/runtime-adapters'
+import type { NormalizedRuntimeEvent, RuntimeProcessCompletion, ToolQuestion } from '@teammate/runtime-adapters'
 
-import type { CodexMissionUpdate, PublicPeerMessage } from '../shared/ipc.js'
+import type { CodexMissionUpdate, MissionApprovalAnswer, MissionApprovalRequest, MissionQuestion, PublicPeerMessage } from '../shared/ipc.js'
+import { createCascadeApi } from './antigravity-cascade.js'
+import type { AntigravityPendingQuestion, AntigravityQuestionResponse, CascadeApi } from './antigravity-cascade.js'
 import { createAgentApi, projectIdFor, transcriptPathFor } from './antigravity-host.js'
 import type { AgentApi, AntigravityHost } from './antigravity-host.js'
 import { runtimeThreadIdOf } from './codex-mission.js'
@@ -60,6 +62,12 @@ export const ANTIGRAVITY_IDLE_TIMEOUT_MS = 10 * 60_000
  * screen wondering.
  */
 export const ANTIGRAVITY_ASKING_NOTICE_MS = 90_000
+/**
+ * How many looks, one a poll, for the step that waits on a question's answer
+ * before the card goes up without it -- saying to answer in Antigravity. The
+ * step is written a moment after the call that asks (two seconds, measured).
+ */
+export const ANTIGRAVITY_QUESTION_LOOKUPS = 8
 const NOBODY = ''
 
 export interface AntigravityMissionOptions {
@@ -92,6 +100,16 @@ export interface AntigravityMissionOptions {
   readonly askingNoticeMs?: number
   /** A note into the mission's own thread; absent means the notice is not drawn. */
   readonly notify?: (input: { runId: string; missionId: string; message: string }) => void
+  /**
+   * Raise a question card, and take one down that was answered elsewhere.
+   * Absent: a question is only its row in the thread, as before 0.280.
+   */
+  readonly emitApproval?: (request: MissionApprovalRequest) => void
+  readonly withdrawApproval?: (approvalId: string) => void
+  /** Test seam: Antigravity's own server, which takes a question's answer. */
+  readonly cascadeApi?: (host: AntigravityHost) => CascadeApi
+  /** Test seam: looks for the waiting step before the card goes up without it. */
+  readonly questionLookups?: number
 }
 
 export interface AntigravityMission {
@@ -117,6 +135,12 @@ export interface AntigravityMissionService {
   liveMissionIds(): readonly string[]
   /** The run this teammate has going here, if any. */
   runIdOwnedBy(teammateId: string): string | undefined
+  /**
+   * The person's answer to a question card this service raised. False when
+   * no question here is waiting under that id, or Antigravity did not take
+   * the answer (said in the thread).
+   */
+  decide(answer: MissionApprovalAnswer): Promise<boolean>
   dispose(): Promise<void>
 }
 
@@ -167,6 +191,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     // rather than silently losing it.
     Math.floor(idleTimeoutMs / 2)
   )
+  const questionLookups = Math.max(1, options.questionLookups ?? ANTIGRAVITY_QUESTION_LOOKUPS)
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined ? undefined : createPeerExchange({
           workroom: options.workroom,
@@ -174,6 +199,23 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           ...(options.memory === undefined ? {} : { memory: options.memory })
         })
   const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.self.teammateId ?? NOBODY
+
+  /**
+   * A question the agent put to the person with `ask_question`, from the call
+   * until its answer is in the transcript.
+   */
+  interface Asking {
+    readonly itemId: string
+    readonly question: ToolQuestion
+    readonly approvalId: string
+    /** The step waiting on the answer, with the ids an answer names; once found. */
+    pending: AntigravityPendingQuestion | undefined
+    lookups: number
+    /** The card is up. */
+    raised: boolean
+    /** Answered from Locust; the transcript's completion is on its way. */
+    answered: boolean
+  }
 
   interface LiveRun {
     readonly runId: string
@@ -191,6 +233,10 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     lastProgressAt: number
     /** Whether the person has already been told this silence looks like a question. */
     saidItMightBeAsking: boolean
+    /** Antigravity's own server, for answering a question. */
+    readonly cascade: CascadeApi
+    /** The question waiting on the person, if the agent asked one. */
+    asking: Asking | undefined
     timer: NodeJS.Timeout | undefined
     polling: boolean
     ended: boolean
@@ -228,6 +274,107 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       }
     })
     await Promise.resolve()
+  }
+
+  /*
+   * A QUESTION, FROM THE CALL THAT ASKS IT TO THE ANSWER IN THE TRANSCRIPT.
+   *
+   * Yurt's beta run (2026-09-23) sat on an `ask_question` that Locust showed
+   * only as a row among the folded tool calls; the agent waits in
+   * Antigravity until someone answers. So the call raises the same question
+   * card Codex's questions use -- the person is told by the OS if they are
+   * looking elsewhere, and the teammate reads "waiting on you" -- and the
+   * card answers it through Antigravity's own server (antigravity-cascade.ts).
+   * If it is answered in Antigravity's window instead, the completion arrives
+   * in the transcript and the card is taken down.
+   */
+  const settleQuestion = (run: LiveRun): void => {
+    const asking = run.asking
+    if (asking === undefined) return
+    run.asking = undefined
+    if (asking.raised) options.withdrawApproval?.(asking.approvalId)
+  }
+
+  const noteQuestions = (run: LiveRun, events: readonly NormalizedRuntimeEvent[]): void => {
+    for (const event of events) {
+      const payload = event.payload as { readonly itemId?: string; readonly question?: ToolQuestion }
+      if (event.type === 'tool.started' && payload.question !== undefined && payload.itemId !== undefined) {
+        // A newer question replaces one still open; the transcript is linear.
+        settleQuestion(run)
+        run.asking = {
+          itemId: payload.itemId,
+          question: payload.question,
+          approvalId: `ap_${createId()}`,
+          pending: undefined,
+          lookups: 0,
+          raised: false,
+          answered: false
+        }
+      } else if ((event.type === 'tool.completed' || event.type === 'tool.failed') && payload.itemId === run.asking?.itemId) {
+        settleQuestion(run)
+      }
+    }
+  }
+
+  /** A question's markdown links, as the words they show. */
+  const plainQuestion = (text: string): string => text.replace(/\[([^\]]+)\]\([^)\s]+\)/g, '$1')
+
+  const questionCard = (run: LiveRun, asking: Asking): MissionApprovalRequest => {
+    const pending = asking.pending
+    const questions: readonly MissionQuestion[] =
+      pending === undefined
+        ? [
+            {
+              id: '0',
+              header: null,
+              question: plainQuestion(asking.question.question),
+              options: asking.question.options.map((label) => ({ label, description: null })),
+              isOther: false,
+              isSecret: false
+            }
+          ]
+        : pending.questions.map((question, index) => ({
+            id: String(index),
+            header: null,
+            question: plainQuestion(question.question),
+            // Labels exactly as Antigravity sent them: an answer is matched
+            // back to its option id by this text.
+            options: question.options.map((option) => ({ label: option.text, description: null })),
+            // Antigravity's card takes a written answer ("Other").
+            isOther: true,
+            isSecret: false
+          }))
+    return {
+      approvalId: asking.approvalId,
+      runId: run.runId,
+      missionId: run.missionId,
+      runtime: 'antigravity',
+      kind: 'question',
+      summary: pending?.action ?? 'Antigravity is asking you something',
+      detail: '',
+      cwd: options.workspacePath,
+      requestedAt: now().toISOString(),
+      questions,
+      blocking: true,
+      ...(pending === undefined ? { answerIn: 'Antigravity' } : { skippable: true })
+    }
+  }
+
+  /** Look for the waiting step, and raise the card: with it, or after enough looks, without. */
+  const raiseQuestion = async (run: LiveRun): Promise<void> => {
+    const asking = run.asking
+    if (asking === undefined || asking.raised || options.emitApproval === undefined) return
+    asking.lookups += 1
+    try {
+      asking.pending = await run.cascade.pendingQuestion(run.conversationId, asking.question.askedAtStep)
+    } catch {
+      asking.pending = undefined
+    }
+    // Answered, or replaced, while the server was being asked.
+    if (run.asking !== asking || run.ended) return
+    if (asking.pending === undefined && asking.lookups < questionLookups) return
+    asking.raised = true
+    options.emitApproval(questionCard(run, asking))
   }
 
   const persistAndEmit = async (run: LiveRun, events: readonly NormalizedRuntimeEvent[]): Promise<void> => {
@@ -269,6 +416,8 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     run.ended = true
     if (run.timer !== undefined) clearInterval(run.timer)
     runs.delete(run.runId)
+    // No card outlives its run.
+    settleQuestion(run)
     try {
       await persistAndEmit(run, run.normalizer.finish(completion(run, input)))
     } catch {
@@ -329,7 +478,10 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
        * from `run.fed` every tick, so leaving it where it was is what makes a
        * transient failure genuinely retryable.
        */
-      if (fresh.length > 0) await persistAndEmit(run, fresh)
+      if (fresh.length > 0) {
+        await persistAndEmit(run, fresh)
+        noteQuestions(run, fresh)
+      }
       if (lines.length > run.fed) {
         run.fed = lines.length
         run.lastProgressAt = Date.now()
@@ -340,6 +492,13 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
         await end(run, {})
         return
       }
+      await raiseQuestion(run)
+      /*
+       * A question waiting on the person is not a silence. The agent is held
+       * until they answer, which may take longer than any idle limit, and the
+       * card already says what "might be asking" would guess at.
+       */
+      const waitingOnPerson = run.asking !== undefined && !run.asking.answered
       /*
        * SAY IT EARLY, and do not end the run to say it.
        *
@@ -359,7 +518,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
        */
       const silentFor = Date.now() - run.lastProgressAt
       const pendingNow = run.normalizer.pendingToolName
-      if (silentFor > askingNoticeMs && silentFor <= idleTimeoutMs && pendingNow !== undefined && !run.saidItMightBeAsking) {
+      if (!waitingOnPerson && silentFor > askingNoticeMs && silentFor <= idleTimeoutMs && pendingNow !== undefined && !run.saidItMightBeAsking) {
         run.saidItMightBeAsking = true
         options.notify?.({
           runId: run.runId,
@@ -367,7 +526,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           message: `Antigravity has been on its own "${pendingNow}" step for ${String(Math.round(silentFor / 60_000) || 1)} minute${Math.round(silentFor / 60_000) === 1 ? '' : 's'} without reporting anything. It asks questions in its own window, not here -- if it is waiting on you, answer it there.`
         })
       }
-      if (Date.now() - run.lastProgressAt > idleTimeoutMs) {
+      if (!waitingOnPerson && Date.now() - run.lastProgressAt > idleTimeoutMs) {
         // Say WHY, and do not blame the model for a silence this app caused.
         //
         // Antigravity's native `ask_question` holds the run open waiting for an
@@ -554,6 +713,8 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           lastProgressAt: Date.now(),
           timer: undefined,
           saidItMightBeAsking: false,
+          cascade: (options.cascadeApi ?? createCascadeApi)(host),
+          asking: undefined,
           polling: false,
           ended: false
         }
@@ -577,6 +738,38 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       } finally {
         starting.delete(owner)
       }
+    },
+
+    async decide(answer) {
+      const run = [...runs.values()].find((entry) => entry.asking?.approvalId === answer.approvalId)
+      const asking = run?.asking
+      if (run === undefined || asking === undefined || !asking.raised || asking.answered) return false
+      // A question is answered, never approved; and without the waiting step
+      // there is nothing to answer here (the card said to use Antigravity).
+      if (!('answers' in answer) || asking.pending === undefined) return false
+      const pending = asking.pending
+      const responses: AntigravityQuestionResponse[] = pending.questions.map((question, index) => {
+        const given = answer.answers[String(index)] ?? []
+        if (given.length === 0) return { selectedOptionIds: [], skipped: true }
+        const selectedOptionIds = question.options.filter((option) => given.includes(option.text)).map((option) => option.id)
+        const written = given.filter((entry) => !question.options.some((option) => option.text === entry)).join('\n').trim()
+        return { selectedOptionIds, ...(written.length > 0 ? { writeIn: written } : {}) }
+      })
+      try {
+        await run.cascade.answerQuestion(run.conversationId, pending, responses)
+      } catch (error) {
+        const why = error instanceof Error ? error.message : String(error)
+        options.notify?.({
+          runId: run.runId,
+          missionId: run.missionId,
+          message: `Locust could not hand your answer to Antigravity (${why}). Answer it in Antigravity's own window; this run carries on from there.`
+        })
+        return false
+      }
+      asking.answered = true
+      // The agent picks up from here; its silence starts now, not at the question.
+      run.lastProgressAt = Date.now()
+      return true
     },
 
     cancel(runId) {

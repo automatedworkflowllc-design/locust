@@ -2668,7 +2668,14 @@ export function buildThread(
     const openToolId = [...openTools.keys()].at(-1)
     const openTool = openToolId === undefined ? undefined : openTools.get(openToolId)
     const openToolMeta = openToolId === undefined ? undefined : openToolAt.get(openToolId)
-    if (openTool !== undefined && openToolMeta !== undefined) {
+    if (options.awaitingDecision === true) {
+      // Stopped on the person: no live line at all, whatever is open. The card
+      // says what the run waits for, and the header already reads "waiting on
+      // you". The rule was only kept when no step had been reported, so a run
+      // stopped with a tool OPEN still drew "Using a tool..." straight above
+      // the card asking the question -- Antigravity's `ask_question`,
+      // 2026-09-23, which is exactly a tool left open until the answer comes.
+    } else if (openTool !== undefined && openToolMeta !== undefined) {
       items.push({
         key: 'live-step',
         type: 'live-step',
@@ -2694,7 +2701,7 @@ export function buildThread(
         orb: orbStateFor(undefined, options.planMode === true, runningStep.register),
         ...(runningStep.kind === 'reasoning' ? { waiting: true } : {})
       })
-    } else if (!streaming && options.awaitingDecision !== true) {
+    } else if (!streaming) {
       // Nothing has begun, or the last step closed and the next has not
       // opened. The thread used to draw NOTHING here, so pressing Enter left
       // an empty page until the runtime's first event -- seconds, for a CLI

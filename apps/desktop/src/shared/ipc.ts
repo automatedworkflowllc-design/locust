@@ -588,6 +588,8 @@ export const WORKTREE_LIST_CHANNEL = 'worktrees:list'
 export const WORKTREE_REMOVE_CHANNEL = 'worktrees:remove'
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
+/** An approval answered somewhere else -- a question answered in Antigravity's own window. */
+export const MISSION_APPROVAL_WITHDRAWN_CHANNEL = 'mission-approval:withdrawn'
 
 export type LocalRuntimeId = 'codex' | 'claude' | 'cursor' | 'gemini' | 'opencode' | 'copilot' | 'antigravity' | 'muse' | 'omniroute'
 
@@ -1426,6 +1428,17 @@ export interface MissionApprovalRequest {
    * stop-everything card would be a claim about the run that is not true.
    */
   readonly blocking?: boolean
+  /**
+   * Where the question has to be answered, when it cannot be answered here.
+   *
+   * Antigravity's questions are answered through its own server; when Locust
+   * could not find the waiting step there, the card still shows the question
+   * and says to answer it in this app's window, with no buttons that would
+   * pretend otherwise.
+   */
+  readonly answerIn?: string
+  /** A question the person may decline, as Antigravity's own card offers. */
+  readonly skippable?: boolean
 }
 
 export interface ApprovalPatch {
@@ -2058,6 +2071,7 @@ export interface DesktopApi {
   writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void
+  onMissionApprovalWithdrawn(listener: (approvalId: string) => void): () => void
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>
   cancelCodexMission(request: CodexMissionCancelRequest): Promise<CodexMissionCancelResponse>
   handOffMission(request: MissionHandoffRequest): Promise<MissionHandoffResponse>

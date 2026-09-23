@@ -25,10 +25,13 @@ import { fileCounts, parseUnifiedDiff } from '../diff.js'
 function QuestionForm({
   questions,
   onAnswer,
+  skippable = false,
   busy
 }: {
   readonly questions: readonly MissionQuestion[]
   readonly onAnswer: (answers: Readonly<Record<string, readonly string[]>>) => void
+  /** The runtime takes "no answer" as an answer -- Antigravity's own card has Skip. */
+  readonly skippable?: boolean
   readonly busy: boolean
 }): ReactElement {
   const [chosen, setChosen] = useState<Readonly<Record<string, string>>>({})
@@ -103,12 +106,52 @@ function QuestionForm({
         >
           {questions.length > 1 ? 'Send answers' : 'Send answer'}
         </button>
+        {skippable && (
+          <button
+            type="button"
+            className="lc-ghostbutton"
+            disabled={busy}
+            // Every question left alone: the runtime is told it was skipped.
+            onClick={() => onAnswer(Object.fromEntries(questions.map((question) => [question.id, []])))}
+          >
+            Skip
+          </button>
+        )}
       </div>
       <p className="lc-approval__note">
         {/* No "Always": a question has no session grant in the protocol, and a
             button that cannot mean what it says is worse than one fewer. */}
-        This goes back to the runtime as your answer. Stop the run below if you
-        would rather not answer.
+        {skippable
+          ? 'This goes back to the runtime as your answer. Skip tells it you would rather not say.'
+          : 'This goes back to the runtime as your answer. Stop the run below if you would rather not answer.'}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * A question Locust can show but not answer: the runtime takes the answer in
+ * its own window (Antigravity, when its waiting step could not be found).
+ * No buttons -- a button here would claim an answer can go somewhere it
+ * cannot.
+ */
+function QuestionElsewhere({ questions, where }: { readonly questions: readonly MissionQuestion[]; readonly where: string }): ReactElement {
+  return (
+    <div className="lc-questions">
+      {questions.map((question) => (
+        <div key={question.id} className="lc-question">
+          <p className="lc-question__text">{question.question}</p>
+          {question.options.length > 0 && (
+            <ul className="lc-question__listed">
+              {question.options.map((option) => (
+                <li key={option.label}>{option.label}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+      <p className="lc-approval__note">
+        Answer it in {where}&rsquo;s own window. Locust carries on as soon as {where} has your answer.
       </p>
     </div>
   )
@@ -271,8 +314,10 @@ export function ApprovalCard({
         * question this build cannot read still falls through to the
         * authorization controls rather than drawing a form with no fields.
         */}
-      {isQuestion && questions.length > 0 ? (
-        <QuestionForm questions={questions} onAnswer={onAnswer} busy={busy} />
+      {isQuestion && questions.length > 0 && request.answerIn !== undefined ? (
+        <QuestionElsewhere questions={questions} where={request.answerIn} />
+      ) : isQuestion && questions.length > 0 ? (
+        <QuestionForm questions={questions} onAnswer={onAnswer} skippable={request.skippable === true} busy={busy} />
       ) : (
         <>
           <div className="lc-approval__actions">
