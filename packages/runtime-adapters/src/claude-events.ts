@@ -240,6 +240,77 @@ export function usageWindowText(windows: unknown): string | undefined {
     .join(" · ");
 }
 
+/**
+ * What a model call held: its whole prompt, cached or not.
+ *
+ * MEASURED 2026-09-23 off Colin's ledger: every call's `message_start` states
+ * `input_tokens`, `cache_creation_input_tokens` and `cache_read_input_tokens`,
+ * and in a long run the first two are small and the third is nearly all of it
+ * (2 + 3,689 + 236,049). Undefined when the record states none of them.
+ */
+export function promptTokensOf(usage: unknown): number | undefined {
+  if (!isObject(usage)) return undefined;
+  let total: number | undefined;
+  for (const key of ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]) {
+    const held = usage[key];
+    if (typeof held === "number" && Number.isFinite(held) && held >= 0) total = (total ?? 0) + held;
+  }
+  return total;
+}
+
+function outputTokensOf(usage: unknown): number | undefined {
+  if (!isObject(usage)) return undefined;
+  const held = usage.output_tokens;
+  return typeof held === "number" && Number.isFinite(held) && held >= 0 ? held : undefined;
+}
+
+/**
+ * A record from a subagent's own conversation. It has a context of its own,
+ * so its calls say nothing about how full the person's conversation is.
+ */
+function fromSubagent(parsed: JsonObject): boolean {
+  return typeof parsed.parent_tool_use_id === "string" && parsed.parent_tool_use_id.length > 0;
+}
+
+/** "5-hour", "7-day", "7-day opus": a window key in words. */
+function windowName(key: string | undefined): string {
+  if (key === undefined || key.length === 0) return "usage";
+  return key.replace("five_hour", "5-hour").replace("seven_day", "7-day").replace(/_/g, " ");
+}
+
+/**
+ * A limit record in words: "You've used 53% of your 7-day window · resets
+ * 2026-09-28T07:00:00.000Z" (the app turns the instant into a local time).
+ *
+ * It said "seven_day limit allowed_warning · resets 2026-09-28T07:00:00.000Z",
+ * the record's own keys, in amber, in the thread (drive, 2026-09-23). The
+ * warning comes on every turn while it holds, and it is not a fixed
+ * threshold -- that drive got one at 53% of the week -- so it states how much
+ * is used, the way Claude Code words its own ("You've used 90% of your weekly
+ * limit"), rather than claiming the limit is near.
+ */
+export function limitSentence(info: JsonObject): string {
+  const key = stringValue(info.rateLimitType);
+  const windows = isObject(info.unifiedWindows) ? info.unifiedWindows : {};
+  const ownWindow = key === undefined ? undefined : windows[key];
+  const utilization = typeof info.utilization === "number"
+    ? info.utilization
+    : isObject(ownWindow) ? ownWindow.utilization : undefined;
+  const percent = typeof utilization === "number" && Number.isFinite(utilization)
+    ? Math.round(utilization * 100)
+    : undefined;
+  const resets = resetsAtIso(info.resetsAt);
+  const when = resets === undefined ? "" : ` · resets ${resets}`;
+  const window = `${windowName(key)} window`;
+  if (limitKindFor(info.status) === "temporary-rate-limit") {
+    return percent === undefined
+      ? `Your ${window} is running low${when}`
+      : `You've used ${String(percent)}% of your ${window}${when}`;
+  }
+  // A rejection is headed "Usage limit reached" where it is shown.
+  return `${window}${percent === undefined ? "" : ` ${String(percent)}% used`}${when}`;
+}
+
 /** `resetsAt` is epoch SECONDS, not milliseconds. */
 export function resetsAtIso(value: unknown): string | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
@@ -351,6 +422,29 @@ export function createClaudeEventNormalizer(
   let completedUsage: Record<string, number> | undefined;
   let resolvedModel: string | undefined;
   /**
+   * The conversation's last model call: what its prompt held and what it
+   * wrote, which is what the conversation holds now.
+   *
+   * NOT the result's `usage`. MEASURED 2026-09-23: that block adds up every
+   * call in the run, and each call re-reads the whole conversation from
+   * cache, so a 23-call run whose prompt never passed 240k reported
+   * 4,978,743 -- the context ring Colin saw read "5M of 1M". Claude Code
+   * reads its own context the same way this does: the last response's
+   * input, cache and output, added.
+   */
+  let lastCall: { id: string | undefined; prompt: number; output: number } | undefined;
+  /**
+   * Whether this run was on a subscription's usage windows, and whether any of
+   * it ran on paid extra usage past them. MEASURED 2026-09-23 on Colin's
+   * three Claude runs: every one sent a `rate_limit_event` with
+   * `unifiedWindows` (even a two-call run), `isUsingOverage: false`, and
+   * `apiKeySource: "none"` in its init. The windows are the evidence used: a
+   * key source of "none" is also what a cloud-billed setup reports, and that
+   * one is paying.
+   */
+  let onUsageWindows = false;
+  let usedExtraUsage = false;
+  /**
    * The block the assistant's text is actually streaming into.
    *
    * MEASURED 2026-09-03: Claude Code does not always put the text at index 0.
@@ -408,6 +502,8 @@ export function createClaudeEventNormalizer(
 
     if (type === "rate_limit_event") {
       const info = isObject(parsed.rate_limit_info) ? parsed.rate_limit_info : {};
+      if (isObject(info.unifiedWindows) && Object.keys(info.unifiedWindows).length > 0) onUsageWindows = true;
+      if (info.isUsingOverage === true) usedExtraUsage = true;
       const kind = limitKindFor(info.status);
       if (kind === undefined) {
         // Allowed, with the windows' utilisation: what Claude Code's own
@@ -426,15 +522,10 @@ export function createClaudeEventNormalizer(
           }),
         ];
       }
-      const resets = resetsAtIso(info.resetsAt);
-      const window = stringValue(info.rateLimitType) ?? "window";
-      const status = stringValue(info.status) ?? "unknown";
       return [
         emit("route.limit_detected", {
           kind,
-          message: boundedMessageText(
-            `${window} limit ${status}${resets === undefined ? "" : ` · resets ${resets}`}`,
-          ),
+          message: boundedMessageText(limitSentence(info)),
           evidence,
         }),
       ];
@@ -585,7 +676,20 @@ export function createClaudeEventNormalizer(
       const inner = isObject(parsed.event) ? parsed.event : {};
       const innerType = stringValue(inner.type);
       if (innerType === "message_start") {
+        const message = isObject(inner.message) ? inner.message : {};
+        const prompt = promptTokensOf(message.usage);
+        if (prompt !== undefined && !fromSubagent(parsed)) {
+          lastCall = { id: identityValue(message.id), prompt, output: outputTokensOf(message.usage) ?? 0 };
+        }
         return [emit("step.started", { stepKind: "turn", evidence })];
+      }
+      if (innerType === "message_delta") {
+        // The call's final output count arrives here, at its end.
+        const output = outputTokensOf(inner.usage);
+        if (output !== undefined && lastCall !== undefined && !fromSubagent(parsed)) {
+          lastCall = { ...lastCall, output: Math.max(lastCall.output, output) };
+        }
+        return [];
       }
       if (innerType === "content_block_start") {
         const block = isObject(inner.content_block) ? inner.content_block : {};
@@ -633,6 +737,19 @@ export function createClaudeEventNormalizer(
       // the buffer exactly this way, so the bug would reach the resume summary.
       const message = isObject(parsed.message) ? parsed.message : {};
       const content = Array.isArray(message.content) ? message.content : [];
+      // The complete message states its call's usage too: the same call as
+      // the last `message_start` when the run streams, the only word on it
+      // when it does not.
+      if (!fromSubagent(parsed)) {
+        const id = identityValue(message.id);
+        const output = outputTokensOf(message.usage);
+        const prompt = promptTokensOf(message.usage);
+        if (lastCall !== undefined && id !== undefined && id === lastCall.id) {
+          if (output !== undefined) lastCall = { ...lastCall, output: Math.max(lastCall.output, output) };
+        } else if (prompt !== undefined) {
+          lastCall = { id, prompt, output: output ?? 0 };
+        }
+      }
       // The same record carries every tool_use block with its input filled
       // in, which is the first point the target is knowable.
       for (const block of content) {
@@ -885,10 +1002,22 @@ export function createClaudeEventNormalizer(
           }),
         ];
       }
+      // The receipt, with what only the whole run could say: how full the
+      // conversation is after its last call, and whether a subscription's
+      // windows covered the run. `usd` stays as Claude Code wrote it; on a
+      // subscription it is what the tokens would have cost on the API, and
+      // the app decides what to show.
+      const usage: Record<string, number | string> | undefined = completedUsage === undefined
+        ? undefined
+        : {
+            ...completedUsage,
+            ...(lastCall === undefined ? {} : { contextTokens: lastCall.prompt + lastCall.output }),
+            ...(onUsageWindows && !usedExtraUsage ? { billing: "subscription" } : {}),
+          };
       return [
         emit("run.completed", {
           ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
-          ...(completedUsage === undefined ? {} : { usage: completedUsage }),
+          ...(usage === undefined ? {} : { usage }),
           ...(resolvedModel === undefined ? {} : { resolvedModel }),
           process,
         }),

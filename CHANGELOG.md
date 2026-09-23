@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.285.0 - 2026-09-23
+
+### Fixed
+
+- **The context ring reads what the conversation holds.** On a long Claude
+  run it added up every step, so a conversation holding 240k of a 1M window
+  read "5M of 1M". It now reads the conversation after the run's last step.
+  Conversations from before this build show the ring again after their next
+  reply.
+
+- **No cost on a subscription.** A Claude run your plan covered shows "in
+  your plan" instead of a dollar figure, and the ring shows only the context.
+  Runs billed per token still show what they cost.
+
+- **Usage warnings in words.** "seven_day limit allowed_warning · resets
+  2026-09-28T07:00:00.000Z" now reads "You've used 53% of your 7-day window ·
+  resets Mon 03:00".
+
 ## 0.284.0 - 2026-09-23
 
 ### New

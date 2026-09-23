@@ -42,7 +42,7 @@ import {
 import { CliArtifacts } from './CliArtifacts.js'
 import { TeammateBot } from './TeammateBot.js'
 import { Icon } from './Icon.js'
-import { COST_NOT_REPORTED_SHORT, costLine, costLineOrWhyNot, costUnit, runCostOf, sumCosts } from '../cost.js'
+import { COST_NOT_REPORTED_SHORT, costLabel, costLine, costLineOrWhyNot, costTotal, runCostOf } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
@@ -232,15 +232,10 @@ export function MissionsScreen({
       : missions.filter((mission) => mission.workspaceId !== workspaceId).length
   // What the shown missions cost, in whatever units their receipts carry.
   // Runtimes that report nothing contribute nothing, and are counted as such
-  // rather than as free.
-  const costs = shown.map((mission) => runCostOf(mission.events))
-  const priced = costs.filter((cost) => cost !== undefined).length
-  const summed = sumCosts(costs)
-  const total = costLine(summed)
-  // "priced" is a claim about money. When every receipt reported tokens and
-  // no price -- which is what a free route gives -- the honest word for the
-  // same count is "measured". See `costUnit`.
-  const counted = costUnit(summed) === 'money' ? 'priced' : 'measured'
+  // rather than as free. "priced" is a claim about money: when every receipt
+  // reported tokens and no price -- which is what a free route gives -- the
+  // honest word for the same count is "measured". See `costTotal`.
+  const total = costTotal(shown.map((mission) => runCostOf(mission.events)))
 
   /*
    * A running mission cannot be deleted -- the host refuses, because
@@ -276,7 +271,7 @@ export function MissionsScreen({
             : damaged === 0
               ? 'ledger verified'
               : ledgerDamageWords(withIssues, unreadableLedgers)
-        }${total === undefined ? '' : ` · ${total} across ${priced} ${counted}`}`}
+        }${total === undefined ? '' : ` · ${total.line} across ${String(total.runs)} ${total.word}`}`}
       />
       {/*
         * Filters over an empty archive are four controls that can only ever
@@ -600,7 +595,7 @@ export function TeammatesScreen({
                   <dl className="lc-rostercard__cost">
                     {/* `Usage` when the receipts carry tokens and no price: a
                         free route's numbers are a measurement, not a charge. */}
-                    <dt>{costUnit(work.cost) === 'money' ? 'Cost' : 'Usage'}</dt>
+                    <dt>{costLabel(work.cost)}</dt>
                     <dd className={`lc-mono${work.cost === undefined ? ' is-unreported' : ''}`}>
                       {costLineOrWhyNot(work.cost)}
                     </dd>

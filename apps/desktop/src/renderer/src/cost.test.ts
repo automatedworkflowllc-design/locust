@@ -103,15 +103,18 @@ describe('how full the context is', () => {
   // MEASURED 2026-09-06: Claude Code's result carries `modelUsage`, whose
   // entries state the model's real `contextWindow` (1,000,000 for
   // claude-sonnet-5). That reported number is the only denominator used.
-  it('counts the whole prompt, cached or not, against the reported window', () => {
+  it('counts what the conversation held after its last call against the reported window', () => {
+    // `contextTokens` is the last call's whole prompt, cached or not, and
+    // what it wrote; the adapter measures it (claude-events.ts).
     const reading = contextReading({
       inputTokens: 2,
       outputTokens: 5,
       cacheReadTokens: 23997,
       cacheWriteTokens: 15080,
+      contextTokens: 39084,
       contextWindow: 1_000_000
     })
-    expect(reading).toEqual({ usedTokens: 39079, windowTokens: 1_000_000, percent: 4 })
+    expect(reading).toEqual({ usedTokens: 39084, windowTokens: 1_000_000, percent: 4 })
   })
 
   it('says nothing at all when the runtime did not report a window', () => {
@@ -127,7 +130,7 @@ describe('how full the context is', () => {
     // The window holds ONE prompt. Summing turns would report a five-turn
     // conversation as five times as full as it is.
     const turn = (used: number) => ({
-      events: [completed({ inputTokens: used, contextWindow: 200_000 })]
+      events: [completed({ inputTokens: used, contextTokens: used, contextWindow: 200_000 })]
     })
     expect(latestContext([turn(10_000), turn(20_000)], turn(30_000).events)?.usedTokens).toBe(30_000)
     // A live turn has reported nothing yet; the one before it still answers.
@@ -135,7 +138,7 @@ describe('how full the context is', () => {
   })
 
   it('says it in the words the tooltip uses', () => {
-    const reading = contextReading({ inputTokens: 39_079, contextWindow: 1_000_000 })
+    const reading = contextReading({ contextTokens: 39_079, contextWindow: 1_000_000 })
     expect(contextSentence(reading!)).toMatch(/^Context: .* of .* used, 4%$/)
   })
 })

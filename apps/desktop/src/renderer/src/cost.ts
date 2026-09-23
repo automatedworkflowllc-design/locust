@@ -28,6 +28,19 @@ export interface RunCost {
   readonly cacheReadTokens?: number
   readonly cacheWriteTokens?: number
   readonly contextWindow?: number
+  /**
+   * What the conversation held after the run's last model call. The token
+   * counts above are the run's TOTALS, every call added, and a call re-reads
+   * the whole conversation -- so they are not a measure of how full it is.
+   */
+  readonly contextTokens?: number
+  /**
+   * The run was covered by the person's subscription: Claude Code reported
+   * its usage windows and no paid extra usage. Its dollar figure is then
+   * what the same tokens would have cost on the API, which nobody paid, and
+   * it is not carried here. Claude Code shows subscribers no cost either.
+   */
+  readonly plan?: true
 }
 
 function count(value: unknown): number | undefined {
@@ -41,14 +54,18 @@ export function runCostOf(events: readonly NormalizedRuntimeEvent[]): RunCost | 
   const usage = (completed.payload as { readonly usage?: unknown }).usage
   if (typeof usage !== 'object' || usage === null) return undefined
   const record = usage as Record<string, unknown>
+  const plan = record.billing === 'subscription'
+  const usd = plan ? undefined : count(record.usd ?? record.totalCostUsd ?? record.total_cost_usd)
   const cost: RunCost = {
     ...(count(record.inputTokens ?? record.input_tokens) === undefined ? {} : { inputTokens: count(record.inputTokens ?? record.input_tokens) }),
     ...(count(record.outputTokens ?? record.output_tokens) === undefined ? {} : { outputTokens: count(record.outputTokens ?? record.output_tokens) }),
-    ...(count(record.usd ?? record.totalCostUsd ?? record.total_cost_usd) === undefined ? {} : { usd: count(record.usd ?? record.totalCostUsd ?? record.total_cost_usd) }),
+    ...(usd === undefined ? {} : { usd }),
     ...(count(record.premiumRequests) === undefined ? {} : { premiumRequests: count(record.premiumRequests) }),
     ...(count(record.cacheReadTokens) === undefined ? {} : { cacheReadTokens: count(record.cacheReadTokens) }),
     ...(count(record.cacheWriteTokens) === undefined ? {} : { cacheWriteTokens: count(record.cacheWriteTokens) }),
-    ...(count(record.contextWindow) === undefined ? {} : { contextWindow: count(record.contextWindow) })
+    ...(count(record.contextWindow) === undefined ? {} : { contextWindow: count(record.contextWindow) }),
+    ...(count(record.contextTokens) === undefined ? {} : { contextTokens: count(record.contextTokens) }),
+    ...(plan ? { plan: true as const } : {})
   }
   return Object.keys(cost).length === 0 ? undefined : cost
 }
@@ -84,12 +101,24 @@ function tokens(value: number): string {
  * decides a route is free -- it decides only what UNIT was reported, which is
  * the one thing the receipt actually says.
  */
-export function costUnit(cost: RunCost | undefined): 'money' | 'usage' | undefined {
+export function costUnit(cost: RunCost | undefined): 'money' | 'plan' | 'usage' | undefined {
   if (cost === undefined) return undefined
   if (cost.usd !== undefined || cost.premiumRequests !== undefined) return 'money'
+  // Before tokens: a subscription run reports tokens too, and what a person
+  // wants to know about it is that it cost them nothing extra.
+  if (cost.plan === true) return 'plan'
   if (cost.inputTokens !== undefined || cost.outputTokens !== undefined) return 'usage'
   return undefined
 }
+
+/** What a receipt calls the row: money and a plan both answer "what did it cost". */
+export function costLabel(cost: RunCost | undefined): 'Cost' | 'Usage' {
+  const unit = costUnit(cost)
+  return unit === 'money' || unit === 'plan' ? 'Cost' : 'Usage'
+}
+
+/** A subscription run's cost, short enough for a table cell. */
+export const COST_IN_PLAN = 'in your plan'
 
 export function costLine(cost: RunCost | undefined): string | undefined {
   if (cost === undefined) return undefined
@@ -97,10 +126,31 @@ export function costLine(cost: RunCost | undefined): string | undefined {
   if (cost.premiumRequests !== undefined) {
     return `${String(cost.premiumRequests)} premium request${cost.premiumRequests === 1 ? '' : 's'}`
   }
+  if (cost.plan === true) return COST_IN_PLAN
   if (cost.inputTokens !== undefined || cost.outputTokens !== undefined) {
     return `${tokens(cost.inputTokens ?? 0)} in · ${tokens(cost.outputTokens ?? 0)} out`
   }
   return undefined
+}
+
+/**
+ * A list's total, in one unit, over the runs that reported that unit.
+ *
+ * "$8.75 across 3 priced" counted every run that reported ANYTHING as priced,
+ * so free runs beside priced ones inflated the count. And a subscription's
+ * runs are not priced one by one, so a list of only those has no total to
+ * state: saying "in your plan across 3" is a sentence about nothing.
+ */
+export function costTotal(costs: readonly (RunCost | undefined)[]): { readonly line: string; readonly runs: number; readonly word: 'priced' | 'measured' } | undefined {
+  const summed = sumCosts(costs)
+  const unit = costUnit(summed)
+  const line = costLine(summed)
+  if (unit === undefined || unit === 'plan' || line === undefined) return undefined
+  return {
+    line,
+    runs: costs.filter((cost) => costUnit(cost) === unit).length,
+    word: unit === 'money' ? 'priced' : 'measured'
+  }
 }
 
 /**
@@ -134,7 +184,8 @@ export function sumCosts(costs: readonly (RunCost | undefined)[]): RunCost | und
       ...(cost.inputTokens === undefined ? {} : { inputTokens: (held.inputTokens ?? 0) + cost.inputTokens }),
       ...(cost.outputTokens === undefined ? {} : { outputTokens: (held.outputTokens ?? 0) + cost.outputTokens }),
       ...(cost.usd === undefined ? {} : { usd: (held.usd ?? 0) + cost.usd }),
-      ...(cost.premiumRequests === undefined ? {} : { premiumRequests: (held.premiumRequests ?? 0) + cost.premiumRequests })
+      ...(cost.premiumRequests === undefined ? {} : { premiumRequests: (held.premiumRequests ?? 0) + cost.premiumRequests }),
+      ...(cost.plan === true ? { plan: true as const } : {})
     }
   }
   return total
@@ -143,10 +194,16 @@ export function sumCosts(costs: readonly (RunCost | undefined)[]): RunCost | und
 /**
  * How full the model's context is, when the runtime said how big it is.
  *
- * The occupied part is the whole prompt the last turn sent -- what was
- * written fresh, what was written to cache, and what was read back from it.
- * A resumed turn sends almost nothing new and reads the rest from cache, so
- * `inputTokens` alone would report a nearly-full conversation as empty.
+ * The occupied part is what the conversation held after the run's last model
+ * call: that call's whole prompt -- written fresh, written to cache, read back
+ * from it -- and what it wrote. The adapter measures it as `contextTokens`.
+ *
+ * NOT the run's token totals. This read them, on a measurement of a one-call
+ * run where the two are the same number; a run with tools makes a call per
+ * step and every call re-reads the conversation, so the totals count it once
+ * per call. Colin's ring read "5M of 1M" on a 23-call run that never held
+ * more than 240k (2026-09-23). A receipt written before the adapter measured
+ * the last call cannot say what it held, and gets no reading.
  *
  * Returns nothing at all where no window was reported. Every other runtime
  * is in that position today, and a ring drawn against a guessed denominator
@@ -183,8 +240,8 @@ export function latestContext(
 export function contextReading(cost: RunCost | undefined): ContextReading | undefined {
   const windowTokens = cost?.contextWindow
   if (cost === undefined || windowTokens === undefined || windowTokens <= 0) return undefined
-  const usedTokens = (cost.inputTokens ?? 0) + (cost.cacheReadTokens ?? 0) + (cost.cacheWriteTokens ?? 0)
-  if (usedTokens <= 0) return undefined
+  const usedTokens = cost.contextTokens
+  if (usedTokens === undefined || usedTokens <= 0) return undefined
   return {
     usedTokens,
     windowTokens,
@@ -267,5 +324,11 @@ export function conversationCostLine(
   earlierTurns: readonly { readonly events: readonly NormalizedRuntimeEvent[] }[],
   events: readonly NormalizedRuntimeEvent[]
 ): string | undefined {
-  return costLine(conversationCost(earlierTurns, events))
+  const whole = conversationCost(earlierTurns, events)
+  // A conversation on a subscription has spent nothing a person pays per
+  // turn. Colin, 2026-09-23: "it has a conversation cost, which is silly for
+  // a subscription plan". The hover says how full the context is, and that
+  // is all it has to say.
+  if (costUnit(whole) === 'plan') return undefined
+  return costLine(whole)
 }

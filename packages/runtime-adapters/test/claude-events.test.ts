@@ -4,6 +4,7 @@ import {
   createClaudeEventNormalizer,
   claudeToolTarget,
   limitKindFor,
+  limitSentence,
   resetsAtIso,
   summarizeInit,
   usageWindowText,
@@ -227,7 +228,7 @@ describe("trap 3: a rate-limit warning is not exhaustion", () => {
     expect(resetsAtIso("nope")).toBeUndefined();
   });
 
-  it("emits a limit event carrying the window and status", () => {
+  it("emits a limit event carrying the window and status, in words", () => {
     const [event] = normalizer().accept(
       record({
         type: "rate_limit_event",
@@ -241,7 +242,25 @@ describe("trap 3: a rate-limit warning is not exhaustion", () => {
     );
     expect(event?.type).toBe("route.limit_detected");
     expect(event?.type === "route.limit_detected" && event.payload.kind).toBe("temporary-rate-limit");
-    expect(event?.type === "route.limit_detected" && event.payload.message).toContain("seven_day");
+    // It read "seven_day limit allowed_warning · resets ...", the record's
+    // own keys, in the thread (drive, 2026-09-23).
+    expect(event?.type === "route.limit_detected" && event.payload.message).toBe(
+      "You've used 31% of your 7-day window · resets 2026-09-07T07:00:00.000Z",
+    );
+  });
+
+  it("words a limit from the window's own reading when the record has no top-level figure, and a rejection without the warning", () => {
+    expect(
+      limitSentence({
+        status: "allowed_warning",
+        rateLimitType: "five_hour",
+        resetsAt: 1788764400,
+        unifiedWindows: { five_hour: { utilization: 0.92, resetsAt: 1788764400 } },
+      }),
+    ).toBe("You've used 92% of your 5-hour window · resets 2026-09-07T07:00:00.000Z");
+    expect(limitSentence({ status: "allowed_warning", rateLimitType: "seven_day" })).toBe("Your 7-day window is running low");
+    expect(limitSentence({ status: "rejected", rateLimitType: "seven_day_opus" })).toBe("7-day opus window");
+    expect(limitSentence({ status: "rejected" })).toBe("usage window");
   });
 
   it("says nothing about a snapshot that reports the request was allowed", () => {
@@ -528,6 +547,114 @@ describe("what the run cost, as Claude Code priced it", () => {
     claude.accept(record({ type: "result", subtype: "success", is_error: false }));
     const [done] = claude.finish(completion({ exitCode: 0 }));
     expect((done?.payload as { usage?: unknown }).usage).toBeUndefined();
+  });
+});
+
+describe("how full the conversation is, and who paid for the run", () => {
+  // MEASURED 2026-09-23 off Colin's ledger, which is where these shapes come
+  // from: a 23-call Opus 5.5 run whose result `usage` summed to 4,978,743
+  // tokens against a 1,000,000 window -- the ring read "5M of 1M" -- while no
+  // single call's prompt passed 240k. Every call re-reads the conversation
+  // from cache, so the sum counts it once per call.
+  const call = (id: string, cacheWrite: number, cacheRead: number, extra: Record<string, unknown> = {}) =>
+    record({
+      type: "stream_event",
+      parent_tool_use_id: null,
+      event: {
+        type: "message_start",
+        message: { id, model: "claude-opus-5-5", usage: { input_tokens: 2, cache_creation_input_tokens: cacheWrite, cache_read_input_tokens: cacheRead, output_tokens: 1 } },
+      },
+      ...extra,
+    });
+  const ended = (output: number) =>
+    record({ type: "stream_event", parent_tool_use_id: null, event: { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: output } } });
+  const window = (overage: boolean) =>
+    record({
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "allowed",
+        resetsAt: 1790141400,
+        rateLimitType: "five_hour",
+        overageStatus: "rejected",
+        isUsingOverage: overage,
+        unifiedWindows: { five_hour: { utilization: 0.65, resetsAt: 1790141400 }, seven_day: { utilization: 0.45, resetsAt: 1790578800 } },
+      },
+    });
+  const result = record({
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    total_cost_usd: 3.06,
+    usage: { input_tokens: 46, output_tokens: 31_000, cache_read_input_tokens: 4_796_000, cache_creation_input_tokens: 151_697 },
+    modelUsage: { "claude-opus-5-5": { contextWindow: 1_000_000 } },
+  });
+  const receipt = (claude: ReturnType<typeof normalizer>) =>
+    (claude.finish(completion({ exitCode: 0 }))[0]?.payload as { usage?: Record<string, unknown> }).usage;
+
+  it("reads the context off the last call, never off the run's sum", () => {
+    const claude = normalizer();
+    claude.accept(call("msg_1", 191_411, 0));
+    claude.accept(ended(59));
+    claude.accept(call("msg_2", 3_333, 191_411));
+    claude.accept(ended(54));
+    claude.accept(call("msg_3", 2_347, 233_702));
+    claude.accept(ended(706));
+    claude.accept(result);
+    const usage = receipt(claude);
+    // What the conversation holds after its last call: that call's prompt,
+    // cached or not, and what it wrote.
+    expect(usage?.contextTokens).toBe(2 + 2_347 + 233_702 + 706);
+    // The run's own totals stay what Claude Code said they were.
+    expect(usage?.cacheReadTokens).toBe(4_796_000);
+    expect(usage?.contextWindow).toBe(1_000_000);
+  });
+
+  it("leaves a subagent's calls out: its context is its own", () => {
+    const claude = normalizer();
+    claude.accept(call("msg_1", 2_347, 233_702));
+    claude.accept(ended(706));
+    claude.accept(call("msg_sub", 40_000, 0, { parent_tool_use_id: "toolu_agent" }));
+    claude.accept(record({ type: "assistant", parent_tool_use_id: "toolu_agent", message: { id: "msg_sub", content: [], usage: { input_tokens: 5, cache_read_input_tokens: 90_000, output_tokens: 300 } } }));
+    claude.accept(result);
+    expect(receipt(claude)?.contextTokens).toBe(2 + 2_347 + 233_702 + 706);
+  });
+
+  it("reads the complete message's usage when the run does not stream", () => {
+    const claude = normalizer();
+    claude.accept(record({ type: "assistant", parent_tool_use_id: null, message: { id: "msg_1", content: [{ type: "text", text: "a" }], usage: { input_tokens: 2, cache_creation_input_tokens: 916, cache_read_input_tokens: 204_276, output_tokens: 59 } } }));
+    claude.accept(record({ type: "assistant", parent_tool_use_id: null, message: { id: "msg_2", content: [{ type: "text", text: "b" }], usage: { input_tokens: 2, cache_creation_input_tokens: 1_783, cache_read_input_tokens: 212_934, output_tokens: 54 } } }));
+    claude.accept(result);
+    expect(receipt(claude)?.contextTokens).toBe(2 + 1_783 + 212_934 + 54);
+  });
+
+  it("says no context at all when no call stated one", () => {
+    const claude = normalizer();
+    claude.accept(result);
+    expect(receipt(claude)?.contextTokens).toBeUndefined();
+  });
+
+  it("marks a run a subscription's windows covered, and keeps Claude Code's dollar figure as it wrote it", () => {
+    const claude = normalizer();
+    claude.accept(call("msg_1", 2_347, 233_702));
+    claude.accept(window(false));
+    claude.accept(result);
+    const usage = receipt(claude);
+    expect(usage?.billing).toBe("subscription");
+    expect(usage?.usd).toBe(3.06);
+  });
+
+  it("does not, where any of the run spent paid extra usage, or where no window was reported", () => {
+    // A key source of "none" alone is not the evidence: a cloud-billed setup
+    // reports the same, and that one is paying.
+    const extra = normalizer();
+    extra.accept(window(false));
+    extra.accept(window(true));
+    extra.accept(result);
+    expect(receipt(extra)?.billing).toBeUndefined();
+    const keyed = normalizer();
+    keyed.accept(record({ ...INIT, apiKeySource: "none" }));
+    keyed.accept(result);
+    expect(receipt(keyed)?.billing).toBeUndefined();
   });
 });
 

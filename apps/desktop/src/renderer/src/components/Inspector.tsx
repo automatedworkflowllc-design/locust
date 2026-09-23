@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { MissionRouteSummary, PublicRecoveredMission } from '../../../shared/ipc.js'
-import { costLineOrWhyNot, costUnit, runCostOf } from '../cost.js'
+import { costLabel, costLineOrWhyNot, runCostOf } from '../cost.js'
 import { buildSignalRail, buildThread, producedFiles } from '../missionView.js'
 import { checkpointLabel, ledgerVerificationLabel, sandboxPhrase, shortMissionId } from '../status.js'
 import { Icon } from './Icon.js'
@@ -192,7 +192,7 @@ export function Inspector({
             <dd>{events.length} recorded in this view</dd>
             {/* The Team card's rule: Cost for a priced run, Usage for tokens --
                 this said Cost for token counts (review of 0.255.0, #10). */}
-            <dt>{costUnit(runCostOf(events)) === 'money' ? 'Cost' : 'Usage'}</dt>
+            <dt>{costLabel(runCostOf(events))}</dt>
             <dd className="lc-mono">
               {costLineOrWhyNot(runCostOf(events), running)}
             </dd>

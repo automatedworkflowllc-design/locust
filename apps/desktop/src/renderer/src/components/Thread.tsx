@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -19,7 +19,7 @@ import { JumpToBottom } from './JumpToBottom.js'
 import { ledgerFailureRows, ledgerFailureSentence } from '../ledgerFailure.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
-import { costLineOrWhyNot, costUnit, runCostOf } from '../cost.js'
+import { costLabel, costLineOrWhyNot, runCostOf } from '../cost.js'
 import type { FaceActivity } from '../faceState.js'
 import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
 import { ActivityCard } from './ActivityCard.js'
@@ -374,8 +374,9 @@ export function ThreadItems({
           // warning is not that: the mission ran fine, and a full-width red
           // card on every turn trains a person to ignore the colour that is
           // supposed to mean "stopped".
+          // The reset instant is the ledger's; a person reads a local time.
           if (item.kind === 'temporary-rate-limit') {
-            return <DiagnosticLine key={item.key} level="warning" message={item.message} />
+            return <DiagnosticLine key={item.key} level="warning" message={usageWindowLabel(item.message)} />
           }
           return (
             <div className="lc-card is-terminal is-red" key={item.key}>
@@ -383,7 +384,7 @@ export function ThreadItems({
                 <span>Usage limit reached</span>
                 <span className="lc-tag is-red">{item.kind}</span>
               </div>
-              <div className="lc-card__body">{item.message}</div>
+              <div className="lc-card__body">{usageWindowLabel(item.message)}</div>
             </div>
           )
         }
@@ -528,7 +529,7 @@ function ReceiptCard({
         <dd>
           {mission.eventCount} recorded{mission.eventsTruncated ? ' · window truncated for display' : ''}
         </dd>
-        <dt>{costUnit(runCostOf(mission.events)) === 'money' ? 'Cost' : 'Usage'}</dt>
+        <dt>{costLabel(runCostOf(mission.events))}</dt>
         <dd className="lc-mono">{costLineOrWhyNot(runCostOf(mission.events))}</dd>
         <dt>Ledger</dt>
         <dd className={verification === 'ledger verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
