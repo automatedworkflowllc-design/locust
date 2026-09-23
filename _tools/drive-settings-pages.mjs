@@ -16,11 +16,17 @@
 
 import { FREE_ROUTE, scratchRepository, startDrive } from './drive-lib.mjs'
 
+const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
+const packaged = arg('--packaged')
+const outPath = arg('--out')
+
 const workspace = await scratchRepository()
 const drive = await startDrive({
   name: 'settings-pages',
   port: 9294,
   workspace,
+  ...(packaged === undefined ? {} : { packaged }),
+  ...(outPath === undefined ? {} : { outPath }),
   seed: {
     schemaVersion: 1,
     teammates: [
