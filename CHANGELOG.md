@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.298.0 - 2026-09-23
+
+### Fixed
+
+- **A message you queue is sent when the turn in front of it ends.** If you
+  wrote the next message while a teammate was still working, it could
+  vanish when that turn finished: Locust sent it a moment before it had
+  finished tidying up after the turn, was told the teammate was still busy,
+  and dropped it — leaving you on the teammate's home screen, with your next
+  message starting a new conversation. The next turn now goes straight
+  through, and a message that still can't go yet waits in the queue and
+  tries again instead of disappearing.
+
 ## 0.297.0 - 2026-09-23
 
 ### Improved
