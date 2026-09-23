@@ -1,6 +1,6 @@
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from './window-size.js'
 import { startAppServerProcess } from './app-server-process.js'
-import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, sweepStaleElectronShortcuts } from './stale-shortcut.js'
+import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeTheme, Notification, screen, session, shell } from 'electron'
@@ -1401,7 +1401,9 @@ if (!ownsSingleInstanceLock) {
         const target = approvalWindow
         return target !== undefined && !target.isDestroyed() && target.isFocused() && !target.isMinimized()
       },
-      supported: () => Notification.isSupported(),
+      // Not from a drive: a toast from any copy points the Start-menu
+      // shortcut at that copy (stale-shortcut.ts).
+      supported: () => Notification.isSupported() && mayShowToasts(process.argv),
       notify: ({ title, body, onClick }) => {
         const toast = new Notification({ title, body })
         toast.on('click', onClick)

@@ -58,3 +58,25 @@ export function sweepStaleElectronShortcuts(options: StaleShortcutSweepOptions):
   }
   return removed
 }
+
+/**
+ * Whether this launch may show OS notifications -- which, on Windows, is
+ * whether it may point the Start-menu shortcut at itself.
+ *
+ * Electron writes a Start-menu shortcut for the app's id when it shows a
+ * toast, targeting whatever copy is running: the "Electron.lnk" above is the
+ * development build doing it. On 2026-09-23 a drive of a PACKAGED build, run
+ * from a worktree's release folder, raised the new "waiting on you" notice for
+ * an Antigravity question, and "Locust.lnk" in Colin's Start menu was
+ * rewritten to that folder at that second. His installed copy then updated to
+ * 0.280, and the installer relaunches through that shortcut -- so he was
+ * running the drive's copy without knowing it, and it held the folder the
+ * next release had to be packaged in.
+ *
+ * A scripted launch has no one to notify: every drive takes the window with
+ * `--remote-debugging-port`, and nobody using Locust starts it that way. So it
+ * shows none, and claims nothing.
+ */
+export function mayShowToasts(argv: readonly string[]): boolean {
+  return !argv.some((argument) => argument.startsWith('--remote-debugging-port'))
+}
