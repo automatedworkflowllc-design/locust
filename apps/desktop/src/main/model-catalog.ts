@@ -39,6 +39,8 @@ export interface ModelCatalogOptions {
 
 export interface ModelCatalog {
   read(): Promise<ModelCatalogResponse>
+  /** Drop what was read: an agent just changed under it (runtime-updates.ts). */
+  forget(): void
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -518,6 +520,9 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
   }
 
   return {
+    forget(): void {
+      cached = undefined
+    },
     read(): Promise<ModelCatalogResponse> {
       const held = cached
       if (held !== undefined && now() - held.at < CACHE_MS) return Promise.resolve(held.response)

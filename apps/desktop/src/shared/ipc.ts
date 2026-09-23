@@ -428,6 +428,42 @@ export interface RuntimeInstallProgress {
   readonly line: string
 }
 
+/**
+ * Keeping the coding agents current (main/runtime-updates.ts).
+ *
+ * Colin, 2026-09-23: "is there a way to make it so the models will
+ * automatically update without messing up load times or interfering with the
+ * app". The models are read live from each agent; the agents that never update
+ * themselves -- Codex and Copilot, from npm -- are updated here, after launch
+ * and only when nothing is using them.
+ */
+export const RUNTIME_UPDATES_CHANNEL = 'runtime-updates:read'
+export const RUNTIME_UPDATES_SET_CHANNEL = 'runtime-updates:set'
+/** Pushed when an update starts, lands or fails. */
+export const RUNTIME_UPDATES_EVENT_CHANNEL = 'runtime-updates:changed'
+
+export type RuntimeUpdateStatus =
+  | { readonly kind: 'current' }
+  /** Newer is out and waits: something is using it, it is too new to trust yet, or keeping current is off. */
+  | { readonly kind: 'waiting'; readonly version: string; readonly why: 'in use' | 'too new' | 'off' }
+  | { readonly kind: 'updating'; readonly version: string }
+  | { readonly kind: 'updated'; readonly from: string; readonly to: string; readonly at: string }
+  | { readonly kind: 'failed'; readonly version: string; readonly what: string; readonly at: string }
+
+export interface RuntimeUpdateView {
+  readonly runtime: string
+  readonly installed: string
+  readonly latest: string | undefined
+  readonly status: RuntimeUpdateStatus
+}
+
+export interface RuntimeUpdatesState {
+  readonly enabled: boolean
+  /** When npm was last asked; undefined before the first look. */
+  readonly checkedAt: string | undefined
+  readonly agents: readonly RuntimeUpdateView[]
+}
+
 export type RuntimeInstallResponse =
   | { readonly ok: true }
   | {
@@ -2054,6 +2090,12 @@ export interface DesktopApi {
   installRuntime(runtime: string): Promise<RuntimeInstallResponse>
   /** npm output while an install runs. Returns the unsubscribe. */
   onRuntimeInstallProgress(listener: (progress: RuntimeInstallProgress) => void): () => void
+  /** The coding agents Locust keeps current, and what it has done about them. */
+  readRuntimeUpdates(): Promise<RuntimeUpdatesState>
+  /** Keep them current, or not. */
+  setRuntimeUpdates(enabled: boolean): Promise<RuntimeUpdatesState>
+  /** An update started, landed or failed. Returns the unsubscribe. */
+  onRuntimeUpdates(listener: (state: RuntimeUpdatesState) => void): () => void
   /** Open the runtime's sign-in in its own window. */
   signInRuntime(runtime: string): Promise<RuntimeSignInResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>

@@ -87,6 +87,15 @@ import { createRuntimeFactsStore } from './runtime-facts.js'
 import { createRuntimeInstaller } from './runtime-installer.js'
 import { openSignIn } from './runtime-sign-in.js'
 import { freeRoutesOnly } from './free-routes.js'
+import {
+  FIRST_LOOK_AFTER_MS,
+  createRuntimeUpdates,
+  mayUpdateAgents,
+  npmGlobalRoot,
+  npmRelease,
+  processesUsing,
+  savedUpdatesFrom
+} from './runtime-updates.js'
 import { createStartReadiness } from './start-readiness.js'
 import { plannedRuntimes } from '../shared/runtime-integration.js'
 import {
@@ -114,6 +123,9 @@ import {
   MODEL_CATALOG_CHANNEL,
   RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
+  RUNTIME_UPDATES_CHANNEL,
+  RUNTIME_UPDATES_EVENT_CHANNEL,
+  RUNTIME_UPDATES_SET_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
@@ -1600,6 +1612,53 @@ if (!ownsSingleInstanceLock) {
       discover: discoverForStart,
       spawn: spawnAppServer
     })
+
+    /*
+     * KEEPING THE CODING AGENTS CURRENT (runtime-updates.ts). Colin,
+     * 2026-09-23: "is there a way to make it so the models will automatically
+     * update without messing up load times or interfering with the app". The
+     * first look waits until the app has been up a while, never on the way
+     * up; after it, an hourly tick that goes to the network only when a look
+     * is due; an update only of what nothing is using -- and never from a
+     * scripted launch (mayUpdateAgents). After one, the machine is asked
+     * again and the models re-read, so the new ones are in the picker.
+     */
+    const updatesFile = join(app.getPath('userData'), 'runtime-updates.json')
+    const runtimeUpdates = createRuntimeUpdates({
+      discover: discoverForWork,
+      npmRoot: npmGlobalRoot,
+      latest: npmRelease,
+      inUse: processesUsing,
+      install: async (runtime, version) => {
+        npmSeen = undefined
+        const outcome = await runtimeInstaller.install({ runtime, version, onLine: () => undefined })
+        return outcome.ok ? { ok: true } : { ok: false, what: outcome.what }
+      },
+      load: async () => savedUpdatesFrom(JSON.parse(await readFile(updatesFile, 'utf8'))),
+      save: (saved) => writeFile(updatesFile, JSON.stringify(saved), 'utf8'),
+      updated: () => {
+        discoveryCache = undefined
+        runtimeDiscovery.invalidate()
+        modelCatalog.forget()
+      },
+      changed: () => {
+        void runtimeUpdates.state().then((state) => {
+          for (const window of BrowserWindow.getAllWindows()) {
+            if (!window.isDestroyed()) window.webContents.send(RUNTIME_UPDATES_EVENT_CHANNEL, state)
+          }
+        })
+      }
+    })
+    ipcMain.handle(RUNTIME_UPDATES_CHANNEL, (event) =>
+      fromOwnWindow(event) ? runtimeUpdates.state() : { enabled: false, checkedAt: undefined, agents: [] }
+    )
+    ipcMain.handle(RUNTIME_UPDATES_SET_CHANNEL, (event, enabled: unknown) =>
+      fromOwnWindow(event) && typeof enabled === 'boolean' ? runtimeUpdates.setEnabled(enabled) : runtimeUpdates.state()
+    )
+    if (mayUpdateAgents(process.argv, process.env)) {
+      setTimeout(() => void runtimeUpdates.tick(), FIRST_LOOK_AFTER_MS)
+      setInterval(() => void runtimeUpdates.tick(), 60 * 60 * 1000)
+    }
 
 
     /**
@@ -3810,6 +3869,17 @@ ${taskSection({
       // still be partial, but the host already knows this teammate's route.
       const peer = await peerContextFor(payload.teammateId)
       const { runtime, model, effort } = routeAtStart(payload, peer?.self)
+      // An agent being updated is being replaced on disk: a run started on
+      // it now would start on half of one (runtime-updates.ts).
+      if (runtimeUpdates.updating() === runtime) {
+        return {
+          ok: false,
+          error: {
+            code: 'RUNTIME_START_FAILED',
+            message: `${runtimeDisplayName(runtime)} is updating to its newest version. Try again in a moment.`
+          }
+        } as const
+      }
       // `approve-each` needs a runtime able to stop and ask, and only Codex
       // has one. Another runtime asked for it would have been started on
       // Codex without a word; it is refused instead.

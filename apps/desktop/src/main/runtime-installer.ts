@@ -62,6 +62,11 @@ export interface RuntimeInstaller {
   busy(): boolean
   install(input: {
     readonly runtime: string
+    /**
+     * A release to install over the one there -- an update (runtime-updates.ts)
+     * -- rather than whatever npm calls newest. Numbers and dots only.
+     */
+    readonly version?: string
     readonly onLine: (progress: InstallProgress) => void
   }): Promise<InstallOutcome>
 }
@@ -377,9 +382,13 @@ export function createRuntimeInstaller(options: RuntimeInstallerOptions = {}): R
 
   return {
     busy: () => running,
-    async install({ runtime, onLine }) {
+    async install({ runtime, version, onLine }) {
       const facts = runtimeInstallFacts(runtime)
-      const line = installCommand(runtime)
+      if (version !== undefined && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/.test(version)) {
+        return { ok: false, what: `"${version}" is not a version Locust installs.`, next: 'Nothing was changed.' }
+      }
+      const plain = installCommand(runtime)
+      const line = plain === undefined || version === undefined ? plain : `${plain}@${version}`
       if (facts === undefined || facts.install.kind !== 'npm' || line === undefined) {
         return {
           ok: false,

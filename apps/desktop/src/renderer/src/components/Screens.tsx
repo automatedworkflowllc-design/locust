@@ -3,7 +3,7 @@ import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../m
 import { WhatsNew } from './WhatsNew.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import type { SettingsPageId } from '../settingsPages.js'
-import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
+import type { RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import { modelDisplayName, routeModelName, shortRuntimeName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
 
@@ -41,6 +41,7 @@ import {
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
 import { TeammateBot } from './TeammateBot.js'
+import { keepCurrentNote, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
 import { costCell, costLabel, costLineOrWhyNot, costTotal, runCostOf } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
@@ -1135,6 +1136,8 @@ export function SettingsScreen({
   runtimes,
   limitedRuntimes,
   usageWindows,
+  runtimeUpdates,
+  onKeepAgentsCurrent,
   runtimeSetup,
   cliArtifacts,
   workspaceBrief,
@@ -1193,6 +1196,9 @@ export function SettingsScreen({
   readonly limitedRuntimes: ReadonlyMap<string, string>
   /** The latest still-allowed rate-limit reading per runtime, in words. */
   readonly usageWindows?: ReadonlyMap<string, string>
+  /** What keeping the coding agents current has done (runtime-updates.ts); undefined until read. */
+  readonly runtimeUpdates?: RuntimeUpdatesState
+  readonly onKeepAgentsCurrent?: (enabled: boolean) => void
   /** Each runtime's own MCP servers and hooks, by runtime id; undefined until read. */
   readonly runtimeSetup: Readonly<Record<string, PublicRuntimeSetup>> | undefined
   /**
@@ -1654,6 +1660,12 @@ export function SettingsScreen({
                     </div>
                     {/* "Signed in on this machine" is said once, in the lede; a row only speaks when its state is not the ordinary one. */}
                     {status.tag !== 'READY' && <div className="lc-runtimerow__detail">{status.detail}</div>}
+                    {/* Kept current (runtime-updates.ts): a newer version, an update under way, one that landed. */}
+                    {updateLine(runtimeUpdates?.agents.find((agent) => agent.runtime === runtime.id)) !== undefined && (
+                      <div className="lc-runtimerow__detail lc-runtimerow__update">
+                        {updateLine(runtimeUpdates?.agents.find((agent) => agent.runtime === runtime.id))}
+                      </div>
+                    )}
                     {usageWindows?.get(runtime.id) !== undefined && (
                       <div className={`lc-runtimerow__detail lc-runtimerow__usage${(usagePercent(usageWindows.get(runtime.id)!) ?? 0) >= 80 ? ' lc-tone-amber' : ''}`}>
                         {usageWindowSentence(usageWindows.get(runtime.id)!)}
@@ -1703,6 +1715,29 @@ export function SettingsScreen({
               )
             })}
           </div>
+          {/*
+            * Colin, 2026-09-23: "is there a way to make it so the models will
+            * automatically update without messing up load times or
+            * interfering with the app". The models are read from each agent;
+            * this keeps the two agents that never update themselves current.
+            */}
+          {runtimeUpdates !== undefined && onKeepAgentsCurrent !== undefined && (
+            <div className="lc-settingrows">
+              <div className="lc-settingrow">
+                <span className="lc-settings__note">{keepCurrentNote(runtimeUpdates.enabled)}</span>
+                <button
+                  type="button"
+                  className={`lc-switch${runtimeUpdates.enabled ? ' is-on' : ''}`}
+                  role="switch"
+                  aria-checked={runtimeUpdates.enabled}
+                  aria-label="Keep Codex CLI and Copilot CLI up to date"
+                  onClick={() => onKeepAgentsCurrent(!runtimeUpdates.enabled)}
+                >
+                  <span className="lc-switch__knob" />
+                </button>
+              </div>
+            </div>
+          )}
         </section>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Connectors</h2>

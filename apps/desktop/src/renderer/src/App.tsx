@@ -6,6 +6,7 @@ import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime
 import type { AvatarSpec } from '../../shared/avatar.js'
 
 import type {
+  RuntimeUpdatesState,
   LayoutPreference,
   TubePreference,
   ReplyTextSize,
@@ -1409,6 +1410,33 @@ export default function App(): ReactElement {
    * insisting nothing had happened (drive, 2026-09-06).
    */
   const askDiscoveryAgain = useRef<(everything?: boolean) => void>(() => undefined)
+  /*
+   * Keeping the coding agents current (main/runtime-updates.ts): what it has
+   * done, for Settings -- and when an agent has just been updated, the
+   * machine is asked again and the models re-read, so what the new version
+   * brings (GPT-6-Sol and -Luna, the day this was written) is in the picker
+   * without a restart.
+   */
+  const [runtimeUpdates, setRuntimeUpdates] = useState<RuntimeUpdatesState>()
+  useEffect(() => {
+    const bridge = window.desktop
+    if (bridge === undefined) return undefined
+    void bridge.readRuntimeUpdates().then(setRuntimeUpdates).catch(() => undefined)
+    const heard = new Set<string>()
+    return bridge.onRuntimeUpdates((state) => {
+      setRuntimeUpdates(state)
+      const landed = state.agents.flatMap((agent) =>
+        agent.status.kind === 'updated' ? [`${agent.runtime}@${agent.status.to}`] : []
+      )
+      if (landed.some((key) => !heard.has(key))) {
+        for (const key of landed) heard.add(key)
+        askDiscoveryAgain.current(true)
+        readModels()
+      }
+    })
+    // Once: the listener reads the state it is handed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   /** Check again starts the count of sweeps over; see the discovery effect. */
   const resetDiscoveryBudget = useRef<() => void>(() => undefined)
   const [installElapsed, setInstallElapsed] = useState(0)
@@ -4939,6 +4967,13 @@ export default function App(): ReactElement {
               runtimes={runtimes}
               limitedRuntimes={limitedRuntimes}
               usageWindows={usageWindows}
+              {...(runtimeUpdates === undefined ? {} : { runtimeUpdates })}
+              onKeepAgentsCurrent={(enabled) => {
+                void window.desktop
+                  ?.setRuntimeUpdates(enabled)
+                  .then(setRuntimeUpdates)
+                  .catch(() => undefined)
+              }}
               runtimeSetup={runtimeSetup}
               cliArtifacts={cliArtifacts}
               workspaceBrief={workspaceBrief}

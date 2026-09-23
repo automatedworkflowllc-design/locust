@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.302.0 - 2026-09-23
+
+### New
+
+- **Codex and Copilot stay current, and new models show up by themselves.**
+  Locust reads each coding agent's models from the agent, so they appear as
+  soon as the agent knows them -- but Codex CLI and Copilot CLI never update
+  themselves. Now Locust looks for a newer version a while after it opens,
+  never while it is starting, and updates them when nothing is using them;
+  then it reads the models again. GPT-6-Sol and GPT-6-Luna come with Codex
+  CLI 0.156.1. Settings › Runtimes says what it did, and has a switch to turn
+  it off. Claude Code, OpenCode and Cursor Agent already keep themselves
+  current.
+
 ## 0.301.0 - 2026-09-23
 
 ### Improved

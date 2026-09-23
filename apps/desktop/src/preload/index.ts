@@ -26,6 +26,9 @@ import {
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
+  RUNTIME_UPDATES_CHANNEL,
+  RUNTIME_UPDATES_EVENT_CHANNEL,
+  RUNTIME_UPDATES_SET_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
@@ -141,6 +144,7 @@ import type {
   TeammateFolderResponse,
   WorktreeListResponse,
   RuntimeInstallProgress,
+  RuntimeUpdatesState,
   RuntimeInstallResponse,
   RuntimeSignInResponse
 } from '../shared/ipc.js'
@@ -261,6 +265,16 @@ const desktopApi: DesktopApi = {
     ipcRenderer.on(RUNTIME_INSTALL_PROGRESS_CHANNEL, handler)
     return () => {
       ipcRenderer.removeListener(RUNTIME_INSTALL_PROGRESS_CHANNEL, handler)
+    }
+  },
+  readRuntimeUpdates: () => ipcRenderer.invoke(RUNTIME_UPDATES_CHANNEL) as Promise<RuntimeUpdatesState>,
+  setRuntimeUpdates: (enabled: boolean) =>
+    ipcRenderer.invoke(RUNTIME_UPDATES_SET_CHANNEL, enabled === true) as Promise<RuntimeUpdatesState>,
+  onRuntimeUpdates: (listener: (state: RuntimeUpdatesState) => void) => {
+    const handler = (_event: unknown, state: RuntimeUpdatesState): void => listener(state)
+    ipcRenderer.on(RUNTIME_UPDATES_EVENT_CHANNEL, handler)
+    return () => {
+      ipcRenderer.removeListener(RUNTIME_UPDATES_EVENT_CHANNEL, handler)
     }
   },
   readWorkspaceSettings: () =>

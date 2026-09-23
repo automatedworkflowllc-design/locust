@@ -4927,6 +4927,12 @@ textarea {
   font-size: var(--lc-text-mono-caption);
 }
 
+/* What keeping the agent current has done (runtime-updates.ts): a version
+   number in a sentence, so its figures line up with the row's own. */
+.lc-runtimerow__update {
+  font-variant-numeric: tabular-nums;
+}
+
 .lc-footnote {
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-label);
