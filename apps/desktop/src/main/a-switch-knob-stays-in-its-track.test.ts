@@ -28,7 +28,9 @@ import { describe, expect, it } from 'vitest'
 const read = (relative: string): string => readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8')
 const CSS = read('../renderer/src/shell.css')
 const SCREENS = read('../renderer/src/components/Screens.tsx')
-const COMPOSER = read('../renderer/src/components/Composer.tsx')
+// The composer's switch (effort's Fast variant) lives in the effort control,
+// which the composer draws, since 0.284 (EffortSlider.tsx).
+const COMPOSER = read('../renderer/src/components/Composer.tsx') + read('../renderer/src/components/EffortSlider.tsx')
 
 /** Every `selector { ... }` body in the sheet, in source order. */
 function bodiesOf(selector: string): readonly string[] {

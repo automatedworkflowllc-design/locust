@@ -10551,115 +10551,147 @@ textarea {
   gap: var(--lc-space-4);
 }
 
+/*
+ * Claude Code's effort control (EffortSlider.tsx): "Effort Max" and a ?, the
+ * ends, then the track. Values fitted to this panel from Colin's frame of it.
+ */
 .lc-effortpanel__head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--lc-space-4);
+  align-items: center;
+  gap: var(--lc-space-3);
+  font-size: var(--lc-text-control);
+}
+
+.lc-effortpanel__label {
+  color: var(--lc-text-muted);
 }
 
 .lc-effortpanel__now {
   color: var(--lc-text-primary);
+  font-weight: 500;
+}
+
+/* The ?, at the far end of the head. */
+.lc-effortpanel__what {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  border: 1px solid var(--lc-border-button);
+  border-radius: 50%;
+  color: var(--lc-text-muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+}
+
+.lc-effortpanel__ends {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: calc(-1 * var(--lc-space-2));
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
 }
 
 /*
- * The scale: drawn stops, with a real range input on top.
- *
- * One dot per level, so you can see how many choices there are and which one
- * this is without dragging it (Colin, 2026-09-08: "where you can see the
- * notches brother"). The input keeps its own keyboard and screen-reader
- * behaviour -- a hand-built track would throw both away -- so its track is made
- * invisible and the dots show through from behind.
+ * The track: a rounded bar with a dot at every stop and the part up to the
+ * level filled. The thumb is the liquid slider's blob, drawn above the bar and
+ * below the real input, which lies over all of it, transparent, and takes the
+ * pointer and the keys.
  */
 .lc-effortpanel__scale {
   position: relative;
   display: block;
-  height: 20px;
+  height: 22px;
+}
+
+.lc-effortpanel__track,
+.lc-effortpanel__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 22px;
+  border-radius: 11px;
+  pointer-events: none;
+}
+
+.lc-effortpanel__track {
+  right: 0;
+  background: var(--lc-effort-track);
+}
+
+.lc-effortpanel__fill {
+  background: var(--lc-effort-fill);
+  transition: width 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .lc-effortpanel__notches {
   position: absolute;
-  inset: 0 7px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  inset: 0;
   pointer-events: none;
 }
 
-/* The rail the dots sit on. */
-.lc-effortpanel__notches::before {
-  content: '';
+.lc-effortpanel__notch {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--lc-effort-dot);
+}
+
+.lc-effortpanel__notch.is-passed {
+  background: var(--lc-effort-dot-passed);
+}
+
+/*
+ * SIZED, like the page's `.sl` (240 x 80): the library sets its root
+ * `position: relative; isolation: isolate` inline, which beat an `inset: 0`
+ * here and left it 216 x 0 -- and a root with no height measured every blob
+ * at radius 0, so the thumb was simply not there (drive-effort-slider, first
+ * frames; the probe read `r="0"`). In flow, it is the track's own box; the
+ * isolation it brings keeps its goo, drawn at z-index -1, above the panel.
+ */
+.lc-effortpanel__liquid {
+  display: block;
+  width: 100%;
+  height: 22px;
+  pointer-events: none;
+}
+
+/* The thumb element is unstyled on purpose: its surface and shadow are the
+   liquid's blob (the page's `.sl-thumb`). A white pill, as Claude Code's. */
+.lc-effortpanel__thumb {
   position: absolute;
   left: 0;
-  right: 0;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--lc-border-button);
+  top: 2px;
+  width: 12px;
+  height: 18px;
+  border-radius: 6px;
 }
 
-.lc-effortpanel__notch {
-  position: relative;
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--lc-text-muted);
-}
-
-/* Everything up to and including the current level reads as chosen. */
-.lc-effortpanel__notch.is-passed {
-  background: var(--lc-text-primary);
-}
-
+/* The control itself: the whole track, invisible, above everything drawn. */
 .lc-effortpanel__slider {
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 1;
   width: 100%;
-  height: 20px;
+  height: 22px;
   margin: 0;
-  background: transparent;
+  opacity: 0;
   appearance: none;
   cursor: pointer;
-}
-
-.lc-effortpanel__slider::-webkit-slider-runnable-track {
-  height: 20px;
-  background: transparent;
-}
-
-.lc-effortpanel__slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: 3px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--lc-text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-}
-
-.lc-effortpanel__slider:focus-visible::-webkit-slider-thumb {
-  outline: 2px solid var(--lc-focus-ring);
-  outline-offset: 2px;
 }
 
 .lc-effortpanel__slider:disabled {
-  opacity: 0.45;
   cursor: default;
 }
 
-/* The ends of the scale, so the direction means something without a legend. */
-.lc-effortpanel__ends {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--lc-text-mono-caption);
-  color: var(--lc-text-muted);
-}
-
-.lc-effortpanel__what {
-  margin: 0;
-  font-size: var(--lc-text-description);
-  color: var(--lc-text-muted);
+/* The input is invisible, so its focus is shown on what it moves. */
+.lc-effortpanel__scale:has(.lc-effortpanel__slider:focus-visible) .lc-effortpanel__track {
+  box-shadow: 0 0 0 2px var(--lc-focus-ring);
 }
 
 .lc-effortpanel__fast {
@@ -12925,6 +12957,14 @@ textarea {
 .lc-composer__controls .lc-control--boxed:hover:not(:disabled),
 .lc-composer__controls .lc-control--folder:hover:not(:disabled) {
   background: var(--lc-chip-bg-hover);
+}
+
+/* One face on the row, the chip's own: Colin, 2026-09-23, "Use the same font
+   that edit uses for the other buttons". The model's name and the effort were
+   set in the mono face; here they are the chip's sans, the model still muted
+   beside its runtime. */
+.lc-composer__controls .lc-control__mono {
+  font-family: inherit;
 }
 
 /* A chip with nothing to open carries no chevron, so no chevron's room. */

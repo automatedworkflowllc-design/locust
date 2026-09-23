@@ -49,6 +49,34 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   'xhigh-fast': 'slowest, on the fast variant'
 }
 
+/**
+ * A level's name, in words: "Max", "Extra high", "Medium".
+ *
+ * Claude Code names its level above the slider ("Effort Max"); the runtimes
+ * list lowercase keys (`xhigh`, `max`). Colin, 2026-09-22: "adjusted effort
+ * names for each model variant". A key this file knows gets its word; one it
+ * does not is shown as the runtime wrote it, capitalised, never renamed into
+ * something it might not be. A fast variant is the switch, not the name.
+ */
+const NAMES: Readonly<Record<string, string>> = {
+  none: 'None',
+  minimal: 'Minimal',
+  low: 'Low',
+  medium: 'Medium',
+  balanced: 'Balanced',
+  high: 'High',
+  xhigh: 'Extra high',
+  max: 'Max',
+  ultra: 'Ultra',
+  fast: 'Fast'
+}
+
+export function effortName(level: string): string {
+  const known = NAMES[level.toLowerCase()]
+  if (known !== undefined) return known
+  return level.length === 0 ? level : level.charAt(0).toUpperCase() + level.slice(1)
+}
+
 /** What this level means, or undefined when this build cannot say. */
 export function effortDescription(level: string): string | undefined {
   return DESCRIPTIONS[level.toLowerCase()]

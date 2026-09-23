@@ -35,7 +35,8 @@ import { PlusMenu } from './PlusMenu.js'
 import type { ContextReading } from '../cost.js'
 import { Icon } from './Icon.js'
 import { Beam } from './Beam.js'
-import { effortDescription, effortFooter } from '../effortLevels.js'
+import { effortFooter, effortName } from '../effortLevels.js'
+import { EffortSlider } from './EffortSlider.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
 import { ATTACHMENT_DIR, attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
 import { availableCommands, matchingCommands, slashQuery } from '../slashCommands.js'
@@ -1376,75 +1377,21 @@ export function Composer({
                       * listed, in the order it listed them, so right is more.
                       */
                     <div className="lc-menu lc-menu--right lc-effortpanel" role="group" aria-label="Reasoning effort">
-                      <div className="lc-effortpanel__head">
-                        <span className="lc-fieldlabel lc-mono">Effort</span>
-                        <span className="lc-effortpanel__now lc-control__mono">{effortBase}</span>
-                      </div>
-                      {/*
-                        * The stops are DRAWN, one dot per level, so the scale
-                        * shows how many choices there are and which one this
-                        * is without dragging it (Colin, 2026-09-08: "where you
-                        * can see the notches brother"). The dots sit behind a
-                        * real range input, which keeps the keyboard and screen
-                        * reader behaviour a hand-built track would lose.
-                        */}
-                      <span className="lc-effortpanel__scale">
-                        <span className="lc-effortpanel__notches" aria-hidden="true">
-                          {effortBases.map((base, index) => (
-                            <span
-                              key={base}
-                              className={`lc-effortpanel__notch${index <= effortIndex ? ' is-passed' : ''}`}
-                            />
-                          ))}
-                        </span>
-                      <input
-                        className="lc-effortpanel__slider"
-                        type="range"
-                        min={0}
-                        max={Math.max(0, effortBases.length - 1)}
-                        step={1}
-                        value={effortIndex}
-                        aria-label="Reasoning effort"
-                        aria-valuetext={effortBase}
-                        disabled={effortBases.length < 2}
-                        onChange={(event) => {
-                          const next = effortBases[Number(event.currentTarget.value)]
-                          if (next === undefined) return
-                          const level = joinEffort(next, effortIsFast, supportedEfforts)
+                      <EffortSlider
+                        bases={effortBases}
+                        index={effortIndex}
+                        fast={effortIsFast}
+                        hasFast={effortHasFast}
+                        footer={effortFooter(route.runtime)}
+                        onPick={(base) => {
+                          const level = joinEffort(base, effortIsFast, supportedEfforts)
+                          if (level !== undefined) onEffortChange(level)
+                        }}
+                        onFast={(next) => {
+                          const level = joinEffort(effortBase, next, supportedEfforts)
                           if (level !== undefined) onEffortChange(level)
                         }}
                       />
-                      </span>
-                      <div className="lc-effortpanel__ends lc-mono">
-                        <span>Faster</span>
-                        <span>Smarter</span>
-                      </div>
-                      {effortDescription(effortBase) !== undefined && (
-                        <p className="lc-effortpanel__what">{effortDescription(effortBase)}</p>
-                      )}
-                      {effortHasFast && (
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={effortIsFast}
-                          className={`lc-effortpanel__fast${effortIsFast ? ' is-on' : ''}`}
-                          onClick={() => {
-                            const level = joinEffort(effortBase, !effortIsFast, supportedEfforts)
-                            if (level !== undefined) onEffortChange(level)
-                          }}
-                        >
-                          <span>Fast variant</span>
-                          {/* A switch track, not a filled button: Colin,
-                              2026-09-08, "just make the fast variant a simple
-                              toggle bar, doesnt need to be so big". */}
-                          <span className="lc-switch" aria-hidden="true">
-                            <span className="lc-switch__knob" />
-                          </span>
-                        </button>
-                      )}
-                      {effortFooter(route.runtime) !== undefined && (
-                        <p className="lc-menu__foot">{effortFooter(route.runtime)}</p>
-                      )}
                     </div>
                   )}
                   <button
@@ -1463,7 +1410,11 @@ export function Composer({
                     onClick={() => setEffortOpen(!effortOpen)}
                   >
                     {swarm && <img className="lc-control__swarmmark" src={mark} alt="" aria-hidden="true" />}
-                    <span className="lc-control__mono lc-control__effort">{shownEffort}</span>
+                    {/* The level in words, as the panel says it: "High", "High · Fast". */}
+                    <span className="lc-control__effort">
+                      {effortName(effortBase)}
+                      {effortIsFast ? ' · Fast' : ''}
+                    </span>
                     <ChevronGlyph />
                   </button>
                 </span>
@@ -1485,7 +1436,7 @@ export function Composer({
                   className="lc-control lc-control--boxed is-static"
                   title="This runtime does not let the effort be chosen; it uses its own."
                 >
-                  <span className="lc-control__mono lc-control__effort">effort · fixed</span>
+                  <span className="lc-control__effort">Fixed</span>
                 </span>
               )}
               {running && !canQueue ? (

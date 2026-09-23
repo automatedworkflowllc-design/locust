@@ -609,6 +609,14 @@
      page's "Figma soft" shadow for it, rebuilt by the library on the merged
      silhouette. */
   --lc-plusmenu-fill: #202020;
+  /* The effort control, Claude Code's on the gooey slider: its track, the
+     part up to the level, the stops, and the white pill thumb's liquid. */
+  --lc-effort-track: rgba(255, 255, 255, 0.07);
+  --lc-effort-fill: rgba(255, 255, 255, 0.11);
+  --lc-effort-dot: rgba(255, 255, 255, 0.26);
+  --lc-effort-dot-passed: rgba(255, 255, 255, 0.5);
+  --lc-effort-thumb: #f2f2f2;
+  --lc-effort-thumb-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.45);
   --lc-plusmenu-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 6px 0 rgba(0, 0, 0, 0.05), 0 4px 42px 0 rgba(0, 0, 0, 0.24);
   --lc-hover-surface-strong: rgba(255, 255, 255, 0.07);
   --lc-hover-border: rgba(255, 255, 255, 0.2);

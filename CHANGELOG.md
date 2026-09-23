@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.284.0 - 2026-09-23
+
+### New
+
+- **Effort, the way Claude Code shows it.** The effort control reads "Effort
+  High" with a ? that says what the level costs, runs from Faster to Smarter
+  over a dotted track, and its white thumb pours from one level to the next.
+  Levels read as words: Low, Medium, High, Extra high, Max. A model with fast
+  variants keeps its Fast switch.
+
+### Improved
+
+- **One font in the message box.** The model's name and the effort level are
+  in the same typeface as the rest of the row.
+
+- **"Fixed".** A model that sets its own effort says Fixed, not "effort ·
+  fixed".
+
 ## 0.283.0 - 2026-09-23
 
 ### New
